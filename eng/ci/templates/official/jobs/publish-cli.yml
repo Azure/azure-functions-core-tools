@@ -30,7 +30,8 @@ jobs:
           $isMinified = ''
       }
 
-      dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
+      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
+        -o "$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}" `
         -c Release `
         -f net8.0 `
         -r $runtime `
@@ -38,82 +39,68 @@ jobs:
         --no-restore `
          $isMinified `
          /p:TelemetryInstrumentationKey="$(TELEMETRY_INSTRUMENTATION_KEY)"
-    displayName: 'Build CLI (${{ parameters.runtime }})'
+    displayName: 'Build & publish CLI (${{ parameters.runtime }})'
     env:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts/$runtime'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts/$runtime'
       signPatterns: $(thirdPartyBinariesToSign)
 
+  - task: ArchiveFiles@2
+    displayName: 'Zip CLI (${{ parameters.runtime }})'
+    inputs:
+      rootFolderOrFile: '$(Build.Repository.LocalPath)/artifacts/$runtime'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.${{ parameters.runtime }}.$(Build.BuildNumber).zip'
+
+  - ${{ if contains(parameters.runtime, 'osx') }}:
+    - template: /eng/ci/templates/official/steps/sign-mac.yml@self
+      parameters:
+        folderPath: '$(Build.Repository.LocalPath)/artifacts'
+        signPatterns: '*.osx-*.zip'
+
+  - ${{ if contains(parameters.runtime, 'linux') }}:
+    - template: /eng/ci/templates/official/steps/sign-linux.yml@self
+      parameters:
+        folderPath: '$(Build.Repository.LocalPath)/artifacts'
+        signPatterns: 'func,gozip'
+
+  # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
+  - ${{ if startsWith(parameters.runtime, 'win-x') }}:
+    - pwsh: >
+        ./eng/scripts/generate-msi-files.ps1
+        -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
+        -runtime "${{ parameters.runtime }}"
+      displayName: 'Generate MSI files'
+
+    - template: /eng/ci/templates/official/steps/sign-msi.yml@self
+      parameters:
+        folderPath: '$(Build.Repository.LocalPath)/artifacts'
+
+  - pwsh: ./eng/scripts/generate-sha-files.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
+    displayName: 'Generate .sha files'
+
   - pwsh: |
-      $runtime = "${{ parameters.runtime }}"
-      if ($runtime.StartsWith('min')) {
-          $isMinified = '/p:IsMinified=true'
-          $runtime = $runtime -replace '^min\.?', ''
-      } else {
-          $isMinified = ''
+      $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -ErrorAction SilentlyContinue
+      if ($msiFiles) {
+        Write-Host "Moving MSI files to ArtifactStagingDirectory: $($msiFiles.FullName)"
+        Move-Item -Path $msiFiles.FullName -Destination '$(Build.ArtifactStagingDirectory)'
       }
 
-      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
-        -o "$(Build.Repository.LocalPath)/artifacts/$runtime" `
-        -c Release `
-        -f net8.0 `
-        -r $runtime `
-        --self-contained `
-        --no-build `
-        /p:ZipAfterPublish=true `
-        /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts" `
-        $isMinified `
-        -bl:$(Build.ArtifactStagingDirectory)/clipublish.binlog
-    displayName: 'Publish & Zip CLI'
-
-  # - ${{ if contains(parameters.runtime, 'osx') }}:
-  #   - template: /eng/ci/templates/official/steps/sign-mac.yml@self
-  #     parameters:
-  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
-  #       signPatterns: '*.osx-*.zip'
-
-  # - ${{ if contains(parameters.runtime, 'linux') }}:
-  #   - template: /eng/ci/templates/official/steps/sign-linux.yml@self
-  #     parameters:
-  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
-  #       signPatterns: 'func,gozip'
-
-  # # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
-  # - ${{ if startsWith(parameters.runtime, 'win-x') }}:
-  #   - pwsh: >
-  #       ./eng/scripts/generate-msi-files.ps1
-  #       -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
-  #       -runtime "${{ parameters.runtime }}"
-  #     displayName: 'Generate MSI files'
-
-  #   - template: /eng/ci/templates/official/steps/sign-msi.yml@self
-  #     parameters:
-  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
-
-  # - pwsh: ./eng/scripts/generate-sha-files.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
-  #   displayName: 'Generate .sha files'
-
-  # - pwsh: |
-  #     $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -ErrorAction SilentlyContinue
-  #     if ($msiFiles) {
-  #       Write-Host "Moving MSI files to ArtifactStagingDirectory: $($msiFiles.FullName)"
-  #       Move-Item -Path $msiFiles.FullName -Destination '$(Build.ArtifactStagingDirectory)'
-  #     }
-
-  #     $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -ErrorAction SilentlyContinue
-  #     if ($funcZips) {
-  #       Write-Host "Moving func zips to ArtifactStagingDirectory: $($funcZips.FullName)"
-  #       Move-Item -Path $funcZips.FullName -Destination '$(Build.ArtifactStagingDirectory)'
-  #     }
-  #   displayName: 'Move artifacts to ArtifactStagingDirectory'
+      $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -ErrorAction SilentlyContinue
+      if ($funcZips) {
+        Write-Host "Moving func zips to ArtifactStagingDirectory: $($funcZips.FullName)"
+        Move-Item -Path $funcZips.FullName -Destination '$(Build.ArtifactStagingDirectory)'
+      }
+    displayName: 'Move artifacts to ArtifactStagingDirectory'
 
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeeded()
