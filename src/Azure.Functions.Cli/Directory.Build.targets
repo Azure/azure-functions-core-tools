@@ -1,5 +1,6 @@
 <Project>
 
-  <Import Project="$(MSBuildThisFileDirectory)Workers.Python.Workaround.targets" Condition="'$(RuntimeIdentifier)' == 'win-arm64'" />
+  <Import Project="$(MSBuildThisFileDirectory)../../eng/build/Workers.Python.Workaround.targets" Condition="'$(RuntimeIdentifier)' == 'win-arm64'" />
+  <Import Project="$(MSBuildThisFileDirectory)../../eng/build/Version.targets" />
 
 </Project>

@@ -4,14 +4,6 @@
     <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
-    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
-    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
-    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
-    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
-    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
-    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
-    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
