@@ -12,12 +12,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
 {
     /// <summary>
     /// Fixture for Durable Functions E2E tests.
-    /// Starts Azurite, creates a Durable Functions app.
+    /// Ensures azurite is running and creates a Durable Functions app.
     /// </summary>
     public class DurableFunctionAppFixture : IAsyncLifetime
     {
-        private Process? _azuriteProcess;
-
         public DurableFunctionAppFixture()
         {
             Log = new Mock<ITestOutputHelper>().Object;
