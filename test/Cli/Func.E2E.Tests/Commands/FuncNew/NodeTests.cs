@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
-using Azure.Functions.Cli.TestFramework.Commands;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Xunit;
@@ -15,7 +14,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
     public class NodeTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public async void FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
+        public async Task FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
         {
             var testName = nameof(FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully);
 
@@ -123,7 +122,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        public async void FuncNew_TypeScript_HttpTrigger_CreatesFunctionSuccessfully()
+        public async Task FuncNew_TypeScript_HttpTrigger_CreatesFunctionSuccessfully()
         {
             var testName = nameof(FuncNew_TypeScript_HttpTrigger_CreatesFunctionSuccessfully);
             var workingDir = WorkingDirectory;

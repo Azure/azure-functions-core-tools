@@ -1,10 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Common;
+using System.IO;
 using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
-using Azure.Functions.Cli.TestFramework.Commands;
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
@@ -15,7 +14,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
     {
         [Fact]
         [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Powershell)]
-        public async void FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds()
+        public async Task FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds()
         {
             var testName = nameof(FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds);
             var functionJsonPath = Path.Combine(WorkingDirectory, "MyHttpTriggerFunction", Common.Constants.FunctionJsonFileName);
