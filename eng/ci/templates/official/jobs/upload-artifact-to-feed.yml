@@ -18,7 +18,7 @@ jobs:
   - task: DownloadPipelineArtifact@2
     displayName: Download artifact
     inputs:
-      artifact: '{{ parameters.artifactName }}'
+      artifact: '${{ parameters.artifactName }}'
       path: $(Build.ArtifactStagingDirectory)/drop
 
   - task: UniversalPackages@0
@@ -27,7 +27,7 @@ jobs:
       command: publish
       publishDirectory: '$(Build.ArtifactStagingDirectory)/drop'
       vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: '{{ parameters.packageName }}'
+      vstsFeedPackagePublish: '${{ parameters.packageName }}'
       versionOption: custom
       versionPublish: '$(Build.BuildNumber)'
       packagePublishDescription: 'Core tools default nightly build'
