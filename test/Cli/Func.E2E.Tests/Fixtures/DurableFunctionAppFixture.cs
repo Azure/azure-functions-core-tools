@@ -53,7 +53,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
         {
             try
             {
-                StopAzurite();
                 if (CleanupWorkingDirectory && Directory.Exists(WorkingDirectory))
                 {
                     Directory.Delete(WorkingDirectory, true);
@@ -70,52 +69,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
         public async Task InitializeAsync()
         {
             // Start Azurite if not already running
-            StartAzurite();
+            if (!IsAzuriteRunning())
+            {
+                throw new ApplicationException("Azurite is not running. Please start Azurite before running the tests.");
+            }
 
             // Create a new Durable Functions app
             await CreateDurableFunctionAppAsync();
-        }
-
-        private void StartAzurite()
-        {
-            // Try to start azurite if not already running
-            if (!IsAzuriteRunning())
-            {
-                string azuriteExecutable = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "azurite.cmd" : "azurite";
-                var azuriteLocation = Path.Combine(Path.GetTempPath(), "azurite");
-                Directory.CreateDirectory(azuriteLocation);
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = azuriteExecutable,
-                    Arguments = "--location . --silent",
-                    WorkingDirectory = azuriteLocation,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                try
-                {
-                    _azuriteProcess = Process.Start(psi);
-                    Task.Delay(2000).Wait(); // Wait for Azurite to start
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException("Failed to start Azurite. Ensure it is installed and available in PATH.", ex);
-                }
-            }
-        }
-
-        private void StopAzurite()
-        {
-            if (_azuriteProcess != null && !_azuriteProcess.HasExited)
-            {
-                _azuriteProcess.Kill(entireProcessTree: true);
-                _azuriteProcess.Dispose();
-                _azuriteProcess = null;
-            }
         }
 
         private static bool IsAzuriteRunning()
