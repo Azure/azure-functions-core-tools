@@ -3,7 +3,7 @@
 
 using System.Text.RegularExpressions;
 
-namespace Azure.Functions.Cli.ArtifactAssembler
+namespace ArtifactAssembler
 {
     internal sealed partial class ArtifactAssembler
     {
