@@ -21,11 +21,16 @@ The following artifact folders are expected to be present in the root directory 
 
 Before running the project, ensure the following environment variables are set:
 
+- `OutOfProcArtifactAlias`: Name of the directory which contains the out-of-proc artifact.
+- `OutOfProcArtifactName`: Name of the out-of-proc artifact (this is the main CLI artifact).
+
 - `InProcArtifactAlias`: Name of the directory which contains `in-proc6` and `in-proc8` artifacts.
-- `CoreToolsHostArtifactAlias`: Name of the directory which contains the core tools host artifact.
 - `InProc6ArtifactName`: Name of the in-proc6 artifact. This should match the in-proc6 directory name present in the `InProcArtifactAlias` directory.
 - `InProc8ArtifactName`: Name of the in-proc8 artifact. This should match the in-proc8 directory name present in the `InProcArtifactAlias` directory.
-- `CoreToolsHostArtifactName`: Name of the core tools host artifact.
+
+- `CoreToolsHostArtifactAlias`: Name of the directory which contains the core tools host artifact.
+- `CoreToolsHostWindowsArtifactName`: Name of the core tools host artifact for Windows.
+- `CoreToolsHostLinuxArtifactName`: Name of the core tools host artifact for Linux.
 
 You can set these environment variables in your terminal or through Visual Studio's project settings.
 
@@ -37,11 +42,14 @@ You can set these environment variables in your terminal or through Visual Studi
 
 ```json
 "environmentVariables": {
-    "IN_PROC_ARTIFACT_ALIAS": "core-tools-inproc",
-    "CORETOOLS_HOST_ARTIFACT_ALIAS": "core-tools-host",
-    "IN_PROC6_ARTIFACT_NAME": "drop-net6",
-    "IN_PROC8_ARTIFACT_NAME": "drop-net8",
-    "CORETOOLS_HOST_ARTIFACT_NAME": "drop-coretools-host-windows"
+    "OUT_OF_PROC_ARTIFACT_NAME": "func-cli",
+    "OUT_OF_PROC_ARTIFACT_ALIAS": "func-cli-default",
+    "IN_PROC_ARTIFACT_ALIAS": "func-cli-inproc",
+    "IN_PROC6_ARTIFACT_NAME": "inproc6",
+    "IN_PROC8_ARTIFACT_NAME": "inproc8",
+    "CORETOOLS_HOST_ARTIFACT_ALIAS": "func-cli-host",
+    "CORETOOLS_HOST_WINDOWS_ARTIFACT_NAME": "windows",
+    "CORETOOLS_HOST_LINUX_ARTIFACT_NAME": "linux"
 }
 ```
 
@@ -51,9 +59,9 @@ You can set these environment variables in your terminal or through Visual Studi
 
 2. If you only want to test generating one artifact rid type (ex: win-x64), you may pass in an argument when running the assembler. The argument must be formatted as `Azure.Functions.Cli.[RID]`
 ```
-dotnet run "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj -c release Azure.Functions.Cli.win-x64"
+dotnet run "$(Build.SourcesDirectory)/src/ArtifactAssembler/ArtifactAssembler.csproj -c release Azure.Functions.Cli.win-x64"
 ```
 3. To zip up the artifacts generated that are currently in the staging directory, you may pass in a zip parameter. Ex:
 ```
-dotnet run "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj -c release zip"
+dotnet run "$(Build.SourcesDirectory)/src/ArtifactAssembler/ArtifactAssembler.csproj -c release zip"
 ```
