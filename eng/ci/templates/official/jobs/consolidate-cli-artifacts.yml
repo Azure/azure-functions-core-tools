@@ -76,7 +76,7 @@ jobs:
     displayName: "Run ArtifactAssembler"
     inputs:
       command: run
-      projects: "$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj"
+      projects: "$(Build.SourcesDirectory)/src/ArtifactAssembler/ArtifactAssembler.csproj"
       arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
     env:
@@ -150,7 +150,7 @@ jobs:
     displayName: 'Zip Artifacts'
     inputs:
       command: run
-      projects: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj'
+      projects: '$(Build.SourcesDirectory)/src/ArtifactAssembler/ArtifactAssembler.csproj'
       arguments: '--no-build -c release -- zip'
       workingDirectory: '$(Pipeline.Workspace)'
 
