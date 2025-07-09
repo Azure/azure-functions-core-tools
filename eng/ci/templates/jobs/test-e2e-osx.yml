@@ -1,0 +1,78 @@
+jobs:
+- job: OSX_E2E_Test
+  timeoutInMinutes: '180'
+  displayName: 'E2E Test:'
+
+  pool:
+    name: Azure Pipelines
+    image: macOS-latest
+    os: macOS
+
+  # Need to find an arm64 image/agent for macOS
+  strategy:
+    matrix:
+      dotnet_osx_x64:
+        languageWorker: 'Dotnet'
+        runtime: 'osx-x64'
+      # dotnet_osx_arm64:
+      #   languageWorker: 'Dotnet'
+      #   runtime: 'osx-arm64'
+
+      dotnetIsolated_osx_x64:
+        languageWorker: 'DotnetIsolated'
+        runtime: 'osx-x64'
+      # dotnetIsolated_osx_arm64:
+      #   languageWorker: 'DotnetIsolated'
+      #   runtime: 'osx-arm64'
+
+      node_osx_x64:
+        languageWorker: 'Node'
+        runtime: 'osx-x64'
+      # node_osx_arm64:
+      #   languageWorker: 'Node'
+      #   runtime: 'osx-arm64'
+
+      powershell_osx_x64:
+        languageWorker: 'Powershell'
+        runtime: 'osx-x64'
+      # powershell_osx_arm64:
+      #   languageWorker: 'Powershell'
+      #   runtime: 'osx-arm64'
+
+
+  steps:
+  - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
+    displayName: 'Start emulators (NoWait)'
+
+  - script: |
+      brew install go
+      go version
+    displayName: 'Install Go'
+
+  - script: |
+      sudo chown -R $(id -u):$(id -g) ~/.npm
+      npm install -g @azure/functions
+    displayName: 'Install @azure/functions'
+
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+
+  - pwsh: |
+      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r $(runtime) `
+      --self-contained `
+      -o $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
+    displayName: 'Publish CLI ($(runtime))'
+
+  - bash: |
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
+    displayName: 'Make CLI binaries executable'
+
+  - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
+    parameters:
+      worker: $(languageWorker)
+      runtime: $(runtime)

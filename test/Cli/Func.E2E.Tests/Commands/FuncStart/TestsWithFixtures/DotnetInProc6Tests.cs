@@ -194,7 +194,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             // We are expecting an exit to happen gracefully here;
             // if func start were to succeed, the user would have to manually kill the process and exit with -1
             result.Should().ExitWith(0);
-            result.Should().HaveStdOutContaining("Host.json file in missing");
+            result.Should().HaveStdOutContaining("Host.json file is missing");
 
             // Clean up temporary directory
             Directory.Delete(tempDir, true);

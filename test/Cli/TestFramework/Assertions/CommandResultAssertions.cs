@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Assertions/CommandResultAssertions.cs
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Abstractions;
 using FluentAssertions;
 using FluentAssertions.Execution;
@@ -92,14 +93,14 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
 
         public AndConstraint<CommandResultAssertions> WriteVsCodeExtensionsJsonAndExitWithZero(string workingDirectory)
         {
-            var pattern = $"Writing {workingDirectory}\\.vscode\\extensions.json";
+            var vsCodeExtPattern = @"Writing.*[\\/]\.vscode[\\/]*extensions\.json";
             var gitInitPattern = "Initialized empty Git repository";
 
             Execute.Assertion.ForCondition(_commandResult.ExitCode == 0)
                 .FailWith($"Expected command to exit with 0 but it did not. Error message: {_commandResult.StdErr}");
 
-            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains(pattern))
-                .FailWith($"The command output did not contain expected result: {pattern}{Environment.NewLine}");
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && Regex.IsMatch(_commandResult.StdOut, vsCodeExtPattern))
+                .FailWith($"The command output did not contain expected (using regex pattern): {vsCodeExtPattern}{Environment.NewLine}");
 
             Execute.Assertion.ForCondition(_commandResult.StdOut is not null && !_commandResult.StdOut.Contains(gitInitPattern))
                 .FailWith($"The command output did contain unexpected result: {gitInitPattern}{Environment.NewLine}");
@@ -125,6 +126,31 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
                 }
             }
 
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
+
+        public AndConstraint<CommandResultAssertions> FileDoesNotContain(string filePath, params string[] unexpectedContents)
+        {
+            Execute.Assertion.ForCondition(File.Exists(filePath))
+                .FailWith($"File '{filePath}' does not exist.");
+
+            var actualContent = File.ReadAllText(filePath);
+
+            foreach (var input in unexpectedContents)
+            {
+                Execute.Assertion.ForCondition(!actualContent.Contains(input))
+                    .FailWith($"File '{filePath}' should not contain '{input}', but it does.");
+            }
+
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
+
+        public AndConstraint<CommandResultAssertions> HaveStdOutMatchesRegex(string pattern)
+        {
+            Execute.Assertion.ForCondition(
+                    _commandResult.StdOut is not null &&
+                    System.Text.RegularExpressions.Regex.IsMatch(_commandResult.StdOut, pattern))
+                .FailWith($"The command output did not match the regex pattern: {pattern}{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
     }

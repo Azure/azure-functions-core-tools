@@ -1,0 +1,34 @@
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+  displayName: 'Install Node 18.x'
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.10'
+    addToPath: true
+  displayName: 'Install Python 3.10'
+
+- task: NuGetToolInstaller@1
+  inputs:
+    versionSpec:
+  displayName: 'Install NuGet'
+
+- task: UseDotNet@2
+  displayName: Install .NET 6
+  inputs:
+    packageType: sdk
+    version: 6.x
+
+- task: UseDotNet@2
+  displayName: Install .NET 8
+  inputs:
+    packageType: sdk
+    version: 8.x
+
+- task: UseDotNet@2 # The pinned SDK we use to build
+  displayName: Install .NET SDK from global.json
+  inputs:
+    packageType: sdk
+    useGlobalJson: true

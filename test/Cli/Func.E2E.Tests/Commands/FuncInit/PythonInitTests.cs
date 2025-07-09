@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "python" };
             var requirementsPath = Path.Combine(workingDir, "requirements.txt");
-            var expectedRequirementsContent = new[] { "# Do not include azure-functions-worker", "azure-functions" };
+            var expectedRequirementsContent = new[] { "# azure-monitor-opentelemetry", "azure-functions" };
 
             var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
             {

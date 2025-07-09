@@ -88,6 +88,22 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                 });
         }
 
+        public static async Task FuncSettingsWithRetryAsync(
+            string funcPath,
+            string testName,
+            string workingDirectory,
+            ITestOutputHelper log,
+            IEnumerable<string> args)
+        {
+            await ExecuteCommandWithRetryAsync(
+                funcPath,
+                testName,
+                workingDirectory,
+                log,
+                args,
+                (path, name, logger) => new FuncSettingsCommand(path, name, logger));
+        }
+
         public static async Task<CommandResult> FuncNewWithResultRetryAsync(
             string funcPath,
             string testName,

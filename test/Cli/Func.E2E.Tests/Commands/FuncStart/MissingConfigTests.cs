@@ -14,18 +14,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
     public class MissingConfigTests(ITestOutputHelper log) : BaseMissingConfigTests(log)
     {
-        [Fact(Skip="Test fails and needs to be investiagted on why it does.")]
+        [Fact]
         [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
-        public async Task Start_DotnetIsolated_InvalidHostJson_FailsWithExpectedError()
+        public async Task Start_DotnetIsolated_InvalidHostJson_Succeeds()
         {
-            await RunInvalidHostJsonTest("dotnet-isolated", nameof(Start_DotnetIsolated_InvalidHostJson_FailsWithExpectedError));
+            await RunInvalidHostJsonTest("dotnet-isolated", false, nameof(Start_DotnetIsolated_InvalidHostJson_Succeeds));
         }
 
-        [Fact(Skip = "Test fails and needs to be investiagted on why it does.")]
+        [Fact]
         [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
-        public async Task Start_DotnetIsolated_MissingHostJson_FailsWithExpectedError()
+        public async Task Start_DotnetIsolated_MissingHostJson_Succeeds()
         {
-            await RunMissingHostJsonTest("dotnet-isolated", nameof(Start_DotnetIsolated_MissingHostJson_FailsWithExpectedError));
+            await RunMissingHostJsonTest("dotnet-isolated", false, nameof(Start_DotnetIsolated_MissingHostJson_Succeeds));
         }
 
         [Theory]

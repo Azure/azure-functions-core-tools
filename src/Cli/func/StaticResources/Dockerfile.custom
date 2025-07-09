@@ -1,4 +1,5 @@
-# FROM mcr.microsoft.com/azure-functions/dotnet:4-appservice 
+# DisableDockerDetector "Base docker file that is consumed by the other Dockerfiles in this directory. It is not intended to be used directly."
+# FROM mcr.microsoft.com/azure-functions/dotnet:4-appservice
 FROM mcr.microsoft.com/azure-functions/dotnet:4
 ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
     AzureFunctionsJobHost__Logging__Console__IsEnabled=true

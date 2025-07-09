@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             result.Should().HaveStdOutContaining("Using for user secrets file configuration.");
         }
 
-        public async Task RunMissingStorageConnString_FailsWithExpectedError(string languageWorker, string testName)
+        public async Task RunMissingStorageConnString(string languageWorker, bool shouldFail, string testName)
         {
             var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
@@ -111,17 +111,38 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
             SetupUserSecrets(userSecrets);
 
-            // Call func start for HTTP function only
-            var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["start", "--functions", "http1", "--port", port.ToString()]);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
+            string? capturedContent = null;
 
-            // Validate error message
-            result.Should().HaveStdOutContaining("Missing value for AzureWebJobsStorage in local.settings.json");
-            result.Should().HaveStdOutContaining("A host error has occurred during startup operation");
+            if (!shouldFail)
+            {
+                funcStartCommand.ProcessStartedHandler = async (process) =>
+                {
+                    capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "http1");
+                };
+            }
+
+            // Call func start for HTTP function only
+            var result = funcStartCommand
+            .WithWorkingDirectory(WorkingDirectory)
+            .Execute(["--functions", "http1", "--port", port.ToString()]);
+
+            if (shouldFail)
+            {
+                // Validate error message
+                result.Should().HaveStdOutContaining("Missing value for AzureWebJobsStorage in local.settings.json");
+                result.Should().HaveStdOutContaining("A host error has occurred during startup operation");
+            }
+            else
+            {
+                // Validate successful start
+                capturedContent.Should().Be(
+                    "Welcome to Azure Functions!",
+                    because: "response from default function should be 'Welcome to Azure Functions!'");
+            }
         }
 
-        public async Task RunWithUserSecrets_MissingBindingSetting_FailsWithExpectedError(string languageWorker, string testName)
+        public async Task RunWithUserSecrets_MissingBindingSettings(string languageWorker, string testName)
         {
             var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
@@ -170,11 +191,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--port", port.ToString()]);
+                .Execute(["--port", port.ToString(), "--verbose"]);
 
-            // Validate warning message about missing connection string
-            result.Should().HaveStdOutContaining("Warning: Cannot find value named 'ConnectionStrings:MyQueueConn' in local.settings.json");
-            result.Should().HaveStdOutContaining("You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json.");
+            if (languageWorker == "dotnet")
+            {
+                // Validate warning message about missing connection string
+                result.Should().HaveStdOutContaining("Warning: Cannot find value named 'ConnectionStrings:MyQueueConn' in local.settings.json");
+                result.Should().HaveStdOutContaining("You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json.");
+            }
+            else
+            {
+                result.Should().HaveStdOutContaining("Error indexing method 'Functions.queue1'. Microsoft.Azure.WebJobs.Extensions.Storage.Queues: Storage account connection string 'AzureWebJobsConnectionStrings:MyQueueConn' does not exist. Make sure that it is a defined App Setting.");
+            }
         }
 
         private void SetupUserSecrets(Dictionary<string, string> secrets)
