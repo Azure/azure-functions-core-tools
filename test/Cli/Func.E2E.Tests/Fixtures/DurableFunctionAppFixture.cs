@@ -66,28 +66,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
 
         public async Task InitializeAsync()
         {
-            // Start Azurite if not already running
-            if (!IsAzuriteRunning())
-            {
-                throw new ApplicationException("Azurite is not running. Please start Azurite before running the tests.");
-            }
-
             // Create a new Durable Functions app
             await CreateDurableFunctionAppAsync();
-        }
-
-        private static bool IsAzuriteRunning()
-        {
-            try
-            {
-                using var client = new System.Net.Sockets.TcpClient();
-                client.Connect("127.0.0.1", 10000);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private async Task CreateDurableFunctionAppAsync()
