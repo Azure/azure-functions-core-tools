@@ -1,9 +1,9 @@
-﻿using System;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Extensions;
 using FluentAssertions;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
@@ -11,15 +11,15 @@ using Newtonsoft.Json;
 using SuaveServerWrapper;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.ExtensionsTests
 {
     public class UriExtensionsTests
     {
         [Theory]
         [InlineData("invalid://example.com", false)]
-        public static async Task IsServerRunningNegativeTest(string Url, bool expected)
+        public static async Task IsServerRunningNegativeTest(string url, bool expected)
         {
-            var uri = new Uri(Url);
+            var uri = new Uri(url);
             var result = await uri.IsServerRunningAsync();
             Assert.Equal(expected, result);
         }
@@ -40,7 +40,8 @@ namespace Azure.Functions.Cli.Tests
             var port = GetAvailablePort();
             using (var httpHost = new HttpHost(port))
             {
-                await httpHost.OpenAsync(r => {
+                await httpHost.OpenAsync(r =>
+                {
                     var url = r.RequestUri;
                     HttpResponseMessage response;
 

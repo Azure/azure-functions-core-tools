@@ -1,11 +1,11 @@
-﻿using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Text;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-namespace Azure.Functions.Cli.Tests
+using Microsoft.Extensions.Configuration;
+
+namespace Azure.Functions.Cli.UnitTests
 {
-    public static class TestUtils
+    public static class TestUtilities
     {
         public static IConfigurationRoot CreateSetupWithConfiguration(Dictionary<string, string> settings = null)
         {

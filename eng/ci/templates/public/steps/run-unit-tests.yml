@@ -3,7 +3,7 @@ steps:
   displayName: 'Run unit tests'
   inputs:
     command: 'test'
-    projects: '**/Azure.Functions.Cli.Unit.Tests.csproj'
+    projects: '**/Azure.Functions.Cli.UnitTests.csproj'
     arguments: '--framework net8.0'
 
 - task: PublishTestResults@2

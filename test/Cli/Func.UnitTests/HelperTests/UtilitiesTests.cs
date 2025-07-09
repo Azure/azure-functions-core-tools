@@ -1,11 +1,12 @@
-﻿using Microsoft.Azure.WebJobs.Script.Configuration;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
-using System.IO;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class UtilitiesTests
     {
@@ -17,7 +18,7 @@ namespace Azure.Functions.Cli.Tests
         {
             var settings = new Dictionary<string, string>();
             settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "logging", "loglevel", "default"), expectedLogLevel.ToString());
-            var testConfiguration = TestUtils.CreateSetupWithConfiguration(settings);
+            var testConfiguration = TestUtilities.CreateSetupWithConfiguration(settings);
             LogLevel actualLogLevel;
             bool result = Utilities.LogLevelExists(testConfiguration, Utilities.LogLevelDefaultSection, out actualLogLevel);
             Assert.Equal(actualLogLevel, expectedLogLevel);
@@ -34,8 +35,8 @@ namespace Azure.Functions.Cli.Tests
                 settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "extensionBundle", "id"), "Microsoft.Azure.Functions.ExtensionBundle");
                 settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "extensionBundle", "version"), "[2.*, 3.0.0)");
             }
-            
-            var testConfiguration = TestUtils.CreateSetupWithConfiguration(settings);
+
+            var testConfiguration = TestUtilities.CreateSetupWithConfiguration(settings);
             Assert.Equal(expected, Utilities.JobHostConfigSectionExists(testConfiguration, section));
         }
 

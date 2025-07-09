@@ -1,14 +1,15 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Kubernetes;
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
 using FluentAssertions;
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class KubernetesHelperUnitTests
+    public class KubernetesHelperTests
     {
         [Theory]
         [InlineData("normalname", true)]
@@ -35,14 +36,14 @@ namespace Azure.Functions.Cli.Tests
         [Fact]
         public void ValidateYamlStringQuote()
         {
-            var result = KubernetesHelper.SerializeResources(new []
-            {
+            var result = KubernetesHelper.SerializeResources(
+            [
                 new ScaledObjectKedaV2
                 {
                     Spec = new ScaledObjectSpecV1Alpha1
                     {
-                        Triggers = new []
-                        {
+                        Triggers =
+                        [
                             new ScaledObjectTriggerV1Alpha1
                             {
                                 Metadata = new Dictionary<string, string>
@@ -50,10 +51,11 @@ namespace Azure.Functions.Cli.Tests
                                     ["targetValue"] = "1",
                                 }
                             }
-                        }
+                        ]
                     }
                 }
-            }, Kubernetes.Models.OutputSerializationOptions.Yaml);
+            ],
+            Kubernetes.Models.OutputSerializationOptions.Yaml);
 
             result.Should().Contain("\"1\"");
         }

@@ -184,7 +184,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                 //fileSystem.File.Exists(Arg.Is(Path.Combine(folder, "function.json"))).Returns(true);
 
                 fileSystem.File.Open(Arg.Is(Path.Combine(folder, "function.json")), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                    .Returns(fileContent.ToStream());
+                    .Returns(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(fileContent)));
             }
 
             return fileSystem;

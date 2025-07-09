@@ -1,21 +1,17 @@
-﻿using Azure.Functions.Cli.Diagnostics;
-using Microsoft.Azure.WebJobs.Script.Configuration;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using Xunit;
-using System;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-namespace Azure.Functions.Cli.Tests
+using System.Text;
+using Azure.Functions.Cli.Diagnostics;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Xunit;
+
+namespace Azure.Functions.Cli.UnitTests.ConsoleTests
 {
     public class ColoredConsoleLoggerTests
     {
-        private IConfigurationRoot _testConfiguration;
+        private readonly IConfigurationRoot _testConfiguration;
 
         public ColoredConsoleLoggerTests()
         {

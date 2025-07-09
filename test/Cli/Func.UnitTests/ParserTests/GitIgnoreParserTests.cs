@@ -1,8 +1,11 @@
-﻿using Azure.Functions.Cli.Common;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.ParserTests
 {
     /// <summary>
     /// This is a C# reimplementation of https://github.com/codemix/gitignore-parser
@@ -11,9 +14,9 @@ namespace Azure.Functions.Cli.Tests
     /// Licensed under the Apache License, Version 2.0 (the "License");
     /// you may not use this file except in compliance with the License.
     /// You may obtain a copy of the License at
-    /// 
+    ///
     /// [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
-    /// 
+    ///
     /// Unless required by applicable law or agreed to in writing, software
     /// distributed under the License is distributed on an "AS IS" BASIS,
     /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,12 +25,12 @@ namespace Azure.Functions.Cli.Tests
     /// </summary>
     public class GitIgnoreParserTests
     {
-        const string gitIgnoreFile = @"# This is a comment in a .gitignore file!
-/node_modules
+        private const string GitIgnoreFile = @"# This is a comment in a .gitignore file!
+node_modules
 *.log
 
 # Ignore this nonexistent file
-/nonexistent
+nonexistent
 
 # Do not ignore this file
 !/nonexistent/foo
@@ -36,14 +39,14 @@ namespace Azure.Functions.Cli.Tests
 
 /baz
 
-/foo/*.wat
+foo/*.wat
 
 /test1
 
 test2
 
 # Ignore some deep sub folders
-/othernonexistent/**/what
+othernonexistent/**/what
 
 # Unignore some other sub folders
 !/othernonexistent/**/what/foo
@@ -51,9 +54,10 @@ test2
 
 *.swp
 ";
-        const string gitIgnoreNoNegatives = "node_modules";
-        private GitIgnoreParser _gitignore = new GitIgnoreParser(gitIgnoreFile);
-        private GitIgnoreParser _gitignoreNoNegatives = new GitIgnoreParser(gitIgnoreNoNegatives);
+
+        private const string GitIgnoreNoNegatives = "node_modules";
+        private readonly GitIgnoreParser _gitignore = new GitIgnoreParser(GitIgnoreFile);
+        private readonly GitIgnoreParser _gitignoreNoNegatives = new GitIgnoreParser(GitIgnoreNoNegatives);
 
         [Fact]
         public void AcceptShouldAcceptTheGivenFilenames()
@@ -68,7 +72,7 @@ test2
         [Fact]
         public void AcceptShouldAcceptFileNameThatContainsNameIgnored()
         {
-            _gitignore.Accepts("test1").Should().BeFalse();
+            _gitignore.Accepts("test2").Should().BeFalse();
             _gitignore.Accepts("test1File.wat").Should().BeTrue();
         }
 
@@ -76,7 +80,7 @@ test2
         public void AcceptShouldNotAcceptTheGivenFilenames()
         {
             _gitignore.Accepts("test.swp").Should().BeFalse();
-            _gitignore.Accepts("node_modules/wat.js").Should().BeFalse();
+            _gitignore.Accepts("node_modules/what.js").Should().BeFalse();
             _gitignore.Accepts("foo/bar.wat").Should().BeFalse();
             _gitignore.Accepts("othernonexistent/blah/what").Should().BeFalse();
             _gitignoreNoNegatives.Accepts("node_modules/wat.js").Should().BeFalse();

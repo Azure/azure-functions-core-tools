@@ -1,11 +1,12 @@
-﻿using Microsoft.Azure.WebJobs.Script.Configuration;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class LoggingFilterHelperTests
     {
@@ -16,19 +17,20 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("Host.Startup", true, LogLevel.Information)]
         public void LoggingFilterHelper_Tests(string categoryKey, bool? verboseLogging, LogLevel expectedDefaultLogLevel)
         {
-
             var settings = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(categoryKey))
             {
                 settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "logging", "loglevel", categoryKey), expectedDefaultLogLevel.ToString());
             }
-            var testConfiguration = TestUtils.CreateSetupWithConfiguration(settings);
+
+            var testConfiguration = TestUtilities.CreateSetupWithConfiguration(settings);
             LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(testConfiguration, verboseLogging);
             if (verboseLogging == null)
             {
                 Assert.False(loggingFilterHelper.VerboseLogging);
             }
-            if ( !string.IsNullOrEmpty(categoryKey) && categoryKey.Equals("Default", StringComparison.OrdinalIgnoreCase))
+
+            if (!string.IsNullOrEmpty(categoryKey) && categoryKey.Equals("Default", StringComparison.OrdinalIgnoreCase))
             {
                 Assert.Equal(expectedDefaultLogLevel, loggingFilterHelper.UserLogDefaultLogLevel);
                 Assert.Equal(expectedDefaultLogLevel, loggingFilterHelper.SystemLogDefaultLogLevel);
@@ -59,14 +61,14 @@ namespace Azure.Functions.Cli.Tests
                 {
                     Environment.SetEnvironmentVariable(LoggingFilterHelper.CiBuildNumber, "90l99");
                 }
-                var testConfiguration = TestUtils.CreateSetupWithConfiguration(null);
+
+                var testConfiguration = TestUtilities.CreateSetupWithConfiguration(null);
                 LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(testConfiguration, verboseLogging);
                 Assert.Equal(expected, loggingFilterHelper.IsCiEnvironment(verboseLogging.HasValue));
-
             }
             finally
             {
-                Environment.SetEnvironmentVariable(LoggingFilterHelper.CiBuildNumber, "");
+                Environment.SetEnvironmentVariable(LoggingFilterHelper.CiBuildNumber, string.Empty);
             }
         }
     }

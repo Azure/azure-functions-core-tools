@@ -1,11 +1,14 @@
-﻿using System.Runtime.InteropServices;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests
 {
-    public class CommandCheckerFacts
+    public class CommandCheckerTests
     {
         [Fact]
         public void CommandCheckerShouldWork()

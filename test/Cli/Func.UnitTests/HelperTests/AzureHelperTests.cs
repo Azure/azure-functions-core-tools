@@ -1,17 +1,19 @@
-using System.Net.Http;
-using System.Threading.Tasks;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Helpers;
 using FluentAssertions;
 using RichardSzalay.MockHttp;
 using Xunit;
 
-namespace Azure.Functions.Cli.Helpers.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class AzureHelperTests
     {
-        const string managementUrl = "https://example.com";
-        const string appId = "subscriptions/000/resourceGroups/000/Microsoft.Web/sites/000";
-        const string accessToken = "accessToken";
+        private const string ManagementUrl = "https://example.com";
+        private const string AppId = "subscriptions/000/resourceGroups/000/Microsoft.Web/sites/000";
+        private const string AccessToken = "AccessToken";
 
         [Theory]
         [InlineData("default", "default-value")]
@@ -21,7 +23,7 @@ namespace Azure.Functions.Cli.Helpers.Tests
             try
             {
                 const string functionName = "function1";
-                var mockUrl = $"{managementUrl}{appId}/functions/{functionName}/listKeys?api-version={ArmUriTemplates.WebsitesApiVersion}";
+                var mockUrl = $"{ManagementUrl}{AppId}/functions/{functionName}/listKeys?api-version={ArmUriTemplates.WebsitesApiVersion}";
 
                 var mockHttp = new MockHttpMessageHandler();
                 mockHttp.When(HttpMethod.Post, mockUrl)
@@ -29,7 +31,7 @@ namespace Azure.Functions.Cli.Helpers.Tests
 
                 ArmClient.SetTestHandler(mockHttp);
 
-                var result = await AzureHelper.GetFunctionKey(functionName, appId, accessToken, managementUrl);
+                var result = await AzureHelper.GetFunctionKey(functionName, AppId, AccessToken, ManagementUrl);
                 result.Should().Be(value);
             }
             finally
