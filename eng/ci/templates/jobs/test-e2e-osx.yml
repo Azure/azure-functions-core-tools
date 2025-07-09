@@ -41,7 +41,7 @@ jobs:
 
 
   steps:
-  - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
+  - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
 
   - script: |

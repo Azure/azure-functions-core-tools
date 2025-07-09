@@ -24,7 +24,7 @@ jobs:
         runtime: 'linux-x64'
 
   steps:
-  - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
+  - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
