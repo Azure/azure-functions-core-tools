@@ -7,16 +7,13 @@ namespace Azure.Functions.Cli.Abstractions
     // Simple console manager
     public class Reporter : IReporter
     {
-        // cannot use auto properties, as those are static
-#pragma warning disable IDE0032 // Use auto property
-        private static readonly Reporter _consoleOutReporter = new(AnsiConsole.GetOutput());
-        private static readonly Reporter _consoleErrReporter = new(AnsiConsole.GetError());
-#pragma warning restore IDE0032 // Use auto property
+        private static readonly Reporter s_consoleOutReporter = new(AnsiConsole.GetOutput());
+        private static readonly Reporter s_consoleErrReporter = new(AnsiConsole.GetError());
 
-        private static SpinLock _spinlock = default(SpinLock);
-        private static IReporter _errorReporter = _consoleErrReporter;
-        private static IReporter _outputReporter = _consoleOutReporter;
-        private static IReporter _verboseReporter = _consoleOutReporter;
+        private static readonly SpinLock s_spinlock = default;
+        private static IReporter s_errorReporter = s_consoleErrReporter;
+        private static IReporter s_outputReporter = s_consoleOutReporter;
+        private static IReporter s_verboseReporter = s_consoleOutReporter;
 
         private readonly AnsiConsole? _console;
 
@@ -32,9 +29,9 @@ namespace Azure.Functions.Cli.Abstractions
 
         public static Reporter NullReporter { get; } = new(console: null);
 
-        public static Reporter ConsoleOutReporter => _consoleOutReporter;
+        public static Reporter ConsoleOutReporter => s_consoleOutReporter;
 
-        public static Reporter ConsoleErrReporter => _consoleErrReporter;
+        public static Reporter ConsoleErrReporter => s_consoleErrReporter;
 
         public static IReporter Output { get; private set; } = NullReporter;
 
@@ -64,7 +61,7 @@ namespace Azure.Functions.Cli.Abstractions
         {
             UseSpinLock(() =>
             {
-                _outputReporter = reporter;
+                s_outputReporter = reporter;
                 ResetOutput();
             });
         }
@@ -77,7 +74,7 @@ namespace Azure.Functions.Cli.Abstractions
         {
             UseSpinLock(() =>
             {
-                _errorReporter = reporter;
+                s_errorReporter = reporter;
                 ResetError();
             });
         }
@@ -90,24 +87,24 @@ namespace Azure.Functions.Cli.Abstractions
         {
             UseSpinLock(() =>
             {
-                _verboseReporter = reporter;
+                s_verboseReporter = reporter;
                 ResetVerbose();
             });
         }
 
         private static void ResetOutput()
         {
-            Output = CommandLoggingContext.OutputEnabled ? _outputReporter : NullReporter;
+            Output = CommandLoggingContext.OutputEnabled ? s_outputReporter : NullReporter;
         }
 
         private static void ResetError()
         {
-            Error = CommandLoggingContext.ErrorEnabled ? _errorReporter : NullReporter;
+            Error = CommandLoggingContext.ErrorEnabled ? s_errorReporter : NullReporter;
         }
 
         private static void ResetVerbose()
         {
-            Verbose = CommandLoggingContext.IsVerbose ? _verboseReporter : NullReporter;
+            Verbose = CommandLoggingContext.IsVerbose ? s_verboseReporter : NullReporter;
         }
 
         public void WriteLine(string message)
@@ -152,14 +149,14 @@ namespace Azure.Functions.Cli.Abstractions
             bool lockTaken = false;
             try
             {
-                _spinlock.Enter(ref lockTaken);
+                s_spinlock.Enter(ref lockTaken);
                 action();
             }
             finally
             {
                 if (lockTaken)
                 {
-                    _spinlock.Exit(false);
+                    s_spinlock.Exit(false);
                 }
             }
         }

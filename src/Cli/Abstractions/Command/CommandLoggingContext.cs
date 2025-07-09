@@ -9,27 +9,27 @@ namespace Azure.Functions.Cli.Abstractions
     /// </summary>
     public static class CommandLoggingContext
     {
-        private static readonly Lazy<bool> _ansiPassThru = new(() => Env.GetEnvironmentVariableAsBool(Variables.AnsiPassThru));
-        private static Lazy<bool> _verbose = new(() => Env.GetEnvironmentVariableAsBool(Variables.Verbose));
-        private static Lazy<bool> _output = new(() => Env.GetEnvironmentVariableAsBool(Variables.Output, true));
-        private static Lazy<bool> _error = new(() => Env.GetEnvironmentVariableAsBool(Variables.Error, true));
+        private static readonly Lazy<bool> s_ansiPassThru = new(() => Env.GetEnvironmentVariableAsBool(Variables.AnsiPassThru));
+        private static Lazy<bool> s_verbose = new(() => Env.GetEnvironmentVariableAsBool(Variables.Verbose));
+        private static Lazy<bool> s_output = new(() => Env.GetEnvironmentVariableAsBool(Variables.Output, true));
+        private static Lazy<bool> s_error = new(() => Env.GetEnvironmentVariableAsBool(Variables.Error, true));
 
         /// <summary>
         /// Gets a value indicating whether true if the verbose output is enabled.
         /// </summary>
-        public static bool IsVerbose => _verbose.Value;
+        public static bool IsVerbose => s_verbose.Value;
 
-        public static bool ShouldPassAnsiCodesThrough => _ansiPassThru.Value;
+        public static bool ShouldPassAnsiCodesThrough => s_ansiPassThru.Value;
 
         /// <summary>
         /// Gets a value indicating whether true if normal output is enabled.
         /// </summary>
-        internal static bool OutputEnabled => _output.Value;
+        internal static bool OutputEnabled => s_output.Value;
 
         /// <summary>
         /// Gets a value indicating whether true if error output is enabled.
         /// </summary>
-        internal static bool ErrorEnabled => _error.Value;
+        internal static bool ErrorEnabled => s_error.Value;
 
         /// <summary>
         /// Sets or resets the verbose output.
@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Abstractions
         /// </remarks>
         public static void SetVerbose(bool value)
         {
-            _verbose = new Lazy<bool>(() => value);
+            s_verbose = new Lazy<bool>(() => value);
         }
 
         /// <summary>
@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Abstractions
         /// </remarks>
         public static void SetOutput(bool value)
         {
-            _output = new Lazy<bool>(() => value);
+            s_output = new Lazy<bool>(() => value);
         }
 
         /// <summary>
@@ -61,7 +61,7 @@ namespace Azure.Functions.Cli.Abstractions
         /// </remarks>
         public static void SetError(bool value)
         {
-            _error = new Lazy<bool>(() => value);
+            s_error = new Lazy<bool>(() => value);
         }
 
         public static class Variables

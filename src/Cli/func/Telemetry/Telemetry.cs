@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Telemetry
     // Most of the Telemetry implementation is inspired / acquired from https://github.com/dotnet/cli/tree/master/src/dotnet/Telemetry
     public class Telemetry : ITelemetry
     {
-        private static string _currentSessionId = null;
+        private static string s_currentSessionId = null;
         private readonly int _senderCount;
         private TelemetryClient _client = null;
         private Dictionary<string, string> _commonProperties = null;
@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Telemetry
             Enabled = true;
 
             // Store the session ID in a static field so that it can be reused
-            _currentSessionId = sessionId ?? Guid.NewGuid().ToString();
+            s_currentSessionId = sessionId ?? Guid.NewGuid().ToString();
             _senderCount = senderCount;
             if (blockThreadInitialization)
             {
@@ -92,12 +92,12 @@ namespace Azure.Functions.Cli.Telemetry
                     ConnectionString = $"InstrumentationKey={Constants.TelemetryInstrumentationKey}"
                 };
                 _client = new TelemetryClient(telemetryConfiguration);
-                _client.Context.Session.Id = _currentSessionId;
+                _client.Context.Session.Id = s_currentSessionId;
                 _client.Context.Device.OperatingSystem = RuntimeEnvironment.OperatingSystem;
 
                 // We don't want to log this.
                 // Setting it to null doesn't work. So might as well log the session id.
-                _client.Context.Cloud.RoleInstance = $"private-{_currentSessionId}";
+                _client.Context.Cloud.RoleInstance = $"private-{s_currentSessionId}";
 
                 _commonProperties = new TelemetryCommonProperties().GetTelemetryCommonProperties();
                 _commonMeasurements = new Dictionary<string, double>();
@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Telemetry
             {
                 _client = null;
 
-                // we dont want to fail the tool if telemetry fails.
+                // we don't want to fail the tool if telemetry fails.
                 if (StaticSettings.IsDebug)
                 {
                     ColoredConsole.Error.WriteLine(e.ToString());

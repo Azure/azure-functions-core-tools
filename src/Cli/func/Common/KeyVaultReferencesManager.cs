@@ -14,8 +14,8 @@ namespace Azure.Functions.Cli.Common
     internal class KeyVaultReferencesManager
     {
         private const string VaultUriSuffix = "vault.azure.net";
-        private static readonly Regex _basicKeyVaultReferenceRegex = new Regex(@"^@Microsoft\.KeyVault\((?<ReferenceString>.*)\)$", RegexOptions.Compiled);
-        private readonly ConcurrentDictionary<string, SecretClient> _clients = new ConcurrentDictionary<string, SecretClient>();
+        private static readonly Regex s_basicKeyVaultReferenceRegex = new(@"^@Microsoft\.KeyVault\((?<ReferenceString>.*)\)$", RegexOptions.Compiled);
+        private readonly ConcurrentDictionary<string, SecretClient> _clients = new();
         private readonly TokenCredential _credential = new DefaultAzureCredential();
 
         public void ResolveKeyVaultReferences(IDictionary<string, string> settings)
@@ -65,7 +65,7 @@ namespace Azure.Functions.Cli.Common
             }
 
             // Determine if the secret value is attempting to use a key vault reference
-            var keyVaultReferenceMatch = _basicKeyVaultReferenceRegex.Match(value);
+            var keyVaultReferenceMatch = s_basicKeyVaultReferenceRegex.Match(value);
             if (keyVaultReferenceMatch.Success)
             {
                 var referenceString = keyVaultReferenceMatch.Groups["ReferenceString"].Value;

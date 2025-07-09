@@ -9,8 +9,8 @@ namespace Azure.Functions.Cli.Abstractions
     public class EnvironmentProvider : IEnvironmentProvider
     {
         private readonly Lazy<string> _userHomeDirectory = new(static () => Environment.GetEnvironmentVariable("HOME") ?? string.Empty);
-        private static readonly char[] _pathSeparator = [Path.PathSeparator];
-        private static readonly char[] _quote = ['"'];
+        private static readonly char[] s_pathSeparator = [Path.PathSeparator];
+        private static readonly char[] s_quote = ['"'];
         private IEnumerable<string>? _searchPaths;
         private IEnumerable<string>? _executableExtensions;
 
@@ -49,8 +49,8 @@ namespace Azure.Functions.Cli.Abstractions
 
                     searchPaths.AddRange(Env
                         .GetEnvironmentVariable("PATH")?
-                        .Split(_pathSeparator)
-                        .Select(p => p.Trim(_quote))
+                        .Split(s_pathSeparator)
+                        .Select(p => p.Trim(s_quote))
                         .Where(p => !string.IsNullOrWhiteSpace(p))
                         .Select(p => ExpandTildeSlash(p)) ?? []);
 

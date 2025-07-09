@@ -8,13 +8,13 @@ namespace Azure.Functions.Cli.Common
 {
     internal static class FileSystemHelpers
     {
-        private static readonly IFileSystem _default = new FileSystem();
-        private static IFileSystem _instance;
+        private static readonly IFileSystem s_default = new FileSystem();
+        private static IFileSystem s_instance;
 
         public static IFileSystem Instance
         {
-            get { return _instance ?? _default; }
-            set { _instance = value; }
+            get { return s_instance ?? s_default; }
+            set { s_instance = value; }
         }
 
         public static Stream OpenFile(string path, FileMode mode, FileAccess access = FileAccess.ReadWrite, FileShare share = FileShare.None)

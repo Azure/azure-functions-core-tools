@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Helpers
 
     public static class WorkerRuntimeLanguageHelper
     {
-        private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> _availableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
+        private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> s_availableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
             { WorkerRuntime.DotnetIsolated, new[] { "dotnet-isolated", "c#-isolated", "csharp-isolated", "f#-isolated", "fsharp-isolated" } },
             { WorkerRuntime.Dotnet, new[] { "c#", "csharp", "f#", "fsharp" } },
@@ -41,11 +41,11 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Custom, new string[] { } }
         };
 
-        private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
+        private static readonly IDictionary<string, WorkerRuntime> s_normalizeMap = s_availableWorkersRuntime
             .SelectMany(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = p.Key.ToString(), value = p.Key }))
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
 
-        private static readonly IDictionary<WorkerRuntime, string> _workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
+        private static readonly IDictionary<WorkerRuntime, string> s_workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
         {
             { WorkerRuntime.Dotnet, Constants.Languages.CSharp },
             { WorkerRuntime.DotnetIsolated, Constants.Languages.CSharpIsolated },
@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Custom, Constants.Languages.Custom },
         };
 
-        private static readonly IDictionary<string, IEnumerable<string>> _languageToAlias = new Dictionary<string, IEnumerable<string>>
+        private static readonly IDictionary<string, IEnumerable<string>> s_languageToAlias = new Dictionary<string, IEnumerable<string>>
         {
             // By default node should map to javascript
             { Constants.Languages.JavaScript, new[] { "js", "node" } },
@@ -68,7 +68,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.Custom, new string[] { } }
         };
 
-        public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = _languageToAlias
+        public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = s_languageToAlias
             .Select(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = p.Key.ToString(), value = p.Key }))
             .SelectMany(i => i)
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
@@ -80,11 +80,11 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharpIsolated, Constants.Languages.FSharpIsolated } }
         };
 
-        public static IEnumerable<WorkerRuntime> AvailableWorkersList => _availableWorkersRuntime.Keys
+        public static IEnumerable<WorkerRuntime> AvailableWorkersList => s_availableWorkersRuntime.Keys
             .Where(k => k != WorkerRuntime.Java);
 
         public static string AvailableWorkersRuntimeString =>
-            string.Join(", ", _availableWorkersRuntime.Keys
+            string.Join(", ", s_availableWorkersRuntime.Keys
                 .Where(k => (k != WorkerRuntime.Java))
                 .Select(s => s.ToString()))
             .Replace(WorkerRuntime.DotnetIsolated.ToString(), "dotnet-isolated");
@@ -142,9 +142,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentNullException(nameof(workerRuntime), "Worker runtime cannot be null or empty.");
             }
-            else if (_normalizeMap.ContainsKey(workerRuntime))
+            else if (s_normalizeMap.ContainsKey(workerRuntime))
             {
-                return _normalizeMap[workerRuntime];
+                return s_normalizeMap[workerRuntime];
             }
             else
             {
@@ -158,7 +158,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentNullException(nameof(languageString), "language can't be empty");
             }
-            else if (_normalizeMap.ContainsKey(languageString))
+            else if (s_normalizeMap.ContainsKey(languageString))
             {
                 return WorkerRuntimeStringToLanguage[languageString];
             }
@@ -170,7 +170,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static IEnumerable<string> LanguagesForWorker(WorkerRuntime worker)
         {
-            return _normalizeMap.Where(p => p.Value == worker).Select(p => p.Key);
+            return s_normalizeMap.Where(p => p.Value == worker).Select(p => p.Key);
         }
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager)
@@ -204,12 +204,12 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
         {
-            if (_workerToDefaultLanguageMap.ContainsKey(worker))
+            if (s_workerToDefaultLanguageMap.ContainsKey(worker))
             {
                 throw new ArgumentException($"Worker runtime '{worker}' is not a valid worker for a template.");
             }
 
-            return _workerToDefaultLanguageMap[worker];
+            return s_workerToDefaultLanguageMap[worker];
         }
 
         public static bool IsDotnet(WorkerRuntime worker)

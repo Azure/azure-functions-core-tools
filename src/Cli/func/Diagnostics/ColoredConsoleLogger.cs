@@ -16,6 +16,9 @@ namespace Azure.Functions.Cli.Diagnostics
     public class ColoredConsoleLogger : ILogger, IDisposable
     {
         private const string JsonLogPrefix = "azfuncjsonlog:";
+        private static readonly LoggerRuleSelector s_ruleSelector = new();
+        private static readonly Type s_providerType = typeof(ColoredConsoleLoggerProvider);
+        private static readonly ConcurrentDictionary<string, object> s_fileAccessLocks = new();
         private readonly bool _verboseErrors;
         private readonly Action<string> _logJsonOutput;
         private readonly object _fileAccessLock;
@@ -23,10 +26,7 @@ namespace Azure.Functions.Cli.Diagnostics
         private readonly LoggingFilterHelper _loggingFilterHelper;
         private readonly LoggerFilterOptions _loggerFilterOptions;
         private readonly string[] _allowedLogsPrefixes = ["Worker process started and initialized.", "Host lock lease acquired by instance ID"];
-        private static readonly LoggerRuleSelector _ruleSelector = new LoggerRuleSelector();
-        private static readonly Type _providerType = typeof(ColoredConsoleLoggerProvider);
         private readonly FileStream _jsonOutputFileStream;
-        private static readonly ConcurrentDictionary<string, object> _fileAccessLocks = new ConcurrentDictionary<string, object>();
         private bool _disposed;
 
         public ColoredConsoleLogger(string category, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions, string jsonOutputFilePath = null)
@@ -50,15 +50,15 @@ namespace Azure.Functions.Cli.Diagnostics
 
                 _logJsonOutput = LogJsonToFile;
 
-                _fileAccessLock = _fileAccessLocks.GetOrAdd(jsonOutputFilePath, s => new object());
+                _fileAccessLock = s_fileAccessLocks.GetOrAdd(jsonOutputFilePath, s => new object());
             }
         }
 
         internal LoggerFilterRule SelectRule(string categoryName, LoggerFilterOptions loggerFilterOptions)
         {
-            _ruleSelector.Select(loggerFilterOptions, _providerType, categoryName, out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter);
+            s_ruleSelector.Select(loggerFilterOptions, s_providerType, categoryName, out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter);
 
-            return new LoggerFilterRule(_providerType.FullName, categoryName, minLevel, filter);
+            return new LoggerFilterRule(s_providerType.FullName, categoryName, minLevel, filter);
         }
 
         internal bool IsEnabled(string category, LogLevel logLevel)
@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Diagnostics
 
             if (filterRule.Filter != null)
             {
-                bool enabled = filterRule.Filter(_providerType.FullName, category, logLevel);
+                bool enabled = filterRule.Filter(s_providerType.FullName, category, logLevel);
                 if (!enabled)
                 {
                     return false;

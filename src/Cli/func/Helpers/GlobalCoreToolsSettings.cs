@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class GlobalCoreToolsSettings
     {
-        private static WorkerRuntime _currentWorkerRuntime;
+        private static WorkerRuntime s_currentWorkerRuntime;
 
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
@@ -18,18 +18,18 @@ namespace Azure.Functions.Cli.Helpers
         {
             get
             {
-                if (_currentWorkerRuntime == WorkerRuntime.None)
+                if (s_currentWorkerRuntime == WorkerRuntime.None)
                 {
                     ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--dotnet-isolated, --dotnet, --javascript, --typescript, --java, --python, --powershell, --custom]"));
                     throw new CliException($"Worker runtime cannot be '{WorkerRuntime.None}'. Please set a valid runtime.");
                 }
 
-                return _currentWorkerRuntime;
+                return s_currentWorkerRuntime;
             }
 
             set
             {
-                _currentWorkerRuntime = value;
+                s_currentWorkerRuntime = value;
             }
         }
 
@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             get
             {
-                return _currentWorkerRuntime;
+                return s_currentWorkerRuntime;
             }
         }
 
@@ -49,62 +49,62 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (args.Contains("--csharp"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Dotnet;
+                    s_currentWorkerRuntime = WorkerRuntime.Dotnet;
                     CurrentLanguageOrNull = "csharp";
                 }
                 else if (args.Contains("--dotnet"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Dotnet;
+                    s_currentWorkerRuntime = WorkerRuntime.Dotnet;
                 }
                 else if (args.Contains("--dotnet-isolated"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.DotnetIsolated;
+                    s_currentWorkerRuntime = WorkerRuntime.DotnetIsolated;
                 }
                 else if (args.Contains("--javascript"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Node;
+                    s_currentWorkerRuntime = WorkerRuntime.Node;
                     CurrentLanguageOrNull = "javascript";
                 }
                 else if (args.Contains("--typescript"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Node;
+                    s_currentWorkerRuntime = WorkerRuntime.Node;
                     CurrentLanguageOrNull = "typescript";
                 }
                 else if (args.Contains("--node"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Node;
+                    s_currentWorkerRuntime = WorkerRuntime.Node;
                 }
                 else if (args.Contains("--java"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Java;
+                    s_currentWorkerRuntime = WorkerRuntime.Java;
                 }
                 else if (args.Contains("--python"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Python;
+                    s_currentWorkerRuntime = WorkerRuntime.Python;
                 }
                 else if (args.Contains("--powershell"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Powershell;
+                    s_currentWorkerRuntime = WorkerRuntime.Powershell;
                 }
                 else if (args.Contains("--custom"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.Custom;
+                    s_currentWorkerRuntime = WorkerRuntime.Custom;
                 }
                 else
                 {
-                    _currentWorkerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
+                    s_currentWorkerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
                 }
             }
             catch
             {
-                _currentWorkerRuntime = WorkerRuntime.None;
+                s_currentWorkerRuntime = WorkerRuntime.None;
             }
         }
 
         // Test helper method to set _currentWorkerRuntime for testing purpose
         internal static void SetWorkerRuntime(WorkerRuntime workerRuntime)
         {
-            _currentWorkerRuntime = workerRuntime;
+            s_currentWorkerRuntime = workerRuntime;
         }
     }
 }

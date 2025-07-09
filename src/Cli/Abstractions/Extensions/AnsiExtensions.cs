@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Abstractions
 {
     public static class AnsiExtensions
     {
-        private static readonly Lazy<bool> _xtermEnabled = new(
+        private static readonly Lazy<bool> s_xtermEnabled = new(
             () =>
             {
                 var environment = Environment.GetEnvironmentVariable("TERM");
@@ -71,7 +71,7 @@ namespace Azure.Functions.Cli.Abstractions
         /// <returns>A string containing the URL wrapped with ANSI escape codes.</returns>
         public static string Url(this string url, string displayText)
         {
-            return _xtermEnabled.Value
+            return s_xtermEnabled.Value
                 ? "\x1B]8;;" + url + "\x1b\\" + displayText + "\x1b]8;;\x1b\\"
                 : url;
         }

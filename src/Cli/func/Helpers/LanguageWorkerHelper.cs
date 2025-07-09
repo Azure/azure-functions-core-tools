@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class LanguageWorkerHelper
     {
-        private static readonly Dictionary<WorkerRuntime, string> _map = new Dictionary<WorkerRuntime, string>
+        private static readonly Dictionary<WorkerRuntime, string> s_map = new Dictionary<WorkerRuntime, string>
         {
             { WorkerRuntime.Node, "languageWorkers:node:arguments" },
             { WorkerRuntime.Python, "languageWorkers:python:arguments" },
@@ -24,11 +24,11 @@ namespace Azure.Functions.Cli.Helpers
 
         public static IReadOnlyDictionary<string, string> GetWorkerConfiguration(string value)
         {
-            if (_map.ContainsKey(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !string.IsNullOrWhiteSpace(value))
+            if (s_map.ContainsKey(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !string.IsNullOrWhiteSpace(value))
             {
                 return new Dictionary<string, string>
                 {
-                    { _map[GlobalCoreToolsSettings.CurrentWorkerRuntime], value }
+                    { s_map[GlobalCoreToolsSettings.CurrentWorkerRuntime], value }
                 };
             }
             else

@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class AzureHelper
     {
-        private static readonly string _storageApiVersion = "2018-02-01";
+        private static readonly string s_storageApiVersion = "2018-02-01";
 
         internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null, Func<Site, string, string, Task<Site>> loadFunction = null)
         {
@@ -312,7 +312,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             try
             {
-                var url = new Uri($"{managementURL}{armWrapper.Id}/listKeys?api-version={_storageApiVersion}");
+                var url = new Uri($"{managementURL}{armWrapper.Id}/listKeys?api-version={s_storageApiVersion}");
                 var keys = await ArmHttpAsync<ArmStorageKeysArray>(HttpMethod.Post, url, accessToken);
                 return new StorageAccount
                 {

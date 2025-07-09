@@ -109,6 +109,10 @@ dotnet_naming_rule.private_instance_fields_must_be_camel_cased_and_prefixed_with
 dotnet_naming_rule.private_instance_fields_must_be_camel_cased_and_prefixed_with_underscore.style     = camel_case_and_prefix_with_underscore_style
 dotnet_naming_rule.private_instance_fields_must_be_camel_cased_and_prefixed_with_underscore.severity  = error
 
+dotnet_naming_rule.private_instance_fields_must_be_camel_cased_and_prefixed_with_underscore.symbols   = private_static_field_symbols
+dotnet_naming_rule.private_instance_fields_must_be_camel_cased_and_prefixed_with_underscore.style     = camel_case_and_prefix_with_s_underscore_style
+dotnet_naming_rule.private_instance_fields_must_be_camel_cased_and_prefixed_with_underscore.severity  = error
+
 # Symbols
 dotnet_naming_symbols.externally_visible_symbols.applicable_kinds                                     = class,struct,interface,enum,property,method,field,event,delegate
 dotnet_naming_symbols.externally_visible_symbols.applicable_accessibilities                           = public,internal,friend,protected,protected_internal,protected_friend,private_protected
@@ -240,7 +244,9 @@ csharp_prefer_braces = false:none
 dotnet_diagnostic.SA1101.severity = none # Prefix local calls with this
 dotnet_diagnostic.SA1127.severity = none # Generic type constraints should be on their own line
 dotnet_diagnostic.SA1204.severity = none # Static elements should appear before instance elements
+dotnet_diagnostic.SA1308.severity = none # Variable names should not be prefixed
 dotnet_diagnostic.SA1309.severity = none # Field names should not begin with underscore
+dotnet_diagnostic.SA1311.severity = none # Static readonly fields should begin with upper-case letter
 dotnet_diagnostic.SA1413.severity = none # Use trailing comma in multi-line initializers
 dotnet_diagnostic.SA1405.severity = none # Debug.Assert should provide message text
 dotnet_diagnostic.SA1600.severity = none # Elements should be documented

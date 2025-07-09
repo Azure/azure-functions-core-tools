@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 {
     internal static class PersistenceChannelDebugLog
     {
-        private static readonly bool _isEnabled = IsEnabledByEnvironment();
+        private static readonly bool s_isEnabled = IsEnabledByEnvironment();
 
         private static bool IsEnabledByEnvironment()
         {
@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 
         public static void WriteLine(string message)
         {
-            if (_isEnabled)
+            if (s_isEnabled)
             {
                 ColoredConsole.WriteLine(Cyan(message));
             }

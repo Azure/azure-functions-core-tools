@@ -7,17 +7,17 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class TargetFrameworkHelper
     {
-        private static readonly IEnumerable<string> _supportedTargetFrameworks = [TargetFramework.Net9, TargetFramework.Net8, TargetFramework.Net7, TargetFramework.Net6, TargetFramework.Net48];
-        private static readonly IEnumerable<string> _supportedInProcTargetFrameworks = [TargetFramework.Net8, TargetFramework.Net6];
+        private static readonly IEnumerable<string> s_supportedTargetFrameworks = [TargetFramework.Net9, TargetFramework.Net8, TargetFramework.Net7, TargetFramework.Net6, TargetFramework.Net48];
+        private static readonly IEnumerable<string> s_supportedInProcTargetFrameworks = [TargetFramework.Net8, TargetFramework.Net6];
 
         public static IEnumerable<string> GetSupportedTargetFrameworks()
         {
-            return _supportedTargetFrameworks;
+            return s_supportedTargetFrameworks;
         }
 
         public static IEnumerable<string> GetSupportedInProcTargetFrameworks()
         {
-            return _supportedInProcTargetFrameworks;
+            return s_supportedInProcTargetFrameworks;
         }
     }
 }

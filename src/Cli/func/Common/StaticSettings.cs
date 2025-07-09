@@ -7,16 +7,10 @@ namespace Azure.Functions.Cli.Common
 {
     public static class StaticSettings
     {
-        private static readonly Lazy<bool> _isTelemetryEnabledCache = new Lazy<bool>(() => TelemetryHelpers.CheckIfTelemetryEnabled());
+        private static readonly Lazy<bool> s_isTelemetryEnabledCache = new(TelemetryHelpers.CheckIfTelemetryEnabled);
 
         public static bool IsDebug => Environment.GetEnvironmentVariable(Constants.CliDebug) == "1";
 
-        public static bool IsTelemetryEnabled
-        {
-            get
-            {
-                return _isTelemetryEnabledCache.Value;
-            }
-        }
+        public static bool IsTelemetryEnabled => s_isTelemetryEnabledCache.Value;
     }
 }

@@ -12,8 +12,8 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class PythonHelpers
     {
-        private static readonly string _pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
-        private static WorkerLanguageVersionInfo _pythonVersionCache = null;
+        private static readonly string s_pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
+        private static WorkerLanguageVersionInfo s_pythonVersionCache = null;
 
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
 
@@ -212,14 +212,14 @@ namespace Azure.Functions.Cli.Helpers
         {
             // By circuiting here, we avoid computing the Python version multiple times
             // in the scope of one command run
-            if (_pythonVersionCache != null)
+            if (s_pythonVersionCache != null)
             {
-                return _pythonVersionCache;
+                return s_pythonVersionCache;
             }
 
             // If users are overriding this value, we will use the path it's pointing to.
             // This also allows for an escape path for complicated envrionments.
-            string pythonDefaultExecutablePath = Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar);
+            string pythonDefaultExecutablePath = Environment.GetEnvironmentVariable(s_pythonDefaultExecutableVar);
             if (!string.IsNullOrEmpty(pythonDefaultExecutablePath))
             {
                 return await GetVersion(pythonDefaultExecutablePath);
@@ -259,35 +259,35 @@ namespace Azure.Functions.Cli.Helpers
             WorkerLanguageVersionInfo recommendedPythonWorker = versions.FirstOrDefault(w => IsVersionSupported(w));
             if (recommendedPythonWorker != null)
             {
-                _pythonVersionCache = recommendedPythonWorker;
-                return _pythonVersionCache;
+                s_pythonVersionCache = recommendedPythonWorker;
+                return s_pythonVersionCache;
             }
 
             // If any of the possible python executables are 3.x, we will take that.
             WorkerLanguageVersionInfo python3worker = versions.FirstOrDefault(w => w?.Major == 3);
             if (python3worker != null)
             {
-                _pythonVersionCache = python3worker;
-                return _pythonVersionCache;
+                s_pythonVersionCache = python3worker;
+                return s_pythonVersionCache;
             }
 
             // Least preferred -- If we found any python versions at all we return that
             WorkerLanguageVersionInfo anyPythonWorker = versions.FirstOrDefault(w => !string.IsNullOrEmpty(w?.Version));
-            _pythonVersionCache = anyPythonWorker ?? new WorkerLanguageVersionInfo(WorkerRuntime.Python, null, null);
+            s_pythonVersionCache = anyPythonWorker ?? new WorkerLanguageVersionInfo(WorkerRuntime.Python, null, null);
 
-            return _pythonVersionCache;
+            return s_pythonVersionCache;
         }
 
         public static void SetWorkerPath(string pyExe, bool overwrite = false)
         {
-            if (overwrite || string.IsNullOrEmpty(Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar)))
+            if (overwrite || string.IsNullOrEmpty(Environment.GetEnvironmentVariable(s_pythonDefaultExecutableVar)))
             {
-                Environment.SetEnvironmentVariable(_pythonDefaultExecutableVar, pyExe, EnvironmentVariableTarget.Process);
+                Environment.SetEnvironmentVariable(s_pythonDefaultExecutableVar, pyExe, EnvironmentVariableTarget.Process);
             }
 
             if (StaticSettings.IsDebug)
             {
-                ColoredConsole.WriteLine(VerboseColor($"{_pythonDefaultExecutableVar} is set to {Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar)}"));
+                ColoredConsole.WriteLine(VerboseColor($"{s_pythonDefaultExecutableVar} is set to {Environment.GetEnvironmentVariable(s_pythonDefaultExecutableVar)}"));
             }
         }
 

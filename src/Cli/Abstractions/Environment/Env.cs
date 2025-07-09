@@ -6,26 +6,26 @@ namespace Azure.Functions.Cli.Abstractions
 {
     public static class Env
     {
-        private static readonly IEnvironmentProvider _environment = new EnvironmentProvider();
+        private static readonly IEnvironmentProvider s_environment = new EnvironmentProvider();
 
-        public static IEnumerable<string> ExecutableExtensions => _environment.ExecutableExtensions;
+        public static IEnumerable<string> ExecutableExtensions => s_environment.ExecutableExtensions;
 
         public static string? GetCommandPath(string commandName, params string[] extensions) =>
-            _environment.GetCommandPath(commandName, extensions);
+            s_environment.GetCommandPath(commandName, extensions);
 
         public static string? GetCommandPathFromRootPath(string rootPath, string commandName, params string[] extensions) =>
-            _environment.GetCommandPathFromRootPath(rootPath, commandName, extensions);
+            s_environment.GetCommandPathFromRootPath(rootPath, commandName, extensions);
 
         public static string? GetCommandPathFromRootPath(string rootPath, string commandName, IEnumerable<string> extensions) =>
-            _environment.GetCommandPathFromRootPath(rootPath, commandName, extensions);
+            s_environment.GetCommandPathFromRootPath(rootPath, commandName, extensions);
 
         public static bool GetEnvironmentVariableAsBool(string name, bool defaultValue = false) =>
-            _environment.GetEnvironmentVariableAsBool(name, defaultValue);
+            s_environment.GetEnvironmentVariableAsBool(name, defaultValue);
 
         public static int? GetEnvironmentVariableAsNullableInt(string name) =>
-            _environment.GetEnvironmentVariableAsNullableInt(name);
+            s_environment.GetEnvironmentVariableAsNullableInt(name);
 
         public static string? GetEnvironmentVariable(string name) =>
-            _environment.GetEnvironmentVariable(name);
+            s_environment.GetEnvironmentVariable(name);
     }
 }

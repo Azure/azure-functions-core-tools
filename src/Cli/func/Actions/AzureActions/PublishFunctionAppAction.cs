@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private const string HostVersion = "4";
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
-        private static string _requiredNetFrameworkVersion = "8.0";
+        private static string s_requiredNetFrameworkVersion = "8.0";
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -192,17 +192,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false) &&
                             (runtimeSettings.IsDeprecatedForRuntime == null || runtimeSettings.IsDeprecatedForRuntime == false))
                         {
-                            _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
+                            s_requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
                         }
                     }
                     else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        _requiredNetFrameworkVersion = "8.0";
+                        s_requiredNetFrameworkVersion = "8.0";
                     }
                     else
                     {
                         ColoredConsole.WriteLine(WarningColor(
-                            $"Can not interpret target framework '{targetFramework}', assuming framework '{_requiredNetFrameworkVersion}'"));
+                            $"Can not interpret target framework '{targetFramework}', assuming framework '{s_requiredNetFrameworkVersion}'"));
                     }
                 }
 
@@ -804,10 +804,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 var flexSkus = await GetFlexSkus(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), new AzureHelperService(AccessToken, ManagementURL));
-                if (!flexSkus.Any(s => s.FunctionAppConfigProperties.Runtime.Version == _requiredNetFrameworkVersion))
+                if (!flexSkus.Any(s => s.FunctionAppConfigProperties.Runtime.Version == s_requiredNetFrameworkVersion))
                 {
                     var versions = string.Join(", ", flexSkus.Select(s => s.FunctionAppConfigProperties.Runtime.Version));
-                    throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton supports .NET {versions}. Please upgrade your app to an appropriate .NET version and try the deployment again.");
+                    throw new CliException($"You are deploying .NET Isolated {s_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton supports .NET {versions}. Please upgrade your app to an appropriate .NET version and try the deployment again.");
                 }
             }
 
@@ -1420,7 +1420,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (version == null)
             {
-                parsedVersion = new Version(_requiredNetFrameworkVersion);
+                parsedVersion = new Version(s_requiredNetFrameworkVersion);
             }
             else if (!Version.TryParse(version, out parsedVersion))
             {

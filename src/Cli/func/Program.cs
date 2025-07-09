@@ -11,14 +11,14 @@ namespace Azure.Functions.Cli
 {
     internal class Program
     {
-        private static readonly string[] _versionArgs = ["version", "v"];
-        private static IContainer _container;
+        private static readonly string[] s_versionArgs = ["version", "v"];
+        private static IContainer s_container;
 
         internal static void Main(string[] args)
         {
             // Check for version arg up front and prioritize speed over all else
             // Tools like VS Code may call this often and we want their UI to be responsive
-            if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", string.Empty).Equals(va, StringComparison.OrdinalIgnoreCase)))
+            if (args.Length == 1 && s_versionArgs.Any(va => args[0].Replace("-", string.Empty).Equals(va, StringComparison.OrdinalIgnoreCase)))
             {
                 ColoredConsole.WriteLine($"{Constants.CliVersion}");
                 Environment.Exit(ExitCodes.Success);
@@ -28,20 +28,20 @@ namespace Azure.Functions.Cli
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
-            _container = InitializeAutofacContainer();
+            s_container = InitializeAutofacContainer();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
 
             Console.CancelKeyPress += (s, e) =>
             {
-                _container.Resolve<IProcessManager>()?.KillChildProcesses();
+                s_container.Resolve<IProcessManager>()?.KillChildProcesses();
             };
 
-            ConsoleApp.Run<Program>(args, _container);
+            ConsoleApp.Run<Program>(args, s_container);
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
         {
-            var processManager = _container.Resolve<IProcessManager>();
+            var processManager = s_container.Resolve<IProcessManager>();
             processManager?.KillChildProcesses();
         }
 

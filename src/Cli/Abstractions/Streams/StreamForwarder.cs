@@ -8,8 +8,8 @@ namespace Azure.Functions.Cli.Abstractions
 {
     public sealed class StreamForwarder
     {
-        private static readonly char[] _ignoreCharacters = ['\r'];
-        private static readonly char _flushBuilderCharacter = '\n';
+        private static readonly char[] s_ignoreCharacters = ['\r'];
+        private static readonly char s_flushBuilderCharacter = '\n';
 
         private StringBuilder? _builder;
         private StringWriter? _capture;
@@ -72,11 +72,11 @@ namespace Azure.Functions.Cli.Abstractions
             {
                 currentCharacter = buffer[0];
 
-                if (currentCharacter == _flushBuilderCharacter)
+                if (currentCharacter == s_flushBuilderCharacter)
                 {
                     WriteBuilder();
                 }
-                else if (!_ignoreCharacters.Contains(currentCharacter))
+                else if (!s_ignoreCharacters.Contains(currentCharacter))
                 {
                     _builder.Append(currentCharacter);
                 }
