@@ -13,8 +13,8 @@ namespace Azure.Functions.Cli
         static IContainer _container;
         internal static void Main(string[] args)
         {
-            // Set console encoding to UTF-8 to properly display international characters
-            SetConsoleEncoding();
+            // Configure console encoding
+            ConsoleHelper.ConfigureConsoleOutputEncoding();
 
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
@@ -99,20 +99,6 @@ namespace Azure.Functions.Cli
                 .As<IContextHelpManager>();
 
             return builder.Build();
-        }
-
-        private static void SetConsoleEncoding()
-        {
-            // Set console encoding to UTF-8 to properly display international characters
-            try
-            {
-                Console.OutputEncoding = Encoding.UTF8;
-            }
-            catch
-            {
-                // Silently fall back to default encoding if UTF-8 isn't supported
-                // International characters may not display correctly but CLI will still function
-            }
         }
     }
 }
