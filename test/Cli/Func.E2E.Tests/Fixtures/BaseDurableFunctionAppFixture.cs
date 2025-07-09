@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
@@ -135,7 +135,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
         private async Task CreateDurableFunctionAppAsync()
         {
             // Scaffold a new function app with Durable Functions
-            var workerRuntime = "dotnet";
+            var workerRuntime = "dotnet-isolated";
             var initArgs = new[] { ".", "--worker-runtime", workerRuntime };
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, "DurableApp", WorkingDirectory, Log, initArgs);
 
