@@ -1,8 +1,8 @@
 {
   "name": "azure-functions-core-tools",
-  "version": "3.0.2106",
+  "version": "4.0.7512",
   "description": "Azure Functions Core Tools",
-  "consolidatedBuildId": "123",
+  "consolidatedBuildId": "226050",
   "scripts": {
     "postinstall": "node lib/install.js",
     "prepublishOnly": "node lib/copy-metadata.js"
