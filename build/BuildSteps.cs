@@ -109,12 +109,15 @@ namespace Build
                 ExecuteDotnetPublish(outputPath, rid, _targetFramework);
             }
 
-            // in-proc version does not need language workers.
-            foreach (var runtime in Settings.TargetRuntimes)
+            // in-proc version does not need language workers for net6.0
+            if (_targetFramework == Net6TargetFramework)
             {
-                var outputPath = Path.Combine(Settings.OutputDir, runtime);
-                RemoveLanguageWorkers(outputPath);
-            };
+                foreach (var runtime in Settings.TargetRuntimes)
+                {
+                    var outputPath = Path.Combine(Settings.OutputDir, runtime);
+                    RemoveLanguageWorkers(outputPath);
+                }
+            }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
