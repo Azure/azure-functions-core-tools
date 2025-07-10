@@ -21,6 +21,20 @@ jobs:
       artifact: '${{ parameters.artifactName }}'
       path: $(Build.ArtifactStagingDirectory)/drop
 
+  - task: PowerShell@2
+    displayName: 'Extract version number'
+    inputs:
+      targetType: 'inline'
+      script: |
+        # For in-proc, we need to remove the 'inproc_' prefix from the build number
+        $buildNumberVersion = "$(Build.BuildNumber)"
+        $version = $buildNumberVersion -replace '^[^_]*_',''
+        Write-Host "Stripped version: $version"
+        Write-Host "##vso[task.setvariable variable=FuncVersionNumber]$version"
+
+  - bash: echo $(FuncVersionNumber)
+    displayName: 'Print version number'
+
   - task: UniversalPackages@0
     displayName: Publish to feed
     inputs:
@@ -29,5 +43,5 @@ jobs:
       vstsFeedPublish: 'internal/core-tools-nightly-build'
       vstsFeedPackagePublish: '${{ parameters.packageName }}'
       versionOption: custom
-      versionPublish: '$(Build.BuildNumber)'
+      versionPublish: '$(FuncVersionNumber)'
       packagePublishDescription: 'Core tools default nightly build'
