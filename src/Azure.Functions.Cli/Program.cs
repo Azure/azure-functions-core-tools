@@ -15,6 +15,9 @@ namespace Azure.Functions.Cli
 
         internal static void Main(string[] args)
         {
+            // Configure console encoding
+            ConsoleHelper.ConfigureConsoleOutputEncoding();
+
             // Check for version arg up front and prioritize speed over all else
             // Tools like VS Code may call this often and we want their UI to be responsive
             if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
