@@ -126,7 +126,7 @@ namespace Build
         {
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber={Settings.BuildNumber} " +
-                                $"/p:NoWorkers=\"true\" " +
+                                (targetFramework == "net6.0" ? $"/p:NoWorkers=\"true\" " : string.Empty) +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release -f {targetFramework} --no-restore --self-contained" +
