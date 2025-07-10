@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
+using Azure.Functions.Cli.TestFramework.Commands;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Xunit;
@@ -10,20 +11,23 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 {
-    [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
     public class NodeTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public async Task FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
+        public void FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
         {
             var testName = nameof(FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully);
 
             // Initialize function app with Node.js runtime and model version v3
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
+            new FuncInitCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--worker-runtime", "node", "-m", "v3"]);
 
-            // Run func new
-            var args = new[] { ".", "--template", "HttpTrigger", "--name", "testfunc", "--authlevel", "function" };
-            var result = await FuncNewWithResultRetryAsync(testName, args, "node");
+            // Create a new HTTP Trigger function with authlevel = function
+            var result = new FuncNewCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute([".", "--template", "HttpTrigger", "--name", "testfunc", "--authlevel", "function"]);
 
             // Validate expected output
             result.Should().ExitWith(0);
@@ -31,18 +35,20 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task FuncNew_UsingLanguageJS_CreatesFunctionSuccessfully()
         {
             var testName = nameof(FuncNew_UsingLanguageJS_CreatesFunctionSuccessfully);
             var workingDir = WorkingDirectory;
 
-            // Initialize the function app with node worker and model v3
+            // Step 1: Initialize the function app with node worker and model v3
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
 
-            // Run func new
-            var args = new[] { ".", "--language", "js", "--template", "HttpTrigger", "--name", "JSTestFunc" };
-            var result = await FuncNewWithResultRetryAsync(testName, args, "node");
+            // Step 2: Run func new using alias for language and template
+            var funcNewCommand = new FuncNewCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
+            var result = funcNewCommand
+                .WithWorkingDirectory(workingDir)
+                .Execute([".", "--language", "js", "--template", "HttpTrigger", "--name", "JSTestFunc"]);
 
             // Step 3: Validate output
             result.Should().ExitWith(0);
@@ -52,14 +58,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         [Fact]
         public async Task FuncNew_HttpTrigger_WithNoSpaceV3TemplateName_CreatesFunctionSuccessfully()
         {
-            var testName = nameof(FuncNew_HttpTrigger_WithNoSpaceV3TemplateName_CreatesFunctionSuccessfully);
+            var methodName = nameof(FuncNew_HttpTrigger_WithNoSpaceV3TemplateName_CreatesFunctionSuccessfully);
+            var uniqueTestName = methodName;
 
             // Initialize function app with Node.js runtime and model version v3
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
+            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
 
-            // Run func new
-            var args = new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" };
-            var result = await FuncNewWithResultRetryAsync(testName, args, "node");
+            // Create a new HTTP Trigger function
+            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
+            var result = funcNewCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
             result.Should().ExitWith(0);
@@ -69,14 +78,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         [Fact]
         public async Task FuncNew_HttpTrigger_WithoutV3TemplateName_CreatesFunctionSuccessfully()
         {
-            var testName = nameof(FuncNew_HttpTrigger_WithoutV3TemplateName_CreatesFunctionSuccessfully);
+            var methodName = nameof(FuncNew_HttpTrigger_WithoutV3TemplateName_CreatesFunctionSuccessfully);
+            var uniqueTestName = methodName;
 
             // Initialize function app with Node.js runtime and model version v3
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node" });
+            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "node" });
 
-            // Run func new
-            var args = new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" };
-            var result = await FuncNewWithResultRetryAsync(testName, args, "node");
+            // Create a new HTTP Trigger function
+            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
+            var result = funcNewCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
@@ -85,14 +97,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         [Fact(Skip = "Flaky in model v4: validate again in stable templates")]
         public async Task FuncNew_HttpTrigger_NodeV4Model_CreatesFunctionSuccessfully()
         {
-            var testName = nameof(FuncNew_HttpTrigger_NodeV4Model_CreatesFunctionSuccessfully);
+            var methodName = nameof(FuncNew_HttpTrigger_NodeV4Model_CreatesFunctionSuccessfully);
+            var uniqueTestName = methodName;
 
             // Initialize function app with Node.js runtime and model version v4
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
-            // Run func new
-            var args = new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" };
-            var result = await FuncNewWithResultRetryAsync(testName, args, "node");
+            // Create a new HTTP Trigger function
+            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
+            var result = funcNewCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
@@ -101,40 +116,46 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         [Fact]
         public async Task FuncNew_TypeScript_HttpTrigger_CreatesFunctionWithExpectedMetadata()
         {
-            var testName = nameof(FuncNew_TypeScript_HttpTrigger_CreatesFunctionWithExpectedMetadata);
-            var functionJsonPath = Path.Combine(WorkingDirectory, "testfunc", "function.json");
-            var expectedcontent = new[] { "../dist/testfunc/index.js", "authLevel", "methods", "httpTrigger" };
-            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
-            {
-                (functionJsonPath, expectedcontent)
-            };
+            var uniqueTestName = nameof(FuncNew_TypeScript_HttpTrigger_CreatesFunctionWithExpectedMetadata);
 
             // Initialize the project with TypeScript and model v3
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "--language", "typescript", "-m", "v3" });
+            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "node", "--language", "typescript", "-m", "v3" });
 
-            // Run func new
-            var args = new[] { ".", "--template", "httptrigger", "--name", "testfunc" };
-            var result = await FuncNewWithResultRetryAsync(testName, args, "node");
+            // Create new Http Trigger function
+            var newCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
+            var result = newCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
-            result.Should().FilesExistsWithExpectContent(filesToValidate);
+
+            var functionJsonPath = Path.Combine(WorkingDirectory, "testfunc", "function.json");
+            var content = await File.ReadAllTextAsync(functionJsonPath);
+            content.Should().Contain("../dist/testfunc/index.js");
+            content.Should().Contain("authLevel");
+            content.Should().Contain("methods");
+            content.Should().Contain("httpTrigger");
         }
 
         [Fact]
-        public async Task FuncNew_TypeScript_HttpTrigger_CreatesFunctionSuccessfully()
+        public void FuncNew_TypeScript_HttpTrigger_CreatesFunctionSuccessfully()
         {
             var testName = nameof(FuncNew_TypeScript_HttpTrigger_CreatesFunctionSuccessfully);
             var workingDir = WorkingDirectory;
 
-            // func init
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "--language", "typescript" });
+            // Step 1: func init
+            var initCommand = new FuncInitCommand(FuncPath, testName, Log);
+            initCommand.WithWorkingDirectory(workingDir)
+                .Execute([".", "--worker-runtime", "node", "--language", "typescript"]);
 
-            // Run func new
-            var args = new[] { ".", "--template", "httptrigger", "--name", "testfunc" };
-            var result = await FuncNewWithResultRetryAsync(testName, args, "node");
+            // Step 2: func new
+            var newCommand = new FuncNewCommand(FuncPath, testName, Log);
+            var result = newCommand
+                .WithWorkingDirectory(workingDir)
+                .Execute([".", "--template", "httptrigger", "--name", "testfunc"]);
 
-            // Validate expected output
+            // Step 3: Assertions
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
         }
     }
