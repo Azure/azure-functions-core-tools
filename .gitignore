@@ -27,6 +27,7 @@ artifacts/
 /src/Azure.Functions.Cli/Properties/launchSettings.json
 launchSettings.json
 publish-env
+_*
 
 # MacOS related
 .DS_Store
