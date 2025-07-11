@@ -109,15 +109,19 @@ namespace Build
                 ExecuteDotnetPublish(outputPath, rid, _targetFramework);
             }
 
-            // in-proc version does not need language workers for net6.0
-            if (_targetFramework == Net6TargetFramework)
+            foreach (var runtime in Settings.TargetRuntimes)
             {
-                foreach (var runtime in Settings.TargetRuntimes)
+                // In-proc version does not need language workers for net6.0 or if it's the minified runtime.
+                // We need the inproc8 build for logic apps so we are including it for that scenario.
+                if (_targetFramework != Net6TargetFramework && !runtime.StartsWith(Settings.MinifiedVersionPrefix))
                 {
-                    var outputPath = Path.Combine(Settings.OutputDir, runtime);
-                    RemoveLanguageWorkers(outputPath);
+                    continue;
                 }
+
+                var outputPath = Path.Combine(Settings.OutputDir, runtime);
+                RemoveLanguageWorkers(outputPath);
             }
+            
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
