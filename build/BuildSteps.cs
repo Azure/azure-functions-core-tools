@@ -112,8 +112,8 @@ namespace Build
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 // In-proc version does not need language workers for net6.0 or if it's the minified runtime.
-                // We need the inproc8 build for logic apps so we are including it for that scenario.
-                if (_targetFramework != Net6TargetFramework && !runtime.StartsWith(Settings.MinifiedVersionPrefix))
+                // We need workers for the inproc8 build for logic apps.
+                if (_targetFramework == DefaultTargetFramework && !runtime.StartsWith(Settings.MinifiedVersionPrefix))
                 {
                     continue;
                 }
@@ -133,7 +133,7 @@ namespace Build
         {
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber={Settings.BuildNumber} " +
-                                (targetFramework == "net6.0" ? $"/p:NoWorkers=\"true\" " : string.Empty) +
+                                (targetFramework == Net6TargetFramework ? $"/p:NoWorkers=\"true\" " : string.Empty) +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release -f {targetFramework} --no-restore --self-contained" +
