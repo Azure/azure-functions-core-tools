@@ -51,6 +51,9 @@ variables:
   value: true
 - name: supportedRuntimes
   value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+  # Skipping arm64 builds for testing as we do not have an agent pool that supports it.
+- name: supportedRuntimesForTesting
+  value: 'linux-x64,osx-x64,win-x64,win-x86,min.win-x64,min.win-x86'
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -71,6 +74,7 @@ extends:
     stages:
     - stage: ConsolidateArticacts
       displayName: "Consolidate CLI Artifacts"
+
       jobs:
       - template: /eng/ci/templates/official/jobs/download-cli-nuget-package.yml@self
         parameters:
@@ -82,3 +86,14 @@ extends:
             arch: ${{ runtime }}
             displayName: ${{ replace(replace(runtime, '-', ''), '.', '') }}
             isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
+
+    - stage: TestArtifacts
+      dependsOn: 'ConsolidateArticacts'
+      displayName: "Test CLI Artifacts"
+
+      jobs:
+      - ${{ each runtime in split(variables.supportedRuntimesForTesting,',') }}:
+        - template: /eng/ci/templates/official/jobs/test-consolidated-cli-artifacts.yml@self
+          parameters:
+            arch: ${{ runtime }}
+            displayName: ${{ replace(replace(runtime, '-', ''), '.', '') }}
