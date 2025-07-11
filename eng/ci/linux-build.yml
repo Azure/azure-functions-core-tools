@@ -20,6 +20,8 @@ resources:
 
 variables:
   - template: /ci/variables/cfs.yml@eng
+  - name: DisableKubernetesDeploymentDetector
+    value: true
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -28,7 +30,7 @@ extends:
       name: 1es-pool-azfunc
       image: 1es-windows-2022
       os: windows
-    stages:     
+    stages:
       - stage: BuildAndTest
         jobs:
         - template: /eng/ci/templates/official/jobs/linux-package.yml@self

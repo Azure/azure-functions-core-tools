@@ -18,6 +18,8 @@ resources:
 
 variables:
   - template: ci/variables/cfs.yml@eng
+  - name: DisableKubernetesDeploymentDetector
+    value: true
 
 extends:
   template: ci/code-mirror.yml@eng
