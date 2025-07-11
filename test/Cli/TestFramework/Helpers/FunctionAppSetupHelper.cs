@@ -9,6 +9,8 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
 {
     public static class FunctionAppSetupHelper
     {
+        public const int RetryTimeoutMilliseconds = 300 * 10000; // Retry timeout set to 50 minutes
+
         public static async Task ExecuteCommandWithRetryAsync(
             string funcPath,
             string testName,
@@ -45,7 +47,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                         return Task.FromResult(false);
                     }
                 },
-                timeout: 300 * 10000);
+                timeout: RetryTimeoutMilliseconds);
         }
 
         public static async Task FuncInitWithRetryAsync(

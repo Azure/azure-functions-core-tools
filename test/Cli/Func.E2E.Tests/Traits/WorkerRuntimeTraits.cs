@@ -44,5 +44,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Traits
         /// Indicates tests that target the Java runtime.
         /// </summary>
         public const string Java = "Java";
+
+        /// <summary>
+        /// Indicates tests that target the Custom runtime.
+        /// </summary>
+        public const string Custom = "Custom";
     }
 }
