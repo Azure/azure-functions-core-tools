@@ -15,8 +15,9 @@ jobs:
     inputs:
     - input: pipelineArtifact
       pipeline: core-tools-consolidated-artifacts
-      artifactName: drop-metadata-json
-      targetPath: $(Pipeline.Workspace)/core-tools-consolidated-artifacts/drop-metadata-json
+      artifactName: func-cli-metadata-json
+      targetPath: $(Pipeline.Workspace)/release-metadata
+
     outputParentDirectory: $(drop_path)
     outputs:
     - output: pipelineArtifact
@@ -30,7 +31,7 @@ jobs:
     inputs:
       targetType: 'inline'
       script: |
-        $metadataPath = "$(Pipeline.Workspace)/core-tools-consolidated-artifacts/drop-metadata-json/metadata.json"
+        $metadataPath = "$(Pipeline.Workspace)/release-metadata/metadata.json"
         Write-Host "Reading metadata from $metadataPath"
         $metadata = Get-Content -Path $metadataPath | ConvertFrom-Json
         Write-Host "Consolidated Build ID: $($metadata.consolidatedBuildId)"
@@ -39,6 +40,9 @@ jobs:
         # Set as pipeline variables for later steps
         Write-Host "##vso[task.setvariable variable=ConsolidatedBuildId]$($metadata.consolidatedBuildId)"
         Write-Host "##vso[task.setvariable variable=DefaultArtifactVersion]$($metadata.defaultArtifactVersion)"
+
+        # Set version as the build number
+        Write-Host "##vso[build.updatebuildnumber]$($metadata.defaultArtifactVersion)"
 
   - task: Bash@3
     displayName: 'Build DEB package'

@@ -7,16 +7,15 @@ jobs:
     os: windows
 
   steps:
-  - task: UseDotNet@2
-    inputs:
-      version: 9.x
-      includePreviewVersions: true
-    displayName: Install .NET 9
+  - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - task: UseDotNet@2
+  # Building the solution gets us the latest version of the CLI and sets the Build.BuildNumber
+  - task: DotnetCoreCLI@2
+    displayName: Build sln
     inputs:
-      version: 6.x
-    displayName: Install .NET 6
+      command: build
+      projects: $(Build.SourcesDirectory)/Azure.Functions.Cli.sln
+      workingDirectory: $(Build.SourcesDirectory)
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-x64)
