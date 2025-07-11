@@ -72,6 +72,8 @@ jobs:
         version: '*'
         downloadPath: '$(Pipeline.Workspace)/func-cli-default/func-cli'
 
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
     inputs:
@@ -98,7 +100,7 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-msi-files.ps1'
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/func-cli"'
-        workingDirectory: '$(Build.SourcesDirectory)/build'
+        workingDirectory: '$(Build.SourcesDirectory)'
 
     - template: ci/sign-files.yml@eng
       parameters:
@@ -165,9 +167,11 @@ jobs:
     displayName: 'Copy Files to Artifact Staging Directory'
     inputs:
       SourceFolder: '$(Pipeline.Workspace)/staging'
-      Contents: 'func-cli-*/**'
+      Contents: 'func-cli*/**'
       TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
 
+  # The only reason this step occurs only on min.win-x64 is because the metadata.json file only needs to be generated once.
+  # This file is used by the release pipeline to determine the version of the CLI & other metadata needed for release.
   - ${{ if eq(parameters.arch, 'min.win-x64') }}:
     - task: PowerShell@2
       displayName: 'Generate metadata.json file'
