@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Arm;
@@ -383,31 +383,43 @@ namespace Azure.Functions.Cli.Helpers
             functionAppReadyClient.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
             functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
 
+            var statusUri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
+            ColoredConsole.WriteLine($"Host status endpoint: {statusUri.GetLeftPart(UriPartial.Path)}");
+
             await RetryHelper.Retry(
                 async () =>
                 {
+                    // Remove the header in case it already exists from a previous retry
+                    functionAppReadyClient.DefaultRequestHeaders.Remove("x-ms-request-id");
                     functionAppReadyClient.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
-                    var uri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
+
                     var request = new HttpRequestMessage()
                     {
-                        RequestUri = uri,
+                        RequestUri = statusUri,
                         Method = HttpMethod.Get
                     };
 
                     var response = await functionAppReadyClient.SendAsync(request);
                     ColoredConsole.Write(".");
 
+                    string responseContent = await response.Content.ReadAsStringAsync();
+
                     if (response.IsSuccessStatusCode)
                     {
                         ColoredConsole.WriteLine(" done");
+                        ColoredConsole.WriteLine($"Host status: {responseContent}");
                     }
                     else
                     {
+                        ColoredConsole.WriteLine($"Host status check failed\nReason Phrase: {response.ReasonPhrase}" +
+                                       (!string.IsNullOrEmpty(responseContent) ? $"\nError response: {responseContent}" : string.Empty));
+
                         throw new CliException($"The host didn't return success status. Returned: {response.StatusCode}");
                     }
                 },
-                15,
-                TimeSpan.FromSeconds(3));
+                retryCount: 15,
+                retryDelay: TimeSpan.FromSeconds(5),
+                displayError: true);
         }
 
         public static async Task<Site> LoadSiteObjectAsync(Site site, string accessToken, string managementURL)
