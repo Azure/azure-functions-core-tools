@@ -3,6 +3,7 @@
 
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Exceptions;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
@@ -138,7 +139,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", string.Empty), _workerRuntime, AuthorizationLevel);
+                try
+                {
+                    await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", string.Empty), _workerRuntime, AuthorizationLevel);
+                }
+                catch (CsTemplateNotFoundException)
+                {
+                    if (_templates.Value
+                        .Where(x => x.Metadata.Language.Equals(Languages.CSharp, StringComparison.InvariantCultureIgnoreCase))
+                        .Any(x => x.Metadata.Name.Equals(TemplateName, StringComparison.InvariantCultureIgnoreCase)))
+                    {
+                        throw new CsxTemplateReferredWithoutCsxOptionException(TemplateName);
+                    }
+
+                    throw;
+                }
             }
             else if (IsNewPythonProgrammingModel())
             {
