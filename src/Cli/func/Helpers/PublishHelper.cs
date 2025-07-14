@@ -4,6 +4,7 @@
 using System.Net.Http.Handlers;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -46,6 +47,14 @@ namespace Azure.Functions.Cli.Helpers
                     FileSystemHelpers.FileExists(Constants.RequirementsTxt) &&
                     new FileInfo(Path.Combine(Environment.CurrentDirectory, Constants.RequirementsTxt)).Length > 0)
                 {
+                    // For Python apps, if running on Windows (typically targeting Linux), use remote build
+                    // This ensures dependencies are built for the correct target platform
+                    if (PlatformHelper.IsWindows)
+                    {
+                        return BuildOption.Remote;
+                    }
+                    
+                    // For non-Windows platforms, use remote build as well (existing behavior)
                     return BuildOption.Remote;
                 }
             }
