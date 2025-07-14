@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
@@ -8,7 +9,7 @@ using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.KubernetesTests
 {
     public class KedaV2ResourceTests
     {

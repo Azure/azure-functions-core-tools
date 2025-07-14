@@ -1,3 +1,5 @@
+// Requires Function App resource
+
 using System;
 using System.IO;
 using System.Collections.Generic;

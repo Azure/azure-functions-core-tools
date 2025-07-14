@@ -1,21 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.IO.Compression;
-using System.Linq;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Tests.E2E.Helpers;
+using Azure.Functions.Cli.UnitTests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class ZipHelperTests
     {
         private readonly ITestOutputHelper _output;
-        private bool _isCI = Environment.GetEnvironmentVariable("TF_BUILD")?.ToLowerInvariant() == "true";
+        private readonly bool _isCI = Environment.GetEnvironmentVariable("TF_BUILD")?.ToLowerInvariant() == "true";
 
         public ZipHelperTests(ITestOutputHelper output)
         {
@@ -88,6 +86,7 @@ namespace Azure.Functions.Cli.Tests
             // build the project for the rid
             var csproj = dir.GetFiles($"{proj}.csproj", SearchOption.AllDirectories).FirstOrDefault();
             var csprojDir = csproj.Directory.FullName;
+
             ProcessHelper.RunProcess("dotnet", $"build -r {rid}", csprojDir, writeOutput: WriteOutput);
 
             string outPath = Path.GetFullPath(Path.Combine(csprojDir, "..", "..", "out", "bin", "ZippedExe", $"debug_{rid}"));

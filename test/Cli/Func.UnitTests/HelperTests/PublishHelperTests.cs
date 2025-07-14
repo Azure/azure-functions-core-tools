@@ -1,10 +1,10 @@
-﻿using Azure.Functions.Cli.Helpers;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Helpers;
 using Xunit;
 
-namespace Azure.Functions.Cli.PublishHelperTests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class PublishHelperTests
     {

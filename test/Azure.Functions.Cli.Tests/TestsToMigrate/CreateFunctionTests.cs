@@ -1,4 +1,6 @@
-﻿using Azure.Functions.Cli.Common;
+﻿// Requires Function App resource
+
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using System;
 using System.IO;

@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.IO.Abstractions;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -15,23 +13,23 @@ using FluentAssertions;
 using Moq;
 using NSubstitute;
 using Xunit;
-using YamlDotNet.Core;
 
-namespace Azure.Functions.Cli.Tests.ActionsTests
+namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
     public class StartHostActionTests : IDisposable
     {
         [SkippableFact]
-        public async Task CheckNonOptionalSettingsThrowsOnMissingAzureWebJobsStorageAndManagedIdentity()
+        public async Task CheckNonOptionalSettings_ThrowsOnMissingAzureWebJobsStorageAndManagedIdentity()
         {
-            Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
+            Skip.IfNot(
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
                 reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
 
-            var fileSystem = GetFakeFileSystem(new[]
-            {
+            var fileSystem = GetFakeFileSystem(
+            [
                 ("x:\\folder1", "{'bindings': [{'type': 'blobTrigger'}]}"),
                 ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
-            });
+            ]);
 
             FileSystemHelpers.Instance = fileSystem;
 
@@ -52,15 +50,15 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         }
 
         [Fact]
-        public async Task CheckNonOptionalSettingsDoesntThrowMissingConnectionUsingManagedIdentity()
+        public async Task CheckNonOptionalSettings_DoesntThrowMissingConnectionUsingManagedIdentity()
         {
-            var fileSystem = GetFakeFileSystem(new[]
-                {
+            var fileSystem = GetFakeFileSystem(
+            [
                 ("x:\\folder1", "{'bindings': [{'type': 'serviceBusTrigger', 'connection': 'myServiceBusConnection'}]}"),
                 ("x:\\folder2", "{'bindings': [{'type': 'eventHubTrigger', 'connection': 'myEventHubConnection'}]}"),
                 ("x:\\folder3", "{'bindings': [{'type': 'blobTrigger', 'connection': 'myBlobStorage'}]}"),
                 ("x:\\folder4", "{'bindings': [{'type': 'queueTrigger', 'connection': 'myQueueStorage'}]}")
-            });
+            ]);
 
             var secrets = new Dictionary<string, string>()
             {
@@ -82,19 +80,22 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             {
                 exception = e;
             }
+
             exception.Should().BeNull();
         }
 
-        [Fact]
-        public async Task CheckNonOptionalSettingsDoesntThrowMissingStorageUsingManagedIdentity()
+        [SkippableFact]
+        public async Task CheckNonOptionalSettings_DoesntThrowMissingStorageUsingManagedIdentity()
         {
-            Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
+            Skip.IfNot(
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
                 reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
-            var fileSystem = GetFakeFileSystem(new[]
-                {
+
+            var fileSystem = GetFakeFileSystem(
+            [
                 ("x:\\folder1", "{'bindings': [{'type': 'blobTrigger'}]}"),
                 ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
-            });
+            ]);
 
             var secrets = new Dictionary<string, string>()
             {
@@ -113,19 +114,22 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             {
                 exception = e;
             }
+
             exception.Should().BeNull();
         }
 
-        [Fact]
-        public async Task CheckNonOptionalSettingsDoesntThrowOnMissingAzureWebJobsStorage()
+        [SkippableFact]
+        public async Task CheckNonOptionalSettings_DoesntThrowOnMissingAzureWebJobsStorage()
         {
-            Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
+            Skip.IfNot(
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
                 reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
-            var fileSystem = GetFakeFileSystem(new[]
-                {
+
+            var fileSystem = GetFakeFileSystem(
+            [
                 ("x:\\folder1", "{'bindings': [{'type': 'blobTrigger'}]}"),
                 ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
-            });
+            ]);
 
             var secrets = new Dictionary<string, string>()
             {
@@ -144,20 +148,22 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             {
                 exception = e;
             }
+
             exception.Should().BeNull();
         }
 
         [SkippableFact]
         public async Task CheckNonOptionalSettingsPrintsWarningForMissingSettings()
         {
-            Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
+            Skip.IfNot(
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
                 reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
 
-            var fileSystem = GetFakeFileSystem(new[]
-            {
+            var fileSystem = GetFakeFileSystem(
+            [
                 ("x:\\folder1", "{'bindings': [{'type': 'httpTrigger', 'connection': 'blah'}]}"),
                 ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger', 'connection': ''}]}")
-            });
+            ]);
 
             FileSystemHelpers.Instance = fileSystem;
 
@@ -173,16 +179,14 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             output.ToString().Should().Contain("Warning: 'connection' property in 'x:\\folder2\\function.json' is empty.");
         }
 
-        private IFileSystem GetFakeFileSystem(IEnumerable<(string folder, string functionJsonContent)> list)
+        private IFileSystem GetFakeFileSystem(IEnumerable<(string Folder, string FunctionJsonContent)> list)
         {
             var fileSystem = Substitute.For<IFileSystem>();
-            fileSystem.Directory.GetDirectories(Arg.Any<string>()).Returns(list.Select(t => t.folder).ToArray());
+            fileSystem.Directory.GetDirectories(Arg.Any<string>()).Returns(list.Select(t => t.Folder).ToArray());
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
 
             foreach ((var folder, var fileContent) in list)
             {
-                //fileSystem.File.Exists(Arg.Is(Path.Combine(folder, "function.json"))).Returns(true);
-
                 fileSystem.File.Open(Arg.Is(Path.Combine(folder, "function.json")), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
                     .Returns(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(fileContent)));
             }
@@ -191,25 +195,35 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         }
 
         [Theory]
+
         // In-proc target, in-proc 8 argument, project configured for .NET 8. Succeeds.
         [InlineData(WorkerRuntime.Dotnet, DotnetConstants.InProc8HostRuntime, true, false)]
+
         // In-proc target, in-proc 8 argument, project NOT configured for .NET 8. Fails.
         [InlineData(WorkerRuntime.Dotnet, DotnetConstants.InProc8HostRuntime, false, true)]
+
         // In-proc target, in-proc 6 argument, project NOT configured for .NET 8. Succeeds.
         [InlineData(WorkerRuntime.Dotnet, DotnetConstants.InProc6HostRuntime, false, false)]
+
         // In-proc target,'default' argument, project configured for .NET 8. Fails.
         [InlineData(WorkerRuntime.Dotnet, "default", true, true)]
+
         // Isolated target,'default' argument, project NOT configured for .NET 8. Succeeds.
         [InlineData(WorkerRuntime.DotnetIsolated, "default", true, false)]
+
         // Isolated target,'default' argument, project configured for .NET 8. Succeeds.
         [InlineData(WorkerRuntime.DotnetIsolated, "default", false, false)]
+
         // Isolated target,in-proc 8 argument, project configured for .NET 8. Fails.
         [InlineData(WorkerRuntime.DotnetIsolated, DotnetConstants.InProc8HostRuntime, true, true)]
+
         // Isolated target,in-proc 6 argument, project not configured for .NET 8. Fails.
         [InlineData(WorkerRuntime.DotnetIsolated, DotnetConstants.InProc6HostRuntime, false, true)]
+
         // Unsupported runtime targets.
         [InlineData(WorkerRuntime.DotnetIsolated, "somevalue", false, true)]
         [InlineData(WorkerRuntime.Dotnet, "somevalue", false, true)]
+
         // Non .NET worker runtimes.
         [InlineData(WorkerRuntime.Python, "default", false, false)]
         [InlineData(WorkerRuntime.Java, "default", false, false)]

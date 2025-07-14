@@ -1,12 +1,12 @@
-﻿using System;
-using System.IO;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class PythonHelperTests
     {
@@ -119,11 +119,13 @@ namespace Azure.Functions.Cli.Tests
             {
                 foreach (string p in path.Split(Path.PathSeparator))
                 {
-                    if (File.Exists(Path.Combine(p, pythonExe))) {
+                    if (File.Exists(Path.Combine(p, pythonExe)))
+                    {
                         return true;
                     }
                 }
             }
+
             return false;
         }
     }
