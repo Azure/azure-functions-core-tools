@@ -28,7 +28,7 @@ steps:
     }
 
     Write-Host "##vso[task.setvariable variable=DURABLE_FUNCTION_PATH]$(Build.SourcesDirectory)/test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder"
-    Write-Host "##vso[task.setvariable variable=INPROC_RUN_SETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2E.Tests/.runsettings/start_tests/ci_pipeline/dotnet_inproc.runsettings"
+    Write-Host "##vso[task.setvariable variable=INPROC_RUN_SETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/.runsettings/start_tests/ci_pipeline/dotnet_inproc.runsettings"
   displayName: 'Set environment variables for E2E tests'
 
 
@@ -38,7 +38,7 @@ steps:
 
 - pwsh: |
     $worker = '${{ parameters.worker }}'
-    $proj = '$(Build.SourcesDirectory)/test/Cli/Func.E2E.Tests/Azure.Functions.Cli.E2E.Tests.csproj'
+    $proj = '$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/Azure.Functions.Cli.E2ETests.csproj'
     $baseArgs = @(
       '--framework', 'net8.0'
       '--blame-hang-timeout', '10m'

@@ -23,7 +23,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreToolsHost", "src\CoreTo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.TestFramework", "test\Cli\TestFramework\Azure.Functions.Cli.TestFramework.csproj", "{3A8E1907-E3A2-1CE0-BA8B-805B655FAF09}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.E2E.Tests", "test\Cli\Func.E2E.Tests\Azure.Functions.Cli.E2E.Tests.csproj", "{D61226F6-3472-32C7-16F5-F07705F779CE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.E2ETests", "test\Cli\Func.E2ETests\Azure.Functions.Cli.E2ETests.csproj", "{D61226F6-3472-32C7-16F5-F07705F779CE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoZipTool", "src\GoZipTool\GoZipTool.csproj", "{7849148F-F156-4FAD-8087-3ADF22785A4B}"
 EndProject
