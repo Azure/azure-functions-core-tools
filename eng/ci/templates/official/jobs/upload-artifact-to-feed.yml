@@ -30,4 +30,4 @@ jobs:
       vstsFeedPackagePublish: '${{ parameters.packageName }}'
       versionOption: custom
       versionPublish: '$(Build.BuildNumber)'
-      packagePublishDescription: 'Core tools default nightly build'
+      packagePublishDescription: 'Core tools nightly build'

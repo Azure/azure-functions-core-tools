@@ -45,32 +45,7 @@ jobs:
 
   # Conditional download of artifacts based on isNightlyBuild parameter from ADO feed
   - ${{ if eq(parameters.isNightlyBuild, true) }}:
-    - task: DownloadPackage@1
-      displayName: 'Download func-cli-host from feed'
-      inputs:
-        packageType: 'upack'
-        feed: 'internal/core-tools-nightly-build'
-        definition: 'func-cli-host'
-        version: '*'
-        downloadPath: '$(Pipeline.Workspace)/func-cli-host'
-
-    - task: DownloadPackage@1
-      displayName: 'Download func-cli-inproc from feed'
-      inputs:
-        packageType: 'upack'
-        feed: 'internal/core-tools-nightly-build'
-        definition: 'func-cli-inproc'
-        version: '*'
-        downloadPath: '$(Pipeline.Workspace)/func-cli-inproc'
-
-    - task: DownloadPackage@1
-      displayName: 'Download func-cli from feed'
-      inputs:
-        packageType: 'upack'
-        feed: 'internal/core-tools-nightly-build'
-        definition: 'func-cli'
-        version: '*'
-        downloadPath: '$(Pipeline.Workspace)/func-cli-default/func-cli'
+    - template: /eng/ci/templates/official/steps/download-latest-from-feed.yml@self
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
