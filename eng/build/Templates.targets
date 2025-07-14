@@ -57,7 +57,7 @@
     <ItemGroup>
       <!-- Resolve the .nupkg file paths in the NuGet cache -->
       <TemplatePackagesResolved Include="@(_TemplatePackages)">
-        <PackagePath>$(NuGetPackageRoot)%(Identity)/%(Version)/%(Identity).%(Version).nupkg</PackagePath>
+        <PackagePath>$(NuGetPackageRoot)/%(Identity)/%(Version)/%(Identity).%(Version).nupkg</PackagePath>
       </TemplatePackagesResolved>
     </ItemGroup>
 
