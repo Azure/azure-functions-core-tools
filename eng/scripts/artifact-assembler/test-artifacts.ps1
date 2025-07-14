@@ -7,9 +7,9 @@ $rootDir = Join-Path $PSScriptRoot "../../.." | Resolve-Path
 Write-Host "Repository root: $rootDir"
 
 # Paths to test project and runtime settings
-$testProjectPath        = ".\test\Cli\Func.E2E.Tests\Azure.Functions.Cli.E2E.Tests.csproj"
-$defaultRuntimeSettings = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\default.runsettings"
-$inProcRuntimeSettings  = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\dotnet_inproc.runsettings"
+$testProjectPath        = ".\test\Cli\Func.E2ETests\Azure.Functions.Cli.E2ETests.csproj"
+$defaultRuntimeSettings = ".\test\Cli\Func.E2ETests\.runsettings\start_tests\artifact_consolidation_pipeline\default.runsettings"
+$inProcRuntimeSettings  = ".\test\Cli\Func.E2ETests\.runsettings\start_tests\artifact_consolidation_pipeline\dotnet_inproc.runsettings"
 
 # Build the test project
 dotnet build $testProjectPath
