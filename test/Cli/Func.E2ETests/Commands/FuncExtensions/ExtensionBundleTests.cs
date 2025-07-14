@@ -8,8 +8,9 @@ using Microsoft.Azure.WebJobs.Script;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncExtensions
+namespace Azure.Functions.Cli.E2ETests.Commands.FuncExtensions
 {
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
     public class ExtensionBundleTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]

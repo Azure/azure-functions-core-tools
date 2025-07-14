@@ -71,7 +71,9 @@ namespace Azure.Functions.Cli.UnitTests.KubernetesTests
             JObject durableTaskConfig = hostConfig.SelectToken("extensions.durableTask") as JObject;
 
             if (providerJson != null)
+            {
                 durableTaskConfig.Add("storageProvider", JObject.Parse(providerJson));
+            }
 
             ScaledObjectKedaV2 scaledObject = GetKubernetesResource(hostConfig);
 
@@ -107,10 +109,14 @@ namespace Azure.Functions.Cli.UnitTests.KubernetesTests
             JObject durableTaskConfig = hostConfig.SelectToken("extensions.durableTask") as JObject;
 
             if (configuredMaxOrchestrations.HasValue)
+            {
                 durableTaskConfig.Add("maxConcurrentOrchestratorFunctions", configuredMaxOrchestrations);
+            }
 
             if (configuredMaxActivities.HasValue)
+            {
                 durableTaskConfig.Add("maxConcurrentActivityFunctions", configuredMaxActivities);
+            }
 
             ScaledObjectKedaV2 scaledObject = GetKubernetesResource(hostConfig);
 
