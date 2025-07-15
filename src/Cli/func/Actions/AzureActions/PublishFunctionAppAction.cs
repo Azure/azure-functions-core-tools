@@ -573,7 +573,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
             ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages);
 
             bool shouldSyncTriggers = true;
             bool shouldDeferPublishZipDeploy = false;
