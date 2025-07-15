@@ -23,20 +23,14 @@ jobs:
 
   # Conditional download of artifacts based on isNightlyBuild parameter
   - ${{ if eq(parameters.isNightlyBuild, true) }}:
-    # Download from ADO feed for nightly builds
-    - task: DownloadPackage@1
-      displayName: 'Download core-tools-default from feed'
-      inputs:
-        packageType: 'upack'
-        feed: 'internal/core-tools-nightly-build'
-        definition: 'func-cli'
-        version: '*'
-        downloadPath: '$(Pipeline.Workspace)/core-tools-default/func-cli'
+    - template: /eng/ci/templates/official/steps/download-latest-from-feed.yml@self
+      parameters:
+        defaultCliOnly: true
 
   - task: CopyFiles@2
     displayName: 'Copy NuGet package to output directory'
     inputs:
-      SourceFolder: '$(Pipeline.Workspace)/core-tools-default/func-cli'
+      SourceFolder: '$(Pipeline.Workspace)/func-cli-default/func-cli'
       Contents: 'Microsoft.Azure.Functions.CoreTools.*.nupkg'
       TargetFolder: '$(Pipeline.Workspace)/nugetPackage'
       OverWrite: true

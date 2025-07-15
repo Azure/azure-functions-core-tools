@@ -1,0 +1,54 @@
+# Because all of our nightly build artifacts will have a pre-release version (i.e. 4.1.0-ci.<buildnumber>),
+# we cannot use '*' wildcard matching to get the latest version. Instead, we will fetch the latest version
+# from the feed using the Azure DevOps REST API.
+parameters:
+  - name: defaultCliOnly
+    type: boolean
+    default: false
+
+steps:
+- task: PowerShell@2
+  displayName: 'Get latest artifact version'
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Fetch the latest version of the func-cli package from the feed. All packages should have the
+      # same package version as it is based on the CLI version + build number (which is date based)
+      $packageUrl = "https://feeds.dev.azure.com/azfunc/internal/_apis/packaging/feeds/core-tools-nightly-build/packages/a998de77-f16c-4c10-af8c-cfa5a430eae7?api-version=7.1"
+      $headers = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
+
+      $response = Invoke-RestMethod -Uri $packageUrl -Headers $headers -Method Get
+      $latestVersion = $response.versions[0].version
+
+      Write-Host "##vso[task.setvariable variable=FUNC_CLI_VERSION]$latestVersion"
+      Write-Host "Using func-cli version: $latestVersion"
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- task: DownloadPackage@1
+  displayName: 'Download func-cli from feed'
+  inputs:
+    packageType: 'upack'
+    feed: 'internal/core-tools-nightly-build'
+    definition: 'func-cli'
+    version: '$(FUNC_CLI_VERSION)'
+    downloadPath: '$(Pipeline.Workspace)/func-cli-default/func-cli'
+
+- ${{ if not(parameters.defaultCliOnly) }}:
+  - task: DownloadPackage@1
+    displayName: 'Download func-cli-inproc from feed'
+    inputs:
+      packageType: 'upack'
+      feed: 'internal/core-tools-nightly-build'
+      definition: 'func-cli-inproc'
+      version: '$(FUNC_CLI_VERSION)'
+      downloadPath: '$(Pipeline.Workspace)/func-cli-inproc'
+
+  - task: DownloadPackage@1
+    displayName: 'Download func-cli-host from feed'
+    inputs:
+      packageType: 'upack'
+      feed: 'internal/core-tools-nightly-build'
+      definition: 'func-cli-host'
+      version: '$(FUNC_CLI_VERSION)'
+      downloadPath: '$(Pipeline.Workspace)/func-cli-host'

@@ -45,32 +45,7 @@ jobs:
 
   # Conditional download of artifacts based on isNightlyBuild parameter from ADO feed
   - ${{ if eq(parameters.isNightlyBuild, true) }}:
-    - task: DownloadPackage@1
-      displayName: 'Download func-cli-host from feed'
-      inputs:
-        packageType: 'upack'
-        feed: 'internal/core-tools-nightly-build'
-        definition: 'func-cli-host'
-        version: '*'
-        downloadPath: '$(Pipeline.Workspace)/func-cli-host'
-
-    - task: DownloadPackage@1
-      displayName: 'Download func-cli-inproc from feed'
-      inputs:
-        packageType: 'upack'
-        feed: 'internal/core-tools-nightly-build'
-        definition: 'func-cli-inproc'
-        version: '*'
-        downloadPath: '$(Pipeline.Workspace)/func-cli-inproc'
-
-    - task: DownloadPackage@1
-      displayName: 'Download func-cli from feed'
-      inputs:
-        packageType: 'upack'
-        feed: 'internal/core-tools-nightly-build'
-        definition: 'func-cli'
-        version: '*'
-        downloadPath: '$(Pipeline.Workspace)/func-cli-default/func-cli'
+    - template: /eng/ci/templates/official/steps/download-latest-from-feed.yml@self
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
@@ -131,22 +106,6 @@ jobs:
               "ToolVersion": "1.0"
             }
           ]
-
-  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
-    - task: PowerShell@2
-      displayName: 'Test Artifacts - Visual Studio'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/func-cli-visualstudio"'
-
-  - ${{ if startsWith(parameters.arch, 'win') }}:
-    - task: PowerShell@2
-      displayName: 'Test Artifacts'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/func-cli"'
 
   - task: DotNetCoreCLI@2
     displayName: 'Zip Artifacts'
