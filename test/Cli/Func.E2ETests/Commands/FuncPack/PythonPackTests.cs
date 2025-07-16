@@ -1,56 +1,54 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.E2ETests.Traits;
+using Azure.Functions.Cli.E2E.Tests.Fixtures;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
+using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Python)]
-    public class PythonPackTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class PythonPackTests : IClassFixture<PythonFunctionAppFixture>
     {
+        private readonly PythonFunctionAppFixture _fixture;
+
+        public PythonPackTests(PythonFunctionAppFixture fixture, ITestOutputHelper log)
+        {
+            _fixture = fixture;
+            _fixture.Log = log;
+        }
+
+        [Fact]
+        public void Pack_Python_WorksAsExpected()
+        {
+            var workingDir = _fixture.WorkingDirectory;
+            var testName = nameof(Pack_Python_WorksAsExpected);
+
+            BasePackTests.TestBasicPackFunctionality(
+                workingDir,
+                testName,
+                _fixture,
+                new[]
+                {
+                    "host.json",
+                    "requirements.txt",
+                    "function_app.py"
+                });
+        }
+
         [Fact]
         public void Pack_PythonFromCache_WorksAsExpected()
         {
-            var workingDir = WorkingDirectory;
+            var workingDir = _fixture.WorkingDirectory;
             var testName = nameof(Pack_PythonFromCache_WorksAsExpected);
             var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
 
-            // Step 1: Initialize a Python function app
-            var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var initResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute([".", "--worker-runtime", "python"]);
-
-            initResult.Should().ExitWith(0);
-            initResult.Should().HaveStdOutContaining("Writing host.json");
-            initResult.Should().HaveStdOutContaining("Writing local.settings.json");
-
-            // Create HTTP trigger function
-            var funcNewCommand = new FuncNewCommand(FuncPath, testName, Log);
-            var newResult = funcNewCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute([".", "--template", "\"HTTP Trigger\"", "--name", "httptrigger", "--authlevel", "anonymous"]);
-
-            newResult.Should().ExitWith(0);
-
-            // Verify local.settings.json has the correct content
-            var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
-            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
-            {
-                (localSettingsPath, new[] { "FUNCTIONS_WORKER_RUNTIME", "python" })
-            };
-            initResult.Should().FilesExistsWithExpectContent(filesToValidate);
-
             // Step 2: Run pack for the first time
-            var funcPackCommand = new FuncPackCommand(FuncPath, testName, Log);
+            var funcPackCommand = new FuncPackCommand(_fixture.FuncPath, testName, _fixture.Log);
             var firstPackResult = funcPackCommand
                 .WithWorkingDirectory(workingDir)
                 .Execute([]);
@@ -78,7 +76,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             // Step 4: Update requirements.txt and pack again (should restore dependencies)
             var requirementsPath = Path.Combine(workingDir, "requirements.txt");
-            Log.WriteLine($"Writing to file {requirementsPath}");
+            _fixture.Log.WriteLine($"Writing to file {requirementsPath}");
             File.WriteAllText(requirementsPath, "requests");
 
             var thirdPackResult = funcPackCommand
