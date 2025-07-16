@@ -12,11 +12,13 @@ namespace Azure.Functions.Cli.E2ETests.Fixtures
 {
     public abstract class BaseFunctionAppFixture : IAsyncLifetime
     {
-        public BaseFunctionAppFixture(WorkerRuntime workerRuntime, string? targetFramework = null, string? version = null)
+        public BaseFunctionAppFixture(WorkerRuntime workerRuntime, string? targetFramework = null, string? version = null, string templateName = "HttpTrigger", bool includeAnonymousAuth = false)
         {
             WorkerRuntime = workerRuntime;
             TargetFramework = targetFramework;
             Version = version;
+            TemplateName = templateName;
+            IncludeAnonymousAuth = includeAnonymousAuth;
 
             Log = new Mock<ITestOutputHelper>().Object;
 
@@ -55,6 +57,10 @@ namespace Azure.Functions.Cli.E2ETests.Fixtures
 
         public string? Version { get; set; }
 
+        public string TemplateName { get; set; }
+
+        public bool IncludeAnonymousAuth { get; set; }
+
         public Task DisposeAsync()
         {
             try
@@ -85,8 +91,9 @@ namespace Azure.Functions.Cli.E2ETests.Fixtures
 
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
 
-            var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }
+            var funcNewArgs = new[] { ".", "--template", TemplateName, "--name", "httptrigger" }
                                 .Concat((WorkerRuntime != WorkerRuntime.Dotnet && WorkerRuntime != WorkerRuntime.DotnetIsolated) ? ["--language", workerRuntime] : Array.Empty<string>())
+                                .Concat(IncludeAnonymousAuth ? ["--authlevel", "anonymous"] : Array.Empty<string>())
                                 .ToArray();
             await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, workerRuntime);
         }
