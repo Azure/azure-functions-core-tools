@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
@@ -10,41 +10,66 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class HostHelperTests
+    public class HostHelperTests : IDisposable
     {
-        [Theory]
-        [InlineData("{'customHandler':{'description':{'defaultExecutablePath':'file.exe'}}}", false, "file.exe")]
-        [InlineData("{'customHandler':{'description':{}}}", false, "")]
-        [InlineData("{}", false, "")]
-        [InlineData(null, true, "")]
-        public async Task GetCustomHandlerExecutableTest(string hostJsonContent, bool exception, string expected)
+        [Fact]
+        public async Task GetCustomHandlerExecutable_Throws_When_HostJson_Missing()
         {
             var fileSystem = Substitute.For<IFileSystem>();
-            if (hostJsonContent != null)
-            {
-                fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(false);
+            FileSystemHelpers.Instance = fileSystem;
 
-                fileSystem.File.Open(
-                    Arg.Is("host.json"),
-                    Arg.Any<FileMode>(),
-                    Arg.Any<FileAccess>(),
-                    Arg.Any<FileShare>())
-                    .Returns(hostJsonContent.ToStream());
-            }
+            await Assert.ThrowsAsync<InvalidOperationException>(() => HostHelpers.GetCustomHandlerExecutable());
+        }
+
+        [Fact]
+        public async Task GetCustomHandlerExecutable_Returns_ExecutablePath_When_Present()
+        {
+            var json = @"{""customHandler"":{""description"":{""defaultExecutablePath"":""file.exe""}}}";
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(json.ToStream());
 
             FileSystemHelpers.Instance = fileSystem;
 
-            Func<Task<string>> action = () => HostHelpers.GetCustomHandlerExecutable();
+            var result = await HostHelpers.GetCustomHandlerExecutable();
+            result.Should().Be("file.exe");
+        }
 
-            if (exception)
-            {
-                action.Should().Throw<InvalidOperationException>();
-            }
-            else
-            {
-                var result = await action();
-                result.Should().Be(expected);
-            }
+        [Fact]
+        public async Task GetCustomHandlerExecutable_Returns_Empty_When_ExecutablePath_Missing()
+        {
+            var json = @"{""customHandler"":{""description"":{}}}";
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(json.ToStream());
+
+            FileSystemHelpers.Instance = fileSystem;
+
+            var result = await HostHelpers.GetCustomHandlerExecutable();
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetCustomHandlerExecutable_Returns_Empty_When_CustomHandler_Missing()
+        {
+            var json = @"{}";
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(json.ToStream());
+
+            FileSystemHelpers.Instance = fileSystem;
+
+            var result = await HostHelpers.GetCustomHandlerExecutable();
+            result.Should().BeEmpty();
+        }
+
+        public void Dispose()
+        {
+            FileSystemHelpers.Instance = null;
         }
     }
 }

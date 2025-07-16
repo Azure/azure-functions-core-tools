@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class ZipHelperTests
+    public class ZipHelperTests : IDisposable
     {
         private readonly ITestOutputHelper _output;
         private readonly bool _isCI = Environment.GetEnvironmentVariable("TF_BUILD")?.ToLowerInvariant() == "true";
@@ -18,9 +18,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public ZipHelperTests(ITestOutputHelper output)
         {
             _output = output;
-
-            // reset to default in case other tests have set this up with mocks
-            FileSystemHelpers.Instance = null;
         }
 
         [Fact]
@@ -103,8 +100,14 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // use our zip utilities to zip them
             var zipFile = Path.Combine(tempDir, "test.zip");
-            var stream = await ZipHelper.CreateZip(files, tempDir, executables: new string[] { exe });
 
+            foreach (var file in files)
+            {
+                Assert.True(File.Exists(file), $"{file} does not exist");
+            }
+
+            var stream = await ZipHelper.CreateZip(files, tempDir, executables: new string[] { exe });
+            Assert.NotNull(stream);
             await FileSystemHelpers.WriteToFile(zipFile, stream);
 
             return zipFile;
@@ -191,6 +194,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         private void WriteOutput(string output)
         {
             _output.WriteLine(output);
+        }
+
+        public void Dispose()
+        {
+            FileSystemHelpers.Instance = null;
         }
     }
 }

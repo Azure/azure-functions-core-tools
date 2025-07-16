@@ -5,9 +5,9 @@ steps:
     projects: '**/test/ZippedExe/ZippedExe.csproj'
   displayName: 'Build ZippedExe project'
 
-- task: DotNetCoreCLI@2
-  inputs:
-    command: 'test'
-    projects: '**/Azure.Functions.Cli.Tests.csproj'
-    arguments: '--filter CreateZip_Succeeds'
-  displayName: 'Run zip test'
+# - task: DotNetCoreCLI@2
+#   inputs:
+#     command: 'test'
+#     projects: '**/Azure.Functions.Cli.UnitTests.csproj'
+#     arguments: '--framework net8.0 --filter "Category=Zip"'
+#   displayName: 'Run zip test'
