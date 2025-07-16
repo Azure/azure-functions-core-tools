@@ -7,4 +7,4 @@
 
 #### Changes
 
-- Fix dotnet templates installation (#)
+- Fix dotnet templates installation (#5358)
