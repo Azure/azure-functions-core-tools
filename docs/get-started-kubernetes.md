@@ -1,4 +1,4 @@
-# Getting Started on Kubernetes
+# Getting Started on Kubernetes using Core Tools
 
 Using the Core Tools, you can easily configure a Kubernetes cluster and run Azure Functions on it.
 

@@ -9,18 +9,16 @@
 
 The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
 
-## Usage
-
-To use the Azure Functions Core Tools, open a terminal and run the `func` command. You can see the available commands and options by running:
-
-```bash
-func --help
-```
-
-### Helpful Documentation
+#### Helpful Documentation
 
 - [Code and test Azure Functions locally](https://docs.microsoft.com/azure/azure-functions/functions-run-local)
-- [Get started with Kubernetes](docs/get-started-kubernetes.md)
+- [Get started with Kubernetes using Core Tools](docs/get-started-kubernetes.md)
+
+## Usage
+
+```bash
+func [--version] [--help] <command> [<args>] [--verbose]
+```
 
 ## Versions
 
@@ -28,7 +26,7 @@ func --help
 
 **v4**: (main branch): Self-contained cross-platform package **(recommended)**
 
-## Installing
+## Installing the CLI
 
 ### Windows
 
@@ -51,8 +49,6 @@ func --help
 
 
 #### chocolatey
-
-Of course! Here's the markdown table for this set:
 
 | Version  | Installation Command                                           |
 | -------- | -------------------------------------------------------------- |
@@ -128,8 +124,6 @@ apt-get update && apt-get install libicu-dev  -y
 ```
 
 #### 2. Install
-
-Here’s a clean markdown table for this information:
 
 | Version | Installation Commands                                                           |
 | ------- | ------------------------------------------------------------------------------- |
