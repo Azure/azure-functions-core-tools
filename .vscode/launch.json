@@ -11,7 +11,7 @@
             "env": {
                 "CLI_DEBUG": "1"
             },
-            "args": "${input:funcArgs}",
+            "args": "${input:funcArgs} --script-root ${input:scriptRootArg}",
             "cwd": "${workspaceFolder}/src/Cli/func",
             "console": "internalConsole",
             "stopAtEntry": false
@@ -28,6 +28,14 @@
             "type": "promptString",
             "description": "Args to pass to the 'func' command",
             "default": "--version"
+        },
+        // Optional argument for script root, useful for debugging a specific function app.
+        // This is the root directory of the function app, where the host.json file is located.
+        {
+            "id": "scriptRootArg",
+            "type": "promptString",
+            "description": "Optional --script-root argument (leave blank if none)",
+            "default": ""
         }
     ]
 }
