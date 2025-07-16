@@ -79,6 +79,7 @@ jobs:
         ./eng/scripts/generate-msi-files.ps1
         -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
         -runtime "${{ parameters.runtime }}"
+        -cliVersion "$(Build.BuildNumber)"
       displayName: 'Generate MSI files'
 
     - template: /eng/ci/templates/official/steps/sign-msi.yml@self

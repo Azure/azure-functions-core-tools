@@ -1,6 +1,7 @@
 param (
     [string]$artifactsPath,
-    [string]$runtime
+    [string]$runtime,
+    [string]$cliVersion = $null
 )
 
 # Resource directory is one level up from the script location
@@ -50,38 +51,19 @@ if ([string]::IsNullOrWhiteSpace($runtime)) {
     Write-Host "Runtime '$runtime' mapped to platform(s): $($platforms -join ', ')"
 }
 
-# Get runtime version by finding func.dll
-Write-Host "Searching for func.dll in $artifactsPath..."
-$funcDlls = Get-ChildItem -Path $artifactsPath -Filter "func.dll" -Recurse -ErrorAction Continue
+# Try and get the CLI version from the folder name if not provided
+if ([string]::IsNullOrWhiteSpace($cliVersion)) {
+    Write-Host "CLI version not provided, attempting to extract from artifacts path..."
 
-if ($funcDlls.Count -eq 0) {
-    Write-Host "ERROR: No func.dll files found. Check the path or file name." -ForegroundColor Red
-    exit 1
+    $versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-(?:ci|beta|rc)[-\.\d]+)?)$'
+
+    $cliVersion = Get-ChildItem -Path $artifactsPath -Directory |
+        Where-Object { $_.Name -match $versionPattern } |
+        Select-Object -First 1 -ExpandProperty Name |
+        ForEach-Object { $_ -replace $versionPattern, '$1' }
 }
 
-$cli = ""
-
-Write-Host "Found $($funcDlls.Count) func.dll files"
-foreach ($dll in $funcDlls) {
-    $path = $dll.FullName
-
-    # Check if this is the root func.dll and not in inproc folders
-    if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
-        $cli = $path
-        break
-    }
-}
-
-if (-not $cli) {
-    $cli = $funcDlls[0].FullName  # Fallback to first dll found
-}
-
-$cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
-$buildNumberForZipFile = ($cliVersion -split "\.")[2]
-
-Write-Host "CLI version: $cliVersion"
-Write-Host "Build number: $buildNumberForZipFile"
-Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
+Write-Host "CLI Version: $cliVersion"
 
 # Function to process MSI generation for a platform
 function New-PlatformMSI {
