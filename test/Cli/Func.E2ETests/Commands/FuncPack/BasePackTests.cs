@@ -1,13 +1,13 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.E2E.Tests.Fixtures;
+using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using FluentAssertions;
 using Xunit;
 
-namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncPack
+namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     internal static class BasePackTests
     {

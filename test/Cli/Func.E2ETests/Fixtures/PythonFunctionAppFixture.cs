@@ -3,7 +3,7 @@
 
 using Azure.Functions.Cli.Helpers;
 
-namespace Azure.Functions.Cli.E2E.Tests.Fixtures
+namespace Azure.Functions.Cli.E2ETests.Fixtures
 {
     public class PythonFunctionAppFixture : BaseFunctionAppFixture
     {
