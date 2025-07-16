@@ -130,7 +130,7 @@ namespace Azure.Functions.Cli.Helpers
                 workerRuntime);
         }
 
-        private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
+        internal static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
         {
             "blobtrigger" => "blob",
             "eventgridblobtrigger" => "eventgridblob",
@@ -295,12 +295,12 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task EnsureIsolatedTemplatesInstalled()
         {
-            if (await AreDotnetTemplatePackagesInstalled(WebJobsTemplateBasePackId))
+            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
             {
                 await UninstallWebJobsTemplates();
             }
 
-            if (await AreDotnetTemplatePackagesInstalled(IsolatedTemplateBasePackId))
+            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
             {
                 return;
             }
@@ -310,12 +310,12 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task EnsureWebJobsTemplatesInstalled()
         {
-            if (await AreDotnetTemplatePackagesInstalled(IsolatedTemplateBasePackId))
+            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
             {
                 await UninstallIsolatedTemplates();
             }
 
-            if (await AreDotnetTemplatePackagesInstalled(WebJobsTemplateBasePackId))
+            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
             {
                 return;
             }
@@ -323,12 +323,12 @@ namespace Azure.Functions.Cli.Helpers
             await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
         }
 
-        private static async Task<bool> AreDotnetTemplatePackagesInstalled(string packageIdPrefix)
+        internal static bool AreDotnetTemplatePackagesInstalled(HashSet<string> templates, string packageIdPrefix)
         {
-            var templates = await _installedTemplatesList.Value;
-            return templates.Any(id =>
-                id.Equals($"{packageIdPrefix}.ProjectTemplates", StringComparison.OrdinalIgnoreCase) ||
-                id.Equals($"{packageIdPrefix}.ItemTemplates", StringComparison.OrdinalIgnoreCase));
+            var hasProjectTemplates = templates.Contains($"{packageIdPrefix}.ProjectTemplates", StringComparer.OrdinalIgnoreCase);
+            var hasItemTemplates = templates.Contains($"{packageIdPrefix}.ItemTemplates", StringComparer.OrdinalIgnoreCase);
+
+            return hasProjectTemplates && hasItemTemplates;
         }
 
         private static async Task<HashSet<string>> GetInstalledTemplatePackageIds()
