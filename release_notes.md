@@ -7,4 +7,4 @@
 
 #### Changes
 
-- <entry>
+- Fix dotnet templates installation (#)

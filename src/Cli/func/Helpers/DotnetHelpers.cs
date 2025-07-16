@@ -295,12 +295,12 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task EnsureIsolatedTemplatesInstalled()
         {
-            if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
+            if (await AreDotnetTemplatePackagesInstalled(WebJobsTemplateBasePackId))
             {
                 await UninstallWebJobsTemplates();
             }
 
-            if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
+            if (await AreDotnetTemplatePackagesInstalled(IsolatedTemplateBasePackId))
             {
                 return;
             }
@@ -310,12 +310,12 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task EnsureWebJobsTemplatesInstalled()
         {
-            if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
+            if (await AreDotnetTemplatePackagesInstalled(IsolatedTemplateBasePackId))
             {
                 await UninstallIsolatedTemplates();
             }
 
-            if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
+            if (await AreDotnetTemplatePackagesInstalled(WebJobsTemplateBasePackId))
             {
                 return;
             }
@@ -323,10 +323,12 @@ namespace Azure.Functions.Cli.Helpers
             await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
         }
 
-        private static async Task<bool> IsTemplatePackageInstalled(string packageId)
+        private static async Task<bool> AreDotnetTemplatePackagesInstalled(string packageIdPrefix)
         {
             var templates = await _installedTemplatesList.Value;
-            return templates.Any(id => id.StartsWith(packageId, StringComparison.OrdinalIgnoreCase));
+            return templates.Any(id =>
+                id.Equals($"{packageIdPrefix}.ProjectTemplates", StringComparison.OrdinalIgnoreCase) ||
+                id.Equals($"{packageIdPrefix}.ItemTemplates", StringComparison.OrdinalIgnoreCase));
         }
 
         private static async Task<HashSet<string>> GetInstalledTemplatePackageIds()
