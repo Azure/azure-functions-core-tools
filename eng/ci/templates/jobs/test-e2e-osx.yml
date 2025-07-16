@@ -10,9 +10,6 @@ jobs:
 
   strategy:
     matrix:
-      dotnet_osx_x64:
-        languageWorker: 'Dotnet'
-        runtime: 'osx-x64'
       dotnetIsolated_osx_x64:
         languageWorker: 'DotnetIsolated'
         runtime: 'osx-x64'
@@ -21,6 +18,9 @@ jobs:
         runtime: 'osx-x64'
       powershell_osx_x64:
         languageWorker: 'Powershell'
+        runtime: 'osx-x64'
+      python_osx_x64:
+        languageWorker: 'Python'
         runtime: 'osx-x64'
 
   steps:
