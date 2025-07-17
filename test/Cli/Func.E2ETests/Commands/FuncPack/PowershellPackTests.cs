@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 PowershellProjectPath,
                 testName,
                 FuncPath,
-                log,
+                Log,
                 new[]
                 {
                     "host.json",
