@@ -289,12 +289,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)GoZipTool\GoZipTool.csproj">
-      <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
-    </ProjectReference>
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="content" />
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="contentFiles/any/$(TargetFramework)" />
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\**\*" Pack="true" PackagePath="tools/$(TargetFramework)/any" />

@@ -1,7 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
@@ -9,31 +8,26 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
-    public class DotnetInProc6PackTests : IClassFixture<Dotnet6InProcFunctionAppFixture>
+    public class DotnetInProc6PackTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private readonly Dotnet6InProcFunctionAppFixture _fixture;
-
-        public DotnetInProc6PackTests(Dotnet6InProcFunctionAppFixture fixture, ITestOutputHelper log)
-        {
-            _fixture = fixture;
-            _fixture.Log = log;
-        }
+        private string Dotnet6ProjectPath => Path.Combine(TestProjectDirectory, "TestNet6InProcProject");
 
         [Fact]
         public void Pack_Dotnet6InProc_WorksAsExpected()
         {
-            var workingDir = _fixture.WorkingDirectory;
             var testName = nameof(Pack_Dotnet6InProc_WorksAsExpected);
+            Log.WriteLine(Dotnet6ProjectPath);
 
             BasePackTests.TestBasicPackFunctionality(
-                workingDir,
+                Dotnet6ProjectPath,
                 testName,
-                _fixture,
+                FuncPath,
+                log,
                 new[]
                 {
                     "host.json",
-                    "HttpTrigger.cs",
-                    "Properties\\launchSettings.json"
+                    "Dotnet6InProc.cs",
+                    "TestNet6InProcProject.csproj"
                 });
         }
     }
