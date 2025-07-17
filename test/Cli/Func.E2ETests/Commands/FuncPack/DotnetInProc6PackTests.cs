@@ -8,8 +8,13 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
-    public class DotnetInProc6PackTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class DotnetInProc6PackTests : BaseE2ETests
     {
+        public DotnetInProc6PackTests(ITestOutputHelper log)
+            : base(log)
+        {
+        }
+
         private string Dotnet6ProjectPath => Path.Combine(TestProjectDirectory, "TestNet6InProcProject");
 
         [Fact]
@@ -22,7 +27,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 Dotnet6ProjectPath,
                 testName,
                 FuncPath,
-                log,
+                Log,
                 new[]
                 {
                     "host.json",

@@ -8,8 +8,13 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
-    public class NodePackTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class NodePackTests : BaseE2ETests
     {
+        public NodePackTests(ITestOutputHelper log)
+            : base(log)
+        {
+        }
+
         private string NodeProjectPath => Path.Combine(TestProjectDirectory, "TestNodeProject");
 
         [Fact]

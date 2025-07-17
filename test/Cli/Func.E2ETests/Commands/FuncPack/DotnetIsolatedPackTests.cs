@@ -9,8 +9,13 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
-    public class DotnetIsolatedPackTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class DotnetIsolatedPackTests : BaseE2ETests
     {
+        public DotnetIsolatedPackTests(ITestOutputHelper log)
+            : base(log)
+        {
+        }
+
         private string DotnetIsolatedProjectPath => Path.Combine(TestProjectDirectory, "TestDotnet8IsolatedProject");
 
         [Fact]
