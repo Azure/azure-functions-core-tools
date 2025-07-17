@@ -31,9 +31,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 {
                     "host.json",
                     "requirements.psd1",
-                    "HttpTrigger\\run.ps1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
                     "profile.ps1",
-                    "HttpTrigger\\function.json"
+                    Path.Combine("HttpTrigger", "function.json")
                 });
         }
     }
