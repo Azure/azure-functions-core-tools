@@ -63,6 +63,9 @@ if ([string]::IsNullOrWhiteSpace($cliVersion)) {
         ForEach-Object { $_ -replace $versionPattern, '$1' }
 }
 
+# If the version has -ci.x.y, convert it to .x to ensure we have a valid MSI version format
+$cliVersion = $cliVersion -replace '-(?:ci|beta|rc|dev)\.([0-9]+)\.0$', '.$1'
+
 Write-Host "CLI Version: $cliVersion"
 
 # Function to process MSI generation for a platform

@@ -12,13 +12,11 @@ jobs:
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
-  # The windows part of this test will create a Zip file that we need to download and test on Linux.
-  - template: /eng/ci/templates/public/steps/build-test-zip.yml@self
-
+  # The windows part of ZipHelpers test will create a Zip file that we need to download and test on Linux.
   - template: /eng/ci/templates/public/steps/run-unit-tests.yml@self
 
   templateContext:
     outputs:
     - output: pipelineArtifact
-      path: 'out/bin/Azure.Functions.Cli.Tests/debug/ZippedOnWindows.zip'
+      path: 'out/bin/Azure.Functions.Cli.UnitTests/debug/ZippedOnWindows.zip'
       artifact: ZippedOnWindows

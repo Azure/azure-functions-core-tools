@@ -23,6 +23,4 @@ jobs:
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
-  - template: /eng/ci/templates/public/steps/build-test-zip.yml@self
-
   - template: /eng/ci/templates/public/steps/run-unit-tests.yml@self

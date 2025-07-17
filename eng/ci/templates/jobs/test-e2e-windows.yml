@@ -8,49 +8,20 @@ jobs:
     image: 1es-windows-2022
     os: windows
 
-  # Need to find an arm64 image/agent for windows
   strategy:
     matrix:
-      dotnet_win_x86:
-        languageWorker: 'Dotnet'
-        runtime: 'win-x86'
-      dotnet_win_x64:
-        languageWorker: 'Dotnet'
-        runtime: 'win-x64'
-      # dotnet_win_arm64:
-      #   languageWorker: 'Dotnet'
-      #   runtime: 'win-arm64'
-
-      dotnetIsolated_win_x86:
-        languageWorker: 'DotnetIsolated'
-        runtime: 'win-x86'
       dotnetIsolated_win_x64:
         languageWorker: 'DotnetIsolated'
         runtime: 'win-x64'
-      # dotnetIsolated_win_arm64:
-      #   languageWorker: 'DotnetIsolated'
-      #   runtime: 'win-arm64'
-
-      node_win_x86:
-        languageWorker: 'Node'
-        runtime: 'win-x86'
       node_win_x64:
         languageWorker: 'Node'
         runtime: 'win-x64'
-      # node_win_arm64:
-      #   languageWorker: 'Node'
-      #   runtime: 'win-arm64'
-
-      powershell_win_x86:
-        languageWorker: 'Powershell'
-        runtime: 'win-x86'
       powershell_win_x64:
         languageWorker: 'Powershell'
         runtime: 'win-x64'
-      # powershell_win_arm64:
-      #   languageWorker: 'Powershell'
-      #   runtime: 'win-arm64'
-
+      python_win_x64:
+        languageWorker: 'Python'
+        runtime: 'win-x64'
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait

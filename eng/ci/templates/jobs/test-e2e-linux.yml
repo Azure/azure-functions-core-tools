@@ -10,9 +10,6 @@ jobs:
 
   strategy:
     matrix:
-      dotnet_linux_x64:
-        languageWorker: 'Dotnet'
-        runtime: 'linux-x64'
       dotnetIsolated_linux_x64:
         languageWorker: 'DotnetIsolated'
         runtime: 'linux-x64'
@@ -21,6 +18,9 @@ jobs:
         runtime: 'linux-x64'
       powershell_linux_x64:
         languageWorker: 'Powershell'
+        runtime: 'linux-x64'
+      python_linux_x64:
+        languageWorker: 'Python'
         runtime: 'linux-x64'
 
   steps:

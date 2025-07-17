@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
-    public class ResolveActionTests
+    public class ResolveActionTests : IDisposable
     {
         [Theory]
         [InlineData("azure functionapp enable-git-repo appName", typeof(DeprecatedAzureActions))]
@@ -123,6 +123,11 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 .As<IDurableManager>();
 
             return builder.Build();
+        }
+
+        public void Dispose()
+        {
+            FileSystemHelpers.Instance = null;
         }
     }
 }

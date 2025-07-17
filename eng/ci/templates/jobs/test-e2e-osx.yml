@@ -8,37 +8,20 @@ jobs:
     image: macOS-latest
     os: macOS
 
-  # Need to find an arm64 image/agent for macOS
   strategy:
     matrix:
-      dotnet_osx_x64:
-        languageWorker: 'Dotnet'
-        runtime: 'osx-x64'
-      # dotnet_osx_arm64:
-      #   languageWorker: 'Dotnet'
-      #   runtime: 'osx-arm64'
-
       dotnetIsolated_osx_x64:
         languageWorker: 'DotnetIsolated'
         runtime: 'osx-x64'
-      # dotnetIsolated_osx_arm64:
-      #   languageWorker: 'DotnetIsolated'
-      #   runtime: 'osx-arm64'
-
       node_osx_x64:
         languageWorker: 'Node'
         runtime: 'osx-x64'
-      # node_osx_arm64:
-      #   languageWorker: 'Node'
-      #   runtime: 'osx-arm64'
-
       powershell_osx_x64:
         languageWorker: 'Powershell'
         runtime: 'osx-x64'
-      # powershell_osx_arm64:
-      #   languageWorker: 'Powershell'
-      #   runtime: 'osx-arm64'
-
+      python_osx_x64:
+        languageWorker: 'Python'
+        runtime: 'osx-x64'
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1

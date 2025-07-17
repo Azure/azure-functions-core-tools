@@ -1,3 +1,5 @@
+// Requires KeyVault resource or emulator
+
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -71,7 +73,6 @@ namespace Azure.Functions.Cli.Tests
             {
                 outputString.Should().BeEmpty();
             }
-            
         }
 
         // See https://docs.microsoft.com/en-us/azure/app-service/app-service-key-vault-references

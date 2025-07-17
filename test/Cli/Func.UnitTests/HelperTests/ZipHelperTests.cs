@@ -1,28 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.IO.Compression;
-using System.Linq;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Tests.E2E.Helpers;
+using Azure.Functions.Cli.UnitTests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class ZipHelperTests
+    public class ZipHelperTests : IDisposable
     {
         private readonly ITestOutputHelper _output;
-        private bool _isCI = Environment.GetEnvironmentVariable("TF_BUILD")?.ToLowerInvariant() == "true";
+        private readonly bool _isCI = Environment.GetEnvironmentVariable("TF_BUILD")?.ToLowerInvariant() == "true";
 
         public ZipHelperTests(ITestOutputHelper output)
         {
             _output = output;
-
-            // reset to default in case other tests have set this up with mocks
-            FileSystemHelpers.Instance = null;
         }
 
         [Fact]
@@ -88,6 +83,7 @@ namespace Azure.Functions.Cli.Tests
             // build the project for the rid
             var csproj = dir.GetFiles($"{proj}.csproj", SearchOption.AllDirectories).FirstOrDefault();
             var csprojDir = csproj.Directory.FullName;
+
             ProcessHelper.RunProcess("dotnet", $"build -r {rid}", csprojDir, writeOutput: WriteOutput);
 
             string outPath = Path.GetFullPath(Path.Combine(csprojDir, "..", "..", "out", "bin", "ZippedExe", $"debug_{rid}"));
@@ -104,8 +100,14 @@ namespace Azure.Functions.Cli.Tests
 
             // use our zip utilities to zip them
             var zipFile = Path.Combine(tempDir, "test.zip");
-            var stream = await ZipHelper.CreateZip(files, tempDir, executables: new string[] { exe });
 
+            foreach (var file in files)
+            {
+                Assert.True(File.Exists(file), $"{file} does not exist");
+            }
+
+            var stream = await ZipHelper.CreateZip(files, tempDir, executables: new string[] { exe });
+            Assert.NotNull(stream);
             await FileSystemHelpers.WriteToFile(zipFile, stream);
 
             return zipFile;
@@ -192,6 +194,11 @@ namespace Azure.Functions.Cli.Tests
         private void WriteOutput(string output)
         {
             _output.WriteLine(output);
+        }
+
+        public void Dispose()
+        {
+            FileSystemHelpers.Instance = null;
         }
     }
 }
