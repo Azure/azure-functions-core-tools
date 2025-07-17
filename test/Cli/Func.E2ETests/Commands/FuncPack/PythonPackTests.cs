@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 PythonProjectPath,
                 testName,
                 FuncPath,
-                log,
+                Log,
                 new[]
                 {
                     "host.json",
