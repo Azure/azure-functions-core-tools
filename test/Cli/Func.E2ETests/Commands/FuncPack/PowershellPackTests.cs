@@ -8,8 +8,13 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Powershell)]
-    public class PowershellPackTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class PowershellPackTests : BaseE2ETests
     {
+        public PowershellPackTests(ITestOutputHelper log)
+            : base(log)
+        {
+        }
+
         private string PowershellProjectPath => Path.Combine(TestProjectDirectory, "TestPowershellProject");
 
         [Fact]

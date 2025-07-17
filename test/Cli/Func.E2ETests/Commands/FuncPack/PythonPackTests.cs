@@ -11,8 +11,13 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Python)]
-    public class PythonPackTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class PythonPackTests : BaseE2ETests
     {
+        public PythonPackTests(ITestOutputHelper log)
+            : base(log)
+        {
+        }
+
         private string PythonProjectPath => Path.Combine(TestProjectDirectory, "TestPythonProject");
 
         [Fact]
