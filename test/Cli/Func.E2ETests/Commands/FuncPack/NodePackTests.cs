@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 {
                     "host.json",
                     "package.json",
-                    "src\\functions\\HttpTrigger.js",
+                    Path.Combine("src", "functions", "HttpTrigger.js"),
                     "package-lock.json"
                 });
         }
