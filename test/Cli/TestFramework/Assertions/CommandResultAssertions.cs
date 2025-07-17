@@ -7,7 +7,6 @@ using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Abstractions;
 using FluentAssertions;
 using FluentAssertions.Execution;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Assertions
