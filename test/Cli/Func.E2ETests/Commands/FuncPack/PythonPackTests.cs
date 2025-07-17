@@ -41,6 +41,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
 
             // Step 1: Initialize a Python function app
+            // Note that we need to initialize the function app as we are testing an instance that has not run pack before.
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var initResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
@@ -95,7 +96,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             // Step 4: Update requirements.txt and pack again (should restore dependencies)
             var requirementsPath = Path.Combine(workingDir, "requirements.txt");
-            log.WriteLine($"Writing to file {requirementsPath}");
+            Log.WriteLine($"Writing to file {requirementsPath}");
             File.WriteAllText(requirementsPath, "requests");
 
             var thirdPackResult = funcPackCommand
