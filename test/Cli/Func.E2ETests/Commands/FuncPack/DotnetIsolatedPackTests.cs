@@ -9,34 +9,26 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
-    public class DotnetIsolatedPackTests : IClassFixture<DotnetIsolatedFunctionAppFixture>
+    public class DotnetIsolatedPackTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private readonly DotnetIsolatedFunctionAppFixture _fixture;
-
-        public DotnetIsolatedPackTests(DotnetIsolatedFunctionAppFixture fixture, ITestOutputHelper log)
-        {
-            _fixture = fixture;
-            _fixture.Log = log;
-        }
+        private string DotnetIsolatedProjectPath => Path.Combine(TestProjectDirectory, "TestDotnet8IsolatedProject");
 
         [Fact]
         public void Pack_DotnetIsolated_WorksAsExpected()
         {
-            var workingDir = _fixture.WorkingDirectory;
             var testName = nameof(Pack_DotnetIsolated_WorksAsExpected);
 
             BasePackTests.TestBasicPackFunctionality(
-                workingDir,
+                DotnetIsolatedProjectPath,
                 testName,
-                _fixture,
+                FuncPath,
+                log,
                 new[]
                 {
                     "host.json",
-                    "HttpTrigger.cs",
-                    "Properties\\launchSettings.json",
+                    "TestDotnet8IsolatedProject.csproj",
                     "Program.cs",
-                    "obj\\project.assets.json",
-                    "obj\\project.nuget.cache"
+                    "Function1.cs"
                 });
         }
     }

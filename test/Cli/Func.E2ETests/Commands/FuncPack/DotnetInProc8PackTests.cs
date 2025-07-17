@@ -1,7 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
@@ -9,31 +8,25 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
-    public class DotnetInProc8PackTests : IClassFixture<Dotnet8InProcFunctionAppFixture>
+    public class DotnetInProc8PackTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private readonly Dotnet8InProcFunctionAppFixture _fixture;
-
-        public DotnetInProc8PackTests(Dotnet8InProcFunctionAppFixture fixture, ITestOutputHelper log)
-        {
-            _fixture = fixture;
-            _fixture.Log = log;
-        }
+        private string Dotnet8ProjectPath => Path.Combine(TestProjectDirectory, "TestNet8InProcProject");
 
         [Fact]
         public void Pack_Dotnet8InProc_WorksAsExpected()
         {
-            var workingDir = _fixture.WorkingDirectory;
             var testName = nameof(Pack_Dotnet8InProc_WorksAsExpected);
 
             BasePackTests.TestBasicPackFunctionality(
-                workingDir,
+                Dotnet8ProjectPath,
                 testName,
-                _fixture,
+                FuncPath,
+                log,
                 new[]
                 {
                     "host.json",
-                    "HttpTrigger.cs",
-                    "Properties\\launchSettings.json"
+                    "Dotnet8InProc.cs",
+                    "TestNet8InProcProject.csproj"
                 });
         }
     }

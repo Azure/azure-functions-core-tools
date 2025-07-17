@@ -13,8 +13,8 @@ $runtimeSettings = ".\test\Cli\Func.E2ETests\.runsettings\start_tests\artifact_c
 [System.Environment]::SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet", "Process")
 
 # Path for Visual Studio test projects (convert to absolute paths)
-$net8VsProjectPath = ".\test\TestFunctionApps\VisualStudioTestProjects\TestNet8InProcProject"
-$net6VsProjectPath = ".\test\TestFunctionApps\VisualStudioTestProjects\TestNet6InProcProject"
+$net8VsProjectPath = ".\test\TestFunctionApps\TestNet8InProcProject"
+$net6VsProjectPath = ".\test\TestFunctionApps\TestNet6InProcProject"
 
 # Resolve paths to absolute paths
 $absoluteNet8VsProjectPath = (Resolve-Path -Path $net8VsProjectPath -ErrorAction SilentlyContinue).Path
