@@ -34,7 +34,8 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 {
                     "host.json",
                     "requirements.txt",
-                    "function_app.py"
+                    "function_app.py",
+                    Path.Combine(".python_packages", "requirements.txt.md5")
                 });
         }
 
