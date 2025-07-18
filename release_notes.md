@@ -8,3 +8,4 @@
 #### Changes
 
 - Fix dotnet templates installation (#5358)
+- Add `func pack` support for in-proc functions (#4529)
