@@ -29,6 +29,7 @@ steps:
 
     Write-Host "##vso[task.setvariable variable=DURABLE_FUNCTION_PATH]$(Build.SourcesDirectory)/test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder"
     Write-Host "##vso[task.setvariable variable=INPROC_RUN_SETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/.runsettings/start_tests/ci_pipeline/dotnet_inproc.runsettings"
+    Write-Host "##vso[task.setvariable variable=TEST_PROJECT_PATH]$(Build.SourcesDirectory)/test/TestFunctionApps"
   displayName: 'Set environment variables for E2E tests'
 
 
