@@ -1,7 +1,7 @@
 ﻿const fs = require('fs');
 const path = require('path');
 
-const readMeSrc = path.resolve(__dirname, '..', '..', '..', 'README.md');
+const readMeSrc = path.resolve(__dirname, '..', '..', '..', '..', '..', 'README.md');
 const readMeDest = path.resolve(__dirname, '..', 'README.md');
 
 fs.copyFile(readMeSrc, readMeDest, (err) => {

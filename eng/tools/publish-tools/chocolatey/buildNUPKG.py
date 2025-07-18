@@ -60,10 +60,14 @@ def preparePackage():
 
     # write install powershell script
     scriptDir = os.path.abspath(os.path.dirname(__file__))
+    print(f"scriptDir: {scriptDir}")
+
     with open(os.path.join(scriptDir, "installps_template")) as f:
         # TODO stream replace instead of reading the entire string into memory
         stringData = f.read()
+
     t = Template(stringData)
+
     with open(os.path.join(tools, "chocolateyinstall.ps1"), "w") as f:
         print("writing install powershell script")
         f.write(t.safe_substitute(substitutionMapping))
@@ -71,8 +75,10 @@ def preparePackage():
     # write nuspec package metadata
     with open(os.path.join(scriptDir,"nuspec_template")) as f:
         stringData = f.read()
+
     t = Template(stringData)
     nuspecFile = os.path.join(constants.BUILDFOLDER, constants.PACKAGENAME+".nuspec")
+
     with open(nuspecFile, 'w') as f:
         print("writing nuspec")
         f.write(t.safe_substitute(substitutionMapping))
