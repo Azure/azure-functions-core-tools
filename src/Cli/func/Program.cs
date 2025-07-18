@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli
             _container = InitializeAutofacContainer();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
 
-            CancelKeyHandler.Register(_container.Resolve<IProcessManager>());
+            CancelKeyHandler.Register(_container.Resolve<IProcessManager>(), _container.Resolve<IConsoleReader>());
 
             ConsoleApp.Run<Program>(args, _container);
         }
@@ -93,6 +93,10 @@ namespace Azure.Functions.Cli
 
             builder.RegisterType<ProcessManager>()
                 .As<IProcessManager>()
+                .SingleInstance();
+
+            builder.RegisterType<ConsoleReader>()
+                .As<IConsoleReader>()
                 .SingleInstance();
 
             builder.RegisterType<SecretsManager>()
