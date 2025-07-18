@@ -8,3 +8,4 @@
 #### Changes
 
 - Fix dotnet templates installation (#5358)
+- Add ability to force exit on second Ctrl+C press (#4540)
