@@ -296,7 +296,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
-            settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+            settings.TryAdd("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
 
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
