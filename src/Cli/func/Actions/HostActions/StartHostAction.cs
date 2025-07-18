@@ -438,22 +438,25 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var runTask = host.RunAsync();
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
 
-            await hostService.DelayUntilHostReady();
-
-            var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
-            var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
-            if (scriptHost != null && scriptHost.Functions.Any())
+            if (hostService.State is not ScriptHostState.Stopping && hostService.State is not ScriptHostState.Stopped)
             {
-                // Checking if in Limelight - it should have a `AzureDevSessionsRemoteHostName` value in local.settings.json.
-                var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
-                    s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
-                if (forwardedHttpUrl != null)
-                {
-                    var baseUrl = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
-                    baseUri = new Uri(baseUrl);
-                }
+                await hostService.DelayUntilHostReady();
 
-                DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
+                var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
+                var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
+                if (scriptHost != null && scriptHost.Functions.Any())
+                {
+                    // Checking if in Limelight - it should have a `AzureDevSessionsRemoteHostName` value in local.settings.json.
+                    var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
+                        s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
+                    if (forwardedHttpUrl != null)
+                    {
+                        var baseUrl = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
+                        baseUri = new Uri(baseUrl);
+                    }
+
+                    DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
+                }
             }
 
             if (VerboseLogging == null || !VerboseLogging.Value)

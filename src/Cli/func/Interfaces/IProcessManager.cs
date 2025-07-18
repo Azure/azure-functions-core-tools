@@ -22,5 +22,8 @@ namespace Azure.Functions.Cli.Interfaces
 
         // Kill all child processes spawned by the current process.
         internal void KillChildProcesses();
+
+        // Kill the main process. This is typically used when the process needs to exit immediately.
+        internal void KillMainProcess();
     }
 }
