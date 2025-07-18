@@ -68,40 +68,42 @@ jobs:
         filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
         arguments: '-FuncCliPath "$(Pipeline.Workspace)/staging/func-cli"'
 
-  - task: PowerShell@2
-    displayName: 'Check if visualstudio artifact exists'
-    inputs:
-      targetType: 'inline'
-      pwsh: true
-      script: |
-        $path = "$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli-visualstudio"
-        if (Test-Path $path) {
-          Write-Host "Visual Studio CLI artifacts found at $path"
-          Write-Host "##vso[task.setvariable variable=vsCliExists]true"
-        } else {
-          Write-Host "Visual Studio CLI artifacts not found at $path"
-          Write-Host "##vso[task.setvariable variable=vsCliExists]false"
-        }
+  # The visual studio tests are checking for the Core Tools Host - we only build the host for linux and windows.
+  - ${{ if or(eq(parameters.arch, 'linux-x64'), contains(parameters.arch, 'win')) }}:
+    - task: PowerShell@2
+      displayName: 'Check if visualstudio artifact exists'
+      inputs:
+        targetType: 'inline'
+        pwsh: true
+        script: |
+          $path = "$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli-visualstudio"
+          if (Test-Path $path) {
+            Write-Host "Visual Studio CLI artifacts found at $path"
+            Write-Host "##vso[task.setvariable variable=vsCliExists]true"
+          } else {
+            Write-Host "Visual Studio CLI artifacts not found at $path"
+            Write-Host "##vso[task.setvariable variable=vsCliExists]false"
+          }
 
-  - task: ExtractFiles@1
-    condition: eq( variables['vsCliExists'], 'true' )
-    inputs:
-      archiveFilePatterns: '$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli-visualstudio/*.zip'
-      destinationFolder: '$(Pipeline.Workspace)/staging/func-cli-visualstudio'
-      cleanDestinationFolder: true
-      overwriteExistingFiles: true
-
-  - ${{ if not(contains(parameters.arch, 'win')) }}:
-    - bash: |
-        chmod +x $(Pipeline.Workspace)/staging/func-cli-visualstudio/func
-        chmod +x $(Pipeline.Workspace)/staging/func-cli-visualstudio/gozip
-      displayName: 'Make CLI binaries executable'
+    - task: ExtractFiles@1
+      displayName: 'Unzip func-cli-visualstudio'
       condition: eq( variables['vsCliExists'], 'true' )
+      inputs:
+        archiveFilePatterns: '$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli-visualstudio/*.zip'
+        destinationFolder: '$(Pipeline.Workspace)/staging/func-cli-visualstudio'
+        cleanDestinationFolder: true
+        overwriteExistingFiles: true
 
-  - task: PowerShell@2
-    displayName: 'Test Artifacts - Visual Studio'
-    condition: eq( variables['vsCliExists'], 'true' )
-    inputs:
-      targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
-      arguments: '-FuncCliPath "$(Pipeline.Workspace)/staging/func-cli-visualstudio"'
+    - ${{ if not(contains(parameters.arch, 'win')) }}:
+      - bash: |
+          chmod +x $(Pipeline.Workspace)/staging/func-cli-visualstudio/func
+        displayName: 'Make CLI binaries executable'
+        condition: eq( variables['vsCliExists'], 'true' )
+
+    - task: PowerShell@2
+      displayName: 'Test Artifacts - Visual Studio'
+      condition: eq( variables['vsCliExists'], 'true' )
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
+        arguments: '-FuncCliPath "$(Pipeline.Workspace)/staging/func-cli-visualstudio"'

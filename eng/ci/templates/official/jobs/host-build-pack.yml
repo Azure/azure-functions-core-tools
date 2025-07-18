@@ -149,7 +149,7 @@ jobs:
     displayName: Copy files (linux-x64)
     inputs:
       SourceFolder: $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
-      # Publish output will include many other files. We only need func & nethost.dll
+      # Publish output will include many other files. We only need func & libnethost.so
       Contents: |
         func
         libnethost.so
