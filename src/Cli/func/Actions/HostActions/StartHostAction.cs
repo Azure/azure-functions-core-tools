@@ -21,6 +21,7 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
+using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -265,6 +266,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     {
                         services.AddSingleton<IConfigureBuilder<IServiceCollection>>(_ => new DotNetIsolatedDebugConfigureBuilder());
                     }
+
+                    // We do not need diagnostic events for local development, so we replace it with a null repository
+                    services.AddSingleton<IDiagnosticEventRepository, DiagnosticEventNullRepository>();
                 })
                 .Build();
         }
