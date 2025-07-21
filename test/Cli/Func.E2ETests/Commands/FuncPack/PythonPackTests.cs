@@ -1,21 +1,44 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
+using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Python)]
-    public class PythonPackTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class PythonPackTests : BaseE2ETests
     {
+        public PythonPackTests(ITestOutputHelper log)
+            : base(log)
+        {
+        }
+
+        private string PythonProjectPath => Path.Combine(TestProjectDirectory, "TestPythonProject");
+
+        [Fact]
+        public void Pack_Python_WorksAsExpected()
+        {
+            var testName = nameof(Pack_Python_WorksAsExpected);
+
+            BasePackTests.TestBasicPackFunctionality(
+                PythonProjectPath,
+                testName,
+                FuncPath,
+                Log,
+                new[]
+                {
+                    "host.json",
+                    "requirements.txt",
+                    "function_app.py",
+                    Path.Combine(".python_packages", "requirements.txt.md5")
+                });
+        }
+
         [Fact]
         public void Pack_PythonFromCache_WorksAsExpected()
         {
@@ -24,6 +47,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
 
             // Step 1: Initialize a Python function app
+            // Note that we need to initialize the function app as we are testing an instance that has not run pack before.
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var initResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)

@@ -15,8 +15,8 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.InProcTests
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
     public class VisualStudioInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private readonly string _vsNet8ProjectPath = Environment.GetEnvironmentVariable(Constants.VisualStudioNet8ProjectPath) ?? Path.Combine("..", "..", "..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet8InProcProject");
-        private readonly string _vsNet6ProjectPath = Environment.GetEnvironmentVariable(Constants.VisualStudioNet6ProjectPath) ?? Path.Combine("..", "..", "..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet6InProcProject");
+        private readonly string _vsNet8ProjectPath = Environment.GetEnvironmentVariable(Constants.VisualStudioNet8ProjectPath) ?? Path.Combine("..", "..", "..", "..", "..", "TestFunctionApps", "TestNet8InProcProject");
+        private readonly string _vsNet6ProjectPath = Environment.GetEnvironmentVariable(Constants.VisualStudioNet6ProjectPath) ?? Path.Combine("..", "..", "..", "..", "..", "TestFunctionApps", "TestNet6InProcProject");
 
         [Fact]
         public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
