@@ -1,17 +1,18 @@
-using Azure.Functions.Cli.Helpers;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
-using System;
-using System.IO;
+using Azure.Functions.Cli.Helpers;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class PackActionBuildOptionTests : IDisposable
+    public class ResolveBuildOptionTests : IDisposable
     {
         private readonly string _tempDirectory;
         private readonly string _originalDirectory;
 
-        public PackActionBuildOptionTests()
+        public ResolveBuildOptionTests()
         {
             _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             Directory.CreateDirectory(_tempDirectory);
@@ -36,11 +37,11 @@ namespace Azure.Functions.Cli.Tests
             File.WriteAllText(requirementsTxtPath, "requests==2.25.1\nnumpy==1.21.0");
 
             // Act
-            var result = PublishHelper.ResolveBuildOption(
-                BuildOption.Default, 
-                WorkerRuntime.Python, 
-                site: null, 
-                buildNativeDeps: false, 
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Default,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
                 noBuild: false);
 
             // Assert
@@ -52,14 +53,14 @@ namespace Azure.Functions.Cli.Tests
         {
             // Arrange
             var requirementsTxtPath = Path.Combine(_tempDirectory, Constants.RequirementsTxt);
-            File.WriteAllText(requirementsTxtPath, ""); // Empty file
+            File.WriteAllText(requirementsTxtPath, string.Empty); // Empty file
 
             // Act
-            var result = PublishHelper.ResolveBuildOption(
-                BuildOption.Default, 
-                WorkerRuntime.Python, 
-                site: null, 
-                buildNativeDeps: false, 
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Default,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
                 noBuild: false);
 
             // Assert
@@ -72,11 +73,11 @@ namespace Azure.Functions.Cli.Tests
             // Arrange - no requirements.txt file
 
             // Act
-            var result = PublishHelper.ResolveBuildOption(
-                BuildOption.Default, 
-                WorkerRuntime.Python, 
-                site: null, 
-                buildNativeDeps: false, 
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Default,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
                 noBuild: false);
 
             // Assert
@@ -91,11 +92,11 @@ namespace Azure.Functions.Cli.Tests
             File.WriteAllText(requirementsTxtPath, "requests==2.25.1");
 
             // Act
-            var result = PublishHelper.ResolveBuildOption(
-                BuildOption.Default, 
-                WorkerRuntime.Node, 
-                site: null, 
-                buildNativeDeps: false, 
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Default,
+                WorkerRuntime.Node,
+                site: null,
+                buildNativeDeps: false,
                 noBuild: false);
 
             // Assert
@@ -110,11 +111,11 @@ namespace Azure.Functions.Cli.Tests
             File.WriteAllText(requirementsTxtPath, "requests==2.25.1");
 
             // Act
-            var result = PublishHelper.ResolveBuildOption(
-                BuildOption.Default, 
-                WorkerRuntime.Python, 
-                site: null, 
-                buildNativeDeps: true, 
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Default,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: true,
                 noBuild: false);
 
             // Assert
@@ -130,11 +131,11 @@ namespace Azure.Functions.Cli.Tests
             File.WriteAllText(requirementsTxtPath, "requests==2.25.1");
 
             // Act
-            var result = PublishHelper.ResolveBuildOption(
-                BuildOption.Default, 
-                WorkerRuntime.Python, 
-                site: null, 
-                buildNativeDeps: false, 
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Default,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
                 noBuild: true);
 
             // Assert
