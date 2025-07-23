@@ -12,9 +12,10 @@ namespace Azure.Functions.Cli
     internal class Program
     {
         private static readonly string[] _versionArgs = ["version", "v"];
+        private static readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
         private static IContainer _container;
 
-        internal static void Main(string[] args)
+        internal static async Task Main(string[] args)
         {
             // Configure console encoding
             ConsoleHelper.ConfigureConsoleOutputEncoding();
@@ -34,12 +35,22 @@ namespace Azure.Functions.Cli
             _container = InitializeAutofacContainer();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
 
-            Console.CancelKeyPress += (s, e) =>
+            try
             {
-                _container.Resolve<IProcessManager>()?.KillChildProcesses();
-            };
+                CancelKeyHandler.Register(
+                    processManager: _container.Resolve<IProcessManager>(),
+                    onCancel: () => _shutdownCts.Cancel());
 
-            ConsoleApp.Run<Program>(args, _container);
+                await Task.Run(() => ConsoleApp.Run<Program>(args, _container)).WaitAsync(_shutdownCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected cancellation, do nothing
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.WriteLine($"Unexpected error: {ex.Message}");
+            }
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
