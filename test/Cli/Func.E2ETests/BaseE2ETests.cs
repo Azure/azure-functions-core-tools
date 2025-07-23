@@ -17,6 +17,8 @@ namespace Azure.Functions.Cli.E2ETests
 
         protected string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
+        protected string TestProjectDirectory { get; set; } = Environment.GetEnvironmentVariable(Constants.TestProjectPath) ?? Path.GetFullPath(Path.Combine("..", "..", "..", "..", "test", "TestFunctionApps"));
+
         public Task InitializeAsync()
         {
             if (string.IsNullOrEmpty(FuncPath))

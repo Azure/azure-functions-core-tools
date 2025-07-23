@@ -2,10 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Assertions/CommandResultAssertions.cs
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Abstractions;
 using FluentAssertions;
 using FluentAssertions.Execution;
+using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Assertions
 {
@@ -151,6 +153,54 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
                     _commandResult.StdOut is not null &&
                     System.Text.RegularExpressions.Regex.IsMatch(_commandResult.StdOut, pattern))
                 .FailWith($"The command output did not match the regex pattern: {pattern}{Environment.NewLine}");
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
+
+        public AndConstraint<CommandResultAssertions> ValidateZipContents(string zipFilePath, string[] expectedContents, ITestOutputHelper? logger)
+        {
+            // Create temporary directory to extract zip contents
+            string tempExtractDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            try
+            {
+                logger?.WriteLine($"Extracting zip to: {tempExtractDir}");
+                Directory.CreateDirectory(tempExtractDir);
+
+                // Extract the zip file
+                ZipFile.ExtractToDirectory(zipFilePath, tempExtractDir, overwriteFiles: true);
+
+                // Log all files in the extracted directory
+                string[] extractedFiles = Directory.GetFiles(tempExtractDir, "*", SearchOption.AllDirectories);
+                logger?.WriteLine($"Found {extractedFiles.Length} files in the zip:");
+                foreach (string file in extractedFiles)
+                {
+                    var relativePath = file.Replace(tempExtractDir, string.Empty).TrimStart(Path.DirectorySeparatorChar);
+                    logger?.WriteLine($"  - {relativePath}");
+                }
+
+                // Verify expected contents are present
+                foreach (string file in expectedContents)
+                {
+                    string filePath = Path.Combine(tempExtractDir, file);
+                    Execute.Assertion.ForCondition(File.Exists(filePath))
+                        .FailWith($"Expected file '{file}' not found in the zip contents.");
+                }
+            }
+            finally
+            {
+                // Clean up the temporary directory
+                if (Directory.Exists(tempExtractDir))
+                {
+                    try
+                    {
+                        Directory.Delete(tempExtractDir, recursive: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.WriteLine($"Warning: Failed to delete temporary directory: {ex.Message}");
+                    }
+                }
+            }
+
             return new AndConstraint<CommandResultAssertions>(this);
         }
     }

@@ -109,7 +109,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
-            var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, noBuild: false, buildOption: BuildOption.Default, additionalPackages: AdditionalPackages);
+            var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, BuildOption.Default, noBuild: false, additionalPackages: AdditionalPackages);
 
             if (Squashfs)
             {

@@ -7,5 +7,7 @@
 
 #### Changes
 
-- Fix dotnet templates installation (#5358)
+- Fix dotnet templates installation (#4538)
+- Disable diagnostic events in local development by replacing the `IDiagnosticEventRepository` with a `DiagnosticEventNullRepository` (#4542)
+- Add `func pack` support for in-proc functions (#4529)
 - Implement (2 second) graceful shutdown timeout period for the CLI (#4540)
