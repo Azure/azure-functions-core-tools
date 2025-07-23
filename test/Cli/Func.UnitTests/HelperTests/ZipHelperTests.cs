@@ -200,5 +200,72 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             FileSystemHelpers.Instance = null;
         }
+
+        [Fact]
+        public async Task GetAppZipFile_BasicZip_Succeeds()
+        {
+            GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Node;
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+
+            var file1 = Path.Combine(tempDir, "file1.txt");
+            var file2 = Path.Combine(tempDir, "file2.txt");
+            File.WriteAllText(file1, "Hello");
+            File.WriteAllText(file2, "World");
+
+            var zipStream = await ZipHelper.GetAppZipFile(tempDir, false, BuildOption.None, true, mockCustomHandler: string.Empty);
+            Assert.NotNull(zipStream);
+            zipStream.Seek(0, SeekOrigin.Begin);
+            var zip = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
+            Assert.Contains(zip.Entries, e => e.Name == "file1.txt");
+            Assert.Contains(zip.Entries, e => e.Name == "file2.txt");
+        }
+
+        [Fact]
+        public async Task GetAppZipFile_WithFuncIgnore_ExcludesFiles()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Node;
+            Directory.CreateDirectory(tempDir);
+            var file1 = Path.Combine(tempDir, "file1.txt");
+            var file2 = Path.Combine(tempDir, "file2.log");
+            File.WriteAllText(file1, "Hello");
+            File.WriteAllText(file2, "World");
+            var ignorePath = Path.Combine(tempDir, ".funcignore");
+            File.WriteAllText(ignorePath, "*.log");
+
+            var zipStream = await ZipHelper.GetAppZipFile(tempDir, false, BuildOption.None, true, mockCustomHandler: string.Empty);
+            Assert.NotNull(zipStream);
+            zipStream.Seek(0, SeekOrigin.Begin);
+            using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
+            Assert.Contains(zip.Entries, e => e.Name == "file1.txt");
+            Assert.DoesNotContain(zip.Entries, e => e.Name == "file2.log");
+        }
+
+        [Fact]
+        public async Task GetAppZipFile_RemoteBuild_ExcludesBinObj()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            var file1 = Path.Combine(tempDir, "file1.txt");
+            var binDir = Path.Combine(tempDir, "bin");
+            var objDir = Path.Combine(tempDir, "obj");
+            Directory.CreateDirectory(binDir);
+            Directory.CreateDirectory(objDir);
+            var binFile = Path.Combine(binDir, "shouldNotBeIncluded.txt");
+            var objFile = Path.Combine(objDir, "shouldNotBeIncluded.txt");
+            File.WriteAllText(file1, "Hello");
+            File.WriteAllText(binFile, "bin");
+            File.WriteAllText(objFile, "obj");
+
+            GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Dotnet;
+            var zipStream = await ZipHelper.GetAppZipFile(tempDir, false, BuildOption.Remote, true);
+            Assert.NotNull(zipStream);
+            zipStream.Seek(0, SeekOrigin.Begin);
+            using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
+            Assert.Contains(zip.Entries, e => e.Name == "file1.txt");
+            Assert.DoesNotContain(zip.Entries, e => e.FullName.Contains("bin"));
+            Assert.DoesNotContain(zip.Entries, e => e.FullName.Contains("obj"));
+        }
     }
 }

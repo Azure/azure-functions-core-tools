@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
+        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null, string mockCustomHandler = null)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                var customHandler = await HostHelpers.GetCustomHandlerExecutable();
+                var customHandler = mockCustomHandler == null ? await HostHelpers.GetCustomHandlerExecutable() : string.Empty;
                 IEnumerable<string> executables = !string.IsNullOrEmpty(customHandler)
                     ? new[] { customHandler }
                     : Enumerable.Empty<string>();
