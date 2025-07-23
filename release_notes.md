@@ -10,5 +10,4 @@
 - Fix dotnet templates installation (#4538)
 - Disable diagnostic events in local development by replacing the `IDiagnosticEventRepository` with a `DiagnosticEventNullRepository` (#4542)
 - Add `func pack` support for in-proc functions (#4529)
-- Disable diagnostic events in local development by replacing the `IDiagnosticEventRepository` with a `DiagnosticEventNullRepository` (#4542)
-- Default to remote build for func pack for python apps (#4530)
+- Default to remote build for `func pack` for python apps (#4530)
