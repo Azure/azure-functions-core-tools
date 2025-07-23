@@ -25,15 +25,20 @@ You should now be able to debug the host via the `func start` command in the CLI
 
 #### VS Code
 
-1. Press F5
-2. Provide the command you want to run i.e. `start --verbose`
+1. Press `F5`
+2. Provide the command you want to run e.g. `start --verbose`
 3. Provide the path to your test app, e.g. `<path>/MyTestFuncApp`
 
 This will build the CLI and start the host with the provided command and test app path, and automatically attach the debugger.
 
 #### Visual Studio
 
-//todo: Add instructions for Visual Studio
+1. Open debug launch profiles UI in the Debug tab
+2. Set the `Command line arguments` to the command you want to run
+3. Set the `Working directory` to the path of your test app
+4. Press `F5`
+
+![Visual Studio Debug Settings](../images/vs-debug-settings.png)
 
 #### Other
 
