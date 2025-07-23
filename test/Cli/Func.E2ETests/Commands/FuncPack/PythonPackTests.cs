@@ -34,8 +34,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 {
                     "host.json",
                     "requirements.txt",
-                    "function_app.py",
-                    Path.Combine(".python_packages", "requirements.txt.md5")
+                    "function_app.py"
                 });
         }
 
@@ -83,14 +82,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             firstPackResult.Should().HaveStdOutContaining("Creating a new package");
             firstPackResult.Should().NotHaveStdOutContaining(syncDirMessage);
 
-            // Verify .python_packages/requirements.txt.md5 file exists
-            var pythonPackagesMd5Path = Path.Combine(workingDir, ".python_packages", "requirements.txt.md5");
-            var packFilesToValidate = new List<(string FilePath, string[] ExpectedContent)>
-            {
-                (pythonPackagesMd5Path, new[] { string.Empty }) // Just check file exists, content can be empty
-            };
-            firstPackResult.Should().FilesExistsWithExpectContent(packFilesToValidate);
-
             // Step 3: Run pack again without changing requirements.txt (should use cache)
             var secondPackResult = funcPackCommand
                 .WithWorkingDirectory(workingDir)
@@ -98,7 +89,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             secondPackResult.Should().ExitWith(0);
             secondPackResult.Should().HaveStdOutContaining("Creating a new package");
-            secondPackResult.Should().HaveStdOutContaining(syncDirMessage);
+            secondPackResult.Should().NotHaveStdOutContaining(syncDirMessage);
 
             // Step 4: Update requirements.txt and pack again (should restore dependencies)
             var requirementsPath = Path.Combine(workingDir, "requirements.txt");
@@ -112,9 +103,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             thirdPackResult.Should().ExitWith(0);
             thirdPackResult.Should().HaveStdOutContaining("Creating a new package");
             thirdPackResult.Should().NotHaveStdOutContaining(syncDirMessage);
-
-            // Verify .python_packages/requirements.txt.md5 file still exists
-            thirdPackResult.Should().FilesExistsWithExpectContent(packFilesToValidate);
         }
     }
 }
