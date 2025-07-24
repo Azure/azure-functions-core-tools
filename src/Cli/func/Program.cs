@@ -12,7 +12,8 @@ namespace Azure.Functions.Cli
     internal class Program
     {
         private static readonly string[] _versionArgs = ["version", "v"];
-        private static readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
+        private static readonly CancellationTokenSource _shuttingDownCts = new CancellationTokenSource();
+        private static readonly CancellationTokenSource _forceShutdownCts = new CancellationTokenSource();
         private static IContainer _container;
 
         internal static async Task Main(string[] args)
@@ -33,19 +34,21 @@ namespace Azure.Functions.Cli
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
             _container = InitializeAutofacContainer();
+            var processManager = _container.Resolve<IProcessManager>();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+
+            CancelKeyHandler.Register(
+                processManager: processManager,
+                onShuttingDown: _shuttingDownCts.Cancel,
+                onGracePeriodTimeout: _forceShutdownCts.Cancel);
 
             try
             {
-                CancelKeyHandler.Register(
-                    processManager: _container.Resolve<IProcessManager>(),
-                    onCancel: () => _shutdownCts.Cancel());
-
-                await Task.Run(() => ConsoleApp.Run<Program>(args, _container)).WaitAsync(_shutdownCts.Token);
+                await ConsoleApp.RunAsync<Program>(args, _container, _shuttingDownCts.Token).WaitAsync(_forceShutdownCts.Token);
             }
             catch (OperationCanceledException)
             {
-                // Expected cancellation, do nothing
+                processManager.KillMainProcess();
             }
             catch (Exception ex)
             {

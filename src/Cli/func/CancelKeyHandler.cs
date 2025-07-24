@@ -9,12 +9,14 @@ internal static class CancelKeyHandler
 {
     private static readonly TimeSpan _gracefulShutdownPeriod = TimeSpan.FromSeconds(2);
     private static IProcessManager _processManager = null!;
-    private static Action _onCancel;
+    private static Action _onShuttingDown;
+    private static Action _onGracePeriodTimeout;
     private static bool _registered = false;
 
     public static void Register(
         IProcessManager processManager,
-        Action onCancel)
+        Action onShuttingDown,
+        Action onGracePeriodTimeout = null)
     {
         if (_registered)
         {
@@ -22,7 +24,8 @@ internal static class CancelKeyHandler
         }
 
         _processManager = processManager ?? throw new ArgumentNullException(nameof(processManager));
-        _onCancel = onCancel ?? throw new ArgumentNullException(nameof(onCancel));
+        _onShuttingDown = onShuttingDown ?? throw new ArgumentNullException(nameof(onShuttingDown));
+        _onGracePeriodTimeout = onGracePeriodTimeout ?? (() => { });
 
         Console.CancelKeyPress += HandleCancelKeyPress;
         _registered = true;
@@ -31,12 +34,12 @@ internal static class CancelKeyHandler
     internal static void HandleCancelKeyPress(object sender, ConsoleCancelEventArgs e)
     {
         _processManager.KillChildProcesses();
-        _onCancel?.Invoke();
+        _onShuttingDown?.Invoke();
 
         _ = Task.Run(async () =>
         {
             await Task.Delay(_gracefulShutdownPeriod);
-            _processManager.KillMainProcess();
+            _onGracePeriodTimeout?.Invoke();
         });
     }
 

@@ -9,25 +9,32 @@ using Xunit;
 public class CancelKeyHandlerTests
 {
     [Fact]
-    public async Task CtrlC_KillsChildImmediately_AndMainAfterDelay()
+    public async Task CtrlC_KillsChildImmediately_AndInvokesGracePeriodTimeout()
     {
         // Arrange
-        var cts = new CancellationTokenSource();
-        var mockProcessManager = new TestProcessManager(); // your concrete test double
+        var ctsShuttingDown = new CancellationTokenSource();
+        var ctsGracePeriod = new CancellationTokenSource();
+        var mockProcessManager = new TestProcessManager();
 
-        CancelKeyHandler.Register(mockProcessManager, onCancel: () => cts.Cancel());
+        CancelKeyHandler.Register(
+            processManager: mockProcessManager,
+            onShuttingDown: ctsShuttingDown.Cancel,
+            onGracePeriodTimeout: ctsGracePeriod.Cancel);
 
         try
         {
             // Act
             CancelKeyHandler.HandleCancelKeyPress(null, CreateFakeCancelEventArgs());
 
-            // Assert after short delay
+            // Assert immediate child process kill
             Assert.True(mockProcessManager.KillChildProcessesCalled);
-            Assert.False(mockProcessManager.KillMainProcessCalled);
+            Assert.False(ctsGracePeriod.IsCancellationRequested);
 
-            await Task.Delay(2200); // Wait for delayed KillMainProcess
-            Assert.True(mockProcessManager.KillMainProcessCalled);
+            // Assert graceful timeout is called after ~2 seconds
+            var gracePeriodInvoked = await Task.Run(() =>
+                ctsGracePeriod.Token.WaitHandle.WaitOne(3000)); // Slight buffer
+
+            Assert.True(gracePeriodInvoked, "Grace period timeout was not triggered.");
         }
         finally
         {

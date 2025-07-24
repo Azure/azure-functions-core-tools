@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Common
 
         public void KillMainProcess()
         {
-            Process.GetCurrentProcess().Kill(true);
+            Process.GetCurrentProcess().Kill();
         }
 
         public void KillChildProcesses()
@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.Common
             {
                 if (!childProcess.HasExited)
                 {
-                    childProcess.Kill(true);
+                    childProcess.Kill();
                 }
             }
         }
