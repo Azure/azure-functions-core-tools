@@ -6,6 +6,7 @@ namespace Azure.Functions.Cli;
 internal static class CancelKeyHandler
 {
     private static readonly TimeSpan _gracefulShutdownPeriod = TimeSpan.FromSeconds(2);
+    private static readonly ConsoleCancelEventHandler _handlerDelegate = HandleCancelKeyPress;
     private static Action _onShuttingDown;
     private static Action _onGracePeriodTimeout;
     private static bool _registered = false;
@@ -21,7 +22,7 @@ internal static class CancelKeyHandler
         _onShuttingDown = onShuttingDown ?? (() => { });
         _onGracePeriodTimeout = onGracePeriodTimeout ?? (() => { });
 
-        Console.CancelKeyPress += HandleCancelKeyPress;
+        Console.CancelKeyPress += _handlerDelegate;
         _registered = true;
     }
 
@@ -47,9 +48,12 @@ internal static class CancelKeyHandler
     {
         if (_registered)
         {
-            Console.CancelKeyPress -= HandleCancelKeyPress;
+            Console.CancelKeyPress -= _handlerDelegate;
             _registered = false;
-            _shutdownStarted = false;
         }
+
+        _shutdownStarted = false;
+        _onShuttingDown = null;
+        _onGracePeriodTimeout = null;
     }
 }
