@@ -31,24 +31,23 @@ namespace Azure.Functions.Cli
             }
 
             FirstTimeCliExperience();
-            SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
             _container = InitializeAutofacContainer();
             var processManager = _container.Resolve<IProcessManager>();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-
-            CancelKeyHandler.Register(
-                processManager: processManager,
-                onShuttingDown: _shuttingDownCts.Cancel,
-                onGracePeriodTimeout: _forceShutdownCts.Cancel);
+            CancelKeyHandler.Register(_shuttingDownCts.Cancel, _forceShutdownCts.Cancel);
 
             try
             {
                 await ConsoleApp.RunAsync<Program>(args, _container, _shuttingDownCts.Token).WaitAsync(_forceShutdownCts.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
-                processManager.KillMainProcess();
+                if (ex.CancellationToken == _forceShutdownCts.Token)
+                {
+                    processManager.KillChildProcesses();
+                    processManager.KillMainProcess();
+                }
             }
             catch (Exception ex)
             {
@@ -60,20 +59,6 @@ namespace Azure.Functions.Cli
         {
             var processManager = _container.Resolve<IProcessManager>();
             processManager?.KillChildProcesses();
-        }
-
-        private static void SetupGlobalExceptionHandler()
-        {
-            // AppDomain.CurrentDomain.UnhandledException += (s, e) =>
-            // {
-            //     if (e.IsTerminating)
-            //     {
-            //         ColoredConsole.Error.WriteLine(ErrorColor(e.ExceptionObject.ToString()));
-            //         ColoredConsole.Write("Press any to continue....");
-            //         Console.ReadKey(true);
-            //         Environment.Exit(ExitCodes.GeneralError);
-            //     }
-            // };
         }
 
         private static void FirstTimeCliExperience()

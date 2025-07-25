@@ -1,30 +1,24 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Interfaces;
-
 namespace Azure.Functions.Cli;
 
 internal static class CancelKeyHandler
 {
     private static readonly TimeSpan _gracefulShutdownPeriod = TimeSpan.FromSeconds(2);
-    private static IProcessManager _processManager = null!;
     private static Action _onShuttingDown;
     private static Action _onGracePeriodTimeout;
     private static bool _registered = false;
+    private static bool _shutdownStarted = false;
 
-    public static void Register(
-        IProcessManager processManager,
-        Action onShuttingDown,
-        Action onGracePeriodTimeout = null)
+    public static void Register(Action onShuttingDown = null, Action onGracePeriodTimeout = null)
     {
         if (_registered)
         {
             return;
         }
 
-        _processManager = processManager ?? throw new ArgumentNullException(nameof(processManager));
-        _onShuttingDown = onShuttingDown ?? throw new ArgumentNullException(nameof(onShuttingDown));
+        _onShuttingDown = onShuttingDown ?? (() => { });
         _onGracePeriodTimeout = onGracePeriodTimeout ?? (() => { });
 
         Console.CancelKeyPress += HandleCancelKeyPress;
@@ -33,7 +27,12 @@ internal static class CancelKeyHandler
 
     internal static void HandleCancelKeyPress(object sender, ConsoleCancelEventArgs e)
     {
-        _processManager.KillChildProcesses();
+        if (_shutdownStarted)
+        {
+            return;
+        }
+
+        _shutdownStarted = true;
         _onShuttingDown?.Invoke();
 
         _ = Task.Run(async () =>
@@ -43,12 +42,14 @@ internal static class CancelKeyHandler
         });
     }
 
+    // For testing purposes, we need to ensure that the handler can be disposed of properly.
     internal static void Dispose()
     {
         if (_registered)
         {
             Console.CancelKeyPress -= HandleCancelKeyPress;
             _registered = false;
+            _shutdownStarted = false;
         }
     }
 }
