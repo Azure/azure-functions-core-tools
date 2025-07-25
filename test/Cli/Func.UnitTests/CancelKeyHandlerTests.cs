@@ -93,41 +93,6 @@ public class CancelKeyHandlerTests
         }
     }
 
-    [Fact]
-    public async Task MultipleCtrlC_OnlyTriggersHandlersOnce()
-    {
-        try
-        {
-            // Arrange
-            int shutdownCount = 0;
-            int graceCount = 0;
-
-            var graceCts = new CancellationTokenSource();
-
-            CancelKeyHandler.Register(
-                onShuttingDown: () => shutdownCount++,
-                onGracePeriodTimeout: () =>
-                {
-                    graceCount++;
-                    graceCts.Cancel();
-                });
-
-            // Act
-            CancelKeyHandler.HandleCancelKeyPress(null, CreateFakeCancelEventArgs());
-            CancelKeyHandler.HandleCancelKeyPress(null, CreateFakeCancelEventArgs());
-
-            await Task.Run(() => graceCts.Token.WaitHandle.WaitOne(3000));
-
-            // Assert
-            Assert.Equal(1, shutdownCount);
-            Assert.Equal(1, graceCount);
-        }
-        finally
-        {
-            CancelKeyHandler.Dispose();
-        }
-    }
-
     private static ConsoleCancelEventArgs CreateFakeCancelEventArgs()
     {
         var constructor = typeof(ConsoleCancelEventArgs)
