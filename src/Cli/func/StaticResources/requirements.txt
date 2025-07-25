@@ -1,5 +1,18 @@
 ﻿# Uncomment to enable Azure Monitor OpenTelemetry
-# Ref: aka.ms/functions-azure-monitor-python 
-# azure-monitor-opentelemetry 
+# Ref: aka.ms/functions-azure-monitor-python
+# azure-monitor-opentelemetry
+
+# Uncomment to start using SDK Bindings
+# Ref: aka.ms/functions-sdk-blob-python
+# azurefunctions-extensions-bindings-blob
+
+# Ref: aka.ms/functions-sdk-cosmosdb-python
+# azurefunctions-extensions-bindings-cosmosdb
+
+# Ref: aka.ms/functions-sdk-eventhub-python
+# azurefunctions-extensions-bindings-eventhub
+
+# Ref: /aka.ms/functions-sdk-servicebus-python
+# azurefunctions-extensions-bindings-servicebus
 
 azure-functions
