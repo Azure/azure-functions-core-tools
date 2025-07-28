@@ -168,5 +168,4 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             Assert.True(zipFiles.Length > 0, $"No zip files found in {workingDir}");
         }
     }
-    }
 }
