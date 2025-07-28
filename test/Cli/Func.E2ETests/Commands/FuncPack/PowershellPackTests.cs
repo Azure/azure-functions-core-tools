@@ -36,5 +36,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     Path.Combine("HttpTrigger", "function.json")
                 });
         }
+
+        [Fact]
+        public void Pack_Powershell_WithBuildLocal_ShouldFail()
+        {
+            var testName = nameof(Pack_Powershell_WithBuildLocal_ShouldFail);
+
+            BasePackTests.TestBuildLocalFlagForNonPythonRuntime(
+                PowershellProjectPath,
+                testName,
+                FuncPath,
+                Log,
+                "powershell");
+        }
     }
 }

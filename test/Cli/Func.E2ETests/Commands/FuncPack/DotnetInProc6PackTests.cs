@@ -35,5 +35,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "TestNet6InProcProject.csproj"
                 });
         }
+
+        [Fact]
+        public void Pack_Dotnet6InProc_WithBuildLocal_ShouldFail()
+        {
+            var testName = nameof(Pack_Dotnet6InProc_WithBuildLocal_ShouldFail);
+
+            BasePackTests.TestBuildLocalFlagForNonPythonRuntime(
+                Dotnet6ProjectPath,
+                testName,
+                FuncPath,
+                Log,
+                "dotnet");
+        }
     }
 }

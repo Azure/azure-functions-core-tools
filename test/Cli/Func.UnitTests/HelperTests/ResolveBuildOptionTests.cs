@@ -49,6 +49,46 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
+        public void ResolveBuildOption_PythonWithRequirementsTxt_WithWindowsBuild_ReturnsDefault()
+        {
+            // Arrange
+            var requirementsTxtPath = Path.Combine(_tempDirectory, Constants.RequirementsTxt);
+            File.WriteAllText(requirementsTxtPath, "requests==2.25.1\nnumpy==1.21.0");
+
+            // Act
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Default,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
+                noBuild: false,
+                includeLocalBuildForWindows: true);
+
+            // Assert
+            Assert.Equal(BuildOption.Default, result);
+        }
+
+        [Fact]
+        public void ResolveBuildOption_PythonWithRequirementsTxt_WithWindowsBuild_AndLocalBuild_ReturnsDefault()
+        {
+            // Arrange
+            var requirementsTxtPath = Path.Combine(_tempDirectory, Constants.RequirementsTxt);
+            File.WriteAllText(requirementsTxtPath, "requests==2.25.1\nnumpy==1.21.0");
+
+            // Act
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Local,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
+                noBuild: false,
+                includeLocalBuildForWindows: true);
+
+            // Assert
+            Assert.Equal(BuildOption.Local, result);
+        }
+
+        [Fact]
         public void ResolveBuildOption_PythonWithEmptyRequirementsTxt_ReturnsDefault()
         {
             // Arrange

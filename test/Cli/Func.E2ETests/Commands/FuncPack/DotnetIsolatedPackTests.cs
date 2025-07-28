@@ -36,5 +36,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "Function1.cs"
                 });
         }
+
+        [Fact]
+        public void Pack_DotnetIsolated_WithBuildLocal_ShouldFail()
+        {
+            var testName = nameof(Pack_DotnetIsolated_WithBuildLocal_ShouldFail);
+
+            BasePackTests.TestBuildLocalFlagForNonPythonRuntime(
+                DotnetIsolatedProjectPath,
+                testName,
+                FuncPath,
+                Log,
+                "dotnet-isolated");
+        }
     }
 }

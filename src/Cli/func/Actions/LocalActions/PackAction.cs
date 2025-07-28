@@ -31,6 +31,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Squashfs { get; private set; }
 
+        public bool BuildLocal { get; private set; } = false;
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
@@ -53,6 +55,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<bool>("squashfs")
                 .Callback(f => Squashfs = f);
+            Parser.
+                Setup<bool>("build-local")
+                .WithDescription("Builds the function app locally instead of remotely. This is only applicable for Python function apps.")
+                .Callback(f => BuildLocal = f);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -89,8 +95,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
 
-            // Resolve build option to detect if remote build is needed (e.g., Python app on Windows)
-            var buildOption = ResolveBuildOptionHelper.ResolveBuildOption(BuildOption.Default, workerRuntime, site: null, BuildNativeDeps, noBuild: false);
+            var defaultBuildOption = BuildOption.Default;
+
+            if (BuildLocal)
+            {
+                if (workerRuntime != WorkerRuntime.Python)
+                {
+                    throw new CliException("The --build-local option is only applicable for Python function apps.");
+                }
+
+                defaultBuildOption = BuildOption.Local;
+            }
+
+            // Resolve build option to detect if remote build is needed
+            // IncludeLocalBuildForWindows is set to true to ensure that local builds are used for Python on Windows
+            var buildOption = ResolveBuildOptionHelper.ResolveBuildOption(defaultBuildOption, workerRuntime, site: null, BuildNativeDeps, noBuild: false, includeLocalBuildForWindows: true);
 
             outputPath += Squashfs ? ".squashfs" : ".zip";
             if (FileSystemHelpers.FileExists(outputPath))

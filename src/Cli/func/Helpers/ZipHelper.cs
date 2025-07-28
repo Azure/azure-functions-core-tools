@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
             }
-            else if (buildOption == BuildOption.Local)
+            else if (buildOption == BuildOption.Local || buildOption == BuildOption.Default)
             {
                 ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project."));
             }

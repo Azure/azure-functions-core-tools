@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
@@ -25,17 +26,28 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         {
             var testName = nameof(Pack_Python_WorksAsExpected);
 
+            var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+            var expectedFiles = new[]
+            {
+                "host.json",
+                "requirements.txt",
+                "function_app.py"
+            };
+
+            if (isWindows)
+            {
+                // On Windows, we expect the .python_packages directory to be included
+                expectedFiles = [.. expectedFiles, Path.Combine(".python_packages", "requirements.txt.md5")];
+            }
+
             BasePackTests.TestBasicPackFunctionality(
                 PythonProjectPath,
                 testName,
                 FuncPath,
                 Log,
-                new[]
-                {
-                    "host.json",
-                    "requirements.txt",
-                    "function_app.py"
-                });
+                expectedFiles,
+                shouldHaveLocalBuildLogs: true);
         }
 
         [Fact]
@@ -44,6 +56,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             var workingDir = WorkingDirectory;
             var testName = nameof(Pack_PythonFromCache_WorksAsExpected);
             var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
+            var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
             // Step 1: Initialize a Python function app
             // Note that we need to initialize the function app as we are testing an instance that has not run pack before.
@@ -82,6 +95,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             firstPackResult.Should().HaveStdOutContaining("Creating a new package");
             firstPackResult.Should().NotHaveStdOutContaining(syncDirMessage);
 
+            var pythonPackagesMd5Path = Path.Combine(workingDir, ".python_packages", "requirements.txt.md5");
+            var packFilesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+                {
+                    (pythonPackagesMd5Path, new[] { string.Empty }) // Just check file exists, content can be empty
+                };
+
+            if (isWindows)
+            {
+                // Verify .python_packages/requirements.txt.md5 file exists
+                firstPackResult.Should().FilesExistsWithExpectContent(packFilesToValidate);
+            }
+
             // Step 3: Run pack again without changing requirements.txt (should use cache)
             var secondPackResult = funcPackCommand
                 .WithWorkingDirectory(workingDir)
@@ -89,7 +114,16 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             secondPackResult.Should().ExitWith(0);
             secondPackResult.Should().HaveStdOutContaining("Creating a new package");
-            secondPackResult.Should().NotHaveStdOutContaining(syncDirMessage);
+            if (isWindows)
+            {
+                // On Windows, we expect the .python_packages directory to be in sync
+                secondPackResult.Should().HaveStdOutContaining(syncDirMessage);
+            }
+            else
+            {
+                // On non-Windows, we should not see the sync message
+                secondPackResult.Should().NotHaveStdOutContaining(syncDirMessage);
+            }
 
             // Step 4: Update requirements.txt and pack again (should restore dependencies)
             var requirementsPath = Path.Combine(workingDir, "requirements.txt");
@@ -103,6 +137,36 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             thirdPackResult.Should().ExitWith(0);
             thirdPackResult.Should().HaveStdOutContaining("Creating a new package");
             thirdPackResult.Should().NotHaveStdOutContaining(syncDirMessage);
+
+            if (isWindows)
+            {
+                // Verify .python_packages/requirements.txt.md5 file still exists
+                thirdPackResult.Should().FilesExistsWithExpectContent(packFilesToValidate);
+            }
         }
+
+        [Fact]
+        public void Pack_Python_WithBuildLocal_WorksAsExpected()
+        {
+            var workingDir = WorkingDirectory;
+            var testName = nameof(Pack_PythonFromCache_WorksAsExpected);
+
+            // Run pack command with --build-local flag
+            var funcPackCommand = new FuncPackCommand(FuncPath, testName, Log);
+            var packResult = funcPackCommand
+                .WithWorkingDirectory(workingDir)
+                .Execute(["--build-local"]);
+
+            // Verify pack succeeded
+            packResult.Should().ExitWith(0);
+            packResult.Should().HaveStdOutContaining("Creating a new package");
+
+            // Find any zip files in the working directory
+            var zipFiles = Directory.GetFiles(workingDir, "*.zip");
+
+            // Verify at least one zip file exists
+            Assert.True(zipFiles.Length > 0, $"No zip files found in {workingDir}");
+        }
+    }
     }
 }

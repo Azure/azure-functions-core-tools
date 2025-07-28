@@ -34,5 +34,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "TestNet8InProcProject.csproj"
                 });
         }
+
+        [Fact]
+        public void Pack_Dotnet8InProc_WithBuildLocal_ShouldFail()
+        {
+            var testName = nameof(Pack_Dotnet8InProc_WithBuildLocal_ShouldFail);
+
+            BasePackTests.TestBuildLocalFlagForNonPythonRuntime(
+                Dotnet8ProjectPath,
+                testName,
+                FuncPath,
+                Log,
+                "dotnet");
+        }
     }
 }
