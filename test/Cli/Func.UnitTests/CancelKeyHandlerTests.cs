@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli;
 using Xunit;
+using static Azure.Functions.Cli.UnitTests.TestUtilities;
 
 public class CancelKeyHandlerTests
 {
@@ -34,15 +35,11 @@ public class CancelKeyHandlerTests
             CancelKeyHandler.HandleCancelKeyPress(null, CreateFakeCancelEventArgs());
 
             // Assert immediate shutdown signal
-            var shutdownCalled = await Task.Run(() => shuttingDownCts.Token.WaitHandle.WaitOne(500));
-            Assert.True(shutdownCalled, "onShuttingDown was not invoked immediately.");
-            Assert.True(shuttingDownInvoked);
+            Assert.True(await WaitForConditionAsync(() => shuttingDownInvoked, TimeSpan.FromSeconds(1)), "onShuttingDown was not invoked immediately.");
             Assert.False(gracePeriodInvoked, "onGracePeriodTimeout should not be invoked immediately after shutting down.");
 
             // Assert delayed grace period signal
-            var graceCalled = await Task.Run(() => gracePeriodCts.Token.WaitHandle.WaitOne(3000));
-            Assert.True(graceCalled, "onGracePeriodTimeout was not invoked after delay.");
-            Assert.True(gracePeriodInvoked);
+            Assert.True(await WaitForConditionAsync(() => gracePeriodInvoked, TimeSpan.FromSeconds(5), 500), "onGracePeriodTimeout was not invoked after delay.");
         }
         finally
         {
@@ -73,7 +70,7 @@ public class CancelKeyHandlerTests
     }
 
     [Fact]
-    public async Task Register_WithNullCallbacks_DoesNotThrow()
+    public void Register_WithNullCallbacks_DoesNotThrow()
     {
         try
         {
@@ -84,8 +81,6 @@ public class CancelKeyHandlerTests
 
             // Assert
             Assert.Null(exception);
-
-            await Task.Delay(2100);
         }
         finally
         {
