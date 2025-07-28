@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Xunit;
@@ -49,7 +50,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void ResolveBuildOption_PythonWithRequirementsTxt_WithWindowsBuild_ReturnsDefault()
+        public void ResolveBuildOption_PythonWithRequirementsTxt_DependingOnOs_ReturnsExpectedValue()
         {
             // Arrange
             var requirementsTxtPath = Path.Combine(_tempDirectory, Constants.RequirementsTxt);
@@ -65,7 +66,16 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 includeLocalBuildForWindows: true);
 
             // Assert
-            Assert.Equal(BuildOption.Default, result);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // On Windows, we expect the default behavior to be Remote
+                Assert.Equal(BuildOption.Default, result);
+            }
+            else
+            {
+                // On non-Windows, it should still return Remote
+                Assert.Equal(BuildOption.Remote, result);
+            }
         }
 
         [Fact]
