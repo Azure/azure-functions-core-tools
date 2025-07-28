@@ -11,3 +11,5 @@
 - Disable diagnostic events in local development by replacing the `IDiagnosticEventRepository` with a `DiagnosticEventNullRepository` (#4542)
 - Add `func pack` support for in-proc functions (#4529)
 - Default to remote build for `func pack` for python apps (#4530)
+- Add   build-local` option for `func pack` and default to local buidl for Python apps on windows with warning (#4550)
+

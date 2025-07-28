@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
+        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, bool isPackAction, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -26,7 +26,14 @@ namespace Azure.Functions.Cli.Helpers
             }
             else if (buildOption == BuildOption.Remote)
             {
-                ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
+                if (isPackAction)
+                {
+                    ColoredConsole.WriteLine(DarkYellow("Skipping local build. Please request a remote build while deploying"));
+                }
+                else
+                {
+                    ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
+                }
             }
             else if (buildOption == BuildOption.Local || buildOption == BuildOption.Default)
             {
