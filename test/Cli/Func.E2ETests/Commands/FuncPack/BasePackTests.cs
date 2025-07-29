@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             File.Delete(zipFiles.First()); // Clean up the zip file after validation
         }
 
-        internal static void TestBuildLocalFlagForNonPythonRuntime(string workingDir, string testName, string funcPath, ITestOutputHelper log, string runtime)
+        internal static void TestBuildLocalFlag(string workingDir, string testName, string funcPath, ITestOutputHelper log, bool isPythonRuntime)
         {
             // Run pack command with --build-local flag
             var funcPackCommand = new FuncPackCommand(funcPath, testName, log);
@@ -63,8 +63,25 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 .Execute(["--build-local"]);
 
             // Verify pack failed with appropriate error message
-            packResult.Should().ExitWith(1);
-            packResult.Should().HaveStdErrContaining("The --build-local option is only applicable for Python function apps.");
+            packResult.Should().ExitWith(0);
+            packResult.Should().HaveStdOutContaining("Creating a new package");
+
+            if (!isPythonRuntime)
+            {
+                packResult.Should().HaveStdOutContaining("The --build-local option is only applicable for Python function apps.");
+            }
+            else
+            {
+                packResult.Should().HaveStdOutContaining("Performing local build for functions project.");
+            }
+
+            // Find any zip files in the working directory
+            var zipFiles = Directory.GetFiles(workingDir, "*.zip");
+
+            // Verify at least one zip file exists
+            Assert.True(zipFiles.Length > 0, $"No zip files found in {workingDir}");
+
+            File.Delete(zipFiles.First()); // Clean up the zip file after validation
         }
     }
 }

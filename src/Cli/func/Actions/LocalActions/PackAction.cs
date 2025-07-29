@@ -101,10 +101,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (workerRuntime != WorkerRuntime.Python)
                 {
-                    throw new CliException("The --build-local option is only applicable for Python function apps.");
+                    ColoredConsole.WriteLine(WarningColor("The --build-local option is only applicable for Python function apps."));
                 }
-
-                defaultBuildOption = BuildOption.Local;
+                else
+                {
+                    defaultBuildOption = BuildOption.Local;
+                }
             }
 
             // Resolve build option to detect if remote build is needed

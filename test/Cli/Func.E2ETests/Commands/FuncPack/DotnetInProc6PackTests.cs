@@ -41,12 +41,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         {
             var testName = nameof(Pack_Dotnet6InProc_WithBuildLocal_ShouldFail);
 
-            BasePackTests.TestBuildLocalFlagForNonPythonRuntime(
+            BasePackTests.TestBuildLocalFlag(
                 Dotnet6ProjectPath,
                 testName,
                 FuncPath,
                 Log,
-                "dotnet");
+                false);
         }
     }
 }

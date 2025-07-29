@@ -148,26 +148,14 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         [Fact]
         public void Pack_Python_WithBuildLocal_WorksAsExpected()
         {
-            var testName = nameof(Pack_PythonFromCache_WorksAsExpected);
+            var testName = nameof(Pack_Python_WithBuildLocal_WorksAsExpected);
 
-            // Run pack command with --build-local flag
-            var funcPackCommand = new FuncPackCommand(FuncPath, testName, Log);
-            var packResult = funcPackCommand
-                .WithWorkingDirectory(PythonProjectPath)
-                .Execute(["--build-local"]);
-
-            // Verify pack succeeded
-            packResult.Should().ExitWith(0);
-            packResult.Should().HaveStdOutContaining("Creating a new package");
-            packResult.Should().HaveStdOutContaining("Performing local build for functions project.");
-
-            // Find any zip files in the working directory
-            var zipFiles = Directory.GetFiles(PythonProjectPath, "*.zip");
-
-            // Verify at least one zip file exists
-            Assert.True(zipFiles.Length > 0, $"No zip files found in {PythonProjectPath}");
-
-            File.Delete(zipFiles.First()); // Clean up the zip file after validation
+            BasePackTests.TestBuildLocalFlag(
+                PythonProjectPath,
+                testName,
+                FuncPath,
+                Log,
+                true);
         }
     }
 }

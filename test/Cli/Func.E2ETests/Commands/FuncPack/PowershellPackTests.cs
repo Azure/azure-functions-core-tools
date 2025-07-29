@@ -38,16 +38,16 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         }
 
         [Fact]
-        public void Pack_Powershell_WithBuildLocal_ShouldFail()
+        public void Pack_Powershell_WithBuildLocal_WorksAsExpected()
         {
-            var testName = nameof(Pack_Powershell_WithBuildLocal_ShouldFail);
+            var testName = nameof(Pack_Powershell_WithBuildLocal_WorksAsExpected);
 
-            BasePackTests.TestBuildLocalFlagForNonPythonRuntime(
+            BasePackTests.TestBuildLocalFlag(
                 PowershellProjectPath,
                 testName,
                 FuncPath,
                 Log,
-                "powershell");
+                false);
         }
     }
 }
