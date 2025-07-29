@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 FuncPath,
                 Log,
                 expectedFiles,
-                shouldHaveLocalBuildLogs: true);
+                shouldHaveLocalBuildLogs: isWindows);
         }
 
         [Fact]
