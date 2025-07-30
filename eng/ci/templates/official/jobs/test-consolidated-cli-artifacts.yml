@@ -69,7 +69,7 @@ jobs:
         arguments: '-FuncCliPath "$(Pipeline.Workspace)/staging/func-cli"'
 
   # The visual studio tests are checking for the Core Tools Host - we only build the host for linux and windows.
-  - ${{ if contains(parameters.arch, 'win') }}:
+  - ${{ if or(eq(parameters.arch, 'linux-x64'), contains(parameters.arch, 'win')) }}:
     - task: PowerShell@2
       displayName: 'Check if visualstudio artifact exists'
       inputs:
