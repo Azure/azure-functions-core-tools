@@ -205,7 +205,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (settings.ContainsKey("CONTAINER_NAME")) // && !RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ?
             {
-                throw new CliException("CONTAINER_NAME is a protected environment variable for the Functions host. Please remove or rename this setting.");
+                throw new CliException("CONTAINER_NAME is a reserved environment variable for the Functions Host. Please remove or rename this setting.");
             }
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
