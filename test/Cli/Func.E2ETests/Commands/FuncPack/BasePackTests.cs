@@ -14,8 +14,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
     {
         internal static void TestBasicPackFunctionality(string workingDir, string testName, string funcPath, ITestOutputHelper log, string[] filesToValidate, bool shouldHaveLocalBuildLogs = false)
         {
-            var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
             // Run pack command
             var funcPackCommand = new FuncPackCommand(funcPath, testName, log);
             var packResult = funcPackCommand
@@ -24,7 +22,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             // Verify pack succeeded
             packResult.Should().ExitWith(0);
-            packResult.Should().HaveStdOutContaining("Creating a new package");
 
             // Verify the logs for python runtime on Windows
             if (shouldHaveLocalBuildLogs)

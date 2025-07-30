@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, bool isPackAction, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
+        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -22,20 +22,20 @@ namespace Azure.Functions.Cli.Helpers
 
             if (noBuild)
             {
-                ColoredConsole.WriteLine(DarkYellow("Skipping build event for functions project (--no-build)."));
+                ColoredConsole.WriteLine(DarkYellow("Skipping build event for functions project (--no-build).\n"));
             }
             else if (buildOption == BuildOption.Remote)
             {
-                ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
+                ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project.\n"));
             }
             else if (buildOption == BuildOption.Local)
             {
-                ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project."));
+                ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project.\n"));
             }
             else if (buildOption == BuildOption.Deferred)
             {
                 ColoredConsole.WriteLine(DarkYellow("Performing deferred build (remote build ready) for functions project."));
-                Console.WriteLine(DarkYellow("Please configure a remote build when deploying the package"));
+                Console.WriteLine(DarkYellow("Please configure a remote build when deploying the package.\n"));
             }
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && !noBuild)

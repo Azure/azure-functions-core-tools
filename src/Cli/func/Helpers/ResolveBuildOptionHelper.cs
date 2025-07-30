@@ -36,12 +36,12 @@ namespace Azure.Functions.Cli.Helpers
                     new FileInfo(Path.Combine(Environment.CurrentDirectory, Constants.RequirementsTxt)).Length > 0)
                 {
                     // Include default (local) build option for Windows as some customers may be using a local build for testing purposes
-                    // Note that this will be deprecated in the future after 4.1.1 is released
+                    // Note that defaulting to the local build for Windows for python function apps will be deprecated in the future after 4.1.1 is released
                     if (isFuncPackAction && OperatingSystem.IsWindows())
                     {
                         ColoredConsole.WriteLine("Python runtime detected on Windows. Using local build option.");
                         ColoredConsole.WriteLine(OutputTheme.WarningColor($"The default build option for python function apps with a valid requirements.txt " +
-                            $"will be switched over to use remote builds after version 4.1.1.\n" +
+                            $"will be switched over to use deferred builds in the future, which are remote build ready.\n" +
                             "If a local build is still needed, please use the `--build-local` flag when running `func pack`."));
                         return BuildOption.Local;
                     }

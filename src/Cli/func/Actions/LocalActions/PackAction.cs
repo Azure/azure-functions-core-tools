@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
-using System.Runtime.InteropServices;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -100,9 +99,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (BuildLocal && workerRuntime != WorkerRuntime.Python)
             {
-                ColoredConsole.WriteLine(WarningColor("The --build-local option is only applicable for Python function apps."));
+                ColoredConsole.WriteLine(WarningColor("The --build-local option is only applicable for Python function apps. Local build setting not applied.\n"));
             }
-            else if (BuildLocal && workerRuntime == WorkerRuntime.Python)
+            else if (BuildLocal)
             {
                 shouldBuildLocal = true;
             }
@@ -114,13 +113,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             ColoredConsole.WriteLine($"Detected Runtime: {workerRuntime}");
             ColoredConsole.WriteLine($"Detected Machine OS: {Environment.OSVersion.Platform}");
             ColoredConsole.WriteLine($"Build Option: {buildOption}");
-            ColoredConsole.WriteLine($"Output Path: {Path.GetFullPath(outputPath)}");
+            ColoredConsole.WriteLine($"Output Path: {Path.GetFullPath(outputPath)}\n");
 
             outputPath += Squashfs ? ".squashfs" : ".zip";
 
             if (FileSystemHelpers.FileExists(outputPath))
             {
-                ColoredConsole.WriteLine($"Deleting the old package {outputPath}");
+                ColoredConsole.WriteLine($"Deleting the old package {outputPath}\n");
                 try
                 {
                     FileSystemHelpers.FileDelete(outputPath);
@@ -138,7 +137,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
-            var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, noBuild: false, isPackAction: true, buildOption: buildOption, additionalPackages: AdditionalPackages);
+            var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, noBuild: false, buildOption: buildOption, additionalPackages: AdditionalPackages);
 
             if (Squashfs)
             {
@@ -147,8 +146,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             ColoredConsole.WriteLine($"Packaging output...");
             await FileSystemHelpers.WriteToFile(outputPath, stream);
-            ColoredConsole.WriteLine($"Successfully packaged the function app project to: {outputPath}.");
-            Console.WriteLine("----------------------------------------------------------------------");
+            ColoredConsole.WriteLine($"Packaging succeeded.\n");
+            Console.WriteLine("---------------------------------------------------------------------------------------------\n");
             ColoredConsole.WriteLine("To deploy this package run: ");
             ColoredConsole.WriteLine($"az functionapp deployment source config-zip --src \"{outputPath}\" " +
                 $"--name <function_app_name> --build-remote {buildOption == BuildOption.Deferred}");
