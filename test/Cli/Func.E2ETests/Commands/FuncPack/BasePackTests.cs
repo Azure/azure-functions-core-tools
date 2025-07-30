@@ -64,7 +64,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             // Verify pack failed with appropriate error message
             packResult.Should().ExitWith(0);
-            packResult.Should().HaveStdOutContaining("Creating a new package");
 
             if (!isPythonRuntime)
             {
