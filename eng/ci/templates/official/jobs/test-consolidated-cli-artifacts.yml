@@ -68,8 +68,8 @@ jobs:
         filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
         arguments: '-FuncCliPath "$(Pipeline.Workspace)/staging/func-cli"'
 
-  # The visual studio tests are checking for the Core Tools Host - we only build the host for linux and windows.
-  - ${{ if or(eq(parameters.arch, 'linux-x64'), contains(parameters.arch, 'win')) }}:
+  # The visual studio tests are only for Windows
+  - ${{ if contains(parameters.arch, 'win') }}:
     - task: PowerShell@2
       displayName: 'Check if visualstudio artifact exists'
       inputs:
@@ -93,12 +93,6 @@ jobs:
         destinationFolder: '$(Pipeline.Workspace)/staging/func-cli-visualstudio'
         cleanDestinationFolder: true
         overwriteExistingFiles: true
-
-    - ${{ if not(contains(parameters.arch, 'win')) }}:
-      - bash: |
-          chmod +x $(Pipeline.Workspace)/staging/func-cli-visualstudio/func
-        displayName: 'Make CLI binaries executable'
-        condition: eq( variables['vsCliExists'], 'true' )
 
     - task: PowerShell@2
       displayName: 'Test Artifacts - Visual Studio'
