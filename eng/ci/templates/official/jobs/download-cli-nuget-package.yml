@@ -12,7 +12,7 @@ jobs:
         - input: pipelineArtifact
           pipeline: core-tools-default
           artifactName: func-cli
-          targetPath: $(Pipeline.Workspace)/core-tools-default/func-cli
+          targetPath: $(Pipeline.Workspace)/func-cli-default/func-cli
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
