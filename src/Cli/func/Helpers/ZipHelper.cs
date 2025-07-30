@@ -26,18 +26,16 @@ namespace Azure.Functions.Cli.Helpers
             }
             else if (buildOption == BuildOption.Remote)
             {
-                if (isPackAction)
-                {
-                    ColoredConsole.WriteLine(DarkYellow("Skipping local build. Please request a remote build while deploying"));
-                }
-                else
-                {
-                    ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
-                }
+                ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
             }
-            else if (buildOption == BuildOption.Local || buildOption == BuildOption.Default)
+            else if (buildOption == BuildOption.Local)
             {
                 ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project."));
+            }
+            else if (buildOption == BuildOption.Deferred)
+            {
+                ColoredConsole.WriteLine(DarkYellow("Performing deferred build (remote build ready) for functions project."));
+                Console.WriteLine(DarkYellow("Please configure a remote build when deploying the package"));
             }
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && !noBuild)

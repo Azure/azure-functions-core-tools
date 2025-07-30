@@ -58,28 +58,28 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // Act
             var result = ResolveBuildOptionHelper.ResolveBuildOption(
-                BuildOption.Default,
+                BuildOption.Local,
                 WorkerRuntime.Python,
                 site: null,
                 buildNativeDeps: false,
                 noBuild: false,
-                includeLocalBuildForWindows: true);
+                isFuncPackAction: true);
 
             // Assert
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 // On Windows, we expect the default behavior to be Remote
-                Assert.Equal(BuildOption.Default, result);
+                Assert.Equal(BuildOption.Local, result);
             }
             else
             {
-                // On non-Windows, it should still return Remote
-                Assert.Equal(BuildOption.Remote, result);
+                // On non-Windows, it should return Deferred
+                Assert.Equal(BuildOption.Deferred, result);
             }
         }
 
         [Fact]
-        public void ResolveBuildOption_PythonWithRequirementsTxt_WithWindowsBuild_AndLocalBuild_ReturnsDefault()
+        public void ResolveBuildOption_PythonWithRequirementsTxt_WithLocalBuildOption_ReturnsLocal()
         {
             // Arrange
             var requirementsTxtPath = Path.Combine(_tempDirectory, Constants.RequirementsTxt);
@@ -92,7 +92,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 site: null,
                 buildNativeDeps: false,
                 noBuild: false,
-                includeLocalBuildForWindows: true);
+                isFuncPackAction: true,
+                buildOptionLocal: true);
 
             // Assert
             Assert.Equal(BuildOption.Local, result);
