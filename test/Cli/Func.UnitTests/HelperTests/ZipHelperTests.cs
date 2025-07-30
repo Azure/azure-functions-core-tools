@@ -1,10 +1,12 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO.Abstractions;
 using System.IO.Compression;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.UnitTests.Helpers;
+using NSubstitute;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -191,19 +193,15 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             Assert.Equal("Hello, World!", outputLines.Last());
         }
 
-        private void WriteOutput(string output)
-        {
-            _output.WriteLine(output);
-        }
-
-        public void Dispose()
-        {
-            FileSystemHelpers.Instance = null;
-        }
-
         [Fact]
         public async Task GetAppZipFile_BasicZip_Succeeds()
         {
+            var json = @"{""customHandler"":{""description"":{}}}";
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists("host.json").Returns(true);
+            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(json.ToStream());
+
             GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Node;
             var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             Directory.CreateDirectory(tempDir);
@@ -213,10 +211,15 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             File.WriteAllText(file1, "Hello");
             File.WriteAllText(file2, "World");
 
-            var zipStream = await ZipHelper.GetAppZipFile(tempDir, false, BuildOption.None, true, mockCustomHandler: string.Empty);
+            fileSystem.Directory.GetFiles(tempDir, "*", SearchOption.TopDirectoryOnly)
+                .Returns(new[] { file1, file2 });
+            FileSystemHelpers.Instance = fileSystem;
+
+            var zipStream = await ZipHelper.GetAppZipFile(tempDir, false, BuildOption.None, true);
             Assert.NotNull(zipStream);
             zipStream.Seek(0, SeekOrigin.Begin);
             var zip = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
+
             Assert.Contains(zip.Entries, e => e.Name == "file1.txt");
             Assert.Contains(zip.Entries, e => e.Name == "file2.txt");
         }
@@ -224,6 +227,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [Fact]
         public async Task GetAppZipFile_WithFuncIgnore_ExcludesFiles()
         {
+            var json = @"{""customHandler"":{""description"":{}}}";
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists("host.json").Returns(true);
+            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(json.ToStream());
+
             var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Node;
             Directory.CreateDirectory(tempDir);
@@ -232,7 +241,15 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             File.WriteAllText(file1, "Hello");
             File.WriteAllText(file2, "World");
             var ignorePath = Path.Combine(tempDir, ".funcignore");
-            File.WriteAllText(ignorePath, "*.log");
+            var ignoreContent = @"*.log";
+            File.WriteAllText(ignorePath, ignoreContent);
+
+            fileSystem.Directory.GetFiles(tempDir, "*", SearchOption.TopDirectoryOnly)
+                .Returns(new[] { file1, file2, ignorePath });
+            fileSystem.File.Exists(Path.Combine(tempDir, ".funcignore")).Returns(true);
+            fileSystem.File.Open(ignorePath, Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(ignoreContent.ToStream());
+            FileSystemHelpers.Instance = fileSystem;
 
             var zipStream = await ZipHelper.GetAppZipFile(tempDir, false, BuildOption.None, true, mockCustomHandler: string.Empty);
             Assert.NotNull(zipStream);
@@ -245,6 +262,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [Fact]
         public async Task GetAppZipFile_RemoteBuild_ExcludesBinObj()
         {
+            var json = @"{""customHandler"":{""description"":{}}}";
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists("host.json").Returns(true);
+            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(json.ToStream());
+
             var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             Directory.CreateDirectory(tempDir);
             var file1 = Path.Combine(tempDir, "file1.txt");
@@ -258,6 +281,13 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             File.WriteAllText(binFile, "bin");
             File.WriteAllText(objFile, "obj");
 
+            fileSystem.Directory.GetFiles(tempDir, "*", SearchOption.TopDirectoryOnly)
+                .Returns(new[] { file1 });
+
+            fileSystem.Directory.GetDirectories(tempDir, "*", SearchOption.TopDirectoryOnly)
+                .Returns(new[] { binDir, objDir });
+            FileSystemHelpers.Instance = fileSystem;
+
             GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Dotnet;
             var zipStream = await ZipHelper.GetAppZipFile(tempDir, false, BuildOption.Remote, true);
             Assert.NotNull(zipStream);
@@ -266,6 +296,16 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             Assert.Contains(zip.Entries, e => e.Name == "file1.txt");
             Assert.DoesNotContain(zip.Entries, e => e.FullName.Contains("bin"));
             Assert.DoesNotContain(zip.Entries, e => e.FullName.Contains("obj"));
+        }
+
+        private void WriteOutput(string output)
+        {
+            _output.WriteLine(output);
+        }
+
+        public void Dispose()
+        {
+            FileSystemHelpers.Instance = null;
         }
     }
 }
