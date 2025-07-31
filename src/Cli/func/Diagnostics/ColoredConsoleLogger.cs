@@ -39,14 +39,7 @@ namespace Azure.Functions.Cli.Diagnostics
 
             if (jsonOutputFilePath != null)
             {
-                if (!File.Exists(jsonOutputFilePath))
-                {
-                    _jsonOutputFileStream = File.Create(jsonOutputFilePath);
-                }
-                else
-                {
-                    _jsonOutputFileStream = File.Open(jsonOutputFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-                }
+                _jsonOutputFileStream = File.Open(jsonOutputFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
 
                 _logJsonOutput = LogJsonToFile;
 
