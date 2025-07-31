@@ -273,7 +273,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Build();
         }
 
-        private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
+        internal async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
             var settings = _secretsManager.GetSecrets();
             settings.Add(Constants.WebsiteHostname, uri.Authority);
@@ -298,9 +298,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             await CheckNonOptionalSettings(settings.Union(environment).Union(userSecrets), scriptPath, userSecretsEnabled);
 
-            // when running locally in CLI we want the host to run in debug mode
-            // which optimizes host responsiveness
-            settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+            // When running locally in CLI we want the host to run in debug mode which optimizes host responsiveness
+            // We intentionally override the value of AZURE_FUNCTIONS_ENVIRONMENT to Development if it is already set to something else.
+            if (settings.TryGetValue("AZURE_FUNCTIONS_ENVIRONMENT", out var oldValue))
+            {
+                ColoredConsole.WriteLine(WarningColor($"AZURE_FUNCTIONS_ENVIRONMENT already exists with value '{oldValue}', overriding to 'Development'."));
+            }
+            settings["AZURE_FUNCTIONS_ENVIRONMENT"] = "Development";
+
 
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
