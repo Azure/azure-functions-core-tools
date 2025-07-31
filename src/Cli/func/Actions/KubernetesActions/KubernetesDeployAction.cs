@@ -95,7 +95,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<string>("image-name", "Image to use for the pod deployment and to read functions from", n => ImageName = n);
             SetFlag<KedaVersion>("keda-version", $"Defines the version of KEDA to use. Default: {Kubernetes.KEDA.KedaVersion.V2}. Options are: {Kubernetes.KEDA.KedaVersion.V1} or {Kubernetes.KEDA.KedaVersion.V2}", n => KedaVersion = n);
             SetFlag<string>("registry", "When set, a docker build is run and the image is pushed to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
-            SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: Current namespace in Kubernetes config.", ns => Namespace = ns);
+            SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: Current namespace in Kubernetes config if set, otherwise 'default'.", ns => Namespace = ns);
             SetFlag<string>("pull-secret", "The secret holding a private registry credentials", s => PullSecret = s);
             SetFlag<int>("polling-interval", "The polling interval for checking non-http triggers. Default: 30 (seconds)", p => PollingInterval = p);
             SetFlag<int>("cooldown-period", "The cooldown period for the deployment before scaling back to 0 after all triggers are no longer active. Default: 300 (seconds)", p => CooldownPeriod = p);
@@ -131,6 +131,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public override async Task RunAsync()
         {
+            Namespace ??= await KubernetesHelper.GetCurrentNamespaceOrDefault("default");
+
             (var resolvedImageName, var shouldBuild) = await ResolveImageName();
             TriggersPayload triggers = null;
             if (DryRun)

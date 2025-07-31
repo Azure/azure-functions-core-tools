@@ -4716,7 +4716,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: horizontal-pod-autoscaler
-  namespace: kube-system
+  namespace: KEDA_NAMESPACE
 ---
 # Source: keda/templates/role_binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -4737,7 +4737,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: keda-auth-reader
-  namespace: kube-system
+  namespace: KEDA_NAMESPACE
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
