@@ -11,3 +11,4 @@
 - Disable diagnostic events in local development by replacing the `IDiagnosticEventRepository` with a `DiagnosticEventNullRepository` (#4542)
 - Add `func pack` support for in-proc functions (#4529)
 - Default to remote build for `func pack` for python apps (#4530)
+- Update KEDA templates & `kubernetes create` command to correctly use a provided namespace, or use default namespace (#4558)
