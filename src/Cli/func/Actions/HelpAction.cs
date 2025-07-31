@@ -140,7 +140,7 @@ namespace Azure.Functions.Cli.Actions
                 var usageFormat = hasSubcontexts
                     ? $"{TitleColor("Usage:")} func {context.ToLowerCaseString()} [subcontext] <action> [-/--options]"
                     : $"{TitleColor("Usage:")} func {context.ToLowerCaseString()} <action> [-/--options]";
-                
+
                 ColoredConsole
                 .WriteLine(usageFormat)
                 .WriteLine();
