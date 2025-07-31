@@ -247,7 +247,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime, functionAppRoot);
 
             // Update build option
-            PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
+            PublishBuildOption = ResolveBuildOptionHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
 
             bool isNonCsxDotnetRuntime = WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx;
 
@@ -606,7 +606,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
             ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages);
 
             bool shouldSyncTriggers = true;
             bool shouldDeferPublishZipDeploy = false;
@@ -886,9 +886,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         await AzureHelper.CheckFunctionHostStatusForFlex(functionApp, AccessToken, ManagementURL);
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check the app logs.");
+                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check the app logs.", ex);
                     }
 
                     ColoredConsole.WriteLine(VerboseColor(GetLogMessage("The deployment was successful!")));

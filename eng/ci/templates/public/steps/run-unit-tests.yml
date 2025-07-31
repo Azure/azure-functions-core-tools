@@ -1,0 +1,16 @@
+steps:
+- task: DotNetCoreCLI@2
+  displayName: 'Run unit tests'
+  inputs:
+    command: 'test'
+    projects: '**/Azure.Functions.Cli.UnitTests.csproj'
+    arguments: '--framework net8.0'
+
+- task: PublishTestResults@2
+  displayName: 'Publish test results'
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '**/*.trx'
+    failTaskOnFailedTests: true
+    searchFolder: $(Agent.TempDirectory)
+  condition: succeededOrFailed()

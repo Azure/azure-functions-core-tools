@@ -4,14 +4,23 @@ param (
 )
 
 # Define paths using the provided StagingDirectory
-$stagingCoreToolsCli = Join-Path $StagingDirectory "coretools-cli"
-$stagingCoreToolsVisualStudio = Join-Path $StagingDirectory "coretools-visualstudio"
+$stagingCoreToolsCli = Join-Path $StagingDirectory "func-cli"
+$stagingCoreToolsVisualStudio = Join-Path $StagingDirectory "func-cli-visualstudio"
 
-# Get OOP Artifact Version
-$oopVersion = (Get-ChildItem $stagingCoreToolsCli | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)$", '$1'
+# Matches the entire version, with or without -ci.xxx
+$versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-ci\.[\d\.]+)?)\.zip$'
 
-# Get inProc Artifact Version
-$inProcVersion = (Get-ChildItem $stagingCoreToolsVisualStudio | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$", '$1'
+# OOP
+$oopVersion = Get-ChildItem $stagingCoreToolsCli -Filter '*.zip' |
+    Where-Object { $_.Name -match $versionPattern } |
+    Select-Object -First 1 -ExpandProperty Name |
+    ForEach-Object { $_ -replace $versionPattern, '$1' }
+
+# inProc
+$inProcVersion = Get-ChildItem $stagingCoreToolsVisualStudio -Filter '*.zip' |
+    Where-Object { $_.Name -match $versionPattern } |
+    Select-Object -First 1 -ExpandProperty Name |
+    ForEach-Object { $_ -replace $versionPattern, '$1' }
 
 # Get the current release number from ADO
 $releaseNumber = $env:BUILD_BUILDID

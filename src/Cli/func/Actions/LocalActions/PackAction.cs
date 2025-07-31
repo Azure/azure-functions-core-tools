@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
@@ -88,6 +88,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+
+            // Resolve build option to detect if remote build is needed (e.g., Python app on Windows)
+            var buildOption = ResolveBuildOptionHelper.ResolveBuildOption(BuildOption.Default, workerRuntime, site: null, BuildNativeDeps, noBuild: false);
+
             outputPath += Squashfs ? ".squashfs" : ".zip";
             if (FileSystemHelpers.FileExists(outputPath))
             {
@@ -109,7 +113,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
-            var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, noBuild: false, buildOption: BuildOption.Default, additionalPackages: AdditionalPackages);
+            var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, noBuild: false, buildOption: buildOption, additionalPackages: AdditionalPackages);
 
             if (Squashfs)
             {

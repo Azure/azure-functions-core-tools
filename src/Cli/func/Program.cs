@@ -11,11 +11,14 @@ namespace Azure.Functions.Cli
 {
     internal class Program
     {
-        private static readonly string[] _versionArgs = new[] { "version", "v" };
+        private static readonly string[] _versionArgs = ["version", "v"];
         private static IContainer _container;
 
         internal static void Main(string[] args)
         {
+            // Configure console encoding
+            ConsoleHelper.ConfigureConsoleOutputEncoding();
+
             // Check for version arg up front and prioritize speed over all else
             // Tools like VS Code may call this often and we want their UI to be responsive
             if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", string.Empty).Equals(va, StringComparison.OrdinalIgnoreCase)))

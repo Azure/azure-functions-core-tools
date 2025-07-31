@@ -1,0 +1,23 @@
+parameters:
+- name: folderPath
+  type: string
+- name: signPatterns
+  type: string
+
+steps:
+- template: ci/sign-files.yml@eng
+  parameters:
+    displayName: 'Linux signing'
+    folderPath: '${{ parameters.folderPath }}'
+    pattern: '${{ parameters.signPatterns }}'
+    signType: inline
+    inlineOperation: |
+      [
+        {
+          "keyCode": "CP-450779-Pgp",
+          "operationSetCode": "LinuxSign",
+          "parameters": [],
+          "toolName": "sign",
+          "toolVersion": "1.0"
+        }
+      ]

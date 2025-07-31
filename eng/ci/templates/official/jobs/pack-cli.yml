@@ -1,0 +1,55 @@
+jobs:
+- job: Publish_Nupkg
+  displayName: 'Publish nupkg'
+  timeoutInMinutes: "180"
+
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  variables:
+  - template: /eng/ci/templates/official/variables/authenticode-binaries-tosign.yml@self
+  - template: /eng/ci/templates/official/variables/thirdparty-binaries-tosign.yml@self
+
+  steps:
+  - template: /eng/ci/templates/official/steps/prebuild-common.yml@self
+
+  - pwsh: |
+      dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
+        -c Release `
+        -f net8.0 `
+        --no-restore `
+        /p:NoWorkers="true" `
+        /p:SkipTemplates="true"
+    displayName: 'Build CLI'
+
+  - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
+    parameters:
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+      signPatterns: $(authenticodeBinariesToSign)
+
+  - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
+    parameters:
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+      signPatterns: $(thirdPartyBinariesToSign)
+
+  - pwsh: |
+      dotnet pack src/Cli/func/Azure.Functions.Cli.csproj  `
+        -o $(Build.Repository.LocalPath)/artifacts `
+        -c Release `
+        --no-build `
+        /p:NoWorkers="true" `
+        /p:SkipTemplates="true"
+    displayName: 'Pack CLI for NuGet'
+
+  - pwsh: |
+      Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
+    displayName: 'Move artifacts to ArtifactStagingDirectory'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeeded()
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifactName: 'func-cli-nupkg'
+      artifactType: 'pipeline'

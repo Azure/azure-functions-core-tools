@@ -1,0 +1,228 @@
+jobs:
+- job: BuildCoreToolsHostWindows
+  displayName: '[Windows] Build CoreToolsHost'
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-windows-2022
+    os: windows
+
+  steps:
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  # Building the solution gets us the latest version of the CLI and sets the Build.BuildNumber
+  - task: DotnetCoreCLI@2
+    displayName: Build sln
+    inputs:
+      command: build
+      projects: $(Build.SourcesDirectory)/Azure.Functions.Cli.sln
+      workingDirectory: $(Build.SourcesDirectory)
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (win-x64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-x64
+      workingDirectory: $(Build.SourcesDirectory)/src/CoreToolsHost
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (win-arm64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
+      workingDirectory: $(Build.SourcesDirectory)/src/CoreToolsHost
+
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Authenticode signing (dll) (win-arm64)'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/windows/win-arm64'
+      pattern: '*.dll, *.exe'
+      signType: inline
+      inlineOperation: |
+        [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+        ]
+
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Authenticode signing (dll) (win-x64)'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/windows/win-x64'
+      pattern: '*.dll, *.exe'
+      signType: inline
+      inlineOperation: |
+        [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+        ]
+
+  - task: CopyFiles@2
+    displayName: Copy files (win-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
+      # Publish output will include many other files. We only need func.exe & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-x64
+
+  - task: CopyFiles@2
+    displayName: Copy files (win-arm64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
+      # Publish output will include many other files. We only need func.exe & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-arm64
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
+      artifact: func-host-windows-signed
+
+- job: BuildCoreToolsHostLinux
+  displayName: '[Linux] Build CoreToolsHost'
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-ubuntu-22.04
+    os: linux
+
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 9.x
+      includePreviewVersions: true
+    displayName: Install .NET 9
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (linux-x64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
+      workingDirectory: $(Build.SourcesDirectory)/src/CoreToolsHost
+
+  - task: CopyFiles@2
+    displayName: Copy files (linux-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
+      # Publish output will include many other files. We only need func & libnethost.so
+      Contents: |
+        func
+        libnethost.so
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
+      artifact: func-host-linux
+
+- job: SignCoreToolsHostLinux
+  displayName: '[Linux] Sign CoreToolsHost'
+  dependsOn: BuildCoreToolsHostLinux
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-ubuntu-22.04
+    os: linux
+
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 8.x
+    displayName: Install .NET 8
+
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: func-host-linux
+      path: $(Build.SourcesDirectory)/func-host-linux
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
+      script: |
+        cd publish-scripts
+        python3 -m venv publish-env
+        source publish-env/bin/activate
+        sudo pip install -r requirements.txt
+        sudo apt-get install fakeroot
+        export PATH="$PATH:/mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.4/net462"
+      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Sign'
+      folderPath: '/mnt/vss/_work/1/s/func-host-linux'
+      pattern: 'func, libnethost.so'
+      signType: inline
+      inlineOperation: |
+        [
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "sign",
+            "toolVersion": "1.0"
+          }
+        ]
+
+  - task: CopyFiles@2
+    displayName: Copy files (linux-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/func-host-linux/linux-x64
+      # Publish output will include many other files. We only need func & libnethost.so
+      Contents: |
+        func
+        libnethost.so
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
+      artifact: func-host-linux-signed

@@ -1,0 +1,99 @@
+schedules:
+- cron: "30 2 * * *"
+  displayName: Nightly Consolidation
+  always: true
+  branches:
+    include:
+      - main
+
+trigger: none
+
+# This pipeline is triggered by the completion of scheduled builds
+# in the core-tools-inproc and core-tools-default pipelines
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+  pipelines:
+    - pipeline: core-tools-host
+      source: azure/azure-functions-core-tools/core-tools-host.official
+      branch: main
+      trigger:
+        branches:
+          include:
+            - main
+
+    - pipeline: core-tools-inproc
+      source: azure/azure-functions-core-tools/core-tools.official
+      branch: in-proc  # in-proc branch of core-tools.official
+      trigger:
+        branches:
+          include:
+            - in-proc
+
+    - pipeline: core-tools-default
+      source: azure/azure-functions-core-tools/core-tools.official
+      branch: main  # main branch of core-tools.official
+      trigger:
+        branches:
+          include:
+            - main
+
+variables:
+- template: /ci/variables/cfs.yml@eng
+- name: DisableKubernetesDeploymentDetector
+  value: true
+- name: supportedRuntimes
+  value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+  # Skipping arm64 builds for testing as we do not have an agent pool that supports it.
+- name: supportedRuntimesForTesting
+  value: 'linux-x64,osx-x64,win-x64,win-x86,min.win-x64,min.win-x86'
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  parameters:
+    featureFlags:
+      incrementalSDLBinaryAnalysis: true
+      incrementalSDLSourceAnalysis: true
+    pool:
+      name: 1es-pool-azfunc
+      image: 1es-windows-2022
+      os: windows
+    sdl:
+      codeql:
+         compiled:
+           enabled: true
+         runSourceLanguagesInSourceAnalysis: true
+
+    stages:
+    - stage: ConsolidateArticacts
+      displayName: "Consolidate CLI Artifacts"
+
+      jobs:
+      - template: /eng/ci/templates/official/jobs/download-cli-nuget-package.yml@self
+        parameters:
+          isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
+
+      - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+        - template: /eng/ci/templates/official/jobs/consolidate-cli-artifacts.yml@self
+          parameters:
+            arch: ${{ runtime }}
+            displayName: ${{ replace(replace(runtime, '-', ''), '.', '') }}
+            isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
+
+    - stage: TestArtifacts
+      dependsOn: 'ConsolidateArticacts'
+      displayName: "Test CLI Artifacts"
+
+      jobs:
+      - ${{ each runtime in split(variables.supportedRuntimesForTesting,',') }}:
+        - template: /eng/ci/templates/official/jobs/test-consolidated-cli-artifacts.yml@self
+          parameters:
+            arch: ${{ runtime }}
+            displayName: ${{ replace(replace(runtime, '-', ''), '.', '') }}

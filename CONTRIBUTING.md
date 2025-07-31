@@ -8,15 +8,24 @@ To install the required dotnet packages navigate into the repository root and ru
 
 ## Compiling the CLI Tools
 
-To build the project run `cd src/Azure.Functions.Cli; dotnet build` (note navigating into the src directory is required due to the test suite currently failing to compile on non-windows environments - see below)
+To build the project run `dotnet build` from the root of the repository. This will build the project and all of its dependencies.
+The output will be placed in the `out/bin/Azure.Functions.Cli/debug` directory.
+
+`dotnet run --project src/Cli/func <command>` will run the CLI tool from the source directory.
 
 ### Running against a function app
 
 To test this project against a local function app you can run from that function app's directory
 
-`dotnet run --project PATH_TO_FUNCTIONS_CLI/src/Azure.Functions.Cli start`
+- `cd myTestFunctionApp`
+- `dotnet run --project PATH_TO_FUNCTIONS_CLI/src/Cli/func <command>`
 
 where PATH_TO_FUNCTIONS_CLI is the absolute or relative path to the root of this repository.
+
+Or you can add `out/bin/Azure.Functions.Cli/debug/func` to your `PATH` environment variable and run the command from anywhere.
+
+- `export PATH=$PATH:/path/to/Azure.Functions.Cli/out/bin/Azure.Functions.Cli/debug/func`
+- `func <command>`
 
 ### Running the Test Suite
 
@@ -41,7 +50,7 @@ If you see an error saying the templates folder is missing, you can download the
 From the root of the repo, run:
 
 - `./eng/scripts/download-templates.ps1 -OutputPath "./out/bin/<test_project_name>/debug`
-  - e.g. "./out/bin/Azure.Functions.Cli.E2E.Tests/debug"
+  - e.g. "./out/bin/Azure.Functions.Cli.E2ETests/debug"
 
 The script will download the template packages to a `templates` folder in the specified output directory.
 
@@ -64,5 +73,3 @@ Before we can accept your pull-request you'll need to sign a [Contribution Licen
 When your pull-request is created, we classify it. If the change is trivial, i.e. you just fixed a typo, then the PR is labelled with `cla-not-required`. Otherwise it's classified as `cla-required`. In that case, the system will also also tell you how you can sign the CLA. Once you signed a CLA, the current and all future pull-requests will be labelled as `cla-signed`. Signing the CLA might sound scary but it's actually super simple and can be done in less than a minute.
 
 Before submitting a feature or substantial code contribution please discuss it with the team and ensure it follows the product roadmap. Note that all code submissions will be rigorously reviewed and tested by the Azure Functions Core Tools team, and only those that meet the bar for both quality and design/roadmap appropriateness will be merged into the source.
-
-Path: /opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.7030/templates

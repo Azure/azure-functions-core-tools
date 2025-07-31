@@ -1,0 +1,103 @@
+parameters:
+  - name: arch
+    type: string
+  - name: displayName
+    type: string
+
+jobs:
+- job: TestArtifacts${{ parameters.displayName }}
+  displayName: "Test ${{ parameters.arch }}"
+
+  ${{ if startsWith(parameters.arch, 'linux') }}:
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-ubuntu-22.04
+      os: linux
+
+  ${{ if startsWith(parameters.arch, 'osx') }}:
+    pool:
+      name: Azure Pipelines
+      image: macOS-latest
+      os: macOS
+
+  ${{ if contains(parameters.arch, 'win') }}:
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-windows-2022
+      os: windows
+
+  steps:
+  - checkout: self
+
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  - task: GoTool@0
+    displayName: 'Install Go'
+    inputs:
+      version: '1.20'
+
+  - download: current
+    displayName: 'Download artifact'
+    artifact: func-cli-${{ parameters.arch }}
+
+  # Testing for non-min versions of the CLI as some of the tests require the workers.
+  - ${{ if not(startsWith(parameters.arch, 'min.')) }}:
+    - task: ExtractFiles@1
+      displayName: 'Unzip func-cli'
+      inputs:
+        archiveFilePatterns: '$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli/*.zip'
+        destinationFolder: '$(Pipeline.Workspace)/staging/func-cli'
+        cleanDestinationFolder: true
+        overwriteExistingFiles: true
+
+    # Make the CLI binaries executable on non-Windows platforms.
+    - ${{ if not(contains(parameters.arch, 'win')) }}:
+      - bash: |
+          chmod +x $(Pipeline.Workspace)/staging/func-cli/func
+          chmod +x $(Pipeline.Workspace)/staging/func-cli/gozip
+          chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc6/func
+          chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc6/gozip
+          chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc8/func
+          chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc8/gozip
+        displayName: 'Make CLI binaries executable'
+
+    - task: PowerShell@2
+      displayName: 'Test Artifacts'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
+        arguments: '-FuncCliPath "$(Pipeline.Workspace)/staging/func-cli"'
+
+  # The visual studio tests are only for Windows
+  - ${{ if contains(parameters.arch, 'win') }}:
+    - task: PowerShell@2
+      displayName: 'Check if visualstudio artifact exists'
+      inputs:
+        targetType: 'inline'
+        pwsh: true
+        script: |
+          $path = "$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli-visualstudio"
+          if (Test-Path $path) {
+            Write-Host "Visual Studio CLI artifacts found at $path"
+            Write-Host "##vso[task.setvariable variable=vsCliExists]true"
+          } else {
+            Write-Host "Visual Studio CLI artifacts not found at $path"
+            Write-Host "##vso[task.setvariable variable=vsCliExists]false"
+          }
+
+    - task: ExtractFiles@1
+      displayName: 'Unzip func-cli-visualstudio'
+      condition: eq( variables['vsCliExists'], 'true' )
+      inputs:
+        archiveFilePatterns: '$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli-visualstudio/*.zip'
+        destinationFolder: '$(Pipeline.Workspace)/staging/func-cli-visualstudio'
+        cleanDestinationFolder: true
+        overwriteExistingFiles: true
+
+    - task: PowerShell@2
+      displayName: 'Test Artifacts - Visual Studio'
+      condition: eq( variables['vsCliExists'], 'true' )
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
+        arguments: '-FuncCliPath "$(Pipeline.Workspace)/staging/func-cli-visualstudio"'

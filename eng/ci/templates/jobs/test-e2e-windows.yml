@@ -1,0 +1,46 @@
+jobs:
+- job: Windows_E2E_Test
+  timeoutInMinutes: '180'
+  displayName: 'E2E Test:'
+
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  strategy:
+    matrix:
+      dotnetIsolated_win_x64:
+        languageWorker: 'DotnetIsolated'
+        runtime: 'win-x64'
+      node_win_x64:
+        languageWorker: 'Node'
+        runtime: 'win-x64'
+      powershell_win_x64:
+        languageWorker: 'Powershell'
+        runtime: 'win-x64'
+      python_win_x64:
+        languageWorker: 'Python'
+        runtime: 'win-x64'
+
+  steps:
+  - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
+    displayName: 'Start emulators (NoWait)'
+
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+
+  - pwsh: |
+      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r $(runtime) `
+      --self-contained `
+      -o $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
+    displayName: 'Publish CLI ($(runtime))'
+
+  - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
+    parameters:
+      worker: $(languageWorker)
+      runtime: $(runtime)
