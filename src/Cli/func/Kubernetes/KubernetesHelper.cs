@@ -55,11 +55,7 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static async Task<string> GetCurrentNamespaceOrDefault(string defaultNamespace)
         {
-            var (output, _, exitCode) = await KubectlHelper.RunKubectl(
-                "config view --minify --output jsonpath={..namespace}",
-                ignoreError: true,
-                showOutput: false
-            );
+            var (output, _, exitCode) = await KubectlHelper.RunKubectl("config view --minify --output jsonpath={..namespace}", ignoreError: true, showOutput: false);
 
             if (exitCode == 0 && !string.IsNullOrWhiteSpace(output))
             {
