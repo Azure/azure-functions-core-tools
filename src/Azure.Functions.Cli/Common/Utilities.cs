@@ -47,10 +47,28 @@ namespace Azure.Functions.Cli
 
         internal static void PrintVersion()
         {
+#if NET6_0
+            const string prefix = "6";
+#elif NET8_0
+            const string prefix = "8";
+#else
+            const string prefix = "";
+#endif
+
+            string version = ScriptHost.Version;
+            string[] parts = version.Split('.');
+
+            if (parts[1].Length == 2)
+            {
+                // no prefix, add it
+                parts[1] = prefix + parts[1];
+            }
+
+            version = string.Join(".", parts);
             ColoredConsole
                 .WriteLine($"\nAzure Functions Core Tools")
                 .WriteLine($"Core Tools Version:       {Constants.CliDetailedVersion + (Environment.Is64BitProcess ? " (64-bit)" : " (32-bit)")}".DarkGray())
-                .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
+                .WriteLine($"Function Runtime Version: {version}\n".DarkGray());
         }
 
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)
