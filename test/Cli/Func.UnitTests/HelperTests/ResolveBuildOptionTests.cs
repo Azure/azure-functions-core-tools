@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Xunit;
@@ -46,6 +47,56 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // Assert
             Assert.Equal(BuildOption.Remote, result);
+        }
+
+        [Fact]
+        public void ResolveBuildOption_PythonWithRequirementsTxt_DependingOnOs_ReturnsExpectedValue()
+        {
+            // Arrange
+            var requirementsTxtPath = Path.Combine(_tempDirectory, Constants.RequirementsTxt);
+            File.WriteAllText(requirementsTxtPath, "requests==2.25.1\nnumpy==1.21.0");
+
+            // Act
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Local,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
+                noBuild: false,
+                isFuncPackAction: true);
+
+            // Assert
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // On Windows, we expect the default behavior to be Remote
+                Assert.Equal(BuildOption.Local, result);
+            }
+            else
+            {
+                // On non-Windows, it should return Deferred
+                Assert.Equal(BuildOption.Deferred, result);
+            }
+        }
+
+        [Fact]
+        public void ResolveBuildOption_PythonWithRequirementsTxt_WithLocalBuildOption_ReturnsLocal()
+        {
+            // Arrange
+            var requirementsTxtPath = Path.Combine(_tempDirectory, Constants.RequirementsTxt);
+            File.WriteAllText(requirementsTxtPath, "requests==2.25.1\nnumpy==1.21.0");
+
+            // Act
+            var result = ResolveBuildOptionHelper.ResolveBuildOption(
+                BuildOption.Local,
+                WorkerRuntime.Python,
+                site: null,
+                buildNativeDeps: false,
+                noBuild: false,
+                isFuncPackAction: true,
+                buildOptionLocal: true);
+
+            // Assert
+            Assert.Equal(BuildOption.Local, result);
         }
 
         [Fact]

@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
@@ -22,15 +22,20 @@ namespace Azure.Functions.Cli.Helpers
 
             if (noBuild)
             {
-                ColoredConsole.WriteLine(DarkYellow("Skipping build event for functions project (--no-build)."));
+                ColoredConsole.WriteLine(DarkYellow("Skipping build event for functions project (--no-build).\n"));
             }
             else if (buildOption == BuildOption.Remote)
             {
-                ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
+                ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project.\n"));
             }
             else if (buildOption == BuildOption.Local)
             {
-                ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project."));
+                ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project.\n"));
+            }
+            else if (buildOption == BuildOption.Deferred)
+            {
+                ColoredConsole.WriteLine(DarkYellow("Performing deferred build (remote build ready) for functions project."));
+                Console.WriteLine(DarkYellow("Please configure a remote build when deploying the package.\n"));
             }
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && !noBuild)

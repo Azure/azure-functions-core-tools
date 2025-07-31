@@ -35,5 +35,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "package-lock.json"
                 });
         }
+
+        [Fact]
+        public void Pack_Node_WithBuildLocal_WorksAsExpected()
+        {
+            var testName = nameof(Pack_Node_WithBuildLocal_WorksAsExpected);
+
+            BasePackTests.TestBuildLocalFlag(
+                NodeProjectPath,
+                testName,
+                FuncPath,
+                Log,
+                false);
+        }
     }
 }

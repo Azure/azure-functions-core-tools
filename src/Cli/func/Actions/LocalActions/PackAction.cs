@@ -31,6 +31,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Squashfs { get; private set; }
 
+        public bool BuildLocal { get; private set; } = false;
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
@@ -53,6 +55,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<bool>("squashfs")
                 .Callback(f => Squashfs = f);
+            Parser.
+                Setup<bool>("build-local")
+                .WithDescription("Builds the function app locally instead of remotely. This is only applicable for Python function apps.")
+                .Callback(f => BuildLocal = f);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -89,13 +95,31 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
 
-            // Resolve build option to detect if remote build is needed (e.g., Python app on Windows)
-            var buildOption = ResolveBuildOptionHelper.ResolveBuildOption(BuildOption.Default, workerRuntime, site: null, BuildNativeDeps, noBuild: false);
+            bool shouldBuildLocal = false;
+
+            if (BuildLocal && workerRuntime != WorkerRuntime.Python)
+            {
+                ColoredConsole.WriteLine(WarningColor("The --build-local option is only applicable for Python function apps. Local build setting not applied.\n"));
+            }
+            else if (BuildLocal)
+            {
+                shouldBuildLocal = true;
+            }
+
+            // Resolve build option to detect if deferred build is needed
+            // isFuncPackAction is set to true to ensure that local builds are used for Python on Windows if --build-local is not specified.
+            var buildOption = ResolveBuildOptionHelper.ResolveBuildOption(BuildOption.Local, workerRuntime, site: null, BuildNativeDeps, noBuild: false, isFuncPackAction: true, buildOptionLocal: shouldBuildLocal);
+
+            ColoredConsole.WriteLine($"Detected Runtime: {workerRuntime}");
+            ColoredConsole.WriteLine($"Detected Machine OS: {Environment.OSVersion.Platform}");
+            ColoredConsole.WriteLine($"Build Option: {buildOption}");
+            ColoredConsole.WriteLine($"Output Path: {Path.GetFullPath(outputPath)}\n");
 
             outputPath += Squashfs ? ".squashfs" : ".zip";
+
             if (FileSystemHelpers.FileExists(outputPath))
             {
-                ColoredConsole.WriteLine($"Deleting the old package {outputPath}");
+                ColoredConsole.WriteLine($"Deleting the old package {outputPath}\n");
                 try
                 {
                     FileSystemHelpers.FileDelete(outputPath);
@@ -120,8 +144,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 stream = await PythonHelpers.ZipToSquashfsStream(stream);
             }
 
-            ColoredConsole.WriteLine($"Creating a new package {outputPath}");
+            ColoredConsole.WriteLine($"Packaging output...");
             await FileSystemHelpers.WriteToFile(outputPath, stream);
+            ColoredConsole.WriteLine($"Packaging succeeded.\n");
+            Console.WriteLine("---------------------------------------------------------------------------------------------\n");
+            ColoredConsole.WriteLine("To deploy this package run: ");
+            ColoredConsole.WriteLine($"az functionapp deployment source config-zip --src \"{outputPath}\" " +
+                $"--name <function_app_name> --build-remote {buildOption == BuildOption.Deferred}");
         }
     }
 }

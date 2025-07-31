@@ -415,8 +415,8 @@ namespace Azure.Functions.Cli.Helpers
             if (FileSystemHelpers.DirectoryExists(packagesLocation))
             {
                 // Only update packages if checksum of requirements.txt does not match
-                // If build option is remote, we don't need to verify if packages are in sync, as we need to delete them regardless
-                if (buildOption != BuildOption.Remote && await ArePackagesInSync(reqTxtFile, packagesLocation))
+                // If build option is remote or deferred, we don't need to verify if packages are in sync, as we need to delete them regardless
+                if (buildOption != BuildOption.Remote && buildOption != BuildOption.Deferred && await ArePackagesInSync(reqTxtFile, packagesLocation))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
                     return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot, Enumerable.Empty<string>());
@@ -440,7 +440,7 @@ namespace Azure.Functions.Cli.Helpers
                     throw new CliException("Docker is required to build native dependencies for python function apps");
                 }
             }
-            else if (buildOption == BuildOption.Remote)
+            else if (buildOption == BuildOption.Remote || buildOption == BuildOption.Deferred)
             {
                 // No-ops, python packages will be resolved on the server side
             }
@@ -449,8 +449,8 @@ namespace Azure.Functions.Cli.Helpers
                 await RestorePythonRequirementsPackapp(functionAppRoot, packagesLocation);
             }
 
-            // No need to generate and compare .md5 when using remote build
-            if (buildOption != BuildOption.Remote)
+            // No need to generate and compare .md5 when using remote or deferred build
+            if (buildOption != BuildOption.Remote && buildOption != BuildOption.Deferred)
             {
                 // Store a checksum of requirements.txt
                 var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
