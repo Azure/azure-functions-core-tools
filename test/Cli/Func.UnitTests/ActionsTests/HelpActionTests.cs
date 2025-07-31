@@ -16,7 +16,8 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             
             // Expected formats after the fix:
             var expectedGeneralFormat = "Usage: func [context] <action> [-/--options]";
-            var expectedContextFormat = "func {context} [subcontext] <action> [-/--options]";
+            var expectedContextWithSubcontextFormat = "func {context} [subcontext] <action> [-/--options]";
+            var expectedContextWithoutSubcontextFormat = "func {context} <action> [-/--options]";
             var expectedSubContextFormat = "func {context} {subcontext} <action> [-/--options]";
             
             // Problematic format that should NOT appear:
@@ -24,8 +25,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             
             // Assert correct formats are used
             expectedGeneralFormat.Should().NotContain("[context] [context]");
-            expectedContextFormat.Should().NotContain("[context] <action>");
-            expectedContextFormat.Should().Contain("[subcontext]");
+            expectedContextWithSubcontextFormat.Should().NotContain("[context] <action>");
+            expectedContextWithSubcontextFormat.Should().Contain("[subcontext]");
+            expectedContextWithoutSubcontextFormat.Should().NotContain("[subcontext]");
             expectedSubContextFormat.Should().NotContain("[context]");
             
             // Assert problematic format is avoided
