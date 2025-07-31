@@ -273,7 +273,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Build();
         }
 
-        private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
+        internal async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
             var settings = _secretsManager.GetSecrets();
             settings.Add(Constants.WebsiteHostname, uri.Authority);

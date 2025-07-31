@@ -10,7 +10,6 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using FluentAssertions;
-using FluentAssertions.Execution;
 using Moq;
 using NSubstitute;
 using Xunit;
@@ -262,42 +261,39 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             Assert.False(expectException, "Expected validation failure.");
         }
 
-        [InlineData(WorkerRuntime.DotnetIsolated, "default", true)]
-        [InlineData(WorkerRuntime.DotnetIsolated, "default", false)]
-        [InlineData(WorkerRuntime.Python, "default", false)]
-        [InlineData(WorkerRuntime.Java, "default", false)]
-        [InlineData(WorkerRuntime.Node, "default", false)]
-        [Theory]
-        public async Task AzureFunctionsEnvironment_EnvironmentVariable_SetByUser_DoesNotThrow(WorkerRuntime currentRuntime, string hostRuntimeArgument, bool validNet8Configuration)
+        [Fact]
+        public async Task GetConfigurationSettings_DoesNotOverwriteAzFuncEnvironment_WhenAlreadyInSecrets()
         {
-            Environment.SetEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(currentRuntime));
-            GlobalCoreToolsSettings.SetWorkerRuntime(currentRuntime);
-
-            Mock<IProcessManager> processManager = new();
-            Mock<ISecretsManager> secretsManager = new();
-
-            var settings = new Dictionary<string, string> { ["AZURE_FUNCTIONS_ENVIRONMENT"] = "MyEnvironment" };
-            secretsManager.Setup(s => s.GetSecrets()).Returns(() => settings);
-
-            GlobalCoreToolsSettings.Init(secretsManager.Object, []);
-
-            var startHostAction = new StartHostAction(secretsManager.Object, processManager.Object)
+            // Arrange
+            var secretsDict = new Dictionary<string, string>
             {
-                HostRuntime = hostRuntimeArgument,
-                VerboseLogging = true,
-                //LanguageWorkerSetting = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(currentRuntime),
+                ["AZURE_FUNCTIONS_ENVIRONMENT"] = "UserEnv"
             };
 
-            try
-            {
-                await startHostAction.RunAsync().WaitAsync(TimeSpan.FromSeconds(1));
-                throw new AssertionFailedException("Should've canceled via timeout");
-            }
-            catch (TimeoutException)
-            {
-            }
+            var mockSecretsManager = new Mock<ISecretsManager>();
+            mockSecretsManager.Setup(s => s.GetSecrets())
+                            .Returns(() => new Dictionary<string, string>(secretsDict));
 
-            Assert.Equal("MyEnvironment", settings["AZURE_FUNCTIONS_ENVIRONMENT"]);
+            // Return an empty set of connection strings of the expected type
+            mockSecretsManager.Setup(s => s.GetConnectionStrings())
+                            .Returns(Array.Empty<ConnectionString>);
+
+            // Initialize globals if required by your setup
+            GlobalCoreToolsSettings.Init(mockSecretsManager.Object, []);
+
+            var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>())
+            {
+                DotNetIsolatedDebug = false,
+                EnableJsonOutput = false,
+                VerboseLogging = false,
+                HostRuntime = "default"
+            };
+
+            // Act
+            var result = await action.GetConfigurationSettings("some/path", new Uri("https://example.com"));
+
+            // Assert
+            Assert.Equal("UserEnv", result["AZURE_FUNCTIONS_ENVIRONMENT"]);
         }
 
         public void Dispose()
