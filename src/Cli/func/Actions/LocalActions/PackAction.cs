@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -137,7 +138,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
-            var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, noBuild: false, buildOption: buildOption, additionalPackages: AdditionalPackages);
+            await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "publish"), "--configuration release");
+
+            var stream = await ZipHelper.GetAppZipFile(Environment.CurrentDirectory, BuildNativeDeps, noBuild: false, buildOption: buildOption, additionalPackages: AdditionalPackages);
 
             if (Squashfs)
             {
