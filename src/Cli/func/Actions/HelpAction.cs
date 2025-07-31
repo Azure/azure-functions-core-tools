@@ -129,7 +129,7 @@ namespace Azure.Functions.Cli.Actions
             if (subContext == Context.None)
             {
                 ColoredConsole
-                .WriteLine($"{TitleColor("Usage:")} func {context.ToLowerCaseString()} [context] <action> [-/--options]")
+                .WriteLine($"{TitleColor("Usage:")} func {context.ToLowerCaseString()} <action> [-/--options]")
                 .WriteLine();
                 var contexts = _actionTypes
                     .Where(a => a.Contexts.Contains(context))
@@ -178,7 +178,7 @@ namespace Azure.Functions.Cli.Actions
                 .OrderBy(c => c.ToLowerCaseString());
             Utilities.PrintVersion();
             ColoredConsole
-                .WriteLine("Usage: func [context] [context] <action> [-/--options]")
+                .WriteLine("Usage: func [context] <action> [-/--options]")
                 .WriteLine();
             DisplayContextsHelp(contexts);
             var actions = _actionTypes.Where(a => a.Contexts.Contains(Context.None));
