@@ -71,12 +71,9 @@ namespace Azure.Functions.Cli.Common
 
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
-                templatesJson = await FileLockHelper.WithFileLockAsync(BundleTemplatesLockFileName, async () =>
-                {
-                    await ExtensionBundleHelper.GetExtensionBundle();
-                    var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
-                    return await contentProvider.GetTemplates();
-                });
+                await ExtensionBundleHelper.GetExtensionBundle();
+                var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+                return await contentProvider.GetTemplates();
             }
             else
             {
@@ -294,7 +291,7 @@ namespace Azure.Functions.Cli.Common
 
             if (string.IsNullOrEmpty(templateJson))
             {
-                throw new CliException("Templates JSON is empty. Please check the templates location.");
+                throw new CliException("Templates (v2) JSON is empty. Please check the templates location.");
             }
 
             return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(templateJson);

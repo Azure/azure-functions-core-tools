@@ -12,6 +12,13 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class HostHelperTests : IDisposable
     {
+        private readonly IFileSystem _originalFileSystem;
+
+        public HostHelperTests()
+        {
+            _originalFileSystem = FileSystemHelpers.Instance;
+        }
+
         [Fact]
         public async Task GetCustomHandlerExecutable_Throws_When_HostJson_Missing()
         {
@@ -28,8 +35,17 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var json = @"{""customHandler"":{""description"":{""defaultExecutablePath"":""file.exe""}}}";
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                .Returns(json.ToStream());
+            fileSystem.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(ci =>
+                {
+                    var path = ci.ArgAt<string>(0);
+                    if (Path.GetFileName(path) == "host.json")
+                    {
+                        return json.ToStream();
+                    }
+
+                    throw new FileNotFoundException(path);
+                });
 
             FileSystemHelpers.Instance = fileSystem;
 
@@ -43,8 +59,17 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var json = @"{""customHandler"":{""description"":{}}}";
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                .Returns(json.ToStream());
+            fileSystem.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(ci =>
+                {
+                    var path = ci.ArgAt<string>(0);
+                    if (Path.GetFileName(path) == "host.json")
+                    {
+                        return json.ToStream();
+                    }
+
+                    throw new FileNotFoundException(path);
+                });
 
             FileSystemHelpers.Instance = fileSystem;
 
@@ -58,8 +83,17 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var json = @"{}";
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            fileSystem.File.Open("host.json", Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                .Returns(json.ToStream());
+            fileSystem.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                .Returns(ci =>
+                {
+                    var path = ci.ArgAt<string>(0);
+                    if (Path.GetFileName(path) == "host.json")
+                    {
+                        return json.ToStream();
+                    }
+
+                    throw new FileNotFoundException(path);
+                });
 
             FileSystemHelpers.Instance = fileSystem;
 
@@ -69,7 +103,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
         public void Dispose()
         {
-            FileSystemHelpers.Instance = null;
+            FileSystemHelpers.Instance = _originalFileSystem;
         }
     }
 }
