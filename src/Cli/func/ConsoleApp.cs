@@ -43,12 +43,12 @@ namespace Azure.Functions.Cli
             GlobalCoreToolsSettings.Init(container.Resolve<ISecretsManager>(), args);
         }
 
-        public static void Run<T>(string[] args, IContainer container)
+        public static void Run<T>(string[] args, IContainer container, CancellationToken cancellationToken = default)
         {
             Task.Run(() => RunAsync<T>(args, container)).Wait();
         }
 
-        public static async Task RunAsync<T>(string[] args, IContainer container)
+        public static async Task RunAsync<T>(string[] args, IContainer container, CancellationToken cancellationToken = default)
         {
             var stopWatch = Stopwatch.StartNew();
 
