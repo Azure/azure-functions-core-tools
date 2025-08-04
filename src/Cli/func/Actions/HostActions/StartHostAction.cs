@@ -304,8 +304,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 ColoredConsole.WriteLine(WarningColor($"AZURE_FUNCTIONS_ENVIRONMENT already exists with value '{oldValue}', overriding to 'Development'."));
             }
-            settings["AZURE_FUNCTIONS_ENVIRONMENT"] = "Development";
 
+            settings["AZURE_FUNCTIONS_ENVIRONMENT"] = "Development";
 
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
