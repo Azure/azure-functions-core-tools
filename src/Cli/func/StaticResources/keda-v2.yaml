@@ -5030,7 +5030,7 @@ metadata:
     app.kubernetes.io/part-of: keda-operator
     app.kubernetes.io/version: 2.7.0
   name: keda-operator
-  namespace: keda
+  namespace: KEDA_NAMESPACE
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -5161,7 +5161,7 @@ metadata:
     app.kubernetes.io/part-of: keda-operator
     app.kubernetes.io/version: 2.7.0
   name: keda-auth-reader
-  namespace: kube-system
+  namespace: KEDA_NAMESPACE
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -5169,7 +5169,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: keda-operator
-  namespace: keda
+  namespace: KEDA_NAMESPACE
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -5186,7 +5186,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: horizontal-pod-autoscaler
-  namespace: kube-system
+  namespace: KEDA_NAMESPACE
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -5203,7 +5203,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: keda-operator
-  namespace: keda
+  namespace: KEDA_NAMESPACE
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -5220,7 +5220,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: keda-operator
-  namespace: keda
+  namespace: KEDA_NAMESPACE
 ---
 apiVersion: v1
 kind: Service
@@ -5230,7 +5230,7 @@ metadata:
     app.kubernetes.io/part-of: keda-operator
     app.kubernetes.io/version: 2.7.0
   name: keda-metrics-apiserver
-  namespace: keda
+  namespace: KEDA_NAMESPACE
 spec:
   ports:
   - name: https
@@ -5251,7 +5251,7 @@ metadata:
     app.kubernetes.io/part-of: keda-operator
     app.kubernetes.io/version: 2.7.0
   name: keda-metrics-apiserver
-  namespace: keda
+  namespace: KEDA_NAMESPACE
 spec:
   replicas: 1
   selector:
@@ -5331,7 +5331,7 @@ metadata:
     app.kubernetes.io/part-of: keda-operator
     app.kubernetes.io/version: 2.7.0
   name: keda-operator
-  namespace: keda
+  namespace: KEDA_NAMESPACE
 spec:
   replicas: 1
   selector:
@@ -5410,6 +5410,6 @@ spec:
   insecureSkipTLSVerify: true
   service:
     name: keda-metrics-apiserver
-    namespace: keda
+    namespace: KEDA_NAMESPACE
   version: v1beta1
   versionPriority: 100
