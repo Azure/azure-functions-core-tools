@@ -35,7 +35,7 @@ namespace Azure.Functions.Cli
             _container = InitializeAutofacContainer();
             var processManager = _container.Resolve<IProcessManager>();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-            CancelKeyHandler.Register(_shuttingDownCts.Cancel, _forceShutdownCts.Cancel);
+            _ = CancelKeyHandler.Register(_shuttingDownCts.Cancel, _forceShutdownCts.Cancel);
 
             try
             {
