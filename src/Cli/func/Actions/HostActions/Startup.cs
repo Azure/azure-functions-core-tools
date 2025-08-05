@@ -12,8 +12,10 @@ using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
 using Microsoft.Azure.WebJobs.Script.WebHost.Controllers;
 using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
+using Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -83,6 +85,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             SetBundlesEnvironmentVariables();
 
             services.AddWebJobsScriptHost(_builderContext.Configuration);
+
+            // Replace the default MemoryMappedFileAccessor with a null implementation
+            services.Replace(ServiceDescriptor.Singleton<IMemoryMappedFileAccessor, NullMemoryMappedFileAccessor>());
 
             services.Configure<ScriptApplicationHostOptions>(o =>
             {
