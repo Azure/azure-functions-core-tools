@@ -278,6 +278,12 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             mockSecretsManager.Setup(s => s.GetConnectionStrings())
                             .Returns(Array.Empty<ConnectionString>);
 
+            // Set up file system mock to avoid the project root directory error
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            fileSystem.Directory.GetDirectories(Arg.Any<string>()).Returns(Array.Empty<string>());
+            FileSystemHelpers.Instance = fileSystem;
+
             // Initialize globals if required by your setup
             GlobalCoreToolsSettings.Init(mockSecretsManager.Object, []);
 
