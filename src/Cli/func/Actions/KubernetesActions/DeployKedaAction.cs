@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: Current namespace in Kubernetes config.", ns => Namespace = ns);
+            SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: Current namespace in Kubernetes config if set, otherwise 'default'", ns => Namespace = ns);
             SetFlag<KedaVersion>("keda-version", $"Defines the version of KEDA to install. Default: {KedaVersion.V2}. Options are: {KedaVersion.V1} or {KedaVersion.V2}", f => KedaVersion = f);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
 
@@ -28,7 +28,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public override async Task RunAsync()
         {
+            Namespace ??= await KubernetesHelper.GetCurrentNamespaceOrDefault("default");
             var kedaDeploymentYaml = KedaHelper.GetKedaDeploymentYaml(Namespace, KedaVersion);
+
             if (DryRun)
             {
                 ColoredConsole.WriteLine(kedaDeploymentYaml);

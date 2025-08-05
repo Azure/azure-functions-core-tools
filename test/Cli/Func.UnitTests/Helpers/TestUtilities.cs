@@ -17,5 +17,21 @@ namespace Azure.Functions.Cli.UnitTests
 
             return builder.Build();
         }
+
+        public static async Task<bool> WaitForConditionAsync(Func<bool> condition, TimeSpan timeout, int pollIntervalMs = 50)
+        {
+            var start = DateTime.UtcNow;
+            while (DateTime.UtcNow - start < timeout)
+            {
+                if (condition())
+                {
+                    return true;
+                }
+
+                await Task.Delay(pollIntervalMs);
+            }
+
+            return condition();
+        }
     }
 }
