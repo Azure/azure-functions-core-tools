@@ -9,6 +9,10 @@ namespace Azure.Functions.Cli.Common
 {
     internal class SecretsManager : ISecretsManager
     {
+        private static readonly Lazy<AppSettingsFile> _lazySettings = new Lazy<AppSettingsFile>(() => new AppSettingsFile(AppSettingsFilePath));
+
+        private static AppSettingsFile Settings => _lazySettings.Value;
+
         public static string AppSettingsFilePath
         {
             get
@@ -34,94 +38,85 @@ namespace Azure.Functions.Cli.Common
 
         public IDictionary<string, string> GetSecrets()
         {
-            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
-            return appSettingsFile.GetValues();
+            return Settings.GetValues();
         }
 
         public IEnumerable<ConnectionString> GetConnectionStrings()
         {
-            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
-            return appSettingsFile.GetConnectionStrings();
+            return Settings.GetConnectionStrings();
         }
 
         public void SetSecret(string name, string value)
         {
-            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
-            appSettingsFile.SetSecret(name, value);
-            appSettingsFile.Commit();
+            Settings.SetSecret(name, value);
+            Settings.Commit();
         }
 
         public void SetConnectionString(string name, string value)
         {
-            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
-            appSettingsFile.SetConnectionString(name, value, Constants.DefaultSqlProviderName);
-            appSettingsFile.Commit();
+            Settings.SetConnectionString(name, value, Constants.DefaultSqlProviderName);
+            Settings.Commit();
         }
 
         public void DecryptSettings()
         {
-            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
-            if (settingsFile.IsEncrypted)
+            if (Settings.IsEncrypted)
             {
-                var values = settingsFile.GetValues();
-                var connectionStrings = settingsFile.GetConnectionStrings();
-                settingsFile.IsEncrypted = false;
+                var values = Settings.GetValues();
+                var connectionStrings = Settings.GetConnectionStrings();
+                Settings.IsEncrypted = false;
 
                 foreach (var pair in values)
                 {
-                    settingsFile.SetSecret(pair.Key, pair.Value);
+                    Settings.SetSecret(pair.Key, pair.Value);
                 }
 
                 foreach (var connectionString in connectionStrings)
                 {
-                    settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
+                    Settings.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
 
-                settingsFile.Commit();
+                Settings.Commit();
             }
         }
 
         public void EncryptSettings()
         {
-            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
-            if (!settingsFile.IsEncrypted)
+            if (!Settings.IsEncrypted)
             {
-                var values = settingsFile.GetValues();
-                var connectionStrings = settingsFile.GetConnectionStrings();
-                settingsFile.IsEncrypted = true;
+                var values = Settings.GetValues();
+                var connectionStrings = Settings.GetConnectionStrings();
+                Settings.IsEncrypted = true;
 
                 foreach (var pair in values)
                 {
-                    settingsFile.SetSecret(pair.Key, pair.Value);
+                    Settings.SetSecret(pair.Key, pair.Value);
                 }
 
                 foreach (var connectionString in connectionStrings)
                 {
-                    settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
+                    Settings.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
 
-                settingsFile.Commit();
+                Settings.Commit();
             }
         }
 
         public void DeleteSecret(string name)
         {
-            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
-            settingsFile.RemoveSetting(name);
-            settingsFile.Commit();
+            Settings.RemoveSetting(name);
+            Settings.Commit();
         }
 
         public HostStartSettings GetHostStartSettings()
         {
-            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
-            return settingsFile.Host ?? new HostStartSettings();
+            return Settings.Host ?? new HostStartSettings();
         }
 
         public void DeleteConnectionString(string name)
         {
-            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
-            settingsFile.RemoveConnectionString(name);
-            settingsFile.Commit();
+            Settings.RemoveConnectionString(name);
+            Settings.Commit();
         }
     }
 }
