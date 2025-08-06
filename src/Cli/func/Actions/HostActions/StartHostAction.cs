@@ -203,11 +203,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             _keyVaultReferencesManager.ResolveKeyVaultReferences(settings);
             UpdateEnvironmentVariables(settings);
 
-            // Should we also check for "!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)"? Who sets CONTAINER_NAME in Functions on Linux?
-            // Can we allow for this to be set in linux environments?
             if (settings.ContainsKey("CONTAINER_NAME"))
             {
-                // Do we want to throw instead?
                 ColoredConsole.WriteLine(ErrorColor("CONTAINER_NAME is a reserved environment variable for the Functions Host. Please remove or rename this setting."));
             }
 
