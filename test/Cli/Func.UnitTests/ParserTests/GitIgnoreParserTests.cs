@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
@@ -149,57 +150,10 @@ othernonexistent/**/what
         }
 
         [Fact]
-        public void PowerShellModuleBinFoldersShouldBeHandledCorrectly()
+        public async void PowerShellModuleBinFoldersShouldBeHandledCorrectly()
         {
             // Test the current gitignore content from the actual static resource
-            var currentGitIgnore = @"bin
-obj
-csx
-.vs
-edge
-Publish
-
-*.user
-*.suo
-*.cscfg
-*.Cache
-project.lock.json
-
-/packages
-/TestResults
-
-/tools/NuGet.exe
-/App_Data
-/secrets
-/data
-.secrets
-appsettings.json
-local.settings.json
-
-node_modules
-dist
-
-# Local python packages
-.python_packages/
-
-# Python Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Azurite artifacts
-__blobstorage__
-__queuestorage__
-__azurite_db*__.json";
+            var currentGitIgnore = await StaticResources.GitIgnore;
 
             var currentParser = new GitIgnoreParser(currentGitIgnore);
 
@@ -207,82 +161,11 @@ __azurite_db*__.json";
             currentParser.Denies("bin/somefile.dll").Should().BeTrue();
             currentParser.Denies("src/bin/output.dll").Should().BeTrue();
 
-            // These PowerShell module paths are currently being ignored but shouldn't be
-            // This demonstrates the current problem
-            currentParser.Denies("Modules/Az.Storage/8.1.0/Storage.Autorest/bin/Az.Storage.private.dll").Should().BeTrue("Current implementation incorrectly ignores PowerShell module bin files");
-            currentParser.Denies("Modules/SomeModule/1.0.0/bin/Module.dll").Should().BeTrue("Current implementation incorrectly ignores PowerShell module bin files");
+            // These PowerShell module paths should NOT be ignored with the updated gitignore
+            currentParser.Denies("Modules/Az.Storage/8.1.0/Storage.Autorest/bin/Az.Storage.private.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
+            currentParser.Denies("Modules/SomeModule/1.0.0/bin/Module.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
 
             // Non-bin files in modules should not be ignored
             currentParser.Denies("Modules/Az.Accounts/2.0.0/lib/netstandard2.0/Microsoft.Azure.dll").Should().BeFalse();
-        }
-
-        [Fact]
-        public void PowerShellModuleBinFoldersShouldNotBeIgnoredWithUpdatedGitIgnore()
-        {
-            // Test the proposed fix
-            var updatedGitIgnore = @"bin/
-**/bin/
-!Modules/**
-obj
-csx
-.vs
-edge
-Publish
-
-*.user
-*.suo
-*.cscfg
-*.Cache
-project.lock.json
-
-/packages
-/TestResults
-
-/tools/NuGet.exe
-/App_Data
-/secrets
-/data
-.secrets
-appsettings.json
-local.settings.json
-
-node_modules
-dist
-
-# Local python packages
-.python_packages/
-
-# Python Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Azurite artifacts
-__blobstorage__
-__queuestorage__
-__azurite_db*__.json";
-
-            var updatedParser = new GitIgnoreParser(updatedGitIgnore);
-
-            // Regular bin folders should still be ignored
-            updatedParser.Denies("bin/somefile.dll").Should().BeTrue();
-            updatedParser.Denies("src/bin/output.dll").Should().BeTrue();
-
-            // PowerShell module bin folders should NOT be ignored (this is the fix)
-            updatedParser.Denies("Modules/Az.Storage/8.1.0/Storage.Autorest/bin/Az.Storage.private.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
-            updatedParser.Denies("Modules/SomeModule/1.0.0/bin/Module.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
-
-            // Non-bin files in modules should still not be ignored
-            updatedParser.Denies("Modules/Az.Accounts/2.0.0/lib/netstandard2.0/Microsoft.Azure.dll").Should().BeFalse();
-        }
     }
 }
