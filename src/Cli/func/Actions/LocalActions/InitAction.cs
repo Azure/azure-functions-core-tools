@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
@@ -433,6 +433,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else if (targetFramework == Common.TargetFramework.Net9)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet9Isolated);
+                }
+                else if (targetFramework == Common.TargetFramework.Net10)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet10Isolated);
                 }
                 else
                 {
