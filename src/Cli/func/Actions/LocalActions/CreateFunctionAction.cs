@@ -309,6 +309,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     throw new CliException("Selected language doesn't match worker set in local.settings.json." +
                         $"Selected worker is: {_workerRuntime} and selected language is: {workerRuntimeSelected}");
                 }
+
+                if (workerRuntimeSelected == WorkerRuntime.Java)
+                {
+                    ColoredConsole
+                        .WriteLine($"This action is not supported when using the core tools directly. Please use Maven to test {workerRuntimeSelected} apps locally as specified by" +
+                        $"https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local?pivots=programming-language-java");
+                }
             }
             else if (string.IsNullOrWhiteSpace(Language))
             {
