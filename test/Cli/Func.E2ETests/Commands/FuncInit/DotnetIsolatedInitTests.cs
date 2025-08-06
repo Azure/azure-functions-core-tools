@@ -36,17 +36,20 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
-        [Fact]
-        public void Init_WithNet9TargetFramework_GeneratesProjectFile_ContainsExpectedVersion()
+        [Theory]
+        [InlineData("net8.0")]
+        [InlineData("net9.0")]
+        [InlineData("net10.0")]
+        public void Init_WithNetTargetFramework_GeneratesProjectFile_ContainsExpectedVersion(string targetFramework)
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithNet9TargetFramework_GeneratesProjectFile_ContainsExpectedVersion);
+            var testName = nameof(Init_WithNetTargetFramework_GeneratesProjectFile_ContainsExpectedVersion);
             var projectName = "Test-funcs";
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, projectName, Common.Constants.LocalSettingsJsonFileName);
             var csprojfilepath = Path.Combine(workingDir, projectName, "Test-funcs.csproj");
             var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated" };
-            var expectedCsprojContent = new[] { "Microsoft.NET.Sdk", "v4", "net9.0" };
+            var expectedCsprojContent = new[] { "Microsoft.NET.Sdk", "v4", targetFramework };
             var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
             {
                 (localSettingsPath, expectedLocalSettingsContent),
@@ -56,7 +59,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute([projectName, "--worker-runtime", "dotnet-isolated", "--target-framework", "net9.0"]);
+                .Execute([projectName, "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
@@ -121,6 +124,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         [InlineData("net7.0")]
         [InlineData("net8.0")]
         [InlineData("net9.0")]
+        [InlineData("net10.0")]
         public async void Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile(string targetFramework)
         {
             var targetFrameworkstr = targetFramework.Replace("net", string.Empty);
