@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
@@ -98,6 +98,13 @@ namespace Azure.Functions.Cli.Helpers
             catch
             {
                 _currentWorkerRuntime = WorkerRuntime.None;
+            }
+
+            if (_currentWorkerRuntime == WorkerRuntime.Java)
+            {
+                ColoredConsole
+                    .WriteLine(WarningColor($"This action is not supported when using the core tools directly. Please use one of the supported environments to test {_currentWorkerRuntime} apps locally as specified by" +
+                    $"https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local?pivots=programming-language-java"));
             }
         }
 
