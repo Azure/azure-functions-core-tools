@@ -100,7 +100,7 @@ namespace Azure.Functions.Cli.Helpers
                 _currentWorkerRuntime = WorkerRuntime.None;
             }
 
-            if (_currentWorkerRuntime == WorkerRuntime.Java)
+            if (_currentWorkerRuntime == WorkerRuntime.Java || args.Any(arg => string.Equals(arg, WorkerRuntime.Java.ToString(), StringComparison.OrdinalIgnoreCase)))
             {
                 ColoredConsole
                     .WriteLine(WarningColor($"This action is not supported when using the core tools directly. Please use one of the supported environments to test {_currentWorkerRuntime} apps locally as specified by" +

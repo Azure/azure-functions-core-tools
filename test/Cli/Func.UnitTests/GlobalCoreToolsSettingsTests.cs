@@ -10,12 +10,15 @@ namespace Azure.Functions.Cli.UnitTests
 {
     public class GlobalCoreToolsSettingsTests
     {
-        [Fact]
-        public void Init_LogsWarning_ForJavaWorkerRuntime()
+        [Theory]
+        [InlineData("init", "--java")]
+        [InlineData("init", "--worker-runtime", "java")]
+        [InlineData("new", "--java")]
+        [InlineData("new", "--language", "java")]
+        public void Init_LogsWarning_ForJavaWorkerRuntime(params string[] args)
         {
             // Arrange
             var secretsManager = new Mock<ISecretsManager>();
-            var args = new[] { "--java" };
 
             var stringWriter = new StringWriter();
             var originalOut = Console.Out;
