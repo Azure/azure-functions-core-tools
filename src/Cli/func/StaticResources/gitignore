@@ -1,4 +1,6 @@
-bin
+bin/
+**/bin/
+!Modules/**
 obj
 csx
 .vs
