@@ -17,6 +17,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     internal class LogStreamAction : BaseFunctionAppAction
     {
         private const string ApplicationInsightsIKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
+        private const string ApplicationInsightsConnectionString = "APPLICATIONINSIGHTS_CONNECTION_STRING";
         private const string LiveMetricsUriTemplate = "https://portal.azure.com/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/{0}/ResourceId/{1}";
 
         public bool UseBrowser { get; set; }
@@ -44,9 +45,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            if (functionApp.IsLinux && functionApp.IsDynamic)
+            if (functionApp.IsFlex || (functionApp.IsLinux && functionApp.IsDynamic))
             {
-                throw new CliException("Log stream is not currently supported in Linux Consumption Apps. " +
+                throw new CliException("Log stream is not currently supported in Linux Consumption and Flex Apps. " +
                     "Please use --browser to open Azure Application Insights Live Stream in the Azure portal.");
             }
 
@@ -92,14 +93,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task OpenLiveStreamInBrowser(Site functionApp, IEnumerable<ArmSubscription> allSubscriptions)
         {
-            if (!functionApp.AzureAppSettings.ContainsKey(ApplicationInsightsIKeySetting))
+            string iKey;
+
+            // First, check for a connection string. If it's not available, default to using the Instrumentation Key.
+            if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsConnectionString, out var connectionString))
             {
-                throw new CliException($"Missing {ApplicationInsightsIKeySetting} App Setting. " +
+                iKey = Utilities.ExtractIKeyFromConnectionString(connectionString);
+            }
+            else if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsIKeySetting, out var instrumentationKey))
+            {
+                iKey = instrumentationKey;
+            }
+            else
+            {
+                throw new CliException($"Missing {ApplicationInsightsConnectionString} App Setting. " +
                     $"Please make sure you have Application Insights configured with your function app.");
             }
 
-            var iKey = functionApp.AzureAppSettings[ApplicationInsightsIKeySetting];
-            if (string.IsNullOrEmpty(iKey))
+            if (string.IsNullOrWhiteSpace(iKey))
             {
                 throw new CliException("Invalid Instrumentation Key found. Please make sure that the Application Insights is configured correctly.");
             }
