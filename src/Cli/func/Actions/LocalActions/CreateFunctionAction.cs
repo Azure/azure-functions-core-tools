@@ -313,7 +313,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (workerRuntimeSelected == WorkerRuntime.Java)
                 {
                     ColoredConsole
-                        .WriteLine($"This action is not supported when using the core tools directly. Please use Maven to test {workerRuntimeSelected} apps locally as specified by" +
+                        .WriteLine($"This action is not supported when using the core tools directly. Please use one of the supported environments to test {workerRuntimeSelected} apps locally as specified by" +
                         $"https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local?pivots=programming-language-java");
                 }
             }

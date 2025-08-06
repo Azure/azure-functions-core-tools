@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
                 // Assert
                 var output = stringWriter.ToString();
-                Assert.Contains("Please use Maven to test", output);
+                Assert.Contains("This action is not supported", output);
                 Assert.Contains("Java", output);
             }
             finally
