@@ -202,16 +202,16 @@ __queuestorage__
 __azurite_db*__.json";
 
             var currentParser = new GitIgnoreParser(currentGitIgnore);
-            
+
             // These paths should be ignored (regular bin folders)
             currentParser.Denies("bin/somefile.dll").Should().BeTrue();
             currentParser.Denies("src/bin/output.dll").Should().BeTrue();
-            
+
             // These PowerShell module paths are currently being ignored but shouldn't be
             // This demonstrates the current problem
             currentParser.Denies("Modules/Az.Storage/8.1.0/Storage.Autorest/bin/Az.Storage.private.dll").Should().BeTrue("Current implementation incorrectly ignores PowerShell module bin files");
             currentParser.Denies("Modules/SomeModule/1.0.0/bin/Module.dll").Should().BeTrue("Current implementation incorrectly ignores PowerShell module bin files");
-            
+
             // Non-bin files in modules should not be ignored
             currentParser.Denies("Modules/Az.Accounts/2.0.0/lib/netstandard2.0/Microsoft.Azure.dll").Should().BeFalse();
         }
@@ -272,15 +272,15 @@ __queuestorage__
 __azurite_db*__.json";
 
             var updatedParser = new GitIgnoreParser(updatedGitIgnore);
-            
+
             // Regular bin folders should still be ignored
             updatedParser.Denies("bin/somefile.dll").Should().BeTrue();
             updatedParser.Denies("src/bin/output.dll").Should().BeTrue();
-            
+
             // PowerShell module bin folders should NOT be ignored (this is the fix)
             updatedParser.Denies("Modules/Az.Storage/8.1.0/Storage.Autorest/bin/Az.Storage.private.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
             updatedParser.Denies("Modules/SomeModule/1.0.0/bin/Module.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
-            
+
             // Non-bin files in modules should still not be ignored
             updatedParser.Denies("Modules/Az.Accounts/2.0.0/lib/netstandard2.0/Microsoft.Azure.dll").Should().BeFalse();
         }
