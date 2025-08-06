@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Azure.WebJobs.Script.Configuration;
@@ -76,6 +76,26 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             File.Delete(filePath);
             Assert.Equal(expected, output);
+        }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData("", null)]
+        [InlineData(";", null)]
+        [InlineData("InstrumentationKey=abc123;", "abc123")]
+        [InlineData("InstrumentationKey=abc123;IngestionEndpoint=https://...", "abc123")]
+        [InlineData("  InstrumentationKey  =   abc123    ;", "abc123")]
+        [InlineData("InstrumentationKey=abc123;OtherKey=xyz", "abc123")]
+        [InlineData("otherKey=xyz;InstrumentationKey=abc123;", "abc123")]
+        [InlineData("InstrumentationKey=ABC123", "ABC123")]
+        [InlineData("instrumentationkey=abc123", "abc123")]
+        [InlineData("InstrumentationKey= ;", null)]
+        [InlineData("SomeKey=SomeValue;AnotherKey=AnotherValue", null)]
+        public void ExtractIKeyFromConnectionString_ReturnsExpectedInstrumentationKey(string connectionString, string expected)
+        {
+            var actual = Utilities.ExtractIKeyFromConnectionString(connectionString);
+
+            Assert.Equal(expected, actual);
         }
     }
 }
