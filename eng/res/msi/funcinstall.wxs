@@ -34,6 +34,9 @@
              Languages='1033'
              SummaryCodepage='1252' />
 
+    <!-- Enable verbose logs -->    
+    <Property Id="MsiLogging" Value="voicewarmupx" />
+
     <MajorUpgrade AllowDowngrades='yes' Schedule='afterInstallInitialize' />
 
     <Media Id='1' Cabinet='funchost.cab' EmbedCab='yes' />

@@ -15,3 +15,4 @@
 - Implement (2 second) graceful timeout period for the CLI shutdown (#4540)
 - Overwrite `AZURE_FUNCTIONS_ENVIRONMENT` to `Development` if it is already set (#4563)
 - Warn if there is a `JsonException` when parsing the `local.settings.json` file (#4571)
+- Enabled verbose logs in MSI by default (#4578)
