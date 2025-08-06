@@ -17,7 +17,7 @@ public class CancelKeyHandlerTests
         var shuttingDownCts = new CancellationTokenSource();
         var gracePeriodCts = new CancellationTokenSource();
 
-        CancelKeyHandler.Register(
+        bool registered = CancelKeyHandler.Register(
             onShuttingDown: () =>
             {
                 shuttingDownInvoked = true;
@@ -29,21 +29,27 @@ public class CancelKeyHandlerTests
                 gracePeriodCts.Cancel();
             });
 
+        Assert.True(registered, "Register should return true on first call.");
+
         try
         {
             // Act
             CancelKeyHandler.HandleCancelKeyPress(null, CreateFakeCancelEventArgs());
 
             // Assert immediate shutdown signal
-            Assert.True(await WaitForConditionAsync(() => shuttingDownInvoked, TimeSpan.FromSeconds(1)), "onShuttingDown was not invoked immediately.");
+            Assert.True(
+                await WaitForConditionAsync(() => shuttingDownInvoked, TimeSpan.FromSeconds(1)),
+                "onShuttingDown was not invoked immediately.");
             Assert.False(gracePeriodInvoked, "onGracePeriodTimeout should not be invoked immediately after shutting down.");
 
             // Assert delayed grace period signal
-            Assert.True(await WaitForConditionAsync(() => gracePeriodInvoked, TimeSpan.FromSeconds(5), 500), "onGracePeriodTimeout was not invoked after delay.");
+            Assert.True(
+                await WaitForConditionAsync(() => gracePeriodInvoked, TimeSpan.FromSeconds(5), 500),
+                "onGracePeriodTimeout was not invoked after delay.");
         }
         finally
         {
-            CancelKeyHandler.Dispose();
+            CancelKeyHandler.Unregister();
         }
     }
 
@@ -54,10 +60,14 @@ public class CancelKeyHandlerTests
         {
             // Arrange
             int callCount = 0;
-            CancelKeyHandler.Register(() => callCount++);
+
+            bool first = CancelKeyHandler.Register(() => callCount++);
+            Assert.True(first, "First Register should return true.");
+
+            bool second = CancelKeyHandler.Register(() => callCount++);
+            Assert.False(second, "Second Register should return false (no double-registration).");
 
             // Act
-            CancelKeyHandler.Register(() => callCount++); // Should be ignored
             CancelKeyHandler.HandleCancelKeyPress(null, CreateFakeCancelEventArgs());
 
             // Assert
@@ -65,17 +75,24 @@ public class CancelKeyHandlerTests
         }
         finally
         {
-            CancelKeyHandler.Dispose();
+            CancelKeyHandler.Unregister();
         }
     }
 
     [Fact]
-    public void Register_WithNullCallbacks_DoesNotThrow()
+    public void Register_NullOnShuttingDown_ThrowsArgumentNullException()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() => CancelKeyHandler.Register(null));
+        Assert.Equal("onShuttingDown", ex.ParamName);
+    }
+
+    [Fact]
+    public void Register_OnlyShuttingDownCallback_AllowsNullGraceCallback()
     {
         try
         {
             // Act
-            CancelKeyHandler.Register();
+            CancelKeyHandler.Register(() => { }, onGracePeriodTimeout: null);
             var exception = Record.Exception(() =>
                 CancelKeyHandler.HandleCancelKeyPress(null, CreateFakeCancelEventArgs()));
 
@@ -84,7 +101,7 @@ public class CancelKeyHandlerTests
         }
         finally
         {
-            CancelKeyHandler.Dispose();
+            CancelKeyHandler.Unregister();
         }
     }
 

@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using Autofac;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -35,7 +36,7 @@ namespace Azure.Functions.Cli
             _container = InitializeAutofacContainer();
             var processManager = _container.Resolve<IProcessManager>();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-            CancelKeyHandler.Register(_shuttingDownCts.Cancel, _forceShutdownCts.Cancel);
+            _ = CancelKeyHandler.Register(_shuttingDownCts.Cancel, _forceShutdownCts.Cancel);
 
             try
             {
@@ -45,13 +46,9 @@ namespace Azure.Functions.Cli
             {
                 if (ex.CancellationToken == _forceShutdownCts.Token)
                 {
-                    processManager.KillChildProcesses();
-                    processManager.KillMainProcess();
+                    processManager?.KillChildProcesses();
+                    Process.GetCurrentProcess().Kill();
                 }
-            }
-            catch (Exception ex)
-            {
-                ColoredConsole.WriteLine($"Unexpected error: {ex.Message}");
             }
         }
 

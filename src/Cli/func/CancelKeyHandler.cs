@@ -12,18 +12,21 @@ internal static class CancelKeyHandler
     private static bool _registered = false;
     private static bool _shutdownStarted = false;
 
-    public static void Register(Action onShuttingDown = null, Action onGracePeriodTimeout = null)
+    public static bool Register(Action onShuttingDown, Action onGracePeriodTimeout = null)
     {
         if (_registered)
         {
-            return;
+            return false;
         }
 
-        _onShuttingDown = onShuttingDown ?? (() => { });
-        _onGracePeriodTimeout = onGracePeriodTimeout ?? (() => { });
+        ArgumentNullException.ThrowIfNull(onShuttingDown, nameof(onShuttingDown));
+
+        _onShuttingDown = onShuttingDown;
+        _onGracePeriodTimeout = onGracePeriodTimeout;
 
         Console.CancelKeyPress += _handlerDelegate;
         _registered = true;
+        return true;
     }
 
     internal static void HandleCancelKeyPress(object sender, ConsoleCancelEventArgs e)
@@ -36,15 +39,18 @@ internal static class CancelKeyHandler
         _shutdownStarted = true;
         _onShuttingDown?.Invoke();
 
-        _ = Task.Run(async () =>
+        if (_onGracePeriodTimeout is not null)
         {
-            await Task.Delay(_gracefulShutdownPeriod);
-            _onGracePeriodTimeout?.Invoke();
-        });
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(_gracefulShutdownPeriod);
+                _onGracePeriodTimeout?.Invoke();
+            });
+        }
     }
 
-    // For testing purposes, we need to ensure that the handler can be disposed of properly.
-    internal static void Dispose()
+    // For testing purposes, we need to ensure that the handler can be unregistered properly.
+    internal static void Unregister()
     {
         if (_registered)
         {
