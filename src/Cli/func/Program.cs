@@ -46,13 +46,9 @@ namespace Azure.Functions.Cli
             {
                 if (ex.CancellationToken == _forceShutdownCts.Token)
                 {
-                    processManager.KillChildProcesses();
+                    processManager?.KillChildProcesses();
                     Process.GetCurrentProcess().Kill();
                 }
-            }
-            catch (Exception ex)
-            {
-                ColoredConsole.WriteLine($"Unexpected error: {ex.Message}");
             }
         }
 
