@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text;
@@ -27,6 +27,8 @@ namespace Azure.Functions.Cli
         public static Task<string> DockerfileDotnet8Isolated => GetValue("Dockerfile.dotnet8Isolated");
 
         public static Task<string> DockerfileDotnet9Isolated => GetValue("Dockerfile.dotnet9Isolated");
+
+        public static Task<string> DockerfileDotnet10Isolated => GetValue("Dockerfile.dotnet10Isolated");
 
         public static Task<string> DockerfileJava8 => GetValue("Dockerfile.java8");
 

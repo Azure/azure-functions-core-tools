@@ -7,4 +7,4 @@
 
 #### Changes
 
-- <entry>
+- Add support for .NET 10 isolated model (#4589)
