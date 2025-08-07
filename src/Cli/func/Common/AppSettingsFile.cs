@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text;
+using Colors.Net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -24,8 +26,13 @@ namespace Azure.Functions.Cli.Common
                 ConnectionStrings = appSettings.ConnectionStrings;
                 Host = appSettings.Host;
             }
-            catch
+            catch (Exception ex)
             {
+                if (ex is JsonException)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Failed to read app settings file at '{_filePath}'. Ensure it is a valid JSON file. {ex.Message}"));
+                }
+
                 Values = new Dictionary<string, string>();
                 ConnectionStrings = new Dictionary<string, JToken>();
                 IsEncrypted = true;

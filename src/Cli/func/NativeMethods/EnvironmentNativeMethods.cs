@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.NativeMethods
                 // Any changes through setenv() are ignored.
                 if (StaticSettings.IsDebug)
                 {
-                    ColoredConsole.WriteLine("Setting unsupported .NET environment variables (empty string) is not implemented for this platform.");
+                    ColoredConsole.WriteLine($"Setting an environment variable ('{key}') to an empty string is not implemented for this platform.");
                 }
             }
         }

@@ -273,7 +273,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Build();
         }
 
-        private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
+        internal async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
             var settings = _secretsManager.GetSecrets();
             settings.Add(Constants.WebsiteHostname, uri.Authority);
@@ -298,9 +298,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             await CheckNonOptionalSettings(settings.Union(environment).Union(userSecrets), scriptPath, userSecretsEnabled);
 
-            // when running locally in CLI we want the host to run in debug mode
-            // which optimizes host responsiveness
-            settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+            // When running locally in CLI we want the host to run in debug mode which optimizes host responsiveness
+            // We intentionally override the value of AZURE_FUNCTIONS_ENVIRONMENT to Development if it is already set to something else.
+            if (settings.TryGetValue("AZURE_FUNCTIONS_ENVIRONMENT", out var oldValue))
+            {
+                ColoredConsole.WriteLine(WarningColor($"AZURE_FUNCTIONS_ENVIRONMENT already exists with value '{oldValue}', overriding to 'Development'."));
+            }
+
+            settings["AZURE_FUNCTIONS_ENVIRONMENT"] = "Development";
 
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
@@ -442,22 +447,25 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var runTask = host.RunAsync();
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
 
-            await hostService.DelayUntilHostReady();
-
-            var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
-            var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
-            if (scriptHost != null && scriptHost.Functions.Any())
+            if (hostService.State is not ScriptHostState.Stopping && hostService.State is not ScriptHostState.Stopped)
             {
-                // Checking if in Limelight - it should have a `AzureDevSessionsRemoteHostName` value in local.settings.json.
-                var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
-                    s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
-                if (forwardedHttpUrl != null)
-                {
-                    var baseUrl = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
-                    baseUri = new Uri(baseUrl);
-                }
+                await hostService.DelayUntilHostReady();
 
-                DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
+                var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
+                var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
+                if (scriptHost != null && scriptHost.Functions.Any())
+                {
+                    // Checking if in Limelight - it should have a `AzureDevSessionsRemoteHostName` value in local.settings.json.
+                    var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
+                        s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
+                    if (forwardedHttpUrl != null)
+                    {
+                        var baseUrl = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
+                        baseUri = new Uri(baseUrl);
+                    }
+
+                    DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
+                }
             }
 
             if (VerboseLogging == null || !VerboseLogging.Value)

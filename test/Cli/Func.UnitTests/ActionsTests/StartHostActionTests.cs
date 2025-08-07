@@ -261,6 +261,47 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             Assert.False(expectException, "Expected validation failure.");
         }
 
+        [Fact]
+        public async Task GetConfigurationSettings_OverwritesAzFuncEnvironment_WhenAlreadyInSecrets()
+        {
+            // Arrange
+            var secretsDict = new Dictionary<string, string>
+            {
+                ["AZURE_FUNCTIONS_ENVIRONMENT"] = "UserEnv"
+            };
+
+            var mockSecretsManager = new Mock<ISecretsManager>();
+            mockSecretsManager.Setup(s => s.GetSecrets())
+                            .Returns(() => new Dictionary<string, string>(secretsDict));
+
+            // Return an empty set of connection strings of the expected type
+            mockSecretsManager.Setup(s => s.GetConnectionStrings())
+                            .Returns(Array.Empty<ConnectionString>);
+
+            // Set up file system mock to avoid the project root directory error
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            fileSystem.Directory.GetDirectories(Arg.Any<string>()).Returns(Array.Empty<string>());
+            FileSystemHelpers.Instance = fileSystem;
+
+            // Initialize globals if required by your setup
+            GlobalCoreToolsSettings.Init(mockSecretsManager.Object, []);
+
+            var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>())
+            {
+                DotNetIsolatedDebug = false,
+                EnableJsonOutput = false,
+                VerboseLogging = false,
+                HostRuntime = "default"
+            };
+
+            // Act
+            var result = await action.GetConfigurationSettings("some/path", new Uri("https://example.com"));
+
+            // Assert
+            Assert.Equal("Development", result["AZURE_FUNCTIONS_ENVIRONMENT"]);
+        }
+
         public void Dispose()
         {
             FileSystemHelpers.Instance = null;

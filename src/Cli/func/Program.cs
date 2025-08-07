@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using Autofac;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -12,9 +13,11 @@ namespace Azure.Functions.Cli
     internal class Program
     {
         private static readonly string[] _versionArgs = ["version", "v"];
+        private static readonly CancellationTokenSource _shuttingDownCts = new CancellationTokenSource();
+        private static readonly CancellationTokenSource _forceShutdownCts = new CancellationTokenSource();
         private static IContainer _container;
 
-        internal static void Main(string[] args)
+        internal static async Task Main(string[] args)
         {
             // Configure console encoding
             ConsoleHelper.ConfigureConsoleOutputEncoding();
@@ -29,37 +32,30 @@ namespace Azure.Functions.Cli
             }
 
             FirstTimeCliExperience();
-            SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
             _container = InitializeAutofacContainer();
+            var processManager = _container.Resolve<IProcessManager>();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+            _ = CancelKeyHandler.Register(_shuttingDownCts.Cancel, _forceShutdownCts.Cancel);
 
-            Console.CancelKeyPress += (s, e) =>
+            try
             {
-                _container.Resolve<IProcessManager>()?.KillChildProcesses();
-            };
-
-            ConsoleApp.Run<Program>(args, _container);
+                await ConsoleApp.RunAsync<Program>(args, _container, _shuttingDownCts.Token).WaitAsync(_forceShutdownCts.Token);
+            }
+            catch (OperationCanceledException ex)
+            {
+                if (ex.CancellationToken == _forceShutdownCts.Token)
+                {
+                    processManager?.KillChildProcesses();
+                    Process.GetCurrentProcess().Kill();
+                }
+            }
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
         {
             var processManager = _container.Resolve<IProcessManager>();
             processManager?.KillChildProcesses();
-        }
-
-        private static void SetupGlobalExceptionHandler()
-        {
-            // AppDomain.CurrentDomain.UnhandledException += (s, e) =>
-            // {
-            //     if (e.IsTerminating)
-            //     {
-            //         ColoredConsole.Error.WriteLine(ErrorColor(e.ExceptionObject.ToString()));
-            //         ColoredConsole.Write("Press any to continue....");
-            //         Console.ReadKey(true);
-            //         Environment.Exit(ExitCodes.GeneralError);
-            //     }
-            // };
         }
 
         private static void FirstTimeCliExperience()
