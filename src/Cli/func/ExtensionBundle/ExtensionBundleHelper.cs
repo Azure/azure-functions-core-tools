@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
+using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Configuration;
@@ -13,6 +15,10 @@ namespace Azure.Functions.Cli.ExtensionBundle
 {
     internal class ExtensionBundleHelper
     {
+        private const int MaxRetries = 3;
+        private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(10);
+
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
             hostOptions = hostOptions ?? SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
@@ -49,13 +55,23 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static async Task GetExtensionBundle()
         {
             var extensionBundleManager = GetExtensionBundleManager();
+            var bundlePath = await extensionBundleManager.GetExtensionBundlePath();
+
+            if (Directory.Exists(bundlePath) && Directory.GetFiles(bundlePath, "*", SearchOption.AllDirectories).Any())
+            {
+                ColoredConsole.WriteLine($"Extension Bundle already exists at {bundlePath}. Skipping download.");
+                return;
+            }
+
             try
             {
-                using (var httpClient = new HttpClient())
-                {
-                    httpClient.Timeout = TimeSpan.FromMinutes(10);
-                    await extensionBundleManager.GetExtensionBundlePath(httpClient);
-                }
+                using var httpClient = new HttpClient { Timeout = _httpTimeout };
+
+                await RetryHelper.Retry(
+                    func: async () => await extensionBundleManager.GetExtensionBundlePath(httpClient),
+                    retryCount: MaxRetries,
+                    retryDelay: _retryDelay,
+                    displayError: false);
             }
             catch (Exception)
             {
