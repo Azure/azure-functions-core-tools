@@ -203,6 +203,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
             _keyVaultReferencesManager.ResolveKeyVaultReferences(settings);
             UpdateEnvironmentVariables(settings);
 
+            if (settings.ContainsKey("CONTAINER_NAME"))
+            {
+                ColoredConsole.WriteLine(ErrorColor("CONTAINER_NAME is a reserved environment variable for the Functions Host. Please remove or rename this setting."));
+            }
+
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
 
             if (UseHttps)
