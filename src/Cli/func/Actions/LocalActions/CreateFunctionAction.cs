@@ -134,8 +134,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     ColoredConsole.WriteLine($"Template: {TemplateName}");
                 }
 
-                ColoredConsole.Write("Function name: ");
+                ColoredConsole.Write($"Function name: [{TemplateName}] ");
                 FunctionName = FunctionName ?? Console.ReadLine();
+                FunctionName = string.IsNullOrEmpty(FunctionName) ? TemplateName : FunctionName;
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
                 await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", string.Empty), _workerRuntime, AuthorizationLevel);
