@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
+using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
+using Colors.Net;
 using NSubstitute;
 using Xunit;
 
@@ -34,21 +36,20 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
             fileSystem.Directory.GetFiles(Arg.Any<string>(), "*", SearchOption.AllDirectories).Returns(new[] { "existing.dll" });
 
-            var originalOut = Console.Out;
-            var sw = new StringWriter();
-            Console.SetOut(sw);
+            var output = new StringBuilder();
+            var console = Substitute.For<IConsoleWriter>();
+            console.WriteLine(Arg.Do<object>(o => output.AppendLine(o?.ToString()))).Returns(console);
+            console.Write(Arg.Do<object>(o => output.Append(o.ToString()))).Returns(console);
+            ColoredConsole.Out = console;
+            ColoredConsole.Error = console;
 
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await ExtensionBundleHelper.GetExtensionBundle();
 
-            // Restore the real console
-            Console.SetOut(originalOut);
-
             // Assert
-            var output = sw.ToString();
-            Assert.Contains("Extension Bundle already exists", output);
+            Assert.Contains("Extension Bundle already exists", output.ToString());
         }
 
         public void Dispose()
