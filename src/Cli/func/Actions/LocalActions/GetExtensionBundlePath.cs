@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return base.ParseArgs(args);
         }
 
-        public override Task RunAsync()
+        public override async Task RunAsync()
         {
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             if (extensionBundleManager.IsExtensionBundleConfigured())
@@ -26,7 +26,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 try
                 {
                     var options = ExtensionBundleHelper.GetExtensionBundleOptions();
-                    var bundlePath = ExtensionBundleHelper.GetBundleDownloadPath(options.Id);
+                    var bundleBasePath = ExtensionBundleHelper.GetBundleDownloadPath(options.Id);
+                    var bundleDetails = await extensionBundleManager.GetExtensionBundleDetails();
+                    var bundlePath = Path.Combine(bundleBasePath, bundleDetails.Version);
 
                     if (string.IsNullOrEmpty(bundlePath))
                     {
@@ -46,8 +48,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 ColoredConsole.WriteLine("Extension bundle not configured.");
             }
-
-            return Task.CompletedTask;
         }
     }
 }

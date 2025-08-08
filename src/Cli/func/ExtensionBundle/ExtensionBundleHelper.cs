@@ -55,18 +55,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static async Task GetExtensionBundle()
         {
             var extensionBundleManager = GetExtensionBundleManager();
-            var bundlePath = await extensionBundleManager.GetExtensionBundlePath();
-
-            if (Directory.Exists(bundlePath) && Directory.GetFiles(bundlePath, "*", SearchOption.AllDirectories).Any())
-            {
-                ColoredConsole.WriteLine($"Extension Bundle already exists at {bundlePath}. Skipping download.");
-                return;
-            }
 
             try
             {
                 using var httpClient = new HttpClient { Timeout = _httpTimeout };
 
+                // Attempt to get the extension bundle path, which will trigger the download if not already present
                 await RetryHelper.Retry(
                     func: async () => await extensionBundleManager.GetExtensionBundlePath(httpClient),
                     retryCount: MaxRetries,
