@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("SomeKey=SomeValue;AnotherKey=AnotherValue", null)]
         public void ExtractIKeyFromConnectionString_ReturnsExpectedInstrumentationKey(string connectionString, string expected)
         {
-            var actual = Utilities.ExtractIKeyFromConnectionString(connectionString);
+            var actual = Utilities.ExtractInstrumentationKeyFromConnectionString(connectionString);
 
             Assert.Equal(expected, actual);
         }

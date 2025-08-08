@@ -16,8 +16,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Show interactive streaming logs for an Azure-hosted Function App")]
     internal class LogStreamAction : BaseFunctionAppAction
     {
-        private const string ApplicationInsightsIKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
-        private const string ApplicationInsightsConnectionString = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+        private const string ApplicationInsightsInstrumentationKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
+        private const string ApplicationInsightsConnectionStringSetting = "APPLICATIONINSIGHTS_CONNECTION_STRING";
         private const string LiveMetricsUriTemplate = "https://portal.azure.com/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/{0}/ResourceId/{1}";
 
         public bool UseBrowser { get; set; }
@@ -93,30 +93,30 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task OpenLiveStreamInBrowser(Site functionApp, IEnumerable<ArmSubscription> allSubscriptions)
         {
-            string iKey;
+            string instrumentationKey;
 
             // First, check for a connection string. If it's not available, default to using the Instrumentation Key.
-            if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsConnectionString, out var connectionString))
+            if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsConnectionStringSetting, out var connectionString))
             {
-                iKey = Utilities.ExtractIKeyFromConnectionString(connectionString);
+                instrumentationKey = Utilities.ExtractInstrumentationKeyFromConnectionString(connectionString);
             }
-            else if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsIKeySetting, out var instrumentationKey))
+            else if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsInstrumentationKeySetting, out var key))
             {
-                iKey = instrumentationKey;
+                instrumentationKey = key;
             }
             else
             {
-                throw new CliException($"Missing {ApplicationInsightsConnectionString} App Setting. " +
+                throw new CliException($"Missing {ApplicationInsightsConnectionStringSetting} App Setting. " +
                     $"Please make sure you have Application Insights configured with your function app.");
             }
 
-            if (string.IsNullOrWhiteSpace(iKey))
+            if (string.IsNullOrWhiteSpace(instrumentationKey))
             {
                 throw new CliException("Invalid Instrumentation Key found. Please make sure that the Application Insights is configured correctly.");
             }
 
             ColoredConsole.WriteLine("Retrieving Application Insights information...");
-            var appId = await AzureHelper.GetApplicationInsightIDFromIKey(iKey, AccessToken, ManagementURL, allSubs: allSubscriptions);
+            var appId = await AzureHelper.GetApplicationInsightIDFromIKey(instrumentationKey, AccessToken, ManagementURL, allSubs: allSubscriptions);
             var armResourceId = AzureHelper.ParseResourceId(appId);
             var componentId = $@"{{""Name"":""{armResourceId.Name}"",""SubscriptionId"":""{armResourceId.Subscription}"",""ResourceGroup"":""{armResourceId.ResourceGroup}""}}";
 

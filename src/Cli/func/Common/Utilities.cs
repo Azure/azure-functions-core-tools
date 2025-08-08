@@ -294,7 +294,7 @@ namespace Azure.Functions.Cli
             return false;
         }
 
-        internal static string ExtractIKeyFromConnectionString(string connectionString)
+        internal static string ExtractInstrumentationKeyFromConnectionString(string connectionString)
         {
             if (string.IsNullOrEmpty(connectionString))
             {
