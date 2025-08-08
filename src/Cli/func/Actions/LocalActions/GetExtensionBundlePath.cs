@@ -25,7 +25,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 try
                 {
-                    string bundlePath = await extensionBundleManager.GetExtensionBundlePath();
+                    var options = ExtensionBundleHelper.GetExtensionBundleOptions();
+                    var bundleBasePath = ExtensionBundleHelper.GetBundleDownloadPath(options.Id);
+                    var bundleDetails = await extensionBundleManager.GetExtensionBundleDetails();
+                    var bundlePath = Path.Combine(bundleBasePath, bundleDetails.Version);
+
                     if (string.IsNullOrEmpty(bundlePath))
                     {
                         throw new CliException("Unable to locate extension bundle.");
