@@ -87,6 +87,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("  InstrumentationKey  =   abc123    ;", "abc123")]
         [InlineData("InstrumentationKey=abc123;OtherKey=xyz", "abc123")]
         [InlineData("otherKey=xyz;InstrumentationKey=abc123;", "abc123")]
+        [InlineData("otherKey=xyz;InstrumentationKey=abc123", "abc123")]
         [InlineData("InstrumentationKey=ABC123", "ABC123")]
         [InlineData("instrumentationkey=abc123", "abc123")]
         [InlineData("InstrumentationKey= ;", null)]
