@@ -12,6 +12,10 @@ pr:
     - release_4.0
     - main
     - in-proc
+  paths:
+    exclude:
+    - docs/*
+    - '**/*.md'
 
 trigger:
   batch: true
@@ -21,6 +25,10 @@ trigger:
     - main
     - in-proc
     - feature/*
+  paths:
+    exclude:
+    - docs/*
+    - '**/*.md'
 
 resources:
   repositories:
