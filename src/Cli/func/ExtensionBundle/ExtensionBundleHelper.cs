@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
     {
         private const int MaxRetries = 3;
         private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
-        private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(3);
+        private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
 
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
