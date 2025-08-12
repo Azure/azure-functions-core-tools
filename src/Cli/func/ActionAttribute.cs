@@ -15,5 +15,7 @@ namespace Azure.Functions.Cli
         public string HelpText { get; set; } = "placeholder";
 
         public bool ShowInHelp { get; set; } = true;
+
+        public string ParentCommandName { get; set; } = string.Empty;
     }
 }
