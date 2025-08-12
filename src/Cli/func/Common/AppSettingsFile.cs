@@ -20,11 +20,19 @@ namespace Azure.Functions.Cli.Common
             try
             {
                 var content = FileSystemHelpers.ReadAllTextFromFile(_filePath);
-                var appSettings = JsonConvert.DeserializeObject<AppSettingsFile>(content);
-                IsEncrypted = appSettings.IsEncrypted;
-                Values = appSettings.Values;
-                ConnectionStrings = appSettings.ConnectionStrings;
-                Host = appSettings.Host;
+                var appSettings = JObject.Parse(content);
+
+                var localSerializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
+                {
+                    MissingMemberHandling = MissingMemberHandling.Ignore,
+                    ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                    ObjectCreationHandling = ObjectCreationHandling.Replace
+                });
+
+                IsEncrypted = appSettings.Value<bool?>("IsEncrypted") ?? true;
+                Values = appSettings["Values"]?.ToObject<Dictionary<string, string>>(localSerializer) ?? new Dictionary<string, string>();
+                ConnectionStrings = appSettings["ConnectionStrings"]?.ToObject<Dictionary<string, JToken>>(localSerializer) ?? new Dictionary<string, JToken>();
+                Host = appSettings["Host"]?.ToObject<HostStartSettings>(localSerializer) ?? new HostStartSettings();
             }
             catch (Exception ex)
             {
