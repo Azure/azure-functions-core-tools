@@ -59,21 +59,27 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
 
             // Get the original command line args to pass to subcommands
-            var originalArgs = Environment.GetCommandLineArgs().Skip(1).ToArray();
+            var packOptions = new PackOptions
+            {
+                FolderPath = FolderPath,
+                OutputPath = OutputPath,
+                NoBuild = NoBuild,
+                PreserveExecutables = PreserveExecutables
+            };
 
             // Internally dispatch to runtime-specific subcommand
-            await RunRuntimeSpecificPack(workerRuntime, originalArgs);
+            await RunRuntimeSpecificPack(workerRuntime, packOptions);
         }
 
-        private async Task RunRuntimeSpecificPack(WorkerRuntime runtime, string[] args)
+        private async Task RunRuntimeSpecificPack(WorkerRuntime runtime, PackOptions packOptions)
         {
             // Internally dispatch to the appropriate subcommand handler
             switch (runtime)
             {
                 case WorkerRuntime.Dotnet:
                 case WorkerRuntime.DotnetIsolated:
-                    var dotnetSubCommand = new DotNetPackSubCommand(_secretsManager, this);
-                    await dotnetSubCommand.ParseAndRunAsync(args);
+                    var dotnetSubCommand = new DotnetPackSubcommandAction(_secretsManager);
+                    await dotnetSubCommand.RunAsync(packOptions);
                     break;
                 /*
                 case WorkerRuntime.Python:
@@ -94,71 +100,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                     break;
                 */
                 default:
-                    var genericSubCommand = new GenericPackSubCommand(_secretsManager, this);
-                    await genericSubCommand.ParseAndRunAsync(args);
+                    // Keep the default behavior for now until we have created subcommands for other runtimes
+                    var functionAppRoot = PackHelpers.ResolveFunctionAppRoot(FolderPath);
+                    PackHelpers.ValidateFunctionAppRoot(functionAppRoot);
+
+                    var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, OutputPath);
+                    PackHelpers.CleanupExistingPackage(outputPath);
+
+                    if (!NoBuild)
+                    {
+                        var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
+                        await installExtensionAction.RunAsync();
+                    }
+
+                    await PackHelpers.CreatePackage(functionAppRoot, outputPath, NoBuild, TelemetryCommandEvents);
                     break;
             }
-        }
-
-        // Common helper methods that all subcommands can use
-        public string ResolveFunctionAppRoot()
-        {
-            return string.IsNullOrEmpty(FolderPath)
-                ? ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory)
-                : Path.Combine(Environment.CurrentDirectory, FolderPath);
-        }
-
-        public string ResolveOutputPath(string functionAppRoot)
-        {
-            string resolvedPath;
-            if (string.IsNullOrEmpty(OutputPath))
-            {
-                resolvedPath = Path.Combine(Environment.CurrentDirectory, $"{Path.GetFileName(functionAppRoot)}");
-            }
-            else
-            {
-                resolvedPath = Path.Combine(Environment.CurrentDirectory, OutputPath);
-                if (FileSystemHelpers.DirectoryExists(resolvedPath))
-                {
-                    resolvedPath = Path.Combine(resolvedPath, $"{Path.GetFileName(functionAppRoot)}");
-                }
-            }
-            return resolvedPath + ".zip";
-        }
-
-        public void ValidateFunctionAppRoot(string functionAppRoot)
-        {
-            if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, ScriptConstants.HostMetadataFileName)))
-            {
-                throw new CliException($"Can't find {Path.Combine(functionAppRoot, ScriptConstants.HostMetadataFileName)}");
-            }
-        }
-
-        public void CleanupExistingPackage(string outputPath)
-        {
-            if (FileSystemHelpers.FileExists(outputPath))
-            {
-                ColoredConsole.WriteLine($"Deleting the old package {outputPath}");
-                try
-                {
-                    FileSystemHelpers.FileDelete(outputPath);
-                }
-                catch (Exception)
-                {
-                    throw new CliException($"Could not delete {outputPath}");
-                }
-            }
-        }
-
-        public async Task CreatePackage(string packingRoot, string outputPath, bool buildNativeDeps = false)
-        {
-            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
-            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
-
-            var stream = await ZipHelper.GetAppZipFile(packingRoot, buildNativeDeps, BuildOption.Default, noBuild: NoBuild);
-
-            ColoredConsole.WriteLine($"Creating a new package {outputPath}");
-            await FileSystemHelpers.WriteToFile(outputPath, stream);
         }
     }
 }
