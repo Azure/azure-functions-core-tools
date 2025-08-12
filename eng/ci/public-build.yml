@@ -6,6 +6,8 @@ schedules:
       - main
   always: true
 
+trigger: none
+
 pr:
   branches:
     include:
@@ -13,18 +15,13 @@ pr:
     - main
     - in-proc
   paths:
-    exclude:
-    - docs/*
-    - '**/*.md'
-
-trigger:
-  batch: true
-  branches:
     include:
-    - release_4.0
-    - main
-    - in-proc
-    - feature/*
+    - eng
+    - src
+    - test
+    exclude:
+    - docs
+    - '**/*.md'
 
 resources:
   repositories:
