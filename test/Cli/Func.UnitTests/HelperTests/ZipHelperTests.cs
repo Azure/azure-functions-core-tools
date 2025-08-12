@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.UnitTests.Helpers;
@@ -20,9 +21,13 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             _output = output;
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task CreateZip_Succeeds()
         {
+            Skip.IfNot(
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux),
+                reason: "Unsupported OS.");
+
             var windowsZip = await BuildAndCopyFileToZipAsync("win-x64");
             var linuxZip = await BuildAndCopyFileToZipAsync("linux-x64");
 
