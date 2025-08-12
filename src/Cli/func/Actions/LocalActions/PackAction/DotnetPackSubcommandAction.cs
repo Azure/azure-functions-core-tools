@@ -5,43 +5,43 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
+using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack dotnet", CommandType = CommandType.SubCommand, ShowInHelp = true, HelpText = "Internal .NET runtime-specific pack command")]
-    internal class DotNetPackSubCommand : PackSubCommandBase
+    [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = ".NET specific arguments")]
+    internal class DotnetPackSubcommandAction : BaseAction
     {
-        public DotNetPackSubCommand(ISecretsManager secretsManager, PackAction parentAction)
-            : base(secretsManager, parentAction)
+        private readonly ISecretsManager _secretsManager;
+
+        public DotnetPackSubcommandAction(ISecretsManager secretsManager)
         {
+            _secretsManager = secretsManager;
         }
 
-        protected override void SetupParser()
+        public override ICommandLineParserResult ParseArgs(string[] args)
         {
             // .NET doesn't have any runtime-specific arguments beyond the common ones
-            Parser
-                .Setup<bool>("build-native-deps")
-                .SetDefault(false)
-                .WithDescription("Build native dependencies in Docker container");
+            return base.ParseArgs(args);
         }
 
-        public override async Task RunAsync()
+        public async Task RunAsync(PackOptions packOptions)
         {
-            var functionAppRoot = ParentAction.ResolveFunctionAppRoot();
+            var functionAppRoot = PackHelpers.ResolveFunctionAppRoot(packOptions.FolderPath);
             string packingRoot = functionAppRoot;
 
-            if (ParentAction.NoBuild)
+            if (packOptions.NoBuild)
             {
                 // For --no-build, treat FolderPath as the build output directory
-                if (string.IsNullOrEmpty(ParentAction.FolderPath))
+                if (string.IsNullOrEmpty(packOptions.FolderPath))
                 {
                     throw new CliException("When using --no-build for .NET projects, you must specify the path to the build output directory (e.g., ./bin/Release/net8.0/publish)");
                 }
 
-                packingRoot = Path.IsPathRooted(ParentAction.FolderPath)
-                    ? ParentAction.FolderPath
-                    : Path.Combine(Environment.CurrentDirectory, ParentAction.FolderPath);
+                packingRoot = Path.IsPathRooted(packOptions.FolderPath)
+                    ? packOptions.FolderPath
+                    : Path.Combine(Environment.CurrentDirectory, packOptions.FolderPath);
 
                 if (!Directory.Exists(packingRoot))
                 {
@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
             else
             {
-                ParentAction.ValidateFunctionAppRoot(functionAppRoot);
+                PackHelpers.ValidateFunctionAppRoot(functionAppRoot);
 
                 // Run dotnet publish
                 ColoredConsole.WriteLine("Building .NET project...");
@@ -62,17 +62,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 packingRoot = Path.Combine(functionAppRoot, "output");
             }
 
-            var outputPath = ParentAction.ResolveOutputPath(functionAppRoot);
-            ParentAction.CleanupExistingPackage(outputPath);
+            var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, packOptions.OutputPath);
+            PackHelpers.CleanupExistingPackage(outputPath);
 
             // Install extensions if not in no-build mode
-            if (!ParentAction.NoBuild)
+            if (!packOptions.NoBuild)
             {
-                var installExtensionAction = new InstallExtensionAction(SecretsManager, false);
+                var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
                 await installExtensionAction.RunAsync();
             }
 
-            await ParentAction.CreatePackage(packingRoot, outputPath);
+            await PackHelpers.CreatePackage(packingRoot, outputPath, packOptions.NoBuild, TelemetryCommandEvents);
+        }
+
+        public override Task RunAsync()
+        {
+            // Keep this in case the customer tries to run func pack dotnet, since this subcommand is not meant to be run directly.
+            throw new InvalidOperationException("Invalid command. Please run func pack instead with valid arguments. To see a list of valid arguments, please see func --help.");
         }
 
         private void ValidateDotNetPublishDirectory(string path)
