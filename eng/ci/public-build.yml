@@ -25,10 +25,6 @@ trigger:
     - main
     - in-proc
     - feature/*
-  paths:
-    exclude:
-    - docs/*
-    - '**/*.md'
 
 resources:
   repositories:
