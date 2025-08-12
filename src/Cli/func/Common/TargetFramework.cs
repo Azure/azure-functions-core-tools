@@ -10,5 +10,6 @@ namespace Azure.Functions.Cli.Common
         public const string Net7 = "net7.0";
         public const string Net8 = "net8.0";
         public const string Net9 = "net9.0";
+        public const string Net10 = "net10.0";
     }
 }
