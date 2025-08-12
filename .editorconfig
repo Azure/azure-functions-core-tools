@@ -8,6 +8,7 @@ root = true
 # All files | Don't use tabs for indentation.
 [*]
 indent_style = space
+charset = utf-8
 
 # Code files
 [*.{cs,csx,vb,vbx}]
@@ -16,7 +17,6 @@ xml_header = false
 indent_size = 4
 insert_final_newline = true
 trim_trailing_whitespace = true
-charset = utf-8-bom
 
 #############################
 # Script Coding Conventions #
