@@ -38,7 +38,7 @@ This will build the CLI and start the host with the provided command and test ap
 3. Set the `Working directory` to the path of your test app
 4. Press `F5`
 
-![Visual Studio Debug Settings](../images/vs-debug-settings.png)
+![Visual Studio Debug Settings](./images/vs-debug-settings.png)
 
 #### Other
 
