@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
@@ -56,7 +57,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 }
                 catch (Exception)
                 {
-                    throw new CliException($"Could not delete {outputPath}");
+                    ColoredConsole.WriteLine(WarningColor($"Could not delete {outputPath}"));
                 }
             }
         }
