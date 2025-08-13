@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
@@ -103,7 +103,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsInstrumentationKeySetting, out var key))
             {
-                ColoredConsole.WriteLine(WarningColor("Support for instrumentation key ingestion ended on March 31, 2025. Switch to connection strings to access new features."));
+                ColoredConsole.WriteLine(WarningColor("Support for instrumentation key ingestion has ended. Switch to connection strings to access new features."));
                 instrumentationKey = key;
             }
             else
