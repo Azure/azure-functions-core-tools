@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Fclp;
@@ -98,10 +99,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // First, check for a connection string. If it's not available, default to using the Instrumentation Key.
             if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsConnectionStringSetting, out var connectionString))
             {
-                instrumentationKey = Utilities.ExtractInstrumentationKeyFromConnectionString(connectionString);
+                instrumentationKey = connectionString.GetValueFromDelimitedString("InstrumentationKey");
             }
             else if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsInstrumentationKeySetting, out var key))
             {
+                ColoredConsole.WriteLine(WarningColor("Support for instrumentation key ingestion ended on March 31, 2025. Switch to connection strings to access new features."));
                 instrumentationKey = key;
             }
             else

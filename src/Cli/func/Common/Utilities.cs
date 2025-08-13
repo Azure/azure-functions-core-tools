@@ -293,46 +293,5 @@ namespace Azure.Functions.Cli
 
             return false;
         }
-
-        internal static string ExtractInstrumentationKeyFromConnectionString(string connectionString)
-        {
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                return null;
-            }
-
-            var span = connectionString.AsSpan();
-            var start = 0;
-
-            while (start < span.Length)
-            {
-                var semicolonIndex = span.Slice(start).IndexOf(';');
-                var length = semicolonIndex == -1 ? span.Length - start : semicolonIndex;
-                var segment = span.Slice(start, length).Trim();
-
-                start += length + (semicolonIndex == -1 ? 0 : 1);
-
-                if (segment.IsEmpty)
-                {
-                    continue;
-                }
-
-                int equalsIndex = segment.IndexOf('=');
-                if (equalsIndex <= 0 || equalsIndex >= segment.Length - 1)
-                {
-                    continue;
-                }
-
-                var key = segment.Slice(0, equalsIndex).Trim();
-                var value = segment.Slice(equalsIndex + 1).Trim();
-
-                if (key.Equals("InstrumentationKey", StringComparison.OrdinalIgnoreCase))
-                {
-                    return value.ToString();
-                }
-            }
-
-            return null;
-        }
     }
 }
