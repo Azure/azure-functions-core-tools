@@ -10,7 +10,7 @@ using Microsoft.Azure.WebJobs.Script;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to run.", ShowInHelp = true)]
+    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy.", ShowInHelp = true)]
     internal class PackAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
@@ -32,17 +32,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         {
             Parser
                 .Setup<string>('o', "output")
-                .WithDescription("output path for the packed archive")
+                .WithDescription("Specifies the file path where the packed ZIP archive will be created.")
                 .Callback(o => OutputPath = o);
 
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Skip running build for specific language if it is required")
+                .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents." +
+                "Otherwise, default is the current directory.")
                 .Callback(n => NoBuild = n);
 
             Parser
                 .Setup<string>("preserve-executables")
-                .WithDescription("Comma separated list of executables to indicate which bits are to be set as executable in the zip file.")
+                .WithDescription("Comma - separated list of executable files to specify which files should be set as executable in the zip archive.")
                 .Callback(p => PreserveExecutables = p.Split(',').Select(s => s.Trim()).ToArray());
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -68,54 +69,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             };
 
             // Internally dispatch to runtime-specific subcommand
-            await RunRuntimeSpecificPack(workerRuntime, packOptions);
+            await RunRuntimeSpecificPackAsync(workerRuntime, packOptions);
         }
 
-        private async Task RunRuntimeSpecificPack(WorkerRuntime runtime, PackOptions packOptions)
-        {
-            // Internally dispatch to the appropriate subcommand handler
-            switch (runtime)
+        private async Task RunRuntimeSpecificPackAsync(WorkerRuntime runtime, PackOptions packOptions) =>
+            await (runtime switch
             {
-                case WorkerRuntime.Dotnet:
-                case WorkerRuntime.DotnetIsolated:
-                    var dotnetSubCommand = new DotnetPackSubcommandAction(_secretsManager);
-                    await dotnetSubCommand.RunAsync(packOptions);
-                    break;
-                /*
-                case WorkerRuntime.Python:
-                    var pythonSubCommand = new PythonPackSubCommand(_secretsManager, this);
-                    await pythonSubCommand.ParseAndRunAsync(args);
-                    break;
-                case WorkerRuntime.Node:
-                    var nodeSubCommand = new NodePackSubCommand(_secretsManager, this);
-                    await nodeSubCommand.ParseAndRunAsync(args);
-                    break;
-                case WorkerRuntime.Java:
-                    var javaSubCommand = new JavaPackSubCommand(_secretsManager, this);
-                    await javaSubCommand.ParseAndRunAsync(args);
-                    break;
-                case WorkerRuntime.Powershell:
-                    var powershellSubCommand = new PowerShellPackSubCommand(_secretsManager, this);
-                    await powershellSubCommand.ParseAndRunAsync(args);
-                    break;
-                */
-                default:
-                    // Keep the default behavior for now until we have created subcommands for other runtimes
-                    var functionAppRoot = PackHelpers.ResolveFunctionAppRoot(FolderPath);
-                    PackHelpers.ValidateFunctionAppRoot(functionAppRoot);
-
-                    var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, OutputPath);
-                    PackHelpers.CleanupExistingPackage(outputPath);
-
-                    if (!NoBuild)
-                    {
-                        var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
-                        await installExtensionAction.RunAsync();
-                    }
-
-                    await PackHelpers.CreatePackage(functionAppRoot, outputPath, NoBuild, TelemetryCommandEvents);
-                    break;
-            }
-        }
+                WorkerRuntime.Dotnet or WorkerRuntime.DotnetIsolated => new DotnetPackSubcommandAction(_secretsManager).RunAsync(packOptions),
+                _ => throw new CliException($"Unsupported runtime: {runtime}")
+            });
     }
 }

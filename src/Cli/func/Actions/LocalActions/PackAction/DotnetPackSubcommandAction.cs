@@ -10,7 +10,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = ".NET specific arguments")]
+    [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to .NET apps when running func pack")]
     internal class DotnetPackSubcommandAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
@@ -31,17 +31,25 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             var functionAppRoot = PackHelpers.ResolveFunctionAppRoot(packOptions.FolderPath);
             string packingRoot = functionAppRoot;
 
+            if (!Directory.Exists(functionAppRoot))
+            {
+                throw new CliException($"Directory not found to pack: {functionAppRoot}");
+            }
+
             if (packOptions.NoBuild)
             {
                 // For --no-build, treat FolderPath as the build output directory
                 if (string.IsNullOrEmpty(packOptions.FolderPath))
                 {
-                    throw new CliException("When using --no-build for .NET projects, you must specify the path to the build output directory (e.g., ./bin/Release/net8.0/publish)");
+                    ColoredConsole.WriteLine(WarningColor("No folder path specified. Using current directory as build output directory."));
+                    packingRoot = Environment.CurrentDirectory;
                 }
-
-                packingRoot = Path.IsPathRooted(packOptions.FolderPath)
-                    ? packOptions.FolderPath
-                    : Path.Combine(Environment.CurrentDirectory, packOptions.FolderPath);
+                else
+                {
+                    packingRoot = Path.IsPathRooted(packOptions.FolderPath)
+                        ? packOptions.FolderPath
+                        : Path.Combine(Environment.CurrentDirectory, packOptions.FolderPath);
+                }
 
                 if (!Directory.Exists(packingRoot))
                 {
@@ -78,7 +86,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         public override Task RunAsync()
         {
             // Keep this in case the customer tries to run func pack dotnet, since this subcommand is not meant to be run directly.
-            throw new InvalidOperationException("Invalid command. Please run func pack instead with valid arguments. To see a list of valid arguments, please see func --help.");
+            return Task.CompletedTask;
         }
 
         private void ValidateDotNetPublishDirectory(string path)
@@ -88,7 +96,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 if (!FileSystemHelpers.FileExists(Path.Combine(path, file)))
                 {
-                    throw new CliException($"Required file {file} not found in build output directory: {path}");
+                    throw new CliException($"Required file '{file}' not found in build output directory: {path}");
                 }
             }
         }
@@ -106,7 +114,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
 
             // Run dotnet publish
-            var exe = new Executable("dotnet", $"publish --configuration Release --output \"{outputPath}\"", workingDirectory: functionAppRoot);
+            var exe = new Executable("dotnet", $"publish --output \"{outputPath}\"", workingDirectory: functionAppRoot);
             var exitCode = await exe.RunAsync(
                 o => ColoredConsole.WriteLine(o),
                 e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
