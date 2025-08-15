@@ -8,3 +8,4 @@
 #### Changes
 
 - Add support for .NET 10 isolated model (#4589)
+- Update log streaming to support both connection string and instrumentation Key (#4586)
