@@ -121,8 +121,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                     // Simple check if build script exists
                     if (packageJsonContent.Contains("\"build\"") && packageJsonContent.Contains("scripts"))
                     {
-                        ColoredConsole.WriteLine("Running npm run build...");
                         await NpmHelper.RunNpmCommand("run build", ignoreError: false);
+                        Console.WriteLine();
                     }
                     else
                     {

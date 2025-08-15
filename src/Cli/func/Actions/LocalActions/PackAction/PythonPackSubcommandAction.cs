@@ -38,6 +38,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         {
             ParseArgs(args);
 
+            // Validate invalid flag combinations
+            if (packOptions.NoBuild && BuildNativeDeps)
+            {
+                throw new CliException("Invalid options: --no-build cannot be used with --build-native-deps.");
+            }
+
             var functionAppRoot = PackHelpers.ResolveFunctionAppRoot(packOptions.FolderPath);
 
             if (!Directory.Exists(functionAppRoot))
@@ -45,7 +51,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 throw new CliException($"Directory not found to pack: {functionAppRoot}");
             }
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && !BuildNativeDeps)
             {
                 ColoredConsole.WriteLine(WarningColor("Python function apps is supported only on Linux. Please use the --build-native-deps flag" +
                     " when building on windows to ensure dependencies are properly restored."));
