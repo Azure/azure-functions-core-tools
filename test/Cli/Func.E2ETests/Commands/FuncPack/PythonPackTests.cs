@@ -1,10 +1,12 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using FluentAssertions;
+using System.IO.Compression;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -25,6 +27,23 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         {
             var testName = nameof(Pack_Python_WorksAsExpected);
 
+            // Remove existing _python_packages directory
+            if (Directory.Exists(Path.Combine(PythonProjectPath, ".python_packages")))
+            {
+                Directory.Delete(Path.Combine(PythonProjectPath, ".python_packages"), true);
+            }
+
+            var logsToValidate = new[]
+            {
+                "Found Python version 3.11.9 (py).",
+                "Successfully downloaded azure-functions werkzeug MarkupSafe"
+            };
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                logsToValidate = logsToValidate.Append("Python function apps is supported only on Linux. Please use the --build-native-deps flag when building on windows to ensure dependencies are properly restored.").ToArray();
+            }
+
             BasePackTests.TestBasicPackFunctionality(
                 PythonProjectPath,
                 testName,
@@ -36,7 +55,8 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "requirements.txt",
                     "function_app.py",
                     Path.Combine(".python_packages", "requirements.txt.md5")
-                });
+                },
+                logsToValidate);
         }
 
         [Fact]
@@ -47,7 +67,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
 
             // Step 1: Initialize a Python function app
-            // Note that we need to initialize the function app as we are testing an instance that has not run pack before.
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var initResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
@@ -115,6 +134,114 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             // Verify .python_packages/requirements.txt.md5 file still exists
             thirdPackResult.Should().FilesExistsWithExpectContent(packFilesToValidate);
+        }
+
+        [Fact]
+        public void Pack_Python_BuildNativeDeps_OnWindows_WorksAsExpected()
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // Only validate this scenario on Windows
+                return;
+            }
+
+            var testName = nameof(Pack_Python_BuildNativeDeps_OnWindows_WorksAsExpected);
+
+            if (Directory.Exists(Path.Combine(PythonProjectPath, ".python_packages")))
+            {
+                Directory.Delete(Path.Combine(PythonProjectPath, ".python_packages"), true);
+            }
+
+            var packResult = new FuncPackCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(PythonProjectPath)
+                .Execute(["--build-native-deps"]);
+
+            packResult.Should().ExitWith(0);
+            packResult.Should().HaveStdOutContaining("Creating a new package");
+
+            var zipFiles = Directory.GetFiles(PythonProjectPath, "*.zip");
+            Assert.True(zipFiles.Length > 0, $"No zip files found in {PythonProjectPath}");
+
+            packResult.Should().ValidateZipContents(
+                zipFiles.First(),
+                new[]
+                {
+                    "host.json",
+                    "requirements.txt",
+                    "function_app.py",
+                    Path.Combine(".python_packages", "requirements.txt.md5")
+                },
+                Log);
+
+            File.Delete(zipFiles.First());
+        }
+
+        [Fact]
+        public void Pack_Python_NoBuild_JustZipsDirectory()
+        {
+            var testName = nameof(Pack_Python_NoBuild_JustZipsDirectory);
+
+            var packResult = new FuncPackCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(PythonProjectPath)
+                .Execute(["--no-build"]);
+
+            packResult.Should().ExitWith(0);
+            packResult.Should().HaveStdOutContaining("Creating a new package");
+            packResult.Should().HaveStdOutContaining("Skipping build event for functions project (--no-build).");
+
+            var zipFiles = Directory.GetFiles(PythonProjectPath, "*.zip");
+            Assert.True(zipFiles.Length > 0, $"No zip files found in {PythonProjectPath}");
+
+            packResult.Should().ValidateZipContents(
+                zipFiles.First(),
+                new[]
+                {
+                    "host.json",
+                    "requirements.txt"
+                },
+                Log);
+
+            File.Delete(zipFiles.First());
+        }
+
+        [Fact]
+        public void Pack_Python_NoBuild_WithNativeDeps_ShouldFail()
+        {
+            var testName = nameof(Pack_Python_NoBuild_WithNativeDeps_ShouldFail);
+
+            var packResult = new FuncPackCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(PythonProjectPath)
+                .Execute(["--no-build", "--build-native-deps"]);
+
+            packResult.Should().ExitWith(1);
+            packResult.Should().HaveStdErrContaining("Invalid options: --no-build cannot be used with --build-native-deps.");
+        }
+
+        [Fact]
+        public void Pack_Python_PreserveExecutables_SetsBit()
+        {
+            var testName = nameof(Pack_Python_PreserveExecutables_SetsBit);
+            var execRelativePath = "TurnThisExecutable";
+
+            var packResult = new FuncPackCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(PythonProjectPath)
+                .Execute(["--preserve-executables", execRelativePath]);
+
+            packResult.Should().ExitWith(0);
+
+            var zipFiles = Directory.GetFiles(PythonProjectPath, "*.zip");
+            Assert.True(zipFiles.Length > 0, $"No zip files found in {PythonProjectPath}");
+            var zipPath = zipFiles.First();
+
+            using (var archive = ZipFile.OpenRead(zipPath))
+            {
+                var entry = archive.Entries.FirstOrDefault(e => e.FullName.Replace('\\', '/').EndsWith(execRelativePath));
+                entry.Should().NotBeNull();
+                int permissions = (entry!.ExternalAttributes >> 16) & 0xFFFF;
+                permissions.Should().Be(Convert.ToInt32("100777", 8));
+            }
+
+            File.Delete(zipPath);
         }
     }
 }
