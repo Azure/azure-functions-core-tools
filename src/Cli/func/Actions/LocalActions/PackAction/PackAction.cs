@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.AppService.Proxy.Common.Constants;
 using Microsoft.Azure.WebJobs.Script;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
@@ -27,6 +28,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         public bool NoBuild { get; set; }
 
         public string[] PreserveExecutables { get; set; } = Array.Empty<string>();
+
+        private string[] Args { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -50,6 +53,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 FolderPath = args.First();
             }
+
+            Args = args;
 
             return base.ParseArgs(args);
         }
@@ -76,6 +81,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             await (runtime switch
             {
                 WorkerRuntime.Dotnet or WorkerRuntime.DotnetIsolated => new DotnetPackSubcommandAction(_secretsManager).RunAsync(packOptions),
+                WorkerRuntime.Python => new PythonPackSubcommandAction(_secretsManager).RunAsync(packOptions, Args),
+                WorkerRuntime.Node => new NodePackSubcommandAction(_secretsManager).RunAsync(packOptions, Args),
+                WorkerRuntime.Powershell => new PowershellPackSubcommandAction().RunAsync(packOptions),
+                WorkerRuntime.Custom => new CustomPackSubcommandAction().RunAsync(packOptions),
                 _ => throw new CliException($"Unsupported runtime: {runtime}")
             });
     }

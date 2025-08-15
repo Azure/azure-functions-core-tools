@@ -73,14 +73,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, packOptions.OutputPath);
             PackHelpers.CleanupExistingPackage(outputPath);
 
-            // Install extensions if not in no-build mode
-            if (!packOptions.NoBuild)
-            {
-                var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
-                await installExtensionAction.RunAsync();
-            }
-
-            await PackHelpers.CreatePackage(packingRoot, outputPath, packOptions.NoBuild, TelemetryCommandEvents);
+            await PackHelpers.CreatePackage(packingRoot, outputPath, packOptions.NoBuild, TelemetryCommandEvents, packOptions.PreserveExecutables);
         }
 
         public override Task RunAsync()
