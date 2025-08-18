@@ -51,7 +51,7 @@ function setWebHostVersion([string]$newVersion) {
             }
         }
     }
-    throw "Failed to find Microsoft.Azure.WebJobs.Script.WebHost in the CLI project."
+    throw "Failed to find Microsoft.Azure.WebJobs.Script.WebHost.InProc in the CLI project."
 }
 
 function getWorkerVersion([string]$packageName) {
