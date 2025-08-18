@@ -43,7 +43,7 @@ function getWebHostVersion() {
 function setWebHostVersion([string]$newVersion) {
     foreach ($group in $cliCsprojXml.Project.ItemGroup) {
         foreach ($pkg in $group.PackageReference) {
-            if ($pkg.Include -eq "Microsoft.Azure.WebJobs.Script.WebHost") {
+            if ($pkg.Include -eq "Microsoft.Azure.WebJobs.Script.WebHost.InProc") {
                 $oldVersion = $pkg.Version
                 $pkg.Version = $newVersion
                 Write-Output "Updated WebHost from $oldVersion to $newVersion"
