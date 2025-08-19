@@ -40,6 +40,38 @@ jobs:
     displayName: 'Download artifact'
     artifact: func-cli-${{ parameters.arch }}
 
+  # Test to see if workers directory is absent in minified versions
+  - ${{ if startsWith(parameters.arch, 'min.') }}:
+    - task: PowerShell@2
+      displayName: 'Determine CLI artifact path to unzip'
+      inputs:
+        targetType: 'inline'
+        pwsh: true
+        script: |
+          $vsPath = "$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli-visualstudio"
+          $defaultPath = "$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli"
+          if (Test-Path $vsPath) {
+            Write-Host "##vso[task.setvariable variable=cliZipPath]$vsPath"
+          } else {
+            Write-Host "##vso[task.setvariable variable=cliZipPath]$defaultPath"
+          }
+
+    - task: ExtractFiles@1
+      displayName: 'Unzip CLI artifact (minified or visualstudio)'
+      inputs:
+        archiveFilePatterns: '$(cliZipPath)/*.zip'
+        destinationFolder: '$(Pipeline.Workspace)/minified-test'
+        cleanDestinationFolder: true
+        overwriteExistingFiles: true    
+
+    - task: PowerShell@2
+      displayName: 'Verify workers directory is absent for minified build'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/check-minified-dir-exists.ps1'
+
+
+
   # Testing for non-min versions of the CLI as some of the tests require the workers.
   - ${{ if not(startsWith(parameters.arch, 'min.')) }}:
     - task: ExtractFiles@1

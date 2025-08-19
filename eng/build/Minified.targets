@@ -2,10 +2,10 @@
 
   <!-- Workers to delete in minified builds -->
   <ItemGroup Condition="'$(IsMinified)' == 'true'">
-    <_LanguageWorkers Include="$(PublishDir)workers\python" />
-    <_LanguageWorkers Include="$(PublishDir)workers\java" />
-    <_LanguageWorkers Include="$(PublishDir)workers\powershell" />
-    <_LanguageWorkers Include="$(PublishDir)workers\node" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\python" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\java" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\powershell" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\node" />
   </ItemGroup>
 
   <!-- Remove worker directories from minified builds -->
@@ -13,6 +13,13 @@
   <Target Name="RemoveLanguageWorkersForMin" AfterTargets="Publish" BeforeTargets="PrepareZipArtifacts" Condition="'$(RuntimeIdentifier)' != ''">
     <Message Importance="low" Text="Removing language workers for minified build..."  />
     <RemoveDir Directories="@(_LanguageWorkers)" />
+    
+  <!-- Check if any directories still exist and fail the build -->
+    <ItemGroup>
+      <_FailedToDelete Include="@(_LanguageWorkers)" Condition="Exists('%(Identity)')" />
+    </ItemGroup>
+
+    <Error Text="Failed to delete one or more language worker directories: %(Identity)" Condition="'@(_FailedToDelete)' != ''" />
   </Target>
 
   <!-- Write artifactsconfig.json for minified builds -->
