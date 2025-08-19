@@ -8,6 +8,9 @@ if (-Not (Test-Path $workersPath)) {
 
 $contents = Get-ChildItem -Path $workersPath
 
-if ($contents.Count -ne 0) {
-    Write-Error "Workers directory is not empty. Minified builds should not include language workers."
+# Filter out placeholder.txt
+$nonPlaceholderContents = $contents | Where-Object { $_.Name -ne "placeholder.txt" }
+
+if ($nonPlaceholderContents.Count -ne 0) {
+    Write-Error "Workers directory contains unexpected files. Only 'placeholder.txt' is allowed in minified builds."
 }

@@ -50,7 +50,7 @@ jobs:
         overwriteExistingFiles: true
 
     - task: PowerShell@2
-      displayName: 'Verify workers directory is absent for minified build'
+      displayName: 'Verify workers directory is empty for minified build'
       inputs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/check-minified-dir-exists.ps1'
