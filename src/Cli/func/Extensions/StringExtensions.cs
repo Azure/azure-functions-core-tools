@@ -58,5 +58,53 @@ namespace Azure.Functions.Cli.Extensions
         {
             return string.Equals(str1, str2, StringComparison.OrdinalIgnoreCase);
         }
+
+        /// <summary>
+        /// Retrieves the value associated with a specified key from a delimited key-value string.
+        /// </summary>
+        /// <param name="input">Retrieves the value associated with a specified key from a delimited key-value pair.</param>
+        /// <param name="key">The key whose value will be retrieved (case-insensitive match).</param>
+        /// <param name="delimiter">The character that separates each key-value pair in the input string (default is ';').</param>
+        /// <returns>The value associated with the specified key, or <c>null</c> if the key is not found or the input is invalid.</returns>
+        public static string GetValueFromDelimitedString(this string input, string key, char delimiter = ';')
+        {
+            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(key))
+            {
+                return null;
+            }
+
+            var span = input.AsSpan();
+            var start = 0;
+
+            while (start < span.Length)
+            {
+                var delimiterIndex = span.Slice(start).IndexOf(delimiter);
+                var length = delimiterIndex == -1 ? span.Length - start : delimiterIndex;
+                var segment = span.Slice(start, length).Trim();
+
+                start += length + (delimiterIndex == -1 ? 0 : 1);
+
+                if (segment.IsEmpty)
+                {
+                    continue;
+                }
+
+                int equalsIndex = segment.IndexOf('=');
+                if (equalsIndex <= 0 || equalsIndex >= segment.Length - 1)
+                {
+                    continue;
+                }
+
+                var keyPart = segment.Slice(0, equalsIndex).Trim();
+                var valuePart = segment.Slice(equalsIndex + 1).Trim();
+
+                if (keyPart.Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return valuePart.ToString();
+                }
+            }
+
+            return null;
+        }
     }
 }

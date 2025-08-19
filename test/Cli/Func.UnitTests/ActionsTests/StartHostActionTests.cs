@@ -4,6 +4,7 @@
 using System.IO.Abstractions;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -176,7 +177,8 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
             await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
             output.ToString().Should().Contain("Warning: Cannot find value named 'blah'");
-            output.ToString().Should().Contain("Warning: 'connection' property in 'x:\\folder2\\function.json' is empty.");
+            var regex = new Regex(@"Warning: 'connection' property in 'x:\\folder2[/\\]function\.json' is empty\.");
+            regex.IsMatch(output.ToString()).Should().BeTrue("Output should match the expected pattern");
         }
 
         private IFileSystem GetFakeFileSystem(IEnumerable<(string Folder, string FunctionJsonContent)> list)

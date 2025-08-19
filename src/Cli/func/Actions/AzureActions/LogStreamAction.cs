@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Fclp;
@@ -16,7 +17,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Show interactive streaming logs for an Azure-hosted Function App")]
     internal class LogStreamAction : BaseFunctionAppAction
     {
-        private const string ApplicationInsightsIKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
+        private const string ApplicationInsightsInstrumentationKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
+        private const string ApplicationInsightsConnectionStringSetting = "APPLICATIONINSIGHTS_CONNECTION_STRING";
         private const string LiveMetricsUriTemplate = "https://portal.azure.com/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/{0}/ResourceId/{1}";
 
         public bool UseBrowser { get; set; }
@@ -44,9 +46,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            if (functionApp.IsLinux && functionApp.IsDynamic)
+            if (functionApp.IsFlex || (functionApp.IsLinux && functionApp.IsDynamic))
             {
-                throw new CliException("Log stream is not currently supported in Linux Consumption Apps. " +
+                throw new CliException("Log stream is not currently supported in Linux Consumption and Flex Apps. " +
                     "Please use --browser to open Azure Application Insights Live Stream in the Azure portal.");
             }
 
@@ -92,20 +94,31 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task OpenLiveStreamInBrowser(Site functionApp, IEnumerable<ArmSubscription> allSubscriptions)
         {
-            if (!functionApp.AzureAppSettings.ContainsKey(ApplicationInsightsIKeySetting))
+            string instrumentationKey;
+
+            // First, check for a connection string. If it's not available, default to using the Instrumentation Key.
+            if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsConnectionStringSetting, out var connectionString))
             {
-                throw new CliException($"Missing {ApplicationInsightsIKeySetting} App Setting. " +
+                instrumentationKey = connectionString.GetValueFromDelimitedString("InstrumentationKey");
+            }
+            else if (functionApp.AzureAppSettings.TryGetValue(ApplicationInsightsInstrumentationKeySetting, out var key))
+            {
+                ColoredConsole.WriteLine(WarningColor("Support for instrumentation key ingestion has ended. Switch to connection strings to access new features."));
+                instrumentationKey = key;
+            }
+            else
+            {
+                throw new CliException($"Missing {ApplicationInsightsConnectionStringSetting} App Setting. " +
                     $"Please make sure you have Application Insights configured with your function app.");
             }
 
-            var iKey = functionApp.AzureAppSettings[ApplicationInsightsIKeySetting];
-            if (string.IsNullOrEmpty(iKey))
+            if (string.IsNullOrWhiteSpace(instrumentationKey))
             {
                 throw new CliException("Invalid Instrumentation Key found. Please make sure that the Application Insights is configured correctly.");
             }
 
             ColoredConsole.WriteLine("Retrieving Application Insights information...");
-            var appId = await AzureHelper.GetApplicationInsightIDFromIKey(iKey, AccessToken, ManagementURL, allSubs: allSubscriptions);
+            var appId = await AzureHelper.GetApplicationInsightIDFromIKey(instrumentationKey, AccessToken, ManagementURL, allSubs: allSubscriptions);
             var armResourceId = AzureHelper.ParseResourceId(appId);
             var componentId = $@"{{""Name"":""{armResourceId.Name}"",""SubscriptionId"":""{armResourceId.Subscription}"",""ResourceGroup"":""{armResourceId.ResourceGroup}""}}";
 
