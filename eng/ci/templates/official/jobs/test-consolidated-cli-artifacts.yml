@@ -54,6 +54,8 @@ jobs:
       inputs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/check-minified-dir-exists.ps1'
+        arguments: '-workersPath "$(Pipeline.Workspace)/minified-test/workers"'
+
 
 
   # Testing for non-min versions of the CLI as some of the tests require the workers.

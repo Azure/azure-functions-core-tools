@@ -1,4 +1,6 @@
-$workersPath = "$(Pipeline.Workspace)/minified-test/workers"
+param (
+    [string]$workersPath
+)
 
 if (-Not (Test-Path $workersPath)) {
     Write-Error "Workers directory is missing at $workersPath. It must exist in minified builds."
