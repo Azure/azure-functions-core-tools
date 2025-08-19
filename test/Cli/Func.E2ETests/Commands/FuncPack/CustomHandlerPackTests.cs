@@ -58,32 +58,5 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             File.Delete(zipPath);
         }
-
-        [Fact]
-        public void Pack_CustomHandler_PreserveExecutables_SetsBit()
-        {
-            var testName = nameof(Pack_CustomHandler_PreserveExecutables_SetsBit);
-            var execRelativePath = Path.GetFullPath(".\\TurnThisExecutable");
-
-            var packResult = new FuncPackCommand(FuncPath, testName, Log)
-                .WithWorkingDirectory(CustomHandlerProjectPath)
-                .Execute(["--preserve-executables", execRelativePath]);
-
-            packResult.Should().ExitWith(0);
-
-            var zipFiles = Directory.GetFiles(CustomHandlerProjectPath, "*.zip");
-            Assert.True(zipFiles.Length > 0, $"No zip files found in {CustomHandlerProjectPath}");
-            var zipPath = zipFiles.First();
-
-            using (var archive = ZipFile.OpenRead(zipPath))
-            {
-                var entry = archive.Entries.FirstOrDefault(e => e.FullName.Replace('\\', '/').EndsWith("TurnThisExecutable"));
-                entry.Should().NotBeNull();
-                int permissions = (entry!.ExternalAttributes >> 16) & 0xFFFF;
-                permissions.Should().Be(Convert.ToInt32("100777", 8));
-            }
-
-            File.Delete(zipPath);
-        }
     }
 }

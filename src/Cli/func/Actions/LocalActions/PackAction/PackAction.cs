@@ -24,8 +24,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public bool NoBuild { get; set; }
 
-        public string[] PreserveExecutables { get; set; } = Array.Empty<string>();
-
         private string[] Args { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -40,11 +38,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents." +
                 "Otherwise, default is the current directory.")
                 .Callback(n => NoBuild = n);
-
-            Parser
-                .Setup<string>("preserve-executables")
-                .WithDescription("Comma - separated list of executable files to specify which files should be set as executable in the zip archive.")
-                .Callback(p => PreserveExecutables = p.Split(',').Select(s => s.Trim()).ToArray());
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -66,8 +59,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 FolderPath = FolderPath,
                 OutputPath = OutputPath,
-                NoBuild = NoBuild,
-                PreserveExecutables = PreserveExecutables
+                NoBuild = NoBuild
             };
 
             // Internally dispatch to runtime-specific subcommand

@@ -6,7 +6,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack powershell", ParentCommandName = "pack", ShowInHelp = true, HelpText = "Arguments specific to PowerShell apps when running func pack")]
+    [Action(Name = "pack powershell", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to PowerShell apps when running func pack")]
     internal class PowershellPackSubcommandAction : BaseAction
     {
         public override ICommandLineParserResult ParseArgs(string[] args)
