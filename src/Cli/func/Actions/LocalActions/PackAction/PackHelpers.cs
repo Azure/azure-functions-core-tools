@@ -62,7 +62,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
         }
 
-        public static async Task CreatePackage(string packingRoot, string outputPath, bool noBuild, IDictionary<string, string> telemetryCommandEvents, string[] executables, bool buildNativeDeps = false)
+        public static async Task CreatePackage(string packingRoot, string outputPath, bool noBuild, IDictionary<string, string> telemetryCommandEvents, bool buildNativeDeps = false)
         {
             bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
             TelemetryHelpers.AddCommandEventToDictionary(telemetryCommandEvents, "UseGoZip", useGoZip.ToString());
@@ -85,7 +85,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             var outputPath = ResolveOutputPath(functionAppRoot, packOptions.OutputPath);
             CleanupExistingPackage(outputPath);
 
-            await CreatePackage(functionAppRoot, outputPath, packOptions.NoBuild, telemetryCommandEvents, packOptions.PreserveExecutables);
+            await CreatePackage(functionAppRoot, outputPath, packOptions.NoBuild, telemetryCommandEvents);
         }
     }
 }

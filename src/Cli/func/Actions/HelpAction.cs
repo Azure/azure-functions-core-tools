@@ -267,13 +267,13 @@ namespace Azure.Functions.Cli.Actions
             var description = subCommand.Type.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
 
             // Display indented subcommand header
-            ColoredConsole.WriteLine($"      {runtimeName.DarkCyan()}     {description}");
+            ColoredConsole.WriteLine($"   {runtimeName.DarkCyan()}     {description}");
 
             // Display subcommand switches with extra indentation
-            DisplaySwitches(subCommand, true);
+            DisplaySwitches(subCommand);
         }
 
-        private void DisplaySwitches(ActionType actionType, bool addExtraIndent = false)
+        private void DisplaySwitches(ActionType actionType)
         {
             var action = _createAction.Invoke(actionType.Type);
             try
@@ -281,7 +281,7 @@ namespace Azure.Functions.Cli.Actions
                 var options = action.ParseArgs(Array.Empty<string>());
                 if (options.UnMatchedOptions.Any())
                 {
-                    DisplayOptions(options.UnMatchedOptions, addExtraIndent);
+                    DisplayOptions(options.UnMatchedOptions);
                     ColoredConsole.WriteLine();
                 }
             }
@@ -289,12 +289,12 @@ namespace Azure.Functions.Cli.Actions
             {
                 if (e.Arguments.Any())
                 {
-                    DisplayPositionalArguments(e.Arguments, addExtraIndent);
+                    DisplayPositionalArguments(e.Arguments);
                 }
 
                 if (e.ParseResults != null && e.ParseResults.UnMatchedOptions.Any())
                 {
-                    DisplayOptions(e.ParseResults.UnMatchedOptions, addExtraIndent);
+                    DisplayOptions(e.ParseResults.UnMatchedOptions);
                 }
 
                 ColoredConsole.WriteLine();
@@ -305,13 +305,13 @@ namespace Azure.Functions.Cli.Actions
             }
         }
 
-        private void DisplayPositionalArguments(IEnumerable<CliArgument> arguments, bool addExtraIndent)
+        private void DisplayPositionalArguments(IEnumerable<CliArgument> arguments)
         {
             var longestName = arguments.Max(o => o.Name.Length);
             longestName += 4; // 4 for coloring and <> characters
             foreach (var argument in arguments)
             {
-                var helpLine = string.Format($"{(addExtraIndent ? "        " : "    ")}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
+                var helpLine = string.Format($"{"    "}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
                 if (helpLine.Length < SafeConsole.BufferWidth)
                 {
                     ColoredConsole.WriteLine(helpLine);

@@ -10,7 +10,5 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         public string OutputPath { get; set; } = string.Empty;
 
         public bool NoBuild { get; set; }
-
-        public string[] PreserveExecutables { get; set; } = Array.Empty<string>();
     }
 }

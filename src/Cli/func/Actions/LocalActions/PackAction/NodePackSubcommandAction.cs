@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, packOptions.OutputPath);
             PackHelpers.CleanupExistingPackage(outputPath);
 
-            await PackHelpers.CreatePackage(functionAppRoot, outputPath, packOptions.NoBuild, TelemetryCommandEvents, packOptions.PreserveExecutables);
+            await PackHelpers.CreatePackage(functionAppRoot, outputPath, packOptions.NoBuild, TelemetryCommandEvents);
         }
 
         public override Task RunAsync()

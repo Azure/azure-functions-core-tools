@@ -1,13 +1,11 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using FluentAssertions;
-using System.IO.Compression;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -123,33 +121,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 Log);
 
             File.Delete(expectedZip);
-        }
-
-        [Fact]
-        public void Pack_Node_PreserveExecutables_SetsBit()
-        {
-            var testName = nameof(Pack_Node_PreserveExecutables_SetsBit);
-            var execRelativePath = "TurnThisExecutable";
-
-            var packResult = new FuncPackCommand(FuncPath, testName, Log)
-                .WithWorkingDirectory(NodeProjectPath)
-                .Execute(["--preserve-executables", execRelativePath]);
-
-            packResult.Should().ExitWith(0);
-
-            var zipFiles = Directory.GetFiles(NodeProjectPath, "*.zip");
-            Assert.True(zipFiles.Length > 0, $"No zip files found in {NodeProjectPath}");
-            var zipPath = zipFiles.First();
-
-            using (var archive = ZipFile.OpenRead(zipPath))
-            {
-                var entry = archive.Entries.FirstOrDefault(e => e.FullName.Replace('\\', '/').EndsWith(execRelativePath));
-                entry.Should().NotBeNull();
-                int permissions = (entry!.ExternalAttributes >> 16) & 0xFFFF;
-                permissions.Should().Be(Convert.ToInt32("100777", 8));
-            }
-
-            File.Delete(zipPath);
         }
     }
 }
