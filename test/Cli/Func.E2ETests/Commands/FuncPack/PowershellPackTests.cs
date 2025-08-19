@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2ETests.Traits;
@@ -88,14 +88,17 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             var baselineZip = Directory.GetFiles(PowershellProjectPath, "*.zip").FirstOrDefault();
             baselineZip.Should().NotBeNull();
-            regular.Should().ValidateZipContents(baselineZip!, new[]
-            {
-                "host.json",
-                "requirements.psd1",
-                Path.Combine("HttpTrigger", "run.ps1"),
-                "profile.ps1",
-                Path.Combine("HttpTrigger", "function.json")
-            }, Log);
+            regular.Should().ValidateZipContents(
+                baselineZip!,
+                new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                },
+                Log);
 
             // Remove zip to avoid interference
             File.Delete(baselineZip!);
@@ -109,14 +112,17 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             var nobuildZip = Directory.GetFiles(PowershellProjectPath, "*.zip").FirstOrDefault();
             nobuildZip.Should().NotBeNull();
-            nobuild.Should().ValidateZipContents(nobuildZip!, new[]
-            {
-                "host.json",
-                "requirements.psd1",
-                Path.Combine("HttpTrigger", "run.ps1"),
-                "profile.ps1",
-                Path.Combine("HttpTrigger", "function.json")
-            }, Log);
+            nobuild.Should().ValidateZipContents(
+                nobuildZip!,
+                new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                },
+                Log);
 
             File.Delete(nobuildZip!);
         }
