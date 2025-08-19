@@ -153,31 +153,43 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             exception.Should().BeNull();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task CheckNonOptionalSettingsPrintsWarningForMissingSettings()
         {
-            Skip.IfNot(
-                RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
-                reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
+            // Use an OS-appropriate fake root
+            var root = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? "x:\\"
+                : "/tmp/funcs/";
+
+            // Build cross-platform folder paths
+            var folder1 = Path.Combine(root, "folder1");
+            var folder2 = Path.Combine(root, "folder2");
 
             var fileSystem = GetFakeFileSystem(
             [
-                ("x:\\folder1", "{'bindings': [{'type': 'httpTrigger', 'connection': 'blah'}]}"),
-                ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger', 'connection': ''}]}")
+                (folder1, "{'bindings': [{'type': 'httpTrigger', 'connection': 'blah'}]}"),
+                (folder2, "{'bindings': [{'type': 'httpTrigger', 'connection': ''}]}")
             ]);
 
             FileSystemHelpers.Instance = fileSystem;
 
+            // Capture console output via ColoredConsole
             var output = new StringBuilder();
             var console = Substitute.For<IConsoleWriter>();
             console.WriteLine(Arg.Do<object>(o => output.AppendLine(o?.ToString()))).Returns(console);
-            console.Write(Arg.Do<object>(o => output.Append(o.ToString()))).Returns(console);
+            console.Write(Arg.Do<object>(o => output.Append(o?.ToString()))).Returns(console);
             ColoredConsole.Out = console;
             ColoredConsole.Error = console;
 
-            await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
+            // Act
+            await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), root, false);
+
+            // Assert
             output.ToString().Should().Contain("Warning: Cannot find value named 'blah'");
-            var regex = new Regex(@"Warning: 'connection' property in 'x:\\folder2[/\\]function\.json' is empty\.");
+
+            // Match either slash or backslash in the path, regardless of OS
+            var escapedFolder2 = Regex.Escape(folder2);
+            var regex = new Regex($@"Warning: 'connection' property in '{escapedFolder2}[/\\]function\.json' is empty\.");
             regex.IsMatch(output.ToString()).Should().BeTrue("Output should match the expected pattern");
         }
 
