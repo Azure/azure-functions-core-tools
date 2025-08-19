@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null, string[] preserveExecutables = null)
+        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.Helpers
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet && buildOption == BuildOption.Remote)
             {
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
-                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Enumerable.Empty<string>());
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Array.Empty<string>());
             }
             else
             {
@@ -49,7 +49,6 @@ namespace Azure.Functions.Cli.Helpers
                     ? new[] { customHandler }
                     : Enumerable.Empty<string>();
 
-                executables = executables.Concat(preserveExecutables ?? Enumerable.Empty<string>());
                 return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables);
             }
         }

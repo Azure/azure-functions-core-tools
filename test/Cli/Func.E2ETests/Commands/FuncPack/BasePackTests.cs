@@ -55,7 +55,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             string[] filesToValidate)
         {
             // Ensure publish output exists for --no-build scenario
-            var exe = new Executable("dotnet", $"publish --output \"./output\"", workingDirectory: projectDir);
+            var randomDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            var outputPath = Path.Combine(randomDir, "output");
+            var exe = new Executable("dotnet", $"publish --output \"{outputPath}\"", workingDirectory: projectDir);
             var exitCode = await exe.RunAsync();
             exitCode.Should().Be(0);
 
@@ -63,7 +65,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             var funcPackCommand = new FuncPackCommand(funcPath, testName, log);
             var packResult = funcPackCommand
                 .WithWorkingDirectory(projectDir)
-                .Execute([Path.Combine(projectDir, "output"), "--no-build", "--output", zipOutputDirectory]);
+                .Execute([outputPath, "--no-build", "--output", zipOutputDirectory]);
 
             // Verify pack succeeded and build was skipped
             packResult.Should().ExitWith(0);

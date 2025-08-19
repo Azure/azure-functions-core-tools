@@ -6,7 +6,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack custom", ParentCommandName = "pack", ShowInHelp = true, HelpText = "Arguments specific to custom worker runtime apps when running func pack")]
+    [Action(Name = "pack custom", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to custom worker runtime apps when running func pack")]
     internal class CustomPackSubcommandAction : BaseAction
     {
         public override ICommandLineParserResult ParseArgs(string[] args)
