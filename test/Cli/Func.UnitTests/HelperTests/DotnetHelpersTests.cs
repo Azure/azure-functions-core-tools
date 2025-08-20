@@ -41,7 +41,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AreDotnetTemplatePackagesInstalled_ReturnsTrue_WhenTemplatesExists(string pkgPrefix)
         {
             // Arrange
-            var templates = new HashSet<string> { $"{pkgPrefix}.ProjectTemplates", $"{pkgPrefix}.ItemTemplates" };
+            var templates = new HashSet<string> { $"{pkgPrefix}.ProjectTemplates.4.0.5059", $"{pkgPrefix}.ItemTemplates.4.0.5059" };
 
             // Act
             var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, pkgPrefix);
@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AreDotnetTemplatePackagesInstalled_ReturnsFalse_WhenOnlyOneRequiredTemplateExists(string pkgSuffix)
         {
             // Arrange
-            var templates = new HashSet<string> { $"Microsoft.Azure.Functions.Worker.{pkgSuffix}" };
+            var templates = new HashSet<string> { $"Microsoft.Azure.Functions.Worker.{pkgSuffix}.4.0.5059" };
 
             // Act
             var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, "Microsoft.Azure.Functions.Worker");
@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AreDotnetTemplatePackagesInstalled_ReturnsFalse_WhenTemplatesDoesNotExist()
         {
             // Arrange
-            var templates = new HashSet<string> { "OtherCompany.ProjectTemplates", "OtherCompany.ItemTemplates", "Microsoft.Azure.Functions.Worker" };
+            var templates = new HashSet<string> { "OtherCompany.ProjectTemplates.9.9.9", "OtherCompany.ItemTemplates.9.9.9", "Microsoft.Azure.Functions.Worker" };
 
             // Act
             // Should fail as we are looking for Item and Project templates
@@ -77,6 +77,108 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // Assert
             Assert.False(result);
+        }
+
+        [Fact]
+        public void AreDotnetTemplatePackagesWithSpecificVersionInstalled_ReturnsFalse_WhenLatestNupkgsNotInstalled()
+        {
+            // Arrange: create a temporary templates directory next to the Azure.Functions.Cli assembly
+            var assemblyDir = Path.GetDirectoryName(typeof(DotnetHelpers).Assembly.Location)!;
+            var tempTemplatesDir = Path.Combine(assemblyDir, "templates_test_latest");
+            Directory.CreateDirectory(tempTemplatesDir);
+
+            var latestItem = Path.Combine(tempTemplatesDir, "itemTemplates.4.0.9999.nupkg");
+            var latestProj = Path.Combine(tempTemplatesDir, "projectTemplates.4.0.9999.nupkg");
+            File.WriteAllText(latestItem, string.Empty);
+            File.WriteAllText(latestProj, string.Empty);
+
+            try
+            {
+                var installed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    // Simulate older installed versions that do not match the latest nupkgs
+                    "Microsoft.Azure.WebJobs.ItemTemplates.4.0.9998",
+                    "Microsoft.Azure.WebJobs.ProjectTemplates.4.0.9998",
+                };
+
+                // Act
+                var upToDate = DotnetHelpers.AreDotnetTemplatePackagesWithSpecificVersionInstalled(installed, Path.GetFileName(tempTemplatesDir), "Microsoft.Azure.WebJobs");
+
+                // Assert: should be false so that install path will be taken
+                Assert.False(upToDate);
+            }
+            finally
+            {
+                Directory.Delete(tempTemplatesDir, true);
+            }
+        }
+
+        [Fact]
+        public void AreDotnetTemplatePackagesWithSpecificVersionInstalled_ReturnsTrue_WhenLatestNupkgsInstalled()
+        {
+            // Arrange
+            var assemblyDir = Path.GetDirectoryName(typeof(DotnetHelpers).Assembly.Location)!;
+            var tempTemplatesDir = Path.Combine(assemblyDir, "templates_test_match");
+            Directory.CreateDirectory(tempTemplatesDir);
+
+            var version = "4.1.0";
+            var latestItem = Path.Combine(tempTemplatesDir, $"itemTemplates.{version}.nupkg");
+            var latestProj = Path.Combine(tempTemplatesDir, $"projectTemplates.{version}.nupkg");
+            File.WriteAllText(latestItem, string.Empty);
+            File.WriteAllText(latestProj, string.Empty);
+
+            try
+            {
+                var installed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    $"Microsoft.Azure.WebJobs.ItemTemplates.{version}",
+                    $"Microsoft.Azure.WebJobs.ProjectTemplates.{version}",
+                };
+
+                // Act
+                var upToDate = DotnetHelpers.AreDotnetTemplatePackagesWithSpecificVersionInstalled(installed, Path.GetFileName(tempTemplatesDir), "Microsoft.Azure.WebJobs");
+
+                // Assert
+                Assert.True(upToDate);
+            }
+            finally
+            {
+                Directory.Delete(tempTemplatesDir, true);
+            }
+        }
+
+        [Fact]
+        public void AreDotnetTemplatePackagesWithSpecificVersionInstalled_ReturnsFalse_WhenOnlyOneOfItemOrProjectIsInstalled()
+        {
+            // Arrange
+            var assemblyDir = Path.GetDirectoryName(typeof(DotnetHelpers).Assembly.Location)!;
+            var tempTemplatesDir = Path.Combine(assemblyDir, "templates_test_partial");
+            Directory.CreateDirectory(tempTemplatesDir);
+
+            var version = "5.0.0";
+            var latestItem = Path.Combine(tempTemplatesDir, $"itemTemplates.{version}.nupkg");
+            var latestProj = Path.Combine(tempTemplatesDir, $"projectTemplates.{version}.nupkg");
+            File.WriteAllText(latestItem, string.Empty);
+            File.WriteAllText(latestProj, string.Empty);
+
+            try
+            {
+                var installed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                     // Missing ProjectTemplates version on purpose
+                    $"Microsoft.Azure.WebJobs.ItemTemplates.{version}",
+                };
+
+                // Act
+                var upToDate = DotnetHelpers.AreDotnetTemplatePackagesWithSpecificVersionInstalled(installed, Path.GetFileName(tempTemplatesDir), "Microsoft.Azure.WebJobs");
+
+                // Assert
+                Assert.False(upToDate);
+            }
+            finally
+            {
+                Directory.Delete(tempTemplatesDir, true);
+            }
         }
     }
 }
