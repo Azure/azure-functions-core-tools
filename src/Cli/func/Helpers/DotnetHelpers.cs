@@ -293,7 +293,7 @@ namespace Azure.Functions.Cli.Helpers
             await action();
         }
 
-        internal static async Task EnsureIsolatedTemplatesInstalled()
+        private static async Task EnsureIsolatedTemplatesInstalled()
         {
             // Ensure no webjobs templates are installed, as they conflict with isolated templates
             if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
@@ -317,7 +317,7 @@ namespace Azure.Functions.Cli.Helpers
             await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
         }
 
-        internal static async Task EnsureWebJobsTemplatesInstalled()
+        private static async Task EnsureWebJobsTemplatesInstalled()
         {
             // Ensure no isolated templates are installed, as they conflict with webjobs templates
             if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
@@ -343,7 +343,6 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static bool AreDotnetTemplatePackagesInstalled(HashSet<string> templates, string packageIdPrefix)
         {
-
             var hasProjectTemplates = templates.Any(t =>
                     t.StartsWith($"{packageIdPrefix}.ProjectTemplates", StringComparison.OrdinalIgnoreCase));
             var hasItemTemplates = templates.Any(t =>
@@ -449,7 +448,6 @@ namespace Azure.Functions.Cli.Helpers
 
             return packageIds;
         }
-
 
         private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
 
