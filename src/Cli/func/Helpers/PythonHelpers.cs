@@ -500,8 +500,20 @@ namespace Azure.Functions.Cli.Helpers
                 dockerImage = await ChoosePythonBuildEnvImage();
             }
 
-            if (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
-                !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) || dockerSkipPullFlagSetting == "1"))
+            if (dockerImage == Constants.DockerImages.LinuxPython313ImageAmd64)
+            {
+                // creating temp folder for Dockerfile
+                string tempDir = Path.Combine(Path.GetTempPath(), "python313-docker");
+                Directory.CreateDirectory(tempDir);
+                string tempDockerfile = Path.Combine(tempDir, "Dockerfile");
+
+                // Writing Dockerfile content using FileSystemHelpers
+                string dockerfileContent = await StaticResources.DockerfilePython313buildenv;
+                await FileSystemHelpers.WriteAllTextToFileAsync(tempDockerfile, dockerfileContent);
+                await DockerHelpers.DockerBuild(dockerImage, tempDir);
+            }
+            else if (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
+              !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) || dockerSkipPullFlagSetting == "1"))
             {
                 await DockerHelpers.DockerPull(dockerImage);
             }
