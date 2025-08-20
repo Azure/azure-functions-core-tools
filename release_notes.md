@@ -1,4 +1,4 @@
-# Azure Functions CLI 4.2.0
+# Azure Functions CLI 4.2.1
 
 #### Host Version
 
@@ -9,3 +9,4 @@
 
 - Add support for .NET 10 isolated model (#4589)
 - Update log streaming to support both connection string and instrumentation Key (#4586)
+- Remove content of workers dir from minified versions (#4609)

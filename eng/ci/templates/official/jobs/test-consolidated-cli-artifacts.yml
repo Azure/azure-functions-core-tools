@@ -40,6 +40,22 @@ jobs:
     displayName: 'Download artifact'
     artifact: func-cli-${{ parameters.arch }}
 
+  - ${{ if startsWith(parameters.arch, 'min.') }}:
+    - task: ExtractFiles@1
+      displayName: 'Unzip func-cli (minified)'
+      inputs:
+        archiveFilePatterns: '$(Pipeline.Workspace)/func-cli-${{ parameters.arch }}/func-cli/*.zip'
+        destinationFolder: '$(Pipeline.Workspace)/minified-test'
+        cleanDestinationFolder: true
+        overwriteExistingFiles: true
+
+    - task: PowerShell@2
+      displayName: 'Verify workers directory is empty for minified build'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/check-minified-dir-exists.ps1'
+        arguments: '-workersPath "$(Pipeline.Workspace)/minified-test/workers"'
+
   # Testing for non-min versions of the CLI as some of the tests require the workers.
   - ${{ if not(startsWith(parameters.arch, 'min.')) }}:
     - task: ExtractFiles@1
