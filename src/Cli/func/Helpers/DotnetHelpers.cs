@@ -293,40 +293,113 @@ namespace Azure.Functions.Cli.Helpers
             await action();
         }
 
-        private static async Task EnsureIsolatedTemplatesInstalled()
+        internal static async Task EnsureIsolatedTemplatesInstalled()
         {
+            // Ensure no webjobs templates are installed, as they conflict with isolated templates
             if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
             {
                 await UninstallWebJobsTemplates();
             }
 
-            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
+            // Check to see if the isolated templates are already installed with the specific version
+            if (AreDotnetTemplatePackagesWithSpecificVersionInstalled(await _installedTemplatesList.Value, Path.Combine("templates", "net-isolated"), IsolatedTemplateBasePackId))
             {
                 return;
             }
 
+            // First uninstall any existing isolated templates, so .templateengine/packages can be cleaned up
+            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
+            {
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, UninstallIsolatedTemplates);
+            }
+
+            // Install the latest isolated templates
             await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
         }
 
-        private static async Task EnsureWebJobsTemplatesInstalled()
+        internal static async Task EnsureWebJobsTemplatesInstalled()
         {
+            // Ensure no isolated templates are installed, as they conflict with webjobs templates
             if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
             {
                 await UninstallIsolatedTemplates();
             }
 
-            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
+            // Check to see if the webjobs templates are already installed with the specific version
+            if (AreDotnetTemplatePackagesWithSpecificVersionInstalled(await _installedTemplatesList.Value, "templates", WebJobsTemplateBasePackId))
             {
                 return;
             }
 
+            // First uninstall any existing webjobs templates, so .templateengine/packages can be cleaned up
+            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
+            {
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, UninstallWebJobsTemplates);
+            }
+
+            // Install the latest webjobs templates
             await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
         }
 
         internal static bool AreDotnetTemplatePackagesInstalled(HashSet<string> templates, string packageIdPrefix)
         {
-            var hasProjectTemplates = templates.Contains($"{packageIdPrefix}.ProjectTemplates", StringComparer.OrdinalIgnoreCase);
-            var hasItemTemplates = templates.Contains($"{packageIdPrefix}.ItemTemplates", StringComparer.OrdinalIgnoreCase);
+
+            var hasProjectTemplates = templates.Any(t =>
+                    t.StartsWith($"{packageIdPrefix}.ProjectTemplates", StringComparison.OrdinalIgnoreCase));
+            var hasItemTemplates = templates.Any(t =>
+                t.StartsWith($"{packageIdPrefix}.ItemTemplates", StringComparison.OrdinalIgnoreCase));
+
+            return hasProjectTemplates && hasItemTemplates;
+        }
+
+        internal static bool AreDotnetTemplatePackagesWithSpecificVersionInstalled(HashSet<string> templates, string templatesPath, string packageIdPrefix)
+        {
+            string[] nupkgFiles = GetNupkgFiles(templatesPath);
+            return AreTemplatesUpdated(templates, packageIdPrefix, nupkgFiles);
+        }
+
+        private static string[] GetNupkgFiles(string templatesPath)
+        {
+            var templatesLocation = Path.Combine(
+                   Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                   Path.Combine(templatesPath));
+
+            if (!FileSystemHelpers.DirectoryExists(templatesLocation))
+            {
+                throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
+            }
+
+            return Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly);
+        }
+
+        private static bool AreTemplatesUpdated(HashSet<string> templates, string packageIdPrefix, string[] nupkgFiles)
+        {
+            bool hasProjectTemplates = false;
+            bool hasItemTemplates = false;
+
+            foreach (var file in nupkgFiles)
+            {
+                var fileName = Path.GetFileNameWithoutExtension(file); // e.g., itemTemplates.4.0.5212
+
+                if (fileName.StartsWith("itemTemplates.", StringComparison.OrdinalIgnoreCase))
+                {
+                    var version = fileName.Substring("itemTemplates.".Length);
+                    var expectedId = $"{packageIdPrefix}.ItemTemplates.{version}";
+                    if (templates.Contains(expectedId, StringComparer.OrdinalIgnoreCase))
+                    {
+                        hasItemTemplates = true;
+                    }
+                }
+                else if (fileName.StartsWith("projectTemplates.", StringComparison.OrdinalIgnoreCase))
+                {
+                    var version = fileName.Substring("projectTemplates.".Length);
+                    var expectedId = $"{packageIdPrefix}.ProjectTemplates.{version}";
+                    if (templates.Contains(expectedId, StringComparer.OrdinalIgnoreCase))
+                    {
+                        hasProjectTemplates = true;
+                    }
+                }
+            }
 
             return hasProjectTemplates && hasItemTemplates;
         }
@@ -336,35 +409,47 @@ namespace Azure.Functions.Cli.Helpers
             var exe = new Executable("dotnet", "new uninstall", shareConsole: false);
             var output = new StringBuilder();
             var exitCode = await exe.RunAsync(o => output.AppendLine(o), e => output.AppendLine(e));
-
             if (exitCode != 0)
             {
                 throw new CliException("Failed to get list of installed template packages");
             }
 
             var lines = output.ToString()
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
             var packageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            const string uninstallPrefix = "dotnet new uninstall ";
+            string currentPackageId = null;
+            string currentVersion = null;
 
             foreach (var line in lines)
             {
                 var trimmed = line.Trim();
 
-                if (trimmed.StartsWith(uninstallPrefix, StringComparison.OrdinalIgnoreCase))
+                // Detect package ID line
+                if (trimmed.StartsWith("dotnet new uninstall ", StringComparison.OrdinalIgnoreCase))
                 {
-                    var packageId = trimmed.Substring(uninstallPrefix.Length).Trim();
-                    if (!string.IsNullOrWhiteSpace(packageId))
-                    {
-                        packageIds.Add(packageId);
-                    }
+                    currentPackageId = trimmed.Substring("dotnet new uninstall ".Length).Trim();
+                }
+
+                // Detect version line
+                else if (trimmed.StartsWith("Version:", StringComparison.OrdinalIgnoreCase))
+                {
+                    currentVersion = trimmed.Substring("Version:".Length).Trim();
+                }
+
+                // If both package ID and version are captured, add to set
+                if (!string.IsNullOrWhiteSpace(currentPackageId) && !string.IsNullOrWhiteSpace(currentVersion))
+                {
+                    packageIds.Add($"{currentPackageId}.{currentVersion}");
+                    currentPackageId = null;
+                    currentVersion = null;
                 }
             }
 
             return packageIds;
         }
+
 
         private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
 
@@ -380,16 +465,7 @@ namespace Azure.Functions.Cli.Helpers
 
             if (!string.IsNullOrEmpty(templateDirectory))
             {
-                var templatesLocation = Path.Combine(
-                    Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
-                    templateDirectory);
-
-                if (!FileSystemHelpers.DirectoryExists(templatesLocation))
-                {
-                    throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
-                }
-
-                list = Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly);
+                list = GetNupkgFiles(templateDirectory);
             }
             else
             {
