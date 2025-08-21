@@ -1,4 +1,13 @@
-# Azure Functions CLI 4.2.1
+# Azure Functions CLI 4.3.0-preview1
+
+This release provides a preview build of Core Tools targeting the Linux-ARM64 architecture.
+
+> [!Note]
+> Unless you're targeting Linux-ARM64, we recommend continuing to use the standard release for broader compatibility.
+
+- This build is intended to enable support for the Linux-ARM64 platform.
+- It does not include .NET applications using the in-process model at this time.
+- This release will only be available on NPM and APT
 
 #### Host Version
 
@@ -7,6 +16,4 @@
 
 #### Changes
 
-- Add support for .NET 10 isolated model (#4589)
-- Update log streaming to support both connection string and instrumentation Key (#4586)
-- Remove content of workers dir from minified versions (#4609)
+- Linux ARM64 support
