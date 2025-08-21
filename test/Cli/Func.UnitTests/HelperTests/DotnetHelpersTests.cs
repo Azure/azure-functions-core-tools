@@ -180,5 +180,59 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 Directory.Delete(tempTemplatesDir, true);
             }
         }
+
+        [Fact]
+        public async Task EnsureWebJobsTemplatesInstalled_DoesNotRun_WhenCachedTrue()
+        {
+            // Arrange
+            DotnetHelpers.ResetTemplateEnsureCachesForTesting();
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static;
+            var type = typeof(DotnetHelpers);
+
+            var webJobsField = type.GetField("_haveWebJobsTemplatesBeenInstalled", flags)!;
+            var isolatedField = type.GetField("_haveIsolatedTemplateBeenInstalled", flags)!;
+
+            // Set both flags to true as sentinels
+            webJobsField.SetValue(null, true);
+
+            // Act: invoke the private ensure method; should short-circuit due to cache and not mutate flags
+            var ensureMethod = type.GetMethod("EnsureWebJobsTemplatesInstalled", flags)!;
+            var task = (Task)ensureMethod.Invoke(null, null)!;
+            await task;
+
+            // Assert: flags remain unchanged
+            Assert.True((bool)webJobsField.GetValue(null)!);
+            Assert.False((bool)isolatedField.GetValue(null)!);
+
+            // Cleanup
+            DotnetHelpers.ResetTemplateEnsureCachesForTesting();
+        }
+
+        [Fact]
+        public async Task EnsureIsolatedTemplatesInstalled_DoesNotRun_WhenCachedTrue()
+        {
+            // Arrange
+            DotnetHelpers.ResetTemplateEnsureCachesForTesting();
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static;
+            var type = typeof(DotnetHelpers);
+
+            var webJobsField = type.GetField("_haveWebJobsTemplatesBeenInstalled", flags)!;
+            var isolatedField = type.GetField("_haveIsolatedTemplateBeenInstalled", flags)!;
+
+            // Set both flags to true as sentinels
+            isolatedField.SetValue(null, true);
+
+            // Act: invoke the private ensure method; should short-circuit due to cache and not mutate flags
+            var ensureMethod = type.GetMethod("EnsureIsolatedTemplatesInstalled", flags)!;
+            var task = (Task)ensureMethod.Invoke(null, null)!;
+            await task;
+
+            // Assert: flags remain unchanged
+            Assert.True((bool)isolatedField.GetValue(null)!);
+            Assert.False((bool)webJobsField.GetValue(null)!);
+
+            // Cleanup
+            DotnetHelpers.ResetTemplateEnsureCachesForTesting();
+        }
     }
 }
