@@ -1,3 +1,14 @@
+# Azure Functions CLI 4.3.0
+
+#### Host Version
+
+- Host Version: TBD
+- In-Proc Host Version: TBD
+
+#### Changes
+
+- Version update for next release
+
 # Azure Functions CLI 4.2.1
 
 #### Host Version
