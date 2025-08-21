@@ -18,17 +18,6 @@ namespace Azure.Functions.Cli.Helpers
         private const string TemplatesLockFileName = "func_dotnet_templates.lock";
         private static readonly Lazy<Task<HashSet<string>>> _installedTemplatesList = new(GetInstalledTemplatePackageIds);
 
-        // Cache to avoid re-running ensure isolated templates logic repeatedly in the same process
-        private static bool _haveIsolatedTemplateBeenInstalled;
-        private static bool _haveWebJobsTemplatesBeenInstalled;
-
-        // Exposed for unit tests to reset the cache
-        internal static void ResetTemplateEnsureCachesForTesting()
-        {
-            _haveIsolatedTemplateBeenInstalled = false;
-            _haveWebJobsTemplatesBeenInstalled = false;
-        }
-
         public static void EnsureDotnet()
         {
             if (!CommandChecker.CommandExists("dotnet"))
@@ -306,22 +295,15 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task EnsureIsolatedTemplatesInstalled()
         {
-            if (_haveIsolatedTemplateBeenInstalled)
-            {
-                return;
-            }
-
             // Ensure no webjobs templates are installed, as they conflict with isolated templates
             if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
             {
                 await UninstallWebJobsTemplates();
-                _haveWebJobsTemplatesBeenInstalled = false;
             }
 
             // Check to see if the isolated templates are already installed with the specific version
             if (AreDotnetTemplatePackagesWithSpecificVersionInstalled(await _installedTemplatesList.Value, Path.Combine("templates", "net-isolated"), IsolatedTemplateBasePackId))
             {
-                _haveIsolatedTemplateBeenInstalled = true;
                 return;
             }
 
@@ -333,28 +315,19 @@ namespace Azure.Functions.Cli.Helpers
 
             // Install the latest isolated templates
             await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
-
-            _haveIsolatedTemplateBeenInstalled = true;
         }
 
         private static async Task EnsureWebJobsTemplatesInstalled()
         {
-            if (_haveWebJobsTemplatesBeenInstalled)
-            {
-                return;
-            }
-
             // Ensure no isolated templates are installed, as they conflict with webjobs templates
             if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
             {
-                _haveIsolatedTemplateBeenInstalled = false;
                 await UninstallIsolatedTemplates();
             }
 
             // Check to see if the webjobs templates are already installed with the specific version
             if (AreDotnetTemplatePackagesWithSpecificVersionInstalled(await _installedTemplatesList.Value, "templates", WebJobsTemplateBasePackId))
             {
-                _haveWebJobsTemplatesBeenInstalled = true;
                 return;
             }
 
@@ -366,8 +339,6 @@ namespace Azure.Functions.Cli.Helpers
 
             // Install the latest webjobs templates
             await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
-
-            _haveWebJobsTemplatesBeenInstalled = true;
         }
 
         internal static bool AreDotnetTemplatePackagesInstalled(HashSet<string> templates, string packageIdPrefix)
