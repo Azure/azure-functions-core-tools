@@ -22,6 +22,9 @@ jobs:
       python_linux_x64:
         languageWorker: 'Python'
         runtime: 'linux-x64'
+      custom_linux_x64:
+        languageWorker: 'Custom'
+        runtime: 'linux-x64'
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1

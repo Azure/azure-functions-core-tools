@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
@@ -285,7 +285,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             };
 
             var mockSecretsManager = new Mock<ISecretsManager>();
-            mockSecretsManager.Setup(s => s.GetSecrets())
+            mockSecretsManager.Setup(s => s.GetSecrets(false))
                             .Returns(() => new Dictionary<string, string>(secretsDict));
 
             // Return an empty set of connection strings of the expected type

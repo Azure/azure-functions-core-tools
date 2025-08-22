@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
@@ -40,14 +40,15 @@ namespace Azure.Functions.Cli.Helpers
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet && buildOption == BuildOption.Remote)
             {
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
-                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Enumerable.Empty<string>());
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Array.Empty<string>());
             }
             else
             {
-                var customHandler = await HostHelpers.GetCustomHandlerExecutable();
+                var customHandler = await HostHelpers.GetCustomHandlerExecutable(functionAppRoot);
                 IEnumerable<string> executables = !string.IsNullOrEmpty(customHandler)
                     ? new[] { customHandler }
                     : Enumerable.Empty<string>();
+
                 return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables);
             }
         }

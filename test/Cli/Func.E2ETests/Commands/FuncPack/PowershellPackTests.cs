@@ -1,7 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2ETests.Traits;
+using Azure.Functions.Cli.TestFramework.Assertions;
+using Azure.Functions.Cli.TestFramework.Commands;
+using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -28,6 +31,126 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 FuncPath,
                 Log,
                 new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                });
+        }
+
+        [Fact]
+        public void Pack_Powershell_CustomOutput_NoBuild()
+        {
+            var testName = nameof(Pack_Powershell_CustomOutput_NoBuild);
+            var customOutput = "pscustom";
+            var packNoBuild = new FuncPackCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(PowershellProjectPath)
+                .Execute(["--no-build", "-o", customOutput]);
+
+            packNoBuild.Should().ExitWith(0);
+            packNoBuild.Should().HaveStdOutContaining("Skipping build event for functions project (--no-build).");
+
+            var expectedZip = Path.Combine(PowershellProjectPath, customOutput, "TestPowershellProject.zip");
+            File.Exists(expectedZip).Should().BeTrue();
+            packNoBuild.Should().ValidateZipContents(expectedZip, ["host.json", "requirements.psd1"], Log);
+            File.Delete(expectedZip);
+        }
+
+        [Fact]
+        public void Pack_Powershell_NoBuild_BehaviorUnchanged()
+        {
+            var testName = nameof(Pack_Powershell_NoBuild_BehaviorUnchanged);
+
+            // Clean any previous zips
+            foreach (var zip in Directory.GetFiles(PowershellProjectPath, "*.zip"))
+            {
+                File.Delete(zip);
+            }
+
+            // Baseline: regular pack
+            var regular = new FuncPackCommand(FuncPath, testName + "_Regular", Log)
+                .WithWorkingDirectory(PowershellProjectPath)
+                .Execute([]);
+            regular.Should().ExitWith(0);
+
+            var baselineZip = Directory.GetFiles(PowershellProjectPath, "*.zip").FirstOrDefault();
+            baselineZip.Should().NotBeNull();
+            regular.Should().ValidateZipContents(
+                baselineZip!,
+                new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                },
+                Log);
+
+            // Remove zip to avoid interference
+            File.Delete(baselineZip!);
+
+            // Now run with --no-build and validate contents are the same (behavior unchanged)
+            var nobuild = new FuncPackCommand(FuncPath, testName + "_NoBuild", Log)
+                .WithWorkingDirectory(PowershellProjectPath)
+                .Execute(["--no-build"]);
+            nobuild.Should().ExitWith(0);
+            nobuild.Should().HaveStdOutContaining("Skipping build event for functions project (--no-build).");
+
+            var nobuildZip = Directory.GetFiles(PowershellProjectPath, "*.zip").FirstOrDefault();
+            nobuildZip.Should().NotBeNull();
+            nobuild.Should().ValidateZipContents(
+                nobuildZip!,
+                new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                },
+                Log);
+
+            File.Delete(nobuildZip!);
+        }
+
+        [Fact]
+        public void Pack_Powershell_WithRelativePathArgument_Works()
+        {
+            var testName = nameof(Pack_Powershell_WithRelativePathArgument_Works);
+            var projectName = "TestPowershellProject";
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: TestProjectDirectory,
+                projectAbsoluteDir: Path.Combine(TestProjectDirectory, projectName),
+                pathArgumentToPass: $"./{projectName}",
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                });
+        }
+
+        [Fact]
+        public void Pack_Powershell_WithAbsolutePathArgument_Works()
+        {
+            var testName = nameof(Pack_Powershell_WithAbsolutePathArgument_Works);
+            var projectAbs = PowershellProjectPath;
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: WorkingDirectory,
+                projectAbsoluteDir: projectAbs,
+                pathArgumentToPass: projectAbs,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
                 {
                     "host.json",
                     "requirements.psd1",
