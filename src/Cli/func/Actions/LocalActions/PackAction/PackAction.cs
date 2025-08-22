@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
@@ -51,9 +51,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public override async Task RunAsync()
         {
-            // Detect the runtime
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
-
             // Get the original command line args to pass to subcommands
             var packOptions = new PackOptions
             {
@@ -61,6 +58,37 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 OutputPath = OutputPath,
                 NoBuild = NoBuild
             };
+
+            var oldCurrentDirectory = Environment.CurrentDirectory;
+            if (!string.IsNullOrEmpty(FolderPath))
+            {
+                if (!Directory.Exists(FolderPath))
+                {
+                    throw new CliException($"The specified folder path '{FolderPath}' does not exist.");
+                }
+
+                // If a folder path is provided, change to that directory
+                Environment.CurrentDirectory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, FolderPath));
+            }
+
+            // Detect the runtime and set the runtime
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+
+            // If no runtime is detected and NoBuild is true, check for .dll files to infer .NET runtime
+            // This is because when we run dotnet publish, there is no local.settings.json anymore to determine runtime.
+            if (workerRuntime == WorkerRuntime.None && NoBuild)
+            {
+                var files = Directory.GetFiles(FolderPath, "*.dll", SearchOption.AllDirectories);
+                if (files.Length > 0)
+                {
+                    workerRuntime = WorkerRuntime.Dotnet;
+                }
+            }
+
+            GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
+
+            // Switch back to original directory after detecting runtime to package app in the correct context
+            Environment.CurrentDirectory = oldCurrentDirectory;
 
             // Internally dispatch to runtime-specific subcommand
             await RunRuntimeSpecificPackAsync(workerRuntime, packOptions);

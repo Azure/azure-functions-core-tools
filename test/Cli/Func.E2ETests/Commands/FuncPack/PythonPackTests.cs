@@ -1,7 +1,6 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO.Compression;
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
@@ -139,14 +138,15 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         [Fact]
         public void Pack_Python_BuildNativeDeps_OnWindows_WorksAsExpected()
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && !RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                // Only validate this scenario on Windows
+                // Only validate this scenario on Linux or macOS
                 return;
             }
 
             var testName = nameof(Pack_Python_BuildNativeDeps_OnWindows_WorksAsExpected);
 
+            // Remove existing _python_packages directory
             if (Directory.Exists(Path.Combine(PythonProjectPath, ".python_packages")))
             {
                 Directory.Delete(Path.Combine(PythonProjectPath, ".python_packages"), true);
@@ -158,10 +158,13 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             packResult.Should().ExitWith(0);
             packResult.Should().HaveStdOutContaining("Creating a new package");
+            packResult.Should().HaveStdOutContaining("Running 'docker pull");
 
+            // Find any zip files in the working directory
             var zipFiles = Directory.GetFiles(PythonProjectPath, "*.zip");
             Assert.True(zipFiles.Length > 0, $"No zip files found in {PythonProjectPath}");
 
+            // Validate minimal contents
             packResult.Should().ValidateZipContents(
                 zipFiles.First(),
                 new[]
@@ -197,7 +200,8 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 new[]
                 {
                     "host.json",
-                    "requirements.txt"
+                    "requirements.txt",
+                    "function_app.py"
                 },
                 Log);
 
@@ -215,6 +219,48 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             packResult.Should().ExitWith(1);
             packResult.Should().HaveStdErrContaining("Invalid options: --no-build cannot be used with --build-native-deps.");
+        }
+
+        [Fact]
+        public void Pack_Python_WithRelativePathArgument_Works()
+        {
+            var testName = nameof(Pack_Python_WithRelativePathArgument_Works);
+            var projectName = "TestPythonProject";
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: TestProjectDirectory,
+                projectAbsoluteDir: Path.Combine(TestProjectDirectory, projectName),
+                pathArgumentToPass: $"./{projectName}",
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "requirements.txt",
+                    "function_app.py",
+                    Path.Combine(".python_packages", "requirements.txt.md5")
+                });
+        }
+
+        [Fact]
+        public void Pack_Python_WithAbsolutePathArgument_Works()
+        {
+            var testName = nameof(Pack_Python_WithAbsolutePathArgument_Works);
+            var projectAbs = PythonProjectPath;
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: WorkingDirectory,
+                projectAbsoluteDir: projectAbs,
+                pathArgumentToPass: projectAbs,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "requirements.txt",
+                    "function_app.py",
+                    Path.Combine(".python_packages", "requirements.txt.md5")
+                });
         }
     }
 }

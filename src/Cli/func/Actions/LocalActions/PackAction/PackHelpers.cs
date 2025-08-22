@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         {
             return string.IsNullOrEmpty(folderPath)
                 ? ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory)
-                : Path.Combine(Environment.CurrentDirectory, folderPath);
+                : Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, folderPath));
         }
 
         public static string ResolveOutputPath(string functionAppRoot, string outputPath)
@@ -29,10 +29,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             else
             {
                 resolvedPath = Path.Combine(Environment.CurrentDirectory, outputPath);
-                if (FileSystemHelpers.DirectoryExists(resolvedPath))
-                {
-                    resolvedPath = Path.Combine(resolvedPath, $"{Path.GetFileName(functionAppRoot)}");
-                }
+
+                // Create directory if it doesn't exist
+                Directory.CreateDirectory(resolvedPath);
+                resolvedPath = Path.Combine(resolvedPath, $"{Path.GetFileName(functionAppRoot)}");
             }
 
             return resolvedPath + ".zip";
@@ -71,21 +71,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
             await FileSystemHelpers.WriteToFile(outputPath, stream);
-        }
-
-        public static async Task DefaultZip(PackOptions packOptions, IDictionary<string, string> telemetryCommandEvents)
-        {
-            var functionAppRoot = ResolveFunctionAppRoot(packOptions.FolderPath);
-
-            if (!Directory.Exists(functionAppRoot))
-            {
-                throw new CliException($"Directory not found to pack: {functionAppRoot}");
-            }
-
-            var outputPath = ResolveOutputPath(functionAppRoot, packOptions.OutputPath);
-            CleanupExistingPackage(outputPath);
-
-            await CreatePackage(functionAppRoot, outputPath, packOptions.NoBuild, telemetryCommandEvents);
         }
     }
 }

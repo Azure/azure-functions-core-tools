@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             File.Delete(zipFiles.First()); // Clean up the zip file after validation
         }
 
-        internal static async Task TestNoBuildCustomOutputPackFunctionality(
+        internal static async Task TestDotnetNoBuildCustomOutputPackFunctionality(
             string projectDir,
             string testName,
             string funcPath,
@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             // Ensure publish output exists for --no-build scenario
             var randomDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             var outputPath = Path.Combine(randomDir, "output");
-            var exe = new Executable("dotnet", $"publish --output \"{outputPath}\"", workingDirectory: projectDir);
+            var exe = new Executable("dotnet", $"publish --output {outputPath}", workingDirectory: projectDir);
             var exitCode = await exe.RunAsync();
             exitCode.Should().Be(0);
 
@@ -81,6 +81,36 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             // Clean up
             File.Delete(zipFiles.First());
+        }
+
+        internal static void TestPackWithPathArgument(
+            string funcInvocationWorkingDir,
+            string projectAbsoluteDir,
+            string pathArgumentToPass,
+            string testName,
+            string funcPath,
+            ITestOutputHelper log,
+            string[] filesToValidate)
+        {
+            var expectedZip = Path.Combine(funcInvocationWorkingDir, Path.GetFileName(projectAbsoluteDir) + ".zip");
+            if (File.Exists(expectedZip))
+            {
+                File.Delete(expectedZip);
+            }
+
+            var funcPackCommand = new FuncPackCommand(funcPath, testName, log);
+            var packResult = funcPackCommand
+                .WithWorkingDirectory(funcInvocationWorkingDir)
+                .Execute(new[] { pathArgumentToPass });
+
+            packResult.Should().ExitWith(0);
+            packResult.Should().HaveStdOutContaining("Creating a new package");
+
+            File.Exists(expectedZip).Should().BeTrue($"Expected package at {expectedZip} was created.");
+
+            packResult.Should().ValidateZipContents(expectedZip, filesToValidate, log);
+
+            File.Delete(expectedZip);
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO;
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -12,7 +13,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
     [Action(Name = "pack node", ParentCommandName = "pack", ShowInHelp = true, HelpText = "Arguments specific to Node.js apps when running func pack")]
-    internal class NodePackSubcommandAction : BaseAction
+    internal class NodePackSubcommandAction : PackSubcommandAction
     {
         private readonly ISecretsManager _secretsManager;
 
@@ -35,39 +36,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public async Task RunAsync(PackOptions packOptions, string[] args)
         {
+            await ExecuteAsync(packOptions, args);
+        }
+
+        protected override void ParseSubcommandArgs(string[] args)
+        {
             // Parse Node.js-specific arguments
             ParseArgs(args);
-
-            var functionAppRoot = PackHelpers.ResolveFunctionAppRoot(packOptions.FolderPath);
-
-            if (!Directory.Exists(functionAppRoot))
-            {
-                throw new CliException($"Directory not found to pack: {functionAppRoot}");
-            }
-
-            // Validate package.json exists
-            ValidateNodeJsProject(functionAppRoot);
-
-            // Run Node.js build process if not skipping
-            if (!packOptions.NoBuild)
-            {
-                await RunNodeJsBuildProcess(functionAppRoot);
-            }
-
-            var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, packOptions.OutputPath);
-            PackHelpers.CleanupExistingPackage(outputPath);
-
-            await PackHelpers.CreatePackage(functionAppRoot, outputPath, packOptions.NoBuild, TelemetryCommandEvents);
         }
 
-        public override Task RunAsync()
+        protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            // This method is called when someone tries to run "func pack node" directly
-            return Task.CompletedTask;
-        }
-
-        private void ValidateNodeJsProject(string functionAppRoot)
-        {
+            // ValidateFunctionApp package.json exists
             var packageJsonPath = Path.Combine(functionAppRoot, "package.json");
             if (!FileSystemHelpers.FileExists(packageJsonPath))
             {
@@ -78,6 +58,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 ColoredConsole.WriteLine(VerboseColor($"Found package.json at {packageJsonPath}"));
             }
+        }
+
+        protected override async Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
+        {
+            // Node packs from the function app root. If build is not skipped, run npm steps before packaging
+            if (!options.NoBuild)
+            {
+                await RunNodeJsBuildProcess(functionAppRoot);
+            }
+
+            return functionAppRoot;
+        }
+
+        protected override Task PackFunctionAsync(string packingRoot, string outputPath, PackOptions options)
+        {
+            return PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, TelemetryCommandEvents);
         }
 
         private async Task RunNodeJsBuildProcess(string functionAppRoot)
@@ -150,6 +146,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 ColoredConsole.WriteLine(VerboseColor("npm command found and available."));
             }
+        }
+
+        public override Task RunAsync()
+        {
+            // This method is called when someone tries to run "func pack node" directly
+            return Task.CompletedTask;
         }
     }
 }

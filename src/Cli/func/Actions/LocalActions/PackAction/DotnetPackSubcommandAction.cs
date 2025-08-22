@@ -1,6 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -11,7 +12,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
     [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to .NET apps when running func pack")]
-    internal class DotnetPackSubcommandAction : BaseAction
+    internal class DotnetPackSubcommandAction : PackSubcommandAction
     {
         private readonly ISecretsManager _secretsManager;
 
@@ -28,58 +29,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public async Task RunAsync(PackOptions packOptions)
         {
-            var functionAppRoot = PackHelpers.ResolveFunctionAppRoot(packOptions.FolderPath);
-            string packingRoot = functionAppRoot;
-
-            if (!Directory.Exists(functionAppRoot))
-            {
-                throw new CliException($"Directory not found to pack: {functionAppRoot}");
-            }
-
-            if (packOptions.NoBuild)
-            {
-                // For --no-build, treat FolderPath as the build output directory
-                if (string.IsNullOrEmpty(packOptions.FolderPath))
-                {
-                    ColoredConsole.WriteLine(WarningColor("No folder path specified. Using current directory as build output directory."));
-                    packingRoot = Environment.CurrentDirectory;
-                }
-                else
-                {
-                    packingRoot = Path.IsPathRooted(packOptions.FolderPath)
-                        ? packOptions.FolderPath
-                        : Path.Combine(Environment.CurrentDirectory, packOptions.FolderPath);
-                }
-
-                if (!Directory.Exists(packingRoot))
-                {
-                    throw new CliException($"Build output directory not found: {packingRoot}");
-                }
-
-                ValidateDotNetPublishDirectory(packingRoot);
-            }
-            else
-            {
-                PackHelpers.ValidateFunctionAppRoot(functionAppRoot);
-
-                // Run dotnet publish
-                ColoredConsole.WriteLine("Building .NET project...");
-                await RunDotNetPublish(functionAppRoot);
-
-                // Update packing root to publish output
-                packingRoot = Path.Combine(functionAppRoot, "output");
-            }
-
-            var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, packOptions.OutputPath);
-            PackHelpers.CleanupExistingPackage(outputPath);
-
-            await PackHelpers.CreatePackage(packingRoot, outputPath, packOptions.NoBuild, TelemetryCommandEvents);
-
-            if (!packOptions.NoBuild)
-            {
-                // If not no-build, delete packing root after packing
-                FileSystemHelpers.DeleteDirectorySafe(packingRoot);
-            }
+            await ExecuteAsync(packOptions);
         }
 
         public override Task RunAsync()
@@ -88,16 +38,65 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             return Task.CompletedTask;
         }
 
-        private void ValidateDotNetPublishDirectory(string path)
+        protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
             var requiredFiles = new[] { "host.json" };
             foreach (var file in requiredFiles)
             {
-                if (!FileSystemHelpers.FileExists(Path.Combine(path, file)))
+                if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, file)))
                 {
-                    throw new CliException($"Required file '{file}' not found in build output directory: {path}");
+                    throw new CliException($"Required file '{file}' not found in build output directory: {functionAppRoot}");
                 }
             }
+        }
+
+        protected override async Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
+        {
+            // ValidateFunctionApp
+            PackHelpers.ValidateFunctionAppRoot(functionAppRoot);
+
+            // For --no-build, treat FolderPath as the build output directory
+            if (options.NoBuild)
+            {
+                var packingRoot = functionAppRoot;
+
+                if (string.IsNullOrEmpty(options.FolderPath))
+                {
+                    ColoredConsole.WriteLine(WarningColor("No folder path specified. Using current directory as build output directory."));
+                    packingRoot = Environment.CurrentDirectory;
+                }
+                else
+                {
+                    packingRoot = Path.IsPathRooted(options.FolderPath)
+                        ? options.FolderPath
+                        : Path.Combine(Environment.CurrentDirectory, options.FolderPath);
+                }
+
+                if (!Directory.Exists(packingRoot))
+                {
+                    throw new CliException($"Build output directory not found: {packingRoot}");
+                }
+
+                return packingRoot;
+            }
+            else
+            {
+                ColoredConsole.WriteLine("Building .NET project...");
+                await RunDotNetPublish(functionAppRoot);
+
+                return Path.Combine(functionAppRoot, "output");
+            }
+        }
+
+        protected override Task PerformCleanupAfterPackingAsync(string packingRoot, string functionAppRoot, PackOptions options)
+        {
+            if (!options.NoBuild)
+            {
+                // If not no-build, delete packing root after packing
+                FileSystemHelpers.DeleteDirectorySafe(packingRoot);
+            }
+
+            return Task.CompletedTask;
         }
 
         private async Task RunDotNetPublish(string functionAppRoot)

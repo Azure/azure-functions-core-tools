@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2ETests.Traits;
@@ -94,7 +94,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "System.Windows.Extensions.dll",
                     "TestDotnet8IsolatedProject.deps.json",
                     "TestDotnet8IsolatedProject.dll",
-                    "TestDotnet8IsolatedProject.exe",
                     "TestDotnet8IsolatedProject.pdb",
                     "TestDotnet8IsolatedProject.runtimeconfig.json",
                     "worker.config.json",
@@ -113,7 +112,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         {
             var testName = nameof(Pack_DotnetIsolated_CustomOutput_NoBuild);
 
-            await BasePackTests.TestNoBuildCustomOutputPackFunctionality(
+            await BasePackTests.TestDotnetNoBuildCustomOutputPackFunctionality(
                 DotnetIsolatedProjectPath,
                 testName,
                 FuncPath,
@@ -126,6 +125,44 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "extensions.json",
                     "functions.metadata",
                     "host.json"
+                });
+        }
+
+        [Fact]
+        public void Pack_DotnetIsolated_WithRelativePathArgument_Works()
+        {
+            var testName = nameof(Pack_DotnetIsolated_WithRelativePathArgument_Works);
+            var projectName = "TestDotnet8IsolatedProject";
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: TestProjectDirectory,
+                projectAbsoluteDir: Path.Combine(TestProjectDirectory, projectName),
+                pathArgumentToPass: $"./{projectName}",
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "extensions.json"
+                });
+        }
+
+        [Fact]
+        public void Pack_DotnetIsolated_WithAbsolutePathArgument_Works()
+        {
+            var testName = nameof(Pack_DotnetIsolated_WithAbsolutePathArgument_Works);
+            var projectAbs = DotnetIsolatedProjectPath;
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: WorkingDirectory,
+                projectAbsoluteDir: projectAbs,
+                pathArgumentToPass: projectAbs,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "extensions.json"
                 });
         }
     }

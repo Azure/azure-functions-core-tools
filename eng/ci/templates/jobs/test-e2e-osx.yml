@@ -22,6 +22,9 @@ jobs:
       python_osx_x64:
         languageWorker: 'Python'
         runtime: 'osx-x64'
+      custom_osx_x64:
+        languageWorker: 'Custom'
+        runtime: 'osx-x64'
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1
