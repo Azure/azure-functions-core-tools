@@ -8,7 +8,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy.", ShowInHelp = true)]
+    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy.", ShowInHelp = false)]
     internal class PackAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
