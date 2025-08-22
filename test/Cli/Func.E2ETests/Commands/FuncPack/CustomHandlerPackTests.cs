@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
@@ -57,6 +57,45 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             }
 
             File.Delete(zipPath);
+        }
+
+        [Fact]
+        public void Pack_CustomHandler_WithRelativePathArgument_Works()
+        {
+            var testName = nameof(Pack_CustomHandler_WithRelativePathArgument_Works);
+            var projectName = "TestCustomHandlerProject";
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: TestProjectDirectory,
+                projectAbsoluteDir: Path.Combine(TestProjectDirectory, projectName),
+                pathArgumentToPass: $"./{projectName}",
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate:
+                new[]
+                {
+                    "host.json",
+                    "GoCustomHandlers"
+                });
+        }
+
+        [Fact]
+        public void Pack_CustomHandler_WithAbsolutePathArgument_Works()
+        {
+            var testName = nameof(Pack_CustomHandler_WithAbsolutePathArgument_Works);
+            var projectAbs = CustomHandlerProjectPath;
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: WorkingDirectory,
+                projectAbsoluteDir: projectAbs,
+                pathArgumentToPass: projectAbs,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "GoCustomHandlers"
+                });
         }
     }
 }

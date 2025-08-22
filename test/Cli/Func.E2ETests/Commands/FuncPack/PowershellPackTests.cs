@@ -44,17 +44,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         public void Pack_Powershell_CustomOutput_NoBuild()
         {
             var testName = nameof(Pack_Powershell_CustomOutput_NoBuild);
-
-            // Warm up (restore extensions) then delete zip
-            var warmup = new FuncPackCommand(FuncPath, testName + "_Warmup", Log)
-                .WithWorkingDirectory(PowershellProjectPath)
-                .Execute([]);
-            warmup.Should().ExitWith(0);
-            foreach (var zip in Directory.GetFiles(PowershellProjectPath, "*.zip"))
-            {
-                File.Delete(zip);
-            }
-
             var customOutput = "pscustom";
             var packNoBuild = new FuncPackCommand(FuncPath, testName, Log)
                 .WithWorkingDirectory(PowershellProjectPath)
@@ -63,9 +52,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             packNoBuild.Should().ExitWith(0);
             packNoBuild.Should().HaveStdOutContaining("Skipping build event for functions project (--no-build).");
 
-            var expectedZip = Path.Combine(PowershellProjectPath, customOutput + ".zip");
+            var expectedZip = Path.Combine(PowershellProjectPath, customOutput, "TestPowershellProject.zip");
             File.Exists(expectedZip).Should().BeTrue();
-            packNoBuild.Should().ValidateZipContents(expectedZip, new[] { "host.json", "requirements.psd1" }, Log);
+            packNoBuild.Should().ValidateZipContents(expectedZip, ["host.json", "requirements.psd1"], Log);
             File.Delete(expectedZip);
         }
 
@@ -125,6 +114,50 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 Log);
 
             File.Delete(nobuildZip!);
+        }
+
+        [Fact]
+        public void Pack_Powershell_WithRelativePathArgument_Works()
+        {
+            var testName = nameof(Pack_Powershell_WithRelativePathArgument_Works);
+            var projectName = "TestPowershellProject";
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: TestProjectDirectory,
+                projectAbsoluteDir: Path.Combine(TestProjectDirectory, projectName),
+                pathArgumentToPass: $"./{projectName}",
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                });
+        }
+
+        [Fact]
+        public void Pack_Powershell_WithAbsolutePathArgument_Works()
+        {
+            var testName = nameof(Pack_Powershell_WithAbsolutePathArgument_Works);
+            var projectAbs = PowershellProjectPath;
+            BasePackTests.TestPackWithPathArgument(
+                funcInvocationWorkingDir: WorkingDirectory,
+                projectAbsoluteDir: projectAbs,
+                pathArgumentToPass: projectAbs,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "requirements.psd1",
+                    Path.Combine("HttpTrigger", "run.ps1"),
+                    "profile.ps1",
+                    Path.Combine("HttpTrigger", "function.json")
+                });
         }
     }
 }

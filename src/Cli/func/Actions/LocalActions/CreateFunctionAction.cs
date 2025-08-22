@@ -28,9 +28,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
         private readonly ITemplatesManager _templatesManager;
-        private IEnumerable<Template> _templates;
-        private IEnumerable<NewTemplate> _newTemplates;
-        private IEnumerable<UserPrompt> _userPrompts;
+        private readonly Lazy<IEnumerable<Template>> _templates;
+        private readonly Lazy<IEnumerable<NewTemplate>> _newTemplates;
+        private readonly Lazy<IEnumerable<UserPrompt>> _userPrompts;
         private WorkerRuntime _workerRuntime;
 
         public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
@@ -40,6 +40,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
             _userInputHandler = new UserInputHandler(_templatesManager);
+            _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
+            _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
+            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
         }
 
         public string Language { get; set; }
@@ -110,17 +113,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            // Ensure that the _templates are loaded before we proceed
-            _templates = await _templatesManager.Templates;
-
             await UpdateLanguageAndRuntime();
-
-            // Depends on UpdateLanguageAndRuntime to set 'Language'
-            if (IsNewPythonProgrammingModel())
-            {
-                _newTemplates = await _templatesManager.NewTemplates;
-                _userPrompts = await _templatesManager.UserPrompts;
-            }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) && !Csx)
             {
@@ -155,7 +148,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     FileName = "function_app.py";
                 }
 
-                var userPrompt = _userPrompts.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
+                var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
                 while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
                 {
                     _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
@@ -192,12 +185,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     providedInputs[GetFileNameParamId] = FileName;
                 }
 
-                var template = _newTemplates.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
-
-                if (template is null)
-                {
-                    throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\"");
-                }
+                var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
 
                 var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
 
@@ -316,19 +304,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (_workerRuntime == WorkerRuntime.None)
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
                 else if (!WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
-                    var displayList = _templates?
+                    var displayList = _templates.Value
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToArray();
-
-                    if (displayList?.Length == 1)
+                    if (displayList.Length == 1)
                     {
                         Language = displayList.First();
                     }
@@ -359,15 +346,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (IsNewNodeJsProgrammingModel(_workerRuntime) ||
                 (forNewModelHelp && (Languages.TypeScript.EqualsIgnoreCase(templateLanguage) || Languages.JavaScript.EqualsIgnoreCase(templateLanguage))))
             {
-                return _templates.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
             else if (_workerRuntime == WorkerRuntime.Node)
             {
                 // Ensuring that we only show v3 templates for node when the user has not opted into the new model
-                return _templates.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                return _templates.Value.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
 
-            return _templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+            return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
         }
 
         private IEnumerable<string> GetTriggerNamesFromNewTemplates(string templateLanguage, bool forNewModelHelp = false)
@@ -379,7 +366,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (IsNewPythonProgrammingModel() || (Languages.Python.EqualsIgnoreCase(templateLanguage) && forNewModelHelp))
             {
-                return _newTemplates.Where(t => t.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                return _newTemplates.Value.Where(t => t.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
 
             throw new CliException("The new version of templates are only supported for Python.");
@@ -527,9 +514,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (workerRuntime == WorkerRuntime.Node)
                 {
-                    if (FileSystemHelpers.FileExists(PackageJsonFileName))
+                    if (FileSystemHelpers.FileExists(Constants.PackageJsonFileName))
                     {
-                        var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(PackageJsonFileName);
+                        var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(Constants.PackageJsonFileName);
                         var packageJson = JsonConvert.DeserializeObject<JToken>(packageJsonData);
                         var funcPackageVersion = packageJson["dependencies"]["@azure/functions"];
                         if (funcPackageVersion != null && new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
