@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                var customHandler = await HostHelpers.GetCustomHandlerExecutable();
+                var customHandler = await HostHelpers.GetCustomHandlerExecutable(functionAppRoot);
                 IEnumerable<string> executables = !string.IsNullOrEmpty(customHandler)
                     ? new[] { customHandler }
                     : Enumerable.Empty<string>();

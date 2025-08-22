@@ -7,7 +7,7 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
     [Action(Name = "pack custom", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to custom worker runtime apps when running func pack")]
-    internal class CustomPackSubcommandAction : BaseAction
+    internal class CustomPackSubcommandAction : PackSubcommandAction
     {
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -16,8 +16,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public async Task RunAsync(PackOptions packOptions)
         {
-            // No build or specific action required before zipping; just perform zip
-            await PackHelpers.DefaultZip(packOptions, TelemetryCommandEvents);
+            await ExecuteAsync(packOptions);
+        }
+
+        protected override Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
+        {
+            // Custom worker packs from the function app root without extra steps
+            return Task.FromResult(functionAppRoot);
         }
 
         public override Task RunAsync()
