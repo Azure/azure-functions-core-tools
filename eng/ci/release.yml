@@ -1,0 +1,105 @@
+pr: none
+trigger: none
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+  pipelines:
+  - pipeline: core-tools-consolidated-artifacts.official
+    source: _core-tools-consolidated-artifacts.official
+  - pipeline: tooling-feed
+    source: _tooling-feed.official
+
+extends:
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-windows-2022
+      os: windows
+    sdl:
+      codeql:
+         compiled:
+           enabled: true
+         runSourceLanguagesInSourceAnalysis: true
+    stages:
+      - stage: UploadZipFileToCdnStorage
+        jobs:
+          - job: SetMetadataVariables
+            steps:
+              - powershell: |
+                  $artifactsDirectory = "$(System.ArtifactsDirectory)"
+                  $jsonFilePath = Join-Path $artifactsDirectory -ChildPath "_core-tools-consolidated-artifacts.official\func-cli-metadata-json\metadata.json"
+                  
+                  if (-Not (Test-Path -Path $jsonFilePath)) {
+                      Write-Host "metadata.json file not found in $(System.ArtifactsDirectory)"
+                      exit 1
+                  }
+
+                  $jsonContent = Get-Content -Path $jsonFilePath -Raw | ConvertFrom-Json
+
+                  foreach ($key in $jsonContent.PSObject.Properties.Name) {
+                      $value = $jsonContent.$key
+                      Write-Host "Setting ADO environment variable: $key with value: $value"
+                      Write-Host "##vso[task.setvariable variable=$key;isOutput=true]$value"
+                  }
+
+                  Write-Host "Output variables set successfully from metadata.json"
+                name: SetMetadata
+                displayName: 'Read metadata.json and generate output variable'
+
+          - job: UploadArtifactsToStorage
+            dependsOn: SetMetadataVariables
+            variables:
+              consolidatedBuildId: $[ dependencies.SetMetadataVariables.outputs['SetMetadata.consolidatedBuildId'] ]
+            steps:
+              - powershell: |
+                  Add-Type -Assembly System.IO.Compression.FileSystem
+                  if (-not (Get-Module -ListAvailable -Name Az.Storage)) {
+                      Install-Module -Name Az.Storage -Force -AllowClobber -Scope CurrentUser
+                  }
+                  Import-Module Az.Storage
+
+                  $artifactsPath = "$(System.ArtifactsDirectory)\_core-tools-consolidated-artifacts.official"
+                  Write-Host "Searching for artifacts in: $artifactsPath"
+
+                  $ctx = New-AzStorageContext -StorageAccountName $env:ACCOUNT_NAME -StorageAccountKey $env:ACCESS_KEY
+
+                  $releaseNumber = "$(consolidatedBuildId)"
+                  Write-Host "Release number: $releaseNumber"
+
+                  $dropDirectories = Get-ChildItem -Path $artifactsPath -Directory | Where-Object { $_.Name -like "func-*" }
+
+                  foreach ($dropDir in $dropDirectories) {
+                      Write-Host "Processing drop directory: $($dropDir.FullName)"
+
+                      $toolsDirs = Get-ChildItem -Path $dropDir.FullName -Directory | Where-Object {
+                          $_.Name -eq "func-cli" -or $_.Name -eq "func-cli-visualstudio"
+                      }
+
+                      foreach ($toolsDir in $toolsDirs) {
+                          $zipFiles = Get-ChildItem -Path $toolsDir.FullName -File | Where-Object {
+                              $_.Extension -eq ".zip" -and -not $_.Name.EndsWith(".zip.sha2")
+                          }
+
+                          foreach ($zipFile in $zipFiles) {
+                              $blobName = "4.0.$releaseNumber/" + $zipFile.Name
+
+                              Write-Host "Uploading file: $($zipFile.FullName)"
+                              Write-Host "Blob name: $blobName"
+
+                              #Set-AzStorageBlobContent -Container "public" -File $zipFile.FullName -Blob $blobName -Context $ctx -Force
+                          }
+                      }
+                  }
+                displayName: 'Upload CLI Artifacts to Storage'
+                env:
+                  ACCOUNT_NAME: "test"
+                  ACCESS_KEY: "not real key"
