@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using Azure.Functions.Cli.Common;
@@ -16,7 +15,6 @@ namespace Azure.Functions.Cli.Helpers
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
         private const string TemplatesLockFileName = "func_dotnet_templates.lock";
-        private static readonly Lazy<Task<HashSet<string>>> _installedTemplatesList = new(GetInstalledTemplatePackageIds);
 
         public static void EnsureDotnet()
         {
@@ -337,54 +335,6 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly);
-        }
-
-        private static async Task<HashSet<string>> GetInstalledTemplatePackageIds()
-        {
-            var exe = new Executable("dotnet", "new uninstall", shareConsole: false);
-            var output = new StringBuilder();
-            var exitCode = await exe.RunAsync(o => output.AppendLine(o), e => output.AppendLine(e));
-            if (exitCode != 0)
-            {
-                throw new CliException("Failed to get list of installed template packages");
-            }
-
-            var lines = output.ToString()
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-
-            var packageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            string currentPackageId = null;
-            string currentVersion = null;
-
-            const string uninstallPrefix = "dotnet new uninstall ";
-
-            foreach (var line in lines)
-            {
-                var trimmed = line.Trim();
-
-                // Detect package ID line
-                if (trimmed.StartsWith(uninstallPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    currentPackageId = trimmed.Substring(uninstallPrefix.Length).Trim();
-                }
-
-                // Detect version line
-                else if (trimmed.StartsWith("Version:", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentVersion = trimmed.Substring("Version:".Length).Trim();
-                }
-
-                // If both package ID and version are captured, add to set
-                if (!string.IsNullOrWhiteSpace(currentPackageId) && !string.IsNullOrWhiteSpace(currentVersion))
-                {
-                    packageIds.Add($"{currentPackageId}.{currentVersion}");
-                    currentPackageId = null;
-                    currentVersion = null;
-                }
-            }
-
-            return packageIds;
         }
 
         private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
