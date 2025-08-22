@@ -138,9 +138,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
         [Fact]
         public void Pack_Python_BuildNativeDeps_OnWindows_WorksAsExpected()
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && !RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // Only validate this scenario on Linux or macOS
+                // Only validate this scenario on Linux since linux based docker image is required
                 return;
             }
 
