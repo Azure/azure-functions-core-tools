@@ -283,78 +283,46 @@ namespace Azure.Functions.Cli.Helpers
 
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
-                await EnsureIsolatedTemplatesInstalled();
+                await EnsureIsolatedTemplatesInstalled(action);
             }
             else
             {
-                await EnsureWebJobsTemplatesInstalled();
+                await EnsureWebJobsTemplatesInstalled(action);
             }
-
-            await action();
         }
 
-        private static async Task EnsureIsolatedTemplatesInstalled()
+        private static async Task EnsureIsolatedTemplatesInstalled(Func<Task> action)
         {
-            // Ensure no webjobs templates are installed, as they conflict with isolated templates
-            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
+            try
             {
+                // Uninstall any existing webjobs templates, as they conflict with isolated templates
                 await UninstallWebJobsTemplates();
+
+                // Install the latest isolated templates
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
+                await action();
             }
-
-            // Check to see if the isolated templates are already installed with the specific version
-            if (AreDotnetTemplatePackagesWithSpecificVersionInstalled(await _installedTemplatesList.Value, Path.Combine("templates", "net-isolated"), IsolatedTemplateBasePackId))
-            {
-                return;
-            }
-
-            // First uninstall any existing isolated templates, so .templateengine/packages can be cleaned up
-            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
-            {
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, UninstallIsolatedTemplates);
-            }
-
-            // Install the latest isolated templates
-            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
-        }
-
-        private static async Task EnsureWebJobsTemplatesInstalled()
-        {
-            // Ensure no isolated templates are installed, as they conflict with webjobs templates
-            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, IsolatedTemplateBasePackId))
+            finally
             {
                 await UninstallIsolatedTemplates();
             }
-
-            // Check to see if the webjobs templates are already installed with the specific version
-            if (AreDotnetTemplatePackagesWithSpecificVersionInstalled(await _installedTemplatesList.Value, "templates", WebJobsTemplateBasePackId))
-            {
-                return;
-            }
-
-            // First uninstall any existing webjobs templates, so .templateengine/packages can be cleaned up
-            if (AreDotnetTemplatePackagesInstalled(await _installedTemplatesList.Value, WebJobsTemplateBasePackId))
-            {
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, UninstallWebJobsTemplates);
-            }
-
-            // Install the latest webjobs templates
-            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
         }
 
-        internal static bool AreDotnetTemplatePackagesInstalled(HashSet<string> templates, string packageIdPrefix)
+        private static async Task EnsureWebJobsTemplatesInstalled(Func<Task> action)
         {
-            var hasProjectTemplates = templates.Any(t =>
-                    t.StartsWith($"{packageIdPrefix}.ProjectTemplates", StringComparison.OrdinalIgnoreCase));
-            var hasItemTemplates = templates.Any(t =>
-                t.StartsWith($"{packageIdPrefix}.ItemTemplates", StringComparison.OrdinalIgnoreCase));
+            try
+            {
+                // Uninstall any existing isolated templates, as they conflict with webjobs templates
+                await UninstallIsolatedTemplates();
 
-            return hasProjectTemplates && hasItemTemplates;
-        }
-
-        internal static bool AreDotnetTemplatePackagesWithSpecificVersionInstalled(HashSet<string> templates, string templatesPath, string packageIdPrefix)
-        {
-            string[] nupkgFiles = GetNupkgFiles(templatesPath);
-            return AreLocalTemplatesUpToDate(templates, packageIdPrefix, nupkgFiles);
+                // Install the latest webjobs templates
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
+                await action();
+            }
+            finally
+            {
+                await UninstallWebJobsTemplates();
+            }
         }
 
         private static string[] GetNupkgFiles(string templatesPath)
@@ -369,38 +337,6 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly);
-        }
-
-        private static bool AreLocalTemplatesUpToDate(HashSet<string> installedLocalTemplates, string packageIdPrefix, string[] templatePackagesFromCoreTools)
-        {
-            bool hasProjectTemplates = false;
-            bool hasItemTemplates = false;
-
-            foreach (var file in templatePackagesFromCoreTools)
-            {
-                var fileName = Path.GetFileNameWithoutExtension(file); // e.g., itemTemplates.4.0.5212
-
-                if (fileName.StartsWith("itemTemplates.", StringComparison.OrdinalIgnoreCase))
-                {
-                    var version = fileName.Substring("itemTemplates.".Length);
-                    var expectedId = $"{packageIdPrefix}.ItemTemplates.{version}";
-                    if (installedLocalTemplates.Contains(expectedId, StringComparer.OrdinalIgnoreCase))
-                    {
-                        hasItemTemplates = true;
-                    }
-                }
-                else if (fileName.StartsWith("projectTemplates.", StringComparison.OrdinalIgnoreCase))
-                {
-                    var version = fileName.Substring("projectTemplates.".Length);
-                    var expectedId = $"{packageIdPrefix}.ProjectTemplates.{version}";
-                    if (installedLocalTemplates.Contains(expectedId, StringComparer.OrdinalIgnoreCase))
-                    {
-                        hasProjectTemplates = true;
-                    }
-                }
-            }
-
-            return hasProjectTemplates && hasItemTemplates;
         }
 
         private static async Task<HashSet<string>> GetInstalledTemplatePackageIds()
