@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Exceptions;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -151,7 +152,7 @@ namespace Azure.Functions.Cli.Helpers
             "daprpublishoutputbinding" => "daprPublishOutputBinding",
             "daprserviceinvocationtrigger" => "daprServiceInvocationTrigger",
             "daprtopictrigger" => "daprTopicTrigger",
-            _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
+            _ => throw new CsTemplateNotFoundException(templateName)
         };
 
         internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
@@ -258,14 +259,14 @@ namespace Azure.Functions.Cli.Helpers
         public static string GetCsprojOrFsproj()
         {
             EnsureDotnet();
-            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
+            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj", excludedDirectories: ["obj"]).ToList();
             if (csProjFiles.Count == 1)
             {
                 return csProjFiles.First();
             }
             else
             {
-                var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").ToList();
+                var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj", excludedDirectories: ["obj"]).ToList();
                 if (fsProjFiles.Count == 1)
                 {
                     return fsProjFiles.First();
