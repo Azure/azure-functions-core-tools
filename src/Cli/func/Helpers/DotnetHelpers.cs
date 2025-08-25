@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string InProcTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
-        private static readonly SemaphoreSlim _templateOperationLock = new(1, 1);
+        private const string TemplatesLockFileName = "func_dotnet_templates.lock";
 
         public static void EnsureDotnet()
         {
@@ -297,7 +297,7 @@ namespace Azure.Functions.Cli.Helpers
                 await UninstallInProcTemplates();
 
                 // Install the latest isolated templates
-                await WithLockAsync(InstallIsolatedTemplates);
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
                 await action();
             }
             finally
@@ -314,7 +314,7 @@ namespace Azure.Functions.Cli.Helpers
                 await UninstallIsolatedTemplates();
 
                 // Install the latest webjobs templates
-                await WithLockAsync(InstallInProcTemplates);
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallInProcTemplates);
                 await action();
             }
             finally
@@ -344,22 +344,6 @@ namespace Azure.Functions.Cli.Helpers
         private static Task InstallInProcTemplates() => DotnetTemplatesAction("install", "templates");
 
         private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $"net-isolated"));
-
-        /// <summary>
-        /// Simple lock mechanism using SemaphoreSlim.
-        /// </summary>
-        private static async Task WithLockAsync(Func<Task> action)
-        {
-            await _templateOperationLock.WaitAsync();
-            try
-            {
-                await action();
-            }
-            finally
-            {
-                _templateOperationLock.Release();
-            }
-        }
 
         private static async Task DotnetTemplatesAction(string action, string templateDirectory = null, string[] nugetPackageList = null)
         {
