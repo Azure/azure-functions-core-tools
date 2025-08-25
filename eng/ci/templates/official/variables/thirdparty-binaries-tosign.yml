@@ -16,5 +16,6 @@ variables:
     OpenTelemetry.Api.ProviderBuilderExtensions.dll,OpenTelemetry.dll,OpenTelemetry.Exporter.Console.dll,
     OpenTelemetry.Exporter.OpenTelemetryProtocol.dll,OpenTelemetry.Extensions.Hosting.dll,
     OpenTelemetry.Instrumentation.AspNetCore.dll,OpenTelemetry.Instrumentation.Http.dll,
+    OpenTelemetry.Instrumentation.Process.dll,OpenTelemetry.Instrumentation.Runtime.dll,
     OpenTelemetry.PersistentStorage.Abstractions.dll,OpenTelemetry.PersistentStorage.FileSystem.dll,
     t32.exe,t64.exe,w32.exe,w64.exe

@@ -2,4 +2,7 @@ variables:
   authenticodeBinariesToSign: >
     func.dll,func.exe,gozip.exe,
     DurableTask.AzureStorage.Internal.dll,DurableTask.Core.Internal.dll,
-    Microsoft.Azure.WebSites.DataProtection.dll
+    Microsoft.Azure.WebSites.DataProtection.dll,
+    Microsoft.Azure.Functions.Platform.Metrics.LinuxConsumption.dll,
+    Microsoft.Azure.WebJobs.*,
+    Microsoft.Azure.AppService.*
