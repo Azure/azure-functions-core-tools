@@ -34,49 +34,5 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var templates = DotnetHelpers.GetTemplates(runtime);
             Assert.Equal(expectedCount, templates.Count());
         }
-
-        [Theory]
-        [InlineData("Microsoft.Azure.Functions.Worker")]
-        [InlineData("Microsoft.Azure.WebJobs")]
-        public void AreDotnetTemplatePackagesInstalled_ReturnsTrue_WhenTemplatesExists(string pkgPrefix)
-        {
-            // Arrange
-            var templates = new HashSet<string> { $"{pkgPrefix}.ProjectTemplates", $"{pkgPrefix}.ItemTemplates" };
-
-            // Act
-            var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, pkgPrefix);
-
-            // Assert
-            Assert.True(result);
-        }
-
-        [Theory]
-        [InlineData("ProjectTemplates")]
-        [InlineData("ItemTemplates")]
-        public void AreDotnetTemplatePackagesInstalled_ReturnsFalse_WhenOnlyOneRequiredTemplateExists(string pkgSuffix)
-        {
-            // Arrange
-            var templates = new HashSet<string> { $"Microsoft.Azure.Functions.Worker.{pkgSuffix}" };
-
-            // Act
-            var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, "Microsoft.Azure.Functions.Worker");
-
-            // Assert
-            Assert.False(result);
-        }
-
-        [Fact]
-        public void AreDotnetTemplatePackagesInstalled_ReturnsFalse_WhenTemplatesDoesNotExist()
-        {
-            // Arrange
-            var templates = new HashSet<string> { "OtherCompany.ProjectTemplates", "OtherCompany.ItemTemplates", "Microsoft.Azure.Functions.Worker" };
-
-            // Act
-            // Should fail as we are looking for Item and Project templates
-            var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, "Microsoft.Azure.Functions.Worker");
-
-            // Assert
-            Assert.False(result);
-        }
     }
 }

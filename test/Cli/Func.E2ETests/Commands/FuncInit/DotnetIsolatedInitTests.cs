@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2ETests.Traits;
@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
+    [Collection("Dotnet-isolated func init tests")] // Runtests in this class sequentially to avoid conflicts for templating
     public class DotnetIsolatedInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
