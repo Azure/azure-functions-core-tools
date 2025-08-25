@@ -12,9 +12,9 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class DotnetHelpers
     {
-        private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
+        private const string InProcTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
-        private const string TemplatesLockFileName = "func_dotnet_templates.lock";
+        private static readonly SemaphoreSlim _templateOperationLock = new(1, 1);
 
         public static void EnsureDotnet()
         {
@@ -281,23 +281,23 @@ namespace Azure.Functions.Cli.Helpers
 
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
-                await EnsureIsolatedTemplatesInstalled(action);
+                await EnsureIsolatedTemplatesInstalledAsync(action);
             }
             else
             {
-                await EnsureWebJobsTemplatesInstalled(action);
+                await EnsureInProcTemplatesInstalledAsync(action);
             }
         }
 
-        private static async Task EnsureIsolatedTemplatesInstalled(Func<Task> action)
+        private static async Task EnsureIsolatedTemplatesInstalledAsync(Func<Task> action)
         {
             try
             {
                 // Uninstall any existing webjobs templates, as they conflict with isolated templates
-                await UninstallWebJobsTemplates();
+                await UninstallInProcTemplates();
 
                 // Install the latest isolated templates
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
+                await WithLockAsync(InstallIsolatedTemplates);
                 await action();
             }
             finally
@@ -306,7 +306,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task EnsureWebJobsTemplatesInstalled(Func<Task> action)
+        private static async Task EnsureInProcTemplatesInstalledAsync(Func<Task> action)
         {
             try
             {
@@ -314,12 +314,12 @@ namespace Azure.Functions.Cli.Helpers
                 await UninstallIsolatedTemplates();
 
                 // Install the latest webjobs templates
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
+                await WithLockAsync(InstallInProcTemplates);
                 await action();
             }
             finally
             {
-                await UninstallWebJobsTemplates();
+                await UninstallInProcTemplates();
             }
         }
 
@@ -339,11 +339,27 @@ namespace Azure.Functions.Cli.Helpers
 
         private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
 
-        private static Task UninstallWebJobsTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{WebJobsTemplateBasePackId}.ProjectTemplates", $"{WebJobsTemplateBasePackId}.ItemTemplates"]);
+        private static Task UninstallInProcTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{InProcTemplateBasePackId}.ProjectTemplates", $"{InProcTemplateBasePackId}.ItemTemplates"]);
 
-        private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "templates");
+        private static Task InstallInProcTemplates() => DotnetTemplatesAction("install", "templates");
 
         private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $"net-isolated"));
+
+        /// <summary>
+        /// Simple lock mechanism using SemaphoreSlim.
+        /// </summary>
+        private static async Task WithLockAsync(Func<Task> action)
+        {
+            await _templateOperationLock.WaitAsync();
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                _templateOperationLock.Release();
+            }
+        }
 
         private static async Task DotnetTemplatesAction(string action, string templateDirectory = null, string[] nugetPackageList = null)
         {
