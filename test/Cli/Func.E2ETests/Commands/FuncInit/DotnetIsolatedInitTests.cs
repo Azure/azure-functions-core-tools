@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
-    [Collection("Dotnet-isolated func init tests")] // Runtests in this class sequentially to avoid conflicts for templating
+    [CollectionDefinition("Dotnet isolated func init tests", DisableParallelization = true)] // Runtests in this class sequentially to avoid conflicts for templating
     public class DotnetIsolatedInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
