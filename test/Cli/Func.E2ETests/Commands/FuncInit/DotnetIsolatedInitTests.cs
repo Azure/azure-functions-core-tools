@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only"]);
+                .Execute(["--docker-only", "--force"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
