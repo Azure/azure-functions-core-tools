@@ -11,8 +11,8 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew.TestsWithFixtures
 {
-    [CollectionDefinition("Dotnet isolated func new tests", DisableParallelization = true)]
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
+    [Trait(TestTraits.Group, TestTraits.RunSequentially)] // Run tests in this class sequentially to avoid conflicts for templating
     public class DotnetIsolatedTests : IClassFixture<DotnetIsolatedFunctionAppFixture>
     {
         private readonly DotnetIsolatedFunctionAppFixture _fixture;

@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
-    [CollectionDefinition("Dotnet func init tests", DisableParallelization = true)] // Run tests in this class sequentially to avoid conflicts for templating
+    [Trait(TestTraits.Group, TestTraits.RunSequentially)] // Run tests in this class sequentially to avoid conflicts for templating
     public class DotnetInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.E2ETests.Traits
@@ -34,10 +34,9 @@ namespace Azure.Functions.Cli.E2ETests.Traits
         /// </summary>
         public const string InProc = "InProc";
 
-        public const string WorkerRuntime = "WorkerRuntime";
-        public const string Dotnet = "Dotnet";
-        public const string DotnetIsolated = "DotnetIsolated";
-        public const string Node = "Node";
-        public const string Powershell = "Powershell";
+        /// <summary>
+        /// Testes that need to be run sequentially to avoid templating conflicts.
+        /// </summary>
+        public const string RunSequentially = "RunSequentially";
     }
 }

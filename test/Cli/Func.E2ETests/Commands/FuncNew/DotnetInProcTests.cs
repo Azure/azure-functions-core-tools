@@ -11,7 +11,8 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
 {
-    [CollectionDefinition("Dotnet isolated func new tests", DisableParallelization = true)] // Run tests in this class sequentially to avoid conflicts for templating
+    // Run tests in this class sequentially to avoid conflicts for templating
+    [Trait(TestTraits.Group, TestTraits.RunSequentially)]
     public class DotnetInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]

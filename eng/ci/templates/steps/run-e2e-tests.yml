@@ -30,6 +30,7 @@ steps:
     Write-Host "##vso[task.setvariable variable=DURABLE_FUNCTION_PATH]$(Build.SourcesDirectory)/test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder"
     Write-Host "##vso[task.setvariable variable=INPROC_RUN_SETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/.runsettings/start_tests/ci_pipeline/dotnet_inproc.runsettings"
     Write-Host "##vso[task.setvariable variable=TEST_PROJECT_PATH]$(Build.SourcesDirectory)/test/TestFunctionApps"
+    Write-Host "##vso[task.setvariable variable=SEQUENTIAL_TEST_RUNSETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/.runsettings/new_and_init_tests/sequential_tests.runsettings"
   displayName: 'Set environment variables for E2E tests'
 
 
@@ -55,8 +56,14 @@ steps:
     }
 
     Write-Host "Running tests for worker: $worker"
+    $env:DOTNET_CLI_CONTEXT_VERBOSE = 'true'
     Write-Host "dotnet test $proj $($args -join ' ')"
     dotnet test $proj @args
+
+    Write-Host "Running sequential tests for worker: $worker"
+    $sequentialArgs = $baseArgs + @('--settings', "$(SEQUENTIAL_TEST_RUNSETTINGS)", '--filter', "WorkerRuntime=$worker")
+    Write-Host "dotnet test $proj $($sequentialArgs -join ' ') -- RunConfiguration.MaxCpuCount=1"
+    dotnet test $proj @sequentialArgs -- RunConfiguration.MaxCpuCount=1
   displayName: 'Run E2E tests'
   env:
     DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
