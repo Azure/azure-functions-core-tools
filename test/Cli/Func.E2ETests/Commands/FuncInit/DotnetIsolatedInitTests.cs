@@ -141,7 +141,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             };
 
             // Initialize dotnet-isolated function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework]);
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework, "--force"]);
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
