@@ -151,6 +151,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             funcInitResult.Should().ExitWith(0);
             funcInitResult.Should().WriteDockerfile();
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+
+            // Clean up any existing Dockerfile
+            if (File.Exists(dockerFilePath))
+            {
+                File.Delete(dockerFilePath);
+            }
         }
     }
 }
