@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Assertions/CommandResultAssertions.cs
@@ -124,7 +124,7 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
                 foreach (var expectedContent in file.ExpectedContents)
                 {
                     Execute.Assertion.ForCondition(actualContent.Contains(expectedContent))
-                        .FailWith($"File '{file.FilePath}' should contain '{expectedContent}', but it did not.");
+                        .FailWith($"File '{file.FilePath}' should contain '{expectedContent}', but it did not. Actual content is: {actualContent}");
                 }
             }
 
