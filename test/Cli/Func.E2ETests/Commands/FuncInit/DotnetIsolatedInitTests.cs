@@ -99,7 +99,8 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         public void Init_WithTargetFrameworkAndDockerFlag_GeneratesDockerFile(string targetFramework)
         {
             var targetFrameworkstr = targetFramework.Replace("net", string.Empty);
-            var workingDir = WorkingDirectory;
+            var workingDir = Path.Combine(WorkingDirectory, targetFramework, Guid.NewGuid().ToString());
+            Directory.CreateDirectory(workingDir);
             var testName = nameof(Init_WithTargetFrameworkAndDockerFlag_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");

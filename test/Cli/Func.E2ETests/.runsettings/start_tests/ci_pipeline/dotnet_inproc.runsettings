@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RunSettings>
   <RunConfiguration>
-    <TestCaseFilter>(WorkerRuntime = Dotnet) &amp; (Group != RunSequentially) &amp;  (Group != RequiresNestedInProcArtifacts) &amp; (Group != UseInVisualStudioConsolidatedArtifactGeneration) &amp; (Group != UseInConsolidatedArtifactGeneration)</TestCaseFilter>
+    <TestCaseFilter>(WorkerRuntime = Dotnet) &amp; (Group != RunSequentially) &amp; (Group != RequiresNestedInProcArtifacts) &amp; (Group != UseInVisualStudioConsolidatedArtifactGeneration) &amp; (Group != UseInConsolidatedArtifactGeneration)</TestCaseFilter>
   </RunConfiguration>
 </RunSettings>
