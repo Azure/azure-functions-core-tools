@@ -11,7 +11,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    public static class DotnetHelpers
+    public static partial class DotnetHelpers
     {
         private const string InProcTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
@@ -88,7 +88,8 @@ namespace Azure.Functions.Cli.Helpers
                     var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                         ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                         : string.Empty;
-                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}");
+                    TryGetCustomHiveArg(workerRuntime, out string customHive);
+                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{customHive}");
                     var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
@@ -119,7 +120,8 @@ namespace Azure.Functions.Cli.Helpers
                         }
                     }
 
-                    var exe = new Executable("dotnet", exeCommandArguments);
+                    TryGetCustomHiveArg(workerRuntime, out string customHive);
+                    var exe = new Executable("dotnet", exeCommandArguments + customHive);
                     string dotnetNewErrorMessage = string.Empty;
                     var exitCode = await exe.RunAsync(o => { }, e =>
                     {
@@ -291,6 +293,14 @@ namespace Azure.Functions.Cli.Helpers
         {
             EnsureDotnet();
 
+            // If we have enabled custom hives (for E2E tests), install templates there and run the action
+            if (UseCustomTemplateHive())
+            {
+                await EnsureTemplatesInCustomHiveAsync(action, workerRuntime);
+                return;
+            }
+
+            // Default CLI behaviour: Templates are installed globally, so we need to install/uninstall them around the action
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 await EnsureIsolatedTemplatesInstalledAsync(action);
@@ -298,6 +308,29 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 await EnsureInProcTemplatesInstalledAsync(action);
+            }
+        }
+
+        private static async Task EnsureTemplatesInCustomHiveAsync(Func<Task> action, WorkerRuntime workerRuntime)
+        {
+            // If the custom hive already has templates installed, just run the action and skip installation
+            string hivePackagesDir = Path.Combine(GetCustomHivePath(workerRuntime), "packages");
+            if (FileSystemHelpers.EnsureDirectoryNotEmpty(hivePackagesDir))
+            {
+                await action();
+                return;
+            }
+
+            // Install only, no need to uninstall as we are using a custom hive
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
+            {
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
+                await action();
+            }
+            else
+            {
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallInProcTemplates);
+                await action();
             }
         }
 
@@ -349,15 +382,15 @@ namespace Azure.Functions.Cli.Helpers
             return Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly);
         }
 
-        private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
+        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", WorkerRuntime.DotnetIsolated, Path.Combine("templates", $"net-isolated"));
 
-        private static Task UninstallInProcTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{InProcTemplateBasePackId}.ProjectTemplates", $"{InProcTemplateBasePackId}.ItemTemplates"]);
+        private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", WorkerRuntime.DotnetIsolated, nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
 
-        private static Task InstallInProcTemplates() => DotnetTemplatesAction("install", "templates");
+        private static Task InstallInProcTemplates() => DotnetTemplatesAction("install", WorkerRuntime.Dotnet, "templates");
 
-        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $"net-isolated"));
+        private static Task UninstallInProcTemplates() => DotnetTemplatesAction("uninstall", WorkerRuntime.Dotnet, nugetPackageList: [$"{InProcTemplateBasePackId}.ProjectTemplates", $"{InProcTemplateBasePackId}.ItemTemplates"]);
 
-        private static async Task DotnetTemplatesAction(string action, string templateDirectory = null, string[] nugetPackageList = null)
+        private static async Task DotnetTemplatesAction(string action,  WorkerRuntime workerRuntime, string templateDirectory = null, string[] nugetPackageList = null)
         {
             string[] list;
 
@@ -372,7 +405,8 @@ namespace Azure.Functions.Cli.Helpers
 
             foreach (var nupkg in list)
             {
-                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\"");
+                TryGetCustomHiveArg(workerRuntime, out string customHive);
+                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\" {customHive}");
                 await exe.RunAsync();
             }
         }

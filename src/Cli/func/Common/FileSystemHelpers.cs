@@ -127,6 +127,12 @@ namespace Azure.Functions.Cli.Common
             return path;
         }
 
+        public static bool EnsureDirectoryNotEmpty(string path)
+        {
+            return DirectoryExists(path) &&
+                Instance.Directory.EnumerateFileSystemEntries(path).Any();
+        }
+
         public static void DeleteDirectorySafe(string path, bool ignoreErrors = true)
         {
             DeleteFileSystemInfo(Instance.DirectoryInfo.FromDirectoryName(path), ignoreErrors);
