@@ -141,22 +141,16 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             };
 
             // Initialize dotnet-isolated function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework, "--force"]);
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework]);
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only", "--force"]);
+                .Execute(["--docker-only"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
             funcInitResult.Should().WriteDockerfile();
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
-
-            // Clean up any existing Dockerfile
-            if (File.Exists(dockerFilePath))
-            {
-                File.Delete(dockerFilePath);
-            }
         }
     }
 }
