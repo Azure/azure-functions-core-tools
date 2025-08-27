@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 // Check for at least 2 install calls with correct template path
                 var installCalls = calls.Where(a => a.Contains("new install", StringComparison.OrdinalIgnoreCase) &&
                                                    a.Contains(Path.Combine("templates", path), StringComparison.OrdinalIgnoreCase)).ToList();
-                Assert.True(installCalls.Count >= 2, $"Expected at least 2 install calls with 'templates/net-isolated', got {installCalls.Count}");
+                Assert.True(installCalls.Count >= 2, $"Expected at least 2 install calls with '{Path.Combine("templates", path)}', got {installCalls.Count}");
 
                 // Verify the sequence: first 2 should be uninstalls
                 Assert.Contains("new uninstall", calls[0], StringComparison.OrdinalIgnoreCase);
