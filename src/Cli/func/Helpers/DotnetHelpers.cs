@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -62,7 +63,20 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
             }
 
-            return output.ToString();
+            // Extract the target framework from the output
+            var outputString = output.ToString();
+            var lines = outputString.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            // Look for a line that looks like a target framework moniker (netX.X format)
+            var tfmPattern = new Regex(@"^net\d+\.\d+(-.*)?$", RegexOptions.IgnoreCase);
+            var tfm = lines.FirstOrDefault(line => tfmPattern.IsMatch(line.Trim()));
+
+            if (string.IsNullOrEmpty(tfm))
+            {
+                throw new CliException($"Could not parse target framework from output: {outputString}");
+            }
+
+            return tfm.Trim();
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
