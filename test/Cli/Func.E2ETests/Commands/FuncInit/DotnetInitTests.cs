@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2ETests.Traits;
@@ -10,7 +10,6 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
-    [Collection("RunInSequence")] // Run tests in this class sequentially to avoid conflicts for templating
     public class DotnetInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]

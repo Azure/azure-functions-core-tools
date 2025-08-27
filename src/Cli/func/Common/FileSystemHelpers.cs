@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
@@ -125,6 +125,12 @@ namespace Azure.Functions.Cli.Common
             }
 
             return path;
+        }
+
+        public static bool EnsureDirectoryNotEmpty(string path)
+        {
+            return DirectoryExists(path) &&
+                Instance.Directory.EnumerateFileSystemEntries(path).Any();
         }
 
         public static void DeleteDirectorySafe(string path, bool ignoreErrors = true)

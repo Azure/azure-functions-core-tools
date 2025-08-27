@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -10,11 +11,21 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    public static class DotnetHelpers
+    public static partial class DotnetHelpers
     {
         private const string InProcTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
         private const string TemplatesLockFileName = "func_dotnet_templates.lock";
+
+        /// <summary>
+        /// Regex that matches all valid .NET Target Framework Monikers (TFMs).
+        /// Covers modern TFMs (netX.Y[-osversion]),
+        /// netstandard, netcoreapp, classic .NET Framework, UAP, WP, Silverlight,
+        /// Tizen, NetNano, NetMF, and legacy WinStore aliases.
+        /// </summary>
+        public static readonly Regex TfmRegex = new Regex(
+            @"net\d+\.\d+(?:-[a-z][a-z0-9]*(?:\d+(?:\.\d+)*)?)?|net(?:standard|coreapp)\d+(?:\.\d+)?|net(?:10|11|20|35|40|403|45|451|452|46|461|462|47|471|472|48|481)|uap\d+(?:\.\d+)*|(?:wp(?:7|75|8|81)|wpa81)|sl(?:4|5)|tizen\d+(?:\.\d+)?|netnano\d+(?:\.\d+)?|netmf|(?:win(?:8|81|10)|netcore(?:45|451|50)|netcore)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         public static void EnsureDotnet()
         {
@@ -62,7 +73,18 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
             }
 
-            return output.ToString();
+            // Extract the target framework from the output
+            var outputString = output.ToString();
+
+            // Look for a line that looks like a target framework moniker
+            var tfm = TfmRegex.Match(outputString);
+
+            if (!tfm.Success)
+            {
+                throw new CliException($"Could not parse target framework from output: {outputString}");
+            }
+
+            return tfm.Value;
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
@@ -76,7 +98,8 @@ namespace Azure.Functions.Cli.Helpers
                     var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                         ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                         : string.Empty;
-                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}");
+                    TryGetCustomHiveArg(workerRuntime, out string customHive);
+                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{customHive}");
                     var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
@@ -107,7 +130,8 @@ namespace Azure.Functions.Cli.Helpers
                         }
                     }
 
-                    var exe = new Executable("dotnet", exeCommandArguments);
+                    TryGetCustomHiveArg(workerRuntime, out string customHive);
+                    var exe = new Executable("dotnet", exeCommandArguments + customHive);
                     string dotnetNewErrorMessage = string.Empty;
                     var exitCode = await exe.RunAsync(o => { }, e =>
                     {
@@ -279,6 +303,14 @@ namespace Azure.Functions.Cli.Helpers
         {
             EnsureDotnet();
 
+            // If we have enabled custom hives (for E2E tests), install templates there and run the action
+            if (UseCustomTemplateHive())
+            {
+                await EnsureTemplatesInCustomHiveAsync(action, workerRuntime);
+                return;
+            }
+
+            // Default CLI behaviour: Templates are installed globally, so we need to install/uninstall them around the action
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 await EnsureIsolatedTemplatesInstalledAsync(action);
@@ -286,6 +318,29 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 await EnsureInProcTemplatesInstalledAsync(action);
+            }
+        }
+
+        private static async Task EnsureTemplatesInCustomHiveAsync(Func<Task> action, WorkerRuntime workerRuntime)
+        {
+            // If the custom hive already has templates installed, just run the action and skip installation
+            string hivePackagesDir = Path.Combine(GetHivePath(workerRuntime), "packages");
+            if (FileSystemHelpers.EnsureDirectoryNotEmpty(hivePackagesDir))
+            {
+                await action();
+                return;
+            }
+
+            // Install only, no need to uninstall as we are using a custom hive
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
+            {
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
+                await action();
+            }
+            else
+            {
+                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallInProcTemplates);
+                await action();
             }
         }
 
@@ -337,15 +392,15 @@ namespace Azure.Functions.Cli.Helpers
             return Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly);
         }
 
-        private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
+        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", WorkerRuntime.DotnetIsolated, Path.Combine("templates", $"net-isolated"));
 
-        private static Task UninstallInProcTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{InProcTemplateBasePackId}.ProjectTemplates", $"{InProcTemplateBasePackId}.ItemTemplates"]);
+        private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", WorkerRuntime.DotnetIsolated, nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
 
-        private static Task InstallInProcTemplates() => DotnetTemplatesAction("install", "templates");
+        private static Task InstallInProcTemplates() => DotnetTemplatesAction("install", WorkerRuntime.Dotnet, "templates");
 
-        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $"net-isolated"));
+        private static Task UninstallInProcTemplates() => DotnetTemplatesAction("uninstall", WorkerRuntime.Dotnet, nugetPackageList: [$"{InProcTemplateBasePackId}.ProjectTemplates", $"{InProcTemplateBasePackId}.ItemTemplates"]);
 
-        private static async Task DotnetTemplatesAction(string action, string templateDirectory = null, string[] nugetPackageList = null)
+        private static async Task DotnetTemplatesAction(string action, WorkerRuntime workerRuntime, string templateDirectory = null, string[] nugetPackageList = null)
         {
             string[] list;
 
@@ -360,7 +415,8 @@ namespace Azure.Functions.Cli.Helpers
 
             foreach (var nupkg in list)
             {
-                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\"");
+                TryGetCustomHiveArg(workerRuntime, out string customHive);
+                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\" {customHive}");
                 await exe.RunAsync();
             }
         }

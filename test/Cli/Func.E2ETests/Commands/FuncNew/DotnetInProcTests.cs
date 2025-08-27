@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO;
@@ -11,7 +11,6 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
 {
-    [Collection("RunInSequence")] // Run tests in this class sequentially to avoid conflicts for templating
     public class DotnetInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
