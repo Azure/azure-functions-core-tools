@@ -53,6 +53,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     // https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables
                     ["DOTNET_NOLOGO"] = "1",  // do not write disclaimer to stdout
+                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1", // just in case
                 });
 
             StringBuilder output = new();
@@ -62,7 +63,19 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
             }
 
-            return output.ToString();
+            // Extract the target framework from the output
+            var outputString = output.ToString();
+            Console.WriteLine($"Output string: {outputString}");
+
+            // Look for a line that looks like a target framework moniker (netX.X format)
+            var tfm = Regex.Match(outputString, @"net\d+\.\d+(?:-[a-zA-Z0-9\-\.]*)?", RegexOptions.IgnoreCase);
+
+            if (!tfm.Success)
+            {
+                throw new CliException($"Could not parse target framework from output: {outputString}");
+            }
+
+            return tfm.Value;
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
