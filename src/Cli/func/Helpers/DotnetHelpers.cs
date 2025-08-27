@@ -15,7 +15,6 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string InProcTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
-        private const string TemplatesLockFileName = "func_dotnet_templates.lock";
 
         /// <summary>
         /// Regex that matches all valid .NET Target Framework Monikers (TFMs).
@@ -26,6 +25,17 @@ namespace Azure.Functions.Cli.Helpers
         public static readonly Regex TfmRegex = new Regex(
             @"net\d+\.\d+(?:-[a-z][a-z0-9]*(?:\d+(?:\.\d+)*)?)?|net(?:standard|coreapp)\d+(?:\.\d+)?|net(?:10|11|20|35|40|403|45|451|452|46|461|462|47|471|472|48|481)|uap\d+(?:\.\d+)*|(?:wp(?:7|75|8|81)|wpa81)|sl(?:4|5)|tizen\d+(?:\.\d+)?|netnano\d+(?:\.\d+)?|netmf|(?:win(?:8|81|10)|netcore(?:45|451|50)|netcore)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Gets or sets test hook to intercept 'dotnet new' invocations for unit tests.
+        /// If null, real process execution is used.
+        /// </summary>
+        internal static Func<string, Task<int>> RunDotnetNewFunc { get; set; } = null;
+
+        private static Task<int> RunDotnetNewAsync(string args)
+            => (RunDotnetNewFunc is not null)
+                ? RunDotnetNewFunc(args)
+                : new Executable("dotnet", args).RunAsync();
 
         public static void EnsureDotnet()
         {
@@ -299,7 +309,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task TemplateOperationAsync(Func<Task> action, WorkerRuntime workerRuntime)
+        internal static async Task TemplateOperationAsync(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
 
@@ -332,16 +342,12 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             // Install only, no need to uninstall as we are using a custom hive
-            if (workerRuntime == WorkerRuntime.DotnetIsolated)
-            {
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
-                await action();
-            }
-            else
-            {
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallInProcTemplates);
-                await action();
-            }
+            Func<Task> installTemplates = workerRuntime == WorkerRuntime.DotnetIsolated
+                ? InstallIsolatedTemplates
+                : InstallInProcTemplates;
+
+            await installTemplates();
+            await action();
         }
 
         private static async Task EnsureIsolatedTemplatesInstalledAsync(Func<Task> action)
@@ -352,7 +358,7 @@ namespace Azure.Functions.Cli.Helpers
                 await UninstallInProcTemplates();
 
                 // Install the latest isolated templates
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
+                await InstallIsolatedTemplates();
                 await action();
             }
             finally
@@ -369,7 +375,7 @@ namespace Azure.Functions.Cli.Helpers
                 await UninstallIsolatedTemplates();
 
                 // Install the latest webjobs templates
-                await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallInProcTemplates);
+                await InstallInProcTemplates();
                 await action();
             }
             finally
@@ -416,8 +422,8 @@ namespace Azure.Functions.Cli.Helpers
             foreach (var nupkg in list)
             {
                 TryGetCustomHiveArg(workerRuntime, out string customHive);
-                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\" {customHive}");
-                await exe.RunAsync();
+                var args = $"new {action} \"{nupkg}\" {customHive}";
+                await RunDotnetNewAsync(args);
             }
         }
     }
