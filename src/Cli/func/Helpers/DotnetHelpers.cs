@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var exe = new Executable(
                 "dotnet",
-                $"build {projectFilename} -getproperty:TargetFramework",
+                $"build {projectFilename} -getproperty:TargetFramework --verbosity quiet",
                 workingDirectory: projectDirectory,
                 environmentVariables: new Dictionary<string, string>
                 {
