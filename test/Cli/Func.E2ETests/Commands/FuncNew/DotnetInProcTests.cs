@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
@@ -11,7 +10,6 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
 {
-    [Trait(TestTraits.Group, TestTraits.RunSequentially)] // Run tests in this class sequentially to avoid conflicts for templating
     public class DotnetInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]

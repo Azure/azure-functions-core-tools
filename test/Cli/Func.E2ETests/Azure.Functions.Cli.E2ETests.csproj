@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include=".runsettings\new_and_init_tests\run_sequentially.runsettings" />
     <None Include=".runsettings\start_tests\artifact_consolidation_pipeline\visualstudio.runsettings" />
     <None Include=".runsettings\start_tests\ci_pipeline\default.runsettings" />
     <None Include=".runsettings\start_tests\ci_pipeline\dotnet_inproc.runsettings" />

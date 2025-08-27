@@ -33,10 +33,5 @@ namespace Azure.Functions.Cli.E2ETests.Traits
         /// This is done since when the dotnet isolated tests are run with dotnet inproc, we run into templating conflict errors.
         /// </summary>
         public const string InProc = "InProc";
-
-        /// <summary>
-        /// Testes that need to be run sequentially to avoid templating conflicts.
-        /// </summary>
-        public const string RunSequentially = "RunSequentially";
     }
 }
