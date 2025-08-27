@@ -123,7 +123,7 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
             }
 
-            // Extract the target framework from the output
+            // Extract the target framework moniker (TFM) from the output using regex pattern matching
             var outputString = output.ToString();
 
             // Look for a line that looks like a target framework moniker
