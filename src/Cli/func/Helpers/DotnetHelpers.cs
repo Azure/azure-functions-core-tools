@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var exe = new Executable(
                 "dotnet",
-                $"build {projectFilename} -getproperty:TargetFramework --verbosity quiet",
+                $"build {projectFilename} -getproperty:TargetFramework",
                 workingDirectory: projectDirectory,
                 environmentVariables: new Dictionary<string, string>
                 {
@@ -65,7 +65,6 @@ namespace Azure.Functions.Cli.Helpers
 
             // Extract the target framework from the output
             var outputString = output.ToString();
-            Console.WriteLine($"Output string: {outputString}");
 
             // Look for a line that looks like a target framework moniker (netX.X format)
             var tfm = Regex.Match(outputString, @"net\d+\.\d+(?:-[a-zA-Z0-9\-\.]*)?", RegexOptions.IgnoreCase);
