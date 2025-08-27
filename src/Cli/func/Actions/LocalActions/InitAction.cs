@@ -399,9 +399,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && string.IsNullOrEmpty(targetFramework) && !csx)
             {
                 var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+                Console.WriteLine($"Current directory: {Environment.CurrentDirectory}");
+                Console.WriteLine("Function app root directory: " + functionAppRoot);
                 if (functionAppRoot != null)
                 {
                     targetFramework = await DotnetHelpers.DetermineTargetFramework(functionAppRoot);
+                    Console.WriteLine($"Using target framework {targetFramework} from existing project.");
                 }
             }
 
