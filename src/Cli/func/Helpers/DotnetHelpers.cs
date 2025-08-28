@@ -76,6 +76,8 @@ namespace Azure.Functions.Cli.Helpers
             // Extract the target framework moniker (TFM) from the output using regex pattern matching
             var outputString = output.ToString();
 
+            Console.WriteLine($"Ouput string: {outputString}");
+
             // Look for a line that looks like a target framework moniker
             var tfm = TargetFrameworkHelper.TfmRegex.Match(outputString);
 
