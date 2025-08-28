@@ -36,47 +36,55 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
-        [InlineData("Microsoft.Azure.Functions.Worker")]
-        [InlineData("Microsoft.Azure.WebJobs")]
-        public void AreDotnetTemplatePackagesInstalled_ReturnsTrue_WhenTemplatesExists(string pkgPrefix)
+        [InlineData(WorkerRuntime.Dotnet, "")]
+        [InlineData(WorkerRuntime.DotnetIsolated, "net-isolated")]
+        public async Task TemplateOperationAsync_Isolated_InstallsAndUninstalls_InOrder(WorkerRuntime workerRuntime, string path)
         {
             // Arrange
-            var templates = new HashSet<string> { $"{pkgPrefix}.ProjectTemplates", $"{pkgPrefix}.ItemTemplates" };
+            var calls = new List<string>();
+            var original = DotnetHelpers.RunDotnetNewFunc;
+            try
+            {
+                DotnetHelpers.RunDotnetNewFunc = args =>
+                {
+                    calls.Add(args);
+                    return Task.FromResult(0);
+                };
 
-            // Act
-            var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, pkgPrefix);
+                bool actionCalled = false;
+                Func<Task> action = () =>
+                {
+                    actionCalled = true;
+                    return Task.CompletedTask;
+                };
 
-            // Assert
-            Assert.True(result);
-        }
+                // Act
+                await DotnetHelpers.TemplateOperationAsync(action, workerRuntime);
 
-        [Theory]
-        [InlineData("ProjectTemplates")]
-        [InlineData("ItemTemplates")]
-        public void AreDotnetTemplatePackagesInstalled_ReturnsFalse_WhenOnlyOneRequiredTemplateExists(string pkgSuffix)
-        {
-            // Arrange
-            var templates = new HashSet<string> { $"Microsoft.Azure.Functions.Worker.{pkgSuffix}" };
+                // Assert
+                Assert.True(actionCalled);
+                var uninstallCalls = calls.Where(a => a.Contains("new uninstall", StringComparison.OrdinalIgnoreCase)).ToList();
+                Assert.True(uninstallCalls.Count >= 4, $"Expected at least 4 uninstall calls, got {uninstallCalls.Count}");
 
-            // Act
-            var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, "Microsoft.Azure.Functions.Worker");
+                // Check for at least 2 install calls with correct template path
+                var installCalls = calls.Where(a => a.Contains("new install", StringComparison.OrdinalIgnoreCase) &&
+                                                   a.Contains(Path.Combine("templates", path), StringComparison.OrdinalIgnoreCase)).ToList();
+                Assert.True(installCalls.Count >= 2, $"Expected at least 2 install calls with '{Path.Combine("templates", path)}', got {installCalls.Count}");
 
-            // Assert
-            Assert.False(result);
-        }
+                // Verify the sequence: first 2 should be uninstalls
+                Assert.Contains("new uninstall", calls[0], StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("new uninstall", calls[1], StringComparison.OrdinalIgnoreCase);
 
-        [Fact]
-        public void AreDotnetTemplatePackagesInstalled_ReturnsFalse_WhenTemplatesDoesNotExist()
-        {
-            // Arrange
-            var templates = new HashSet<string> { "OtherCompany.ProjectTemplates", "OtherCompany.ItemTemplates", "Microsoft.Azure.Functions.Worker" };
-
-            // Act
-            // Should fail as we are looking for Item and Project templates
-            var result = DotnetHelpers.AreDotnetTemplatePackagesInstalled(templates, "Microsoft.Azure.Functions.Worker");
-
-            // Assert
-            Assert.False(result);
+                // Find the last 2 calls and verify they are uninstalls
+                var lastTwoCalls = calls.TakeLast(2).ToList();
+                Assert.True(
+                    lastTwoCalls.All(call => call.Contains("new uninstall", StringComparison.OrdinalIgnoreCase)),
+                    "Last 2 calls should be uninstall operations");
+            }
+            finally
+            {
+                DotnetHelpers.RunDotnetNewFunc = original;
+            }
         }
     }
 }

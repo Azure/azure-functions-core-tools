@@ -10,6 +10,10 @@ namespace Azure.Functions.Cli.E2ETests.Fixtures
         public DotnetIsolatedFunctionAppFixture()
             : base(WorkerRuntime.DotnetIsolated)
         {
+            var hiveRoot = Path.Combine(Path.GetTempPath(), "func-e2e-hives");
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveFlag, "1");
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, hiveRoot);
+            Directory.CreateDirectory(hiveRoot);
         }
     }
 }

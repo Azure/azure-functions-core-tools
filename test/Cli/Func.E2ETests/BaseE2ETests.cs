@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
-using Azure.Functions.Cli.Abstractions;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -36,6 +36,11 @@ namespace Azure.Functions.Cli.E2ETests
                     throw new ApplicationException("Could not locate the 'func' executable to use for testing. Make sure the FUNC_PATH environment variable is set to the full path of the func executable.");
                 }
             }
+
+            var hiveRoot = Path.Combine(Path.GetTempPath(), "func-e2e-hives");
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveFlag, "1");
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, hiveRoot);
+            Directory.CreateDirectory(hiveRoot);
 
             Directory.CreateDirectory(WorkingDirectory);
             return Task.CompletedTask;
