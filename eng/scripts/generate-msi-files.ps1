@@ -63,10 +63,12 @@ if ([string]::IsNullOrWhiteSpace($cliVersion)) {
         ForEach-Object { $_ -replace $versionPattern, '$1' }
 }
 
-# If the version has -ci.x.y, convert it to .x to ensure we have a valid MSI version format
-$cliVersion = $cliVersion -replace '-(?:ci|beta|rc|dev)\.([0-9]+)\.0$', '.$1'
-
 Write-Host "CLI Version: $cliVersion"
+
+# TODO: Figure out MSI versioning for pre-releases
+# If the version has suffix, strip it for MSI versioning
+$msiVersion = $cliVersion -replace '-.*$',''
+Write-Host "MSI Version: $msiVersion"
 
 # Function to process MSI generation for a platform
 function New-PlatformMSI {
@@ -140,7 +142,7 @@ Get-ChildItem -Path $artifactsPath -Directory | ForEach-Object {
     }
 
     if ($matchedPlatform) {
-        New-PlatformMSI -TargetDir $subDir -Platform $matchedPlatform -CliVersion $cliVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
+        New-PlatformMSI -TargetDir $subDir -Platform $matchedPlatform -CliVersion $msiVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
         $processedPlatforms += $matchedPlatform
     }
 }
@@ -152,7 +154,7 @@ if ($processedPlatforms.Count -eq 0) {
     foreach ($platform in $platforms) {
         $targetDir = "$artifactsPath\win-$platform"
         if (Test-Path $targetDir) {
-            New-PlatformMSI -TargetDir $targetDir -Platform $platform -CliVersion $cliVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
+            New-PlatformMSI -TargetDir $targetDir -Platform $platform -CliVersion $msiVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
             $processedPlatforms += $platform
         }
     }
