@@ -55,8 +55,7 @@ if ([string]::IsNullOrWhiteSpace($runtime)) {
 if ([string]::IsNullOrWhiteSpace($cliVersion)) {
     Write-Host "CLI version not provided, attempting to extract from artifacts path..."
 
-    # allow preview/dev too
-    $versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-(?:ci|beta|rc|dev|preview)[-\.\d]+)?)$'
+    $versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-.*)?)$'
 
     $cliVersion = Get-ChildItem -Path $artifactsPath -Directory |
         Where-Object { $_.Name -match $versionPattern } |
@@ -66,15 +65,12 @@ if ([string]::IsNullOrWhiteSpace($cliVersion)) {
 
 Write-Host "CLI Version: $cliVersion"
 
-# 2) Normalize prerelease to a numeric ".N" suffix that MSI accepts
-#    Covers: -ci.25429.0 -> .25429
-#            -preview1   -> .1
-#            -preview.1  -> .1
-#            -preview    -> .0
-#            stable versions are left as-is (e.g. 4.0.1)
-$msiVersion = $cliVersion `
-    -replace '-(?:ci|beta|rc|dev|preview)[\.-]?([0-9]+)(?:\.\d+)?$', '.$1' `
-    -replace '-(?:ci|beta|rc|dev|preview)$', '.0'
+# TODO: Design MSI versioning strategy for pre-release: https://github.com/Azure/azure-functions-core-tools/issues/4627
+# 2) For MSI: strip anything after a dash (-)
+#    Example: 4.2.2-ci.25429.0 -> 4.2.2
+#             4.2.2-preview1   -> 4.2.2
+#             4.2.2            -> 4.2.2
+$msiVersion = $cliVersion -replace '^(\d+\.\d+\.\d+).*$', '$1'
 
 Write-Host "MSI Version: $msiVersion"
 
