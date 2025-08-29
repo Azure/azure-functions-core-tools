@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Colors.Net;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
@@ -60,6 +61,26 @@ namespace Azure.Functions.Cli.Helpers
             {
                 await FileSystemHelpers.WriteFileIfNotExists("tsconfig.json", await StaticResources.TsConfig);
             }
+        }
+
+        public static string GetNodeVersion(string functionAppRoot)
+        {
+            string packageJsonPath = Path.Combine(functionAppRoot, "package.json");
+            if (!File.Exists(packageJsonPath))
+            {
+                return null;
+            }
+
+            var packageJson = JObject.Parse(File.ReadAllText(packageJsonPath));
+
+            // Check if "engines" field specifies Node.js version
+            string nodeVersion = packageJson["engines"]?["node"]?.ToString();
+            if (!string.IsNullOrEmpty(nodeVersion))
+            {
+                return nodeVersion;
+            }
+
+            return null;
         }
     }
 }
