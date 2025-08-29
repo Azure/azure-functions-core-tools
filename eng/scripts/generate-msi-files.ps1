@@ -51,11 +51,12 @@ if ([string]::IsNullOrWhiteSpace($runtime)) {
     Write-Host "Runtime '$runtime' mapped to platform(s): $($platforms -join ', ')"
 }
 
-# Try and get the CLI version from the folder name if not provided
+# 1) Try and get the CLI version from the folder name if not provided
 if ([string]::IsNullOrWhiteSpace($cliVersion)) {
     Write-Host "CLI version not provided, attempting to extract from artifacts path..."
 
-    $versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-(?:ci|beta|rc)[-\.\d]+)?)$'
+    # allow preview/dev too
+    $versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-(?:ci|beta|rc|dev|preview)[-\.\d]+)?)$'
 
     $cliVersion = Get-ChildItem -Path $artifactsPath -Directory |
         Where-Object { $_.Name -match $versionPattern } |
@@ -63,10 +64,19 @@ if ([string]::IsNullOrWhiteSpace($cliVersion)) {
         ForEach-Object { $_ -replace $versionPattern, '$1' }
 }
 
-# If the version has -ci.x.y, convert it to .x to ensure we have a valid MSI version format
-$cliVersion = $cliVersion -replace '-(?:ci|beta|rc|dev)\.([0-9]+)\.0$', '.$1'
-
 Write-Host "CLI Version: $cliVersion"
+
+# 2) Normalize prerelease to a numeric ".N" suffix that MSI accepts
+#    Covers: -ci.25429.0 -> .25429
+#            -preview1   -> .1
+#            -preview.1  -> .1
+#            -preview    -> .0
+#            stable versions are left as-is (e.g. 4.0.1)
+$msiVersion = $cliVersion `
+    -replace '-(?:ci|beta|rc|dev|preview)[\.-]?([0-9]+)(?:\.\d+)?$', '.$1' `
+    -replace '-(?:ci|beta|rc|dev|preview)$', '.0'
+
+Write-Host "MSI Version: $msiVersion"
 
 # Function to process MSI generation for a platform
 function New-PlatformMSI {
@@ -140,7 +150,7 @@ Get-ChildItem -Path $artifactsPath -Directory | ForEach-Object {
     }
 
     if ($matchedPlatform) {
-        New-PlatformMSI -TargetDir $subDir -Platform $matchedPlatform -CliVersion $cliVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
+        New-PlatformMSI -TargetDir $subDir -Platform $matchedPlatform -CliVersion $msiVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
         $processedPlatforms += $matchedPlatform
     }
 }
@@ -152,7 +162,7 @@ if ($processedPlatforms.Count -eq 0) {
     foreach ($platform in $platforms) {
         $targetDir = "$artifactsPath\win-$platform"
         if (Test-Path $targetDir) {
-            New-PlatformMSI -TargetDir $targetDir -Platform $platform -CliVersion $cliVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
+            New-PlatformMSI -TargetDir $targetDir -Platform $platform -CliVersion $msiVersion -ResourceDir $resourceDir -ArtifactsPath $artifactsPath
             $processedPlatforms += $platform
         }
     }
