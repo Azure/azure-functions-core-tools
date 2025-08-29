@@ -1,4 +1,4 @@
-# Azure Functions CLI 4.2.2
+# Azure Functions CLI 4.2.3
 
 #### Host Version
 
@@ -7,4 +7,4 @@
 
 #### Changes
 
-- Fix .NET template install bug (#4612)
+- Log the resolved worker runtime and `local.settings.json` location, if found.
