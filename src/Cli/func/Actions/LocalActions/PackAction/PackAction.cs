@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             Parser
                 .Setup<bool>("no-build")
                 .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents." +
-                    "Otherwise, default is the current directory.")
+                "Otherwise, default is the current directory.")
                 .Callback(n => NoBuild = n);
 
             if (args.Any() && !args.First().StartsWith("-"))

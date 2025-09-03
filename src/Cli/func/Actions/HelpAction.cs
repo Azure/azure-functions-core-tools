@@ -295,6 +295,42 @@ namespace Azure.Functions.Cli.Actions
             }
         }
 
+        private void DisplaySubCommandHelp(ActionType subCommand)
+        {
+            // Ensure subCommand is valid
+            if (subCommand == null)
+            {
+                return;
+            }
+
+            // Extract the runtime name from the full command name
+            // E.g., "pack dotnet" -> "Dotnet"
+            var fullCommandName = subCommand.Names?.FirstOrDefault();
+
+            string runtimeName = null;
+            if (!string.IsNullOrWhiteSpace(fullCommandName))
+            {
+                var parts = fullCommandName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                runtimeName = parts.Length > 1 && !string.IsNullOrEmpty(parts[1])
+                    ? char.ToUpper(parts[1][0]) + parts[1].Substring(1).ToLower()
+                    : fullCommandName;
+            }
+
+            // Fall back to a safe default if we couldn't determine a runtime name
+            runtimeName ??= subCommand.Type?.Name ?? "subcommand";
+
+            var description = subCommand.Type?.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
+
+            // Display indented subcommand header
+            ColoredConsole.WriteLine($"   {runtimeName.DarkCyan()}     {description}");
+
+            // Display subcommand switches with extra indentation
+            if (subCommand.Type != null)
+            {
+                DisplaySwitches(subCommand);
+            }
+        }
+
         private void DisplaySwitches(ActionType actionType)
         {
             var action = _createAction.Invoke(actionType.Type);

@@ -8,6 +8,9 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Google.Protobuf.WellKnownTypes;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Build.Evaluation;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
@@ -29,8 +32,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             Parser
                 .Setup<bool>("build-native-deps")
                 .WithDescription("Builds function app locally using an image that matches the environment used in Azure. " +
-                    "When enabled, Core Tools starts a Docker container, builds the app inside that container," +
-                    " and creates a ZIP file with all dependencies restored in .python_packages.")
+                "When enabled, Core Tools starts a Docker container, builds the app inside that container," +
+                " and creates a ZIP file with all dependencies restored in .python_packages.")
                 .Callback(o => BuildNativeDeps = o);
 
             return base.ParseArgs(args);
