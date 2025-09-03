@@ -7,4 +7,3 @@
 
 #### Changes
 
-- Fix .NET template install bug (#4612)
