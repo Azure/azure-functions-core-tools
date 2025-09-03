@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System;
+using System.IO;
 using Azure.Functions.Cli.Helpers;
 using Xunit;
 
@@ -84,6 +86,202 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             finally
             {
                 DotnetHelpers.RunDotnetNewFunc = original;
+            }
+        }
+
+        [Fact]
+        public void TryGetPropertyValueFromProps_ReturnsNull_WhenPropsMissing()
+        {
+            var tempDir = CreateTempDirectory();
+            try
+            {
+                var result = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                Assert.Null(result);
+            }
+            finally
+            {
+                SafeDeleteDirectory(tempDir);
+            }
+        }
+
+        [Fact]
+        public void TryGetPropertyValueFromProps_ResolvesRelativePath()
+        {
+            var tempDir = CreateTempDirectory();
+            try
+            {
+                string fileContent = """
+                    <Project>
+                      <PropertyGroup>
+                        <ArtifactsPath>artifacts/output</ArtifactsPath>
+                      </PropertyGroup>
+                    </Project>
+                    """;
+                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
+                File.WriteAllText(propsPath, fileContent);
+
+                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                Assert.NotNull(resolved);
+
+                var expected = Path.GetFullPath(Path.Combine(tempDir, "artifacts", "output"));
+                AssertPathsEqual(expected, resolved!);
+            }
+            finally
+            {
+                SafeDeleteDirectory(tempDir);
+            }
+        }
+
+        [Fact]
+        public void TryGetPropertyValueFromProps_ResolvesProjectDirVariable()
+        {
+            var tempDir = CreateTempDirectory();
+            try
+            {
+                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
+                string fileContent =
+                    """
+                    <Project>
+                      <PropertyGroup>
+                        <ArtifactsPath>$(ProjectDir)bin/publish</ArtifactsPath>
+                      </PropertyGroup>
+                    </Project>
+                    """;
+
+                // $(ProjectDir) should expand to absolute project root with a trailing separator
+                File.WriteAllText(propsPath, fileContent);
+
+                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                Assert.NotNull(resolved);
+
+                var expected = Path.Combine(tempDir, "bin", "publish");
+                AssertPathsEqual(expected, resolved!);
+            }
+            finally
+            {
+                SafeDeleteDirectory(tempDir);
+            }
+        }
+
+        [Fact]
+        public void TryGetPropertyValueFromProps_ResolvesMSBuildThisFileDirectoryVariable()
+        {
+            var tempDir = CreateTempDirectory();
+            try
+            {
+                var fileContent = """
+                    <Project>
+                      <PropertyGroup>
+                        <ArtifactsPath>$(MSBuildThisFileDirectory)out/build</ArtifactsPath>
+                      </PropertyGroup>
+                    </Project>
+                    """;
+                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
+                File.WriteAllText(
+                    propsPath,
+                    fileContent);
+
+                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                Assert.NotNull(resolved);
+
+                var expected = Path.Combine(tempDir, "out", "build");
+                AssertPathsEqual(expected, resolved!);
+            }
+            finally
+            {
+                SafeDeleteDirectory(tempDir);
+            }
+        }
+
+        [Fact]
+        public void TryGetPropertyValueFromProps_ExpandsEnvironmentVariables()
+        {
+            var tempDir = CreateTempDirectory();
+            const string EnvVarName = "ART_DIR";
+            string? original = Environment.GetEnvironmentVariable(EnvVarName);
+            try
+            {
+                Environment.SetEnvironmentVariable(EnvVarName, "envArtifacts");
+                string fileContent = """
+                    <Project>
+                      <PropertyGroup>
+                        <ArtifactsPath>$(ART_DIR)</ArtifactsPath>
+                      </PropertyGroup>
+                    </Project>
+                    """;
+
+                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
+
+                // Use %VAR% syntax which Environment.ExpandEnvironmentVariables recognizes on all platforms
+                File.WriteAllText(propsPath, fileContent);
+
+                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                Assert.NotNull(resolved);
+
+                var expected = Path.Combine(tempDir, "envArtifacts");
+                AssertPathsEqual(expected, resolved!);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(EnvVarName, original);
+                SafeDeleteDirectory(tempDir);
+            }
+        }
+
+        [Fact]
+        public void TryGetPropertyValueFromProps_IgnoresMalformedProps()
+        {
+            var tempDir = CreateTempDirectory();
+            try
+            {
+                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
+
+                // Malformed XML
+                File.WriteAllText(propsPath, "<Project><PropertyGroup><ArtifactsPath>foo</PropertyGroup></Project>");
+
+                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                Assert.Null(resolved);
+            }
+            finally
+            {
+                SafeDeleteDirectory(tempDir);
+            }
+        }
+
+        private static string CreateTempDirectory()
+        {
+            var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+            return path;
+        }
+
+        private static void SafeDeleteDirectory(string path)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: true);
+                }
+            }
+            catch
+            {
+                // best effort cleanup
+            }
+        }
+
+        private static void AssertPathsEqual(string expected, string actual)
+        {
+            var exp = Path.GetFullPath(expected).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var act = Path.GetFullPath(actual).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.True(string.Equals(exp, act, StringComparison.OrdinalIgnoreCase), $"Expected '{exp}', got '{act}'");
+            }
+            else
+            {
+                Assert.Equal(exp, act);
             }
         }
     }

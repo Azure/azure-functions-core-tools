@@ -2,15 +2,18 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO;
+using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Fclp.Internals.Extensions;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
+    // ShowInHelp is false since .NET does not have any custom arguments
     [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to .NET apps when running func pack")]
     internal class DotnetPackSubcommandAction : PackSubcommandAction
     {
@@ -55,6 +58,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // ValidateFunctionApp
             PackHelpers.ValidateFunctionAppRoot(functionAppRoot);
 
+            var artifactsPath = DotnetHelpers.TryGetPropertyValueFromProps(functionAppRoot, "ArtifactsPath");
+
             // For --no-build, treat FolderPath as the build output directory
             if (options.NoBuild)
             {
@@ -62,8 +67,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
                 if (string.IsNullOrEmpty(options.FolderPath))
                 {
-                    ColoredConsole.WriteLine(WarningColor("No folder path specified. Using current directory as build output directory."));
-                    packingRoot = Environment.CurrentDirectory;
+                    if (!string.IsNullOrEmpty(artifactsPath))
+                    {
+                        ColoredConsole.WriteLine("Found ArtifactsPath within Directory.Build.props. Using as build output directory.");
+                        packingRoot = artifactsPath;
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine(WarningColor("No folder path specified. Using current directory as build output directory."));
+                        packingRoot = Environment.CurrentDirectory;
+                    }
                 }
                 else
                 {
@@ -82,9 +95,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             else
             {
                 ColoredConsole.WriteLine("Building .NET project...");
-                await RunDotNetPublish(functionAppRoot);
+                await RunDotNetPublish(functionAppRoot, artifactsPath);
 
-                return Path.Combine(functionAppRoot, "output");
+                return Path.Combine(functionAppRoot, artifactsPath ?? "output");
             }
         }
 
@@ -99,11 +112,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             return Task.CompletedTask;
         }
 
-        private async Task RunDotNetPublish(string functionAppRoot)
+        private async Task RunDotNetPublish(string functionAppRoot, string artifactsPath = null)
         {
             DotnetHelpers.EnsureDotnet();
 
-            var outputPath = Path.Combine(functionAppRoot, "output");
+            var outputPath = artifactsPath ?? Path.Combine(functionAppRoot, "output");
 
             // Clean the output directory if it exists
             if (FileSystemHelpers.DirectoryExists(outputPath))
