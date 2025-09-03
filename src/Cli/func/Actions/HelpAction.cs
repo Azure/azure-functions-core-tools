@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.ComponentModel;
@@ -18,6 +18,9 @@ namespace Azure.Functions.Cli.Actions
 {
     internal class HelpAction : BaseAction
     {
+        // Standardized indentation
+        private const int IndentSize = 4;
+
         private readonly string _context;
         private readonly string _subContext;
         private readonly IAction _action;
@@ -54,6 +57,8 @@ namespace Azure.Functions.Cli.Actions
             _action = action;
             _parseResult = parseResult;
         }
+
+        private static string Indent(int levels = 1) => new string(' ', IndentSize * (levels < 0 ? 0 : levels));
 
         public override async Task RunAsync()
         {
@@ -257,7 +262,7 @@ namespace Azure.Functions.Cli.Actions
         private void DisplaySubCommandHelp(ActionType subCommand)
         {
             // Ensure subCommand is valid
-            if (subCommand == null)
+            if (subCommand is null)
             {
                 return;
             }
@@ -280,8 +285,8 @@ namespace Azure.Functions.Cli.Actions
 
             var description = subCommand.Type?.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
 
-            // Display indented subcommand header
-            ColoredConsole.WriteLine($"   {runtimeName.DarkCyan()}     {description}");
+            // Display indented subcommand header with standardized indentation
+            ColoredConsole.WriteLine($"{Indent(1)}{runtimeName.DarkCyan()}{Indent(2)}{description}");
 
             // Display subcommand switches with extra indentation
             if (subCommand.Type != null)
@@ -328,7 +333,7 @@ namespace Azure.Functions.Cli.Actions
             longestName += 4; // 4 for coloring and <> characters
             foreach (var argument in arguments)
             {
-                var helpLine = string.Format($"{"    "}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
+                var helpLine = string.Format($"{Indent(1)}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
                 if (helpLine.Length < SafeConsole.BufferWidth)
                 {
                     ColoredConsole.WriteLine(helpLine);
@@ -378,7 +383,7 @@ namespace Azure.Functions.Cli.Actions
                     stringBuilder.Append($" [-{option.ShortName}]");
                 }
 
-                var helpSwitch = string.Format($"{(addExtraIndent ? "        " : "    ")}{{0, {-longestName}}} ", stringBuilder.ToString().DarkGray());
+                var helpSwitch = string.Format($"{(addExtraIndent ? Indent(2) : Indent(1))}{{0, {-longestName}}} ", stringBuilder.ToString().DarkGray());
                 var helpSwitchLength = helpSwitch.Length - 2; // helpSwitch contains 2 formatting characters.
                 var helpText = option.Description;
                 if (string.IsNullOrWhiteSpace(helpText))

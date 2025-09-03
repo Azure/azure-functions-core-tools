@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Interfaces;
@@ -6,6 +6,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
+    // ShowInHelp is false since powershell does not have any custom arguments
     [Action(Name = "pack powershell", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to PowerShell apps when running func pack")]
     internal class PowershellPackSubcommandAction : PackSubcommandAction
     {

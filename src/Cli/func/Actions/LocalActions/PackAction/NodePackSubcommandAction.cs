@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO;
@@ -82,7 +82,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             EnsureNpmExists();
 
             // Change to the function app directory for npm operations
-            var previousDirectory = Environment.CurrentDirectory;
+            var originalCurrentDirectory = Environment.CurrentDirectory;
             try
             {
                 Environment.CurrentDirectory = functionAppRoot;
@@ -100,7 +100,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             finally
             {
                 // Restore the previous directory
-                Environment.CurrentDirectory = previousDirectory;
+                Environment.CurrentDirectory = originalCurrentDirectory;
             }
         }
 

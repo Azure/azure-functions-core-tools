@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             Parser
                 .Setup<bool>("no-build")
                 .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents." +
-                "Otherwise, default is the current directory.")
+                    "Otherwise, default is the current directory.")
                 .Callback(n => NoBuild = n);
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 NoBuild = NoBuild
             };
 
-            var oldCurrentDirectory = Environment.CurrentDirectory;
+            var originalCurrentDirectory = Environment.CurrentDirectory;
             if (!string.IsNullOrEmpty(FolderPath))
             {
                 if (!Directory.Exists(FolderPath))
@@ -88,7 +88,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
 
             // Switch back to original directory after detecting runtime to package app in the correct context
-            Environment.CurrentDirectory = oldCurrentDirectory;
+            Environment.CurrentDirectory = originalCurrentDirectory;
 
             // Internally dispatch to runtime-specific subcommand
             await RunRuntimeSpecificPackAsync(workerRuntime, packOptions);
