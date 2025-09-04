@@ -7,3 +7,4 @@
 
 #### Changes
 
+- Updated assemblies to sign: AppService, Functions, WebJobs; consolidated OpenTelemetry binaries; removed Python exec patterns (t32, t64, w32, w64) (#4621)
