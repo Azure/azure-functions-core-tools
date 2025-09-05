@@ -33,5 +33,15 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Assert problematic format is avoided
             problematicFormat.Should().Contain("[context] [context]", "this validates our test itself");
         }
+
+        [Theory]
+        [InlineData(new string[] { "--help" }, true)]
+        [InlineData(new string[] { "-h" }, true)]
+        [InlineData(new string[] { }, true)] // just "func"
+        public void IsHelpRequested_ReturnsExpected(string[] args, bool expected)
+        {
+            var result = Program.IsHelpRequested(args);
+            Assert.Equal(expected, result);
+        }
     }
 }

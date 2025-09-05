@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
@@ -29,6 +29,11 @@ namespace Azure.Functions.Cli
                 ColoredConsole.WriteLine($"{Constants.CliVersion}");
                 Environment.Exit(ExitCodes.Success);
                 return;
+            }
+
+            if (IsHelpRequested(args))
+            {
+                ScriptHostHelpers.SetIsHelpRunning();
             }
 
             FirstTimeCliExperience();
@@ -76,6 +81,23 @@ namespace Azure.Functions.Cli
             {
                 Environment.SetEnvironmentVariable(Constants.CliDebug, "1");
             }
+        }
+
+        internal static bool IsHelpRequested(string[] args)
+        {
+            if (args == null || args.Length == 0)
+            {
+                // Just 'func'
+                return true;
+            }
+
+            if (args.Any(a => string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         internal static IContainer InitializeAutofacContainer()
