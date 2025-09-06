@@ -167,16 +167,102 @@ namespace Azure.Functions.Cli.Actions
 
         private void DisplayActionHelp()
         {
-            if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
+            if (_action != null)
             {
-                foreach (var error in _parseResult.Errors)
+                // Get action information
+                var actionType = _action.GetType();
+                var actionAttribute = actionType.GetCustomAttribute<ActionAttribute>();
+                var actionName = actionAttribute?.Name ?? actionType.Name;
+
+                Utilities.PrintVersion();
+                ColoredConsole
+                    .WriteLine($"{TitleColor("Usage:")} func {actionName} [arguments] [options]")
+                    .WriteLine();
+
+                // Show action description
+                if (!string.IsNullOrEmpty(actionAttribute?.HelpText))
                 {
-                    ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
+                    ColoredConsole.WriteLine(TitleColor("Description:"));
+                    ColoredConsole.WriteLine($"  {actionAttribute.HelpText}");
+                    ColoredConsole.WriteLine();
+                }
+
+                // Show arguments and options using DisplaySwitches logic
+                try
+                {
+                    var options = _action.ParseArgs(Array.Empty<string>());
+                    if (options.UnMatchedOptions.Any())
+                    {
+                        ColoredConsole.WriteLine(TitleColor("Options:"));
+                        DisplayOptions(options.UnMatchedOptions);
+                        ColoredConsole.WriteLine();
+                    }
+                }
+                catch (CliArgumentsException e)
+                {
+                    if (e.Arguments.Any())
+                    {
+                        ColoredConsole.WriteLine(TitleColor("Arguments:"));
+                        DisplayPositionalArguments(e.Arguments);
+                        ColoredConsole.WriteLine();
+                    }
+
+                    if (e.ParseResults != null && e.ParseResults.UnMatchedOptions.Any())
+                    {
+                        ColoredConsole.WriteLine(TitleColor("Options:"));
+                        DisplayOptions(e.ParseResults.UnMatchedOptions);
+                        ColoredConsole.WriteLine();
+                    }
+                }
+                catch (Exception)
+                {
+                    // Fall back to showing parse errors if there's an issue
+                    if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
+                    {
+                        foreach (var error in _parseResult.Errors)
+                        {
+                            ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
+                        }
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine(_parseResult.ErrorText);
+                    }
+                }
+
+                // Show subcommands if this action has any
+                var actionTypeName = actionAttribute?.Name;
+                if (!string.IsNullOrEmpty(actionTypeName))
+                {
+                    var subCommands = _actionTypes
+                        .Where(a => a.ParentCommandName.Any(p => p.Equals(actionTypeName, StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
+
+                    if (subCommands.Any())
+                    {
+                        ColoredConsole.WriteLine(TitleColor("Subcommands:"));
+                        foreach (var subCommand in subCommands)
+                        {
+                            DisplaySubCommandHelp(subCommand);
+                        }
+                        ColoredConsole.WriteLine();
+                    }
                 }
             }
             else
             {
-                ColoredConsole.WriteLine(_parseResult.ErrorText);
+                // Fallback to old behavior
+                if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
+                {
+                    foreach (var error in _parseResult.Errors)
+                    {
+                        ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
+                    }
+                }
+                else
+                {
+                    ColoredConsole.WriteLine(_parseResult.ErrorText);
+                }
             }
         }
 

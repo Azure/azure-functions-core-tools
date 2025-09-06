@@ -8,7 +8,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy.", ShowInHelp = false)]
+    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy with optional argument to pass in path of folder to pack.", ShowInHelp = true)]
     internal class PackAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
@@ -35,8 +35,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents." +
-                "Otherwise, default is the current directory.")
+                .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents.Otherwise, default is the current directory")
                 .Callback(n => NoBuild = n);
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -46,7 +45,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             Args = args;
 
-            return base.ParseArgs(args);
+            var parseResult = base.ParseArgs(args);
+
+            // For help display, throw CliArgumentsException to show positional arguments when no args provided
+            if (!args.Any())
+            {
+                throw new CliArgumentsException(
+                    "Pack function app arguments.",
+                    parseResult,
+                    new CliArgument { Name = "PROJECT | SOLUTION", Description = "The project or solution file to operate on. If a file is not specified, the command will search the current directory for one." });
+            }
+
+            return parseResult;
         }
 
         public override async Task RunAsync()
