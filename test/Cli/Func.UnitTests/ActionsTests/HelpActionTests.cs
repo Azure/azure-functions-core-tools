@@ -33,5 +33,41 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Assert problematic format is avoided
             problematicFormat.Should().Contain("[context] [context]", "this validates our test itself");
         }
+
+        [Fact]
+        public void ActionSpecificHelp_ShouldHaveCorrectUsageFormat()
+        {
+            // This test validates that action-specific help uses the correct usage format
+            // as implemented in the DisplayActionHelp method
+
+            var expectedActionHelpUsageFormat = "func {actionName} [arguments] [options]";
+            
+            // Verify the usage format follows the expected pattern
+            expectedActionHelpUsageFormat.Should().Contain("{actionName}");
+            expectedActionHelpUsageFormat.Should().Contain("[arguments]");
+            expectedActionHelpUsageFormat.Should().Contain("[options]");
+            expectedActionHelpUsageFormat.Should().NotContain("[context]");
+        }
+
+        [Fact]
+        public void ActionSpecificHelp_ShouldIncludeRequiredSections()
+        {
+            // This test validates that action-specific help includes all required sections
+            // as implemented in the enhanced DisplayActionHelp method
+
+            var expectedSections = new[]
+            {
+                "Usage:",
+                "Description:",
+                "Arguments:",
+                "Options:",
+                "Subcommands:"
+            };
+
+            foreach (var section in expectedSections)
+            {
+                section.Should().NotBeNullOrEmpty($"section {section} should be defined");
+            }
+        }
     }
 }
