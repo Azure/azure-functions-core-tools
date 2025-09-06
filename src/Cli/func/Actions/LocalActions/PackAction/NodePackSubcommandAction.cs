@@ -47,17 +47,30 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            // ValidateFunctionApp package.json exists
-            var packageJsonPath = Path.Combine(functionAppRoot, "package.json");
-            if (!FileSystemHelpers.FileExists(packageJsonPath))
+            PackValidationHelper.DisplayValidationStart();
+
+            // Validate Folder Structure - check for package.json and host.json
+            var requiredFiles = new[] { "package.json", "host.json" };
+            var isValidStructure = PackValidationHelper.ValidateRequiredFiles(functionAppRoot, requiredFiles, out string missingFile);
+            
+            PackValidationHelper.DisplayValidationResult(
+                "Validate Folder Structure",
+                isValidStructure,
+                isValidStructure ? null : $"Required file '{missingFile}' not found. Node.js function apps require package.json and host.json files at the root.");
+
+            if (!isValidStructure)
             {
-                throw new CliException($"package.json not found in {functionAppRoot}. This is required for Node.js function apps.");
+                PackValidationHelper.DisplayValidationEnd();
+                throw new CliException($"Required file '{missingFile}' not found in {functionAppRoot}. Node.js function apps require package.json and host.json files at the root.");
             }
 
             if (StaticSettings.IsDebug)
             {
+                var packageJsonPath = Path.Combine(functionAppRoot, "package.json");
                 ColoredConsole.WriteLine(VerboseColor($"Found package.json at {packageJsonPath}"));
             }
+
+            PackValidationHelper.DisplayValidationEnd();
         }
 
         protected override async Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
