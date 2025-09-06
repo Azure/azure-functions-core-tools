@@ -1,8 +1,12 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Fclp;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
@@ -23,6 +27,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         {
             // Custom worker packs from the function app root without extra steps
             return Task.FromResult(functionAppRoot);
+        }
+
+        protected override async Task PackFunctionAsync(string packingRoot, string outputPath, PackOptions options)
+        {
+            // Custom handler specific packing logic
+            var gitIgnorePath = Path.Combine(packingRoot, Constants.FuncIgnoreFile);
+            GitIgnoreParser ignoreParser = null;
+            
+            if (FileSystemHelpers.FileExists(gitIgnorePath))
+            {
+                ignoreParser = new GitIgnoreParser(await FileSystemHelpers.ReadAllTextFromFileAsync(gitIgnorePath));
+            }
+
+            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
+            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
+
+            var stream = await CustomHandlerPackHelpers.CreateCustomHandlerZipAsync(packingRoot, ignoreParser);
+
+            ColoredConsole.WriteLine($"Creating a new package {outputPath}");
+            await FileSystemHelpers.WriteToFile(outputPath, stream);
         }
 
         public override Task RunAsync()

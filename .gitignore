@@ -34,3 +34,6 @@ _*
 
 # MacOS related
 .DS_Store
+
+# Temporary files
+*.tar.gz

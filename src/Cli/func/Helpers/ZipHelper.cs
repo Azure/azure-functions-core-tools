@@ -44,11 +44,8 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                var customHandler = await HostHelpers.GetCustomHandlerExecutable(functionAppRoot);
-                IEnumerable<string> executables = !string.IsNullOrEmpty(customHandler)
-                    ? new[] { customHandler }
-                    : Enumerable.Empty<string>();
-
+                // Use the shared helper for custom handler logic
+                var executables = await CustomHandlerPackHelpers.GetCustomHandlerExecutablesAsync(functionAppRoot);
                 return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables);
             }
         }
