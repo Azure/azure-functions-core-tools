@@ -52,18 +52,83 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            // ValidateFunctionApp invalid flag combinations
+            PackValidationHelper.DisplayValidationStart();
+
+            // Validate invalid flag combinations
             if (options.NoBuild && BuildNativeDeps)
             {
+                PackValidationHelper.DisplayValidationResult(
+                    "Validate Flag Compatibility",
+                    false,
+                    "Invalid options: --no-build cannot be used with --build-native-deps.");
+                PackValidationHelper.DisplayValidationEnd();
                 throw new CliException("Invalid options: --no-build cannot be used with --build-native-deps.");
             }
-
-            // Windows warning when not using native deps
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && !BuildNativeDeps)
+            else
             {
-                ColoredConsole.WriteLine(WarningColor("Python function apps are supported only on Linux. Please use the --build-native-deps flag" +
-                    " when building on windows to ensure dependencies are properly restored."));
+                PackValidationHelper.DisplayValidationResult("Validate Flag Compatibility", true);
             }
+
+            // Validate OS Compatibility
+            if (PackValidationHelper.IsRunningOnWindows() && !BuildNativeDeps)
+            {
+                PackValidationHelper.DisplayValidationWarning(
+                    "Validate OS Compatibility",
+                    "Running on Windows. Consider using --build-native-deps if you have Docker installed to avoid native dependency issues when deploying to Linux.");
+            }
+            else
+            {
+                PackValidationHelper.DisplayValidationResult("Validate OS Compatibility", true);
+            }
+
+            // Validate Folder Structure
+            var requiredFiles = new[] { "function_app.py", "requirements.txt", "host.json" };
+            var isValidStructure = PackValidationHelper.ValidateRequiredFiles(functionAppRoot, requiredFiles, out string missingFile);
+            
+            if (!isValidStructure)
+            {
+                PackValidationHelper.DisplayValidationResult(
+                    "Validate Folder Structure",
+                    false,
+                    $"Required file '{missingFile}' not found. Python function apps require function_app.py, requirements.txt, and host.json files.");
+                PackValidationHelper.DisplayValidationEnd();
+                throw new CliException($"Required file '{missingFile}' not found in {functionAppRoot}. Python function apps require function_app.py, requirements.txt, and host.json files.");
+            }
+
+            // Check for .python_packages directory (should exist and not be empty in --no-build scenario)
+            var pythonPackagesPath = Path.Combine(functionAppRoot, ".python_packages");
+            var hasPythonPackages = FileSystemHelpers.DirectoryExists(pythonPackagesPath);
+            var pythonPackagesNotEmpty = hasPythonPackages && PackValidationHelper.ValidateDirectoryNotEmpty(pythonPackagesPath);
+
+            if (options.NoBuild)
+            {
+                if (!hasPythonPackages || !pythonPackagesNotEmpty)
+                {
+                    PackValidationHelper.DisplayValidationResult(
+                        "Validate Folder Structure",
+                        false,
+                        "Directory '.python_packages' not found or is empty. When using --no-build, dependencies must be pre-installed in .python_packages directory.");
+                    PackValidationHelper.DisplayValidationEnd();
+                    throw new CliException($"Directory '.python_packages' not found or is empty in {functionAppRoot}. When using --no-build, dependencies must be pre-installed in .python_packages directory.");
+                }
+            }
+
+            PackValidationHelper.DisplayValidationResult("Validate Folder Structure", true);
+
+            // Validate Python Programming Model
+            var isValidModel = PackValidationHelper.ValidatePythonProgrammingModel(functionAppRoot, out string modelError);
+            PackValidationHelper.DisplayValidationResult(
+                "Validate Python Programming Model",
+                isValidModel,
+                isValidModel ? null : modelError);
+
+            if (!isValidModel)
+            {
+                PackValidationHelper.DisplayValidationEnd();
+                throw new CliException(modelError);
+            }
+
+            PackValidationHelper.DisplayValidationEnd();
         }
 
         protected override Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
