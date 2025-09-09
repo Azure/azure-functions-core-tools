@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
@@ -75,8 +75,6 @@ namespace Azure.Functions.Cli.Helpers
 
             // Extract the target framework moniker (TFM) from the output using regex pattern matching
             var outputString = output.ToString();
-
-            Console.WriteLine($"Ouput string: {outputString}");
 
             // Look for a line that looks like a target framework moniker
             var tfm = TargetFrameworkHelper.TfmRegex.Match(outputString);
