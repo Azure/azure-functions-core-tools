@@ -1,4 +1,6 @@
 # Azure Functions CLI 4.2.3
+# Azure Functions CLI 4.3.0
+
 
 #### Host Version
 
@@ -7,3 +9,4 @@
 
 #### Changes
 - Add `func pack` functionality to other languages (#4600) 
+- Add `func pack` basic functionality (#4600) 
