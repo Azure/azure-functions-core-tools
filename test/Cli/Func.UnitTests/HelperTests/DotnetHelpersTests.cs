@@ -90,12 +90,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetPropertyValueFromProps_ReturnsNull_WhenPropsMissing()
+        public void TryGetPropertyValueFromMSBuild_ReturnsNull_WhenProjectMissing()
         {
             var tempDir = CreateTempDirectory();
             try
             {
-                var result = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                var result = DotnetHelpers.TryGetPropertyValueFromMSBuild(tempDir, "ArtifactsPath");
                 Assert.Null(result);
             }
             finally
@@ -105,26 +105,24 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetPropertyValueFromProps_ResolvesRelativePath()
+        public void TryGetPropertyValueFromMSBuild_ReturnsNull_WhenPropertyNotSet()
         {
             var tempDir = CreateTempDirectory();
             try
             {
-                string fileContent = """
-                    <Project>
-                      <PropertyGroup>
-                        <ArtifactsPath>artifacts/output</ArtifactsPath>
-                      </PropertyGroup>
-                    </Project>
-                    """;
-                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
-                File.WriteAllText(propsPath, fileContent);
+                // Create a basic project without ArtifactsPath
+                string projectContent = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """;
+                var projectPath = Path.Combine(tempDir, "TestProject.csproj");
+                File.WriteAllText(projectPath, projectContent);
 
-                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
-                Assert.NotNull(resolved);
-
-                var expected = Path.GetFullPath(Path.Combine(tempDir, "artifacts", "output"));
-                AssertPathsEqual(expected, resolved!);
+                var result = DotnetHelpers.TryGetPropertyValueFromMSBuild(tempDir, "ArtifactsPath");
+                Assert.Null(result);
             }
             finally
             {
@@ -133,25 +131,23 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetPropertyValueFromProps_ResolvesProjectDirVariable()
+        public void TryGetPropertyValueFromMSBuild_ResolvesProjectDirVariable()
         {
             var tempDir = CreateTempDirectory();
             try
             {
-                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
-                string fileContent =
-                    """
-                    <Project>
-                      <PropertyGroup>
-                        <ArtifactsPath>$(ProjectDir)bin/publish</ArtifactsPath>
-                      </PropertyGroup>
-                    </Project>
-                    """;
+                string projectContent = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <ArtifactsPath>$(MSBuildProjectDirectory)/bin/publish</ArtifactsPath>
+              </PropertyGroup>
+            </Project>
+            """;
+                var projectPath = Path.Combine(tempDir, "TestProject.csproj");
+                File.WriteAllText(projectPath, projectContent);
 
-                // $(ProjectDir) should expand to absolute project root with a trailing separator
-                File.WriteAllText(propsPath, fileContent);
-
-                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                var resolved = DotnetHelpers.TryGetPropertyValueFromMSBuild(tempDir, "ArtifactsPath");
                 Assert.NotNull(resolved);
 
                 var expected = Path.Combine(tempDir, "bin", "publish");
@@ -164,27 +160,37 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetPropertyValueFromProps_ResolvesMSBuildThisFileDirectoryVariable()
+        public void TryGetPropertyValueFromMSBuild_ResolvesFromDirectoryBuildProps()
         {
             var tempDir = CreateTempDirectory();
             try
             {
-                var fileContent = """
-                    <Project>
-                      <PropertyGroup>
-                        <ArtifactsPath>$(MSBuildThisFileDirectory)out/build</ArtifactsPath>
-                      </PropertyGroup>
-                    </Project>
-                    """;
-                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
-                File.WriteAllText(
-                    propsPath,
-                    fileContent);
+                // Create Directory.Build.props
+                string directoryBuildContent = """
+            <Project>
+              <PropertyGroup>
+                <ArtifactsPath>$(MSBuildThisFileDirectory)shared-artifacts</ArtifactsPath>
+              </PropertyGroup>
+            </Project>
+            """;
+                var directoryBuildPath = Path.Combine(tempDir, "Directory.Build.props");
+                File.WriteAllText(directoryBuildPath, directoryBuildContent);
 
-                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                // Create a basic project
+                string projectContent = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """;
+                var projectPath = Path.Combine(tempDir, "TestProject.csproj");
+                File.WriteAllText(projectPath, projectContent);
+
+                var resolved = DotnetHelpers.TryGetPropertyValueFromMSBuild(tempDir, "ArtifactsPath");
                 Assert.NotNull(resolved);
 
-                var expected = Path.Combine(tempDir, "out", "build");
+                var expected = Path.Combine(tempDir, "shared-artifacts");
                 AssertPathsEqual(expected, resolved!);
             }
             finally
@@ -194,32 +200,31 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetPropertyValueFromProps_ExpandsEnvironmentVariables()
+        public void TryGetPropertyValueFromMSBuild_ExpandsEnvironmentVariables()
         {
             var tempDir = CreateTempDirectory();
-            const string EnvVarName = "ART_DIR";
+            const string EnvVarName = "TEST_ARTIFACTS_DIR";
             string? original = Environment.GetEnvironmentVariable(EnvVarName);
             try
             {
-                Environment.SetEnvironmentVariable(EnvVarName, "envArtifacts");
-                string fileContent = """
-                    <Project>
-                      <PropertyGroup>
-                        <ArtifactsPath>$(ART_DIR)</ArtifactsPath>
-                      </PropertyGroup>
-                    </Project>
-                    """;
+                Environment.SetEnvironmentVariable(EnvVarName, "env-artifacts");
 
-                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
+                string projectContent = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <ArtifactsPath>$(TEST_ARTIFACTS_DIR)</ArtifactsPath>
+              </PropertyGroup>
+            </Project>
+            """;
+                var projectPath = Path.Combine(tempDir, "TestProject.csproj");
+                File.WriteAllText(projectPath, projectContent);
 
-                // Use %VAR% syntax which Environment.ExpandEnvironmentVariables recognizes on all platforms
-                File.WriteAllText(propsPath, fileContent);
-
-                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                var resolved = DotnetHelpers.TryGetPropertyValueFromMSBuild(tempDir, "ArtifactsPath");
                 Assert.NotNull(resolved);
 
-                var expected = Path.Combine(tempDir, "envArtifacts");
-                AssertPathsEqual(expected, resolved!);
+                // MSBuild should resolve the environment variable
+                Assert.Contains("env-artifacts", resolved!);
             }
             finally
             {
@@ -229,17 +234,50 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetPropertyValueFromProps_IgnoresMalformedProps()
+        public void TryGetPropertyValueFromMSBuild_HandlesComplexPropertyReferences()
         {
             var tempDir = CreateTempDirectory();
             try
             {
-                var propsPath = Path.Combine(tempDir, "Directory.Build.props");
+                string projectContent = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <OutputRoot>build-output</OutputRoot>
+                <BuildConfiguration>Release</BuildConfiguration>
+                <ArtifactsPath>$(OutputRoot)/$(BuildConfiguration)/artifacts</ArtifactsPath>
+              </PropertyGroup>
+            </Project>
+            """;
+                var projectPath = Path.Combine(tempDir, "TestProject.csproj");
+                File.WriteAllText(projectPath, projectContent);
+
+                var resolved = DotnetHelpers.TryGetPropertyValueFromMSBuild(tempDir, "ArtifactsPath");
+                Assert.NotNull(resolved);
+
+                // Should contain the resolved path elements
+                Assert.Contains("build-output", resolved!);
+                Assert.Contains("Release", resolved!);
+                Assert.Contains("artifacts", resolved!);
+            }
+            finally
+            {
+                SafeDeleteDirectory(tempDir);
+            }
+        }
+
+        [Fact]
+        public void TryGetPropertyValueFromMSBuild_ReturnsNullOnMalformedProject()
+        {
+            var tempDir = CreateTempDirectory();
+            try
+            {
+                var projectPath = Path.Combine(tempDir, "TestProject.csproj");
 
                 // Malformed XML
-                File.WriteAllText(propsPath, "<Project><PropertyGroup><ArtifactsPath>foo</PropertyGroup></Project>");
+                File.WriteAllText(projectPath, "<Project><PropertyGroup><ArtifactsPath>foo</PropertyGroup></Project>");
 
-                var resolved = DotnetHelpers.TryGetPropertyValueFromProps(tempDir, "ArtifactsPath");
+                var resolved = DotnetHelpers.TryGetPropertyValueFromMSBuild(tempDir, "ArtifactsPath");
                 Assert.Null(resolved);
             }
             finally

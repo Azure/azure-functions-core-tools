@@ -124,5 +124,53 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     Path.Combine("bin", "runtimes", "browser", "lib", "net6.0", "System.Text.Encodings.Web.dll")
                 });
         }
+
+        [Fact]
+        public void Pack_DotnetInProc6_WithDirectoryBuildProps_Works()
+        {
+            var testName = nameof(Pack_DotnetInProc6_WithDirectoryBuildProps_Works);
+            var projectAbs = Dotnet6ProjectPath;
+            var logsToValidate = new[]
+            {
+                "Building .NET project...",
+                "Determining projects to restore...",
+                Path.Combine(projectAbs, "customArtifacts")
+            };
+
+            BasePackTests.TestPackWithDirectoryBuildProps(
+                projectAbsoluteDir: projectAbs,
+                noBuild: false,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json"
+                },
+                logsToValidate: logsToValidate);
+        }
+
+        [Fact]
+        public void Pack_DotnetInProc6_WithDirectoryBuildProps_NoBuild_Works()
+        {
+            var testName = nameof(Pack_DotnetInProc6_WithDirectoryBuildProps_NoBuild_Works);
+            var projectAbs = Dotnet6ProjectPath;
+            var logsToValidate = new[]
+            {
+                "Found ArtifactsPath within Directory.Build.props. Using as build output directory.",
+                "Skipping build event for functions project (--no-build)."
+            };
+            BasePackTests.TestPackWithDirectoryBuildProps(
+                projectAbsoluteDir: projectAbs,
+                noBuild: true,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json"
+                },
+                logsToValidate: logsToValidate);
+        }
     }
 }

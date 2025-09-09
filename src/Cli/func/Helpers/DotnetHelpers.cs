@@ -1,10 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -90,119 +89,44 @@ namespace Azure.Functions.Cli.Helpers
             return tfm.Value;
         }
 
-        public static string TryGetPropertyValueFromProps(string projectRoot, string propName)
+        public static string TryGetPropertyValueFromMSBuild(string projectRoot, string propName)
         {
             try
             {
-                // Check for Directory.Build.props at the project root first
-                var directoryBuildProps = Path.Combine(projectRoot, "Directory.Build.props");
-                if (!File.Exists(directoryBuildProps))
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    Arguments = $"msbuild -getProperty:{propName} -nologo -verbosity:quiet",
+                    WorkingDirectory = projectRoot,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(startInfo);
+                if (process == null)
                 {
                     return null;
                 }
 
-                try
+                process.WaitForExit();
+
+                if (process.ExitCode != 0)
                 {
-                    var doc = XDocument.Load(directoryBuildProps);
-                    var root = doc.Root;
-                    if (root == null)
-                    {
-                        return null;
-                    }
-
-                    foreach (var pg in root.Elements().Where(e => e.Name.LocalName.Equals("PropertyGroup", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        var element = pg.Element(root.GetDefaultNamespace() + propName) ?? pg.Element(propName);
-                        if (element != null && !string.IsNullOrWhiteSpace(element.Value))
-                        {
-                            var value = element.Value.Trim();
-
-                            // Handle simple MSBuild variables we know how to resolve
-                            value = value.Replace("$(MSBuildThisFileDirectory)", Path.GetDirectoryName(directoryBuildProps)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar);
-                            value = value.Replace("$(ProjectDir)", projectRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar);
-
-                            // Expand MSBuild property references $(PropertyName)
-                            value = ExpandMSBuildProperties(value, root, directoryBuildProps, projectRoot);
-
-                            // Expand environment variables if present
-                            value = Environment.ExpandEnvironmentVariables(value);
-
-                            // Normalize and resolve relative paths against project root
-                            var resolved = Path.IsPathRooted(value)
-                                ? value
-                                : Path.GetFullPath(Path.Combine(projectRoot, value));
-
-                            return resolved;
-                        }
-                    }
+                    return null;
                 }
-                catch
-                {
-                    // Ignore malformed props and continue
-                }
+
+                var output = process.StandardOutput.ReadToEnd().Trim();
+
+                // Return null if the property is empty or not set
+                return string.IsNullOrWhiteSpace(output) ? null : output;
             }
             catch
             {
                 // Ignore any unexpected errors and return null to use defaults
+                return null;
             }
-
-            return null;
-        }
-
-        private static string ExpandMSBuildProperties(string value, XElement root, string directoryBuildProps, string projectRoot)
-        {
-            // Find all $(PropertyName) patterns
-            var propertyPattern = @"\$\(([^)]+)\)";
-            var matches = Regex.Matches(value, propertyPattern);
-
-            foreach (Match match in matches)
-            {
-                var propertyName = match.Groups[1].Value;
-                var propertyValue = GetPropertyValue(propertyName, root, directoryBuildProps, projectRoot);
-
-                if (!string.IsNullOrEmpty(propertyValue))
-                {
-                    value = value.Replace(match.Value, propertyValue);
-                }
-            }
-
-            return value;
-        }
-
-        private static string GetPropertyValue(string propertyName, XElement root, string directoryBuildProps, string projectRoot)
-        {
-            // Handle built-in MSBuild properties
-            switch (propertyName)
-            {
-                case "MSBuildThisFileDirectory":
-                    return Path.GetDirectoryName(directoryBuildProps)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-                case "ProjectDir":
-                    return projectRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-                case "MSBuildProjectDirectory":
-                    return projectRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            }
-
-            // Look for custom properties in PropertyGroups
-            foreach (var pg in root.Elements().Where(e => e.Name.LocalName.Equals("PropertyGroup", StringComparison.OrdinalIgnoreCase)))
-            {
-                var element = pg.Element(root.GetDefaultNamespace() + propertyName) ?? pg.Element(propertyName);
-                if (element != null && !string.IsNullOrWhiteSpace(element.Value))
-                {
-                    var propValue = element.Value.Trim();
-
-                    // Recursively expand any nested properties (but avoid infinite loops)
-                    if (propValue.Contains("$(") && !propValue.Contains($"$({propertyName})"))
-                    {
-                        propValue = ExpandMSBuildProperties(propValue, root, directoryBuildProps, projectRoot);
-                    }
-
-                    return propValue;
-                }
-            }
-
-            // Check environment variables as fallback
-            var envValue = Environment.GetEnvironmentVariable(propertyName);
-            return envValue ?? string.Empty;
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")

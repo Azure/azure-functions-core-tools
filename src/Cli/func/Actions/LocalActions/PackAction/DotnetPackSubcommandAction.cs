@@ -1,14 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
-using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using Fclp.Internals.Extensions;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
@@ -17,12 +13,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
     [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to .NET apps when running func pack")]
     internal class DotnetPackSubcommandAction : PackSubcommandAction
     {
-        private readonly ISecretsManager _secretsManager;
-
-        public DotnetPackSubcommandAction(ISecretsManager secretsManager)
-        {
-            _secretsManager = secretsManager;
-        }
+        private bool ArtifactsPathSpecified { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -58,7 +49,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // ValidateFunctionApp
             PackHelpers.ValidateFunctionAppRoot(functionAppRoot);
 
-            var artifactsPath = DotnetHelpers.TryGetPropertyValueFromProps(functionAppRoot, "ArtifactsPath");
+            // Get the artifacts path from MSBuild properties if it exists
+            // If the value exists, we perform the build (if specified by the user) in that directory and do not delete the build output
+            var artifactsPath = DotnetHelpers.TryGetPropertyValueFromMSBuild(functionAppRoot, "ArtifactsPath");
+            ArtifactsPathSpecified = string.IsNullOrEmpty(artifactsPath);
 
             // For --no-build, treat FolderPath as the build output directory
             if (options.NoBuild)
@@ -103,9 +97,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override Task PerformCleanupAfterPackingAsync(string packingRoot, string functionAppRoot, PackOptions options)
         {
-            if (!options.NoBuild)
+            if (!options.NoBuild && ArtifactsPathSpecified)
             {
-                // If not no-build, delete packing root after packing
+                // If not no-build and if artifacts path was not specified, delete packing root after packing
                 FileSystemHelpers.DeleteDirectorySafe(packingRoot);
             }
 

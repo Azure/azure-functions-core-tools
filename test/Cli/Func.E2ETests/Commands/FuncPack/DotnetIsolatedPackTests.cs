@@ -165,5 +165,55 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "extensions.json"
                 });
         }
+
+        [Fact]
+        public void Pack_DotnetIsolated_WithDirectoryBuildProps_Works()
+        {
+            var testName = nameof(Pack_DotnetIsolated_WithDirectoryBuildProps_Works);
+            var projectAbs = DotnetIsolatedProjectPath;
+            var logsToValidate = new[]
+            {
+                "Building .NET project...",
+                "Determining projects to restore...",
+                Path.Combine(projectAbs, "customArtifacts")
+            };
+
+            BasePackTests.TestPackWithDirectoryBuildProps(
+                projectAbsoluteDir: projectAbs,
+                noBuild: false,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "extensions.json"
+                },
+                logsToValidate: logsToValidate);
+        }
+
+        [Fact]
+        public void Pack_DotnetIsolated_WithDirectoryBuildProps_NoBuild_Works()
+        {
+            var testName = nameof(Pack_DotnetIsolated_WithDirectoryBuildProps_NoBuild_Works);
+            var projectAbs = DotnetIsolatedProjectPath;
+            var logsToValidate = new[]
+            {
+                "Found ArtifactsPath within Directory.Build.props. Using as build output directory.",
+                "Skipping build event for functions project (--no-build)."
+            };
+            BasePackTests.TestPackWithDirectoryBuildProps(
+                projectAbsoluteDir: projectAbs,
+                noBuild: true,
+                testName: testName,
+                funcPath: FuncPath,
+                log: Log,
+                filesToValidate: new[]
+                {
+                    "host.json",
+                    "extensions.json"
+                },
+                logsToValidate: logsToValidate);
+        }
     }
 }
