@@ -204,7 +204,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             var tempDir = CreateTempDirectory();
             const string EnvVarName = "TEST_ARTIFACTS_DIR";
-            string? original = Environment.GetEnvironmentVariable(EnvVarName);
+            string original = Environment.GetEnvironmentVariable(EnvVarName);
             try
             {
                 Environment.SetEnvironmentVariable(EnvVarName, "env-artifacts");
