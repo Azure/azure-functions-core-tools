@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // Get the artifacts path from MSBuild properties if it exists
             // If the value exists, we perform the build (if specified by the user) in that directory and do not delete the build output
             var artifactsPath = DotnetHelpers.TryGetPropertyValueFromMSBuild(functionAppRoot, "ArtifactsPath");
-            ArtifactsPathSpecified = string.IsNullOrEmpty(artifactsPath);
+            ArtifactsPathSpecified = !string.IsNullOrEmpty(artifactsPath);
 
             // For --no-build, treat FolderPath as the build output directory
             if (options.NoBuild)
@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override Task PerformCleanupAfterPackingAsync(string packingRoot, string functionAppRoot, PackOptions options)
         {
-            if (!options.NoBuild && ArtifactsPathSpecified)
+            if (!options.NoBuild && !ArtifactsPathSpecified)
             {
                 // If not no-build and if artifacts path was not specified, delete packing root after packing
                 FileSystemHelpers.DeleteDirectorySafe(packingRoot);

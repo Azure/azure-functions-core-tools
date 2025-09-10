@@ -175,7 +175,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             {
                 "Building .NET project...",
                 "Determining projects to restore...",
-                Path.Combine(projectAbs, "customArtifacts")
+                Path.Combine(Path.GetFullPath(projectAbs), "customArtifacts")
             };
 
             BasePackTests.TestPackWithDirectoryBuildProps(

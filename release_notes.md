@@ -7,4 +7,5 @@
 - In-Proc Host Version: 4.41.100 (4.841.100, 4.641.100)
 
 #### Changes
+- Add `func pack` basic functionality (#4600)
 - Enhance `func pack` DotnetSubCommand to account for MSBuild prop ArtifactsPath (#4643)

@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                logsToValidate = logsToValidate.Append("Python function apps is supported only on Linux. Please use the --build-native-deps flag when building on windows to ensure dependencies are properly restored.").ToArray();
+                logsToValidate = logsToValidate.Append("Python function apps are supported only on Linux. Please use the --build-native-deps flag when building on windows to ensure dependencies are properly restored.").ToArray();
             }
 
             BasePackTests.TestBasicPackFunctionality(
