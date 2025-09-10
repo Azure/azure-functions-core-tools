@@ -69,28 +69,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 PackValidationHelper.DisplayValidationResult("Validate Flag Compatibility", true);
             }
 
-            // Validate OS Compatibility
-            if (PackValidationHelper.IsRunningOnWindows() && !BuildNativeDeps)
-            {
-                PackValidationHelper.DisplayValidationWarning(
-                    "Validate OS Compatibility",
-                    "Running on Windows. Consider using --build-native-deps if you have Docker installed to avoid native dependency issues when deploying to Linux.");
-            }
-            else
-            {
-                PackValidationHelper.DisplayValidationResult("Validate OS Compatibility", true);
-            }
-
             // Validate Folder Structure
-            var requiredFiles = new[] { "function_app.py", "requirements.txt", "host.json" };
+            var requiredFiles = new[] { "requirements.txt", "host.json" };
             var isValidStructure = PackValidationHelper.ValidateRequiredFiles(functionAppRoot, requiredFiles, out string missingFile);
-            
+
             if (!isValidStructure)
             {
                 PackValidationHelper.DisplayValidationResult(
                     "Validate Folder Structure",
                     false,
-                    $"Required file '{missingFile}' not found. Python function apps require function_app.py, requirements.txt, and host.json files.");
+                    $"Required file '{missingFile}' not found. Python function apps require requirements.txt and host.json files.");
                 PackValidationHelper.DisplayValidationEnd();
                 throw new CliException($"Required file '{missingFile}' not found in {functionAppRoot}. Python function apps require function_app.py, requirements.txt, and host.json files.");
             }

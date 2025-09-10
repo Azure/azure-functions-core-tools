@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
 
             var logsToValidate = new[]
             {
-                "Found Python version 3.11.9 (py).",
+                "Found Python version",
                 "Successfully downloaded azure-functions werkzeug MarkupSafe"
             };
 

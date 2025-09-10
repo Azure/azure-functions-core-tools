@@ -55,6 +55,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         }
 
         protected override Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
+        {
             // PowerShell packs from the function app root without extra steps
             return Task.FromResult(functionAppRoot);
         }

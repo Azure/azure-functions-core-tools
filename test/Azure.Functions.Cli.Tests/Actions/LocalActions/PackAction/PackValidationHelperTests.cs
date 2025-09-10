@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.Tests.E2E.PackAction
             Directory.CreateDirectory(Path.Combine(_tempDirectory, ".azurefunctions"));
 
             // Act
-            var result = PackValidationHelper.ValidateDotnetFolderStructure(_tempDirectory, out string errorMessage);
+            var result = PackValidationHelper.ValidateDotnetIsolatedFolderStructure(_tempDirectory, out string errorMessage);
 
             // Assert
             Assert.True(result);
@@ -84,7 +84,7 @@ namespace Azure.Functions.Cli.Tests.E2E.PackAction
             Directory.CreateDirectory(Path.Combine(_tempDirectory, ".azurefunctions"));
 
             // Act
-            var result = PackValidationHelper.ValidateDotnetFolderStructure(_tempDirectory, out string errorMessage);
+            var result = PackValidationHelper.ValidateDotnetIsolatedFolderStructure(_tempDirectory, out string errorMessage);
 
             // Assert
             Assert.False(result);
