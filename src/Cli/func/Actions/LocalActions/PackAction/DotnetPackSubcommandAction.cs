@@ -59,31 +59,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // For --no-build, treat FolderPath as the build output directory
             if (options.NoBuild)
             {
-                var packingRoot = functionAppRoot;
+                // Prefer FolderPath, then ArtifactsPath, otherwise use current directory
+                string packingRoot = !string.IsNullOrEmpty(options.FolderPath)
+                    ? Path.IsPathRooted(options.FolderPath) ? options.FolderPath : Path.Combine(functionAppRoot, options.FolderPath)
+                    : !string.IsNullOrEmpty(artifactsPath)
+                        ? artifactsPath
+                        : Environment.CurrentDirectory;
 
                 if (string.IsNullOrEmpty(options.FolderPath))
                 {
                     if (!string.IsNullOrEmpty(artifactsPath))
                     {
                         ColoredConsole.WriteLine("Found ArtifactsPath within Directory.Build.props. Using as build output directory.");
-                        packingRoot = artifactsPath;
                     }
                     else
                     {
-                    ColoredConsole.WriteLine(WarningColor("No folder path specified. Using current directory as build output directory."));
-                    packingRoot = Environment.CurrentDirectory;
-                }
-                }
-                else
-                {
-                    packingRoot = Path.IsPathRooted(options.FolderPath)
-                        ? options.FolderPath
-                        : Path.Combine(Environment.CurrentDirectory, options.FolderPath);
-                }
-
-                if (!Directory.Exists(packingRoot))
-                {
-                    throw new CliException($"Build output directory not found: {packingRoot}");
+                        ColoredConsole.WriteLine(WarningColor("No folder path specified. Using current directory as build output directory."));
+                    }
                 }
 
                 return packingRoot;
@@ -92,7 +84,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 ColoredConsole.WriteLine("Building .NET project...");
                 await RunDotNetPublish(functionAppRoot, artifactsPath);
-
                 return Path.Combine(functionAppRoot, artifactsPath ?? "output");
             }
         }
