@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // Validate Folder Structure - check for package.json and host.json
             var requiredFiles = new[] { "package.json", "host.json" };
             var isValidStructure = PackValidationHelper.ValidateRequiredFiles(functionAppRoot, requiredFiles, out string missingFile);
-            
+
             PackValidationHelper.DisplayValidationResult(
                 "Validate Folder Structure",
                 isValidStructure,
@@ -62,12 +62,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 PackValidationHelper.DisplayValidationEnd();
                 throw new CliException($"Required file '{missingFile}' not found in {functionAppRoot}. Node.js function apps require package.json and host.json files at the root.");
-            }
-
-            if (StaticSettings.IsDebug)
-            {
-                var packageJsonPath = Path.Combine(functionAppRoot, "package.json");
-                ColoredConsole.WriteLine(VerboseColor($"Found package.json at {packageJsonPath}"));
             }
 
             PackValidationHelper.DisplayValidationEnd();

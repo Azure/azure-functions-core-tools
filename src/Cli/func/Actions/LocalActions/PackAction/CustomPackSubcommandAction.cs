@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // Validate that host.json exists
             var hostJsonPath = Path.Combine(functionAppRoot, "host.json");
             var hostJsonExists = FileSystemHelpers.FileExists(hostJsonPath);
-            
+
             PackValidationHelper.DisplayValidationResult(
                 "Validate Basic Structure",
                 hostJsonExists,
@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 var hostJsonContent = FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath).Result;
                 var hostConfig = JObject.Parse(hostJsonContent);
-                
+
                 var customHandler = hostConfig["customHandler"];
                 if (customHandler != null)
                 {
@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                         {
                             var executablePath = Path.Combine(functionAppRoot, defaultExecutablePath);
                             var executableExists = FileSystemHelpers.FileExists(executablePath);
-                            
+
                             if (executableExists)
                             {
                                 PackValidationHelper.DisplayValidationResult("Validate Custom Handler Executable", true);
@@ -83,15 +83,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 else
                 {
                     PackValidationHelper.DisplayValidationWarning(
-                        "Validate Custom Handler Configuration", 
+                        "Validate Custom Handler Configuration",
                         "No custom handler configuration found in host.json. This may be intentional if configuration is provided by other means.");
                 }
             }
             catch (Exception ex)
             {
-                PackValidationHelper.DisplayValidationWarning(
-                    "Validate Custom Handler Configuration",
-                    $"Could not parse host.json to validate custom handler configuration: {ex.Message}");
+                PackValidationHelper.DisplayValidationEnd();
+                throw new CliException($"Could not parse host.json to validate custom handler configuration: {ex.Message}");
             }
 
             PackValidationHelper.DisplayValidationEnd();
