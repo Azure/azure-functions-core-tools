@@ -43,6 +43,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
+            // Use the shared custom handler zip creation logic
             var stream = await CustomHandlerPackHelpers.CreateCustomHandlerZipAsync(packingRoot, ignoreParser);
 
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
