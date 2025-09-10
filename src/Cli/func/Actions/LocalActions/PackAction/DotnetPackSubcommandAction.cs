@@ -1,10 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -15,6 +13,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
     [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to .NET apps when running func pack")]
     internal class DotnetPackSubcommandAction : PackSubcommandAction
     {
+        private const string ArtifactsPath = "ArtifactsPath";
+
         private bool ArtifactsPathSpecified { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             // Get the artifacts path from MSBuild properties if it exists
             // If the value exists, we perform the build (if specified by the user) in that directory and do not delete the build output
-            var artifactsPath = DotnetHelpers.TryGetPropertyValueFromMSBuild(functionAppRoot, "ArtifactsPath");
+            var artifactsPath = DotnetHelpers.TryGetPropertyValueFromMSBuild(functionAppRoot, ArtifactsPath);
             ArtifactsPathSpecified = !string.IsNullOrEmpty(artifactsPath);
 
             // For --no-build, treat FolderPath as the build output directory
