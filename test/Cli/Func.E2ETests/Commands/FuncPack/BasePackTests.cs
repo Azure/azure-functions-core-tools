@@ -144,7 +144,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 {
                     log?.WriteLine("Pre-building project for --no-build test...");
 
-                    var buildResult = RunDotNetPublish(projectAbsoluteDir, artifactsDirFullPath, log);
+                    var buildResult = RunDotNetPublish(projectAbsoluteDir, artifactsDirFullPath, log!);
                     if (buildResult != 0)
                     {
                         throw new Exception($"Pre-build failed with exit code {buildResult}");
@@ -160,7 +160,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 }
 
                 // Execute pack
-                var funcPackCommand = new FuncPackCommand(funcPath, testName, log);
+                var funcPackCommand = new FuncPackCommand(funcPath, testName, log!);
                 var args = noBuild ? new[] { "--no-build" } : Array.Empty<string>();
                 var packResult = funcPackCommand
                     .WithWorkingDirectory(projectAbsoluteDir)
@@ -203,10 +203,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 {
                     File.Delete(propsPath);
                 }
+
                 if (File.Exists(packagesPropsPath))
                 {
                     File.Delete(packagesPropsPath);
                 }
+
                 if (Directory.Exists(artifactsDirFullPath))
                 {
                     Directory.Delete(artifactsDirFullPath, true);
