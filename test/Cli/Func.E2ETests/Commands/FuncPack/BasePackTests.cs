@@ -102,10 +102,11 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             string[] logsToValidate)
         {
             // Create Directory.Build.props inside the project directory to define ArtifactsPath.
-            var propsPath = Path.Combine(projectAbsoluteDir, "Directory.Build.props");
-            var packagesPropsPath = Path.Combine(projectAbsoluteDir, "Directory.Packages.props");
+            var path = Path.GetFullPath(projectAbsoluteDir);
+            var propsPath = Path.Combine(path, "Directory.Build.props");
+            var packagesPropsPath = Path.Combine(path, "Directory.Packages.props");
             var artifactsDirName = "customArtifacts";
-            var artifactsDirFullPath = Path.Combine(projectAbsoluteDir, artifactsDirName);
+            var artifactsDirFullPath = Path.Combine(path, artifactsDirName);
 
             // Clean up any previous artifacts dir or zip files
             if (Directory.Exists(artifactsDirFullPath))
@@ -113,7 +114,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                 Directory.Delete(artifactsDirFullPath, true);
             }
 
-            foreach (var zip in Directory.GetFiles(projectAbsoluteDir, "*.zip"))
+            foreach (var zip in Directory.GetFiles(path, "*.zip"))
             {
                 File.Delete(zip);
             }
