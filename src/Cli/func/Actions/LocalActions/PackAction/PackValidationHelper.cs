@@ -191,7 +191,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         }
 
         /// <summary>
-        /// Validates mutual exclusivity between Python V1 (function.json) and V2 (function_app.py) models.
+        /// Validates mutual exclusivity between Python V1 (function.json) and V2 (function_app.py or custom script file) models.
         /// </summary>
         public static bool ValidatePythonProgrammingModel(string directory, out string errorMessage)
         {
@@ -203,7 +203,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 return false;
             }
 
-            var hasFunctionApp = FileSystemHelpers.FileExists(Path.Combine(directory, "function_app.py"));
+            // Check for custom Python script file name from environment variable, fallback to function_app.py
+            var pythonScriptFileName = Environment.GetEnvironmentVariable("PYTHON_SCRIPT_FILE_NAME") ?? "function_app.py";
+            var hasFunctionApp = FileSystemHelpers.FileExists(Path.Combine(directory, pythonScriptFileName));
             var hasFunctionJson = false;
 
             // Scan immediate child directories for function.json (V1 model indicator)
@@ -229,7 +231,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             if (hasFunctionApp && hasFunctionJson)
             {
-                errorMessage = "Cannot mix Python V1 and V2 programming models. Found both 'function_app.py' (V2) and 'function.json' files (V1) in the same project.";
+                errorMessage = $"Cannot mix Python V1 and V2 programming models. Found both '{pythonScriptFileName}' (V2) and 'function.json' files (V1) in the same project.";
                 return false;
             }
 
