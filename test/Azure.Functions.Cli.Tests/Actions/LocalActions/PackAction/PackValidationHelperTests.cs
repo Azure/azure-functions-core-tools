@@ -139,6 +139,62 @@ namespace Azure.Functions.Cli.Tests.E2E.PackAction
         }
 
         [Fact]
+        public void ValidatePythonProgrammingModel_CustomScriptFileFromEnvVar_ReturnsTrue()
+        {
+            // Arrange
+            var customScriptName = "my_custom_app.py";
+            File.WriteAllText(Path.Combine(_tempDirectory, customScriptName), "# Custom V2 model");
+            
+            // Set environment variable
+            Environment.SetEnvironmentVariable("PYTHON_SCRIPT_FILE_NAME", customScriptName);
+
+            try
+            {
+                // Act
+                var result = PackValidationHelper.ValidatePythonProgrammingModel(_tempDirectory, out string errorMessage);
+
+                // Assert
+                Assert.True(result);
+                Assert.Empty(errorMessage);
+            }
+            finally
+            {
+                // Clean up environment variable
+                Environment.SetEnvironmentVariable("PYTHON_SCRIPT_FILE_NAME", null);
+            }
+        }
+
+        [Fact]
+        public void ValidatePythonProgrammingModel_CustomScriptFileMixedWithV1_ReturnsFalse()
+        {
+            // Arrange
+            var customScriptName = "my_custom_app.py";
+            File.WriteAllText(Path.Combine(_tempDirectory, customScriptName), "# Custom V2 model");
+            var functionDir = Path.Combine(_tempDirectory, "HttpTrigger");
+            Directory.CreateDirectory(functionDir);
+            File.WriteAllText(Path.Combine(functionDir, "function.json"), "{}");
+            
+            // Set environment variable
+            Environment.SetEnvironmentVariable("PYTHON_SCRIPT_FILE_NAME", customScriptName);
+
+            try
+            {
+                // Act
+                var result = PackValidationHelper.ValidatePythonProgrammingModel(_tempDirectory, out string errorMessage);
+
+                // Assert
+                Assert.False(result);
+                Assert.Contains("Cannot mix Python V1 and V2 programming models", errorMessage);
+                Assert.Contains(customScriptName, errorMessage);
+            }
+            finally
+            {
+                // Clean up environment variable
+                Environment.SetEnvironmentVariable("PYTHON_SCRIPT_FILE_NAME", null);
+            }
+        }
+
+        [Fact]
         public void ValidateAtLeastOneDirectoryContainsFile_FileExists_ReturnsTrue()
         {
             // Arrange
