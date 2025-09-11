@@ -1,10 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -14,11 +12,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
     [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to .NET apps when running func pack")]
     internal class DotnetPackSubcommandAction : PackSubcommandAction
     {
-        private readonly ISecretsManager _secretsManager;
+        private readonly bool _isDotnetIsolated;
 
-        public DotnetPackSubcommandAction(ISecretsManager secretsManager)
+        public DotnetPackSubcommandAction(bool isDotnetIsolated)
         {
-            _secretsManager = secretsManager;
+            _isDotnetIsolated = isDotnetIsolated;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -40,14 +38,42 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            var requiredFiles = new[] { "host.json" };
-            foreach (var file in requiredFiles)
+            PackValidationHelper.DisplayValidationStart();
+
+            // Basic validation for host.json existence
+            var hostJsonExists = FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, "host.json"));
+            PackValidationHelper.DisplayValidationResult(
+                "Validate Basic Structure",
+                hostJsonExists,
+                hostJsonExists ? null : "Required file 'host.json' not found. Ensure this is a valid Azure Functions project.");
+
+            if (!hostJsonExists)
             {
-                if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, file)))
+                PackValidationHelper.DisplayValidationEnd();
+                throw new CliException($"Required file 'host.json' not found in directory: {functionAppRoot}");
+            }
+
+            // Validate .NET deployment folder structure (after dotnet publish or in --no-build scenario)
+            string directoryToValidate = functionAppRoot;
+
+            // If --no-build is specified, validate the provided directory structure
+            // If build will happen, this validation will run on the publish output
+            if (options.NoBuild && _isDotnetIsolated)
+            {
+                var isValidStructure = PackValidationHelper.ValidateDotnetIsolatedFolderStructure(directoryToValidate, out string errorMessage);
+                PackValidationHelper.DisplayValidationResult(
+                    "Validate Folder Structure",
+                    isValidStructure,
+                    isValidStructure ? null : errorMessage);
+
+                if (!isValidStructure)
                 {
-                    throw new CliException($"Required file '{file}' not found in build output directory: {functionAppRoot}");
+                    PackValidationHelper.DisplayValidationEnd();
+                    throw new CliException(errorMessage);
                 }
             }
+
+            PackValidationHelper.DisplayValidationEnd();
         }
 
         protected override async Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
@@ -120,6 +146,24 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             if (exitCode != 0)
             {
                 throw new CliException("Error publishing .NET project");
+            }
+
+            if (_isDotnetIsolated)
+            {
+                // Validate the published structure
+                ColoredConsole.WriteLine();
+                ColoredConsole.WriteLine("Validating published output...");
+
+                var isValidStructure = PackValidationHelper.ValidateDotnetIsolatedFolderStructure(outputPath, out string errorMessage);
+                PackValidationHelper.DisplayValidationResult(
+                    "Validate Published Structure",
+                    isValidStructure,
+                    isValidStructure ? null : errorMessage);
+
+                if (!isValidStructure)
+                {
+                    throw new CliException($"Published output validation failed: {errorMessage}");
+                }
             }
         }
     }
