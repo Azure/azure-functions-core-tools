@@ -230,6 +230,15 @@ namespace Azure.Functions.Cli.Actions
                     }
                 }
 
+                // Show positional arguments using the new GetPositionalArguments method
+                var positionalArgs = _action.GetPositionalArguments();
+                if (positionalArgs.Any())
+                {
+                    ColoredConsole.WriteLine(TitleColor("Arguments:"));
+                    DisplayPositionalArguments(positionalArgs);
+                    ColoredConsole.WriteLine();
+                }
+
                 // Show subcommands if this action has any
                 var actionTypeName = actionAttribute?.Name;
                 if (!string.IsNullOrEmpty(actionTypeName))

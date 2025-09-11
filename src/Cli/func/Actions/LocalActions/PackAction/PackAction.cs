@@ -46,23 +46,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             Args = args;
 
-            var parseResult = base.ParseArgs(args);
+            return base.ParseArgs(args);
+        }
 
-            // For help display, throw CliArgumentsException to show positional arguments when help is requested
-            var helpArgs = new[] { "help", "h", "?" };
-            var containsHelpFlag = args.Any(arg => 
-                helpArgs.Any(ha => arg.Equals($"-{ha}", StringComparison.OrdinalIgnoreCase) || 
-                                   arg.Equals($"--{ha}", StringComparison.OrdinalIgnoreCase)));
-
-            if (containsHelpFlag)
+        public override IEnumerable<CliArgument> GetPositionalArguments()
+        {
+            return new[]
             {
-                throw new CliArgumentsException(
-                    "Pack function app arguments.",
-                    parseResult,
-                    new CliArgument { Name = "PROJECT | SOLUTION", Description = "The project or solution file to operate on. If a file is not specified, the command will search the current directory for one." });
-            }
-
-            return parseResult;
+                new CliArgument 
+                { 
+                    Name = "PROJECT | SOLUTION", 
+                    Description = "The project or solution file to operate on. If a file is not specified, the command will search the current directory for one." 
+                }
+            };
         }
 
         public override async Task RunAsync()
