@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -47,8 +48,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             var parseResult = base.ParseArgs(args);
 
-            // For help display, throw CliArgumentsException to show positional arguments when no args provided
-            if (!args.Any())
+            // For help display, throw CliArgumentsException to show positional arguments when help is requested
+            var helpArgs = new[] { "help", "h", "?" };
+            var containsHelpFlag = args.Any(arg => 
+                helpArgs.Any(ha => arg.Equals($"-{ha}", StringComparison.OrdinalIgnoreCase) || 
+                                   arg.Equals($"--{ha}", StringComparison.OrdinalIgnoreCase)));
+
+            if (containsHelpFlag)
             {
                 throw new CliArgumentsException(
                     "Pack function app arguments.",
