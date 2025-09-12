@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections;
@@ -351,18 +351,18 @@ namespace Azure.Functions.Cli
             {
                 // Give the action a change to parse its args.
                 var parseResult = action.ParseArgs(args);
-                
+
                 // If help was requested, show action-specific help
                 if (isHelp)
                 {
                     _telemetryEvent.CommandName = invokeCommand.ToString();
                     _telemetryEvent.IActionName = typeof(HelpAction).Name;
                     _telemetryEvent.Parameters = new List<string>();
-                    
+
                     // Display action-specific help
                     return new HelpAction(_actionAttributes, CreateAction, action, parseResult);
                 }
-                
+
                 if (parseResult.HasErrors)
                 {
                     // If we matched the action, we can log the invoke command
