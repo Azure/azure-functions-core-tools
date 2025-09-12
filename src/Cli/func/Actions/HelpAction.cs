@@ -54,6 +54,22 @@ namespace Azure.Functions.Cli.Actions
         public HelpAction(IEnumerable<TypeAttributePair> actions, Func<Type, IAction> createAction, IAction action, ICommandLineParserResult parseResult)
             : this(actions, createAction)
         {
+            _actionTypes = actions
+                .Where(a => a.Attribute.ShowInHelp)
+                .Select(a => a.Type)
+                .Distinct()
+                .Select(type =>
+                {
+                    var attributes = type.GetCustomAttributes<ActionAttribute>();
+                    return new ActionType
+                    {
+                        Type = type,
+                        Contexts = attributes.Select(a => a.Context),
+                        SubContexts = attributes.Select(a => a.SubContext),
+                        Names = attributes.Select(a => a.Name),
+                        ParentCommandName = attributes.Select(a => a.ParentCommandName)
+                    };
+                });
             _action = action;
             _parseResult = parseResult;
         }
@@ -167,7 +183,35 @@ namespace Azure.Functions.Cli.Actions
 
         private void DisplayActionHelp()
         {
-            DisplayActionsHelp(new[] { _actionTypes.First(a => a.Type == _action.GetType()) });
+            if (_action == null)
+            {
+                return;
+            }
+
+            // Get all declared names (ActionAttribute.Name) for the current action.
+            var currentActionNames = _action.GetType()
+                .GetCustomAttributes<ActionAttribute>()
+                .Select(a => a.Name)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToArray();
+
+            // Find the ActionType entry representing the current action (if it exists in the filtered _actionTypes set).
+            var currentActionType = _actionTypes.FirstOrDefault(a => a.Type == _action.GetType());
+
+            // Collect subcommands whose ParentCommandName matches any of the current action names (case-insensitive).
+            var subCommandActionTypes = _actionTypes
+                .Where(a => a.ParentCommandName.Any(p => !string.IsNullOrEmpty(p) && currentActionNames.Contains(p, StringComparer.OrdinalIgnoreCase)))
+                .ToList();
+
+            var actionsToDisplay = new List<ActionType>();
+            if (currentActionType != null)
+            {
+                actionsToDisplay.Add(currentActionType);
+            }
+
+            actionsToDisplay.AddRange(subCommandActionTypes);
+
+            DisplayActionsHelp(actionsToDisplay);
         }
 
         private void DisplayGeneralHelp()
