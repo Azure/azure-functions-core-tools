@@ -352,6 +352,11 @@ namespace Azure.Functions.Cli.Actions
             }
             catch (CliArgumentsException e)
             {
+                if (e.Arguments.Any())
+                {
+                    DisplayPositionalArguments(e.Arguments);
+                }
+
                 if (e.ParseResults != null && e.ParseResults.UnMatchedOptions.Any())
                 {
                     DisplayOptions(e.ParseResults.UnMatchedOptions);
@@ -372,14 +377,10 @@ namespace Azure.Functions.Cli.Actions
             foreach (var argument in arguments)
             {
                 var helpLine = string.Format($"{Indent(1)}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
- 
-                if (helpLine.Length < SafeConsole.BufferWidth)
+                while (helpLine.Length > SafeConsole.BufferWidth)
                 {
-                    while (helpLine.Length > SafeConsole.BufferWidth)
-                    {
-                        var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
-                        helpLine = helpLine.Substring(SafeConsole.BufferWidth);
-                    }
+                    var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
+                    helpLine = helpLine.Substring(SafeConsole.BufferWidth);
                 }
 
                 ColoredConsole.WriteLine(helpLine);

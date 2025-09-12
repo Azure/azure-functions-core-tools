@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 new CliArgument
                 {
                     Name = "PROJECT | SOLUTION",
-                    Description = "Folder path of Azure functions project or solutio. If a path is not specified, the command will pack the current directory."
+                    Description = "Folder path of Azure functions project or solution. If a path is not specified, the command will pack the current directory."
                 }
             };
         }
