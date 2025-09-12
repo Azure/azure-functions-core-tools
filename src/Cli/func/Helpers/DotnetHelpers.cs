@@ -173,6 +173,20 @@ namespace Azure.Functions.Cli.Helpers
             "daprpublishoutputbinding" => "daprPublishOutputBinding",
             "daprserviceinvocationtrigger" => "daprServiceInvocationTrigger",
             "daprtopictrigger" => "daprTopicTrigger",
+            "durablefunctionsentityorchestration" => "durableentity",
+            "httptriggerwithopenapi" => "httpOpenAPI",
+            "kustoinputbinding" => "kustoinput",
+            "kustooutputbinding" => "kustooutput",
+            "mysqlinputbinding" => "mysqlinput",
+            "mysqloutputbinding" => "mysqloutput",
+            "mysqltriggerbinding" => "mysqltrigger",
+            "rabbitmqtrigger" => "rqueue",
+            "signalrtrigger" => "signalr",
+            "sqlinputbinding" => "sqlinput",
+            "sqloutputbinding" => "sqloutput",
+            "sqltriggerbinding" => "sqltrigger",
+            "durablefunctionsentityclass" => "durableentityclass",
+            "durablefunctionsentityfunction" => "durableentityfunction",
             _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
         };
 
@@ -195,6 +209,19 @@ namespace Azure.Functions.Cli.Helpers
                     "DaprPublishOutputBinding",
                     "DaprServiceInvocationTrigger",
                     "DaprTopicTrigger",
+                    "DurableFunctionsEntityClass",
+                    "DurableFunctionsEntityFunction",
+                    "DurableFunctionsOrchestration",
+                    "KustoInputBinding",
+                    "KustoOutputBinding",
+                    "MySqlInputBinding",
+                    "MySqlOutputBinding",
+                    "MySqlTriggerBinding",
+                    "RabbitMQTrigger",
+                    "SignalRTrigger",
+                    "SqlInputBinding",
+                    "SqlOutputBinding",
+                    "SqlTriggerBinding"
                 };
             }
 
@@ -218,6 +245,19 @@ namespace Azure.Functions.Cli.Helpers
                 "DaprPublishOutputBinding",
                 "DaprServiceInvocationTrigger",
                 "DaprTopicTrigger",
+                "DurableFunctionsEntityOrchestration",
+                "EventGridBlobTrigger",
+                "HttpTriggerWithOpenAPI",
+                "KustoInputBinding",
+                "KustoOutputBinding",
+                "MySqlInputBinding",
+                "MySqlOutputBinding",
+                "MySqlTriggerBinding",
+                "RabbitMQTrigger",
+                "SignalRTrigger",
+                "SqlInputBinding",
+                "SqlOutputBinding",
+                "SqlTriggerBinding"
             };
         }
 
