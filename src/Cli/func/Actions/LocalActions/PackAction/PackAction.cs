@@ -36,7 +36,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents.Otherwise, default is the current directory")
+                .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents. " +
+                "Otherwise, default is the current directory")
                 .Callback(n => NoBuild = n);
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -56,7 +57,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 new CliArgument
                 {
                     Name = "PROJECT | SOLUTION",
-                    Description = "Folder path of Azure functions project or solution. If a path is not specified, the command will pack the current directory."
+                    Description = "Folder path of Azure functions project or solution to pack. If a path is not specified, the command will pack the current directory."
                 }
             };
         }
