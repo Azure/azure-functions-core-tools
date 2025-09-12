@@ -1,6 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text;
+using Azure.Functions.Cli.Actions;
+using Azure.Functions.Cli.Interfaces;
 using FluentAssertions;
 using Xunit;
 
