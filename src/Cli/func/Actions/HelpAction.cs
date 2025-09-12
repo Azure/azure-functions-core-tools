@@ -167,111 +167,16 @@ namespace Azure.Functions.Cli.Actions
 
         private void DisplayActionHelp()
         {
-            if (_action != null)
+            if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
             {
-                // Get action information
-                var actionType = _action.GetType();
-                var actionAttribute = actionType.GetCustomAttribute<ActionAttribute>();
-                var actionName = actionAttribute?.Name ?? actionType.Name;
-
-                Utilities.PrintVersion();
-                ColoredConsole
-                    .WriteLine($"{TitleColor("Usage:")} func {actionName} [arguments] [options]")
-                    .WriteLine();
-
-                // Show action description
-                if (!string.IsNullOrEmpty(actionAttribute?.HelpText))
+                foreach (var error in _parseResult.Errors)
                 {
-                    ColoredConsole.WriteLine(TitleColor("Description:"));
-                    ColoredConsole.WriteLine($"  {actionAttribute.HelpText}");
-                    ColoredConsole.WriteLine();
-                }
-
-                // Show arguments and options using DisplaySwitches logic
-                try
-                {
-                    var options = _action.ParseArgs(Array.Empty<string>());
-                    if (options.UnMatchedOptions.Any())
-                    {
-                        ColoredConsole.WriteLine(TitleColor("Options:"));
-                        DisplayOptions(options.UnMatchedOptions);
-                        ColoredConsole.WriteLine();
-                    }
-                }
-                catch (CliArgumentsException e)
-                {
-                    if (e.Arguments.Any())
-                    {
-                        ColoredConsole.WriteLine(TitleColor("Arguments:"));
-                        DisplayPositionalArguments(e.Arguments);
-                        ColoredConsole.WriteLine();
-                    }
-
-                    if (e.ParseResults != null && e.ParseResults.UnMatchedOptions.Any())
-                    {
-                        ColoredConsole.WriteLine(TitleColor("Options:"));
-                        DisplayOptions(e.ParseResults.UnMatchedOptions);
-                        ColoredConsole.WriteLine();
-                    }
-                }
-                catch (Exception)
-                {
-                    // Fall back to showing parse errors if there's an issue
-                    if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
-                    {
-                        foreach (var error in _parseResult.Errors)
-                        {
-                            ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
-                        }
-                    }
-                    else
-                    {
-                        ColoredConsole.WriteLine(_parseResult.ErrorText);
-                    }
-                }
-
-                // Show positional arguments using the new GetPositionalArguments method
-                var positionalArgs = _action.GetPositionalArguments();
-                if (positionalArgs.Any())
-                {
-                    ColoredConsole.WriteLine(TitleColor("Arguments:"));
-                    DisplayPositionalArguments(positionalArgs);
-                    ColoredConsole.WriteLine();
-                }
-
-                // Show subcommands if this action has any
-                var actionTypeName = actionAttribute?.Name;
-                if (!string.IsNullOrEmpty(actionTypeName))
-                {
-                    var subCommands = _actionTypes
-                        .Where(a => a.ParentCommandName.Any(p => p.Equals(actionTypeName, StringComparison.OrdinalIgnoreCase)))
-                        .ToList();
-
-                    if (subCommands.Any())
-                    {
-                        ColoredConsole.WriteLine(TitleColor("Subcommands:"));
-                        foreach (var subCommand in subCommands)
-                        {
-                            DisplaySubCommandHelp(subCommand);
-                        }
-                        ColoredConsole.WriteLine();
-                    }
+                    ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
                 }
             }
             else
             {
-                // Fallback to old behavior
-                if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
-                {
-                    foreach (var error in _parseResult.Errors)
-                    {
-                        ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
-                    }
-                }
-                else
-                {
-                    ColoredConsole.WriteLine(_parseResult.ErrorText);
-                }
+                ColoredConsole.WriteLine(_parseResult.ErrorText);
             }
         }
 
@@ -381,34 +286,38 @@ namespace Azure.Functions.Cli.Actions
             var description = subCommand.Type?.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
 
             // Display indented subcommand header with standardized indentation
-            ColoredConsole.WriteLine($"{Indent(1)}{runtimeName.DarkCyan()}{Indent(2)}{description}");
+            ColoredConsole.WriteLine($"{Indent(1)}{runtimeName.DarkGreen()}{Indent(2)}{description}");
 
             // Display subcommand switches with extra indentation
             if (subCommand.Type != null)
             {
-                DisplaySwitches(subCommand);
+                DisplaySwitches(subCommand, true);
             }
         }
 
-        private void DisplaySwitches(ActionType actionType)
+        private void DisplaySwitches(ActionType actionType, bool shouldIndent = false)
         {
             var action = _createAction.Invoke(actionType.Type);
             try
             {
                 var options = action.ParseArgs(Array.Empty<string>());
+                var arguments = action.GetPositionalArguments();
+
+                if (arguments.Any())
+                {
+                    ColoredConsole.WriteLine(TitleColor("Arguments:"));
+                    DisplayPositionalArguments(arguments);
+                }
+
                 if (options.UnMatchedOptions.Any())
                 {
+                    ColoredConsole.WriteLine(shouldIndent ? Indent(1) + TitleColor("Options:") : TitleColor("Options:"));
                     DisplayOptions(options.UnMatchedOptions);
                     ColoredConsole.WriteLine();
                 }
             }
             catch (CliArgumentsException e)
             {
-                if (e.Arguments.Any())
-                {
-                    DisplayPositionalArguments(e.Arguments);
-                }
-
                 if (e.ParseResults != null && e.ParseResults.UnMatchedOptions.Any())
                 {
                     DisplayOptions(e.ParseResults.UnMatchedOptions);
@@ -429,11 +338,8 @@ namespace Azure.Functions.Cli.Actions
             foreach (var argument in arguments)
             {
                 var helpLine = string.Format($"{Indent(1)}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
+ 
                 if (helpLine.Length < SafeConsole.BufferWidth)
-                {
-                    ColoredConsole.WriteLine(helpLine);
-                }
-                else
                 {
                     while (helpLine.Length > SafeConsole.BufferWidth)
                     {
@@ -441,6 +347,8 @@ namespace Azure.Functions.Cli.Actions
                         helpLine = helpLine.Substring(SafeConsole.BufferWidth);
                     }
                 }
+
+                ColoredConsole.WriteLine(helpLine);
             }
         }
 

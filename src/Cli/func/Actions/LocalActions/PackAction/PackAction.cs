@@ -53,10 +53,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         {
             return new[]
             {
-                new CliArgument 
-                { 
-                    Name = "PROJECT | SOLUTION", 
-                    Description = "The project or solution file to operate on. If a file is not specified, the command will search the current directory for one." 
+                new CliArgument
+                {
+                    Name = "PROJECT | SOLUTION",
+                    Description = "Folder path of Azure functions project or solutio. If a path is not specified, the command will pack the current directory."
                 }
             };
         }
