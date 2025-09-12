@@ -40,6 +40,7 @@ jobs:
         $metadataPath = "$(Pipeline.Workspace)/release-metadata/metadata.json"
         Write-Host "Reading metadata from $metadataPath"
         $metadata = Get-Content -Path $metadataPath | ConvertFrom-Json
+        $metadata.defaultArtifactVersion = "4.3.0-preview1"
         Write-Host "Consolidated Build ID: $($metadata.consolidatedBuildId)"
         Write-Host "Default Artifact Version: $($metadata.defaultArtifactVersion)"
 
