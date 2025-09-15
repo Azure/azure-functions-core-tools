@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -8,7 +9,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy.", ShowInHelp = false)]
+    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy with optional argument to pass in path of folder to pack.", ShowInHelp = true)]
     internal class PackAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
@@ -35,8 +36,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents." +
-                "Otherwise, default is the current directory.")
+                .WithDescription("Do not build the project before packaging. Optionally provide a directory when func pack as the first argument that has the build contents. " +
+                "Otherwise, default is the current directory")
                 .Callback(n => NoBuild = n);
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -47,6 +48,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             Args = args;
 
             return base.ParseArgs(args);
+        }
+
+        public override IEnumerable<CliArgument> GetPositionalArguments()
+        {
+            return new[]
+            {
+                new CliArgument
+                {
+                    Name = "PROJECT | SOLUTION",
+                    Description = "Folder path of Azure functions project or solution to pack. If a path is not specified, the command will pack the current directory."
+                }
+            };
         }
 
         public override async Task RunAsync()

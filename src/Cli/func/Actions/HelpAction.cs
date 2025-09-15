@@ -54,6 +54,22 @@ namespace Azure.Functions.Cli.Actions
         public HelpAction(IEnumerable<TypeAttributePair> actions, Func<Type, IAction> createAction, IAction action, ICommandLineParserResult parseResult)
             : this(actions, createAction)
         {
+            _actionTypes = actions
+                .Where(a => a.Attribute.ShowInHelp)
+                .Select(a => a.Type)
+                .Distinct()
+                .Select(type =>
+                {
+                    var attributes = type.GetCustomAttributes<ActionAttribute>();
+                    return new ActionType
+                    {
+                        Type = type,
+                        Contexts = attributes.Select(a => a.Context),
+                        SubContexts = attributes.Select(a => a.SubContext),
+                        Names = attributes.Select(a => a.Name),
+                        ParentCommandName = attributes.Select(a => a.ParentCommandName)
+                    };
+                });
             _action = action;
             _parseResult = parseResult;
         }
@@ -167,17 +183,35 @@ namespace Azure.Functions.Cli.Actions
 
         private void DisplayActionHelp()
         {
-            if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
+            if (_action == null)
             {
-                foreach (var error in _parseResult.Errors)
-                {
-                    ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
-                }
+                return;
             }
-            else
+
+            // Get all declared names (ActionAttribute.Name) for the current action.
+            var currentActionNames = _action.GetType()
+                .GetCustomAttributes<ActionAttribute>()
+                .Select(a => a.Name)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToArray();
+
+            // Find the ActionType entry representing the current action (if it exists in the filtered _actionTypes set).
+            var currentActionType = _actionTypes.FirstOrDefault(a => a.Type == _action.GetType());
+
+            // Collect subcommands whose ParentCommandName matches any of the current action names (case-insensitive).
+            var subCommandActionTypes = _actionTypes
+                .Where(a => a.ParentCommandName.Any(p => !string.IsNullOrEmpty(p) && currentActionNames.Contains(p, StringComparer.OrdinalIgnoreCase)))
+                .ToList();
+
+            var actionsToDisplay = new List<ActionType>();
+            if (currentActionType != null)
             {
-                ColoredConsole.WriteLine(_parseResult.ErrorText);
+                actionsToDisplay.Add(currentActionType);
             }
+
+            actionsToDisplay.AddRange(subCommandActionTypes);
+
+            DisplayActionsHelp(actionsToDisplay);
         }
 
         private void DisplayGeneralHelp()
@@ -286,23 +320,32 @@ namespace Azure.Functions.Cli.Actions
             var description = subCommand.Type?.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
 
             // Display indented subcommand header with standardized indentation
-            ColoredConsole.WriteLine($"{Indent(1)}{runtimeName.DarkCyan()}{Indent(2)}{description}");
+            ColoredConsole.WriteLine($"{Indent(1)}{runtimeName.DarkGreen()}{Indent(2)}{description}");
 
             // Display subcommand switches with extra indentation
             if (subCommand.Type != null)
             {
-                DisplaySwitches(subCommand);
+                DisplaySwitches(subCommand, true);
             }
         }
 
-        private void DisplaySwitches(ActionType actionType)
+        private void DisplaySwitches(ActionType actionType, bool shouldIndent = false)
         {
             var action = _createAction.Invoke(actionType.Type);
             try
             {
                 var options = action.ParseArgs(Array.Empty<string>());
+                var arguments = action.GetPositionalArguments();
+
+                if (arguments.Any())
+                {
+                    ColoredConsole.WriteLine(TitleColor("Arguments:"));
+                    DisplayPositionalArguments(arguments);
+                }
+
                 if (options.UnMatchedOptions.Any())
                 {
+                    ColoredConsole.WriteLine(shouldIndent ? Indent(1) + TitleColor("Options:") : TitleColor("Options:"));
                     DisplayOptions(options.UnMatchedOptions);
                     ColoredConsole.WriteLine();
                 }
@@ -334,18 +377,13 @@ namespace Azure.Functions.Cli.Actions
             foreach (var argument in arguments)
             {
                 var helpLine = string.Format($"{Indent(1)}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
-                if (helpLine.Length < SafeConsole.BufferWidth)
+                while (helpLine.Length > SafeConsole.BufferWidth)
                 {
-                    ColoredConsole.WriteLine(helpLine);
+                    var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
+                    helpLine = helpLine.Substring(SafeConsole.BufferWidth);
                 }
-                else
-                {
-                    while (helpLine.Length > SafeConsole.BufferWidth)
-                    {
-                        var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
-                        helpLine = helpLine.Substring(SafeConsole.BufferWidth);
-                    }
-                }
+
+                ColoredConsole.WriteLine(helpLine);
             }
         }
 

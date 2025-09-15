@@ -8,3 +8,4 @@
 
 #### Changes
 - Add `func pack` basic functionality (#4600) 
+- Clean up HelpAction and add `func pack` to help menu (#4639)
