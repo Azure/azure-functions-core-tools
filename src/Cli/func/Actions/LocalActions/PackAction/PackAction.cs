@@ -111,7 +111,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             await (runtime switch
             {
                 WorkerRuntime.Dotnet or WorkerRuntime.DotnetIsolated => new DotnetPackSubcommandAction(runtime is WorkerRuntime.DotnetIsolated).RunAsync(packOptions),
-                WorkerRuntime.Python => new PythonPackSubcommandAction(_secretsManager).RunAsync(packOptions, Args),
+                WorkerRuntime.Python => new PythonPackSubcommandAction().RunAsync(packOptions, Args),
                 WorkerRuntime.Node => new NodePackSubcommandAction(_secretsManager).RunAsync(packOptions, Args),
                 WorkerRuntime.Powershell => new PowershellPackSubcommandAction().RunAsync(packOptions),
                 WorkerRuntime.Custom => new CustomPackSubcommandAction().RunAsync(packOptions),

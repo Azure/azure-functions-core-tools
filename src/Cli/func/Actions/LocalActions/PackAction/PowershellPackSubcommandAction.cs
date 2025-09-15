@@ -21,37 +21,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             await ExecuteAsync(packOptions);
         }
 
-        protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
+        protected internal override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            PackValidationHelper.DisplayValidationStart();
-
-            // Validate Folder Structure - check for host.json
-            var hostJsonExists = FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, "host.json"));
-            PackValidationHelper.DisplayValidationResult(
-                "Validate Basic Structure",
-                hostJsonExists,
-                hostJsonExists ? null : "Required file 'host.json' not found. Ensure this is a valid Azure Functions project.");
-
-            if (!hostJsonExists)
+            var validations = new List<Action<string>>
             {
-                PackValidationHelper.DisplayValidationEnd();
-                throw new CliException($"Required file 'host.json' not found in {functionAppRoot}. PowerShell function apps require host.json.");
-            }
-
-            // Validate that at least one folder contains function.json
-            var hasFunctionJson = PackValidationHelper.ValidateAtLeastOneDirectoryContainsFile(functionAppRoot, "function.json");
-            PackValidationHelper.DisplayValidationResult(
-                "Validate Function Structure",
-                hasFunctionJson,
-                hasFunctionJson ? null : "No 'function.json' files found in subdirectories. PowerShell function apps require at least one function with function.json.");
-
-            if (!hasFunctionJson)
-            {
-                PackValidationHelper.DisplayValidationEnd();
-                throw new CliException($"No 'function.json' files found in subdirectories of {functionAppRoot}. PowerShell function apps require at least one function with function.json.");
-            }
-
-            PackValidationHelper.DisplayValidationEnd();
+                dir => PackValidationHelper.RunRequiredFilesValidation(dir, new[] { "function.json" }, "Validate Function Structure")
+            };
+            PackValidationHelper.RunValidations(functionAppRoot, validations);
         }
 
         protected override Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)

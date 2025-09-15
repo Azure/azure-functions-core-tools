@@ -11,6 +11,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
     internal static class PackValidationHelper
     {
+        private const string IndentUnit = "  ";
+
+        private static string GetIndent(int level) => string.Concat(Enumerable.Repeat(IndentUnit, level));
+
         /// <summary>
         /// Writes a standardized header indicating validation has started.
         /// </summary>
@@ -32,10 +36,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
 
             var status = passed ? Green("PASSED") : Red("FAILED");
-            ColoredConsole.WriteLine($"  {validationTitle}: {status}");
+            ColoredConsole.WriteLine($"{GetIndent(1)}{validationTitle}: {status}");
             if (!passed && !string.IsNullOrEmpty(errorMessage))
             {
-                ColoredConsole.WriteLine($"    {ErrorColor(errorMessage)}");
+                ColoredConsole.WriteLine($"{GetIndent(2)}{ErrorColor(errorMessage)}");
             }
         }
 
@@ -50,8 +54,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
 
             var status = Yellow("WARNING");
-            ColoredConsole.WriteLine($"  {validationTitle}: {status}");
-            ColoredConsole.WriteLine($"    {WarningColor(warningMessage)}");
+            ColoredConsole.WriteLine($"{GetIndent(1)}{validationTitle}: {status}");
+            ColoredConsole.WriteLine($"{GetIndent(2)}{WarningColor(warningMessage)}");
         }
 
         /// <summary>
@@ -149,93 +153,92 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         public static bool IsRunningOnWindows() => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
         /// <summary>
-        /// Validates structure expected after a dotnet publish for .NET isolated deployments.
+        /// Runs a required files validation and displays results.
+        /// Throws CliException if validation fails.
         /// </summary>
-        public static bool ValidateDotnetIsolatedFolderStructure(string directory, out string errorMessage)
+        public static void RunRequiredFilesValidation(string directory, string[] requiredFiles, string validationTitle = "Validate Required Files")
         {
-            errorMessage = string.Empty;
-
-            if (string.IsNullOrWhiteSpace(directory))
+            var isValid = ValidateRequiredFiles(directory, requiredFiles, out string missingFile);
+            DisplayValidationResult(
+                validationTitle,
+                isValid,
+                isValid ? null : string.Empty);
+            if (!isValid)
             {
-                errorMessage = "Deployment directory path not specified.";
-                return false;
+                DisplayValidationEnd();
+                throw new CliException($"Required file(s) '{missingFile}' not found in {directory}.");
             }
-
-            // Required artifacts
-            var requiredFiles = new[] { "host.json", "functions.metadata" };
-            var requiredDirectories = new[] { ".azurefunctions" };
-
-            // Validate files
-            foreach (var file in requiredFiles)
-            {
-                var filePath = Path.Combine(directory, file);
-                if (!FileSystemHelpers.FileExists(filePath))
-                {
-                    errorMessage = $"Required file '{file}' not found in deployment structure. Ensure 'dotnet publish' has been run.";
-                    return false;
-                }
-            }
-
-            // Validate directories
-            foreach (var dir in requiredDirectories)
-            {
-                var dirPath = Path.Combine(directory, dir);
-                if (!FileSystemHelpers.DirectoryExists(dirPath))
-                {
-                    errorMessage = $"Required directory '{dir}' not found in deployment structure. Ensure 'dotnet publish' has been run.";
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         /// <summary>
-        /// Validates mutual exclusivity between Python V1 (function.json) and V2 (function_app.py or custom script file) models.
+        /// Runs a host.json existence validation and displays results.
+        /// Throws CliException if validation fails.
         /// </summary>
-        public static bool ValidatePythonProgrammingModel(string directory, out string errorMessage)
+        public static void RunHostJsonValidation(string directory)
         {
-            errorMessage = string.Empty;
-
-            if (string.IsNullOrWhiteSpace(directory))
+            var hostJsonExists = FileSystemHelpers.FileExists(Path.Combine(directory, "host.json"));
+            DisplayValidationResult(
+                "Validate host.json",
+                hostJsonExists,
+                hostJsonExists ? null : string.Empty);
+            if (!hostJsonExists)
             {
-                errorMessage = "Directory path not specified.";
-                return false;
+                DisplayValidationEnd();
+                throw new CliException($"Required file 'host.json' not found in directory: {directory}");
             }
+        }
 
-            // Check for custom Python script file name from environment variable, fallback to function_app.py
-            var pythonScriptFileName = Environment.GetEnvironmentVariable("PYTHON_SCRIPT_FILE_NAME") ?? "function_app.py";
-            var hasFunctionApp = FileSystemHelpers.FileExists(Path.Combine(directory, pythonScriptFileName));
-            var hasFunctionJson = false;
-
-            // Scan immediate child directories for function.json (V1 model indicator)
-            try
+        /// <summary>
+        /// Runs a validation for at least one subdirectory containing a file.
+        /// Throws CliException if validation fails.
+        /// </summary>
+        public static void RunAtLeastOneDirectoryContainsFileValidation(string rootDirectory, string fileName, string validationTitle = "Validate Function Structure")
+        {
+            var hasFile = ValidateAtLeastOneDirectoryContainsFile(rootDirectory, fileName);
+            DisplayValidationResult(
+                validationTitle,
+                hasFile,
+                hasFile ? null : string.Empty);
+            if (!hasFile)
             {
-                var directories = FileSystemHelpers.GetDirectories(directory);
-                foreach (var subDir in directories)
+                DisplayValidationEnd();
+                throw new CliException($"No '{fileName}' files found in subdirectories of {rootDirectory}. At least one is required.");
+            }
+        }
+
+        /// <summary>
+        /// Runs a validation for invalid flag combinations.
+        /// Throws CliException if validation fails.
+        /// </summary>
+        public static void RunInvalidFlagComboValidation(bool condition, string errorMessage, string validationTitle = "Validate Flag Compatibility")
+        {
+            DisplayValidationResult(
+                validationTitle,
+                !condition,
+                !condition ? null : errorMessage);
+            if (condition)
+            {
+                DisplayValidationEnd();
+                throw new CliException(errorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Runs a set of validations, always including host.json validation and wrapping with DisplayValidationStart/End.
+        /// </summary>
+        public static void RunValidations(string directory, IEnumerable<Action<string>> validations)
+        {
+            DisplayValidationStart();
+            RunHostJsonValidation(directory);
+            if (validations != null)
+            {
+                foreach (var validation in validations)
                 {
-                    if (FileSystemHelpers.FileExists(Path.Combine(subDir, "function.json")))
-                    {
-                        hasFunctionJson = true;
-                        break;
-                    }
+                    validation(directory);
                 }
             }
-            catch (Exception ex)
-            {
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine(VerboseColor($"Directory scan failed during python model validation: {ex.Message}"));
-                }
-            }
 
-            if (hasFunctionApp && hasFunctionJson)
-            {
-                errorMessage = $"Cannot mix Python V1 and V2 programming models. Found both '{pythonScriptFileName}' (V2) and 'function.json' files (V1) in the same project.";
-                return false;
-            }
-
-            return true;
+            DisplayValidationEnd();
         }
     }
 }

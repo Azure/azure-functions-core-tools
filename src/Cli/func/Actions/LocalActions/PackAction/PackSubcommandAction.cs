@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         }
 
         // Hook: optional validation prior to determining packing root
-        protected virtual void ValidateFunctionApp(string functionAppRoot, PackOptions options)
+        protected internal virtual void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
         }
 

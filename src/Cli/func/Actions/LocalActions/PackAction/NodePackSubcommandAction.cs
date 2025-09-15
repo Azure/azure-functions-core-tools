@@ -45,26 +45,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             ParseArgs(args);
         }
 
-        protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
+        protected internal override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            PackValidationHelper.DisplayValidationStart();
-
-            // Validate Folder Structure - check for package.json and host.json
-            var requiredFiles = new[] { "package.json", "host.json" };
-            var isValidStructure = PackValidationHelper.ValidateRequiredFiles(functionAppRoot, requiredFiles, out string missingFile);
-
-            PackValidationHelper.DisplayValidationResult(
-                "Validate Folder Structure",
-                isValidStructure,
-                isValidStructure ? null : $"Required file '{missingFile}' not found. Node.js function apps require package.json and host.json files at the root.");
-
-            if (!isValidStructure)
+            var validations = new List<Action<string>>
             {
-                PackValidationHelper.DisplayValidationEnd();
-                throw new CliException($"Required file '{missingFile}' not found in {functionAppRoot}. Node.js function apps require package.json and host.json files at the root.");
-            }
-
-            PackValidationHelper.DisplayValidationEnd();
+                dir => PackValidationHelper.RunRequiredFilesValidation(dir, new[] { "package.json", "host.json" }, "Validate Folder Structure")
+            };
+            PackValidationHelper.RunValidations(functionAppRoot, validations);
         }
 
         protected override async Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
