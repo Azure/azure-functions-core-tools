@@ -110,6 +110,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 return false;
             }
 
+            if (FileSystemHelpers.FileExists(Path.Combine(rootDirectory, fileName)))
+            {
+                return true; // Root directory contains the file.
+            }
+
             try
             {
                 var directories = FileSystemHelpers.GetDirectories(rootDirectory);

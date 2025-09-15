@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         {
             var validations = new List<Action<string>>
             {
-                dir => PackValidationHelper.RunRequiredFilesValidation(dir, new[] { "function.json" }, "Validate Function Structure")
+                dir => PackValidationHelper.RunAtLeastOneDirectoryContainsFileValidation(dir, "function.json", "Validate Function Structure")
             };
             PackValidationHelper.RunValidations(functionAppRoot, validations);
         }
