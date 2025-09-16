@@ -45,19 +45,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             ParseArgs(args);
         }
 
-        protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
+        protected internal override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            // ValidateFunctionApp package.json exists
-            var packageJsonPath = Path.Combine(functionAppRoot, "package.json");
-            if (!FileSystemHelpers.FileExists(packageJsonPath))
+            var validations = new List<Action<string>>
             {
-                throw new CliException($"package.json not found in {functionAppRoot}. This is required for Node.js function apps.");
-            }
-
-            if (StaticSettings.IsDebug)
-            {
-                ColoredConsole.WriteLine(VerboseColor($"Found package.json at {packageJsonPath}"));
-            }
+                dir => PackValidationHelper.RunRequiredFilesValidation(dir, new[] { "package.json", "host.json" }, "Validate Folder Structure")
+            };
+            PackValidationHelper.RunValidations(functionAppRoot, validations);
         }
 
         protected override async Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)

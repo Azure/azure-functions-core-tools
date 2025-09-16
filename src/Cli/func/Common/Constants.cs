@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections.ObjectModel;
@@ -97,6 +97,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
         public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
+        public const string PythonScriptFileName = "PYTHON_SCRIPT_FILE_NAME";
 
         // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
         public static readonly Dictionary<WorkerRuntime, IEnumerable<string>> WorkerRuntimeImages = new Dictionary<WorkerRuntime, IEnumerable<string>>

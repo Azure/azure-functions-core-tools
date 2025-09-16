@@ -85,8 +85,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "host.json",
                     "package.json",
                     Path.Combine("src", "functions", "HttpTrigger.js"),
-                    "package-lock.json",
-                    Path.Combine("node_modules", ".package-lock.json")
+                    "package-lock.json"
                 },
                 Log);
 
@@ -124,8 +123,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
                     "host.json",
                     "package.json",
                     Path.Combine("src", "functions", "HttpTrigger.js"),
-                    "package-lock.json",
-                    Path.Combine("node_modules", ".package-lock.json")
+                    "package-lock.json"
                 },
                 Log);
 

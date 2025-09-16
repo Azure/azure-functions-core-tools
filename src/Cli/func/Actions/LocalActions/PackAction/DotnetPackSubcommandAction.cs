@@ -1,10 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -14,11 +12,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
     [Action(Name = "pack dotnet", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to .NET apps when running func pack")]
     internal class DotnetPackSubcommandAction : PackSubcommandAction
     {
-        private readonly ISecretsManager _secretsManager;
+        private readonly bool _isDotnetIsolated;
 
-        public DotnetPackSubcommandAction(ISecretsManager secretsManager)
+        public DotnetPackSubcommandAction(bool isDotnetIsolated)
         {
-            _secretsManager = secretsManager;
+            _isDotnetIsolated = isDotnetIsolated;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -38,15 +36,69 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             return Task.CompletedTask;
         }
 
-        protected override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
+        protected internal override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            var requiredFiles = new[] { "host.json" };
+            var validations = new List<Action<string>>();
+
+            // .NET isolated: validate folder structure if --no-build
+            if (options.NoBuild && _isDotnetIsolated)
+            {
+                validations.Add(dir => RunDotnetIsolatedFolderStructureValidation(dir));
+            }
+
+            PackValidationHelper.RunValidations(functionAppRoot, validations);
+        }
+
+        internal static bool ValidateDotnetIsolatedFolderStructure(string directory, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                errorMessage = "Deployment directory path not specified.";
+                return false;
+            }
+
+            // Required artifacts
+            var requiredFiles = new[] { "functions.metadata" };
+            var requiredDirectories = new[] { ".azurefunctions" };
+
+            // Validate files
             foreach (var file in requiredFiles)
             {
-                if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, file)))
+                var filePath = Path.Combine(directory, file);
+                if (!FileSystemHelpers.FileExists(filePath))
                 {
-                    throw new CliException($"Required file '{file}' not found in build output directory: {functionAppRoot}");
+                    errorMessage = $"Required file '{file}' not found in deployment structure. Ensure 'dotnet publish' has been run.";
+                    return false;
                 }
+            }
+
+            // Validate directories
+            foreach (var dir in requiredDirectories)
+            {
+                var dirPath = Path.Combine(directory, dir);
+                if (!FileSystemHelpers.DirectoryExists(dirPath))
+                {
+                    errorMessage = $"Required directory '{dir}' not found in deployment structure. Ensure 'dotnet publish' has been run.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static void RunDotnetIsolatedFolderStructureValidation(string directory)
+        {
+            var isValidStructure = ValidateDotnetIsolatedFolderStructure(directory, out string errorMessage);
+            PackValidationHelper.DisplayValidationResult(
+                "Validate Folder Structure",
+                isValidStructure,
+                isValidStructure ? null : errorMessage);
+            if (!isValidStructure)
+            {
+                PackValidationHelper.DisplayValidationEnd();
+                throw new CliException(errorMessage);
             }
         }
 
@@ -120,6 +172,24 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             if (exitCode != 0)
             {
                 throw new CliException("Error publishing .NET project");
+            }
+
+            if (_isDotnetIsolated)
+            {
+                // Validate the published structure
+                ColoredConsole.WriteLine();
+                ColoredConsole.WriteLine("Validating published output...");
+
+                var isValidStructure = ValidateDotnetIsolatedFolderStructure(outputPath, out string errorMessage);
+                PackValidationHelper.DisplayValidationResult(
+                    "Validate Published Structure",
+                    isValidStructure,
+                    isValidStructure ? null : errorMessage);
+
+                if (!isValidStructure)
+                {
+                    throw new CliException($"Published output validation failed: {errorMessage}");
+                }
             }
         }
     }

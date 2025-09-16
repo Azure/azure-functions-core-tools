@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
@@ -18,6 +19,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         public async Task RunAsync(PackOptions packOptions)
         {
             await ExecuteAsync(packOptions);
+        }
+
+        protected internal override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
+        {
+            PackValidationHelper.RunValidations(functionAppRoot, null);
         }
 
         protected override Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)

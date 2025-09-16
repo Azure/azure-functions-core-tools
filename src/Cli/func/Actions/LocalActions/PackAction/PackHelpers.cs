@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         public static string ResolveFunctionAppRoot(string folderPath)
         {
             return string.IsNullOrEmpty(folderPath)
-                ? ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory)
+                ? Environment.CurrentDirectory
                 : Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, folderPath));
         }
 
