@@ -101,45 +101,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         }
 
         /// <summary>
-        /// Validates that at least one first-level subdirectory contains a specific file.
-        /// </summary>
-        public static bool ValidateAtLeastOneDirectoryContainsFile(string rootDirectory, string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(rootDirectory) || string.IsNullOrWhiteSpace(fileName))
-            {
-                return false;
-            }
-
-            if (FileSystemHelpers.FileExists(Path.Combine(rootDirectory, fileName)))
-            {
-                return true; // Root directory contains the file.
-            }
-
-            try
-            {
-                var directories = FileSystemHelpers.GetDirectories(rootDirectory);
-                foreach (var directory in directories)
-                {
-                    var filePath = Path.Combine(directory, fileName);
-                    if (FileSystemHelpers.FileExists(filePath))
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Swallow but emit verbose diagnostic if running in debug mode.
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine(VerboseColor($"Validation check failed while scanning '{rootDirectory}': {ex.Message}"));
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
         /// Validates that a directory exists and contains at least one file or directory.
         /// </summary>
         public static bool ValidateDirectoryNotEmpty(string directoryPath)
@@ -151,11 +112,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             return FileSystemHelpers.EnsureDirectoryNotEmpty(directoryPath);
         }
-
-        /// <summary>
-        /// True if the current OS platform is Windows.
-        /// </summary>
-        public static bool IsRunningOnWindows() => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
         /// <summary>
         /// Runs a required files validation and displays results.
@@ -181,33 +137,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         /// </summary>
         public static void RunHostJsonValidation(string directory)
         {
-            var hostJsonExists = FileSystemHelpers.FileExists(Path.Combine(directory, "host.json"));
+            var hostJsonExists = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.HostJsonFileName));
             DisplayValidationResult(
-                "Validate host.json",
+                $"Validate {Constants.HostJsonFileName}",
                 hostJsonExists,
                 hostJsonExists ? null : string.Empty);
             if (!hostJsonExists)
             {
                 DisplayValidationEnd();
-                throw new CliException($"Required file 'host.json' not found in directory: {directory}");
-            }
-        }
-
-        /// <summary>
-        /// Runs a validation for at least one subdirectory containing a file.
-        /// Throws CliException if validation fails.
-        /// </summary>
-        public static void RunAtLeastOneDirectoryContainsFileValidation(string rootDirectory, string fileName, string validationTitle = "Validate Function Structure")
-        {
-            var hasFile = ValidateAtLeastOneDirectoryContainsFile(rootDirectory, fileName);
-            DisplayValidationResult(
-                validationTitle,
-                hasFile,
-                hasFile ? null : string.Empty);
-            if (!hasFile)
-            {
-                DisplayValidationEnd();
-                throw new CliException($"No '{fileName}' files found in subdirectories of {rootDirectory}. At least one is required.");
+                throw new CliException($"Required file '{Constants.HostJsonFileName}' not found in directory: {directory}");
             }
         }
 

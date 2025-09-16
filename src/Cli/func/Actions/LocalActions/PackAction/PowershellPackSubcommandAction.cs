@@ -23,11 +23,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected internal override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            var validations = new List<Action<string>>
-            {
-                dir => PackValidationHelper.RunAtLeastOneDirectoryContainsFileValidation(dir, "function.json", "Validate Function Structure")
-            };
-            PackValidationHelper.RunValidations(functionAppRoot, validations);
+            PackValidationHelper.RunValidations(functionAppRoot, null);
         }
 
         protected override Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)

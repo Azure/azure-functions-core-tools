@@ -31,48 +31,52 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                     // Validate custom handler configuration and executable
                     try
                     {
-                        var hostJsonPath = Path.Combine(dir, "host.json");
+                        var hostJsonPath = Path.Combine(dir, Constants.HostJsonFileName);
                         var hostJsonContent = FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath).Result;
                         var hostConfig = JObject.Parse(hostJsonContent);
                         var customHandler = hostConfig["customHandler"];
                         var validateCustomHandlerTitle = "Validate Custom Handler Configuration";
+                        var configWarning = "No custom handler configuration found in host.json. Please visit https://aka.ms/custom-handler-host-json" +
+                                            " to view examples on how to configure the app.";
 
-                        if (customHandler != null)
+                        if (customHandler is null)
+                        {
+                            PackValidationHelper.DisplayValidationWarning(
+                                validateCustomHandlerTitle,
+                                configWarning);
+                        }
+                        else
                         {
                             var description = customHandler["description"];
-                            if (description != null)
+                            if (description is null)
+                            {
+                                PackValidationHelper.DisplayValidationWarning(
+                                    validateCustomHandlerTitle,
+                                    configWarning);
+                            }
+                            else
                             {
                                 var defaultExecutablePath = description["defaultExecutablePath"]?.ToString();
-                                if (!string.IsNullOrEmpty(defaultExecutablePath))
+                                if (string.IsNullOrEmpty(defaultExecutablePath))
+                                {
+                                    PackValidationHelper.DisplayValidationWarning(validateCustomHandlerTitle, "No defaultExecutablePath specified in host.json");
+                                }
+                                else
                                 {
                                     var executablePath = Path.Combine(dir, defaultExecutablePath);
                                     var executableExists = FileSystemHelpers.FileExists(executablePath);
-                                    if (executableExists)
-                                    {
-                                        PackValidationHelper.DisplayValidationResult(validateCustomHandlerTitle, true);
-                                    }
-                                    else
+                                    if (!executableExists)
                                     {
                                         PackValidationHelper.DisplayValidationWarning(
                                             validateCustomHandlerTitle,
                                             $"Custom handler executable '{defaultExecutablePath}' not found. Ensure the executable exists.");
                                     }
-                                }
-                                else
-                                {
-                                    PackValidationHelper.DisplayValidationWarning(validateCustomHandlerTitle, "No defaultExecutablePath specified in host.json");
+                                    else
+                                    {
+                                        PackValidationHelper.DisplayValidationResult(validateCustomHandlerTitle, true);
+                                    }
                                 }
                             }
-                            else
-                            {
-                                PackValidationHelper.DisplayValidationResult(validateCustomHandlerTitle, true);
-                            }
-                        }
-                        else
-                        {
-                            PackValidationHelper.DisplayValidationWarning(
-                                validateCustomHandlerTitle,
-                                "No custom handler configuration found in host.json.");
                         }
                     }
                     catch (Exception ex)

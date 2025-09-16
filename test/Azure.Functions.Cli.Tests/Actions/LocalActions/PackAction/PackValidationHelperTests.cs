@@ -59,47 +59,5 @@ namespace Azure.Functions.Cli.Tests.E2E.PackAction
             Assert.False(result);
             Assert.Equal("package.json", missingFile);
         }
-
-        [Fact]
-        public void ValidateAtLeastOneDirectoryContainsFile_FileExists_ReturnsTrue()
-        {
-            // Arrange
-            var subDir = Path.Combine(_tempDirectory, "HttpTrigger");
-            Directory.CreateDirectory(subDir);
-            File.WriteAllText(Path.Combine(subDir, "function.json"), "{}");
-
-            // Act
-            var result = PackValidationHelper.ValidateAtLeastOneDirectoryContainsFile(_tempDirectory, "function.json");
-
-            // Assert
-            Assert.True(result);
-        }
-
-        [Fact]
-        public void ValidateAtLeastOneDirectoryContainsFile_FileNotExists_ReturnsFalse()
-        {
-            // Arrange
-            var subDir = Path.Combine(_tempDirectory, "HttpTrigger");
-            Directory.CreateDirectory(subDir);
-            // Don't create function.json
-
-            // Act
-            var result = PackValidationHelper.ValidateAtLeastOneDirectoryContainsFile(_tempDirectory, "function.json");
-
-            // Assert
-            Assert.False(result);
-        }
-
-        [Fact]
-        public void IsRunningOnWindows_ReturnsCorrectValue()
-        {
-            // Act
-            var result = PackValidationHelper.IsRunningOnWindows();
-
-            // Assert
-            // The result should match the current OS - we can't assert a specific value
-            // but we can ensure it doesn't throw an exception
-            Assert.True(result == true || result == false);
-        }
     }
 }

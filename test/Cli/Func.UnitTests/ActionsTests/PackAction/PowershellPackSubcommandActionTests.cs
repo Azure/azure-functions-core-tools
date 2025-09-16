@@ -29,21 +29,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
         public void ValidatePowershellFunctionApp_ValidStructure_PassesValidation()
         {
             File.WriteAllText(Path.Combine(_tempDirectory, "host.json"), "{}");
-            File.WriteAllText(Path.Combine(_tempDirectory, "function.json"), "{}");
             var action = new PowershellPackSubcommandAction();
             var options = new PackOptions();
             var ex = Record.Exception(() => action.ValidateFunctionApp(_tempDirectory, options));
             Assert.Null(ex);
-        }
-
-        [Fact]
-        public void ValidatePowershellFunctionApp_MissingFunctionJson_FailsValidation()
-        {
-            File.WriteAllText(Path.Combine(_tempDirectory, "host.json"), "{}");
-            var action = new PowershellPackSubcommandAction();
-            var options = new PackOptions();
-            var ex = Assert.Throws<CliException>(() => action.ValidateFunctionApp(_tempDirectory, options));
-            Assert.Contains("function.json", ex.Message);
         }
     }
 }
