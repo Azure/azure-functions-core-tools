@@ -44,40 +44,37 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                             PackValidationHelper.DisplayValidationWarning(
                                 validateCustomHandlerTitle,
                                 configWarning);
+                            return;
                         }
-                        else
+
+                        var description = customHandler["description"];
+                        if (description is null)
                         {
-                            var description = customHandler["description"];
-                            if (description is null)
-                            {
-                                PackValidationHelper.DisplayValidationWarning(
-                                    validateCustomHandlerTitle,
-                                    configWarning);
-                            }
-                            else
-                            {
-                                var defaultExecutablePath = description["defaultExecutablePath"]?.ToString();
-                                if (string.IsNullOrEmpty(defaultExecutablePath))
-                                {
-                                    PackValidationHelper.DisplayValidationWarning(validateCustomHandlerTitle, "No defaultExecutablePath specified in host.json");
-                                }
-                                else
-                                {
-                                    var executablePath = Path.Combine(dir, defaultExecutablePath);
-                                    var executableExists = FileSystemHelpers.FileExists(executablePath);
-                                    if (!executableExists)
-                                    {
-                                        PackValidationHelper.DisplayValidationWarning(
-                                            validateCustomHandlerTitle,
-                                            $"Custom handler executable '{defaultExecutablePath}' not found. Ensure the executable exists.");
-                                    }
-                                    else
-                                    {
-                                        PackValidationHelper.DisplayValidationResult(validateCustomHandlerTitle, true);
-                                    }
-                                }
-                            }
+                            PackValidationHelper.DisplayValidationWarning(
+                                validateCustomHandlerTitle,
+                                configWarning);
+                            return;
                         }
+
+                        var defaultExecutablePath = description["defaultExecutablePath"]?.ToString();
+                        if (string.IsNullOrEmpty(defaultExecutablePath))
+                        {
+                            PackValidationHelper.DisplayValidationWarning(validateCustomHandlerTitle, "No defaultExecutablePath specified in host.json");
+                            return;
+                        }
+
+                        var executablePath = Path.Combine(dir, defaultExecutablePath);
+                        var executableExists = FileSystemHelpers.FileExists(executablePath);
+                        if (!executableExists)
+                        {
+                            PackValidationHelper.DisplayValidationWarning(
+                                validateCustomHandlerTitle,
+                                $"Custom handler executable '{defaultExecutablePath}' not found. Ensure the executable exists.");
+                            return;
+                        }
+
+                        // If we get to this point, validation has succeeded
+                        PackValidationHelper.DisplayValidationResult(validateCustomHandlerTitle, true);
                     }
                     catch (Exception ex)
                     {
