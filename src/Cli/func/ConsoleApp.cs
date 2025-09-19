@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections;
@@ -292,7 +292,7 @@ namespace Azure.Functions.Cli
                 actionStr = argsStack.Pop();
             }
 
-            if (string.IsNullOrEmpty(actionStr) || isHelp)
+            if (string.IsNullOrEmpty(actionStr))
             {
                 // It's ok to log invoke command here because it only contains the
                 // strings we were able to match with context / subcontext.
@@ -301,17 +301,14 @@ namespace Azure.Functions.Cli
                 _telemetryEvent.IActionName = typeof(HelpAction).Name;
                 _telemetryEvent.Parameters = new List<string>();
 
-                // If this wasn't a help command, actionStr was empty or null implying a parseError.
-                _telemetryEvent.ParseError = !isHelp;
+                // actionStr was empty or null implying a parseError.
+                _telemetryEvent.ParseError = true;
 
                 // At this point we have all we need to create an IAction:
                 //    context
                 //    subContext
                 //    action
-                // However, if isHelp is true, then display help for that context.
-                // Action Name is ignored with help since we don't have action specific help yet.
-                // There is no need so far for action specific help since general context help displays
-                // the help for all the actions in that context anyway.
+                // Display general help for the context.
                 return new HelpAction(_actionAttributes, CreateAction, contextStr, subContextStr);
             }
 
@@ -354,6 +351,18 @@ namespace Azure.Functions.Cli
             {
                 // Give the action a change to parse its args.
                 var parseResult = action.ParseArgs(args);
+
+                // If help was requested, show action-specific help
+                if (isHelp)
+                {
+                    _telemetryEvent.CommandName = invokeCommand.ToString();
+                    _telemetryEvent.IActionName = typeof(HelpAction).Name;
+                    _telemetryEvent.Parameters = new List<string>();
+
+                    // Display action-specific help
+                    return new HelpAction(_actionAttributes, CreateAction, action, parseResult);
+                }
+
                 if (parseResult.HasErrors)
                 {
                     // If we matched the action, we can log the invoke command

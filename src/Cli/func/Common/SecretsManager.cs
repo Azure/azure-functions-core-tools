@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Helpers;
@@ -40,8 +40,13 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        public IDictionary<string, string> GetSecrets()
+        public IDictionary<string, string> GetSecrets(bool refreshSecrets = false)
         {
+            if (refreshSecrets)
+            {
+                return new AppSettingsFile(AppSettingsFilePath).GetValues();
+            }
+
             return Settings.GetValues();
         }
 

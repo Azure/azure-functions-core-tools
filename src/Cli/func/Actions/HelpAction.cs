@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.ComponentModel;
@@ -18,6 +18,9 @@ namespace Azure.Functions.Cli.Actions
 {
     internal class HelpAction : BaseAction
     {
+        // Standardized indentation
+        private const int IndentSize = 4;
+
         private readonly string _context;
         private readonly string _subContext;
         private readonly IAction _action;
@@ -42,7 +45,8 @@ namespace Azure.Functions.Cli.Actions
                         Type = type,
                         Contexts = attributes.Select(a => a.Context),
                         SubContexts = attributes.Select(a => a.SubContext),
-                        Names = attributes.Select(a => a.Name)
+                        Names = attributes.Select(a => a.Name),
+                        ParentCommandName = attributes.Select(a => a.ParentCommandName)
                     };
                 });
         }
@@ -50,9 +54,27 @@ namespace Azure.Functions.Cli.Actions
         public HelpAction(IEnumerable<TypeAttributePair> actions, Func<Type, IAction> createAction, IAction action, ICommandLineParserResult parseResult)
             : this(actions, createAction)
         {
+            _actionTypes = actions
+                .Where(a => a.Attribute.ShowInHelp)
+                .Select(a => a.Type)
+                .Distinct()
+                .Select(type =>
+                {
+                    var attributes = type.GetCustomAttributes<ActionAttribute>();
+                    return new ActionType
+                    {
+                        Type = type,
+                        Contexts = attributes.Select(a => a.Context),
+                        SubContexts = attributes.Select(a => a.SubContext),
+                        Names = attributes.Select(a => a.Name),
+                        ParentCommandName = attributes.Select(a => a.ParentCommandName)
+                    };
+                });
             _action = action;
             _parseResult = parseResult;
         }
+
+        private static string Indent(int levels = 1) => new string(' ', IndentSize * (levels < 0 ? 0 : levels));
 
         public override async Task RunAsync()
         {
@@ -161,17 +183,35 @@ namespace Azure.Functions.Cli.Actions
 
         private void DisplayActionHelp()
         {
-            if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
+            if (_action == null)
             {
-                foreach (var error in _parseResult.Errors)
-                {
-                    ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
-                }
+                return;
             }
-            else
+
+            // Get all declared names (ActionAttribute.Name) for the current action.
+            var currentActionNames = _action.GetType()
+                .GetCustomAttributes<ActionAttribute>()
+                .Select(a => a.Name)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToArray();
+
+            // Find the ActionType entry representing the current action (if it exists in the filtered _actionTypes set).
+            var currentActionType = _actionTypes.FirstOrDefault(a => a.Type == _action.GetType());
+
+            // Collect subcommands whose ParentCommandName matches any of the current action names (case-insensitive).
+            var subCommandActionTypes = _actionTypes
+                .Where(a => a.ParentCommandName.Any(p => !string.IsNullOrEmpty(p) && currentActionNames.Contains(p, StringComparer.OrdinalIgnoreCase)))
+                .ToList();
+
+            var actionsToDisplay = new List<ActionType>();
+            if (currentActionType != null)
             {
-                ColoredConsole.WriteLine(_parseResult.ErrorText);
+                actionsToDisplay.Add(currentActionType);
             }
+
+            actionsToDisplay.AddRange(subCommandActionTypes);
+
+            DisplayActionsHelp(actionsToDisplay);
         }
 
         private void DisplayGeneralHelp()
@@ -187,7 +227,8 @@ namespace Azure.Functions.Cli.Actions
                 .WriteLine("Usage: func [context] <action> [-/--options]")
                 .WriteLine();
             DisplayContextsHelp(contexts);
-            var actions = _actionTypes.Where(a => a.Contexts.Contains(Context.None));
+            var actions = _actionTypes
+                .Where(a => a.Contexts.Contains(Context.None));
             DisplayActionsHelp(actions);
         }
 
@@ -211,26 +252,100 @@ namespace Azure.Functions.Cli.Actions
             if (actions.Any())
             {
                 ColoredConsole.WriteLine(TitleColor("Actions: "));
+
+                // Group actions by parent command
+                var parentCommands = actions
+                    .Where(a => a.ParentCommandName.All(p => string.IsNullOrEmpty(p))) // Actions with no parent
+                    .ToList();
+
+                var subCommands = actions
+                    .Where(a => a.ParentCommandName.Any(p => !string.IsNullOrEmpty(p))) // Actions with a parent
+                    .ToList();
+
                 var longestName = actions.Select(a => a.Names).SelectMany(n => n).Max(n => n.Length);
                 longestName += 2; // for coloring chars
-                foreach (var action in actions)
-                {
-                    ColoredConsole.WriteLine(GetActionHelp(action, longestName));
-                    DisplaySwitches(action);
-                }
 
-                ColoredConsole.WriteLine();
+                // Display parent commands first
+                foreach (var parentAction in parentCommands)
+                {
+                    // Display parent command
+                    ColoredConsole.WriteLine(GetActionHelp(parentAction, longestName));
+                    DisplaySwitches(parentAction);
+
+                    // Find and display child commands for this parent
+                    var parentName = parentAction.Names.First();
+                    var childCommands = subCommands
+                        .Where(s => s.ParentCommandName.Any(p => p.Equals(parentName, StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
+
+                    if (childCommands.Any())
+                    {
+                        ColoredConsole.WriteLine(); // Add spacing before subcommands
+
+                        foreach (var childCommand in childCommands)
+                        {
+                            DisplaySubCommandHelp(childCommand);
+                        }
+                    }
+
+                    ColoredConsole.WriteLine();
+                }
             }
         }
 
-        private void DisplaySwitches(ActionType actionType)
+        private void DisplaySubCommandHelp(ActionType subCommand)
+        {
+            // Ensure subCommand is valid
+            if (subCommand is null)
+            {
+                return;
+            }
+
+            // Extract the runtime name from the full command name
+            // E.g., "pack dotnet" -> "Dotnet"
+            var fullCommandName = subCommand.Names?.FirstOrDefault();
+
+            string runtimeName = null;
+            if (!string.IsNullOrWhiteSpace(fullCommandName))
+            {
+                var parts = fullCommandName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                runtimeName = parts.Length > 1 && !string.IsNullOrEmpty(parts[1])
+                    ? char.ToUpper(parts[1][0]) + parts[1].Substring(1).ToLower()
+                    : fullCommandName;
+            }
+
+            // Fall back to a safe default if we couldn't determine a runtime name
+            runtimeName ??= subCommand.Type?.Name ?? "subcommand";
+
+            var description = subCommand.Type?.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
+
+            // Display indented subcommand header with standardized indentation
+            ColoredConsole.WriteLine($"{Indent(1)}{runtimeName.DarkGreen()}{Indent(2)}{description}");
+
+            // Display subcommand switches with extra indentation
+            if (subCommand.Type != null)
+            {
+                DisplaySwitches(subCommand, true);
+            }
+        }
+
+        private void DisplaySwitches(ActionType actionType, bool shouldIndent = false)
         {
             var action = _createAction.Invoke(actionType.Type);
             try
             {
                 var options = action.ParseArgs(Array.Empty<string>());
+                var arguments = action.GetPositionalArguments();
+
+                if (arguments.Any())
+                {
+                    ColoredConsole.WriteLine(TitleColor("Arguments:"));
+                    DisplayPositionalArguments(arguments);
+                }
+
                 if (options.UnMatchedOptions.Any())
                 {
+                    ColoredConsole.WriteLine(shouldIndent ? Indent(1) + TitleColor("Options:") : TitleColor("Options:"));
                     DisplayOptions(options.UnMatchedOptions);
                     ColoredConsole.WriteLine();
                 }
@@ -261,23 +376,18 @@ namespace Azure.Functions.Cli.Actions
             longestName += 4; // 4 for coloring and <> characters
             foreach (var argument in arguments)
             {
-                var helpLine = string.Format($"    {{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
-                if (helpLine.Length < SafeConsole.BufferWidth)
+                var helpLine = string.Format($"{Indent(1)}{{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
+                while (helpLine.Length > SafeConsole.BufferWidth)
                 {
-                    ColoredConsole.WriteLine(helpLine);
+                    var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
+                    helpLine = helpLine.Substring(SafeConsole.BufferWidth);
                 }
-                else
-                {
-                    while (helpLine.Length > SafeConsole.BufferWidth)
-                    {
-                        var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
-                        helpLine = helpLine.Substring(SafeConsole.BufferWidth);
-                    }
-                }
+
+                ColoredConsole.WriteLine(helpLine);
             }
         }
 
-        private static void DisplayOptions(IEnumerable<ICommandLineOption> options)
+        private static void DisplayOptions(IEnumerable<ICommandLineOption> options, bool addExtraIndent = false)
         {
             var longestName = options.Max(o =>
             {
@@ -311,7 +421,7 @@ namespace Azure.Functions.Cli.Actions
                     stringBuilder.Append($" [-{option.ShortName}]");
                 }
 
-                var helpSwitch = string.Format($"    {{0, {-longestName}}} ", stringBuilder.ToString().DarkGray());
+                var helpSwitch = string.Format($"{(addExtraIndent ? Indent(2) : Indent(1))}{{0, {-longestName}}} ", stringBuilder.ToString().DarkGray());
                 var helpSwitchLength = helpSwitch.Length - 2; // helpSwitch contains 2 formatting characters.
                 var helpText = option.Description;
                 if (string.IsNullOrWhiteSpace(helpText))

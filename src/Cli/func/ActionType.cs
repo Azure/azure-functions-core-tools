@@ -12,5 +12,7 @@ namespace Azure.Functions.Cli
         public IEnumerable<Context> SubContexts { get; set; }
 
         public IEnumerable<string> Names { get; set; }
+
+        public IEnumerable<string> ParentCommandName { get; set; }
     }
 }
