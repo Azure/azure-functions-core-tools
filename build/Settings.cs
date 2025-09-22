@@ -44,6 +44,7 @@ namespace Build
             "min.win-x86",
             "min.win-x64",
             "linux-x64",
+            "linux-arm64",
             "osx-x64",
             "osx-arm64",
             "win-x86",
@@ -56,6 +57,7 @@ namespace Build
             { "win-x64", "WINDOWS" },
             { "win-arm64", "WINDOWS"},
             { "linux-x64", "LINUX" },
+            { "linux-arm64", "LINUX" },
             { "osx-x64", "OSX" },
             { "osx-arm64", "OSX" },
             { "min.win-x86", "WINDOWS" },
@@ -95,6 +97,14 @@ namespace Build
             "linux-musl-x64"
         };
 
+        private static readonly string[] _linARMPowershellRuntimes = new[]
+        {
+            "linux",
+            "linux-arm",
+            "linux-arm64",
+            "unix"
+        };
+
         private static readonly string[] _osxPowershellRuntimes = new[]
         {
             "osx",
@@ -117,6 +127,7 @@ namespace Build
                 { "win-x64", _winPowershellRuntimes },
                 { "win-arm64", _winPowershellRuntimes },
                 { "linux-x64", _linPowershellRuntimes },
+                { "linux-arm64", _linARMPowershellRuntimes },
                 { "osx-x64", _osxPowershellRuntimes },
                 { "osx-arm64", _osxARMPowershellRuntimes }
             };
@@ -131,6 +142,7 @@ namespace Build
                 { "win-x64", _winPowershellRuntimesNet8 },
                 { "win-arm64", _winPowershellRuntimesNet8 },
                 { "linux-x64", _linPowershellRuntimes },
+                { "linux-arm64", _linARMPowershellRuntimes },
                 { "osx-x64", _osxPowershellRuntimes },
                 { "osx-arm64", _osxARMPowershellRuntimes }
             };
@@ -148,6 +160,7 @@ namespace Build
                     { "win-x64", _winPowershellRuntimes },
                     { "win-arm64", _winPowershellRuntimes },
                     { "linux-x64", _linPowershellRuntimes },
+                    { "linux-arm64", _linARMPowershellRuntimes },
                     { "osx-x64", _osxPowershellRuntimes },
                     // NOTE: PowerShell 7.0 does not support arm. First version supporting it is 7.2
                     // https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#supported-versions
