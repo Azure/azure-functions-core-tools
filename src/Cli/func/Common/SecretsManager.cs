@@ -115,7 +115,14 @@ namespace Azure.Functions.Cli.Common
 
         public HostStartSettings GetHostStartSettings()
         {
-            return Settings.Host ?? new HostStartSettings();
+            try
+            {
+                return Settings?.Host ?? new HostStartSettings();
+            }
+            catch (CliException)
+            {
+                return new HostStartSettings();
+            }
         }
 
         public void DeleteConnectionString(string name)
