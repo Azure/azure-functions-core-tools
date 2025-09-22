@@ -3,7 +3,9 @@
 
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Build.Logging;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -24,6 +26,8 @@ namespace Azure.Functions.Cli.Common
                     secretsFile,
                 });
                 var secretsFilePath = Path.Combine(rootPath, secretsFile);
+
+                ColoredConsole.WriteLine($"{secretsFile} found in root directory ({rootPath}).");
                 return secretsFilePath;
             }
         }
