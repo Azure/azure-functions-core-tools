@@ -614,5 +614,47 @@
       "enabledInTryMode": false,
       "userPrompt": []
     }
+  },
+  {
+    "id": "McpToolTrigger-typescript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "import { app, InvocationContext, output } from \"@azure/functions\";\n\nconst PROPERTY_TYPE = \"string\";\n\n// Hello function - responds with hello message\nexport async function mcpToolHello(_toolArguments:unknown, context: InvocationContext): Promise<string> {\n    // Get name from the tool arguments\n    const mcptoolargs = context.triggerMetadata.mcptoolargs as {\n        name?: string;\n    };\n    const name = mcptoolargs?.name;\n\n    console.info(`Hello ${name}, I am MCP Tool!`);\n\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\n// Register the hello tool\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responses with a hello message.',\n    toolProperties:[\n    {\n      propertyName: \"name\",\n      propertyType: PROPERTY_TYPE,\n      description: \"Required property to identify the caller.\",\n      required: true,\n    }],\n    handler: mcpToolHello\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpToolTrigger",
+      "description": "$McpToolTrigger_description",
+      "name": "Mcp Tool Trigger",
+      "language": "TypeScript",
+      "triggerType": "mcpToolTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "McpToolTrigger-javascript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "import { app } from \"@azure/functions\";\n\nconst PROPERTY_TYPE = \"string\";\n\n// Hello function - responds with hello message\nexport async function mcpToolHello(_toolArguments, context) {\n    // Get name from the tool arguments\n    const mcptoolargs = context.triggerMetadata.mcptoolargs || {};\n    const name = mcptoolargs.name;\n\n    console.info(`Hello ${name}, I am MCP Tool!`);\n\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\n// Register the hello tool\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responses with a hello message.',\n    toolProperties: [\n        {\n            propertyName: \"name\",\n            propertyType: PROPERTY_TYPE,\n            description: \"Required property to identify the caller.\",\n            required: true,\n        }\n    ],\n    handler: mcpToolHello\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpToolTrigger",
+      "description": "$McpToolTrigger_description",
+      "name": "Mcp Tool Trigger",
+      "language": "JavaScript",
+      "triggerType": "mcpToolTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
   }
 ]
