@@ -490,8 +490,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // On ARM64 Linux, we do not support in-proc .NET host. We always launch out-of-process host.
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
             {
-                Utilities.PrintSupportInformation();
-                PrintVerboseForHostSelection("out-of-process");
+                ColoredConsole.WriteLine(VerboseColor($".NET in-process is not supported on linux-arm64. Selected out-of-proc host."));
                 return false;
             }
 
