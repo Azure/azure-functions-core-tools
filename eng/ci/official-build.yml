@@ -1,11 +1,3 @@
-schedules:
-- cron: "0 0 * * *"
-  displayName: Nightly Build
-  branches:
-    include:
-      - v4.x
-  always: true
-
 name: $(Build.SourceBranchName)_$(Build.Reason)
 
 pr: none
