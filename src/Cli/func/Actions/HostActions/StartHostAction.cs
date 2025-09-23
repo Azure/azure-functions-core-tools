@@ -425,6 +425,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Utilities.WarnIfPreviewVersion();
 
+            Utilities.PrintSupportInformation();
+
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
                 Utilities.PrintLogo();
@@ -485,6 +487,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<bool> TryHandleInProcDotNetLaunchAsync()
         {
+            // On ARM64 Linux, we do not support in-proc .NET host. We always launch out-of-process host.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+            {
+                ColoredConsole.WriteLine(VerboseColor($".NET in-process is not supported on linux-arm64. Selected out-of-proc host."));
+                return false;
+            }
+
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
             if (HostRuntime is not null)
             {

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <VersionPrefix>4.3.0</VersionPrefix>
-    <VersionSuffix>preview1</VersionSuffix>
+    <VersionSuffix></VersionSuffix>
     <UpdateBuildNumber>true</UpdateBuildNumber>
   </PropertyGroup>
 

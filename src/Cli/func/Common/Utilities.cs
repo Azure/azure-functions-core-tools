@@ -61,12 +61,17 @@ namespace Azure.Functions.Cli
             ColoredConsole
                 .WriteLine("You are running a preview version of Azure Functions Core Tools.".DarkYellow());
 
+            ColoredConsole.WriteLine();
+        }
+
+        internal static void PrintSupportInformation()
+        {
             Architecture arch = RuntimeInformation.ProcessArchitecture;
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && arch == Architecture.Arm64)
             {
                 ColoredConsole
-                    .WriteLine("This version of the Azure Functions Core Tools currently doesn't support linux-arm64 with .NET applications using the in-process model.".DarkYellow());
+                    .WriteLine($"Azure Functions Core Tool does not support linux-arm64 with .NET applications using the in-process model. For more information, please visit {DotnetConstants.DotnetIsolatedMigrationDocLink}".DarkYellow());
             }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && arch == Architecture.Arm64)
