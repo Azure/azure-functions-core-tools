@@ -71,7 +71,7 @@ namespace Azure.Functions.Cli
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && arch == Architecture.Arm64)
             {
                 ColoredConsole
-                    .WriteLine("Azure Functions Core Tool does not support linux-arm64 with .NET applications using the in-process model.".DarkYellow());
+                    .WriteLine($"Azure Functions Core Tool does not support linux-arm64 with .NET applications using the in-process model. For more information, please visit {DotnetConstants.DotnetIsolatedMigrationDocLink}".DarkYellow());
             }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && arch == Architecture.Arm64)
