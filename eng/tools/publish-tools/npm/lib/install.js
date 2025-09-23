@@ -103,12 +103,16 @@ https.get(options, response => {
                     catch (err) {
                         // That's alright.
                     }
-                    if (os.platform() === 'linux' || os.platform() === 'darwin') {
+
+                    const platform = os.platform();
+                    const arch = os.arch();
+
+                    if (platform === 'linux' || platform === 'darwin') {
                         fs.chmodSync(`${installPath}/func`, 0o755);
                         fs.chmodSync(`${installPath}/gozip`, 0o755);
 
-                        // Skip for arm64 as it is not supported in the preview version
-                        if (os.arch() != 'arm64') {
+                        // inproc is not packaged in the linux-arm64 builds, so skip setting permissions for that platform
+                        if (!(platform === 'linux' && arch === 'arm64')) {
                             fs.chmodSync(`${installPath}/in-proc8/func`, 0o755);
                             fs.chmodSync(`${installPath}/in-proc6/func`, 0o755);
                         }
