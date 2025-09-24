@@ -95,11 +95,13 @@ namespace Azure.Functions.Cli.Common
         public const string Dotnet = "dotnet";
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
+
+        // forwardedHttpUrl sample format: https://n12abc3t-<port>.asse.devtunnels.ms/
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
         public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
         public const string PythonScriptFileName = "PYTHON_SCRIPT_FILE_NAME";
+        public const string PreviewVersionSuffixLabel = "preview";
 
-        // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
         public static readonly Dictionary<WorkerRuntime, IEnumerable<string>> WorkerRuntimeImages = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
             { WorkerRuntime.Dotnet, new[] { "mcr.microsoft.com/azure-functions/dotnet", "microsoft/azure-functions-dotnet-core2.0", "mcr.microsoft.com/azure-functions/base", "microsoft/azure-functions-base" } },

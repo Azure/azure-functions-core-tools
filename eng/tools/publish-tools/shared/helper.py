@@ -53,11 +53,11 @@ def produceHashForfile(filePath, hashType, Upper = True):
         return hashobj.hexdigest().lower()
 
 @restoreDirectory
-def linuxOutput(buildFolder):
+def linuxOutput(buildFolder, arch):
     os.chdir(constants.DRIVERROOTDIR)
 
     # ubuntu dropped 64, fedora supports both
-    fileName = f"Azure.Functions.Cli.linux-x64.{constants.VERSION}.zip"
+    fileName = f"Azure.Functions.Cli.linux-{arch}.{constants.VERSION}.zip"
     url = f'https://cdn.functions.azure.com/public/4.0.{constants.CONSOLIDATED_BUILD_ID}/{fileName}'
 
     # download the zip
@@ -88,18 +88,23 @@ def linuxOutput(buildFolder):
     exeFullPath = os.path.abspath("func")
 
     os.chdir(buildFolder)
+
     # strip sharedobjects
     import glob
 
-    sharedObjects = glob.glob("**/*.so", recursive=True)
+    stripBinary = "strip"
+    if arch == "arm64":
+        stripBinary = "aarch64-linux-gnu-strip"
 
     # obj files inside the workers should not be removed as workers like "python"
     # come with objects necessary for the worker to work.
+    sharedObjects = glob.glob("**/*.so", recursive=True)
     sharedObjects = [obj for obj in sharedObjects if "workers" not in obj]
-    printReturnOutput(["strip", "--strip-unneeded"] + sharedObjects)
 
-    chmodFolderAndFiles(os.path.join(buildFolder, "usr"))
+    printReturnOutput([stripBinary, "--strip-unneeded"] + sharedObjects)
+
     print(f"change bin/func permission to 755")
+    chmodFolderAndFiles(os.path.join(buildFolder, "usr"))
     # octal
     os.chmod(exeFullPath, 0o755)
 

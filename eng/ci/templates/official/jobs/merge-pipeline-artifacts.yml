@@ -9,6 +9,9 @@ jobs:
     - input: pipelineArtifact
       artifactName: func-cli-linux-x64
       targetPath: $(Pipeline.Workspace)/func-cli
+    - input: pipelineArtifact
+      artifactName: func-cli-linux-arm64
+      targetPath: $(Pipeline.Workspace)/func-cli
 
     - input: pipelineArtifact
       artifactName: func-cli-osx-x64
