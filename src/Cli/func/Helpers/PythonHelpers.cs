@@ -487,6 +487,22 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        private static bool IsLocalDockerImage(string imageName)
+        {
+            return imageName.StartsWith("local/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static Task<string> GetDockerfileForImage(string imageName)
+        {
+            switch (imageName)
+            {
+                case "local/python3.13-buildenv":
+                    return StaticResources.DockerfilePython313buildenv;
+                default:
+                    throw new CliException($"No Dockerfile mapping found for {imageName}");
+            }
+        }
+
         private static async Task RestorePythonRequirementsDocker(string functionAppRoot, string packagesLocation, string additionalPackages)
         {
             // Configurable settings
@@ -500,8 +516,21 @@ namespace Azure.Functions.Cli.Helpers
                 dockerImage = await ChoosePythonBuildEnvImage();
             }
 
-            if (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
-                !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) || dockerSkipPullFlagSetting == "1"))
+            if (IsLocalDockerImage(dockerImage))
+            {
+                // creating temp folder for Dockerfile
+                string imageTag = dockerImage.Replace("local/", string.Empty).Replace(":", "-");
+                string tempDir = Path.Combine(Path.GetTempPath(), $"{imageTag}-docker");
+                Directory.CreateDirectory(tempDir);
+                string tempDockerfile = Path.Combine(tempDir, "Dockerfile");
+
+                // Writing Dockerfile content using FileSystemHelpers
+                string dockerfileContent = await GetDockerfileForImage(dockerImage);
+                await FileSystemHelpers.WriteAllTextToFileAsync(tempDockerfile, dockerfileContent);
+                await DockerHelpers.DockerBuild(dockerImage, tempDir);
+            }
+            else if (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
+              !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) || dockerSkipPullFlagSetting == "1"))
             {
                 await DockerHelpers.DockerPull(dockerImage);
             }
