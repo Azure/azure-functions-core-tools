@@ -10,7 +10,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Azure.Functions.Cli.Abstractions.Helpers;
 
-namespace Azure.Functions.Cli.Abstractions
+namespace Azure.Functions.Cli.Abstractions.Command
 {
     public class Command(Process? process, bool trimTrailingNewlines = false) : ICommand
     {

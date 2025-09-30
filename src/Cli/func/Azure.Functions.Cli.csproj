@@ -274,7 +274,9 @@
     <PackageReference Include="Microsoft.Identity.Client" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="NuGet.Packaging" />
+    <PackageReference Include="Spectre.Console" />
     <PackageReference Include="System.Formats.Asn1" />
+    <PackageReference Include="System.CommandLine" />
     <PackageReference Include="StyleCop.Analyzers" />
     <PackageReference Include="WindowsAzure.Storage" />
     <PackageReference Include="YamlDotNet" />
@@ -295,6 +297,7 @@
     <ProjectReference Include="$(SrcRoot)GoZipTool\GoZipTool.csproj">
       <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
     </ProjectReference>
+    <ProjectReference Include="$(SrcRoot)Cli\Abstractions\Azure.Functions.Cli.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

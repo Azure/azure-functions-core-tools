@@ -9,7 +9,7 @@
   <!-- abstractions-->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5.25306.101" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.0-rc.1.25451.107" />
   </ItemGroup>
   <!-- func -->
   <ItemGroup>
@@ -24,6 +24,7 @@
     <PackageVersion Include="Microsoft.Build" Version="17.0.0" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageVersion Include="NuGet.Packaging" Version="5.11.6" />
+    <PackageVersion Include="Spectre.Console" Version="0.51.1" />
     <PackageVersion Include="System.Formats.Asn1" Version="6.0.1" />
     <PackageVersion Include="YamlDotNet" Version="6.0.0" />
     <!-- Transitive dependency -->

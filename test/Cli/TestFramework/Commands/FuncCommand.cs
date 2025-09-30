@@ -4,6 +4,7 @@
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Commands/TestCommand.cs
 using System.Diagnostics;
 using Azure.Functions.Cli.Abstractions;
+using Azure.Functions.Cli.Abstractions.Command;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Commands

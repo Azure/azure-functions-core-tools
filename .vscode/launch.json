@@ -11,7 +11,8 @@
             "env": {
                 "CLI_DEBUG": "1"
             },
-            "args": "${input:funcArgs} --script-root ${input:scriptRootArg}",
+            //  --script-root ${input:scriptRootArg}
+            "args": "${input:funcArgs}",
             "cwd": "${workspaceFolder}/src/Cli/func",
             "console": "integratedTerminal",
             "stopAtEntry": false

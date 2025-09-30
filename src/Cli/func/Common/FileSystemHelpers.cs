@@ -65,12 +65,12 @@ namespace Azure.Functions.Cli.Common
         {
             if (!FileExists(fileName))
             {
-                ColoredConsole.WriteLine($"Writing {fileName}");
+                Spectre.Console.AnsiConsole.WriteLine($"Writing {fileName}");
                 await WriteAllTextToFileAsync(fileName, fileContent);
             }
             else
             {
-                ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
+                Spectre.Console.AnsiConsole.WriteLine(New.OutputTheme.WarningColor($"{fileName} already exists. Skipped!"));
             }
         }
 
@@ -148,7 +148,7 @@ namespace Azure.Functions.Cli.Common
 
             var ignoredFiles = new[] { ".funcignore", ".gitignore", "local.settings.json", "project.lock.json" };
 
-            foreach (var file in FileSystemHelpers.GetFiles(path, ignoredDirectories, ignoredFiles))
+            foreach (var file in GetFiles(path, ignoredDirectories, ignoredFiles))
             {
                 if (PreCondition(file))
                 {
