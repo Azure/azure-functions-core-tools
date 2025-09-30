@@ -87,31 +87,31 @@ namespace Azure.Functions.Cli.Diagnostics
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            string formattedMessage = formatter(state, exception);
+            // string formattedMessage = formatter(state, exception);
 
-            if (string.IsNullOrEmpty(formattedMessage))
-            {
-                return;
-            }
+            // if (string.IsNullOrEmpty(formattedMessage))
+            // {
+            //     return;
+            // }
 
-            if (formattedMessage.StartsWith(JsonLogPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                _logJsonOutput(formattedMessage.Remove(0, JsonLogPrefix.Length));
-                return;
-            }
+            // if (formattedMessage.StartsWith(JsonLogPrefix, StringComparison.OrdinalIgnoreCase))
+            // {
+            //     _logJsonOutput(formattedMessage.Remove(0, JsonLogPrefix.Length));
+            //     return;
+            // }
 
-            if (DoesMessageStartsWithAllowedLogsPrefix(formattedMessage))
-            {
-                LogToConsole(logLevel, exception, formattedMessage);
-                return;
-            }
+            // if (DoesMessageStartsWithAllowedLogsPrefix(formattedMessage))
+            // {
+            //     LogToConsole(logLevel, exception, formattedMessage);
+            //     return;
+            // }
 
-            if (!IsEnabled(logLevel))
-            {
-                return;
-            }
+            // if (!IsEnabled(logLevel))
+            // {
+            //     return;
+            // }
 
-            LogToConsole(logLevel, exception, formattedMessage);
+            // LogToConsole(logLevel, exception, formattedMessage);
         }
 
         private void LogToConsole(LogLevel logLevel, Exception exception, string formattedMessage, bool includeTimeStamp = true)
