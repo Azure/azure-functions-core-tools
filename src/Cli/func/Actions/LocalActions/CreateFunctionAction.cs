@@ -110,11 +110,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            // Ensure that the worker runtime and language are set.
-            await UpdateLanguageAndRuntime();
-
             // Ensure that the _templates are loaded before we proceed
             _templates = await _templatesManager.Templates;
+
+            // Ensure that the worker runtime and language are set.
+            await UpdateLanguageAndRuntime();
 
             // Depends on UpdateLanguageAndRuntime to set 'Language'
             if (IsNewPythonProgrammingModel())
