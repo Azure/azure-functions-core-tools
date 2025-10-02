@@ -20,7 +20,7 @@
     <PackageVersion Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageVersion Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1042.100" />
+    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1044.300" />
     <PackageVersion Include="Microsoft.Build" Version="17.0.0" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageVersion Include="NuGet.Packaging" Version="5.11.6" />
@@ -32,11 +32,11 @@
   <!-- workers -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.Functions.JavaWorker" Version="2.19.2" />
-    <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.10.1" />
+    <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.12.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.4025" />
-    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4206" />
-    <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.38.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4581" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.40.2" />
   </ItemGroup>
   <!-- host -->
   <ItemGroup>
