@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections.Concurrent;
@@ -122,7 +122,7 @@ namespace Azure.Functions.Cli.Diagnostics
             //         ? $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".DarkGray().ToString()
             //         : string.Empty;
 
-            //     ColoredConsole.WriteLine(prefix + line);
+            // ColoredConsole.WriteLine(prefix + line);
             // }
         }
 
