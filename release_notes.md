@@ -2,8 +2,8 @@
 
 #### Host Version
 
-- Host Version: <version>
-- In-Proc Host Version: <version>
+- Host Version: 4.1042.100
+- In-Proc Host Version: 4.41.100 (4.841.100, 4.641.100)
 
 #### Changes
 
