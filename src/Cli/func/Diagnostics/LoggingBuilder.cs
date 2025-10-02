@@ -32,7 +32,7 @@ namespace Azure.Functions.Cli.Diagnostics
                 return new ColoredConsoleLoggerProvider(_loggingFilterHelper, filterOptions.Value, _jsonOutputFile);
             });
 
-            builder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => true);
+            builder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => false);
 
             builder.Services.AddSingleton<TelemetryClient>(provider =>
             {

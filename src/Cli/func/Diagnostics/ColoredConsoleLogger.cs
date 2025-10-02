@@ -116,23 +116,23 @@ namespace Azure.Functions.Cli.Diagnostics
 
         private void LogToConsole(LogLevel logLevel, Exception exception, string formattedMessage, bool includeTimeStamp = true)
         {
-            foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
-            {
-                string prefix = includeTimeStamp
-                    ? $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".DarkGray().ToString()
-                    : string.Empty;
+            // foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
+            // {
+            //     string prefix = includeTimeStamp
+            //         ? $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".DarkGray().ToString()
+            //         : string.Empty;
 
-                ColoredConsole.WriteLine(prefix + line);
-            }
+            //     ColoredConsole.WriteLine(prefix + line);
+            // }
         }
 
         private void LogJsonToFile(string message)
         {
-            lock (_fileAccessLock)
-            {
-                _jsonOutputFileStream.Write(Encoding.UTF8.GetBytes(message + Environment.NewLine));
-                _jsonOutputFileStream.Flush();
-            }
+            // lock (_fileAccessLock)
+            // {
+            //     _jsonOutputFileStream.Write(Encoding.UTF8.GetBytes(message + Environment.NewLine));
+            //     _jsonOutputFileStream.Flush();
+            // }
         }
 
         internal bool DoesMessageStartsWithAllowedLogsPrefix(string formattedMessage)
