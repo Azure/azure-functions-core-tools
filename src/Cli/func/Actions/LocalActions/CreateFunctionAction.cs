@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.RegularExpressions;
@@ -113,6 +113,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // Ensure that the _templates are loaded before we proceed
             _templates = await _templatesManager.Templates;
 
+            // Ensure that the worker runtime and language are set.
             await UpdateLanguageAndRuntime();
 
             // Depends on UpdateLanguageAndRuntime to set 'Language'
