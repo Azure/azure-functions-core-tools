@@ -98,6 +98,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.13">
       <LogicalName>$(AssemblyName).Dockerfile.python3.13</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python313buildenv">
+      <LogicalName>$(AssemblyName).Dockerfile.python313buildenv</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.javascript">
       <LogicalName>$(AssemblyName).Dockerfile.javascript</LogicalName>
     </EmbeddedResource>
