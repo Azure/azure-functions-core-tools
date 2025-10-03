@@ -7,4 +7,4 @@
 
 #### Changes
 
-- <entry>
+- Add support for Python 3.14 (#4668)
