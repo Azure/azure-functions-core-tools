@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
@@ -39,7 +39,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
             }
 
             var configOptions = new FunctionsHostingConfigOptions();
-            return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance, configOptions);
+            IHttpClientFactory httpClientFactory = new SimpleHttpClientFactory();
+            return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance, configOptions, httpClientFactory);
         }
 
         public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()

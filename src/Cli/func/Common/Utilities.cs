@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
@@ -298,7 +298,8 @@ namespace Azure.Functions.Cli
         internal static IConfigurationRoot BuildHostJsonConfigutation(ScriptApplicationHostOptions hostOptions)
         {
             IConfigurationBuilder builder = new ConfigurationBuilder();
-            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance, metricsLogger: new MetricsLogger()));
+            HostJsonFileConfigurationOptions hostJsonFileConfigurationOptions = new HostJsonFileConfigurationOptions(hostOptions);
+            builder.Add(new HostJsonFileConfigurationSource(hostJsonFileConfigurationOptions, loggerFactory: NullLoggerFactory.Instance, metricsLogger: new MetricsLogger()));
             var configuration = builder.Build();
             return configuration;
         }

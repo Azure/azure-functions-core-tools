@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections;
@@ -458,7 +458,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (hostService.State is not ScriptHostState.Stopping && hostService.State is not ScriptHostState.Stopped)
             {
-                await hostService.DelayUntilHostReady();
+                await hostService.DelayUntilHostReadyAsync();
 
                 var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
                 var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
