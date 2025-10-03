@@ -98,8 +98,8 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.13">
       <LogicalName>$(AssemblyName).Dockerfile.python3.13</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python314">
-      <LogicalName>$(AssemblyName).Dockerfile.python314</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.14">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.14</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.javascript">
       <LogicalName>$(AssemblyName).Dockerfile.javascript</LogicalName>
