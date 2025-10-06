@@ -19,7 +19,7 @@ steps:
             "Parameters": {},
             "ToolName": "sign",
             "ToolVersion": "1.0"
-          }
+          },
           {
             "KeyCode": "CP-230012",
             "OperationCode": "SigntoolSign",
