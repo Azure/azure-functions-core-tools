@@ -21,16 +21,8 @@ namespace Func.UnitTests.ActionsTests
             Directory.SetCurrentDirectory(_testDir);
         }
 
-        [Theory]
-        [InlineData(WorkerRuntime.Dotnet)]
-        [InlineData(WorkerRuntime.DotnetIsolated)]
-        [InlineData(WorkerRuntime.Node)]
-        [InlineData(WorkerRuntime.Python)]
-        [InlineData(WorkerRuntime.Java)]
-        [InlineData(WorkerRuntime.Powershell)]
-        [InlineData(WorkerRuntime.Custom)]
-        [InlineData(WorkerRuntime.None)]
-        public void DeleteOrOverwriteHostJsonIfOnlyFile_DeletesHostJson_WhenOnlyFilePresent(WorkerRuntime runtime)
+        [Fact]
+        public void DeleteOrOverwriteHostJsonIfOnlyFile_DeletesHostJson_WhenOnlyFilePresent()
         {
             // Arrange
             var hostJsonPath = Path.Combine(_testDir, "host.json");
