@@ -110,10 +110,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
+            await UpdateLanguageAndRuntime();
+
             // Ensure that the _templates are loaded before we proceed
             _templates = await _templatesManager.Templates;
-
-            await UpdateLanguageAndRuntime();
 
             // Depends on UpdateLanguageAndRuntime to set 'Language'
             if (IsNewPythonProgrammingModel())
