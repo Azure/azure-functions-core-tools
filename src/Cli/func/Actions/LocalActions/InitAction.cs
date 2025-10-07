@@ -277,6 +277,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 || workerRuntime == Helpers.WorkerRuntime.DotnetIsolated
                 || workerRuntime == Helpers.WorkerRuntime.Dotnet)
             {
+                DeleteOrOverwriteHostJsonIfOnlyFile();
                 if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
                     && languages.Count() != 0)
                 {
@@ -641,6 +642,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             catch (Exception)
             {
                 // ignore. Failure to show the EOL message should not fail the init command.
+            }
+        }
+
+        public static void DeleteOrOverwriteHostJsonIfOnlyFile()
+        {
+            var currentDir = Environment.CurrentDirectory;
+            var files = Directory.GetFiles(currentDir);
+            if (files.Length == 1 && string.Equals(Path.GetFileName(files[0]), "host.json", StringComparison.OrdinalIgnoreCase))
+            {
+                // Delete the host.json file
+                File.Delete(files[0]);
             }
         }
     }
