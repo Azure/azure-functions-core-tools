@@ -1,16 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.IO;
 using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Helpers;
 using Xunit;
 
 namespace Func.UnitTests.ActionsTests
 {
-    public class InitActionHostJsonTests : IDisposable
+    public class InitActionHostJsonTests
     {
         private readonly string _testDir;
 
@@ -50,15 +46,6 @@ namespace Func.UnitTests.ActionsTests
             // Assert
             Assert.True(File.Exists(hostJsonPath));
             Assert.True(File.Exists(otherFilePath));
-        }
-
-        public void Dispose()
-        {
-            Directory.SetCurrentDirectory(Path.GetTempPath());
-            if (Directory.Exists(_testDir))
-            {
-                Directory.Delete(_testDir, true);
-            }
         }
     }
 }
