@@ -1,8 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
@@ -27,18 +28,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly IContextHelpManager _contextHelpManager;
         private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
+        private readonly IEnumerable<IConfigurationProfile> _configurationProfileProviders;
         private readonly ITemplatesManager _templatesManager;
         private IEnumerable<Template> _templates;
         private IEnumerable<NewTemplate> _newTemplates;
         private IEnumerable<UserPrompt> _userPrompts;
         private WorkerRuntime _workerRuntime;
 
-        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
+        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager, IEnumerable<IConfigurationProfile> configurationProfileProviders)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
             _contextHelpManager = contextHelpManager;
-            _initAction = new InitAction(_templatesManager, _secretsManager);
+            _configurationProfileProviders = configurationProfileProviders;
+            // Construct InitAction with the provided providers so it can validate and apply the profile
+            _initAction = new InitAction(_templatesManager, _secretsManager, _configurationProfileProviders);
             _userInputHandler = new UserInputHandler(_templatesManager);
         }
 
