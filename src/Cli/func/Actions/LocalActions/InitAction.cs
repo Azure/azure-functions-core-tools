@@ -4,6 +4,7 @@
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -24,15 +25,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
+        private readonly IEnumerable<IConfigurationProfile> _configurationProfile;
         internal static readonly Dictionary<Lazy<string>, Task<string>> FileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
         };
 
-        public InitAction(ITemplatesManager templatesManager, ISecretsManager secretsManager)
+        public InitAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IEnumerable<IConfigurationProfile> configurationProfile)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
+            _configurationProfile = configurationProfile;
         }
 
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
@@ -58,6 +61,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Language { get; set; }
 
         public string TargetFramework { get; set; }
+
+        public string ConfigurationProfile { get; set; }
 
         public bool? ManagedDependencies { get; set; }
 
@@ -119,6 +124,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>("target-framework")
                 .WithDescription($"Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated or dotnet. Options are - {string.Join(", ", TargetFrameworkHelper.GetSupportedTargetFrameworks())}")
                 .Callback(tf => TargetFramework = tf);
+
+            Parser
+                .Setup<string>("configurationProfile")
+                .SetDefault(null)
+                .WithDescription("Initialize the project with a configuration profile. Currently supported: mcp-custom-handler")
+                .Callback(cp => ConfigurationProfile = cp);
 
             Parser
                 .Setup<bool>("managed-dependencies")
@@ -206,6 +217,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
+            // Validate configuration profile if provided and ensure provider exists
+            IConfigurationProfile selectedProvider = null;
+            if (!string.IsNullOrEmpty(ConfigurationProfile))
+            {
+                selectedProvider = _configurationProfile.FirstOrDefault(p => p.Name == ConfigurationProfile);
+                if (selectedProvider == null)
+                {
+                    var allProfiles = _configurationProfile.Select(p => p.Name);
+                    var supportedProfileNames = string.Join(", ", allProfiles.Where(p => p != null));
+                    var supportedMessage = allProfiles.Any()
+                        ? $"Supported values: {supportedProfileNames}."
+                        : "No configuration profiles are currently registered.";
+                    throw new CliArgumentsException($"configurationProfile '{ConfigurationProfile}' is not supported. {supportedMessage}");
+                }
+
+                // Apply the configuration profile and return
+                await selectedProvider.ApplyAsync(ResolvedWorkerRuntime, Force);
+                return;
+            }
+
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
             ValidateTargetFramework();
@@ -219,6 +250,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
                 await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation);
                 await WriteFiles();
+
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
                 await WriteLocalSettingsJson(ResolvedWorkerRuntime, ResolvedProgrammingModel);
             }
