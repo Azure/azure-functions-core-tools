@@ -111,9 +111,7 @@ namespace Azure.Functions.Cli
             builder.RegisterType<ContextHelpManager>()
                 .As<IContextHelpManager>();
 
-            var container = builder.Build();
-
-            return container;
+            return builder.Build();
         }
     }
 }

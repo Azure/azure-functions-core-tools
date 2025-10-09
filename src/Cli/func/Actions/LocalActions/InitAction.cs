@@ -678,16 +678,5 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 // ignore. Failure to show the EOL message should not fail the init command.
             }
         }
-
-        private static string GetProfileName(IConfigurationProfile provider)
-        {
-            // For McpCustomHandlerConfigurationProfile, return "mcp-custom-handler"
-            // This is a simple heuristic; providers could expose a Name property in the future
-            if (provider is McpCustomHandlerConfigurationProfile)
-            {
-                return "mcp-custom-handler";
-            }
-            return provider.GetType().Name;
-        }
     }
 }

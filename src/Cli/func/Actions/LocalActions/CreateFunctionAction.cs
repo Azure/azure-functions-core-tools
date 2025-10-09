@@ -28,7 +28,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly IContextHelpManager _contextHelpManager;
         private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
-        private readonly IEnumerable<IConfigurationProfile> _configurationProfileProviders;
         private readonly ITemplatesManager _templatesManager;
         private IEnumerable<Template> _templates;
         private IEnumerable<NewTemplate> _newTemplates;
@@ -40,9 +39,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
             _contextHelpManager = contextHelpManager;
-            _configurationProfileProviders = configurationProfileProviders;
+
             // Construct InitAction with the provided providers so it can validate and apply the profile
-            _initAction = new InitAction(_templatesManager, _secretsManager, _configurationProfileProviders);
+            _initAction = new InitAction(_templatesManager, _secretsManager, configurationProfileProviders);
             _userInputHandler = new UserInputHandler(_templatesManager);
         }
 
