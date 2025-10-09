@@ -1,4 +1,4 @@
-# Azure Functions CLI 4.3.0
+# Azure Functions CLI 4.3.1
 
 #### Host Version
 
