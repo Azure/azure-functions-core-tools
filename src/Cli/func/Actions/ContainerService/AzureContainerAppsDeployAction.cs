@@ -1,10 +1,11 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.ContainerApps.Models;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -19,9 +20,9 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
     {
         private readonly CreateFunctionAction _createFunctionAction;
 
-        public AzureContainerAppsDeployAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
+        public AzureContainerAppsDeployAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager, IEnumerable<IConfigurationProfile> configurationProfiles)
         {
-            _createFunctionAction = new CreateFunctionAction(templatesManager, secretsManager, contextHelpManager);
+            _createFunctionAction = new CreateFunctionAction(templatesManager, secretsManager, contextHelpManager, configurationProfiles);
         }
 
         public string ImageName { get; private set; }
