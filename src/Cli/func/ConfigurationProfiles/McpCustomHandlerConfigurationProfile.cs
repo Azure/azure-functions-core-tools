@@ -24,13 +24,17 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
             // Check if host.json exists and read it, otherwise use the default template
             var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
             var hostExists = FileSystemHelpers.FileExists(hostJsonPath);
-            var baseHostJson = await StaticResources.HostJson;
+            string baseHostJson;
 
             JObject hostJsonObj;
             if (hostExists)
             {
                 ColoredConsole.WriteLine($"Applying MCP custom handler configuration profile to existing {hostJsonPath}...");
                 baseHostJson = await FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath);
+            }
+            else
+            {
+                baseHostJson = await StaticResources.HostJson;
             }
 
             hostJsonObj = JsonConvert.DeserializeObject<JObject>(baseHostJson);
@@ -45,7 +49,7 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
             }
 
             // Add customHandler section if missing or if shouldForce is true
-            if (!hostJsonObj.TryGetValue("customHandler", StringComparison.OrdinalIgnoreCase, out var customHandlerToken) || shouldForce)
+            if (!hostJsonObj.TryGetValue("customHandler", StringComparison.OrdinalIgnoreCase, out _) || shouldForce)
             {
                 hostJsonObj["customHandler"] = new JObject
                 {
@@ -58,15 +62,15 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
                 changed = true;
             }
 
-            ColoredConsole.WriteLine(changed
-                ? "Updated host.json with MCP configuration profile."
-                : "host.json already contains MCP configuration profile. Please pass in `--force` to overwrite.\n");
-
             if (changed)
             {
                 var hostJsonContent = JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
                 await FileSystemHelpers.WriteAllTextToFileAsync(hostJsonPath, hostJsonContent);
             }
+
+            ColoredConsole.WriteLine(changed
+                ? "Updated host.json with MCP configuration profile."
+                : "host.json already contains MCP configuration profile. Please pass in `--force` to overwrite.\n");
         }
 
         public async Task ApplyLocalSettingsAsync(WorkerRuntime workerRuntime, bool shouldForce)
@@ -74,13 +78,21 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
             // Check if local.settings.json exists and read it, otherwise use the default template
             var localSettingsPath = Path.Combine(Environment.CurrentDirectory, "local.settings.json");
             var localExists = FileSystemHelpers.FileExists(localSettingsPath);
-            var baseLocalSettings = await StaticResources.LocalSettingsJson;
+            string baseLocalSettings;
 
             JObject localObj;
             if (localExists)
             {
                 ColoredConsole.WriteLine($"Applying MCP custom handler configuration profile to existing {localSettingsPath}...");
                 baseLocalSettings = await FileSystemHelpers.ReadAllTextFromFileAsync(localSettingsPath);
+            }
+            else
+            {
+                baseLocalSettings = await StaticResources.LocalSettingsJson;
+
+                // Replace placeholders in the template
+                baseLocalSettings = baseLocalSettings.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
+                baseLocalSettings = baseLocalSettings.Replace($"{{{Constants.AzureWebJobsStorage}}}", Constants.StorageEmulatorConnectionString);
             }
 
             localObj = JsonConvert.DeserializeObject<JObject>(baseLocalSettings);
@@ -100,8 +112,8 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
 
             // Handle AzureWebJobsFeatureFlags - append if exists and shouldForce is enabled, create if not
             const string mcpFeatureFlag = "EnableMcpCustomHandlerPreview";
-            var valueExists = values.TryGetValue("AzureWebJobsFeatureFlags", StringComparison.OrdinalIgnoreCase, out var existingFlagsToken);
-            if (shouldForce && valueExists)
+            var azureWebJobsFeatureFlagsExists = values.TryGetValue("AzureWebJobsFeatureFlags", StringComparison.OrdinalIgnoreCase, out var existingFlagsToken);
+            if (azureWebJobsFeatureFlagsExists && shouldForce)
             {
                 var existingFlags = existingFlagsToken?.ToString() ?? string.Empty;
 
@@ -122,16 +134,12 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
                 values["AzureWebJobsFeatureFlags"] = string.Join(",", flagsList);
                 changed = true;
             }
-            else if (!valueExists)
+            else if (!azureWebJobsFeatureFlagsExists)
             {
                 // No existing feature flags, create with just our flag
                 values["AzureWebJobsFeatureFlags"] = mcpFeatureFlag;
                 changed = true;
             }
-
-            ColoredConsole.WriteLine(changed
-                ? "Updated local.settings.json with MCP configuration profile."
-                : "local.settings.json already contains MCP configuration profile. Please pass in `--force` to overwrite.\n");
 
             if (changed)
             {
@@ -139,6 +147,10 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
                 var localContent = JsonConvert.SerializeObject(localObj, Formatting.Indented);
                 await FileSystemHelpers.WriteAllTextToFileAsync(localSettingsPath, localContent);
             }
+
+            ColoredConsole.WriteLine(changed
+                ? "Updated local.settings.json with MCP configuration profile."
+                : "local.settings.json already contains MCP configuration profile. Please pass in `--force` to overwrite.\n");
         }
     }
 }
