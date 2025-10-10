@@ -128,7 +128,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>("configurationProfile")
                 .SetDefault(null)
-                .WithDescription("Initialize the project with a configuration profile. Currently supported: mcp-custom-handler")
+                .WithDescription("Initialize the project with a configuration profile." +
+                "Note that the Functions project will not be initialized and only the relevant configuration profile will be set. Currently supported: mcp-custom-handler (preview)")
                 .Callback(cp => ConfigurationProfile = cp);
 
             Parser
@@ -217,11 +218,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            // Validate configuration profile if provided and ensure provider exists
-            IConfigurationProfile selectedProvider = null;
+            // Validate configuration profile if provided and ensure provider exists=
             if (!string.IsNullOrEmpty(ConfigurationProfile))
             {
-                selectedProvider = _configurationProfile.FirstOrDefault(p => p.Name == ConfigurationProfile);
+                IConfigurationProfile selectedProvider = _configurationProfile.FirstOrDefault(p => p.Name == ConfigurationProfile);
                 if (selectedProvider == null)
                 {
                     var allProfiles = _configurationProfile.Select(p => p.Name);
