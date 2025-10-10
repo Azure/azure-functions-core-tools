@@ -11,12 +11,30 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
 {
     internal class McpCustomHandlerConfigurationProfile : IConfigurationProfile
     {
+        private static readonly WorkerRuntime[] _supportedRuntimes = new[]
+        {
+            WorkerRuntime.DotnetIsolated,
+            WorkerRuntime.Python,
+            WorkerRuntime.Node
+        };
+
         public string Name { get; set; } = "mcp-custom-handler";
 
         public async Task ApplyAsync(WorkerRuntime workerRuntime, bool shouldForce = false)
         {
+            ValidateWorkerRuntime(workerRuntime);
             await ApplyHostJsonAsync(shouldForce);
             await ApplyLocalSettingsAsync(workerRuntime, shouldForce);
+        }
+
+        private static void ValidateWorkerRuntime(WorkerRuntime workerRuntime)
+        {
+            if (!_supportedRuntimes.Contains(workerRuntime))
+            {
+                var supportedRuntimesList = string.Join(", ", _supportedRuntimes.Select(r => WorkerRuntimeLanguageHelper.GetRuntimeMoniker(r)));
+                throw new CliException($"The MCP custom handler configuration profile only supports the following runtimes: {supportedRuntimesList}. " +
+                    $"The current runtime '{WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)}' is not supported.");
+            }
         }
 
         public async Task ApplyHostJsonAsync(bool shouldForce)
@@ -128,11 +146,11 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
                 if (!flagsList.Contains(mcpFeatureFlag, StringComparer.OrdinalIgnoreCase))
                 {
                     flagsList.Add(mcpFeatureFlag);
-                }
 
-                // Rejoin with comma and space
-                values["AzureWebJobsFeatureFlags"] = string.Join(",", flagsList);
-                changed = true;
+                    // Rejoin with comma and space
+                    values["AzureWebJobsFeatureFlags"] = string.Join(",", flagsList);
+                    changed = true;
+                }
             }
             else if (!azureWebJobsFeatureFlagsExists)
             {
