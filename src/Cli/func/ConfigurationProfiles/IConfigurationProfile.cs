@@ -8,9 +8,9 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
     internal interface IConfigurationProfile
     {
         /// <summary>
-        /// Gets or sets the name of the profile.
+        /// Gets the name of the profile.
         /// </summary>
-        internal string Name { get; set; }
+        internal string Name { get; }
 
         /// <summary>
         /// Applies the profile by generating necessary configuration artifacts.

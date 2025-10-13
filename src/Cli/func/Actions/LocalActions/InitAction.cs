@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Host.Config;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -126,13 +127,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(tf => TargetFramework = tf);
 
             Parser
-                .Setup<string>("configurationProfile")
-                .SetDefault(null)
-                .WithDescription("Initialize the project with a configuration profile." +
-                "Note that the Functions project will not be initialized and only the relevant configuration profile will be set. Currently supported: mcp-custom-handler (preview)")
-                .Callback(cp => ConfigurationProfile = cp);
-
-            Parser
                 .Setup<bool>("managed-dependencies")
                 .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
                 .Callback(f => ManagedDependencies = f);
@@ -155,6 +149,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("no-docs")
                 .WithDescription("Do not create getting started documentation file. Currently supported when --worker-runtime set to python.")
                 .Callback(d => GeneratePythonDocumentation = !d);
+
+            Parser
+                .Setup<string>("configuration-profile")
+                .SetDefault(null)
+                .WithDescription(WarningColor("[preview]").ToString() + " Initialize a project with a host configuration profile. Currently supported: 'mcp-custom-handler'. "
+                    + WarningColor("Using a configuration profile may skip all other initialization steps.").ToString())
+                .Callback(cp => ConfigurationProfile = cp);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -218,22 +219,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            // Validate configuration profile if provided and ensure provider exists=
-            if (!string.IsNullOrEmpty(ConfigurationProfile))
+            // If a configuration profile is provided, apply it and return
+            if (await ApplyConfigurationProfileIfProvided())
             {
-                IConfigurationProfile selectedProvider = _configurationProfile.FirstOrDefault(p => p.Name == ConfigurationProfile);
-                if (selectedProvider == null)
-                {
-                    var allProfiles = _configurationProfile.Select(p => p.Name);
-                    var supportedProfileNames = string.Join(", ", allProfiles.Where(p => p != null));
-                    var supportedMessage = allProfiles.Any()
-                        ? $"Supported values: {supportedProfileNames}."
-                        : "No configuration profiles are currently registered.";
-                    throw new CliArgumentsException($"configurationProfile '{ConfigurationProfile}' is not supported. {supportedMessage}");
-                }
-
-                // Apply the configuration profile and return
-                await selectedProvider.ApplyAsync(ResolvedWorkerRuntime, Force);
                 return;
             }
 
@@ -677,6 +665,33 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 // ignore. Failure to show the EOL message should not fail the init command.
             }
+        }
+
+        private async Task<bool> ApplyConfigurationProfileIfProvided()
+        {
+            if (string.IsNullOrEmpty(ConfigurationProfile))
+            {
+                return false;
+            }
+
+            IConfigurationProfile configurationProfile = _configurationProfile.FirstOrDefault(p => p.Name == ConfigurationProfile);
+            if (configurationProfile == null)
+            {
+                var allProfiles = _configurationProfile.Select(p => p.Name);
+                var supportedProfileNames = string.Join(", ", allProfiles.Where(p => p != null));
+                var supportedMessage = allProfiles.Any()
+                    ? $"Supported values: {supportedProfileNames}."
+                    : "No configuration profiles are currently registered.";
+
+                ColoredConsole.WriteLine(WarningColor($"Configuration profile '{ConfigurationProfile}' is not supported. {supportedMessage}"));
+                return true;
+            }
+
+            // Apply the configuration profile and return
+            ColoredConsole.WriteLine(WarningColor($"You are using a preview feature. Configuration profiles may change in future releases."));
+            SetupProgressLogger.Section($"Applying configuration profile: {configurationProfile.Name}");
+            await configurationProfile.ApplyAsync(ResolvedWorkerRuntime, Force);
+            return true;
         }
     }
 }

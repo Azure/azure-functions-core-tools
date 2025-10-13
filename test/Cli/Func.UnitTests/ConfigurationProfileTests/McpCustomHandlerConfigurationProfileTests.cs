@@ -153,7 +153,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
-            await _profile.ApplyHostJsonAsync(shouldForce: true);
+            await _profile.ApplyHostJsonAsync(force: true);
 
             // Capture bytes BEFORE asserting (stream might be closed)
             var writtenBytes = writeStream.ToArray();
@@ -184,7 +184,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
-            await _profile.ApplyHostJsonAsync(shouldForce: false);
+            await _profile.ApplyHostJsonAsync(force: false);
 
             // Assert
             fileSystem.File.DidNotReceive().Open(
@@ -270,7 +270,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, shouldForce: true);
+            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
             // Capture bytes BEFORE asserting (stream might be closed)
             var writtenBytes = writeStream.ToArray();
@@ -302,7 +302,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, shouldForce: true);
+            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
             // Capture bytes BEFORE asserting (stream might be closed)
             var writtenBytes = writeStream.ToArray();
@@ -333,7 +333,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, shouldForce: true);
+            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
             // Capture bytes BEFORE asserting (stream might be closed)
             var writtenBytes = writeStream.ToArray();
@@ -361,7 +361,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, shouldForce: false);
+            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: false);
 
             // Assert
             fileSystem.File.DidNotReceive().Open(
@@ -375,7 +375,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
         [InlineData(WorkerRuntime.Node, "node")]
         [InlineData(WorkerRuntime.Python, "python")]
         [InlineData(WorkerRuntime.DotnetIsolated, "dotnet-isolated")]
-        public async Task ApplyLocalSettingsAsync_SetsCorrectWorkerRuntime_ForSupportedRuntimes(WorkerRuntime runtime, string expectedMoniker)
+        public async Task ApplyLocalSettingsAsync_SetsCorrectWorkerRuntime(WorkerRuntime runtime, string expectedMoniker)
         {
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
@@ -401,7 +401,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
         [InlineData(WorkerRuntime.Node)]
         [InlineData(WorkerRuntime.Python)]
         [InlineData(WorkerRuntime.DotnetIsolated)]
-        public async Task ApplyAsync_Succeeds_ForSupportedRuntimes(WorkerRuntime runtime)
+        public async Task ApplyAsync_Succeeds(WorkerRuntime runtime)
         {
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
@@ -433,24 +433,6 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             // Assert
             hostJsonWritten.Should().BeTrue();
             localSettingsWritten.Should().BeTrue();
-        }
-
-        [Theory]
-        [InlineData(WorkerRuntime.Dotnet)]
-        [InlineData(WorkerRuntime.Powershell)]
-        [InlineData(WorkerRuntime.Java)]
-        [InlineData(WorkerRuntime.Custom)]
-        [InlineData(WorkerRuntime.None)]
-        public async Task ApplyAsync_ThrowsCliException_ForUnsupportedRuntimes(WorkerRuntime runtime)
-        {
-            // Arrange
-            var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
-            FileSystemHelpers.Instance = fileSystem;
-
-            // Act & Assert
-            var exception = await Assert.ThrowsAsync<CliException>(() => _profile.ApplyAsync(runtime, false));
-            exception.Message.Should().Contain("The MCP custom handler configuration profile only supports the following runtimes");
-            exception.Message.Should().Contain("dotnet-isolated, python, node");
         }
 
         public void Dispose()
