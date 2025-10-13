@@ -125,6 +125,9 @@ namespace Azure.Functions.Cli.Commands.Init
 
             cliCommand.SetAction(action.Run);
 
+            // trial subcommands for config profile
+            cliCommand.Subcommands.Add(ConfigurationProfileCommandParser.Command.Value);
+
             return cliCommand;
         }
     }

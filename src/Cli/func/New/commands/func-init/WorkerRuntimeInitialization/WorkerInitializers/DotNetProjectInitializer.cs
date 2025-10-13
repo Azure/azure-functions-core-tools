@@ -30,7 +30,6 @@ public sealed class DotNetProjectInitializer : IProjectInitializer
 
         ResolvedTargetFramework = await ResolveTfmAsync(Runtime, requestedTfm, csx);
 
-        // EOL warnings (kept from your existing logic)
         await ShowEolMessageIfNeeded(Runtime, ResolvedTargetFramework);
 
         var appName = Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-");

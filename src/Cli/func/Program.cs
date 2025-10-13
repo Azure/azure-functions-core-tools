@@ -112,6 +112,7 @@ namespace Azure.Functions.Cli
 
             // Register all func builtin command parsers
             services.AddSingleton<ICommandParser, InitCommandParser>();
+            services.AddSingleton<IConfigurationProfile, McpConfigurationProfile>();
 
             // RegisterExternalCommands(services);
             // services.RegisterExternalCommands();
@@ -160,6 +161,9 @@ namespace Azure.Functions.Cli
 
             builder.RegisterType<ContextHelpManager>()
                 .As<IContextHelpManager>();
+
+            builder.RegisterType<McpConfigurationProfile>()
+                .As<IConfigurationProfile>();
 
             return builder.Build();
         }

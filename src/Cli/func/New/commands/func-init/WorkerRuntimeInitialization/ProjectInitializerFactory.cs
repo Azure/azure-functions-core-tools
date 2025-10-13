@@ -14,9 +14,9 @@ public static class ProjectInitializerFactory
         WorkerRuntime.DotnetIsolated => new DotNetProjectInitializer(),
         WorkerRuntime.Node => new NodeProjectInitializer(),
 
-        // WorkerRuntime.Python => new PythonInitWorker(),
-        // WorkerRuntime.Powershell => new PowerShellInitWorker(),
-        // WorkerRuntime.Custom => new CustomInitWorker(),
+        // WorkerRuntime.Python => new PythonProjectInitializer(),
+        // WorkerRuntime.Powershell => new PowershellProjectInitializer(),
+        // WorkerRuntime.Custom => new CustomProjectInitializer(),
         _ => throw new CliException($"Unsupported worker runtime: {runtime}")
     };
 }
