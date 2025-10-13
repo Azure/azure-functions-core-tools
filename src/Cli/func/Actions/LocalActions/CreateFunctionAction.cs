@@ -34,14 +34,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private IEnumerable<UserPrompt> _userPrompts;
         private WorkerRuntime _workerRuntime;
 
-        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager, IEnumerable<IConfigurationProfile> configurationProfileProvider)
+        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager, IEnumerable<IConfigurationProfile> configurationProfiles)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
             _contextHelpManager = contextHelpManager;
 
             // Construct InitAction with the provided providers so it can validate and apply the profile
-            _initAction = new InitAction(_templatesManager, _secretsManager, configurationProfileProvider);
+            _initAction = new InitAction(_templatesManager, _secretsManager, configurationProfiles);
             _userInputHandler = new UserInputHandler(_templatesManager);
         }
 

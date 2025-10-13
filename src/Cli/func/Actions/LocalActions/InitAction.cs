@@ -26,17 +26,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
-        private readonly IEnumerable<IConfigurationProfile> _configurationProfile;
+        private readonly IEnumerable<IConfigurationProfile> _configurationProfiles;
         internal static readonly Dictionary<Lazy<string>, Task<string>> FileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
         };
 
-        public InitAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IEnumerable<IConfigurationProfile> configurationProfile)
+        public InitAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IEnumerable<IConfigurationProfile> configurationProfiles)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
-            _configurationProfile = configurationProfile;
+            _configurationProfiles = configurationProfiles;
         }
 
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
@@ -63,7 +63,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string TargetFramework { get; set; }
 
-        public string ConfigurationProfile { get; set; }
+        public string ConfigurationProfileName { get; set; }
 
         public bool? ManagedDependencies { get; set; }
 
@@ -155,7 +155,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(null)
                 .WithDescription(WarningColor("[preview]").ToString() + " Initialize a project with a host configuration profile. Currently supported: 'mcp-custom-handler'. "
                     + WarningColor("Using a configuration profile may skip all other initialization steps.").ToString())
-                .Callback(cp => ConfigurationProfile = cp);
+                .Callback(cp => ConfigurationProfileName = cp);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -220,7 +220,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             // If a configuration profile is provided, apply it and return
-            if (await ApplyConfigurationProfileIfProvided())
+            if (await TryApplyConfigurationProfileIfProvided())
             {
                 return;
             }
@@ -667,23 +667,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private async Task<bool> ApplyConfigurationProfileIfProvided()
+        private async Task<bool> TryApplyConfigurationProfileIfProvided()
         {
-            if (string.IsNullOrEmpty(ConfigurationProfile))
+            if (string.IsNullOrEmpty(ConfigurationProfileName))
             {
                 return false;
             }
 
-            IConfigurationProfile configurationProfile = _configurationProfile.FirstOrDefault(p => p.Name == ConfigurationProfile);
-            if (configurationProfile == null)
-            {
-                var allProfiles = _configurationProfile.Select(p => p.Name);
-                var supportedProfileNames = string.Join(", ", allProfiles.Where(p => p != null));
-                var supportedMessage = allProfiles.Any()
-                    ? $"Supported values: {supportedProfileNames}."
-                    : "No configuration profiles are currently registered.";
+            IConfigurationProfile configurationProfile = _configurationProfiles
+                .FirstOrDefault(p => string.Equals(p.Name, ConfigurationProfileName, StringComparison.OrdinalIgnoreCase));
 
-                ColoredConsole.WriteLine(WarningColor($"Configuration profile '{ConfigurationProfile}' is not supported. {supportedMessage}"));
+            if (configurationProfile is null)
+            {
+                var supportedProfiles = _configurationProfiles
+                    .Select(p => p.Name)
+                    .ToList();
+
+                ColoredConsole.WriteLine(WarningColor($"Configuration profile '{ConfigurationProfileName}' is not supported. Supported values: {string.Join(", ", supportedProfiles)}"));
+
+                // Return true to avoid running the rest of the initialization steps, we are treating the use of `--configuration-profile`
+                // as a stand alone command. So if the provided profile is invalid, we just warn and exit.
                 return true;
             }
 

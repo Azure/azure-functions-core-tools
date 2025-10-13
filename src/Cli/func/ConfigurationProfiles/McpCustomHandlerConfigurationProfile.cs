@@ -16,13 +16,13 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
 
         public string Name { get; } = "mcp-custom-handler";
 
-        public async Task ApplyAsync(WorkerRuntime workerRuntime, bool shouldForce = false)
+        public async Task ApplyAsync(WorkerRuntime workerRuntime, bool force = false)
         {
-            await ApplyHostJsonAsync(shouldForce);
-            await ApplyLocalSettingsAsync(workerRuntime, shouldForce);
+            await ApplyHostJsonAsync(force);
+            await ApplyLocalSettingsAsync(workerRuntime, force);
         }
 
-        public async Task ApplyHostJsonAsync(bool force)
+        internal async Task ApplyHostJsonAsync(bool force)
         {
             bool changed = false;
             string baseHostJson;
@@ -76,7 +76,7 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
             }
         }
 
-        public async Task ApplyLocalSettingsAsync(WorkerRuntime workerRuntime, bool force)
+        internal async Task ApplyLocalSettingsAsync(WorkerRuntime workerRuntime, bool force)
         {
             bool changed = false;
             string baseLocalSettings;

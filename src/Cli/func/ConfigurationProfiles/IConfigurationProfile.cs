@@ -15,6 +15,8 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
         /// <summary>
         /// Applies the profile by generating necessary configuration artifacts.
         /// </summary>
-        internal Task ApplyAsync(WorkerRuntime runtime, bool shouldForce = false);
+        /// <param name="runtime">The worker runtime of the function app.</param>
+        /// <param name="force">If true, forces overwriting existing configurations.</param>
+        internal Task ApplyAsync(WorkerRuntime runtime, bool force = false);
     }
 }
