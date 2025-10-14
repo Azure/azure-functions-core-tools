@@ -26,7 +26,7 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
     ACCEPT_EULA=Y apt-get install -y unixodbc msodbcsql18 mssql-tools18 && \
     # OpenCV dependencies:libglib2.0-0 libsm6 libxext6 libxrender-dev xvfb
     apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev xvfb && \
-    # .NET Core dependencies: ca-certificates libc6 libgcc1 libgssapi-krb5-2 libicu72 libssl3 libstdc++6 zlib1g 
+    # .NET Core dependencies: ca-certificates libc6 libgcc1 libgssapi-krb5-2 libicu72 libssl3 libstdc++6 zlib1g
     # Azure ML dependencies: liblttng-ust0
     # OpenMP dependencies: libgomp1
     # binutils: binutils
@@ -34,11 +34,10 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
     libc6 libgcc1 libgssapi-krb5-2 libicu72 libssl3 libstdc++6 zlib1g && \
     apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev xvfb binutils \
     libgomp1 liblttng-ust1 && \
-    rm -rf /var/lib/apt/lists/* 
+    rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && \
     apt-get install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
     libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
     xz-utils tk-dev libffi-dev liblzma-dev python3-openssl git unixodbc-dev dh-autoreconf \
     libcurl4-openssl-dev libssl-dev python3-dev libevent-dev python3-openssl squashfs-tools unzip
-    
