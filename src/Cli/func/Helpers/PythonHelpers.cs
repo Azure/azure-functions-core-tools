@@ -492,11 +492,11 @@ namespace Azure.Functions.Cli.Helpers
             return imageName.StartsWith("local/", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static Task<string> GetDockerfileForImage(string imageName)
+        private static Task<string> GetDockerInitFileContent(string imageName)
         {
             switch (imageName)
             {
-                case "local/python3.13-buildenv":
+                case Constants.DockerImages.LinuxPython313ImageAmd64:
                     return StaticResources.DockerfilePython313buildenv;
                 default:
                     throw new CliException($"No Dockerfile mapping found for {imageName}");
@@ -521,11 +521,11 @@ namespace Azure.Functions.Cli.Helpers
                 // creating temp folder for Dockerfile
                 string imageTag = dockerImage.Replace("local/", string.Empty).Replace(":", "-");
                 string tempDir = Path.Combine(Path.GetTempPath(), $"{imageTag}-docker");
-                Directory.CreateDirectory(tempDir);
+                FileSystemHelpers.CreateDirectory(tempDir);
                 string tempDockerfile = Path.Combine(tempDir, "Dockerfile");
 
                 // Writing Dockerfile content using FileSystemHelpers
-                string dockerfileContent = await GetDockerfileForImage(dockerImage);
+                string dockerfileContent = await GetDockerInitFileContent(dockerImage);
                 await FileSystemHelpers.WriteAllTextToFileAsync(tempDockerfile, dockerfileContent);
                 await DockerHelpers.DockerBuild(dockerImage, tempDir);
             }
@@ -618,7 +618,7 @@ namespace Azure.Functions.Cli.Helpers
                     case 12:
                         return StaticResources.DockerfilePython312;
                     case 13:
-                        return StaticResources.DockerfilePython313;
+                        return StaticResources.DockerfilePython313buildenv;
                 }
             }
 
