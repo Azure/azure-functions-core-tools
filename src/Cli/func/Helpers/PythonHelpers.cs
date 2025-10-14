@@ -362,7 +362,8 @@ namespace Azure.Functions.Cli.Helpers
             string containerId = null;
             try
             {
-                string dockerImage = await ChoosePythonBuildEnvImage();
+                DockerImageInfo result = await ChoosePythonBuildEnvImage();
+                string dockerImage = result.ImageName;
                 containerId = await DockerHelpers.DockerRun(dockerImage, command: "sleep infinity");
 
                 await DockerHelpers.CopyToContainer(containerId, tmpFile, $"/file.zip");
@@ -494,14 +495,19 @@ namespace Azure.Functions.Cli.Helpers
             var dockerSkipPullFlagSetting = Environment.GetEnvironmentVariable(Constants.PythonDockerImageSkipPull);
             var dockerRunSetting = Environment.GetEnvironmentVariable(Constants.PythonDockerRunCommand);
 
+            bool canPull = true;
             string dockerImage = pythonDockerImageSetting;
             if (string.IsNullOrEmpty(dockerImage))
             {
-                dockerImage = await ChoosePythonBuildEnvImage();
+                DockerImageInfo result = await ChoosePythonBuildEnvImage();
+                dockerImage = result.ImageName;
+                canPull = result.CanPull;
             }
 
-            if (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
-                !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) || dockerSkipPullFlagSetting == "1"))
+            if (canPull &&
+                (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
+                !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                dockerSkipPullFlagSetting == "1")))
             {
                 await DockerHelpers.DockerPull(dockerImage);
             }
@@ -547,10 +553,30 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<string> ChoosePythonBuildEnvImage()
+        private static async Task<DockerImageInfo> ChoosePythonBuildEnvImage()
         {
             WorkerLanguageVersionInfo workerInfo = await GetEnvironmentPythonVersion();
-            return GetBuildNativeDepsEnvironmentImage(workerInfo);
+            var (image, isLocal) = await GetBuildNativeDepsEnvironmentImage(workerInfo);
+
+            if (isLocal)
+            {
+                // Setup image tag and content
+                string imageContent = image;
+                image = $"azure-functions/python:4-python{workerInfo.Major}.{workerInfo.Minor}-buildenv";
+
+                // Prepare temporary directory for docker build context
+                string tempDockerfileDirecotry = Path.Combine(Path.GetTempPath(), $"{image}-docker");
+                FileSystemHelpers.EnsureDirectory(tempDockerfileDirecotry);
+                string tempDockerfile = Path.Combine(tempDockerfileDirecotry, "Dockerfile");
+
+                // Write Dockerfile content to temporary file
+                await FileSystemHelpers.WriteAllTextToFileAsync(tempDockerfile, imageContent);
+
+                // Build the image
+                await DockerHelpers.DockerBuild(image, tempDockerfileDirecotry);
+            }
+
+            return new DockerImageInfo { ImageName = image, CanPull = !isLocal };
         }
 
         private static string CopyToTemp(IEnumerable<string> files, string rootPath)
@@ -596,32 +622,35 @@ namespace Azure.Functions.Cli.Helpers
             return StaticResources.DockerfilePython37;
         }
 
-        private static string GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
+        // Build environment images for building native dependencies for python function apps
+        private static async Task<(string Image, bool IsLocal)> GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
         {
             if (info?.Major == 3)
             {
                 switch (info?.Minor)
                 {
                     case 6:
-                        return Constants.DockerImages.LinuxPython36ImageAmd64;
+                        return (DockerImages.LinuxPython36ImageAmd64, false);
                     case 7:
-                        return Constants.DockerImages.LinuxPython37ImageAmd64;
+                        return (DockerImages.LinuxPython37ImageAmd64, false);
                     case 8:
-                        return Constants.DockerImages.LinuxPython38ImageAmd64;
+                        return (DockerImages.LinuxPython38ImageAmd64, false);
                     case 9:
-                        return Constants.DockerImages.LinuxPython39ImageAmd64;
+                        return (DockerImages.LinuxPython39ImageAmd64, false);
                     case 10:
-                        return Constants.DockerImages.LinuxPython310ImageAmd64;
+                        return (DockerImages.LinuxPython310ImageAmd64, false);
                     case 11:
-                        return Constants.DockerImages.LinuxPython311ImageAmd64;
+                        return (DockerImages.LinuxPython311ImageAmd64, false);
                     case 12:
-                        return Constants.DockerImages.LinuxPython312ImageAmd64;
+                        return (DockerImages.LinuxPython312ImageAmd64, false);
+
+                    // From Python 3.13 onwards, we use a Dockerfile to build the image locally
                     case 13:
-                        return Constants.DockerImages.LinuxPython313ImageAmd64;
+                        return (await StaticResources.DockerfilePython313BuildEnv, true);
                 }
             }
 
-            return Constants.DockerImages.LinuxPython312ImageAmd64;
+            return (DockerImages.LinuxPython312ImageAmd64, false);
         }
 
         private static bool IsVersionSupported(WorkerLanguageVersionInfo info)

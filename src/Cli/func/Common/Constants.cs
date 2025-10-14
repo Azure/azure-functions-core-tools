@@ -189,7 +189,6 @@ namespace Azure.Functions.Cli.Common
             public const string LinuxPython310ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.10-buildenv";
             public const string LinuxPython311ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.11-buildenv";
             public const string LinuxPython312ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.12-buildenv";
-            public const string LinuxPython313ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.13-buildenv";
         }
 
         public static class StaticResourcesNames
