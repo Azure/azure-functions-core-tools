@@ -7,6 +7,6 @@
 
 #### Changes
 
-- Add support for Python 3.14 (#4668)
 - <entry>
 - Add Dockerfile for python 3.13 local build environment (#4611)
+- Add support for Python 3.14 (#4668)
