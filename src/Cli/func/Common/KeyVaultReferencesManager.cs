@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Common
         private const string VaultUriSuffix = "vault.azure.net";
         private static readonly Regex _basicKeyVaultReferenceRegex = new Regex(@"^@Microsoft\.KeyVault\((?<ReferenceString>.*)\)$", RegexOptions.Compiled);
         private readonly ConcurrentDictionary<string, SecretClient> _clients = new ConcurrentDictionary<string, SecretClient>();
-        private readonly TokenCredential _credential = new DefaultAzureCredential();
+        private readonly TokenCredential _credential = new DefaultAzureCredential(); // CodeQL [SM05137] This is never deployed to production, only used in CLI context in a local dev environment.
 
         public void ResolveKeyVaultReferences(IDictionary<string, string> settings)
         {
