@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -86,6 +87,39 @@ public class AppSettingsFileTests : IDisposable
         Assert.Empty(settings.Values);
         Assert.Empty(settings.ConnectionStrings);
         Assert.Null(settings.Host);
+    }
+
+    [Fact]
+    public void NormalizeBooleanValues_ShouldConvertPascalCaseBooleansToLowercase()
+    {
+        // Arrange
+        var input = new Dictionary<string, string>
+       {
+           { "AzureWebJobs.RestHandler.Disabled", "False" },
+           { "AzureWebJobs.StorageHandler.Disabled", "True" },
+           { "SomeOtherKey", "customValue" }
+       };
+
+        // Act
+        var result = EnvironmentHelper.NormalizeBooleanValues(input);
+
+        // Assert
+        Assert.Equal("false", result["AzureWebJobs.RestHandler.Disabled"]);
+        Assert.Equal("true", result["AzureWebJobs.StorageHandler.Disabled"]);
+        Assert.Equal("customValue", result["SomeOtherKey"]);
+    }
+
+    [Fact]
+    public void NormalizeBooleanValues_ShouldHandleEmptyDictionary()
+    {
+        // Arrange
+        var input = new Dictionary<string, string>();
+
+        // Act
+        var result = EnvironmentHelper.NormalizeBooleanValues(input);
+
+        // Assert
+        Assert.Empty(result);
     }
 
     public void Dispose()

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Helpers
@@ -23,6 +23,25 @@ namespace Azure.Functions.Cli.Helpers
             {
                 Environment.SetEnvironmentVariable(keyName, "true");
             }
+        }
+
+        public static Dictionary<string, string> NormalizeBooleanValues(Dictionary<string, string> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return values ?? new Dictionary<string, string>();
+            }
+
+            foreach (var key in values.Keys.ToList())
+            {
+                var value = values[key];
+                if (string.Equals(value, "True", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "False", StringComparison.OrdinalIgnoreCase))
+                {
+                    values[key] = value.ToLowerInvariant();
+                }
+            }
+
+            return values;
         }
     }
 }
