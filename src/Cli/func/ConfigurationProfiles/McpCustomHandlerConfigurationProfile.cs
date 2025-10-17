@@ -24,134 +24,134 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
 
         internal async Task ApplyHostJsonAsync(bool force)
         {
-            bool changed = false;
-            string baseHostJson;
-
-            // Check if host.json exists and read it, otherwise use the default template
             string hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
+            bool exists = FileSystemHelpers.FileExists(hostJsonPath);
 
-            if (FileSystemHelpers.FileExists(hostJsonPath))
-            {
-                SetupProgressLogger.FileFound("host.json", hostJsonPath);
-                baseHostJson = await FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath);
-            }
-            else
-            {
-                SetupProgressLogger.FileCreated("host.json", hostJsonPath);
-                baseHostJson = await StaticResources.HostJson;
-            }
+            // Load host json source: existing host.json or the static resource
+            string source = exists
+                ? await FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath)
+                : await StaticResources.HostJson;
 
-            JObject hostJsonObj = JsonConvert.DeserializeObject<JObject>(baseHostJson);
+            var hostJsonObj = string.IsNullOrWhiteSpace(source) ? new JObject() : JObject.Parse(source);
 
-            // Add configurationProfile if missing or if force is true
-            if (!hostJsonObj.TryGetValue("configurationProfile", StringComparison.OrdinalIgnoreCase, out _) || force)
+            // 1) Add configuration profile
+            bool updatedConfigProfile = UpsertIfMissing(hostJsonObj, "configurationProfile", JToken.FromObject(Name), force);
+            if (updatedConfigProfile)
             {
-                hostJsonObj["configurationProfile"] = Name;
-                changed = true;
+                SetupProgressLogger.Ok(Constants.HostJsonFileName, $"Set configuration profile to '{Name}'");
             }
 
-            // Add customHandler section if missing or if force is true
-            if (!hostJsonObj.TryGetValue("customHandler", StringComparison.OrdinalIgnoreCase, out _) || force)
+            // 2) Add custom handler settings
+            var customHandlerJson = JObject.Parse(await StaticResources.CustomHandlerConfig);
+            bool updatedCustomHandler = UpsertIfMissing(hostJsonObj, "customHandler", customHandlerJson, force);
+            if (updatedCustomHandler)
             {
-                hostJsonObj["customHandler"] = new JObject
+                SetupProgressLogger.Ok(Constants.HostJsonFileName, "Configured custom handler settings for MCP");
+            }
+
+            if (updatedConfigProfile || updatedCustomHandler)
+            {
+                string content = JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+                await FileSystemHelpers.WriteAllTextToFileAsync(hostJsonPath, content);
+
+                if (!exists)
                 {
-                    ["description"] = new JObject
-                    {
-                        ["defaultExecutablePath"] = string.Empty,
-                        ["arguments"] = new JArray()
-                    }
-                };
-                changed = true;
-            }
-
-            if (changed)
-            {
-                string hostJsonContent = JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
-                await FileSystemHelpers.WriteAllTextToFileAsync(hostJsonPath, hostJsonContent);
-                SetupProgressLogger.Ok("host.json", "Updated with MCP configuration profile");
+                    SetupProgressLogger.FileCreated(Constants.HostJsonFileName, Path.GetFullPath(hostJsonPath));
+                }
             }
             else
             {
-                SetupProgressLogger.Warn("host.json", "Already configured (use --force to overwrite)");
+                SetupProgressLogger.Warn(Constants.HostJsonFileName, "Already configured (use --force to overwrite)");
             }
         }
 
         internal async Task ApplyLocalSettingsAsync(WorkerRuntime workerRuntime, bool force)
         {
-            bool changed = false;
-            string baseLocalSettings;
+            string localSettingsPath = Path.Combine(Environment.CurrentDirectory, Constants.LocalSettingsJsonFileName);
+            bool exists = FileSystemHelpers.FileExists(localSettingsPath);
 
-            // Check if local.settings.json exists and read it, otherwise use the default template
-            string localSettingsPath = Path.Combine(Environment.CurrentDirectory, "local.settings.json");
+            // Load source for local.settings.json: existing file or the static resource
+            string source = exists
+                ? await FileSystemHelpers.ReadAllTextFromFileAsync(localSettingsPath)
+                : (await StaticResources.LocalSettingsJson)
+                    .Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime))
+                    .Replace($"{{{Constants.AzureWebJobsStorage}}}", Constants.StorageEmulatorConnectionString);
 
-            if (FileSystemHelpers.FileExists(localSettingsPath))
+            var localSettingsObj = string.IsNullOrWhiteSpace(source) ? new JObject() : JObject.Parse(source);
+
+            var values = localSettingsObj["Values"] as JObject ?? new JObject();
+
+            // 1) Set worker runtime setting
+            bool updatedWorkerRuntime = UpsertIfMissing(
+                values,
+                Constants.FunctionsWorkerRuntime,
+                WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime),
+                force);
+
+            if (updatedWorkerRuntime)
             {
-                SetupProgressLogger.FileFound("local.settings.json", localSettingsPath);
-                baseLocalSettings = await FileSystemHelpers.ReadAllTextFromFileAsync(localSettingsPath);
-            }
-            else
-            {
-                SetupProgressLogger.FileCreated("local.settings.json", localSettingsPath);
-                baseLocalSettings = await StaticResources.LocalSettingsJson;
-
-                // Replace placeholders in the template
-                baseLocalSettings = baseLocalSettings.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
-                baseLocalSettings = baseLocalSettings.Replace($"{{{Constants.AzureWebJobsStorage}}}", Constants.StorageEmulatorConnectionString);
-            }
-
-            JObject localObj = JsonConvert.DeserializeObject<JObject>(baseLocalSettings);
-            JObject values = localObj["Values"] as JObject ?? [];
-
-            // Determine moniker for default; if existing runtime present, do not overwrite unless force is true
-            if (!values.TryGetValue(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase, out _) || force)
-            {
-                string runtimeMoniker = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
-                values[Constants.FunctionsWorkerRuntime] = runtimeMoniker;
-                changed = true;
+                SetupProgressLogger.Ok(Constants.LocalSettingsJsonFileName, $"Set {Constants.FunctionsWorkerRuntime} to '{WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)}'");
             }
 
-            // Handle AzureWebJobsFeatureFlags - append if exists and force is enabled, create if not
-            bool azureWebJobsFeatureFlagsExists = values.TryGetValue(Constants.AzureWebJobsFeatureFlags, StringComparison.OrdinalIgnoreCase, out var existingFlagsToken);
-            if (azureWebJobsFeatureFlagsExists && force)
+            // 2) Set feature flag setting
+            bool updatedFeatureFlag = false;
+            bool hasFlagsKey = values.TryGetValue(Constants.AzureWebJobsFeatureFlags, StringComparison.OrdinalIgnoreCase, out var flagsToken);
+            var flags = (flagsToken?.ToString() ?? string.Empty)
+                                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                    .Select(f => f.Trim())
+                                    .Where(f => !string.IsNullOrWhiteSpace(f))
+                                    .ToList();
+
+            if (!flags.Contains(McpFeatureFlag, StringComparer.OrdinalIgnoreCase))
             {
-                string existingFlags = existingFlagsToken?.ToString() ?? string.Empty;
+                flags.Add(McpFeatureFlag);
+                values[Constants.AzureWebJobsFeatureFlags] = string.Join(",", flags);
+                updatedFeatureFlag = true;
 
-                // Split by comma and trim whitespace
-                var flagsList = existingFlags
-                    .Split(',')
-                    .Select(f => f.Trim())
-                    .Where(f => !string.IsNullOrWhiteSpace(f))
-                    .ToList();
-
-                // Add the MCP feature flag if it's not already present
-                if (!flagsList.Contains(McpFeatureFlag, StringComparer.OrdinalIgnoreCase))
+                if (!hasFlagsKey)
                 {
-                    flagsList.Add(McpFeatureFlag);
-
-                    // Rejoin with comma and space
-                    values["AzureWebJobsFeatureFlags"] = string.Join(",", flagsList);
-                    changed = true;
+                    SetupProgressLogger.Ok(Constants.LocalSettingsJsonFileName, $"Added feature flag '{McpFeatureFlag}'");
+                }
+                else
+                {
+                    SetupProgressLogger.Ok(Constants.LocalSettingsJsonFileName, $"Appended feature flag '{McpFeatureFlag}'");
                 }
             }
-            else if (!azureWebJobsFeatureFlagsExists)
-            {
-                // No existing feature flags, create with just our flag
-                values["AzureWebJobsFeatureFlags"] = McpFeatureFlag;
-                changed = true;
-                SetupProgressLogger.Warn("local.settings.json", $"Added feature flag '{McpFeatureFlag}'");
-            }
 
-            if (changed)
+            if (updatedWorkerRuntime || updatedFeatureFlag)
             {
-                localObj["Values"] = values;
-                string localContent = JsonConvert.SerializeObject(localObj, Formatting.Indented);
-                await FileSystemHelpers.WriteAllTextToFileAsync(localSettingsPath, localContent);
-                SetupProgressLogger.Ok("local.settings.json", "Updated settings");
+                localSettingsObj["Values"] = values;
+                string content = JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
+                await FileSystemHelpers.WriteAllTextToFileAsync(localSettingsPath, content);
+
+                if (!exists)
+                {
+                    SetupProgressLogger.FileCreated(Constants.LocalSettingsJsonFileName, localSettingsPath);
+                }
             }
             else
             {
-                SetupProgressLogger.Warn("local.settings.json", "Already configured (use --force to overwrite)");
+                SetupProgressLogger.Warn(Constants.LocalSettingsJsonFileName, "Already configured (use --force to overwrite)");
             }
+        }
+
+        private static bool UpsertIfMissing(JObject obj, string key, object desiredValue, bool forceSet)
+        {
+            JToken desired = JToken.FromObject(desiredValue);
+
+            if (obj.TryGetValue(key, StringComparison.OrdinalIgnoreCase, out var existing))
+            {
+                if (!forceSet)
+                {
+                    return false;
+                }
+
+                obj[key] = desired;
+                return true;
+            }
+
+            obj[key] = desired;
+            return true;
         }
     }
 }

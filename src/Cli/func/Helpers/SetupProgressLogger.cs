@@ -21,14 +21,6 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static string Rel(string path)
-        {
-            string cwd = Environment.CurrentDirectory.TrimEnd(Path.DirectorySeparatorChar);
-            return path.StartsWith(cwd, StringComparison.OrdinalIgnoreCase)
-                ? string.Concat(".", path.AsSpan(cwd.Length))
-                : path;
-        }
-
         public static void Section(string text) =>
             ColoredConsole.WriteLine($"\n{DarkGray($"▸ {text}")}");
 
@@ -45,9 +37,9 @@ namespace Azure.Functions.Cli.Helpers
             ColoredConsole.WriteLine($"{Gray($"[{scope}]")} {Yellow($"⚠ {text}")}");
 
         public static void FileFound(string scope, string path) =>
-            Step(scope, $"Found at {Rel(path)}");
+            Step(scope, $"Found at {path}");
 
         public static void FileCreated(string scope, string path) =>
-            Step(scope, $"Creating new at {Rel(path)}");
+            Step(scope, $"Creating new at {path}");
     }
 }
