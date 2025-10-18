@@ -1,9 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
 using Autofac;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
@@ -99,6 +100,10 @@ namespace Azure.Functions.Cli
 
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();
+
+            // Register configuration profiles
+            builder.RegisterType<McpCustomHandlerConfigurationProfile>()
+                .As<IConfigurationProfile>();
 
             builder.RegisterType<DurableManager>()
                 .As<IDurableManager>();
