@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text;
+using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -30,7 +31,8 @@ namespace Azure.Functions.Cli.Common
                 });
 
                 IsEncrypted = appSettings.Value<bool?>("IsEncrypted") ?? true;
-                Values = appSettings["Values"]?.ToObject<Dictionary<string, string>>(localSerializer) ?? new Dictionary<string, string>();
+                var rawValues = appSettings["Values"]?.ToObject<Dictionary<string, string>>(localSerializer) ?? new Dictionary<string, string>();
+                Values = EnvironmentHelper.NormalizeBooleanValues(rawValues);
                 ConnectionStrings = appSettings["ConnectionStrings"]?.ToObject<Dictionary<string, JToken>>(localSerializer) ?? new Dictionary<string, JToken>();
                 Host = appSettings["Host"]?.ToObject<HostStartSettings>(localSerializer) ?? new HostStartSettings();
             }
