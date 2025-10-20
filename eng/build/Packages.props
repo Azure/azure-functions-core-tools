@@ -14,7 +14,7 @@
   <!-- func -->
   <ItemGroup>
     <PackageVersion Include="Autofac" Version="4.6.2" />
-    <PackageVersion Include="Azure.Identity" Version="1.11.4" />
+    <PackageVersion Include="Azure.Identity" Version="1.14.2" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
     <PackageVersion Include="AccentedCommandLineParser" Version="2.0.0" />
     <PackageVersion Include="Microsoft.ApplicationInsights" Version="2.22.0" />
@@ -22,7 +22,7 @@
     <PackageVersion Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
     <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1043.200" />
     <PackageVersion Include="Microsoft.Build" Version="17.0.0" />
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.61.3" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.73.1" />
     <PackageVersion Include="NuGet.Packaging" Version="5.11.6" />
     <PackageVersion Include="System.Formats.Asn1" Version="6.0.1" />
     <PackageVersion Include="YamlDotNet" Version="6.0.0" />
