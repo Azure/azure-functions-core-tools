@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
 {
     internal class McpCustomHandlerConfigurationProfile : IConfigurationProfile
     {
-        // This feature flag enables MCP (Multi-Container Platform) support for custom handlers
+        // This feature flag enables MCP (Model Context Protocol) support for custom handlers
         // This flag is not required locally, but is required when deploying to Azure environments.
         private const string McpFeatureFlag = "EnableMcpCustomHandlerPreview";
 
