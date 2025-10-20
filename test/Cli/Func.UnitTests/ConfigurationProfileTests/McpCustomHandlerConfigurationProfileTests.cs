@@ -352,7 +352,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
                 ""IsEncrypted"": false,
                 ""Values"": {
                     ""FUNCTIONS_WORKER_RUNTIME"": ""dotnet"",
-                    ""AzureWebJobsFeatureFlags"": ""ExistingFlag""
+                    ""AzureWebJobsFeatureFlags"": ""EnableMcpCustomHandlerPreview""
                 }
             }";
 
