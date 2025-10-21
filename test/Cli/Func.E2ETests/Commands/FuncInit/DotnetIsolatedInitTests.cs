@@ -127,23 +127,22 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         [InlineData("net10.0")]
         public async void Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile(string targetFramework)
         {
-            var targetFrameworkstr = targetFramework.Replace("net", string.Empty);
-            var workingDir = WorkingDirectory;
             var testName = nameof(Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile);
-            var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
-            var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated{targetFrameworkstr}" };
+            var dockerFilePath = Path.Combine(WorkingDirectory, "Dockerfile");
+            var targetFrameworkNumber = targetFramework.Replace("net", string.Empty);
+            var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated{targetFrameworkNumber}" };
             var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
             {
                 (dockerFilePath, expectedDockerfileContent)
             };
 
             // Initialize dotnet-isolated function app using retry helper
+            var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework]);
 
             var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only"]);
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute([".", "--docker-only"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);

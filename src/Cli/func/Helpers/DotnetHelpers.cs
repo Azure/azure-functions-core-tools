@@ -55,6 +55,8 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
 
+            ColoredConsole.WriteLine($"Determining target framework for project in '{projectDirectory}'{(projectFilename != null ? $" (project file: {projectFilename})" : string.Empty)}");
+
             var exe = new Executable(
                 "dotnet",
                 $"build {projectFilename} -getproperty:TargetFramework",
@@ -76,8 +78,12 @@ namespace Azure.Functions.Cli.Helpers
             // Extract the target framework moniker (TFM) from the output using regex pattern matching
             var outputString = output.ToString();
 
+            ColoredConsole.WriteLine($"Determined target framework: {outputString.Trim()}");
+
             // Look for a line that looks like a target framework moniker
             var tfm = TargetFrameworkHelper.TfmRegex.Match(outputString);
+
+            ColoredConsole.WriteLine($"Parsed target framework: {tfm.Value}");
 
             if (!tfm.Success)
             {
