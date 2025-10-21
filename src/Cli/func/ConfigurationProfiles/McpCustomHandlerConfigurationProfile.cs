@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
             bool updatedCustomHandler = UpsertIfMissing(hostJsonObj, "customHandler", customHandlerJson, force);
             if (updatedCustomHandler)
             {
-                SetupProgressLogger.Ok(Constants.HostJsonFileName, "Configured custom handler settings for MCP");
+                SetupProgressLogger.Ok(Constants.HostJsonFileName, "Added custom handler configuration");
             }
 
             if (updatedConfigProfile || updatedCustomHandler)
