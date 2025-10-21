@@ -10,7 +10,6 @@
   <ItemGroup>
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Moq" />
-    <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="RichardSzalay.MockHttp" />
     <PackageReference Include="SuaveServerWrapper" />

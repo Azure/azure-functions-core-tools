@@ -27,7 +27,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETCore.DotNetAppHost" />
-    <PackageReference Include="StyleCop.Analyzers" />
   </ItemGroup>
 
 </Project>
