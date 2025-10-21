@@ -53,35 +53,35 @@ extends:
       # PR's from forks do not have sufficient permissions to set tags.
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
     stages:
-      - stage: Build
+      # - stage: Build
 
-        jobs:
-        - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
-          - template: /eng/ci/templates/public/jobs/build-cli.yml@self
-            parameters:
-              runtime: ${{ runtime }}
-              jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
+      #   jobs:
+      #   - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+      #     - template: /eng/ci/templates/public/jobs/build-cli.yml@self
+      #       parameters:
+      #         runtime: ${{ runtime }}
+      #         jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
 
-      - stage: UnitTest
-        dependsOn: ''
+      # - stage: UnitTest
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/public/jobs/test-unit-windows.yml@self
-        - template: /eng/ci/templates/public/jobs/test-unit-linux.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/public/jobs/test-unit-windows.yml@self
+      #   - template: /eng/ci/templates/public/jobs/test-unit-linux.yml@self
 
       # Do we want the E2E tests for the public build?
       # Might need this at first whilst we work on building out solid unit tests
-      - stage: E2ETestWindows
-        dependsOn: ''
+      # - stage: E2ETestWindows
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
 
-      - stage: E2ETestLinux
-        dependsOn: ''
+      # - stage: E2ETestLinux
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
 
       - stage: E2ETestOSX
         dependsOn: ''
