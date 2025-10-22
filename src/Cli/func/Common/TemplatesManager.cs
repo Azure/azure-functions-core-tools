@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
@@ -134,7 +134,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task Deploy(string name, string fileName, Template template)
         {
-            if (template.Id.EndsWith("JavaScript-4.x") || template.Id.EndsWith("TypeScript-4.x"))
+            if (template.Id.EndsWith("JavaScript-4.x", StringComparison.OrdinalIgnoreCase) || template.Id.EndsWith("TypeScript-4.x", StringComparison.OrdinalIgnoreCase))
             {
                 await DeployNewNodeProgrammingModel(name, fileName, template);
             }
