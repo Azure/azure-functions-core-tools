@@ -55,6 +55,9 @@ jobs:
     inputs:
       targetType: 'inline'
       script: |
+        # fail fast and make undefined vars an error
+        set -euo pipefail
+
         cd eng/tools/publish-tools
         python3 -m venv publish-env
         source publish-env/bin/activate
@@ -65,6 +68,7 @@ jobs:
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
         python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
         python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
+
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
