@@ -52,11 +52,12 @@ jobs:
 
   - task: Bash@3
     displayName: 'Build DEB package'
-    failOnStderr: true
     inputs:
       targetType: 'inline'
       script: |
+        # fail fast and make undefined vars an error
         set -euo pipefail
+
         cd eng/tools/publish-tools
         python3 -m venv publish-env
         source publish-env/bin/activate

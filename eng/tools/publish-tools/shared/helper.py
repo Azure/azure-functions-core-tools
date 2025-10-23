@@ -65,7 +65,11 @@ def linuxOutput(buildFolder, arch):
     import wget
     if not os.path.exists(fileName):
         print(f"downloading from {url}")
-        wget.download(url)
+        try:
+            wget.download(url)
+        except Exception as e:
+            print(f"\nERROR: unexpected error downloading {url}: {e}")
+            sys.exit(1)
 
     usr = os.path.join(buildFolder, "usr")
     usrlib = os.path.join(usr, "lib")
