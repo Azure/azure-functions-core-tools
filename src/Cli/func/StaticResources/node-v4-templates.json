@@ -624,7 +624,7 @@
     "metadata": {
       "defaultFunctionName": "mcpToolTrigger",
       "description": "$McpToolTrigger_description",
-      "name": "Mcp Tool Trigger",
+      "name": "MCP Tool Trigger",
       "language": "TypeScript",
       "triggerType": "mcpToolTrigger",
       "category": [
@@ -645,7 +645,7 @@
     "metadata": {
       "defaultFunctionName": "mcpToolTrigger",
       "description": "$McpToolTrigger_description",
-      "name": "Mcp Tool Trigger",
+      "name": "MCP Tool Trigger",
       "language": "JavaScript",
       "triggerType": "mcpToolTrigger",
       "category": [
