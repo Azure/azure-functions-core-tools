@@ -14,3 +14,4 @@
   - Runtime-specific validations for .NET, Python, Node.js, PowerShell, and Custom Handlers
   - Actionable error messages to help developers resolve issues during packaging
   - Validates folder structure, required files, programming models, and runtime-specific configurations 
+  - Adding the MCP Tool Trigger Templates for the Node/Typescript.
