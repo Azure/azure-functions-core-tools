@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Common
                 });
                 var secretsFilePath = Path.Combine(rootPath, secretsFile);
 
-                ColoredConsole.WriteLine(DarkGray($"'{secretsFile}' found in root directory ({rootPath})."));
+                ColoredConsole.WriteLine(DarkGray($"'{secretsFile}' should be in root directory ({rootPath})."));
                 return secretsFilePath;
             }
         }
