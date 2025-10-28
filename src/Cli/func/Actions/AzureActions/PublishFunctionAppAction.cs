@@ -330,9 +330,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (!functionApp.AzureAppSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic && functionApp.IsLinux)
+            if (!functionApp.AzureAppSettings.ContainsKey(Constants.AzureWebJobsStorage) && functionApp.IsDynamic && functionApp.IsLinux)
             {
-                throw new CliException($"Azure Functions Core Tools does not support this deployment path. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/deployfromurl");
+                throw new CliException($"Function App '{FunctionAppName}' is missing the '{Constants.AzureWebJobsStorage}' app setting. Please read the deployment configuration requirements here https://aka.ms/deployfromurl");
             }
 
             if (functionApp.IsFlex)
