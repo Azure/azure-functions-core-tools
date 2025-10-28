@@ -330,13 +330,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (!functionApp.AzureAppSettings.ContainsKey(Constants.AzureWebJobsStorage) && functionApp.IsDynamic && functionApp.IsLinux)
+            if (functionApp.IsLinux &&
+                (functionApp.IsDynamic || functionApp.IsFlex) &&
+                !functionApp.AzureAppSettings.ContainsKey(Constants.AzureWebJobsStorage))
             {
-                throw new CliException($"Function App '{FunctionAppName}' is missing the '{Constants.AzureWebJobsStorage}' app setting. Please read the deployment configuration requirements here https://aka.ms/deployfromurl");
+                var helpUrl = functionApp.IsFlex ?
+                    "https://aka.ms/flex-deployment-settings" :
+                    "https://aka.ms/deployfromurl";
+
+                throw new CliException($"Function App '{FunctionAppName}' is missing the '{Constants.AzureWebJobsStorage}' app setting. Please read the deployment configuration requirements here {helpUrl}");
             }
 
             if (functionApp.IsFlex)
             {
+                if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage))
+                {
+                    throw new CliException($"Function Apps on Flex Consumption do not support '{Constants.WebsiteRunFromPackage}'. Please remove the app setting from your Function App.");
+                }
+
+                if (functionApp.AzureAppSettings.ContainsKey(Constants.DeploymentStorageConnectionString))
+                {
+                    throw new CliException($"Function App '{FunctionAppName}' is missing the '{Constants.DeploymentStorageConnectionString}' app setting. Please read the deployment configuration requirements here https://aka.ms/flex-deployment-settings");
+                }
+
                 if (result.ContainsKey(Constants.FunctionsWorkerRuntime))
                 {
                     await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), null, azureHelperService);
