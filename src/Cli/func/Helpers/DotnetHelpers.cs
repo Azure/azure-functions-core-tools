@@ -195,6 +195,9 @@ namespace Azure.Functions.Cli.Helpers
                     "DaprPublishOutputBinding",
                     "DaprServiceInvocationTrigger",
                     "DaprTopicTrigger",
+                    "DurableFunctionsOrchestration",
+                    "DurableFunctionsEntityClass",
+                    "DurableFunctionsEntityFunction"
                 };
             }
 
@@ -207,6 +210,8 @@ namespace Azure.Functions.Cli.Helpers
                 "KafkaTrigger",
                 "KafkaOutput",
                 "DurableFunctionsOrchestration",
+                "DurableFunctionsEntityClass",
+                "DurableFunctionsEntityFunction",
                 "SendGrid",
                 "EventHubTrigger",
                 "ServiceBusQueueTrigger",
