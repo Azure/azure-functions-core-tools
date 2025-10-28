@@ -49,6 +49,7 @@ namespace Azure.Functions.Cli.Common
         public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
         public const string ScmDoBuildDuringDeployment = "SCM_DO_BUILD_DURING_DEPLOYMENT";
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";
+        public const string DeploymentStorageConnectionString = "DEPLOYMENT_STORAGE_CONNECTION_STRING";
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
         public const string TelemetrySentinelFile = "telemetryDefaultOn.sentinel";
