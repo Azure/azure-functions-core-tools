@@ -167,5 +167,6 @@ othernonexistent/**/what
 
             // Non-bin files in modules should not be ignored
             currentParser.Denies("Modules/Az.Accounts/2.0.0/lib/netstandard2.0/Microsoft.Azure.dll").Should().BeFalse();
+        }
     }
 }
