@@ -15,6 +15,7 @@ namespace Azure.Functions.Cli.Common
         public const string InProcFunctionsSdk = "Microsoft.NET.Sdk.Functions";
         public const string InProcFunctionsMinSdkVersion = "4.5.0";
         public const string InProcFunctionsDocsLink = "https://aka.ms/functions-core-tools-in-proc-sdk-requirement";
+        public const string DotnetIsolatedMigrationDocLink = "https://aka.ms/af-dotnet-isolated-migration";
 
         public static readonly string[] ValidRuntimeValues = [InProc8HostRuntime, InProc6HostRuntime, "default"];
     }

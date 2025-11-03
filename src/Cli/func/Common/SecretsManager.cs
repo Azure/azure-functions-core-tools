@@ -3,7 +3,9 @@
 
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -24,6 +26,8 @@ namespace Azure.Functions.Cli.Common
                     secretsFile,
                 });
                 var secretsFilePath = Path.Combine(rootPath, secretsFile);
+
+                ColoredConsole.WriteLine(DarkGray($"'{secretsFile}' found in root directory ({rootPath})."));
                 return secretsFilePath;
             }
         }
@@ -115,7 +119,14 @@ namespace Azure.Functions.Cli.Common
 
         public HostStartSettings GetHostStartSettings()
         {
-            return Settings.Host ?? new HostStartSettings();
+            try
+            {
+                return Settings?.Host ?? new HostStartSettings();
+            }
+            catch (CliException)
+            {
+                return new HostStartSettings();
+            }
         }
 
         public void DeleteConnectionString(string name)
