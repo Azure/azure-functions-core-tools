@@ -7,4 +7,4 @@
 
 #### Changes
 
-
+- Add updated Durable .NET templates (#4692)
