@@ -7,4 +7,5 @@
 
 #### Changes
 
-- Adding the MCP Tool Trigger Templates for the Node/Typescript
+- Add updated Durable .NET templates (#4692)
+- Adding the MCP Tool Trigger Templates for the Node/Typescript (#4651)
