@@ -98,8 +98,10 @@ def preparePackageForArch(arch, debianVersion):
         stringData = f.read()
     t = Template(stringData)
     with open(os.path.join(debian, "control"), "w") as f:
-        print("trying to write control file")
-        f.write(t.safe_substitute(DEBIANVERSION=debianVersion, PACKAGENAME=constants.PACKAGENAME, DEPENDENCY=deps))
+        if arch == "x64":
+            arch = "amd64"
+        print("trying to write control file - arch:", arch)
+        f.write(t.safe_substitute(DEBIANVERSION=debianVersion, PACKAGENAME=constants.PACKAGENAME, DEPENDENCY=deps, ARCH=arch))
     helper.chmodFolderAndFiles(debian)
 
     # Generate post-install script

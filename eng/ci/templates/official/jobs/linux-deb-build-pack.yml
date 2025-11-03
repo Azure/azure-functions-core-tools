@@ -76,6 +76,14 @@ jobs:
       linuxBuildNumber: $(DefaultArtifactVersion)
       consolidatedBuildId: $(ConsolidatedBuildId)
 
+  - task: Bash@3
+    displayName: "Validate DEB architectures"
+    inputs:
+      targetType: 'inline'
+      script: |
+        chmod +x $(Build.SourcesDirectory)/eng/scripts/validate-deb-arch.sh
+        bash $(Build.SourcesDirectory)/eng/scripts/validate-deb-arch.sh /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact
+
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
