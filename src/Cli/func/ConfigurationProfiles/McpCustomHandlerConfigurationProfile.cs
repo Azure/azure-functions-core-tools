@@ -12,8 +12,6 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
     {
         // This feature flag enables MCP (Model Context Protocol) support for custom handlers
         // This flag is not required locally, but is required when deploying to Azure environments.
-        private const string McpFeatureFlag = "EnableMcpCustomHandlerPreview";
-
         public string Name { get; } = "mcp-custom-handler";
 
         public async Task ApplyAsync(WorkerRuntime workerRuntime, bool force = false)
@@ -102,19 +100,19 @@ namespace Azure.Functions.Cli.ConfigurationProfiles
                                     .Where(f => !string.IsNullOrWhiteSpace(f))
                                     .ToList();
 
-            if (!flags.Contains(McpFeatureFlag, StringComparer.OrdinalIgnoreCase))
+            if (!flags.Contains(Constants.EnableMcpCustomHandlerFeatureFlag, StringComparer.OrdinalIgnoreCase))
             {
-                flags.Add(McpFeatureFlag);
+                flags.Add(Constants.EnableMcpCustomHandlerFeatureFlag);
                 values[Constants.AzureWebJobsFeatureFlags] = string.Join(",", flags);
                 updatedFeatureFlag = true;
 
                 if (!hasFlagsKey)
                 {
-                    SetupProgressLogger.Ok(Constants.LocalSettingsJsonFileName, $"Added feature flag '{McpFeatureFlag}'");
+                    SetupProgressLogger.Ok(Constants.LocalSettingsJsonFileName, $"Added feature flag '{Constants.EnableMcpCustomHandlerFeatureFlag}'");
                 }
                 else
                 {
-                    SetupProgressLogger.Ok(Constants.LocalSettingsJsonFileName, $"Appended feature flag '{McpFeatureFlag}'");
+                    SetupProgressLogger.Ok(Constants.LocalSettingsJsonFileName, $"Appended feature flag '{Constants.EnableMcpCustomHandlerFeatureFlag}'");
                 }
             }
 

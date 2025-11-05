@@ -18,6 +18,7 @@ using Fclp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
@@ -366,6 +367,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     Environment.SetEnvironmentVariable($"AzureFunctionsJobHost__functions__{i}", EnabledFunctions[i]);
                 }
+            }
+
+            if (FeatureFlags.IsEnabled(Constants.EnableMcpCustomHandlerFeatureFlag, SystemEnvironment.Instance))
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, Constants.Languages.Custom);
             }
         }
 
