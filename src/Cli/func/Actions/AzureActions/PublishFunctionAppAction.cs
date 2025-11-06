@@ -330,13 +330,21 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (!functionApp.AzureAppSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic && functionApp.IsLinux)
+            if (!functionApp.AzureAppSettings.Keys.Any(k => k.StartsWith("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)))
             {
-                throw new CliException($"Azure Functions Core Tools does not support this deployment path. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/deployfromurl");
+                throw new CliException(
+                    $"Function App '{FunctionAppName}' is missing host storage configuration. " +
+                    $"Provide either '{Constants.AzureWebJobsStorage}' (connection string) or identity-based settings " +
+                    $"prefixed with '{Constants.AzureWebJobsStorage}__'. Learn more at https://aka.ms/func-app-settings-storage");
             }
 
             if (functionApp.IsFlex)
             {
+                if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage))
+                {
+                    throw new CliException($"Function Apps on Flex Consumption do not support '{Constants.WebsiteRunFromPackage}'. Please remove the app setting from your Function App.");
+                }
+
                 if (result.ContainsKey(Constants.FunctionsWorkerRuntime))
                 {
                     await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), null, azureHelperService);

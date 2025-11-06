@@ -9,3 +9,4 @@
 
 - Add updated Durable .NET templates (#4692)
 - Adding the MCP Tool Trigger Templates for the Node/Typescript (#4651)
+- Set `AzureWebJobsStorage` to use the storage emulator by default on all platforms (#4685)
