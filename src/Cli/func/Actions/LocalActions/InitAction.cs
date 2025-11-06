@@ -400,14 +400,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
         {
-            var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
+            string localSettingsJsonContent = await StaticResources.LocalSettingsJson;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
-
-            var storageConnectionStringValue = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? Constants.StorageEmulatorConnectionString
-                : string.Empty;
-
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", storageConnectionStringValue);
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", Constants.StorageEmulatorConnectionString);
 
             if (workerRuntime == Helpers.WorkerRuntime.Powershell)
             {

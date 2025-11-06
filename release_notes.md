@@ -8,3 +8,4 @@
 #### Changes
 
 - Add updated Durable .NET templates (#4692)
+- Set `AzureWebJobsStorage` to use the storage emulator by default on all platforms (#4685)
