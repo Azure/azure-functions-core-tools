@@ -36,18 +36,25 @@ if (os.platform() === 'win32') {
         platform = 'osx-x64';
     }
 } else if (os.platform() === 'linux') {
-    platform = 'linux-x64';
+    if (os.arch() === 'arm64') {
+        platform = 'linux-arm64';
+    } else {
+        platform = 'linux-x64';
+    }
 } else {
     throw Error('platform ' + os.platform() + ' isn\'t supported');
 }
 
 const fileName = 'Azure.Functions.Cli.' + platform + '.' + version + '.zip';
 const endpoint = 'https://cdn.functions.azure.com/public/' + consolidatedBuildId + '/' + fileName;
+
 console.log('attempting to GET %j', endpoint);
 const options = url.parse(endpoint);
+
 // npm config preceed system environment
 // https://github.com/npm/npm/blob/19397ad523434656af3d3765e80e22d7e6305f48/lib/config/reg-client.js#L7-L8
 // https://github.com/request/request/blob/b12a6245d9acdb1e13c6486d427801e123fdafae/lib/getProxyFromURI.js#L66-L71
+
 const proxy = process.env.npm_config_https_proxy ||
             process.env.npm_config_proxy ||
             process.env.HTTPS_PROXY ||
@@ -96,11 +103,19 @@ https.get(options, response => {
                     catch (err) {
                         // That's alright.
                     }
-                    if (os.platform() === 'linux' || os.platform() === 'darwin') {
+
+                    const platform = os.platform();
+                    const arch = os.arch();
+
+                    if (platform === 'linux' || platform === 'darwin') {
                         fs.chmodSync(`${installPath}/func`, 0o755);
                         fs.chmodSync(`${installPath}/gozip`, 0o755);
-                        fs.chmodSync(`${installPath}/in-proc8/func`, 0o755);
-                        fs.chmodSync(`${installPath}/in-proc6/func`, 0o755);
+
+                        // inproc is not packaged in the linux-arm64 builds, so skip setting permissions for that platform
+                        if (!(platform === 'linux' && arch === 'arm64')) {
+                            fs.chmodSync(`${installPath}/in-proc8/func`, 0o755);
+                            fs.chmodSync(`${installPath}/in-proc6/func`, 0o755);
+                        }
                     }
                 });
             });

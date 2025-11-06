@@ -1,8 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
@@ -33,12 +34,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private IEnumerable<UserPrompt> _userPrompts;
         private WorkerRuntime _workerRuntime;
 
-        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
+        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager, IEnumerable<IConfigurationProfile> configurationProfiles)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
             _contextHelpManager = contextHelpManager;
-            _initAction = new InitAction(_templatesManager, _secretsManager);
+
+            // Construct InitAction with the provided providers so it can validate and apply the profile
+            _initAction = new InitAction(_templatesManager, _secretsManager, configurationProfiles);
             _userInputHandler = new UserInputHandler(_templatesManager);
         }
 
@@ -109,9 +112,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 return;
             }
-
-            // Ensure that the _templates are loaded before we proceed
-            _templates = await _templatesManager.Templates;
 
             await UpdateLanguageAndRuntime();
 
@@ -292,60 +292,110 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async Task UpdateLanguageAndRuntime()
         {
-            _workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            _workerRuntime = await ResolveWorkerRuntimeAsync();
+
+            // Only load templates when we need them and before we try to resolve language
+            if (NeedsToLoadExtensionTemplates(_workerRuntime, Csx))
+            {
+                _templates = await _templatesManager.Templates;
+            }
+
+            ResolveLanguageAsync(_workerRuntime);
+        }
+
+        private static bool NeedsToLoadExtensionTemplates(WorkerRuntime worker, bool csx)
+        {
+            // Templates are needed if:
+            //  - Worker is unknown and we need the list to ask user (non-dotnet path)
+            //  - Worker is non-dotnet (Node, Python, PowerShell, Java, etc.)
+            //  - Worker is dotnet **but** we're in CSX mode
+            //  - Language is unknown and worker is non-dotnet (requires menu from templates)
+            if (worker == WorkerRuntime.None)
+            {
+                return true;
+            }
+
+            if (WorkerRuntimeLanguageHelper.IsDotnet(worker))
+            {
+                return csx;
+            }
+
+            return true;
+        }
+
+        private async Task<WorkerRuntime> ResolveWorkerRuntimeAsync()
+        {
             if (!CurrentPathHasLocalSettings())
             {
                 // we're assuming "func init" has not been run
                 await _initAction.RunAsync();
-                _workerRuntime = _initAction.ResolvedWorkerRuntime;
                 Language = _initAction.ResolvedLanguage;
+                return _initAction.ResolvedWorkerRuntime;
             }
 
-            if (_workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
+            return GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+        }
+
+        private void ResolveLanguageAsync(WorkerRuntime runtime)
+        {
+            // If Language was provided, align runtime
+            if (!string.IsNullOrWhiteSpace(Language))
             {
-                // validate
-                var workerRuntimeSelected = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
-                if (_workerRuntime != workerRuntimeSelected)
+                if (runtime == WorkerRuntime.None)
                 {
-                    throw new CliException("Selected language doesn't match worker set in local.settings.json." +
-                        $"Selected worker is: {_workerRuntime} and selected language is: {workerRuntimeSelected}");
-                }
-            }
-            else if (string.IsNullOrWhiteSpace(Language))
-            {
-                if (_workerRuntime == WorkerRuntime.None)
-                {
-                    SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
+                    return;
                 }
-                else if (!WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) || Csx)
-                {
-                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
-                    var displayList = _templates?
-                            .Select(t => t.Metadata.Language)
-                            .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToArray();
 
-                    if (displayList?.Length == 1)
-                    {
-                        Language = displayList.First();
-                    }
-                    else if (!InferAndUpdateLanguage(_workerRuntime))
-                    {
-                        SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                        Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
-                    }
-                }
-                else if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime))
+                var selected = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
+                if (runtime != selected)
                 {
-                    InferAndUpdateLanguage(_workerRuntime);
+                    throw new CliException(
+                        "Selected language doesn't match worker set in local.settings.json." +
+                        $" Selected worker is: {runtime} and selected language is: {selected}");
                 }
+
+                return;
             }
-            else if (!string.IsNullOrWhiteSpace(Language))
+
+            // .NET SDK-style: infer from project (C#, F#, VB) -> no templates required
+            if (WorkerRuntimeLanguageHelper.IsDotnet(runtime) && !Csx)
             {
-                _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
+                InferAndUpdateLanguage(runtime);
+                return;
+            }
+
+            if (WorkerRuntimeLanguageHelper.IsDotnet(runtime) && Csx)
+            {
+                // Filter display list to CSX-capable languages (likely just "C#")
+                var display = _templates.Select(t => t.Metadata.Language)
+                                        .Where(l => WorkerRuntimeLanguageHelper
+                                            .LanguagesForWorker(runtime)
+                                            .Contains(l, StringComparer.OrdinalIgnoreCase))
+                                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                                        .ToArray();
+
+                Language = display?.Length == 1 ? display[0]
+                         : InferAndUpdateLanguage(runtime) ? Language
+                         : SelectionMenuHelper.DisplaySelectionWizard(display);
+                return;
+            }
+
+            // Non-.NET
+            var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(runtime);
+            var displayList = _templates.Select(t => t.Metadata.Language)
+                                        .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
+                                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                                        .ToArray();
+
+            if (displayList?.Length == 1)
+            {
+                Language = displayList.First();
+            }
+            else if (!InferAndUpdateLanguage(_workerRuntime))
+            {
+                SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
+                Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
             }
         }
 

@@ -180,7 +180,9 @@ namespace Azure.Functions.Cli.Helpers
 
             try
             {
-                return NormalizeWorkerRuntime(setting);
+                WorkerRuntime workerRuntime = NormalizeWorkerRuntime(setting);
+                ColoredConsole.WriteLine($"Resolving worker runtime to '{GetRuntimeMoniker(workerRuntime)}'.");
+                return workerRuntime;
             }
             catch
             {

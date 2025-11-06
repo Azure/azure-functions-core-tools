@@ -4,12 +4,14 @@
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Host.Config;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -24,15 +26,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
+        private readonly IEnumerable<IConfigurationProfile> _configurationProfiles;
         internal static readonly Dictionary<Lazy<string>, Task<string>> FileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
         };
 
-        public InitAction(ITemplatesManager templatesManager, ISecretsManager secretsManager)
+        public InitAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IEnumerable<IConfigurationProfile> configurationProfiles)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
+            _configurationProfiles = configurationProfiles;
         }
 
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
@@ -58,6 +62,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Language { get; set; }
 
         public string TargetFramework { get; set; }
+
+        public string ConfigurationProfileName { get; set; }
 
         public bool? ManagedDependencies { get; set; }
 
@@ -144,6 +150,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Do not create getting started documentation file. Currently supported when --worker-runtime set to python.")
                 .Callback(d => GeneratePythonDocumentation = !d);
 
+            Parser
+                .Setup<string>("configuration-profile")
+                .SetDefault(null)
+                .WithDescription(WarningColor("[preview]").ToString() + " Initialize a project with a host configuration profile. Currently supported: 'mcp-custom-handler'. "
+                    + WarningColor("Using a configuration profile may skip all other initialization steps.").ToString())
+                .Callback(cp => ConfigurationProfileName = cp);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -154,6 +167,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
+            Utilities.WarnIfPreviewVersion();
+            Utilities.PrintSupportInformation();
+
             if (SourceControl != SourceControl.Git)
             {
                 throw new Exception("Only Git is supported right now for vsc");
@@ -203,6 +219,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
+            // If a configuration profile is provided, apply it and return
+            if (await TryApplyConfigurationProfileIfProvided())
+            {
+                return;
+            }
+
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
             ValidateTargetFramework();
@@ -216,6 +238,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
                 await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation);
                 await WriteFiles();
+
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
                 await WriteLocalSettingsJson(ResolvedWorkerRuntime, ResolvedProgrammingModel);
             }
@@ -642,6 +665,36 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 // ignore. Failure to show the EOL message should not fail the init command.
             }
+        }
+
+        private async Task<bool> TryApplyConfigurationProfileIfProvided()
+        {
+            if (string.IsNullOrEmpty(ConfigurationProfileName))
+            {
+                return false;
+            }
+
+            IConfigurationProfile configurationProfile = _configurationProfiles
+                .FirstOrDefault(p => string.Equals(p.Name, ConfigurationProfileName, StringComparison.OrdinalIgnoreCase));
+
+            if (configurationProfile is null)
+            {
+                var supportedProfiles = _configurationProfiles
+                    .Select(p => p.Name)
+                    .ToList();
+
+                ColoredConsole.WriteLine(WarningColor($"Configuration profile '{ConfigurationProfileName}' is not supported. Supported values: {string.Join(", ", supportedProfiles)}"));
+
+                // Return true to avoid running the rest of the initialization steps, we are treating the use of `--configuration-profile`
+                // as a stand alone command. So if the provided profile is invalid, we just warn and exit.
+                return true;
+            }
+
+            // Apply the configuration profile and return
+            ColoredConsole.WriteLine(WarningColor($"You are using a preview feature. Configuration profiles may change in future releases."));
+            SetupProgressLogger.Section($"Applying configuration profile: {configurationProfile.Name}");
+            await configurationProfile.ApplyAsync(ResolvedWorkerRuntime, Force);
+            return true;
         }
     }
 }

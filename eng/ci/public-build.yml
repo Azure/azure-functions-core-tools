@@ -32,7 +32,7 @@ resources:
 
 variables:
   - name: supportedRuntimes
-    value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+    value: 'linux-x64,linux-arm64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
 
 extends:
   template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
@@ -41,6 +41,9 @@ extends:
       name: 1es-pool-azfunc-public
       image: 1es-windows-2022
       os: windows
+      ${{ if eq( variables['Build.Reason'], 'Schedule' ) }}:
+        demands:
+        - Priority -equals Low
     sdl:
       codeql:
          compiled:

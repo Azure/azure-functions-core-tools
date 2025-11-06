@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (console)",
+            "name": "Run func cli (console)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
