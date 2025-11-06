@@ -1,4 +1,4 @@
-﻿[
+[
   {
     "id": "BlobTrigger-JavaScript-4.x",
     "runtime": "2",
@@ -606,6 +606,48 @@
       "name": "Dapr Topic Trigger",
       "language": "JavaScript",
       "triggerType": "daprTopicTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "McpToolTrigger-Typescript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext, arg } from \"@azure/functions\";\n\nexport async function mcpToolHello(_toolArguments: any, context: InvocationContext): Promise<string> {\n    const mcptoolargs = _toolArguments.arguments as {\n        name?: string;\n    };\n    const name = mcptoolargs?.name;\n\n    console.info(`Hello ${name}, I am MCP Tool!`);\n\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responses with a hello message.',\n    toolProperties: {\n      name: arg.string().describe('Name to greet'),\n    },\n    handler: mcpToolHello\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpToolTrigger",
+      "description": "$McpToolTrigger_description",
+      "name": "MCP Tool Trigger",
+      "language": "TypeScript",
+      "triggerType": "mcpToolTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "McpToolTrigger-Javascript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, arg } = require('@azure/functions');\n\nfunction mcpToolHello(_toolArguments, context) {\n    const mcptoolargs = context.triggerMetadata.mcptoolargs || {};\n    const name = mcptoolargs.name;\n    console.info(`Hello ${name}, I am MCP Tool!`);\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responses with a hello message.',\n    toolProperties:{\n        name: arg.string().describe('Name to greet'),\n    },\n    handler: mcpToolHello\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpToolTrigger",
+      "description": "$McpToolTrigger_description",
+      "name": "MCP Tool Trigger",
+      "language": "JavaScript",
+      "triggerType": "mcpToolTrigger",
       "category": [
         "$temp_category_core",
         "$temp_category_dataProcessing"
