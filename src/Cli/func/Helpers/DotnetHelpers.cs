@@ -81,9 +81,6 @@ namespace Azure.Functions.Cli.Helpers
 
             var tfm = TargetFrameworkHelper.TfmRegex.Match(outputString);
 
-            // Look for a line that looks like a target framework moniker
-            var tfm = TargetFrameworkHelper.TfmRegex.Match(outputString);
-
             if (!tfm.Success)
             {
                 throw new CliException($"Could not parse target framework from output: {outputString}");
