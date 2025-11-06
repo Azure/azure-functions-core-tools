@@ -95,9 +95,7 @@ namespace Azure.Functions.Cli.Helpers
                     var frameworkString = string.IsNullOrEmpty(targetFramework)
                         ? string.Empty
                         : $"--Framework \"{targetFramework}\"";
-                    var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                        ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
-                        : string.Empty;
+                    var connectionString = $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\"";
                     TryGetCustomHiveArg(workerRuntime, out string customHive);
                     var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{customHive}");
                     var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
