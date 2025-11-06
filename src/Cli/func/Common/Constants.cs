@@ -95,6 +95,7 @@ namespace Azure.Functions.Cli.Common
         public const string Dotnet = "dotnet";
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
+        public const string EnableMcpCustomHandlerFeatureFlag = "EnableMcpCustomHandlerPreview";
 
         // forwardedHttpUrl sample format: https://n12abc3t-<port>.asse.devtunnels.ms/
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
