@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
@@ -220,6 +220,11 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
             using (var process = Process.Start(initProcess))
             {
                 process?.WaitForExit();
+                if (process?.ExitCode != 0)
+                {
+                    var error = process?.StandardError.ReadToEnd();
+                    throw new Exception($"Failed to init user secrets: {error}");
+                }
             }
 
             // Set each secret
@@ -236,6 +241,11 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
 
                 using var process = Process.Start(setProcess);
                 process?.WaitForExit();
+                if (process?.ExitCode != 0)
+                {
+                    var error = process?.StandardError.ReadToEnd();
+                    throw new Exception($"Failed to set secret {secret.Key}: {error}");
+                }
             }
         }
 

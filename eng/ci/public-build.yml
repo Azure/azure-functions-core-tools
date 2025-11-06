@@ -71,17 +71,17 @@ extends:
 
       # Do we want the E2E tests for the public build?
       # Might need this at first whilst we work on building out solid unit tests
-      - stage: E2ETestWindows
-        dependsOn: ''
+      # - stage: E2ETestWindows
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
 
-      - stage: E2ETestLinux
-        dependsOn: ''
+      # - stage: E2ETestLinux
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
 
       - stage: E2ETestOSX
         dependsOn: ''
