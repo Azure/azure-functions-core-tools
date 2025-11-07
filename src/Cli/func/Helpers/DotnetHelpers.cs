@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -66,18 +67,19 @@ namespace Azure.Functions.Cli.Helpers
                     ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1", // just in case
                 });
 
-            StringBuilder output = new();
-            var exitCode = await exe.RunAsync(o => output.Append(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+            var outputChunks = new ConcurrentQueue<string>();
+
+            var exitCode = await exe.RunAsync(
+                o => outputChunks.Enqueue(o),
+                e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+
             if (exitCode != 0)
             {
                 throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
             }
 
-            // Extract the target framework moniker (TFM) from the output using regex pattern matching
-            var outputString = output.ToString();
-
-            ColoredConsole.WriteLine($"Debug - Raw output: {outputString}"); // Add this
-            ColoredConsole.WriteLine($"Debug - Output length: {outputString.Length}"); // Add this
+            // Combine all output chunks
+            var outputString = string.Concat(outputChunks);
 
             var tfm = TargetFrameworkHelper.TfmRegex.Match(outputString);
 
