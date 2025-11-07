@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
-using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.Helpers;
@@ -27,43 +26,7 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
         [Fact]
         public void Name_ReturnsCorrectValue()
         {
-            // Assert
             _profile.Name.Should().Be("mcp-custom-handler");
-        }
-
-        private static IFileSystem GetMockFileSystem(string hostJsonContent, string localSettingsContent, bool hostJsonExists = true, bool localSettingsExists = true)
-        {
-            var fileSystem = Substitute.For<IFileSystem>();
-
-            fileSystem.File.Exists(Arg.Any<string>()).Returns(ci =>
-            {
-                var path = ci.ArgAt<string>(0);
-                if (path.EndsWith("host.json"))
-                {
-                    return hostJsonExists;
-                }
-                else if (path.EndsWith("local.settings.json"))
-                {
-                    return localSettingsExists;
-                }
-
-                return false;
-            });
-
-            // Setup read streams for existing files - return NEW stream for each call
-            if (hostJsonExists && hostJsonContent != null)
-            {
-                fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("host.json")), FileMode.Open, FileAccess.Read, Arg.Any<FileShare>())
-                    .Returns(ci => hostJsonContent.ToStream());
-            }
-
-            if (localSettingsExists && localSettingsContent != null)
-            {
-                fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("local.settings.json")), FileMode.Open, FileAccess.Read, Arg.Any<FileShare>())
-                    .Returns(ci => localSettingsContent.ToStream());
-            }
-
-            return fileSystem;
         }
 
         [Fact]
@@ -71,34 +34,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
         {
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
-
-            var writeStream = new MemoryStream();
-
-            fileSystem.File.Open(
-                Arg.Is<string>(p => p.EndsWith("host.json")),
-                FileMode.Create,
-                FileAccess.Write,
-                Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyHostJsonAsync(false);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            fileSystem.File.Received(1).Open(
-                Arg.Is<string>(s => s.EndsWith("host.json")),
-                FileMode.Create,
-                FileAccess.Write,
-                Arg.Any<FileShare>());
-
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-
-            var hostJson = JObject.Parse(writtenContent);
+            var hostJson = JObject.Parse(hostCap.LastText());
             hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
             hostJson["customHandler"]?.Should().NotBeNull();
             hostJson["customHandler"]?["description"]?.Should().NotBeNull();
@@ -110,21 +53,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             // Arrange
             var existingHostJson = @"{""version"": ""2.0""}";
             var fileSystem = GetMockFileSystem(existingHostJson, null, hostJsonExists: true, localSettingsExists: false);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("host.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyHostJsonAsync(false);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var hostJson = JObject.Parse(writtenContent);
+            var hostJson = JObject.Parse(hostCap.LastText());
             hostJson["version"]?.ToString().Should().Be("2.0");
             hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
             hostJson["customHandler"]?.Should().NotBeNull();
@@ -146,21 +82,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }";
 
             var fileSystem = GetMockFileSystem(existingHostJson, null, hostJsonExists: true, localSettingsExists: false);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("host.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyHostJsonAsync(force: true);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var hostJson = JObject.Parse(writtenContent);
+            var hostJson = JObject.Parse(hostCap.LastText());
             hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
             hostJson["customHandler"]?["description"]?["defaultExecutablePath"]?.ToString().Should().BeEmpty();
         }
@@ -180,18 +109,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }";
 
             var fileSystem = GetMockFileSystem(existingHostJson, null, hostJsonExists: true, localSettingsExists: false);
-
+            var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json"); // set up so asserts can check no writes
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyHostJsonAsync(force: false);
 
             // Assert
-            fileSystem.File.DidNotReceive().Open(
-                Arg.Any<string>(),
-                FileMode.Create,
-                FileAccess.Write,
-                Arg.Any<FileShare>());
+            hostCap.Streams.Should().BeEmpty("no write should occur without force when config already matches");
         }
 
         [Fact]
@@ -199,21 +124,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
         {
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("local.settings.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, false);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var localSettings = JObject.Parse(writtenContent);
+            var localSettings = JObject.Parse(localCap.LastText());
             localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
             localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString().Should().Be("EnableMcpCustomHandlerPreview");
         }
@@ -230,21 +148,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }";
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("local.settings.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, false);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var localSettings = JObject.Parse(writtenContent);
+            var localSettings = JObject.Parse(localCap.LastText());
             localSettings["Values"]?["AzureWebJobsStorage"]?.ToString().Should().Be("UseDevelopmentStorage=true");
             localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
             localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString().Should().Be("EnableMcpCustomHandlerPreview");
@@ -263,21 +174,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }";
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("local.settings.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var localSettings = JObject.Parse(writtenContent);
+            var localSettings = JObject.Parse(localCap.LastText());
             var flags = localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString();
             flags.Should().Be("ExistingFlag1,ExistingFlag2,EnableMcpCustomHandlerPreview");
         }
@@ -295,21 +199,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }";
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("local.settings.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var localSettings = JObject.Parse(writtenContent);
+            var localSettings = JObject.Parse(localCap.LastText());
             var flags = localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString();
             flags.Should().Be("ExistingFlag,EnableMcpCustomHandlerPreview,AnotherFlag");
         }
@@ -326,21 +223,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }";
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("local.settings.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var localSettings = JObject.Parse(writtenContent);
+            var localSettings = JObject.Parse(localCap.LastText());
             localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
         }
 
@@ -357,18 +247,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }";
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
-
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json"); // so we can assert no writes
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: false);
 
             // Assert
-            fileSystem.File.DidNotReceive().Open(
-                Arg.Any<string>(),
-                FileMode.Create,
-                FileAccess.Write,
-                Arg.Any<FileShare>());
+            localCap.Streams.Should().BeEmpty("no write should occur without force when worker runtime already set");
         }
 
         [Theory]
@@ -379,21 +265,14 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
         {
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
-            var writeStream = new MemoryStream();
-            fileSystem.File.Open(Arg.Is<string>(p => p.EndsWith("local.settings.json")), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(writeStream);
-
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyLocalSettingsAsync(runtime, false);
 
-            // Capture bytes BEFORE asserting (stream might be closed)
-            var writtenBytes = writeStream.ToArray();
-
             // Assert
-            var writtenContent = Encoding.UTF8.GetString(writtenBytes);
-            var localSettings = JObject.Parse(writtenContent);
+            var localSettings = JObject.Parse(localCap.LastText());
             localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be(expectedMoniker);
         }
 
@@ -405,34 +284,64 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
         {
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
-
-            var hostJsonWritten = false;
-            var localSettingsWritten = false;
-
-            fileSystem.File.Open(Arg.Any<string>(), FileMode.Create, FileAccess.Write, Arg.Any<FileShare>())
-                .Returns(ci =>
-                {
-                    var path = ci.ArgAt<string>(0);
-                    if (path.EndsWith("host.json"))
-                    {
-                        hostJsonWritten = true;
-                    }
-                    else if (path.EndsWith("local.settings.json"))
-                    {
-                        localSettingsWritten = true;
-                    }
-
-                    return new MemoryStream();
-                });
-
+            var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
+            var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
             FileSystemHelpers.Instance = fileSystem;
 
             // Act
             await _profile.ApplyAsync(runtime, false);
 
             // Assert
-            hostJsonWritten.Should().BeTrue();
-            localSettingsWritten.Should().BeTrue();
+            hostCap.Streams.Should().NotBeEmpty("host.json should be written");
+            localCap.Streams.Should().NotBeEmpty("local.settings.json should be written");
+        }
+
+        /// <summary>
+        /// Creates a mock IFileSystem that:
+        ///  - Answers File.Exists for host.json/local.settings.json
+        ///  - Returns a NEW MemoryStream each time File.Open(..., Read) is called for those files.
+        /// </summary>
+        private static IFileSystem GetMockFileSystem(string hostJsonContent, string localSettingsContent, bool hostJsonExists = true, bool localSettingsExists = true)
+        {
+            var fileSystem = Substitute.For<IFileSystem>();
+
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(ci =>
+            {
+                var path = ci.ArgAt<string>(0);
+                if (path.EndsWith("host.json", StringComparison.Ordinal))
+                {
+                    return hostJsonExists;
+                }
+                else if (path.EndsWith("local.settings.json", StringComparison.Ordinal))
+                {
+                    return localSettingsExists;
+                }
+
+                return false;
+            });
+
+            // Setup READ streams for existing files - return NEW stream for each call
+            if (hostJsonExists && hostJsonContent != null)
+            {
+                fileSystem.File.Open(
+                        Arg.Is<string>(p => p.EndsWith("host.json", StringComparison.Ordinal)),
+                        FileMode.Open,
+                        FileAccess.Read,
+                        Arg.Any<FileShare>())
+                    .Returns(_ => hostJsonContent.ToStream());
+            }
+
+            if (localSettingsExists && localSettingsContent != null)
+            {
+                fileSystem.File.Open(
+                        Arg.Is<string>(p => p.EndsWith("local.settings.json", StringComparison.Ordinal)),
+                        FileMode.Open,
+                        FileAccess.Read,
+                        Arg.Any<FileShare>())
+                    .Returns(_ => localSettingsContent.ToStream());
+            }
+
+            return fileSystem;
         }
 
         public void Dispose()
