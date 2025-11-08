@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
@@ -85,6 +84,62 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return tfm.Value;
+        }
+
+        public static async Task<string> DetermineTargetFrameworkAsync(string workingDirectory)
+        {
+            EnsureDotnet();
+
+            var projectFilePath = ProjectHelpers.FindProjectFile(workingDirectory);
+
+            var args =
+                $"msbuild \"{projectFilePath}\" " +
+                "-nologo -v:q -restore:false " +
+                "-getProperty:TargetFrameworks " +
+                "-getProperty:TargetFramework";
+
+            var exe = new Executable(
+                "dotnet",
+                args,
+                workingDirectory: workingDirectory,
+                environmentVariables: new Dictionary<string, string>
+                {
+                    ["DOTNET_NOLOGO"] = "1",
+                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
+                });
+
+            var sb = new StringBuilder();
+            var exit = await exe.RunAsync(o => sb.Append(o), e => sb.AppendLine(e));
+            if (exit != 0)
+            {
+                throw new CliException($"Unable to evaluate target frameworks for '{projectFilePath}'.");
+            }
+
+            var output = sb.ToString();
+
+            // Just match any valid TFM
+            var match = TargetFrameworkHelper.TfmRegex.Match(output);
+            if (!match.Success)
+            {
+                throw new CliException($"Could not parse target framework from msbuild output for '{projectFilePath}'. Output:\n{output}");
+            }
+
+            var tfm = match.Value;
+
+            // If multiple are in the string, warn
+            var matches = TargetFrameworkHelper.TfmRegex.Matches(output)
+                .Cast<Match>()
+                .Select(m => m.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (matches.Length > 1)
+            {
+                ColoredConsole.WriteLine(
+                    WarningColor($"[Warning] Multiple target frameworks detected in project '{projectFilePath}': {string.Join(";", matches)}. Using the first: {tfm}"));
+            }
+
+            return tfm;
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
