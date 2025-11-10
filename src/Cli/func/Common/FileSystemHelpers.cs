@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.Common
         public static async Task WriteAllTextToFileAsync(string path, string content)
         {
             using var fileStream = OpenFile(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
-            using var streamWriter = new StreamWriter(fileStream, Encoding.UTF8);
+            using var streamWriter = new StreamWriter(fileStream);
             await streamWriter.WriteAsync(content).ConfigureAwait(false);
             await streamWriter.FlushAsync().ConfigureAwait(false);
         }

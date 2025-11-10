@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
+using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using FluentAssertions;
@@ -10,95 +11,155 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class HostHelperTests : IDisposable
+    public class HostHelperTests
     {
-        private readonly IFileSystem _originalFileSystem;
-
-        public HostHelperTests()
-        {
-            _originalFileSystem = FileSystemHelpers.Instance;
-        }
-
         [Fact]
         public async Task GetCustomHandlerExecutable_Throws_When_HostJson_Missing()
         {
-            var fileSystem = Substitute.For<IFileSystem>();
-            fileSystem.File.Exists(Arg.Any<string>()).Returns(false);
-            FileSystemHelpers.Instance = fileSystem;
+            // Arrange
+            var fs = Substitute.For<IFileSystem>();
+            fs.File.Exists(Arg.Any<string>()).Returns(false);
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => HostHelpers.GetCustomHandlerExecutable());
+            using (FileSystemHelpers.Override(fs))
+            {
+                // Act/Assert
+                await Assert.ThrowsAsync<InvalidOperationException>(() => HostHelpers.GetCustomHandlerExecutable());
+            }
         }
 
         [Fact]
         public async Task GetCustomHandlerExecutable_Returns_ExecutablePath_When_Present()
         {
+            // Arrange
             var json = @"{""customHandler"":{""description"":{ ""defaultExecutablePath"":""file.exe"" }}}";
-            var fileSystem = Substitute.For<IFileSystem>();
-            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            fileSystem.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                .Returns(ci =>
+            var fs = Substitute.For<IFileSystem>();
+
+            fs.File.Exists(Arg.Any<string>()).Returns(ci =>
+                string.Equals(Path.GetFileName(ci.Arg<string>()), "host.json", StringComparison.OrdinalIgnoreCase));
+
+            Stream HostJsonStream() => new MemoryStream(Encoding.UTF8.GetBytes(json), writable: false);
+
+            fs.File.OpenRead(Arg.Any<string>()).Returns(ci =>
+            {
+                var path = ci.Arg<string>();
+                if (string.Equals(Path.GetFileName(path), "host.json", StringComparison.OrdinalIgnoreCase))
                 {
-                    var path = ci.ArgAt<string>(0);
-                    if (Path.GetFileName(path) == "host.json")
-                    {
-                        return json.ToStream();
-                    }
+                    return HostJsonStream();
+                }
 
-                    throw new FileNotFoundException(path);
-                });
+                throw new FileNotFoundException(path);
+            });
 
-            FileSystemHelpers.Instance = fileSystem;
+            fs.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+              .Returns(ci =>
+              {
+                  var path = ci.ArgAt<string>(0);
+                  if (string.Equals(Path.GetFileName(path), "host.json", StringComparison.OrdinalIgnoreCase))
+                  {
+                      return HostJsonStream();
+                  }
 
-            var result = await HostHelpers.GetCustomHandlerExecutable();
-            result.Should().Be("file.exe");
+                  throw new FileNotFoundException(path);
+              });
+
+            using (FileSystemHelpers.Override(fs))
+            {
+                // Act
+                var result = await HostHelpers.GetCustomHandlerExecutable();
+
+                // Assert
+                result.Should().Be("file.exe");
+            }
         }
 
         [Fact]
         public async Task GetCustomHandlerExecutable_Returns_Empty_When_ExecutablePath_Missing()
         {
+            // Arrange
             var json = @"{""customHandler"":{ ""description"":{}}}";
-            var fileSystem = Substitute.For<IFileSystem>();
-            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            fileSystem.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                .Returns(ci =>
+            var fs = Substitute.For<IFileSystem>();
+
+            fs.File.Exists(Arg.Any<string>()).Returns(ci =>
+                string.Equals(Path.GetFileName(ci.Arg<string>()), "host.json", StringComparison.OrdinalIgnoreCase));
+
+            Stream HostJsonStream() => new MemoryStream(Encoding.UTF8.GetBytes(json), writable: false);
+
+            fs.File.OpenRead(Arg.Any<string>()).Returns(ci =>
+            {
+                var path = ci.Arg<string>();
+                if (string.Equals(Path.GetFileName(path), "host.json", StringComparison.OrdinalIgnoreCase))
                 {
-                    var path = ci.ArgAt<string>(0);
-                    if (Path.GetFileName(path) == "host.json")
-                    {
-                        return json.ToStream();
-                    }
+                    return HostJsonStream();
+                }
 
-                    throw new FileNotFoundException(path);
-                });
+                throw new FileNotFoundException(path);
+            });
 
-            FileSystemHelpers.Instance = fileSystem;
+            fs.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+              .Returns(ci =>
+              {
+                  var path = ci.ArgAt<string>(0);
+                  if (string.Equals(Path.GetFileName(path), "host.json", StringComparison.OrdinalIgnoreCase))
+                  {
+                      return HostJsonStream();
+                  }
 
-            var result = await HostHelpers.GetCustomHandlerExecutable();
-            result.Should().BeEmpty();
+                  throw new FileNotFoundException(path);
+              });
+
+            using (FileSystemHelpers.Override(fs))
+            {
+                // Act
+                var result = await HostHelpers.GetCustomHandlerExecutable();
+
+                // Assert
+                result.Should().BeEmpty();
+            }
         }
 
         [Fact]
         public async Task GetCustomHandlerExecutable_Returns_Empty_When_CustomHandler_Missing()
         {
+            // Arrange
             var json = @"{}";
-            var fileSystem = Substitute.For<IFileSystem>();
-            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            fileSystem.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                .Returns(ci =>
+            var fs = Substitute.For<IFileSystem>();
+
+            fs.File.Exists(Arg.Any<string>()).Returns(ci =>
+                string.Equals(Path.GetFileName(ci.Arg<string>()), "host.json", StringComparison.OrdinalIgnoreCase));
+
+            Stream HostJsonStream() => new MemoryStream(Encoding.UTF8.GetBytes(json), writable: false);
+
+            fs.File.OpenRead(Arg.Any<string>()).Returns(ci =>
+            {
+                var path = ci.Arg<string>();
+                if (string.Equals(Path.GetFileName(path), "host.json", StringComparison.OrdinalIgnoreCase))
                 {
-                    var path = ci.ArgAt<string>(0);
-                    if (Path.GetFileName(path) == "host.json")
-                    {
-                        return json.ToStream();
-                    }
+                    return HostJsonStream();
+                }
 
-                    throw new FileNotFoundException(path);
-                });
+                throw new FileNotFoundException(path);
+            });
 
-            FileSystemHelpers.Instance = fileSystem;
+            fs.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+              .Returns(ci =>
+              {
+                  var path = ci.ArgAt<string>(0);
+                  if (string.Equals(Path.GetFileName(path), "host.json", StringComparison.OrdinalIgnoreCase))
+                  {
+                      return HostJsonStream();
+                  }
 
-            var result = await HostHelpers.GetCustomHandlerExecutable();
-            result.Should().BeEmpty();
+                  throw new FileNotFoundException(path);
+              });
+
+            using (FileSystemHelpers.Override(fs))
+            {
+                // Act
+                var result = await HostHelpers.GetCustomHandlerExecutable();
+
+                // Assert
+                result.Should().BeEmpty();
+            }
         }
 
         [Fact]
@@ -109,35 +170,44 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var expectedHostJsonPath = Path.Combine(customRoot, Constants.HostJsonFileName);
             var json = @"{""customHandler"":{""description"":{ ""defaultExecutablePath"":""file.exe"" }}}";
 
-            var fileSystem = Substitute.For<IFileSystem>();
+            var fs = Substitute.For<IFileSystem>();
 
-            fileSystem.File.Exists(Arg.Any<string>())
-                .Returns(ci => string.Equals(ci.ArgAt<string>(0), expectedHostJsonPath, StringComparison.OrdinalIgnoreCase));
+            fs.File.Exists(Arg.Any<string>())
+              .Returns(ci => string.Equals(ci.ArgAt<string>(0), expectedHostJsonPath, StringComparison.OrdinalIgnoreCase));
 
-            fileSystem.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                .Returns(ci =>
+            Stream HostJsonStream() => new MemoryStream(Encoding.UTF8.GetBytes(json), writable: false);
+
+            fs.File.OpenRead(Arg.Any<string>()).Returns(ci =>
+            {
+                var path = ci.Arg<string>();
+                if (string.Equals(path, expectedHostJsonPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    var path = ci.ArgAt<string>(0);
-                    if (string.Equals(path, expectedHostJsonPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return json.ToStream();
-                    }
+                    return HostJsonStream();
+                }
 
-                    throw new FileNotFoundException(path);
-                });
+                throw new FileNotFoundException(path);
+            });
 
-            FileSystemHelpers.Instance = fileSystem;
+            fs.File.Open(Arg.Any<string>(), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+              .Returns(ci =>
+              {
+                  var path = ci.ArgAt<string>(0);
+                  if (string.Equals(path, expectedHostJsonPath, StringComparison.OrdinalIgnoreCase))
+                  {
+                      return HostJsonStream();
+                  }
 
-            // Act
-            var result = await HostHelpers.GetCustomHandlerExecutable(customRoot);
+                  throw new FileNotFoundException(path);
+              });
 
-            // Assert
-            result.Should().Be("file.exe");
-        }
+            using (FileSystemHelpers.Override(fs))
+            {
+                // Act
+                var result = await HostHelpers.GetCustomHandlerExecutable(customRoot);
 
-        public void Dispose()
-        {
-            FileSystemHelpers.Instance = _originalFileSystem;
+                // Assert
+                result.Should().Be("file.exe");
+            }
         }
     }
 }

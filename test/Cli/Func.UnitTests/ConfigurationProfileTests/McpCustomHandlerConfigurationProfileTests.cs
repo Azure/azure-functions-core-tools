@@ -12,16 +12,9 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 {
-    public class McpCustomHandlerConfigurationProfileTests : IDisposable
+    public class McpCustomHandlerConfigurationProfileTests
     {
-        private readonly IFileSystem _originalFileSystem;
-        private readonly McpCustomHandlerConfigurationProfile _profile;
-
-        public McpCustomHandlerConfigurationProfileTests()
-        {
-            _originalFileSystem = FileSystemHelpers.Instance;
-            _profile = new McpCustomHandlerConfigurationProfile();
-        }
+        private readonly McpCustomHandlerConfigurationProfile _profile = new();
 
         [Fact]
         public void Name_ReturnsCorrectValue()
@@ -35,16 +28,18 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
             var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyHostJsonAsync(false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyHostJsonAsync(false);
 
-            // Assert
-            var hostJson = JObject.Parse(hostCap.LastText());
-            hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
-            hostJson["customHandler"]?.Should().NotBeNull();
-            hostJson["customHandler"]?["description"]?.Should().NotBeNull();
+                // Assert
+                var hostJson = JObject.Parse(hostCap.LastText());
+                hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
+                hostJson["customHandler"]?.Should().NotBeNull();
+                hostJson["customHandler"]?["description"]?.Should().NotBeNull();
+            }
         }
 
         [Fact]
@@ -54,16 +49,18 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             var existingHostJson = @"{""version"": ""2.0""}";
             var fileSystem = GetMockFileSystem(existingHostJson, null, hostJsonExists: true, localSettingsExists: false);
             var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyHostJsonAsync(false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyHostJsonAsync(false);
 
-            // Assert
-            var hostJson = JObject.Parse(hostCap.LastText());
-            hostJson["version"]?.ToString().Should().Be("2.0");
-            hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
-            hostJson["customHandler"]?.Should().NotBeNull();
+                // Assert
+                var hostJson = JObject.Parse(hostCap.LastText());
+                hostJson["version"]?.ToString().Should().Be("2.0");
+                hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
+                hostJson["customHandler"]?.Should().NotBeNull();
+            }
         }
 
         [Fact]
@@ -83,15 +80,17 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 
             var fileSystem = GetMockFileSystem(existingHostJson, null, hostJsonExists: true, localSettingsExists: false);
             var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyHostJsonAsync(force: true);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyHostJsonAsync(force: true);
 
-            // Assert
-            var hostJson = JObject.Parse(hostCap.LastText());
-            hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
-            hostJson["customHandler"]?["description"]?["defaultExecutablePath"]?.ToString().Should().BeEmpty();
+                // Assert
+                var hostJson = JObject.Parse(hostCap.LastText());
+                hostJson["configurationProfile"]?.ToString().Should().Be("mcp-custom-handler");
+                hostJson["customHandler"]?["description"]?["defaultExecutablePath"]?.ToString().Should().BeEmpty();
+            }
         }
 
         [Fact]
@@ -110,13 +109,15 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 
             var fileSystem = GetMockFileSystem(existingHostJson, null, hostJsonExists: true, localSettingsExists: false);
             var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json"); // set up so asserts can check no writes
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyHostJsonAsync(force: false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyHostJsonAsync(force: false);
 
-            // Assert
-            hostCap.Streams.Should().BeEmpty("no write should occur without force when config already matches");
+                // Assert
+                hostCap.Streams.Should().BeEmpty("no write should occur without force when config already matches");
+            }
         }
 
         [Fact]
@@ -125,15 +126,17 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, false);
 
-            // Assert
-            var localSettings = JObject.Parse(localCap.LastText());
-            localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
-            localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString().Should().Be("EnableMcpCustomHandlerPreview");
+                // Assert
+                var localSettings = JObject.Parse(localCap.LastText());
+                localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
+                localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString().Should().Be("EnableMcpCustomHandlerPreview");
+            }
         }
 
         [Fact]
@@ -149,16 +152,18 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, false);
 
-            // Assert
-            var localSettings = JObject.Parse(localCap.LastText());
-            localSettings["Values"]?["AzureWebJobsStorage"]?.ToString().Should().Be("UseDevelopmentStorage=true");
-            localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
-            localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString().Should().Be("EnableMcpCustomHandlerPreview");
+                // Assert
+                var localSettings = JObject.Parse(localCap.LastText());
+                localSettings["Values"]?["AzureWebJobsStorage"]?.ToString().Should().Be("UseDevelopmentStorage=true");
+                localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
+                localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString().Should().Be("EnableMcpCustomHandlerPreview");
+            }
         }
 
         [Fact]
@@ -175,15 +180,17 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
-            // Assert
-            var localSettings = JObject.Parse(localCap.LastText());
-            var flags = localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString();
-            flags.Should().Be("ExistingFlag1,ExistingFlag2,EnableMcpCustomHandlerPreview");
+                // Assert
+                var localSettings = JObject.Parse(localCap.LastText());
+                var flags = localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString();
+                flags.Should().Be("ExistingFlag1,ExistingFlag2,EnableMcpCustomHandlerPreview");
+            }
         }
 
         [Fact]
@@ -200,15 +207,17 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
-            // Assert
-            var localSettings = JObject.Parse(localCap.LastText());
-            var flags = localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString();
-            flags.Should().Be("ExistingFlag,EnableMcpCustomHandlerPreview,AnotherFlag");
+                // Assert
+                var localSettings = JObject.Parse(localCap.LastText());
+                var flags = localSettings["Values"]?["AzureWebJobsFeatureFlags"]?.ToString();
+                flags.Should().Be("ExistingFlag,EnableMcpCustomHandlerPreview,AnotherFlag");
+            }
         }
 
         [Fact]
@@ -224,14 +233,16 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: true);
 
-            // Assert
-            var localSettings = JObject.Parse(localCap.LastText());
-            localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
+                // Assert
+                var localSettings = JObject.Parse(localCap.LastText());
+                localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be("node");
+            }
         }
 
         [Fact]
@@ -248,13 +259,15 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
 
             var fileSystem = GetMockFileSystem(null, existingLocalSettings, hostJsonExists: false, localSettingsExists: true);
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json"); // so we can assert no writes
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyLocalSettingsAsync(WorkerRuntime.Node, force: false);
 
-            // Assert
-            localCap.Streams.Should().BeEmpty("no write should occur without force when worker runtime already set");
+                // Assert
+                localCap.Streams.Should().BeEmpty("no write should occur without force when worker runtime already set");
+            }
         }
 
         [Theory]
@@ -266,14 +279,16 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             // Arrange
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyLocalSettingsAsync(runtime, false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyLocalSettingsAsync(runtime, false);
 
-            // Assert
-            var localSettings = JObject.Parse(localCap.LastText());
-            localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be(expectedMoniker);
+                // Assert
+                var localSettings = JObject.Parse(localCap.LastText());
+                localSettings["Values"]?["FUNCTIONS_WORKER_RUNTIME"]?.ToString().Should().Be(expectedMoniker);
+            }
         }
 
         [Theory]
@@ -286,14 +301,16 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             var fileSystem = GetMockFileSystem(null, null, hostJsonExists: false, localSettingsExists: false);
             var hostCap = TestUtilities.SetupWriteFor(fileSystem, "host.json");
             var localCap = TestUtilities.SetupWriteFor(fileSystem, "local.settings.json");
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Act
-            await _profile.ApplyAsync(runtime, false);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Act
+                await _profile.ApplyAsync(runtime, false);
 
-            // Assert
-            hostCap.Streams.Should().NotBeEmpty("host.json should be written");
-            localCap.Streams.Should().NotBeEmpty("local.settings.json should be written");
+                // Assert
+                hostCap.Streams.Should().NotBeEmpty("host.json should be written");
+                localCap.Streams.Should().NotBeEmpty("local.settings.json should be written");
+            }
         }
 
         /// <summary>
@@ -342,11 +359,6 @@ namespace Azure.Functions.Cli.UnitTests.ConfigurationProfileTests
             }
 
             return fileSystem;
-        }
-
-        public void Dispose()
-        {
-            FileSystemHelpers.Instance = _originalFileSystem;
         }
     }
 }

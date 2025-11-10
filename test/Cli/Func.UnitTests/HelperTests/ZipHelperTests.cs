@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO.Abstractions;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
@@ -11,7 +12,7 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class ZipHelperTests : IDisposable
+    public class ZipHelperTests
     {
         private readonly ITestOutputHelper _output;
         private readonly bool _isCI = Environment.GetEnvironmentVariable("TF_BUILD")?.ToLowerInvariant() == "true";
@@ -83,11 +84,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // walk up to the 'test' directory
             var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-            dir = dir.Parent.Parent.Parent.Parent;
+            dir = dir.Parent!.Parent!.Parent!.Parent!;
 
             // build the project for the rid
             var csproj = dir.GetFiles($"{proj}.csproj", SearchOption.AllDirectories).FirstOrDefault();
-            var csprojDir = csproj.Directory.FullName;
+            var csprojDir = csproj!.Directory!.FullName;
 
             ProcessHelper.RunProcess("dotnet", $"build -r {rid}", csprojDir, writeOutput: WriteOutput);
 
@@ -99,7 +100,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 var f = new DirectoryInfo(outPath).GetFiles(fileName, SearchOption.AllDirectories).FirstOrDefault();
                 Assert.True(f != null, $"{fileName} not found.");
                 string destFile = Path.Combine(tempDir, fileName);
-                File.Copy(f.FullName, destFile);
+                File.Copy(f!.FullName, destFile);
                 files.Add(destFile);
             }
 
@@ -111,9 +112,14 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 Assert.True(File.Exists(file), $"{file} does not exist");
             }
 
-            var stream = await ZipHelper.CreateZip(files, tempDir, executables: new string[] { exe });
+            var stream = await ZipHelper.CreateZip(files, tempDir, executables: new[] { exe });
             Assert.NotNull(stream);
-            await FileSystemHelpers.WriteToFile(zipFile, stream);
+
+            // Scope the filesystem explicitly; no global mutation.
+            using (FileSystemHelpers.Override(new FileSystem()))
+            {
+                await FileSystemHelpers.WriteToFile(zipFile, stream);
+            }
 
             return zipFile;
         }
@@ -129,13 +135,13 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             ProcessHelper.RunProcess(Path.Combine(unzipPath, "ZippedExe.exe"), string.Empty, unzipPath, o => exeOutput += o + Environment.NewLine, e => exeError += e + Environment.NewLine);
 
             Assert.Null(exeError);
-            Assert.Equal("Hello, World!", exeOutput.Trim());
+            Assert.Equal("Hello, World!", exeOutput!.Trim());
         }
 
         private void VerifyLinuxZip(string zipFile)
         {
             const string exeName = "ZippedExe";
-            List<string> outputLines = new List<string>();
+            List<string> outputLines = new();
 
             void CaptureOutput(string output)
             {
@@ -144,7 +150,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
 
             var zipFileName = Path.GetFileName(zipFile);
-            var zipDir = Path.GetDirectoryName(zipFile);
+            var zipDir = Path.GetDirectoryName(zipFile)!;
             var mntDir = Path.Combine(zipDir, "mnt");
 
             Directory.CreateDirectory(mntDir);
@@ -176,18 +182,19 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 var fileInfo = new FileInfo(file);
                 if (fileInfo.Name == exeName)
                 {
-                    var readWriteExecute = UnixFileMode.GroupWrite | UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                        UnixFileMode.UserWrite | UnixFileMode.UserRead | UnixFileMode.UserExecute |
-                        UnixFileMode.OtherWrite | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
+                    var rwx = UnixFileMode.GroupWrite | UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                              UnixFileMode.UserWrite | UnixFileMode.UserRead | UnixFileMode.UserExecute |
+                              UnixFileMode.OtherWrite | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
 
-                    Assert.Equal(readWriteExecute, fileInfo.UnixFileMode);
+                    Assert.Equal(rwx, fileInfo.UnixFileMode);
                 }
                 else
                 {
-                    var readWrite = UnixFileMode.GroupWrite | UnixFileMode.GroupRead | UnixFileMode.UserWrite |
-                        UnixFileMode.UserRead | UnixFileMode.OtherWrite | UnixFileMode.OtherRead;
+                    var rw = UnixFileMode.GroupWrite | UnixFileMode.GroupRead |
+                             UnixFileMode.UserWrite | UnixFileMode.UserRead |
+                             UnixFileMode.OtherWrite | UnixFileMode.OtherRead;
 
-                    Assert.Equal(readWrite, fileInfo.UnixFileMode);
+                    Assert.Equal(rw, fileInfo.UnixFileMode);
                 }
             }
 
@@ -199,11 +206,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         private void WriteOutput(string output)
         {
             _output.WriteLine(output);
-        }
-
-        public void Dispose()
-        {
-            FileSystemHelpers.Instance = null;
         }
     }
 }
