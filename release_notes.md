@@ -1,4 +1,4 @@
-# Azure Functions CLI 4.4.0
+# Azure Functions CLI 4.4.1
 
 #### Host Version
 
@@ -7,6 +7,4 @@
 
 #### Changes
 
-- Add Dockerfile for python 3.13 local build environment (#4611)
-- Add support for Python 3.14 (#4668)
-- Implement preview feature to apply host configuration profiles on 'func init' command (#4675)
+- <entry>
