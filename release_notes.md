@@ -3,7 +3,7 @@
 #### Host Version
 
 - Host Version: 4.1044.400
-- In-Proc Host Version: 4.41.100 (4.841.100, 4.641.100)
+- In-Proc Host Version: 4.44.400 (4.844.100, 4.644.100)
 
 #### Changes
 
