@@ -12,7 +12,7 @@
 # Parse CLI arguments
 param (
   [string]$OutputPath = "./templates-download",
-  [string]$TemplatesVersion = "4.0.5212",
+  [string]$TemplatesVersion = "4.0.5212", # updated with release of .NET 10 isolated templates
   [string]$TemplateJsonVersion = "3.1.1648"
 )
 

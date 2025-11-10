@@ -1,7 +1,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <PropertyGroup>
-    <TemplatesVersion>4.0.5212</TemplatesVersion>
+    <TemplatesVersion>4.0.5212</TemplatesVersion> <!-- updated with release of .NET 10 isolated templates -->
     <TemplatesJsonVersion>3.1.1648</TemplatesJsonVersion>
   </PropertyGroup>
 
