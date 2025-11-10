@@ -464,7 +464,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (hostService.State is not ScriptHostState.Stopping && hostService.State is not ScriptHostState.Stopped)
             {
-                await hostService.DelayUntilHostReady();
+                await hostService.DelayUntilHostReadyAsync();
 
                 var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
                 var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();

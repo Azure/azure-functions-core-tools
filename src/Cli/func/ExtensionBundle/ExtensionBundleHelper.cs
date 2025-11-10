@@ -39,7 +39,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
             }
 
             var configOptions = new FunctionsHostingConfigOptions();
-            return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance, configOptions);
+            IHttpClientFactory httpClientFactory = new SimpleHttpClientFactory();
+            return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance, configOptions, httpClientFactory);
         }
 
         public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()
