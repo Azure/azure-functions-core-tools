@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Actions.LocalActions.PackAction;
+using Azure.Functions.Cli.Common;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -104,6 +105,41 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             var result = PythonPackSubcommandAction.ValidatePythonProgrammingModel(_tempDirectory, out string errorMessage);
             Assert.False(result);
             Assert.Contains("Did not find either", errorMessage);
+        }
+
+        [Fact]
+        public void RunPythonDependencyFilesValidation_WithRequirementsTxt_Passes()
+        {
+            File.WriteAllText(Path.Combine(_tempDirectory, Constants.RequirementsTxt), "flask==2.0.0");
+            // Should not throw
+            PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory);
+        }
+
+        [Fact]
+        public void RunPythonDependencyFilesValidation_WithPyProjectToml_Passes()
+        {
+            File.WriteAllText(Path.Combine(_tempDirectory, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+            // Should not throw
+            PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory);
+        }
+
+        [Fact]
+        public void RunPythonDependencyFilesValidation_WithPyProjectTomlAndUvLock_Passes()
+        {
+            File.WriteAllText(Path.Combine(_tempDirectory, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+            File.WriteAllText(Path.Combine(_tempDirectory, Constants.UvLock), "version = 1");
+            // Should not throw
+            PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory);
+        }
+
+        [Fact]
+        public void RunPythonDependencyFilesValidation_WithNoDependencyFiles_Throws()
+        {
+            var exception = Assert.Throws<CliException>(() => 
+                PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory));
+            Assert.Contains("Required dependency file(s) not found", exception.Message);
+            Assert.Contains("requirements.txt", exception.Message);
+            Assert.Contains("pyproject.toml", exception.Message);
         }
     }
 }

@@ -91,6 +91,144 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 Assert.Throws<CliException>(() => PythonHelpers.AssertPythonVersion(worker));
             }
         }
+
+        [Fact]
+        public void DetectPythonDependencyManager_WithRequirementsTxt_ReturnsPip()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, Constants.RequirementsTxt), "flask==2.0.0");
+                var result = PythonHelpers.DetectPythonDependencyManager(tempDir);
+                Assert.Equal(PythonDependencyManager.Pip, result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void DetectPythonDependencyManager_WithPyProjectToml_ReturnsPoetry()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+                var result = PythonHelpers.DetectPythonDependencyManager(tempDir);
+                Assert.Equal(PythonDependencyManager.Poetry, result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void DetectPythonDependencyManager_WithPyProjectTomlAndUvLock_ReturnsUv()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+                File.WriteAllText(Path.Combine(tempDir, Constants.UvLock), "version = 1");
+                var result = PythonHelpers.DetectPythonDependencyManager(tempDir);
+                Assert.Equal(PythonDependencyManager.Uv, result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void DetectPythonDependencyManager_WithPyProjectTomlAndRequirementsTxt_ReturnsUv()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+                File.WriteAllText(Path.Combine(tempDir, Constants.UvLock), "version = 1");
+                File.WriteAllText(Path.Combine(tempDir, Constants.RequirementsTxt), "flask==2.0.0");
+                var result = PythonHelpers.DetectPythonDependencyManager(tempDir);
+                // uv takes priority when both pyproject.toml and uv.lock are present
+                Assert.Equal(PythonDependencyManager.Uv, result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void DetectPythonDependencyManager_WithNoFiles_ReturnsUnknown()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var result = PythonHelpers.DetectPythonDependencyManager(tempDir);
+                Assert.Equal(PythonDependencyManager.Unknown, result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void HasPythonDependencyFiles_WithRequirementsTxt_ReturnsTrue()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, Constants.RequirementsTxt), "flask==2.0.0");
+                var result = PythonHelpers.HasPythonDependencyFiles(tempDir);
+                Assert.True(result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void HasPythonDependencyFiles_WithPyProjectToml_ReturnsTrue()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+                var result = PythonHelpers.HasPythonDependencyFiles(tempDir);
+                Assert.True(result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void HasPythonDependencyFiles_WithNoFiles_ReturnsFalse()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var result = PythonHelpers.HasPythonDependencyFiles(tempDir);
+                Assert.False(result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 
     public sealed class SkipIfPythonNonExistFact : FactAttribute
