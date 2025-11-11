@@ -279,7 +279,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost.InProc" Version="4.41.100" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost.InProc" Version="4.44.100" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -300,7 +300,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.10.1" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.4025" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4206" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4581" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.38.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
