@@ -629,8 +629,8 @@ namespace Azure.Functions.Cli.Helpers
             var tempRequirementsTxt = Path.Combine(Path.GetTempPath(), $"requirements-{Guid.NewGuid()}.txt");
             try
             {
-                // Export dependencies from poetry
-                var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{tempRequirementsTxt}\" --without-hashes");
+                // Export dependencies from poetry - run from function app root where pyproject.toml is located
+                var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{tempRequirementsTxt}\" --without-hashes", workingDirectory: functionAppRoot);
                 var sbPoetryErrors = new StringBuilder();
                 
                 ColoredConsole.WriteLine($"poetry export -f requirements.txt --output {tempRequirementsTxt} --without-hashes");
@@ -680,8 +680,8 @@ namespace Azure.Functions.Cli.Helpers
             var tempRequirementsTxt = Path.Combine(Path.GetTempPath(), $"requirements-{Guid.NewGuid()}.txt");
             try
             {
-                // Export dependencies from uv
-                var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{tempRequirementsTxt}\" --no-hashes");
+                // Export dependencies from uv - run from function app root where pyproject.toml and uv.lock are located
+                var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{tempRequirementsTxt}\" --no-hashes", workingDirectory: functionAppRoot);
                 var sbUvErrors = new StringBuilder();
                 
                 ColoredConsole.WriteLine($"uv export --format requirements-txt --output-file {tempRequirementsTxt} --no-hashes");
@@ -753,13 +753,13 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (dependencyManager == PythonDependencyManager.Poetry)
                 {
-                    // Export from poetry to requirements.txt
+                    // Export from poetry to requirements.txt - run from function app root
                     if (!CommandChecker.CommandExists("poetry"))
                     {
                         throw new CliException("Poetry is not installed. Please install poetry or use --no-build flag.");
                     }
 
-                    var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{requirementsTxtPath}\" --without-hashes");
+                    var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{requirementsTxtPath}\" --without-hashes", workingDirectory: functionAppRoot);
                     var sbErrors = new StringBuilder();
                     var exitCode = await poetryExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
@@ -771,13 +771,13 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 else if (dependencyManager == PythonDependencyManager.Uv)
                 {
-                    // Export from uv to requirements.txt
+                    // Export from uv to requirements.txt - run from function app root
                     if (!CommandChecker.CommandExists("uv"))
                     {
                         throw new CliException("uv is not installed. Please install uv or use --no-build flag.");
                     }
 
-                    var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{requirementsTxtPath}\" --no-hashes");
+                    var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{requirementsTxtPath}\" --no-hashes", workingDirectory: functionAppRoot);
                     var sbErrors = new StringBuilder();
                     var exitCode = await uvExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
