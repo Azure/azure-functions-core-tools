@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 dir => PackValidationHelper.RunInvalidFlagComboValidation(
                     options.NoBuild && BuildNativeDeps,
                     "Invalid options: --no-build cannot be used with --build-native-deps."),
-                dir => PackValidationHelper.RunRequiredFilesValidation(dir, new[] { "requirements.txt" }, "Validate Folder Structure"),
+                dir => RunPythonDependencyFilesValidation(dir),
                 dir =>
                 {
                     // Validate .python_packages directory exists and is not empty
@@ -171,6 +171,32 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 PackValidationHelper.DisplayValidationEnd();
                 throw new CliException(modelError);
+            }
+        }
+
+        /// <summary>
+        /// Runs a Python dependency files validation and displays results.
+        /// Validates that the project has either requirements.txt OR pyproject.toml (with optional uv.lock).
+        /// Throws CliException if validation fails.
+        /// </summary>
+        internal static void RunPythonDependencyFilesValidation(string directory)
+        {
+            var hasRequirementsTxt = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.RequirementsTxt));
+            var hasPyProjectToml = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.PyProjectToml));
+            var hasUvLock = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.UvLock));
+
+            var hasDependencyFiles = hasRequirementsTxt || hasPyProjectToml;
+
+            PackValidationHelper.DisplayValidationResult(
+                "Validate Folder Structure",
+                hasDependencyFiles);
+
+            if (!hasDependencyFiles)
+            {
+                PackValidationHelper.DisplayValidationEnd();
+                throw new CliException(
+                    $"Required dependency file(s) not found in {directory}. " +
+                    $"Python projects require either '{Constants.RequirementsTxt}' or '{Constants.PyProjectToml}' (optionally with '{Constants.UvLock}').");
             }
         }
     }
