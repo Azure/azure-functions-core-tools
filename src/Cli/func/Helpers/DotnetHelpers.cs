@@ -38,108 +38,46 @@ namespace Azure.Functions.Cli.Helpers
         /// Function that determines TargetFramework of a project even when it's defined outside of the .csproj file,
         /// e.g. in Directory.Build.props.
         /// </summary>
-        /// <param name="projectDirectory">Directory containing the .csproj file.</param>
-        /// <param name="projectFilename">Name of the .csproj file.</param>
+        /// <param name="workingDirectory">Directory containing the .csproj file.</param>
         /// <returns>Target framework, e.g. net8.0.</returns>
         /// <exception cref="CliException">Unable to determine target framework.</exception>
-        public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = null)
-        {
-            EnsureDotnet();
-            if (projectFilename == null)
-            {
-                var projectFilePath = ProjectHelpers.FindProjectFile(projectDirectory);
-                if (projectFilePath != null)
-                {
-                    projectFilename = Path.GetFileName(projectFilePath);
-                }
-            }
-
-            var exe = new Executable(
-                "dotnet",
-                $"build {projectFilename} -getproperty:TargetFramework",
-                workingDirectory: projectDirectory,
-                environmentVariables: new Dictionary<string, string>
-                {
-                    // https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables
-                    ["DOTNET_NOLOGO"] = "1",  // do not write disclaimer to stdout
-                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1", // just in case
-                });
-
-            StringBuilder output = new();
-            var exitCode = await exe.RunAsync(o => output.Append(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-            if (exitCode != 0)
-            {
-                throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
-            }
-
-            // Extract the target framework moniker (TFM) from the output using regex pattern matching
-            var outputString = output.ToString();
-
-            // Look for a line that looks like a target framework moniker
-            var tfm = TargetFrameworkHelper.TfmRegex.Match(outputString);
-
-            if (!tfm.Success)
-            {
-                throw new CliException($"Could not parse target framework from output: {outputString}");
-            }
-
-            return tfm.Value;
-        }
-
         public static async Task<string> DetermineTargetFrameworkAsync(string workingDirectory)
         {
             EnsureDotnet();
 
-            var projectFilePath = ProjectHelpers.FindProjectFile(workingDirectory);
+            string projectFilePath = ProjectHelpers.FindProjectFile(workingDirectory);
 
-            var args =
+            string args =
                 $"msbuild \"{projectFilePath}\" " +
                 "-nologo -v:q -restore:false " +
-                "-getProperty:TargetFrameworks " +
                 "-getProperty:TargetFramework";
 
             var exe = new Executable(
                 "dotnet",
                 args,
                 workingDirectory: workingDirectory,
-                environmentVariables: new Dictionary<string, string>
-                {
-                    ["DOTNET_NOLOGO"] = "1",
-                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
-                });
+                environmentVariables: new Dictionary<string, string> { ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1" });
 
-            var sb = new StringBuilder();
-            var exit = await exe.RunAsync(o => sb.Append(o), e => sb.AppendLine(e));
-            if (exit != 0)
+            var stdOut = new StringBuilder();
+            var stdErr = new StringBuilder();
+
+            int exit = await exe.RunAsync(s => stdOut.Append(s), s => stdErr.Append(s));
+            if (exit is not 0)
             {
-                throw new CliException($"Unable to evaluate target frameworks for '{projectFilePath}'.");
+                throw new CliException(
+                    $"Unable to evaluate target framework for '{projectFilePath}'.\nError output:\n{stdErr}");
             }
 
-            var output = sb.ToString();
+            string output = stdOut.ToString();
 
-            // Just match any valid TFM
-            var match = TargetFrameworkHelper.TfmRegex.Match(output);
+            Match match = TargetFrameworkHelper.TfmRegex.Match(output);
             if (!match.Success)
             {
-                throw new CliException($"Could not parse target framework from msbuild output for '{projectFilePath}'. Output:\n{output}");
+                throw new CliException(
+                    $"Could not parse target framework from msbuild output for '{projectFilePath}'.\nStdout:\n{output}\nStderr:\n{stdErr}");
             }
 
-            var tfm = match.Value;
-
-            // If multiple are in the string, warn
-            var matches = TargetFrameworkHelper.TfmRegex.Matches(output)
-                .Cast<Match>()
-                .Select(m => m.Value)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            if (matches.Length > 1)
-            {
-                ColoredConsole.WriteLine(
-                    WarningColor($"[Warning] Multiple target frameworks detected in project '{projectFilePath}': {string.Join(";", matches)}. Using the first: {tfm}"));
-            }
-
-            return tfm;
+            return match.Value;
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
