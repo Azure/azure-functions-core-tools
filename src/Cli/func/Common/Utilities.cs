@@ -297,9 +297,10 @@ namespace Azure.Functions.Cli
 
         internal static IConfigurationRoot BuildHostJsonConfigutation(ScriptApplicationHostOptions hostOptions)
         {
-            IConfigurationBuilder builder = new ConfigurationBuilder();
-            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance, metricsLogger: new MetricsLogger()));
-            var configuration = builder.Build();
+            var builder = new ConfigurationBuilder();
+            var hostJsonFileConfigurationOptions = new HostJsonFileConfigurationOptions(hostOptions);
+            builder.Add(new HostJsonFileConfigurationSource(hostJsonFileConfigurationOptions, loggerFactory: NullLoggerFactory.Instance, metricsLogger: new MetricsLogger()));
+            IConfigurationRoot configuration = builder.Build();
             return configuration;
         }
 
