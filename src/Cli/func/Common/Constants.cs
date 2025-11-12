@@ -22,6 +22,8 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
+        public const string PyProjectToml = "pyproject.toml";
+        public const string UvLock = "uv.lock";
         public const string PythonGettingStarted = "getting_started.md";
         public const string PySteinFunctionAppPy = "function_app.py";
         public const string FunctionJsonFileName = "function.json";
