@@ -1,5 +1,5 @@
 schedules:
-- cron: "30 2 * * *"
+- cron: "30 11 * * *" # 3:30am PST
   displayName: Nightly Consolidation
   always: true
   branches:
