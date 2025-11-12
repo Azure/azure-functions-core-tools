@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
+using System.Text;
 using Colors.Net;
 
 namespace Azure.Functions.Cli.Common
@@ -9,56 +10,63 @@ namespace Azure.Functions.Cli.Common
     internal static class FileSystemHelpers
     {
         private static readonly IFileSystem _default = new FileSystem();
-        private static IFileSystem _instance;
 
+        // Ambient, async-aware scope for the active IFileSystem
+        private static readonly AsyncLocal<IFileSystem> _ambient = new();
+
+        /// <summary>
+        /// Gets the ambient filesystem if present, otherwise the process default.
+        /// </summary>
+        internal static IFileSystem Current => _ambient.Value ?? _default;
+
+        /// <summary>
+        /// Gets FileSystem "Instance".
+        /// Setter is obsolete; use Override(...) in tests.
+        /// </summary>
         public static IFileSystem Instance
         {
-            get { return _instance ?? _default; }
-            set { _instance = value; }
+            get => Current;
         }
 
+        /// <summary>
+        /// For Tests Only:
+        /// Temporarily overrides the ambient filesystem for the lifetime of the returned IDisposable.
+        /// Safe for parallel tests via AsyncLocal.
+        /// </summary>
+        internal static IDisposable Override(IFileSystem fileSystem)
+            => new FsOverride(fileSystem);
+
+        // -----------------------------
+        // Below is the existing surface
+        // -----------------------------
         public static Stream OpenFile(string path, FileMode mode, FileAccess access = FileAccess.ReadWrite, FileShare share = FileShare.None)
-        {
-            return Instance.File.Open(path, mode, access, share);
-        }
+            => Current.File.Open(path, mode, access, share);
 
         internal static byte[] ReadAllBytes(string path)
-        {
-            return Instance.File.ReadAllBytes(path);
-        }
+            => Current.File.ReadAllBytes(path);
 
         public static string ReadAllTextFromFile(string path)
-        {
-            return Instance.File.ReadAllText(path);
-        }
+            => Current.File.ReadAllText(path);
 
         public static void Copy(string source, string destination, bool overwrite = false)
-        {
-            Instance.File.Copy(source, destination, overwrite);
-        }
+            => Current.File.Copy(source, destination, overwrite);
 
         public static async Task<string> ReadAllTextFromFileAsync(string path)
         {
-            using (var fileStream = OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-            using (var streamReader = new StreamReader(fileStream))
-            {
-                return await streamReader.ReadToEndAsync();
-            }
+            using var fileStream = OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var streamReader = new StreamReader(fileStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return await streamReader.ReadToEndAsync().ConfigureAwait(false);
         }
 
         public static void WriteAllTextToFile(string path, string content)
-        {
-            Instance.File.WriteAllText(path, content);
-        }
+            => Current.File.WriteAllText(path, content);
 
         public static async Task WriteAllTextToFileAsync(string path, string content)
         {
-            using (var fileStream = OpenFile(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
-            using (var streamWriter = new StreamWriter(fileStream))
-            {
-                await streamWriter.WriteAsync(content);
-                await streamWriter.FlushAsync();
-            }
+            using var fileStream = OpenFile(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+            using var streamWriter = new StreamWriter(fileStream);
+            await streamWriter.WriteAsync(content).ConfigureAwait(false);
+            await streamWriter.FlushAsync().ConfigureAwait(false);
         }
 
         public static async Task WriteFileIfNotExists(string fileName, string fileContent)
@@ -66,7 +74,7 @@ namespace Azure.Functions.Cli.Common
             if (!FileExists(fileName))
             {
                 ColoredConsole.WriteLine($"Writing {fileName}");
-                await WriteAllTextToFileAsync(fileName, fileContent);
+                await WriteAllTextToFileAsync(fileName, fileContent).ConfigureAwait(false);
             }
             else
             {
@@ -75,46 +83,33 @@ namespace Azure.Functions.Cli.Common
         }
 
         internal static void WriteAllBytes(string path, byte[] bytes)
-        {
-            Instance.File.WriteAllBytes(path, bytes);
-        }
+            => Current.File.WriteAllBytes(path, bytes);
 
         public static async Task WriteToFile(string path, Stream stream)
         {
-            using (var fileStream = OpenFile(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
-            {
-                await stream.CopyToAsync(fileStream);
-            }
+            using var fileStream = OpenFile(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+            await stream.CopyToAsync(fileStream).ConfigureAwait(false);
         }
 
         public static bool FileExists(string path)
-        {
-            return Instance.File.Exists(path);
-        }
+            => Current.File.Exists(path);
 
         public static bool DirectoryExists(string path)
-        {
-            return Instance.Directory.Exists(path);
-        }
+            => Current.Directory.Exists(path);
 
         public static void FileDelete(string path)
-        {
-            Instance.File.Delete(path);
-        }
+            => Current.File.Delete(path);
 
-        internal static void WriteAllTextToFile(string scriptFilePath, object p)
-        {
-            throw new NotImplementedException();
-        }
-
+        // Removed accidental duplicate NotImplementedException overload
         public static void CreateDirectory(string path)
-        {
-            Instance.Directory.CreateDirectory(path);
-        }
+            => Current.Directory.CreateDirectory(path);
 
         public static void CreateFile(string path)
         {
-            Instance.File.Create(path);
+            // Ensure the handle is disposed; FileSystem's Create returns a stream.
+#pragma warning disable SA1312 // Variable names should begin with lower-case letter
+            using var _ = Current.File.Create(path);
+#pragma warning restore SA1312 // Variable names should begin with lower-case letter
         }
 
         public static string EnsureDirectory(string path)
@@ -128,48 +123,38 @@ namespace Azure.Functions.Cli.Common
         }
 
         public static bool EnsureDirectoryNotEmpty(string path)
-        {
-            return DirectoryExists(path) &&
-                Instance.Directory.EnumerateFileSystemEntries(path).Any();
-        }
+            => DirectoryExists(path) && Current.Directory.EnumerateFileSystemEntries(path).Any();
 
         public static void DeleteDirectorySafe(string path, bool ignoreErrors = true)
-        {
-            DeleteFileSystemInfo(Instance.DirectoryInfo.FromDirectoryName(path), ignoreErrors);
-        }
+            => DeleteFileSystemInfo(Current.DirectoryInfo.FromDirectoryName(path), ignoreErrors);
 
         public static IEnumerable<string> GetLocalFiles(string path, GitIgnoreParser ignoreParser = null, bool returnIgnored = false, IEnumerable<string> additionalIgnoredDirectories = null)
         {
-            List<string> ignoredDirectories = new List<string> { ".git", ".vscode" };
-            if (additionalIgnoredDirectories != null)
+            List<string> ignoredDirectories = new() { ".git", ".vscode" };
+            if (additionalIgnoredDirectories is not null)
             {
                 ignoredDirectories.AddRange(additionalIgnoredDirectories);
             }
 
             var ignoredFiles = new[] { ".funcignore", ".gitignore", "local.settings.json", "project.lock.json" };
 
-            foreach (var file in FileSystemHelpers.GetFiles(path, ignoredDirectories, ignoredFiles))
+            foreach (var file in GetFiles(path, ignoredDirectories, ignoredFiles))
             {
-                if (PreCondition(file))
+                var fileName = file.Replace(path, string.Empty).Trim(Path.DirectorySeparatorChar).Replace("\\", "/");
+                bool pass = (returnIgnored ? ignoreParser?.Denies(fileName) : ignoreParser?.Accepts(fileName)) ?? true;
+                if (pass)
                 {
                     yield return file;
                 }
-            }
-
-            bool PreCondition(string file)
-            {
-                var fileName = file.Replace(path, string.Empty).Trim(Path.DirectorySeparatorChar).Replace("\\", "/");
-                return (returnIgnored ? ignoreParser?.Denies(fileName) : ignoreParser?.Accepts(fileName)) ?? true;
             }
         }
 
         internal static IEnumerable<string> GetFiles(string directoryPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> excludedFiles = null, string searchPattern = "*", SearchOption searchOption = SearchOption.AllDirectories)
         {
-            foreach (var file in Instance.Directory.GetFiles(directoryPath, searchPattern, SearchOption.TopDirectoryOnly))
+            foreach (var file in Current.Directory.GetFiles(directoryPath, searchPattern, SearchOption.TopDirectoryOnly))
             {
                 var fileName = Path.GetFileName(file);
-                if (excludedFiles == null ||
-                    !excludedFiles.Any(f => f.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
+                if (excludedFiles is null || !excludedFiles.Any(f => f.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
                 {
                     yield return file;
                 }
@@ -180,11 +165,10 @@ namespace Azure.Functions.Cli.Common
                 yield break;
             }
 
-            foreach (var directory in Instance.Directory.GetDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly))
+            foreach (var directory in Current.Directory.GetDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly))
             {
                 var directoryName = Path.GetFileName(directory);
-                if (excludedDirectories == null ||
-                    !excludedDirectories.Any(d => d.Equals(directoryName, StringComparison.OrdinalIgnoreCase)))
+                if (excludedDirectories is null || !excludedDirectories.Any(d => d.Equals(directoryName, StringComparison.OrdinalIgnoreCase)))
                 {
                     foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles, searchPattern, searchOption))
                     {
@@ -195,9 +179,7 @@ namespace Azure.Functions.Cli.Common
         }
 
         internal static IEnumerable<string> GetDirectories(string path)
-        {
-            return Instance.Directory.GetDirectories(path);
-        }
+            => Current.Directory.GetDirectories(path);
 
         private static void DeleteFileSystemInfo(FileSystemInfoBase fileSystemInfo, bool ignoreErrors)
         {
@@ -206,61 +188,63 @@ namespace Azure.Functions.Cli.Common
                 return;
             }
 
-            try
+            Try(ignoreErrors, () => fileSystemInfo.Attributes = FileAttributes.Normal);
+
+            if (fileSystemInfo is DirectoryInfoBase dir)
             {
-                fileSystemInfo.Attributes = FileAttributes.Normal;
-            }
-            catch
-            {
-                if (!ignoreErrors)
-                {
-                    throw;
-                }
+                DeleteDirectoryContentsSafe(dir, ignoreErrors);
             }
 
-            var directoryInfo = fileSystemInfo as DirectoryInfoBase;
-
-            if (directoryInfo != null)
-            {
-                DeleteDirectoryContentsSafe(directoryInfo, ignoreErrors);
-            }
-
-            DoSafeAction(fileSystemInfo.Delete, ignoreErrors);
+            Try(ignoreErrors, fileSystemInfo.Delete);
         }
 
         private static void DeleteDirectoryContentsSafe(DirectoryInfoBase directoryInfo, bool ignoreErrors)
         {
-            try
+            Try(ignoreErrors, () =>
             {
-                if (directoryInfo.Exists)
+                if (!directoryInfo.Exists)
                 {
-                    foreach (var fsi in directoryInfo.GetFileSystemInfos())
-                    {
-                        DeleteFileSystemInfo(fsi, ignoreErrors);
-                    }
+                    return;
                 }
-            }
-            catch
-            {
-                if (!ignoreErrors)
+
+                foreach (var fsi in directoryInfo.GetFileSystemInfos())
                 {
-                    throw;
+                    DeleteFileSystemInfo(fsi, ignoreErrors);
                 }
-            }
+            });
         }
 
-        private static void DoSafeAction(Action action, bool ignoreErrors)
+        private static void Try(bool ignoreErrors, Action action)
         {
             try
             {
                 action();
             }
-            catch
+            catch when (ignoreErrors)
             {
-                if (!ignoreErrors)
+            }
+        }
+
+        private sealed class FsOverride : IDisposable
+        {
+            private readonly IFileSystem _previous;
+            private bool _disposed;
+
+            public FsOverride(IFileSystem next)
+            {
+                _previous = _ambient.Value;
+                _ambient.Value = next ?? throw new ArgumentNullException(nameof(next));
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
                 {
-                    throw;
+                    return;
                 }
+
+                _disposed = true;
+                _ambient.Value = _previous;
             }
         }
     }

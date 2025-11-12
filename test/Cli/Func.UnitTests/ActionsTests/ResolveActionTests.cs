@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
-    public class ResolveActionTests : IDisposable
+    public class ResolveActionTests
     {
         [Theory]
         [InlineData("azure functionapp enable-git-repo appName", typeof(DeprecatedAzureActions))]
@@ -64,18 +64,21 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         {
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            FileSystemHelpers.Instance = fileSystem;
 
-            var container = InitializeContainerForTests();
-            var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
-            var result = app.Parse();
-            if (returnType == null)
+            using (FileSystemHelpers.Override(fileSystem))
             {
-                result.Should().BeNull();
-            }
-            else
-            {
-                result.Should().BeOfType(returnType);
+                var container = InitializeContainerForTests();
+                var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
+                var result = app.Parse();
+
+                if (returnType is null)
+                {
+                    result.Should().BeNull();
+                }
+                else
+                {
+                    result.Should().BeOfType(returnType);
+                }
             }
         }
 
@@ -85,49 +88,33 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         {
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
-            FileSystemHelpers.Instance = fileSystem;
 
-            var container = InitializeContainerForTests();
-            var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                var container = InitializeContainerForTests();
+                var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
 
-            Assert.Throws<CliArgumentsException>(app.Parse);
+                Assert.Throws<CliArgumentsException>(app.Parse);
+            }
         }
 
         private IContainer InitializeContainerForTests()
         {
             var builder = new ContainerBuilder();
 
-            builder.RegisterType<FunctionsLocalServer>()
-                .As<IFunctionsLocalServer>();
-
-            builder.Register(_ => new PersistentSettings())
-                .As<ISettings>()
-                .SingleInstance();
-
-            builder.RegisterType<ProcessManager>()
-                .As<IProcessManager>()
-                .SingleInstance();
+            builder.RegisterType<FunctionsLocalServer>().As<IFunctionsLocalServer>();
+            builder.Register(_ => new PersistentSettings()).As<ISettings>().SingleInstance();
+            builder.RegisterType<ProcessManager>().As<IProcessManager>().SingleInstance();
 
             var mockedSecretsManager = Substitute.For<ISecretsManager>();
-            builder.RegisterInstance(mockedSecretsManager)
-                .As<ISecretsManager>();
+            builder.RegisterInstance(mockedSecretsManager).As<ISecretsManager>();
             mockedSecretsManager.GetHostStartSettings().Returns(new HostStartSettings());
 
-            builder.RegisterType<TemplatesManager>()
-                .As<ITemplatesManager>();
-
-            builder.RegisterType<ContextHelpManager>()
-                .As<IContextHelpManager>();
-
-            builder.RegisterType<DurableManager>()
-                .As<IDurableManager>();
+            builder.RegisterType<TemplatesManager>().As<ITemplatesManager>();
+            builder.RegisterType<ContextHelpManager>().As<IContextHelpManager>();
+            builder.RegisterType<DurableManager>().As<IDurableManager>();
 
             return builder.Build();
-        }
-
-        public void Dispose()
-        {
-            FileSystemHelpers.Instance = null;
         }
     }
 }

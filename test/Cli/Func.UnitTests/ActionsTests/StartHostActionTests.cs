@@ -17,7 +17,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
-    public class StartHostActionTests : IDisposable
+    public class StartHostActionTests
     {
         [SkippableFact]
         public async Task CheckNonOptionalSettings_ThrowsOnMissingAzureWebJobsStorageAndManagedIdentity()
@@ -32,22 +32,25 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
             ]);
 
-            FileSystemHelpers.Instance = fileSystem;
+            fileSystem.File.Exists(Arg.Is<string>(s => s.EndsWith("local.settings.json"))).Returns(true);
 
-            Exception exception = null;
-            try
+            using (FileSystemHelpers.Override(fileSystem))
             {
-                await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
-            }
-            catch (Exception e)
-            {
-                exception = e;
-            }
+                Exception exception = null;
+                try
+                {
+                    await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
+                }
+                catch (Exception e)
+                {
+                    exception = e;
+                }
 
-            exception.Should().NotBeNull();
-            exception.Should().BeOfType<CliException>();
-            exception.Message.Should().Contain($"Missing value for AzureWebJobsStorage in local.settings.json. " +
-                $"This is required for all triggers other than {string.Join(", ", Common.Constants.TriggersWithoutStorage)}.");
+                exception.Should().NotBeNull();
+                exception.Should().BeOfType<CliException>();
+                exception!.Message.Should().Contain($"Missing value for AzureWebJobsStorage in local.settings.json. " +
+                    $"This is required for all triggers other than {string.Join(", ", Common.Constants.TriggersWithoutStorage)}.");
+            }
         }
 
         [Fact]
@@ -70,19 +73,20 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 { "myQueueStorage__accountName", "myAccountName" }
             };
 
-            FileSystemHelpers.Instance = fileSystem;
-
-            Exception exception = null;
-            try
+            using (FileSystemHelpers.Override(fileSystem))
             {
-                await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\");
-            }
-            catch (Exception e)
-            {
-                exception = e;
-            }
+                Exception exception = null;
+                try
+                {
+                    await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\");
+                }
+                catch (Exception e)
+                {
+                    exception = e;
+                }
 
-            exception.Should().BeNull();
+                exception.Should().BeNull();
+            }
         }
 
         [SkippableFact]
@@ -98,25 +102,28 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
             ]);
 
+            fileSystem.File.Exists(Arg.Is<string>(s => s.EndsWith("local.settings.json"))).Returns(true);
+
             var secrets = new Dictionary<string, string>()
             {
                 { "AzureWebJobsStorage:blobServiceUri", "myuri" },
                 { "AzureWebJobsStorage__queueServiceUri", "queueuri" }
             };
 
-            FileSystemHelpers.Instance = fileSystem;
-
-            Exception exception = null;
-            try
+            using (FileSystemHelpers.Override(fileSystem))
             {
-                await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\");
-            }
-            catch (Exception e)
-            {
-                exception = e;
-            }
+                Exception exception = null;
+                try
+                {
+                    await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\");
+                }
+                catch (Exception e)
+                {
+                    exception = e;
+                }
 
-            exception.Should().BeNull();
+                exception.Should().BeNull();
+            }
         }
 
         [SkippableFact]
@@ -132,25 +139,28 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
             ]);
 
+            fileSystem.File.Exists(Arg.Is<string>(s => s.EndsWith("local.settings.json"))).Returns(true);
+
             var secrets = new Dictionary<string, string>()
             {
                 { "AzureWebJobsStorage:blobServiceUri", "myuri" },
                 { "AzureWebJobsStorage__queueServiceUri", "queueuri" }
             };
 
-            FileSystemHelpers.Instance = fileSystem;
-
-            Exception exception = null;
-            try
+            using (FileSystemHelpers.Override(fileSystem))
             {
-                await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\", false);
-            }
-            catch (Exception e)
-            {
-                exception = e;
-            }
+                Exception exception = null;
+                try
+                {
+                    await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\", false);
+                }
+                catch (Exception e)
+                {
+                    exception = e;
+                }
 
-            exception.Should().BeNull();
+                exception.Should().BeNull();
+            }
         }
 
         [Fact]
@@ -171,38 +181,66 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 (folder2, "{'bindings': [{'type': 'httpTrigger', 'connection': ''}]}")
             ]);
 
-            FileSystemHelpers.Instance = fileSystem;
+            fileSystem.File.Exists(Arg.Is<string>(s => s.EndsWith("local.settings.json"))).Returns(true);
 
-            // Capture console output via ColoredConsole
-            var output = new StringBuilder();
-            var console = Substitute.For<IConsoleWriter>();
-            console.WriteLine(Arg.Do<object>(o => output.AppendLine(o?.ToString()))).Returns(console);
-            console.Write(Arg.Do<object>(o => output.Append(o?.ToString()))).Returns(console);
-            ColoredConsole.Out = console;
-            ColoredConsole.Error = console;
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                // Capture console output via ColoredConsole
+                var output = new StringBuilder();
+                var console = Substitute.For<IConsoleWriter>();
+                console.WriteLine(Arg.Do<object>(o => output.AppendLine(o?.ToString()))).Returns(console);
+                console.Write(Arg.Do<object>(o => output.Append(o?.ToString()))).Returns(console);
 
-            // Act
-            await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), root, false);
+                var oldOut = ColoredConsole.Out;
+                var oldErr = ColoredConsole.Error;
 
-            // Assert
-            output.ToString().Should().Contain("Warning: Cannot find value named 'blah'");
+                try
+                {
+                    ColoredConsole.Out = console;
+                    ColoredConsole.Error = console;
 
-            // Match either slash or backslash in the path, regardless of OS
-            var escapedFolder2 = Regex.Escape(folder2);
-            var regex = new Regex($@"Warning: 'connection' property in '{escapedFolder2}[/\\]function\.json' is empty\.");
-            regex.IsMatch(output.ToString()).Should().BeTrue("Output should match the expected pattern");
+                    // Act
+                    await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), root, false);
+
+                    // Assert
+                    output.ToString().Should().Contain("Warning: Cannot find value named 'blah'");
+
+                    // Match either slash or backslash in the path, regardless of OS
+                    var escapedFolder2 = Regex.Escape(folder2);
+                    var regex = new Regex($@"Warning: 'connection' property in '{escapedFolder2}[/\\]function\.json' is empty\.");
+                    regex.IsMatch(output.ToString()).Should().BeTrue("Output should match the expected pattern");
+                }
+                finally
+                {
+                    ColoredConsole.Out = oldOut;
+                    ColoredConsole.Error = oldErr;
+                }
+            }
         }
 
-        private IFileSystem GetFakeFileSystem(IEnumerable<(string Folder, string FunctionJsonContent)> list)
+        private static IFileSystem GetFakeFileSystem(IEnumerable<(string Folder, string FunctionJsonContent)> list)
         {
             var fileSystem = Substitute.For<IFileSystem>();
-            fileSystem.Directory.GetDirectories(Arg.Any<string>()).Returns(list.Select(t => t.Folder).ToArray());
-            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+
+            fileSystem.Directory.GetDirectories(Arg.Any<string>())
+                .Returns(list.Select(t => t.Folder).ToArray());
+
+            // Only function.json files exist where we expect them; other files can be true if your SUT probes
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(ci =>
+            {
+                var p = ci.Arg<string>();
+                return list.Any(t => string.Equals(p, Path.Combine(t.Folder, "function.json"), StringComparison.OrdinalIgnoreCase));
+            });
 
             foreach ((var folder, var fileContent) in list)
             {
-                fileSystem.File.Open(Arg.Is(Path.Combine(folder, "function.json")), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
-                    .Returns(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(fileContent)));
+                var functionJsonPath = Path.Combine(folder, "function.json");
+                byte[] bytes = Encoding.UTF8.GetBytes(fileContent);
+
+                // Fresh stream every call for this path
+                fileSystem.File
+                    .Open(Arg.Is(functionJsonPath), Arg.Any<FileMode>(), Arg.Any<FileAccess>(), Arg.Any<FileShare>())
+                    .Returns(ci => new MemoryStream(bytes, writable: false));
             }
 
             return fileSystem;
@@ -286,39 +324,35 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
             var mockSecretsManager = new Mock<ISecretsManager>();
             mockSecretsManager.Setup(s => s.GetSecrets(false))
-                            .Returns(() => new Dictionary<string, string>(secretsDict));
+                              .Returns(() => new Dictionary<string, string>(secretsDict));
 
             // Return an empty set of connection strings of the expected type
             mockSecretsManager.Setup(s => s.GetConnectionStrings())
-                            .Returns(Array.Empty<ConnectionString>);
+                              .Returns(Array.Empty<ConnectionString>);
 
             // Set up file system mock to avoid the project root directory error
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
             fileSystem.Directory.GetDirectories(Arg.Any<string>()).Returns(Array.Empty<string>());
-            FileSystemHelpers.Instance = fileSystem;
 
-            // Initialize globals if required by your setup
             GlobalCoreToolsSettings.Init(mockSecretsManager.Object, []);
 
-            var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>())
+            using (FileSystemHelpers.Override(fileSystem))
             {
-                DotNetIsolatedDebug = false,
-                EnableJsonOutput = false,
-                VerboseLogging = false,
-                HostRuntime = "default"
-            };
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>())
+                {
+                    DotNetIsolatedDebug = false,
+                    EnableJsonOutput = false,
+                    VerboseLogging = false,
+                    HostRuntime = "default"
+                };
 
-            // Act
-            var result = await action.GetConfigurationSettings("some/path", new Uri("https://example.com"));
+                // Act
+                var result = await action.GetConfigurationSettings("some/path", new Uri("https://example.com"));
 
-            // Assert
-            Assert.Equal("Development", result["AZURE_FUNCTIONS_ENVIRONMENT"]);
-        }
-
-        public void Dispose()
-        {
-            FileSystemHelpers.Instance = null;
+                // Assert
+                Assert.Equal("Development", result["AZURE_FUNCTIONS_ENVIRONMENT"]);
+            }
         }
     }
 }
