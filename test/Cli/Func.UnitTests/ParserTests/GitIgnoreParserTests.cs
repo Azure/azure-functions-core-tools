@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
@@ -146,6 +147,26 @@ othernonexistent/**/what
         public void DeniesShouldNotDenyNestedUnignoredFilesInIgnoredDirectories()
         {
             _gitignore.Denies("nonexistent/foo/wat").Should().BeFalse();
+        }
+
+        [Fact]
+        public async void PowerShellModuleBinFoldersShouldBeHandledCorrectly()
+        {
+            // Test the current gitignore content from the actual static resource
+            var currentGitIgnore = await StaticResources.GitIgnore;
+
+            var currentParser = new GitIgnoreParser(currentGitIgnore);
+
+            // These paths should be ignored (regular bin folders)
+            currentParser.Denies("bin/somefile.dll").Should().BeTrue();
+            currentParser.Denies("src/bin/output.dll").Should().BeTrue();
+
+            // These PowerShell module paths should NOT be ignored with the updated gitignore
+            currentParser.Denies("Modules/Az.Storage/8.1.0/Storage.Autorest/bin/Az.Storage.private.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
+            currentParser.Denies("Modules/SomeModule/1.0.0/bin/Module.dll").Should().BeFalse("PowerShell module bin files should not be ignored");
+
+            // Non-bin files in modules should not be ignored
+            currentParser.Denies("Modules/Az.Accounts/2.0.0/lib/netstandard2.0/Microsoft.Azure.dll").Should().BeFalse();
         }
     }
 }
