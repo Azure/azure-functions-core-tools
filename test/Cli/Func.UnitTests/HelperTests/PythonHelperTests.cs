@@ -145,18 +145,38 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void DetectPythonDependencyManager_WithPyProjectTomlAndRequirementsTxt_ReturnsUv()
+        public void DetectPythonDependencyManager_WithPyProjectTomlUvLockAndRequirementsTxt_ReturnsUv()
         {
             var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             Directory.CreateDirectory(tempDir);
             try
             {
-                File.WriteAllText(Path.Combine(tempDir, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+                File.WriteAllText(Path.Combine(tempDir, Constants.PyProjectToml), "[tool.uv]\nname = \"test\"");
                 File.WriteAllText(Path.Combine(tempDir, Constants.UvLock), "version = 1");
                 File.WriteAllText(Path.Combine(tempDir, Constants.RequirementsTxt), "flask==2.0.0");
                 var result = PythonHelpers.DetectPythonDependencyManager(tempDir);
                 // uv takes priority when both pyproject.toml and uv.lock are present
                 Assert.Equal(PythonDependencyManager.Uv, result);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void DetectPythonDependencyManager_WithPyProjectTomlAndRequirementsTxt_ReturnsPoetry()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                // When both pyproject.toml and requirements.txt are present but NO uv.lock,
+                // poetry takes priority over pip
+                File.WriteAllText(Path.Combine(tempDir, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
+                File.WriteAllText(Path.Combine(tempDir, Constants.RequirementsTxt), "flask==2.0.0");
+                var result = PythonHelpers.DetectPythonDependencyManager(tempDir);
+                Assert.Equal(PythonDependencyManager.Poetry, result);
             }
             finally
             {
