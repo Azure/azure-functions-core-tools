@@ -1,5 +1,5 @@
 schedules:
-- cron: "0 8 * * *"   # 8 AM UTC == midnight PST, or 11pm PDT
+- cron: "0 7 * * *"   # 11am PST
   displayName: Nightly Build
   branches:
     include:
