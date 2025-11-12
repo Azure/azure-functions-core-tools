@@ -50,6 +50,7 @@ namespace Azure.Functions.Cli.Helpers
             string args =
                 $"msbuild \"{projectFilePath}\" " +
                 "-nologo -v:q -restore:false " +
+                "-getProperty:TargetFrameworks " +
                 "-getProperty:TargetFramework";
 
             var exe = new Executable(
@@ -62,7 +63,7 @@ namespace Azure.Functions.Cli.Helpers
             var stdErr = new StringBuilder();
 
             int exit = await exe.RunAsync(s => stdOut.Append(s), s => stdErr.Append(s));
-            if (exit is not 0)
+            if (exit != 0)
             {
                 throw new CliException(
                     $"Unable to evaluate target framework for '{projectFilePath}'.\nError output:\n{stdErr}");
@@ -70,14 +71,29 @@ namespace Azure.Functions.Cli.Helpers
 
             string output = stdOut.ToString();
 
-            Match tfm = TargetFrameworkHelper.TfmRegex.Match(output);
-            if (!tfm.Success)
+            var uniqueTfms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Match m in TargetFrameworkHelper.TfmRegex.Matches(output))
+            {
+                if (m.Success && !string.IsNullOrEmpty(m.Value))
+                {
+                    uniqueTfms.Add(m.Value);
+                }
+            }
+
+            if (uniqueTfms.Count == 0)
             {
                 throw new CliException(
                     $"Could not parse target framework from msbuild output for '{projectFilePath}'.\nStdout:\n{output}\nStderr:\n{stdErr}");
             }
 
-            return tfm.Value;
+            if (uniqueTfms.Count == 1)
+            {
+                return uniqueTfms.First();
+            }
+
+            ColoredConsole.WriteLine("Multiple target frameworks detected.");
+            SelectionMenuHelper.DisplaySelectionWizardPrompt("target framework");
+            return SelectionMenuHelper.DisplaySelectionWizard(uniqueTfms.ToArray());
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
