@@ -70,14 +70,14 @@ namespace Azure.Functions.Cli.Helpers
 
             string output = stdOut.ToString();
 
-            Match match = TargetFrameworkHelper.TfmRegex.Match(output);
-            if (!match.Success)
+            Match tfm = TargetFrameworkHelper.TfmRegex.Match(output);
+            if (!tfm.Success)
             {
                 throw new CliException(
                     $"Could not parse target framework from msbuild output for '{projectFilePath}'.\nStdout:\n{output}\nStderr:\n{stdErr}");
             }
 
-            return match.Value;
+            return tfm.Value;
         }
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
