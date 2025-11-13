@@ -14,7 +14,7 @@ pr:
     - release_4.0
     - main
     - in-proc
-    - featute/*
+    - feature/*
 
 
 resources:
