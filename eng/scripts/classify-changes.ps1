@@ -21,13 +21,20 @@ if (-not $TargetBranch) {
     exit 0
 }
 
-# Ensure we have the target branch locally
-Write-Host "Fetching target branch: origin/$TargetBranch"
-git fetch origin $TargetBranch --depth=1
+# Normalize target branch (AzDO usually gives refs/heads/main)
+$normalizedTarget = $TargetBranch
+if ($normalizedTarget.StartsWith("refs/heads/")) {
+    $normalizedTarget = $normalizedTarget.Substring("refs/heads/".Length)
+}
+Write-Host "Normalized target branch: $normalizedTarget"
 
-# List changed files between target and current HEAD
-Write-Host "Computing changed files vs origin/$TargetBranch..."
-$changedFiles = git diff --name-only "origin/$TargetBranch"...HEAD
+# Fetch that branch
+Write-Host "Fetching target branch: origin/$normalizedTarget"
+git fetch origin $normalizedTarget --depth=1
+
+# Get changed files between origin/<target> and HEAD
+Write-Host "Computing changed files vs origin/$normalizedTarget..."
+$changedFiles = git diff --name-only "origin/$normalizedTarget" "HEAD"
 
 if (-not $changedFiles -or $changedFiles.Count -eq 0) {
     Write-Host "No changed files detected, treat as non-docs-only"
@@ -41,7 +48,7 @@ $changedFiles | ForEach-Object { Write-Host " - $_" }
 $docsOnly = $true
 
 foreach ($file in $changedFiles) {
-    $leaf = [System.IO.Path]::GetFileName($file)
+    $leaf      = [System.IO.Path]::GetFileName($file)
     $lowerFile = $file.ToLowerInvariant()
 
     # Docs / meta rules:
