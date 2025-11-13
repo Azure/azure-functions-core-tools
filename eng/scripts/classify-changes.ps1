@@ -1,28 +1,29 @@
-param(
-    [string]$BuildReason,
-    [string]$TargetBranch,
-    [string]$SourceBranch
-)
+# eng/ci/scripts/classify-changes.ps1
 
-Write-Host "BuildReason: $BuildReason"
-Write-Host "TargetBranch: $TargetBranch"
-Write-Host "SourceBranch: $SourceBranch"
+# Read from environment variables provided by Azure DevOps
+$buildReason  = $env:BUILD_REASON
+$targetBranch = $env:SYSTEM_PULLREQUEST_TARGETBRANCH
+$sourceBranch = $env:SYSTEM_PULLREQUEST_SOURCEBRANCH
+
+Write-Host "BuildReason: $buildReason"
+Write-Host "TargetBranch (raw): $targetBranch"
+Write-Host "SourceBranch (raw): $sourceBranch"
 
 # Default: not docs-only (for non-PR builds, schedules, etc.)
-if ($BuildReason -ne "PullRequest") {
+if ($buildReason -ne "PullRequest") {
     Write-Host "Non-PR build, forcing DocsOnly = false"
     Write-Host "##vso[task.setvariable variable=DocsOnly;isOutput=true]false"
     exit 0
 }
 
-if (-not $TargetBranch) {
+if (-not $targetBranch) {
     Write-Host "No target branch provided, defaulting DocsOnly = false"
     Write-Host "##vso[task.setvariable variable=DocsOnly;isOutput=true]false"
     exit 0
 }
 
 # Normalize target branch (AzDO usually gives refs/heads/main)
-$normalizedTarget = $TargetBranch
+$normalizedTarget = $targetBranch
 if ($normalizedTarget.StartsWith("refs/heads/")) {
     $normalizedTarget = $normalizedTarget.Substring("refs/heads/".Length)
 }
@@ -52,10 +53,10 @@ foreach ($file in $changedFiles) {
     $lowerFile = $file.ToLowerInvariant()
 
     # Docs / meta rules:
-    $isDocsPath   = $file.StartsWith("docs/")
-    $isMarkdown   = $lowerFile.EndsWith(".md")
-    $isVsCodePath = $file.StartsWith(".vscode/")
-    $isGitHubPath = $file.StartsWith(".github/")
+    $isDocsPath    = $file.StartsWith("docs/")
+    $isMarkdown    = $lowerFile.EndsWith(".md")
+    $isVsCodePath  = $file.StartsWith(".vscode/")
+    $isGitHubPath  = $file.StartsWith(".github/")
     $isLicenseLike = $leaf -in @('LICENSE', 'CODEOWNERS')
 
     $isDocsOrMeta = $isDocsPath -or $isMarkdown -or $isVsCodePath -or $isGitHubPath -or $isLicenseLike

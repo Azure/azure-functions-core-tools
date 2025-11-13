@@ -1,4 +1,3 @@
-# eng/ci/templates/public/jobs/precheck-docs-only.yml
 parameters:
 - name: scriptPath
   type: string
@@ -18,7 +17,3 @@ jobs:
       pwsh: true
       targetType: filePath
       filePath: ${{ parameters.scriptPath }}
-      arguments: >
-        -BuildReason "$(Build.Reason)"
-        -TargetBranch "$(System.PullRequest.TargetBranch)"
-        -SourceBranch "$(System.PullRequest.SourceBranch)"
