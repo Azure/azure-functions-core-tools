@@ -11,4 +11,3 @@
 - Adding the MCP Tool Trigger Templates for the Node/Typescript (#4651)
 - Set `AzureWebJobsStorage` to use the storage emulator by default on all platforms (#4685)
 - Set `FUNCTIONS_WORKER_RUNTIME` to custom if the  `EnableMcpCustomHandlerPreview` feature flag is set (#4703)
-- Update .NET isolated templates package to 4.0.5331 (#4712)
