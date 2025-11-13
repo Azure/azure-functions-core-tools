@@ -419,7 +419,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
                 if (functionAppRoot != null)
                 {
-                    targetFramework = await DotnetHelpers.DetermineTargetFramework(functionAppRoot);
+                    targetFramework = await DotnetHelpers.DetermineTargetFrameworkAsync(functionAppRoot);
                 }
             }
 

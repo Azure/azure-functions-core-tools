@@ -175,7 +175,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
                 {
-                    var targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath));
+                    var targetFramework = await DotnetHelpers.DetermineTargetFrameworkAsync(Path.GetDirectoryName(projectFilePath));
 
                     var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
 
