@@ -14,14 +14,8 @@ pr:
     - release_4.0
     - main
     - in-proc
-  paths:
-    include:
-    - eng
-    - src
-    - test
-    exclude:
-    - docs
-    - '**/*.md'
+    - feature/*
+
 
 resources:
   repositories:
@@ -52,8 +46,24 @@ extends:
     settings:
       # PR's from forks do not have sufficient permissions to set tags.
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
+
     stages:
+      - stage: PreCheck
+        displayName: 'Pre-check: classify changes'
+
+        jobs:
+        - template: /eng/ci/templates/public/jobs/precheck-docs-only.yml@self
+
       - stage: Build
+        dependsOn: PreCheck
+
+        # This condition ensures that if the build is not a PR (i.e a scheduled or manual build), the stages will always run.
+        # If it is a PR, the stages will only run if the changes are not "docs-only" changes.
+        condition: >
+          or(
+            ne(variables['Build.Reason'], 'PullRequest'),
+            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+          )
 
         jobs:
         - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
@@ -63,7 +73,12 @@ extends:
               jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
 
       - stage: UnitTest
-        dependsOn: ''
+        dependsOn: PreCheck
+        condition: >
+          or(
+            ne(variables['Build.Reason'], 'PullRequest'),
+            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+          )
 
         jobs:
         - template: /eng/ci/templates/public/jobs/test-unit-windows.yml@self
@@ -72,19 +87,34 @@ extends:
       # Do we want the E2E tests for the public build?
       # Might need this at first whilst we work on building out solid unit tests
       - stage: E2ETestWindows
-        dependsOn: ''
+        dependsOn: PreCheck
+        condition: >
+          or(
+            ne(variables['Build.Reason'], 'PullRequest'),
+            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+          )
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
 
       - stage: E2ETestLinux
-        dependsOn: ''
+        dependsOn: PreCheck
+        condition: >
+          or(
+            ne(variables['Build.Reason'], 'PullRequest'),
+            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+          )
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
 
       - stage: E2ETestOSX
-        dependsOn: ''
+        dependsOn: PreCheck
+        condition: >
+          or(
+            ne(variables['Build.Reason'], 'PullRequest'),
+            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+          )
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self

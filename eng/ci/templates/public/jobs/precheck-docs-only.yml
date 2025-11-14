@@ -1,0 +1,20 @@
+# eng/ci/templates/public/jobs/precheck-docs-only.yml
+parameters:
+- name: scriptPath
+  type: string
+  default: eng/scripts/classify-changes.ps1
+
+jobs:
+- job: classify_changes
+  displayName: 'Classify changes (docs-only vs code)'
+  steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - task: PowerShell@2
+    name: detect
+    displayName: 'Detect docs-only changes'
+    inputs:
+      pwsh: true
+      targetType: filePath
+      filePath: ${{ parameters.scriptPath }}
