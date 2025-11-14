@@ -12,8 +12,7 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      # Fetch the latest version of the func-cli package from the feed. All packages should have the
-      # same package version as it is based on the CLI version + build number (which is date based)
+      # Fetch the latest version of the func-cli package from the feed for each package
       $headers = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
 
       function Get-LatestPackageVersion {
