@@ -14,14 +14,35 @@ steps:
     script: |
       # Fetch the latest version of the func-cli package from the feed. All packages should have the
       # same package version as it is based on the CLI version + build number (which is date based)
-      $packageUrl = "https://feeds.dev.azure.com/azfunc/internal/_apis/packaging/feeds/core-tools-nightly-build/packages/a998de77-f16c-4c10-af8c-cfa5a430eae7?api-version=7.1"
       $headers = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
 
-      $response = Invoke-RestMethod -Uri $packageUrl -Headers $headers -Method Get
-      $latestVersion = $response.versions[0].version
-
-      Write-Host "##vso[task.setvariable variable=FUNC_CLI_VERSION]$latestVersion"
-      Write-Host "Using func-cli version: $latestVersion"
+      function Get-LatestPackageVersion {
+        param($packageName)
+        
+        $searchUrl = "https://feeds.dev.azure.com/azfunc/internal/_apis/packaging/feeds/core-tools-nightly-build/packages?packageNameQuery=$packageName&api-version=7.1"
+        $searchResponse = Invoke-RestMethod -Uri $searchUrl -Headers $headers -Method Get
+        $package = $searchResponse.value | Where-Object { $_.name -eq $packageName } | Select-Object -First 1
+        
+        if ($package) {
+          $packageUrl = "https://feeds.dev.azure.com/azfunc/internal/_apis/packaging/feeds/core-tools-nightly-build/packages/$($package.id)?api-version=7.1"
+          $packageDetails = Invoke-RestMethod -Uri $packageUrl -Headers $headers -Method Get
+          return $packageDetails.versions[0].version
+        }
+        return $null
+      }
+      
+      # Get version for each package
+      $funcCliVersion = Get-LatestPackageVersion -packageName "func-cli"
+      Write-Host "##vso[task.setvariable variable=FUNC_CLI_VERSION]$funcCliVersion"
+      Write-Host "func-cli version: $funcCliVersion"
+      
+      $funcCliInprocVersion = Get-LatestPackageVersion -packageName "func-cli-inproc"
+      Write-Host "##vso[task.setvariable variable=FUNC_CLI_INPROC_VERSION]$funcCliInprocVersion"
+      Write-Host "func-cli-inproc version: $funcCliInprocVersion"
+      
+      $funcCliHostVersion = Get-LatestPackageVersion -packageName "func-cli-host"
+      Write-Host "##vso[task.setvariable variable=FUNC_CLI_HOST_VERSION]$funcCliHostVersion"
+      Write-Host "func-cli-host version: $funcCliHostVersion"
   env:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
@@ -41,7 +62,7 @@ steps:
       packageType: 'upack'
       feed: 'internal/core-tools-nightly-build'
       definition: 'func-cli-inproc'
-      version: '$(FUNC_CLI_VERSION)'
+      version: '$(FUNC_CLI_INPROC_VERSION)'
       downloadPath: '$(Pipeline.Workspace)/func-cli-inproc'
 
   - task: DownloadPackage@1
@@ -50,5 +71,5 @@ steps:
       packageType: 'upack'
       feed: 'internal/core-tools-nightly-build'
       definition: 'func-cli-host'
-      version: '$(FUNC_CLI_VERSION)'
+      version: '$(FUNC_CLI_HOST_VERSION)'
       downloadPath: '$(Pipeline.Workspace)/func-cli-host'
