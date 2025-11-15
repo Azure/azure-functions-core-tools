@@ -16,7 +16,9 @@ steps:
       $headers = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
 
       # Import the function from the script
-      . "$(Build.SourcesDirectory)/eng/scripts/get-latest-package-version.ps1"
+      $scriptPath = "$(Build.SourcesDirectory)/eng/scripts/get-latest-package-version.ps1"
+      Write-Host "Loading script from: $scriptPath"
+      . $scriptPath
       
       # Get version for each package
       $funcCliVersion = Get-LatestPackageVersion -packageName "func-cli" -headers $headers

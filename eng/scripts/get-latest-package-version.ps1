@@ -7,10 +7,14 @@ function Get-LatestPackageVersion {
         [hashtable]$headers
     )
   
+    Write-Host "Fetching package: $packageName"
+    
     $feedUrl = "https://feeds.dev.azure.com/azfunc/internal/_apis/packaging/feeds/core-tools-nightly-build/packages"
     $apiVersion = "7.1"
 
     $searchUrl = "$feedUrl?packageNameQuery=$packageName&api-version=$apiVersion"
+    Write-Host "Search URL: $searchUrl"
+    
     $searchResponse = Invoke-RestMethod -Uri $searchUrl -Headers $headers -Method Get
     $package = $searchResponse.value | Where-Object { $_.name -eq $packageName } | Select-Object -First 1
     
