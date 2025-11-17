@@ -7,3 +7,4 @@
 
 #### Changes
 
+- Updated assemblies to sign: HealthChecks.UI.Client.dll, HealthChecks.UI.Core.dll, Polly.Extensions.Http.dll (#4736)
