@@ -1,7 +1,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <PropertyGroup>
-    <TemplatesVersion>4.0.5331</TemplatesVersion>
+    <TemplatesVersion>4.0.5337</TemplatesVersion>
     <TemplatesJsonVersion>3.1.1648</TemplatesJsonVersion>
   </PropertyGroup>
 
