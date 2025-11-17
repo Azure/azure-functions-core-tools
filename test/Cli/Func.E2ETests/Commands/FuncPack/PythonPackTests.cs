@@ -135,14 +135,11 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             thirdPackResult.Should().FilesExistsWithExpectContent(packFilesToValidate);
         }
 
-        [Fact]
+        [SkippableFact]
         public void Pack_Python_BuildNativeDeps_OnWindows_WorksAsExpected()
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                // Only validate this scenario on Linux since linux based docker image is required
-                return;
-            }
+            // Only validate this scenario on Linux since linux based docker image is required
+            Skip.If(!RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "This test is only valid on Windows OS.");
 
             var testName = nameof(Pack_Python_BuildNativeDeps_OnWindows_WorksAsExpected);
 
