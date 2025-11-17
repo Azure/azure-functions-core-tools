@@ -4,7 +4,7 @@
 using Xunit;
 using static Azure.Functions.Cli.UnitTests.TestUtilities;
 
-namespace Azure.Functions.Cli.UnitTests.Cli;
+namespace Azure.Functions.Cli.UnitTests;
 
 public class CancelKeyHandlerTests
 {
