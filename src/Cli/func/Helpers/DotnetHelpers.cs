@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             try
             {
-                _ = new DotnetMuxer().MuxerPath;
+                _ = DotnetMuxer.GetMuxerPath();
             }
             catch (InvalidOperationException ex)
             {
