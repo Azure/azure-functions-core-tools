@@ -1,3 +1,4 @@
 {
-    "azureFunctions.suppressProject": true
+    "azureFunctions.suppressProject": true,
+    "dotnet.defaultSolution": "Azure.Functions.Cli.sln"
 }
