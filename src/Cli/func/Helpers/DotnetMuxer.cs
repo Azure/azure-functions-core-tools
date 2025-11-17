@@ -31,7 +31,6 @@ public class DotnetMuxer
         if (_muxerPath is null)
         {
             // Best-effort search for muxer.
-            // SDK sets DOTNET_HOST_PATH as absolute path to current dotnet executable
             string processPath = Environment.ProcessPath;
 
             // The current process should be dotnet in most normal scenarios except when dotnet.dll is loaded in a custom host like the testhost
