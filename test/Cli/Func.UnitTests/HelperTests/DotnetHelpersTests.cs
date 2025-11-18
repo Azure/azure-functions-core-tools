@@ -8,6 +8,14 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class DotnetHelpersTests
     {
+        [Fact]
+        public void EnsureDotnet_DoesNotThrow_WhenDotnetExists()
+        {
+            // dotnet is always installed in the test environment
+            var exception = Record.Exception(() => DotnetHelpers.EnsureDotnet());
+            Assert.Null(exception);
+        }
+
         [Theory]
         [InlineData("BlobTrigger", "blob")]
         [InlineData("HttpTrigger", "http")]

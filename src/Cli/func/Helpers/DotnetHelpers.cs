@@ -28,9 +28,15 @@ namespace Azure.Functions.Cli.Helpers
 
         public static void EnsureDotnet()
         {
-            if (!CommandChecker.CommandExists("dotnet"))
+            try
             {
-                throw new CliException("dotnet sdk is required for dotnet based functions. Please install https://microsoft.com/net");
+                _ = DotnetMuxer.GetMuxerPath();
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new CliException(
+                    "Unable to locate the .NET SDK. Install the .NET SDK from https://aka.ms/dotnet-download or configure PATH | DOTNET_ROOT | DOTNET_HOST_PATH so that 'dotnet' is discoverable.",
+                    ex);
             }
         }
 

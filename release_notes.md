@@ -13,3 +13,4 @@
 - Refactor to use msbuild for determining .NET target framework & add support multiple TFMs (#4715)
   - When using `func init --docker-only` on a .NET project with multiple target frameworks, the CLI will now
    prompt the user to select which target framework to use for the Dockerfile.
+- Enhanced dotnet installation discovery by adopting the same `Muxer` logic used by the .NET SDK itself (#4732)
