@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
@@ -283,12 +283,9 @@
     <PackageReference Include="Microsoft.Identity.Client" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="NuGet.Packaging" />
-    <PackageReference Include="System.Formats.Asn1" />
     <PackageReference Include="StyleCop.Analyzers" />
     <PackageReference Include="WindowsAzure.Storage" />
     <PackageReference Include="YamlDotNet" />
-    <!-- Transitive dependency -->
-    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">

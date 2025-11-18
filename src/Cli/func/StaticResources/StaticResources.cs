@@ -120,10 +120,17 @@ namespace Azure.Functions.Cli
             using (var reader = new StreamReader(stream))
             {
                 var sb = new StringBuilder();
-                while (!reader.EndOfStream)
+                string line;
+                bool firstLine = true;
+                while ((line = await reader.ReadLineAsync()) != null)
                 {
-                    var line = await reader.ReadLineAsync();
-                    sb.AppendFormat("{0}{1}", line, reader.EndOfStream ? string.Empty : Environment.NewLine);
+                    if (!firstLine)
+                    {
+                        sb.Append(Environment.NewLine);
+                    }
+
+                    sb.Append(line);
+                    firstLine = false;
                 }
 
                 return sb.ToString();
