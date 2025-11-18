@@ -1,5 +1,5 @@
 # Run: ./download-templates.ps1 || From root of the repo: ./eng/scripts/download-templates.ps1
-# Optional parameters: -OutputPath "./desired/output/path" -TemplatesVersion "4.0.5331" -TemplateJsonVersion "3.1.1648"
+# Optional parameters: -OutputPath "./desired/output/path" -TemplatesVersion "4.0.5337" -TemplateJsonVersion "3.1.1648"
 
 # You can check NuGet for the latest template versions:
 # https://www.nuget.org/packages/Microsoft.Azure.Functions.Worker.ItemTemplates/
@@ -12,7 +12,7 @@
 # Parse CLI arguments
 param (
   [string]$OutputPath = "./templates-download",
-  [string]$TemplatesVersion = "4.0.5331",
+  [string]$TemplatesVersion = "4.0.5337",
   [string]$TemplateJsonVersion = "3.1.1648"
 )
 
