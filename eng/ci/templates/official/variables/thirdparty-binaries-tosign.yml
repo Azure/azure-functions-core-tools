@@ -17,4 +17,4 @@ variables:
     OpenTelemetry.Api.ProviderBuilderExtensions.dll,OpenTelemetry.dll,OpenTelemetry.Exporter.Console.dll,
     OpenTelemetry.Exporter.OpenTelemetryProtocol.dll,OpenTelemetry.Extensions.Hosting.dll,
     OpenTelemetry.Instrumentation.*.dll,OpenTelemetry.PersistentStorage.Abstractions.dll,
-    OpenTelemetry.PersistentStorage.FileSystem.dll
+    OpenTelemetry.PersistentStorage.FileSystem.dll, HealthChecks.UI.*.dll, Polly.Extensions.Http.dll
