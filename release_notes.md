@@ -15,3 +15,4 @@
    prompt the user to select which target framework to use for the Dockerfile.
 - Enhanced dotnet installation discovery by adopting the same `Muxer` logic used by the .NET SDK itself (#4732)
 - Update .NET templates package version to 4.0.5337 (#4728)
+- Fix `func pack --build-native-deps` failure on Windows for Python 3.13+ (#4742)
