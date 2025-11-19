@@ -564,10 +564,11 @@ namespace Azure.Functions.Cli.Helpers
             {
                 // Setup image tag and content
                 string imageContent = image;
-                image = $"azure-functions/python:4-python{workerInfo.Major}.{workerInfo.Minor}-buildenv";
+                string dockerfileName = $"4-python{workerInfo.Major}{workerInfo.Minor}-buildenv";
+                image = $"azure-functions/python:{dockerfileName}";
 
                 // Prepare temporary directory for docker build context
-                string tempDockerfileDirecotry = Path.Combine(Path.GetTempPath(), $"{image}-docker");
+                string tempDockerfileDirecotry = Path.Combine(Path.GetTempPath(), $"{dockerfileName}");
                 FileSystemHelpers.EnsureDirectory(tempDockerfileDirecotry);
                 string tempDockerfile = Path.Combine(tempDockerfileDirecotry, "Dockerfile");
 
