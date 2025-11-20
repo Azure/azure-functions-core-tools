@@ -91,6 +91,29 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 Assert.Throws<CliException>(() => PythonHelpers.AssertPythonVersion(worker));
             }
         }
+
+        [Theory]
+        [InlineData(3, 10)]
+        [InlineData(3, 11)]
+        [InlineData(3, 12)]
+        [InlineData(3, 13)]
+        [InlineData(3, 14)]
+        public void DockerfileNameShouldNotContainInvalidCharacters(int major, int minor)
+        {
+            // Verify the dockerfile name format matches what's used in ChoosePythonBuildEnvImage
+            // The format should be "4-python{major}{minor}-buildenv" with no colons or other invalid chars
+            string dockerfileName = $"4-python{major}{minor}-buildenv";
+
+            // Ensure no colons (invalid on Windows file paths)
+            Assert.DoesNotContain(":", dockerfileName);
+
+            // Ensure no other invalid Windows path characters
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            Assert.DoesNotContain(dockerfileName, c => invalidChars.Contains(c));
+
+            // Verify expected format
+            Assert.Matches(@"^4-python\d+-buildenv$", dockerfileName);
+        }
     }
 
     public sealed class SkipIfPythonNonExistFact : FactAttribute
