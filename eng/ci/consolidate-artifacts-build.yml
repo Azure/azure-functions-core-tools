@@ -78,14 +78,14 @@ extends:
       jobs:
       - template: /eng/ci/templates/official/jobs/download-cli-nuget-package.yml@self
         parameters:
-          isNightlyBuild: true
+          isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
 
       - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
         - template: /eng/ci/templates/official/jobs/consolidate-cli-artifacts.yml@self
           parameters:
             arch: ${{ runtime }}
             displayName: ${{ replace(replace(runtime, '-', ''), '.', '') }}
-            isNightlyBuild: true
+            isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
 
     - stage: TestArtifacts
       dependsOn: 'ConsolidateArticacts'
