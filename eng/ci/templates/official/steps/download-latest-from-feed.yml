@@ -10,18 +10,8 @@ steps:
 - task: PowerShell@2
   displayName: 'Get latest artifact version'
   inputs:
-    targetType: 'inline'
-    script: |
-      # Fetch the latest version of the func-cli package from the feed. All packages should have the
-      # same package version as it is based on the CLI version + build number (which is date based)
-      $packageUrl = "https://feeds.dev.azure.com/azfunc/internal/_apis/packaging/feeds/core-tools-nightly-build/packages/a998de77-f16c-4c10-af8c-cfa5a430eae7?api-version=7.1"
-      $headers = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
-
-      $response = Invoke-RestMethod -Uri $packageUrl -Headers $headers -Method Get
-      $latestVersion = $response.versions[0].version
-
-      Write-Host "##vso[task.setvariable variable=FUNC_CLI_VERSION]$latestVersion"
-      Write-Host "Using func-cli version: $latestVersion"
+    targetType: 'filePath'
+    filePath: '$(Build.SourcesDirectory)/eng/scripts/get-latest-package-versions.ps1'
   env:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
@@ -41,7 +31,7 @@ steps:
       packageType: 'upack'
       feed: 'internal/core-tools-nightly-build'
       definition: 'func-cli-inproc'
-      version: '$(FUNC_CLI_VERSION)'
+      version: '$(FUNC_CLI_INPROC_VERSION)'
       downloadPath: '$(Pipeline.Workspace)/func-cli-inproc'
 
   - task: DownloadPackage@1
