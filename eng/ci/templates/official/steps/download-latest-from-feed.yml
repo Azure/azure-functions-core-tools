@@ -10,24 +10,8 @@ steps:
 - task: PowerShell@2
   displayName: 'Get latest artifact version'
   inputs:
-    targetType: 'inline'
-    script: |
-      # Fetch the latest version of the func-cli package from the feed for each package
-      $headers = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
-
-      # Import the function from the script
-      $scriptPath = "$(Build.SourcesDirectory)/eng/scripts/get-latest-package-version.ps1"
-      Write-Host "Loading script from: $scriptPath"
-      . $scriptPath
-      
-      # Get version for each package
-      $funcCliVersion = Get-LatestPackageVersion -packageName "func-cli" -headers $headers
-      Write-Host "##vso[task.setvariable variable=FUNC_CLI_VERSION]$funcCliVersion"
-      Write-Host "func-cli version: $funcCliVersion"
-      
-      $funcCliInprocVersion = Get-LatestPackageVersion -packageName "func-cli-inproc" -headers $headers
-      Write-Host "##vso[task.setvariable variable=FUNC_CLI_INPROC_VERSION]$funcCliInprocVersion"
-      Write-Host "func-cli-inproc version: $funcCliInprocVersion"
+    targetType: 'filePath'
+    filePath: '$(Build.SourcesDirectory)/eng/scripts/get-latest-package-versions.ps1'
   env:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
