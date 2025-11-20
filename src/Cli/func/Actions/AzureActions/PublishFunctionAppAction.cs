@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
@@ -376,6 +377,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (File.Exists(Path.Combine(functionAppRoot, Constants.ProxiesJsonFileName)))
             {
                 ColoredConsole.WriteLine(WarningColor(Constants.Errors.ProxiesNotSupported));
+            }
+
+            // Check for deprecated extension bundle version
+            var extensionBundleWarning = await ExtensionBundleHelper.GetDeprecatedExtensionBundleWarning(functionAppRoot);
+            if (!string.IsNullOrEmpty(extensionBundleWarning))
+            {
+                ColoredConsole.WriteLine(WarningColor(extensionBundleWarning));
             }
 
             return result;

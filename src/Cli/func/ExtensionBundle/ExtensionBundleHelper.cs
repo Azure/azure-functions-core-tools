@@ -10,6 +10,7 @@ using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.ExtensionBundle
 {
@@ -74,6 +75,185 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 // There will be another attempt by the host to download the Extension Bundle.
                 // If Extension Bundle download fails again in the host then the host will return the appropriate customer facing error.
             }
+        }
+
+        /// <summary>
+        /// Checks if the extension bundle version in host.json is deprecated.
+        /// </summary>
+        /// <param name="functionAppRoot">The root directory of the function app</param>
+        /// <returns>A warning message if deprecated, null otherwise</returns>
+        public static async Task<string> GetDeprecatedExtensionBundleWarning(string functionAppRoot)
+        {
+            try
+            {
+                var hostJsonPath = Path.Combine(functionAppRoot, Constants.HostJsonFileName);
+                if (!FileSystemHelpers.FileExists(hostJsonPath))
+                {
+                    return null;
+                }
+
+                var hostJsonContent = await FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath);
+                var hostJson = JObject.Parse(hostJsonContent);
+                
+                var extensionBundle = hostJson[Constants.ExtensionBundleConfigPropertyName];
+                if (extensionBundle == null)
+                {
+                    return null;
+                }
+
+                var version = extensionBundle["version"]?.ToString();
+                if (string.IsNullOrEmpty(version))
+                {
+                    return null;
+                }
+
+                // Fetch the default version range from Azure
+                string defaultVersionRange = await GetDefaultExtensionBundleVersionRange();
+                if (string.IsNullOrEmpty(defaultVersionRange))
+                {
+                    return null;
+                }
+
+                // Check if the current version range intersects with the default (recommended) range
+                if (!VersionRangesIntersect(version, defaultVersionRange))
+                {
+                    return $"Your app is using a deprecated version {version} of extension bundles. Upgrade to {defaultVersionRange}.";
+                }
+
+                return null;
+            }
+            catch (Exception)
+            {
+                // If we can't determine deprecation status, don't block the publish
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Fetches the default extension bundle version range from Azure.
+        /// </summary>
+        private static async Task<string> GetDefaultExtensionBundleVersionRange()
+        {
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                var response = await httpClient.GetStringAsync("https://aka.ms/funcStaticProperties");
+                var json = JObject.Parse(response);
+                return json["defaultVersionRange"]?.ToString();
+            }
+            catch (Exception)
+            {
+                // If we can't fetch the default range, return null to avoid blocking
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Checks if two version ranges intersect.
+        /// Supports format: [major.*, major.minor.patch) or [major.minor.patch, major.minor.patch)
+        /// </summary>
+        internal static bool VersionRangesIntersect(string range1, string range2)
+        {
+            try
+            {
+                var parsed1 = ParseVersionRange(range1);
+                var parsed2 = ParseVersionRange(range2);
+
+                if (parsed1 == null || parsed2 == null)
+                {
+                    return true; // If we can't parse, assume they intersect (no warning)
+                }
+
+                // Two ranges intersect if: start1 < end2 AND start2 < end1
+                return CompareVersions(parsed1.Value.start, parsed2.Value.end) < 0 &&
+                       CompareVersions(parsed2.Value.start, parsed1.Value.end) < 0;
+            }
+            catch
+            {
+                return true; // If comparison fails, assume they intersect (no warning)
+            }
+        }
+
+        /// <summary>
+        /// Parses a version range string like "[1.*, 2.0.0)" or "[1.0.0, 2.0.0)"
+        /// Returns (start, end) tuple where versions are normalized to "major.minor.patch" format
+        /// </summary>
+        internal static (string start, string end)? ParseVersionRange(string range)
+        {
+            if (string.IsNullOrEmpty(range))
+            {
+                return null;
+            }
+
+            // Match patterns like [1.*, 2.0.0) or [1.0.0, 2.0.0)
+            var match = System.Text.RegularExpressions.Regex.Match(
+                range,
+                @"\[(\d+(?:\.\d+(?:\.\d+)?)?|\d+)\.\*?,\s*(\d+\.\d+\.\d+)\)"
+            );
+
+            if (!match.Success)
+            {
+                // Try without wildcard: [1.0.0, 2.0.0)
+                match = System.Text.RegularExpressions.Regex.Match(
+                    range,
+                    @"\[(\d+\.\d+\.\d+),\s*(\d+\.\d+\.\d+)\)"
+                );
+            }
+
+            if (!match.Success)
+            {
+                return null;
+            }
+
+            var lower = match.Groups[1].Value;
+            var upper = match.Groups[2].Value;
+
+            // Normalize lower bound: if it contains *, replace with .0.0
+            if (lower.Contains("*"))
+            {
+                lower = lower.Replace(".*", ".0.0");
+            }
+
+            // Ensure both versions are in major.minor.patch format
+            lower = NormalizeVersion(lower);
+            upper = NormalizeVersion(upper);
+
+            return (lower, upper);
+        }
+
+        /// <summary>
+        /// Normalizes a version string to major.minor.patch format
+        /// </summary>
+        private static string NormalizeVersion(string version)
+        {
+            var parts = version.Split('.');
+            if (parts.Length == 1)
+            {
+                return $"{parts[0]}.0.0";
+            }
+            else if (parts.Length == 2)
+            {
+                return $"{parts[0]}.{parts[1]}.0";
+            }
+            return version;
+        }
+
+        /// <summary>
+        /// Compares two version strings in major.minor.patch format
+        /// Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+        /// </summary>
+        private static int CompareVersions(string v1, string v2)
+        {
+            var parts1 = v1.Split('.').Select(int.Parse).ToArray();
+            var parts2 = v2.Split('.').Select(int.Parse).ToArray();
+
+            for (int i = 0; i < Math.Min(parts1.Length, parts2.Length); i++)
+            {
+                if (parts1[i] < parts2[i]) return -1;
+                if (parts1[i] > parts2[i]) return 1;
+            }
+
+            return parts1.Length.CompareTo(parts2.Length);
         }
     }
 }
