@@ -18,44 +18,59 @@ internal static class DotnetMuxer
     /// <exception cref="InvalidOperationException">Thrown when the dotnet executable cannot be located.</exception>
     public static string GetMuxerPath()
     {
-        string muxerPath;
-
         // Most scenarios are running dotnet.dll as the app
         // Root directory with muxer should be two above app base: <root>/sdk/<version>
         string rootPath = Path.GetDirectoryName(Path.GetDirectoryName(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)));
         if (rootPath is not null)
         {
-            muxerPath = Path.Combine(rootPath, $"{_muxerName}{_exeSuffix}");
+            string muxerPath = Path.Combine(rootPath, $"{_muxerName}{_exeSuffix}");
             if (File.Exists(muxerPath))
             {
                 return muxerPath;
             }
         }
 
-        // Best-effort search for muxer.
-        muxerPath = Environment.ProcessPath;
-
-        // The current process should be dotnet in most normal scenarios except when dotnet.dll is loaded in a custom host like the testhost
-        if (muxerPath is not null && !Path.GetFileNameWithoutExtension(muxerPath).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+        // Check if the current process is dotnet
+        // In most scenarios, the process is dotnet, except when dotnet.dll is loaded
+        // in a custom host like testhost, in which case we fall through to other checks
+        string processPath = Environment.ProcessPath;
+        if (processPath is not null && Path.GetFileNameWithoutExtension(processPath).Equals(_muxerName, StringComparison.OrdinalIgnoreCase))
         {
-            // SDK sets DOTNET_HOST_PATH as absolute path to current dotnet executable
-            muxerPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-            if (muxerPath is null)
+            return processPath;
+        }
+
+        // SDK sets DOTNET_HOST_PATH as absolute path to current dotnet executable
+        string envPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        if (envPath is not null)
+        {
+            return envPath;
+        }
+
+        // Fallback to DOTNET_ROOT which typically holds some dotnet executable
+        string dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (dotnetRoot is not null)
+        {
+            string muxerPath = Path.Combine(dotnetRoot, $"{_muxerName}{_exeSuffix}");
+            if (File.Exists(muxerPath))
             {
-                // fallback to DOTNET_ROOT which typically holds some dotnet executable
-                string root = Environment.GetEnvironmentVariable("DOTNET_ROOT");
-                if (root is not null)
+                return muxerPath;
+            }
+        }
+
+        // Search PATH environment variable
+        string pathVariable = Environment.GetEnvironmentVariable("PATH");
+        if (pathVariable is not null)
+        {
+            foreach (string directory in pathVariable.Split(Path.PathSeparator))
+            {
+                string potentialPath = Path.Combine(directory, $"{_muxerName}{_exeSuffix}");
+                if (File.Exists(potentialPath))
                 {
-                    muxerPath = Path.Combine(root, $"dotnet{_exeSuffix}");
+                    return potentialPath;
                 }
             }
         }
 
-        if (muxerPath is null)
-        {
-            throw new InvalidOperationException("Unable to locate dotnet multiplexer");
-        }
-
-        return muxerPath;
+        throw new InvalidOperationException($"Unable to locate {_muxerName} multiplexer");
     }
 }
