@@ -19,6 +19,13 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private const int MaxRetries = 3;
         private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
+        private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        
+        // Regex patterns for version range parsing
+        // Matches: [4.*, 5.0.0) or [1.*, 2.0.0) - with wildcard
+        private const string VersionRangeWithWildcardPattern = @"\[(\d+(?:\.\d+(?:\.\d+)?)?|\d+)\.\*?,\s*(\d+\.\d+\.\d+)\)";
+        // Matches: [1.0.0, 2.0.0) - without wildcard
+        private const string VersionRangePattern = @"\[(\d+\.\d+\.\d+),\s*(\d+\.\d+\.\d+)\)";
 
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
@@ -136,8 +143,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         {
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                var response = await httpClient.GetStringAsync("https://aka.ms/funcStaticProperties");
+                var response = await _sharedHttpClient.GetStringAsync("https://aka.ms/funcStaticProperties");
                 var json = JObject.Parse(response);
                 return json["defaultVersionRange"]?.ToString();
             }
@@ -185,19 +191,13 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 return null;
             }
 
-            // Match patterns like [1.*, 2.0.0) or [1.0.0, 2.0.0)
-            var match = System.Text.RegularExpressions.Regex.Match(
-                range,
-                @"\[(\d+(?:\.\d+(?:\.\d+)?)?|\d+)\.\*?,\s*(\d+\.\d+\.\d+)\)"
-            );
+            // Try to match with wildcard pattern first
+            var match = System.Text.RegularExpressions.Regex.Match(range, VersionRangeWithWildcardPattern);
 
             if (!match.Success)
             {
-                // Try without wildcard: [1.0.0, 2.0.0)
-                match = System.Text.RegularExpressions.Regex.Match(
-                    range,
-                    @"\[(\d+\.\d+\.\d+),\s*(\d+\.\d+\.\d+)\)"
-                );
+                // Try without wildcard
+                match = System.Text.RegularExpressions.Regex.Match(range, VersionRangePattern);
             }
 
             if (!match.Success)
@@ -244,16 +244,26 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// </summary>
         private static int CompareVersions(string v1, string v2)
         {
-            var parts1 = v1.Split('.').Select(int.Parse).ToArray();
-            var parts2 = v2.Split('.').Select(int.Parse).ToArray();
-
-            for (int i = 0; i < Math.Min(parts1.Length, parts2.Length); i++)
+            var parts1 = v1.Split('.');
+            var parts2 = v2.Split('.');
+            
+            // Validate that all parts are numeric
+            if (!parts1.All(p => int.TryParse(p, out _)) || !parts2.All(p => int.TryParse(p, out _)))
             {
-                if (parts1[i] < parts2[i]) return -1;
-                if (parts1[i] > parts2[i]) return 1;
+                // If we can't parse, return 0 (equal) to be safe
+                return 0;
+            }
+            
+            var intParts1 = parts1.Select(int.Parse).ToArray();
+            var intParts2 = parts2.Select(int.Parse).ToArray();
+
+            for (int i = 0; i < Math.Min(intParts1.Length, intParts2.Length); i++)
+            {
+                if (intParts1[i] < intParts2[i]) return -1;
+                if (intParts1[i] > intParts2[i]) return 1;
             }
 
-            return parts1.Length.CompareTo(parts2.Length);
+            return intParts1.Length.CompareTo(intParts2.Length);
         }
     }
 }
