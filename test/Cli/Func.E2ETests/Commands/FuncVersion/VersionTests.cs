@@ -23,12 +23,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncVersion
                         .WithWorkingDirectory(WorkingDirectory)
                         .Execute([args]);
 
-            // Verify the output contains a version number starting with "4."
-            result.Should().HaveStdOutContaining("4.0.");
+            // Verify the output contains the current version number
+            result.Should().HaveStdOutContaining(Common.Constants.CliVersion);
             result.Should().ExitWith(0);
-
-            // TODO: use this when build refactor changes go in:
-            // result.Should().HaveStdOutContaining(Common.Constants.CliVersion);
         }
     }
 }

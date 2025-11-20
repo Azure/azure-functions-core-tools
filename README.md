@@ -77,12 +77,13 @@ func [--version] [--help] <command> [<args>] [--verbose]
 | v3      | `brew tap azure/functions`  <br> `brew install azure-functions-core-tools@3` |
 | v2      | `brew tap azure/functions`  <br> `brew install azure-functions-core-tools@2` |
 
+If upgrading to a new version, you may have to run `brew update` to pull the latest formula
+before you run the install command. Or, you can run `brew upgrade`.
 
 > [!NOTE]
 > Homebrew allows side-by-side installation of v2 and v3. You can switch versions with:
 >
 > `brew link --overwrite azure-functions-core-tools@3`
-
 
 ### Linux
 

@@ -1,22 +1,19 @@
-// Requires KeyVault resource or emulator
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
 using System.Text;
+using Azure.Functions.Cli.Common;
 using Colors.Net;
 using FluentAssertions;
 using NSubstitute;
 using Xunit;
 
-using Azure.Functions.Cli.Common;
-
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.UnitTests.CommonTests
 {
     public class KeyVaultReferencesManagerTests
     {
-        private IDictionary<string, string> _settings;
-
         private readonly KeyVaultReferencesManager _keyVaultReferencesManager = new KeyVaultReferencesManager();
+        private IDictionary<string, string> _settings;
 
         [Theory]
         [InlineData("", null)]
@@ -31,6 +28,7 @@ namespace Azure.Functions.Cli.Tests
                 { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
             };
             _settings.Add(key, value);
+
             Exception exception = null;
             try
             {
@@ -40,6 +38,7 @@ namespace Azure.Functions.Cli.Tests
             {
                 exception = e;
             }
+
             exception.Should().BeNull();
         }
 
@@ -51,10 +50,9 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("test", "@Microsoft.KeyVault(VaultName=vault;)", true)] // missing secret name
         [InlineData("test", "@Microsoft.KeyVault(SecretName=vault;)", true)] // missing vault name
         [InlineData("test", "@Microsoft-KeyVault()", false)] // hyphen instead of dot
-        // Attempted Key Vault references are seen as those matching the regular expression
-        // "^@Microsoft.KeyVault(.*)$".
-        public void ParseSecretEmitsWarningWithUnsuccessullyMatchedKeyVaultReferences(string key, string value, bool attemptedKeyVaultReference)
+        public void ParseSecretEmitsWarningWithUnsuccessfullyMatchedKeyVaultReferences(string key, string value, bool attemptedKeyVaultReference)
         {
+            // Arrange
             var output = new StringBuilder();
             var console = Substitute.For<IConsoleWriter>();
             console.WriteLine(Arg.Do<object>(o => output.AppendLine(o?.ToString()))).Returns(console);
@@ -62,7 +60,10 @@ namespace Azure.Functions.Cli.Tests
             ColoredConsole.Out = console;
             ColoredConsole.Error = console;
 
+            // Act
             _keyVaultReferencesManager.ParseSecret(key, value);
+
+            // Assert
             var outputString = output.ToString();
             if (attemptedKeyVaultReference)
             {
@@ -92,15 +93,33 @@ namespace Azure.Functions.Cli.Tests
             string expectedSecretName = null,
             string expectedVersion = null)
         {
+            // Act
             var matchResult = _keyVaultReferencesManager.ParseVaultReference(vaultReference);
 
+            // Assert
             Assert.True(!((matchResult != null) ^ shouldMatch));
             if (shouldMatch)
             {
-                Assert.Equal(matchResult.Uri.ToString(), expectedVaultUri);
-                Assert.Equal(matchResult.Name, expectedSecretName);
-                Assert.Equal(matchResult.Version, expectedVersion);
+                Assert.Equal(expectedVaultUri, matchResult.Uri.ToString());
+                Assert.Equal(expectedSecretName, matchResult.Name);
+                Assert.Equal(expectedVersion, matchResult.Version);
             }
+        }
+
+        [Theory]
+        [InlineData("SecretUri", "SecretUri=https://example.vault.azure.net/secrets/mysecret", "https://example.vault.azure.net/secrets/mysecret")]
+        [InlineData("VaultName", "VaultName=myVault;SecretName=mySecret", "myVault")]
+        [InlineData("SecretName", "VaultName=myVault;SecretName=mySecret", "mySecret")]
+        [InlineData("SecretVersion", "VaultName=myVault;SecretName=mySecret;SecretVersion=v1", "v1")]
+        [InlineData("SecretUri", "VaultName=myVault;SecretName=mySecret", null)]
+        [InlineData("NonExistent", "VaultName=myVault;SecretName=mySecret", null)]
+        public void GetValueFromVaultReferenceExtractsCorrectValue(string key, string vaultReference, string expectedValue)
+        {
+            // Act
+            var result = _keyVaultReferencesManager.GetValueFromVaultReference(key, vaultReference);
+
+            // Assert
+            Assert.Equal(expectedValue, result);
         }
     }
 }
