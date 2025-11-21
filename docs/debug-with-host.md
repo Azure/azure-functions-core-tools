@@ -58,3 +58,10 @@ export FUNC_CLI=<path-to-published-cli>
 # Start the host inside the test app directory
 $FUNC_CLI start
 ```
+
+Windows:
+
+```pwsh
+$env:FUNC_CLI = "<path-to-published-cli>"
+& $env:FUNC_CLI start
+```

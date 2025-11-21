@@ -2,11 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Actions.LocalActions.PackAction;
-using Azure.Functions.Cli.Common;
-using System.IO;
+using FluentAssertions;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests.E2E.PackAction
+namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
 {
     public class PackValidationHelperTests : IDisposable
     {
@@ -40,8 +39,8 @@ namespace Azure.Functions.Cli.Tests.E2E.PackAction
             var result = PackValidationHelper.ValidateRequiredFiles(_tempDirectory, requiredFiles, out string missingFile);
 
             // Assert
-            Assert.True(result);
-            Assert.Empty(missingFile);
+            result.Should().BeTrue();
+            missingFile.Should().BeEmpty();
         }
 
         [Fact]
@@ -50,14 +49,43 @@ namespace Azure.Functions.Cli.Tests.E2E.PackAction
             // Arrange
             var requiredFiles = new[] { "host.json", "package.json" };
             File.WriteAllText(Path.Combine(_tempDirectory, "host.json"), "{}");
+
             // Don't create package.json
 
             // Act
             var result = PackValidationHelper.ValidateRequiredFiles(_tempDirectory, requiredFiles, out string missingFile);
 
             // Assert
-            Assert.False(result);
-            Assert.Equal("package.json", missingFile);
+            result.Should().BeFalse();
+            missingFile.Should().Be("package.json");
+        }
+
+        [Fact]
+        public void ValidateRequiredFiles_EmptyDirectory_ReturnsFalse()
+        {
+            // Arrange
+            var requiredFiles = new[] { "host.json" };
+
+            // Act
+            var result = PackValidationHelper.ValidateRequiredFiles(_tempDirectory, requiredFiles, out string missingFile);
+
+            // Assert
+            result.Should().BeFalse();
+            missingFile.Should().Be("host.json");
+        }
+
+        [Fact]
+        public void ValidateRequiredFiles_NoRequiredFiles_ReturnsTrue()
+        {
+            // Arrange
+            var requiredFiles = Array.Empty<string>();
+
+            // Act
+            var result = PackValidationHelper.ValidateRequiredFiles(_tempDirectory, requiredFiles, out string missingFile);
+
+            // Assert
+            result.Should().BeTrue();
+            missingFile.Should().BeEmpty();
         }
     }
 }
