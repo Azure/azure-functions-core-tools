@@ -21,6 +21,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("[4.*, 5.0.0)", "4.0.0", "5.0.0")]
         [InlineData("[1.0.0, 2.0.0)", "1.0.0", "2.0.0")]
         [InlineData("[2.*, 3.0.0)", "2.0.0", "3.0.0")]
+        [InlineData("[3.40.0]", "3.40.0", "3.40.1")]  // Exact version treated as point range
+        [InlineData("[4.28.0]", "4.28.0", "4.28.1")]  // Exact version treated as point range
         public void ParseVersionRange_ValidRange_ReturnsCorrectBounds(string range, string expectedStart, string expectedEnd)
         {
             var result = ExtensionBundleHelper.ParseVersionRange(range);
@@ -60,6 +62,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("[2.*, 3.0.0)", "[4.*, 5.0.0)", false)] // Deprecated: v2 doesn't intersect with v4
         [InlineData("[4.*, 5.0.0)", "[4.*, 5.0.0)", true)]  // Not deprecated: same as default
         [InlineData("[4.0.0, 4.5.0)", "[4.*, 5.0.0)", true)] // Not deprecated: within v4 range
+        [InlineData("[3.40.0]", "[4.*, 5.0.0)", false)] // Deprecated: exact v3 version doesn't intersect with v4
+        [InlineData("[4.28.0]", "[4.*, 5.0.0)", true)] // Not deprecated: exact v4 version within v4 range
         public void VersionRangesIntersect_DeprecationScenarios_ReturnsExpectedResult(string localVersion, string defaultVersion, bool shouldIntersect)
         {
             var result = ExtensionBundleHelper.VersionRangesIntersect(localVersion, defaultVersion);

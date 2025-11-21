@@ -26,6 +26,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private const string VersionRangeWithWildcardPattern = @"\[(\d+(?:\.\d+(?:\.\d+)?)?|\d+)\.\*?,\s*(\d+\.\d+\.\d+)\)";
         // Matches: [1.0.0, 2.0.0) - without wildcard
         private const string VersionRangePattern = @"\[(\d+\.\d+\.\d+),\s*(\d+\.\d+\.\d+)\)";
+        // Matches: [1.2.3] - exact version (treated as point range)
+        private const string ExactVersionPattern = @"\[(\d+\.\d+\.\d+)\]";
 
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
@@ -181,8 +183,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
         }
 
         /// <summary>
-        /// Parses a version range string like "[1.*, 2.0.0)" or "[1.0.0, 2.0.0)"
+        /// Parses a version range string like "[1.*, 2.0.0)" or "[1.0.0, 2.0.0)" or "[1.2.3]"
         /// Returns (start, end) tuple where versions are normalized to "major.minor.patch" format
+        /// For exact versions like "[1.2.3]", treats as a point range [1.2.3, 1.2.4)
         /// </summary>
         internal static (string start, string end)? ParseVersionRange(string range)
         {
@@ -191,8 +194,24 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 return null;
             }
 
-            // Try to match with wildcard pattern first
-            var match = System.Text.RegularExpressions.Regex.Match(range, VersionRangeWithWildcardPattern);
+            // Try to match exact version pattern first [X.Y.Z]
+            var match = System.Text.RegularExpressions.Regex.Match(range, ExactVersionPattern);
+            if (match.Success)
+            {
+                var version = match.Groups[1].Value;
+                var parts = version.Split('.');
+                if (parts.Length == 3 && int.TryParse(parts[2], out int patch))
+                {
+                    // Treat [X.Y.Z] as a point range [X.Y.Z, X.Y.(Z+1))
+                    var lower = version;
+                    var upper = $"{parts[0]}.{parts[1]}.{patch + 1}";
+                    return (lower, upper);
+                }
+                return null;
+            }
+
+            // Try to match with wildcard pattern
+            match = System.Text.RegularExpressions.Regex.Match(range, VersionRangeWithWildcardPattern);
 
             if (!match.Success)
             {
