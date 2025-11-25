@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -24,7 +25,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 FunctionAppName = args.First();
             }
-            else
+            else if (!ScriptHostHelpers.IsHelpRunning)
             {
                 throw new CliArgumentsException(
                     "Must specify functionApp name.",

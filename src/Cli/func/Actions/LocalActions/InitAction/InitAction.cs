@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ConfigurationProfiles;
@@ -11,14 +10,13 @@ using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
-using Microsoft.Azure.WebJobs.Host.Config;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "init", HelpText = "Create a new Function App in the current folder.")]
+    [Action(Name = "init", HelpText = "Initialize a new Azure Function App project.", ShowInHelp = true, Order = 1)]
     internal class InitAction : BaseAction
     {
         // Default to .NET 8 if the target framework is not specified
@@ -119,7 +117,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>("configuration-profile")
                 .SetDefault(null)
                 .WithDescription(WarningColor("[preview]").ToString() + " Initialize a project with a host configuration profile. Currently supported: 'mcp-custom-handler'. "
-                    + WarningColor("Using a configuration profile may skip all other initialization steps.").ToString())
+                    + "Using a configuration profile may skip all other initialization steps.")
                 .Callback(cp => ConfigurationProfileName = cp);
 
             // Runtime-specific options - these are still parsed here for functionality

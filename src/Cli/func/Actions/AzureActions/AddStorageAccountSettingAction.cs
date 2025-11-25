@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 StorageAccountName = args.First();
             }
-            else
+            else if (!ScriptHostHelpers.IsHelpRunning)
             {
                 throw new CliArgumentsException(
                     "Must specify storage account name.",

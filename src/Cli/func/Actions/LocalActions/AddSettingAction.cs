@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => IsConnectionString = f)
                 .WithDescription("Specifying this adds the name-value pair to connection strings collection instead.");
 
-            if (args.Length == 0)
+            if (args.Length == 0 && !ScriptHostHelpers.IsHelpRunning)
             {
                 throw new CliArgumentsException(
                     "Must specify setting name.",

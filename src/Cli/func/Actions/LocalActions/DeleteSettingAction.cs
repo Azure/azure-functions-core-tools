@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
@@ -30,13 +31,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => IsConnectionString = f)
                 .WithDescription("Specifying this removes the value from the connection strings collection instead.");
 
-            if (args.Length == 0)
+            if (args.Length == 0 && !ScriptHostHelpers.IsHelpRunning)
             {
                 throw new CliArgumentsException("Must specify setting name.", base.ParseArgs(args), new CliArgument { Name = nameof(Name), Description = "Name of app setting to be deleted." });
             }
             else
             {
-                Name = args.First();
+                Name = args.FirstOrDefault();
                 return base.ParseArgs(args);
             }
         }

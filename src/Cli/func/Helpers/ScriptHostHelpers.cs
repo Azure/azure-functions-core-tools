@@ -11,6 +11,8 @@ namespace Azure.Functions.Cli.Helpers
         private const System.Diagnostics.TraceLevel DefaultTraceLevel = System.Diagnostics.TraceLevel.Info;
         private static bool _isHelpRunning = false;
 
+        public static bool IsHelpRunning => _isHelpRunning;
+
         public static void SetIsHelpRunning()
         {
             _isHelpRunning = true;

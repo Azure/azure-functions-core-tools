@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -9,7 +8,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy with optional argument to pass in path of folder to pack.", ShowInHelp = true)]
+    [Action(Name = "pack", HelpText = "Pack Azure Function App into a zip that's ready to deploy.", ShowInHelp = true, Order = 4)]
     internal class PackAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;

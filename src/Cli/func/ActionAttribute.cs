@@ -17,5 +17,7 @@ namespace Azure.Functions.Cli
         public bool ShowInHelp { get; set; } = true;
 
         public string ParentCommandName { get; set; } = string.Empty;
+
+        public int Order { get; set; } = 100; // Default order for actions not explicitly ordered
     }
 }
