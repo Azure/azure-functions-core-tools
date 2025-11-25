@@ -43,7 +43,8 @@ namespace Azure.Functions.Cli.Helpers
             DirectoryInfo filePath = new DirectoryInfo(path);
             do
             {
-                var projectFiles = filePath.GetFiles("*.csproj");
+                // Look for both C# and F# project files
+                IEnumerable<FileInfo> projectFiles = filePath.GetFiles("*.csproj").Concat(filePath.GetFiles("*.fsproj"));
                 if (projectFiles.Any())
                 {
                     foreach (FileInfo file in projectFiles)
@@ -68,7 +69,7 @@ namespace Azure.Functions.Cli.Helpers
 
             if (shouldLog)
             {
-                logger.LogDebug($"Csproj not found in {path} directory tree. Skipping user secrets file configuration.");
+                logger.LogDebug($"csproj (or fsproj) not found in {path} directory tree. Skipping user secrets file configuration.");
             }
 
             return null;
