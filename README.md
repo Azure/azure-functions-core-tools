@@ -17,7 +17,7 @@ The Azure Functions Core Tools provide a local development experience for creati
 ## Usage
 
 ```bash
-func [--version] [--help] <command> [<args>] [--verbose]
+func [--version] <command> [<args>] [--verbose] [--help]
 ```
 
 ## Versions

@@ -18,7 +18,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "init", HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
+    [Action(Name = "init", HelpText = "Create a new Function App in the current folder.")]
     internal class InitAction : BaseAction
     {
         // Default to .NET 8 if the target framework is not specified
@@ -80,30 +80,25 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
-                .Setup<bool>("source-control")
-                .SetDefault(false)
-                .WithDescription("Run git init. Default is false.")
-                .Callback(f => InitSourceControl = f);
-
-            Parser
                 .Setup<string>("worker-runtime")
                 .SetDefault(null)
                 .WithDescription($"Runtime framework for the functions. Options are: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}")
                 .Callback(w => WorkerRuntime = w);
 
             Parser
-                .Setup<bool>("force")
-                .WithDescription("Force initializing")
-                .Callback(f => Force = f);
+                .Setup<bool>("source-control")
+                .SetDefault(false)
+                .WithDescription("Initialize source control for the new project. Currently, only Git is supported. Defaults to false.")
+                .Callback(f => InitSourceControl = f);
 
             Parser
                 .Setup<bool>("docker")
-                .WithDescription("Create a Dockerfile based on the selected worker runtime")
+                .WithDescription("Create a Dockerfile based on the selected worker runtime.")
                 .Callback(f => InitDocker = f);
 
             Parser
                 .Setup<bool>("docker-only")
-                .WithDescription("Adds a Dockerfile to an existing function app project. Will prompt for worker-runtime if not specified or set in local.settings.json")
+                .WithDescription("Adds a Dockerfile to an existing function app project. Will prompt for worker-runtime if not specified or set in 'local.settings.json'.")
                 .Callback(f =>
                 {
                     InitDocker = f;
@@ -111,44 +106,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 });
 
             Parser
-                .Setup<bool>("csx")
-                .WithDescription("use csx dotnet functions")
-                .Callback(f => Csx = f);
-
-            Parser
-                .Setup<string>("language")
-                .SetDefault(null)
-                .WithDescription("Initialize a language specific project. Currently supported when --worker-runtime set to node. Options are - \"typescript\" and \"javascript\"")
-                .Callback(l => Language = l);
-
-            Parser
-                .Setup<string>("target-framework")
-                .WithDescription($"Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated or dotnet. Options are - {string.Join(", ", TargetFrameworkHelper.GetSupportedTargetFrameworks())}")
-                .Callback(tf => TargetFramework = tf);
-
-            Parser
-                .Setup<bool>("managed-dependencies")
-                .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
-                .Callback(f => ManagedDependencies = f);
-
-            Parser
-                .Setup<string>('m', "model")
-                .WithDescription($"Selects the programming model for the function app. Note this flag is now only applicable to Python and JavaScript/TypeScript. Options are V1 and V2 for Python; V3 and V4 for JavaScript/TypeScript. Currently, the V2 and V4 programming models are in preview.")
-                .Callback(m => ProgrammingModel = m);
-
-            Parser
-                .Setup<bool>("skip-npm-install")
-                .WithDescription("Skips the npm installation phase when using V4 programming model for NodeJS")
-                .Callback(skip => SkipNpmInstall = skip);
-
-            Parser
                 .Setup<bool>("no-bundle")
+                .WithDescription("Do not configure extension bundle in host.json. Only applicable when initializing a new non-.NET project.")
                 .Callback(e => ExtensionBundle = !e);
 
             Parser
-                .Setup<bool>("no-docs")
-                .WithDescription("Do not create getting started documentation file. Currently supported when --worker-runtime set to python.")
-                .Callback(d => GeneratePythonDocumentation = !d);
+                .Setup<bool>("force")
+                .WithDescription("Force initialization in a non-empty directory.")
+                .Callback(f => Force = f);
 
             Parser
                 .Setup<string>("configuration-profile")
@@ -156,6 +121,37 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription(WarningColor("[preview]").ToString() + " Initialize a project with a host configuration profile. Currently supported: 'mcp-custom-handler'. "
                     + WarningColor("Using a configuration profile may skip all other initialization steps.").ToString())
                 .Callback(cp => ConfigurationProfileName = cp);
+
+            // Runtime-specific options - these are still parsed here for functionality
+            // but their help text is displayed via subcommand actions (InitDotnetSubcommandAction, etc.)
+            Parser
+                .Setup<bool>("csx")
+                .Callback(f => Csx = f);
+
+            Parser
+                .Setup<string>("target-framework")
+                .Callback(tf => TargetFramework = tf);
+
+            Parser
+                .Setup<string>("language")
+                .SetDefault(null)
+                .Callback(l => Language = l);
+
+            Parser
+                .Setup<bool>("skip-npm-install")
+                .Callback(skip => SkipNpmInstall = skip);
+
+            Parser
+                .Setup<string>('m', "model")
+                .Callback(m => ProgrammingModel = m);
+
+            Parser
+                .Setup<bool>("no-docs")
+                .Callback(d => GeneratePythonDocumentation = !d);
+
+            Parser
+                .Setup<bool>("managed-dependencies")
+                .Callback(f => ManagedDependencies = f);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {

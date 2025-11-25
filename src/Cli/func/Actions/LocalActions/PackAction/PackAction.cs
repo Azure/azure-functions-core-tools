@@ -52,14 +52,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public override IEnumerable<CliArgument> GetPositionalArguments()
         {
-            return new[]
-            {
+            return
+            [
                 new CliArgument
                 {
-                    Name = "PROJECT | SOLUTION",
-                    Description = "Folder path of Azure functions project or solution to pack. If a path is not specified, the command will pack the current directory."
+                    Name = "FOLDER PATH",
+                    Description = "Folder path of Azure functions project to pack. If a path is not specified, the command will pack the current directory."
                 }
-            };
+            ];
         }
 
         public override async Task RunAsync()
