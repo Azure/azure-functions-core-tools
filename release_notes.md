@@ -18,3 +18,4 @@
 - Fix `func pack --build-native-deps` failure on Windows for Python 3.13+ (#4742)
 - Cleaned up `func --help` output and fixed validation errors when using the `--help` flag for specific commands (#4748)
 - Improved `func init --help` output to better display options for each worker runtime (#4748)
+- Fix F# project & template initialization via `func init | new` (#4749)
