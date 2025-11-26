@@ -16,7 +16,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "init", HelpText = "Initialize a new Azure Function App project.", ShowInHelp = true, Order = 1)]
+    [Action(Name = "init", HelpText = "Initialize a new Azure Function App project.", ShowInHelp = true, HelpOrder = 1)]
     internal class InitAction : BaseAction
     {
         // Default to .NET 8 if the target framework is not specified

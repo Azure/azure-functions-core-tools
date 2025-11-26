@@ -34,7 +34,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.HostActions
 {
     [Action(Name = "start", Context = Context.Host, HelpText = "Launch the Azure Functions host runtime.")]
-    [Action(Name = "start", HelpText = "Launch the Azure Functions host runtime.", Order = 3)]
+    [Action(Name = "start", HelpText = "Launch the Azure Functions host runtime.", HelpOrder = 3)]
     internal class StartHostAction : BaseAction
     {
         private const int DefaultPort = 7071;

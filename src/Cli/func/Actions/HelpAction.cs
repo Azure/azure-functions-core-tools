@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Actions
                         SubContexts = attributes.Select(a => a.SubContext),
                         Names = attributes.Select(a => a.Name),
                         ParentCommandName = attributes.Select(a => a.ParentCommandName),
-                        Order = attributes.Select(a => a.Order).FirstOrDefault()
+                        HelpOrder = attributes.Select(a => a.HelpOrder).FirstOrDefault()
                     };
                 });
         }
@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Actions
                         SubContexts = attributes.Select(a => a.SubContext),
                         Names = attributes.Select(a => a.Name),
                         ParentCommandName = attributes.Select(a => a.ParentCommandName),
-                        Order = attributes.Select(a => a.Order).FirstOrDefault()
+                        HelpOrder = attributes.Select(a => a.HelpOrder).FirstOrDefault()
                     };
                 });
             _action = action;
@@ -292,7 +292,7 @@ namespace Azure.Functions.Cli.Actions
                 // Group actions by parent command
                 var parentCommands = actions
                     .Where(a => a.ParentCommandName.All(p => string.IsNullOrEmpty(p))) // Actions with no parent
-                    .OrderBy(a => a.Order)
+                    .OrderBy(a => a.HelpOrder)
                     .ToList();
 
                 var subCommands = actions

@@ -12,7 +12,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
-    [Action(Name = "delete", Context = Context.Kubernetes, HelpText = "Deletes a Function App deployment from a kubernetes cluster.", Order = 4)]
+    [Action(Name = "delete", Context = Context.Kubernetes, HelpText = "Deletes a Function App deployment from a kubernetes cluster.", HelpOrder = 4)]
     internal class KubernetesDeleteAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;

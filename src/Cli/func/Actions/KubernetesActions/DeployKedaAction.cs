@@ -8,7 +8,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
-    [Action(Name = "install", Context = Context.Kubernetes, HelpText = "Install KEDA (non-http scale to zero) in the kubernetes cluster from kubectl config.", Order = 1)]
+    [Action(Name = "install", Context = Context.Kubernetes, HelpText = "Install KEDA (non-http scale to zero) in the kubernetes cluster from kubectl config.", HelpOrder = 1)]
     internal class DeployKedaAction : BaseAction
     {
         public string Namespace { get; private set; }

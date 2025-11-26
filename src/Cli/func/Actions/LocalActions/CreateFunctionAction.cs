@@ -19,9 +19,9 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "new", HelpText = "Create a new Function from a template.", Order = 2)]
-    [Action(Name = "new", Context = Context.Function, HelpText = "Create a new Function from a template.", Order = 1)]
-    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new Function from a template.", Order = 2)]
+    [Action(Name = "new", HelpText = "Create a new Function from a template.", HelpOrder = 2)]
+    [Action(Name = "new", Context = Context.Function, HelpText = "Create a new Function from a template.", HelpOrder = 1)]
+    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new Function from a template.", HelpOrder = 2)]
     internal class CreateFunctionAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;

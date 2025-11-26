@@ -16,7 +16,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
-    [Action(Name = "deploy", Context = Context.Kubernetes, HelpText = "Deploys a Function App to a kubernetes cluster.", Order = 3)]
+    [Action(Name = "deploy", Context = Context.Kubernetes, HelpText = "Deploys a Function App to a kubernetes cluster.", HelpOrder = 3)]
     internal class KubernetesDeployAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
