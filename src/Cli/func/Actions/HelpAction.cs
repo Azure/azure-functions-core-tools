@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.Actions
 
         public HelpAction(IEnumerable<TypeAttributePair> actions, Func<Type, IAction> createAction, string context = null, string subContext = null)
         {
-            ScriptHostHelpers.SetIsHelpRunning();
+            GlobalCoreToolsSettings.SetIsHelpRunning(true);
             _context = context;
             _subContext = subContext;
             _createAction = createAction;

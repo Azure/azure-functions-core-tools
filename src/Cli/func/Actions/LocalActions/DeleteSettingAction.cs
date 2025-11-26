@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => IsConnectionString = f)
                 .WithDescription("Specifying this removes the value from the connection strings collection instead.");
 
-            if (args.Length == 0 && !ScriptHostHelpers.IsHelpRunning)
+            if (args.Length == 0 && !GlobalCoreToolsSettings.IsHelpRunning)
             {
                 throw new CliArgumentsException("Must specify setting name.", base.ParseArgs(args), new CliArgument { Name = nameof(Name), Description = "Name of app setting to be deleted." });
             }

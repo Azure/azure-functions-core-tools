@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.Common
         {
             _secretsManager = secretsManager;
 
-            if (!ScriptHostHelpers.IsHelpRunning)
+            if (!GlobalCoreToolsSettings.IsHelpRunning)
             {
                 IsValid = TrySetConnectionStringAndTaskHubName();
             }

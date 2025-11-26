@@ -9,18 +9,10 @@ namespace Azure.Functions.Cli.Helpers
     public static class ScriptHostHelpers
     {
         private const System.Diagnostics.TraceLevel DefaultTraceLevel = System.Diagnostics.TraceLevel.Info;
-        private static bool _isHelpRunning = false;
-
-        public static bool IsHelpRunning => _isHelpRunning;
-
-        public static void SetIsHelpRunning()
-        {
-            _isHelpRunning = true;
-        }
 
         public static string GetFunctionAppRootDirectory(string startingDirectory, IEnumerable<string> searchFiles = null)
         {
-            if (_isHelpRunning)
+            if (GlobalCoreToolsSettings.IsHelpRunning)
             {
                 return startingDirectory;
             }

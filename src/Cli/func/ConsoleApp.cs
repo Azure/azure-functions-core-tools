@@ -228,7 +228,7 @@ namespace Azure.Functions.Cli
             {
                 argsToParse = _args.Skip(1);
                 isHelp = true;
-                ScriptHostHelpers.SetIsHelpRunning();
+                GlobalCoreToolsSettings.SetIsHelpRunning(true);
             }
             else
             {
@@ -242,7 +242,7 @@ namespace Azure.Functions.Cli
 
                 if (isHelp)
                 {
-                    ScriptHostHelpers.SetIsHelpRunning();
+                    GlobalCoreToolsSettings.SetIsHelpRunning(true);
                 }
 
                 argsToParse = isHelp
