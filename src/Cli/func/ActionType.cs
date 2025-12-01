@@ -14,5 +14,7 @@ namespace Azure.Functions.Cli
         public IEnumerable<string> Names { get; set; }
 
         public IEnumerable<string> ParentCommandName { get; set; }
+
+        public int HelpOrder { get; set; }
     }
 }

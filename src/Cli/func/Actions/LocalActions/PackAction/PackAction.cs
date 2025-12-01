@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -9,7 +8,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
-    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to deploy with optional argument to pass in path of folder to pack.", ShowInHelp = true)]
+    [Action(Name = "pack", HelpText = "Pack Azure Function App into a zip that's ready to deploy.", ShowInHelp = true, HelpOrder = 4)]
     internal class PackAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
@@ -52,14 +51,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public override IEnumerable<CliArgument> GetPositionalArguments()
         {
-            return new[]
-            {
+            return
+            [
                 new CliArgument
                 {
-                    Name = "PROJECT | SOLUTION",
-                    Description = "Folder path of Azure functions project or solution to pack. If a path is not specified, the command will pack the current directory."
+                    Name = "FOLDER PATH",
+                    Description = "Folder path of Azure functions project to pack. If a path is not specified, the command will pack the current directory."
                 }
-            };
+            ];
         }
 
         public override async Task RunAsync()

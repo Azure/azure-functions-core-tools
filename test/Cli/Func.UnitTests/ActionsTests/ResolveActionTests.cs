@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Actions.DurableActions;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using FluentAssertions;
 using NSubstitute;
@@ -45,12 +46,6 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData("settings delete settingName", typeof(DeleteSettingAction))]
         [InlineData("settings list", typeof(ListSettingsAction))]
         [InlineData("init", typeof(InitAction))]
-        [InlineData("", typeof(HelpAction))]
-        [InlineData("help", typeof(HelpAction))]
-        [InlineData("WrongName", typeof(HelpAction))]
-        [InlineData("azure functionapp --help", typeof(HelpAction))]
-        [InlineData("azure --help", typeof(HelpAction))]
-        [InlineData("--help", typeof(HelpAction))]
         [InlineData("durable delete-task-hub --connection-string-setting connectionSettingName", typeof(DurableDeleteTaskHub))]
         [InlineData("durable get-history --id ab1b5de4c5a9450eafa5a4cf249b3169 --show-input true --connection-string-setting connectionSettingName", typeof(DurableGetHistory))]
         [InlineData("durable get-instances --created-before 11/10/2018 --connection-string-setting connectionSettingName --task-hub-name taskHub1", typeof(DurableGetInstances))]
@@ -79,6 +74,37 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 {
                     result.Should().BeOfType(returnType);
                 }
+            }
+        }
+
+        [Theory]
+        [InlineData("azure functionapp --help", typeof(HelpAction))]
+        [InlineData("azure --help", typeof(HelpAction))]
+        [InlineData("--help", typeof(HelpAction))]
+        [InlineData("", typeof(HelpAction))]
+        [InlineData("help", typeof(HelpAction))]
+        [InlineData("WrongName", typeof(HelpAction))]
+        public void ResolveHelpCommandLineCorrectly(string args, Type returnType)
+        {
+            try
+            {
+                GlobalCoreToolsSettings.SetIsHelpRunning(true);
+                var fileSystem = Substitute.For<IFileSystem>();
+                fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    var container = InitializeContainerForTests();
+                    var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
+                    var result = app.Parse();
+
+                    result.Should().BeOfType(returnType);
+                }
+            }
+            finally
+            {
+                // Reset after help tests to prevent affecting subsequent tests
+                GlobalCoreToolsSettings.SetIsHelpRunning(false);
             }
         }
 
