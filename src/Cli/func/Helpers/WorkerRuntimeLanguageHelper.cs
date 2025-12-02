@@ -48,7 +48,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, string> _workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
         {
             { WorkerRuntime.Dotnet, Constants.Languages.CSharp },
-            { WorkerRuntime.DotnetIsolated, Constants.Languages.CSharpIsolated },
+            { WorkerRuntime.DotnetIsolated, Constants.Languages.CSharp },
             { WorkerRuntime.Node, Constants.Languages.JavaScript },
             { WorkerRuntime.Python, Constants.Languages.Python },
             { WorkerRuntime.Powershell, Constants.Languages.Powershell },
@@ -62,8 +62,10 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.TypeScript, new[] { "ts" } },
             { Constants.Languages.Python, new[] { "py" } },
             { Constants.Languages.Powershell, new[] { "pwsh" } },
-            { Constants.Languages.CSharp, new[] { "csharp", "dotnet" } },
-            { Constants.Languages.CSharpIsolated, new[] { "dotnet-isolated", "dotnetIsolated" } },
+
+            // By default dotnet should map to csharp
+            { Constants.Languages.CSharp, new[] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
+            { Constants.Languages.FSharp, new[] { "fsharp" } },
             { Constants.Languages.Java, new string[] { } },
             { Constants.Languages.Custom, new string[] { } }
         };
@@ -77,7 +79,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             { WorkerRuntime.Node, new[] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
             { WorkerRuntime.Dotnet, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
-            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharpIsolated, Constants.Languages.FSharpIsolated } }
+            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } }
         };
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => _availableWorkersRuntime.Keys
@@ -85,9 +87,8 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", _availableWorkersRuntime.Keys
-                .Where(k => (k != WorkerRuntime.Java))
-                .Select(s => s.ToString()))
-            .Replace(WorkerRuntime.DotnetIsolated.ToString(), "dotnet-isolated");
+                .Where(k => k != WorkerRuntime.Java)
+                .Select(s => GetRuntimeMoniker(s)));
 
         public static string GetRuntimeMoniker(WorkerRuntime workerRuntime)
         {

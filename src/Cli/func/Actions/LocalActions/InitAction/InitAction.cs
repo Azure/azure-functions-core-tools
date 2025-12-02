@@ -225,7 +225,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
                 await ShowEolMessage();
-                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime, TargetFramework);
+                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime, TargetFramework, ResolvedLanguage);
             }
             else
             {
@@ -266,7 +266,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (!string.IsNullOrEmpty(workerRuntimeString))
             {
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeString);
-                language = languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntimeString);
+                language = !string.IsNullOrEmpty(languageString)
+                    ? WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString)
+                    : WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntimeString);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
@@ -282,7 +284,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
-                language = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
+                language = GlobalCoreToolsSettings.CurrentLanguageOrNull
+                    ?? (!string.IsNullOrEmpty(languageString) ? WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString) : null)
+                    ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
             }
 
             return (workerRuntime, language);

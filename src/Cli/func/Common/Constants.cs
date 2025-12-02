@@ -152,8 +152,6 @@ namespace Azure.Functions.Cli.Common
             public const string Python = "python";
             public const string CSharp = "c#";
             public const string FSharp = "f#";
-            public const string CSharpIsolated = "c#-isolated";
-            public const string FSharpIsolated = "f#-isolated";
             public const string Powershell = "powershell";
             public const string Java = "java";
             public const string Custom = "custom";
