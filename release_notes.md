@@ -2,7 +2,7 @@
 
 #### Host Version
 
-- Host Runtime Version: 4.1044.400
+- Host Runtime Version: 4.1045.200
 - In-Proc CLI:
   - CLI Version: 4.3.0
   - Host Runtime Version: 4.44.100 (includes 4.844.100, 4.644.100)
