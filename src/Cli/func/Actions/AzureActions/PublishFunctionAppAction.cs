@@ -827,7 +827,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && functionApp.FunctionAppConfig?.Runtime?.Version == "3.14")
                 {
                     // Remote build for Python 3.14 is not supported on Flex consumption
-                    throw new CliException("Remote build for Python 3.14 is not yet supported for Flex. Please refer to <AKA.MS link> for more details.");
+                    throw new CliException("Remote build for Python 3.14 is not yet supported for Flex. Please refer to aka.ms/py314-remote-build-flex for more details.");
                 }
 
                 deploymentParameters.Add("RemoteBuild", true.ToString());
