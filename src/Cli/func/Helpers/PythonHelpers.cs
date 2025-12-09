@@ -613,14 +613,18 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        private static void EnsureToolInstalled(string toolName, string alternativeMessage)
+        {
+            if (!CommandChecker.CommandExists(toolName))
+            {
+                throw new CliException($"{toolName} is not installed. {alternativeMessage}");
+            }
+        }
+
         private static async Task RestorePythonRequirementsWithPoetry(string functionAppRoot, string packagesLocation)
         {
-            // Check if poetry is installed
-            if (!CommandChecker.CommandExists("poetry"))
-            {
-                throw new CliException("Poetry is not installed. Please install poetry to use pyproject.toml for dependency management. " +
-                    "Alternatively, generate a requirements.txt file from your pyproject.toml.");
-            }
+            EnsureToolInstalled("poetry", "Please install poetry to use pyproject.toml for dependency management. " +
+                "Alternatively, generate a requirements.txt file from your pyproject.toml.");
 
             var pythonWorkerInfo = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pythonWorkerInfo, errorIfNoVersion: true);
@@ -666,12 +670,8 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task RestorePythonRequirementsWithUv(string functionAppRoot, string packagesLocation)
         {
-            // Check if uv is installed
-            if (!CommandChecker.CommandExists("uv"))
-            {
-                throw new CliException("uv is not installed. Please install uv to use uv.lock for dependency management. " +
-                    "Alternatively, generate a requirements.txt file from your pyproject.toml.");
-            }
+            EnsureToolInstalled("uv", "Please install uv to use uv.lock for dependency management. " +
+                "Alternatively, generate a requirements.txt file from your pyproject.toml.");
 
             var pythonWorkerInfo = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pythonWorkerInfo, errorIfNoVersion: true);
@@ -753,11 +753,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (packageTool == PythonPackageTool.Poetry)
                 {
-                    // Export from poetry to requirements.txt - run from function app root
-                    if (!CommandChecker.CommandExists("poetry"))
-                    {
-                        throw new CliException("Poetry is not installed. Please install poetry or use --no-build flag.");
-                    }
+                    EnsureToolInstalled("poetry", "Please install poetry or use --no-build flag.");
 
                     var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{requirementsTxtPath}\" --without-hashes", workingDirectory: functionAppRoot);
                     var sbErrors = new StringBuilder();
@@ -771,11 +767,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 else if (packageTool == PythonPackageTool.Uv)
                 {
-                    // Export from uv to requirements.txt - run from function app root
-                    if (!CommandChecker.CommandExists("uv"))
-                    {
-                        throw new CliException("uv is not installed. Please install uv or use --no-build flag.");
-                    }
+                    EnsureToolInstalled("uv", "Please install uv or use --no-build flag.");
 
                     var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{requirementsTxtPath}\" --no-hashes", workingDirectory: functionAppRoot);
                     var sbErrors = new StringBuilder();
