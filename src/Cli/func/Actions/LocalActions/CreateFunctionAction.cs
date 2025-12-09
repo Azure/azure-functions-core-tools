@@ -19,9 +19,9 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "new", Context = Context.Function, HelpText = "Create a new function from a template.")]
-    [Action(Name = "new", HelpText = "Create a new function from a template.")]
-    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new function from a template.")]
+    [Action(Name = "new", HelpText = "Create a new Function from a template.", HelpOrder = 2)]
+    [Action(Name = "new", Context = Context.Function, HelpText = "Create a new Function from a template.", HelpOrder = 1)]
+    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new Function from a template.", HelpOrder = 2)]
     internal class CreateFunctionAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
@@ -127,7 +127,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (string.IsNullOrWhiteSpace(TemplateName))
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
-                    TemplateName ??= SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(_workerRuntime));
+                    TemplateName ??= SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(_workerRuntime, Language));
                 }
                 else
                 {
@@ -461,7 +461,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     return true;
                 case WorkerRuntime.DotnetIsolated:
                     // use fsproj as an indication that we have a F# project
-                    Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharpIsolated : Constants.Languages.CSharpIsolated;
+                    Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharp : Constants.Languages.CSharp;
                     return true;
                 case WorkerRuntime.Node:
                     // use tsconfig.json as an indicator that we have a TypeScript project

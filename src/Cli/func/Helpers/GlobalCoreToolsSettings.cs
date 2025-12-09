@@ -11,6 +11,9 @@ namespace Azure.Functions.Cli.Helpers
     public static class GlobalCoreToolsSettings
     {
         private static WorkerRuntime _currentWorkerRuntime;
+        private static bool _isHelpRunning;
+
+        public static bool IsHelpRunning => _isHelpRunning;
 
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
@@ -99,6 +102,11 @@ namespace Azure.Functions.Cli.Helpers
             {
                 _currentWorkerRuntime = WorkerRuntime.None;
             }
+        }
+
+        internal static void SetIsHelpRunning(bool value)
+        {
+            _isHelpRunning = value;
         }
 
         // Test helper method to set _currentWorkerRuntime for testing purpose

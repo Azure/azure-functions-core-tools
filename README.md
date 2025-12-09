@@ -17,8 +17,18 @@ The Azure Functions Core Tools provide a local development experience for creati
 ## Usage
 
 ```bash
-func [--version] [--help] <command> [<args>] [--verbose]
+func [context] <action> [-/--options] [--help]
 ```
+
+### Global Options
+
+These options are available for all commands:
+
+- `--script-root <PATH>`: Set the root directory of the function app. Changes the working directory to the specified path. Defaults to the current directory.
+- `-v | --version`: Display the version of Azure Functions Core Tools.
+- `-h | --help`: Display help information about Azure Functions Core Tools or a specific command.
+
+For more detailed usage information, run `func --help`.
 
 ## Versions
 

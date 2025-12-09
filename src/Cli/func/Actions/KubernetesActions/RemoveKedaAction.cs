@@ -8,7 +8,7 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
-    [Action(Name = "remove", Context = Context.Kubernetes, HelpText = "Remove KEDA (non-http scale to zero) from the kubernetes")]
+    [Action(Name = "remove", Context = Context.Kubernetes, HelpText = "Remove KEDA (non-http scale to zero) from the kubernetes.", HelpOrder = 2)]
     internal class RemoveKedaAction : BaseAction
     {
         public string Namespace { get; private set; } = "default";

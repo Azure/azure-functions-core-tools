@@ -102,7 +102,7 @@ namespace Azure.Functions.Cli.Helpers
             return SelectionMenuHelper.DisplaySelectionWizard(uniqueTfms.ToArray());
         }
 
-        public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
+        public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "", string language = "")
         {
             await TemplateOperationAsync(
                 async () =>
@@ -110,9 +110,14 @@ namespace Azure.Functions.Cli.Helpers
                     var frameworkString = string.IsNullOrEmpty(targetFramework)
                         ? string.Empty
                         : $"--Framework \"{targetFramework}\"";
+
+                    var languageString = string.IsNullOrEmpty(language)
+                        ? string.Empty
+                        : $"--language \"{language}\"";
+
                     var connectionString = $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\"";
                     TryGetCustomHiveArg(workerRuntime, out string customHive);
-                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{customHive}");
+                    var exe = new Executable("dotnet", $"new func {frameworkString} {languageString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{customHive}");
                     var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
@@ -189,12 +194,27 @@ namespace Azure.Functions.Cli.Helpers
             _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
         };
 
-        internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
+        internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime, string language = "")
         {
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
-                return new[]
+                if (language.Equals("F#", StringComparison.OrdinalIgnoreCase))
                 {
+                    return
+                    [
+                        "HttpTrigger",
+                        "BlobTrigger",
+                        "QueueTrigger",
+                        "TimerTrigger",
+                        "EventHubTrigger",
+                        "EventGridTrigger",
+                        "CosmosDBTrigger"
+                    ];
+                }
+
+                return
+                [
+                    "McpToolTrigger",
                     "QueueTrigger",
                     "HttpTrigger",
                     "BlobTrigger",
@@ -211,11 +231,11 @@ namespace Azure.Functions.Cli.Helpers
                     "DurableFunctionsOrchestration",
                     "DurableFunctionsEntityClass",
                     "DurableFunctionsEntityFunction"
-                };
+                ];
             }
 
-            return new[]
-            {
+            return
+            [
                 "QueueTrigger",
                 "HttpTrigger",
                 "BlobTrigger",
@@ -236,7 +256,7 @@ namespace Azure.Functions.Cli.Helpers
                 "DaprPublishOutputBinding",
                 "DaprServiceInvocationTrigger",
                 "DaprTopicTrigger",
-            };
+            ];
         }
 
         public static bool CanDotnetBuild()
