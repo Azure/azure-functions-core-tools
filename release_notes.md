@@ -9,6 +9,11 @@
 
 #### Changes
 
+- Add deprecation warning for extension bundles during function app publish (#4700)
+  - Core Tools now displays a warning when publishing function apps that use deprecated extension bundle versions
+  - Warning message matches VS Code Azure Functions extension behavior for consistency
+  - Supports version range formats: `[X.*, Y.Y.Y)`, `[X.Y.Z, A.B.C)`, and exact versions `[X.Y.Z]`
+  - Falls back to default version range `[4.*, 5.0.0)` if CDN endpoint is unreachable
 - Fix .gitignore to allow PowerShell module bin folders (#4574)
 - Refactor to use msbuild for determining .NET target framework & add support multiple TFMs (#4715)
   - When using `func init --docker-only` on a .NET project with multiple target frameworks, the CLI will now
