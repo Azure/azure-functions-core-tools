@@ -1,4 +1,4 @@
-# Azure Functions CLI 4.5.0
+# Azure Functions CLI 4.6.0
 
 #### Host Version
 
@@ -17,3 +17,6 @@
 - Update .NET templates package version to 4.0.5337 (#4728)
 - Fix `func pack --build-native-deps` failure on Windows for Python 3.13+ (#4742)
 - Add deprecation warning for extension bundles during function app publish (#4700)
+- Cleaned up `func --help` output and fixed validation errors when using the `--help` flag for specific commands (#4748)
+- Improved `func init --help` output to better display options for each worker runtime (#4748)
+- Fix F# project & template initialization via `func init | new` (#4749)

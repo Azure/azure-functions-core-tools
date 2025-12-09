@@ -228,6 +228,7 @@ namespace Azure.Functions.Cli
             {
                 argsToParse = _args.Skip(1);
                 isHelp = true;
+                GlobalCoreToolsSettings.SetIsHelpRunning(true);
             }
             else
             {
@@ -239,8 +240,13 @@ namespace Azure.Functions.Cli
                     .ToArray();
                 isHelp = argsHelpIntersection.Any();
 
+                if (isHelp)
+                {
+                    GlobalCoreToolsSettings.SetIsHelpRunning(true);
+                }
+
                 argsToParse = isHelp
-                    ? _args.Where(a => !a.StartsWith("-") || argsHelpIntersection.Contains(a.Replace("-", string.Empty).ToLowerInvariant()))
+                    ? _args.Where(a => !a.StartsWith("-"))
                     : _args;
             }
 

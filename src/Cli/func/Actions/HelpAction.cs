@@ -26,13 +26,16 @@ namespace Azure.Functions.Cli.Actions
         private readonly IAction _action;
         private readonly ICommandLineParserResult _parseResult;
         private readonly IEnumerable<ActionType> _actionTypes;
+        private readonly IEnumerable<TypeAttributePair> _typeAttributePairs;
         private readonly Func<Type, IAction> _createAction;
 
         public HelpAction(IEnumerable<TypeAttributePair> actions, Func<Type, IAction> createAction, string context = null, string subContext = null)
         {
+            GlobalCoreToolsSettings.SetIsHelpRunning(true);
             _context = context;
             _subContext = subContext;
             _createAction = createAction;
+            _typeAttributePairs = actions;
             _actionTypes = actions
                 .Where(a => a.Attribute.ShowInHelp)
                 .Select(a => a.Type)
@@ -46,7 +49,8 @@ namespace Azure.Functions.Cli.Actions
                         Contexts = attributes.Select(a => a.Context),
                         SubContexts = attributes.Select(a => a.SubContext),
                         Names = attributes.Select(a => a.Name),
-                        ParentCommandName = attributes.Select(a => a.ParentCommandName)
+                        ParentCommandName = attributes.Select(a => a.ParentCommandName),
+                        HelpOrder = attributes.Select(a => a.HelpOrder).FirstOrDefault()
                     };
                 });
         }
@@ -67,7 +71,8 @@ namespace Azure.Functions.Cli.Actions
                         Contexts = attributes.Select(a => a.Context),
                         SubContexts = attributes.Select(a => a.SubContext),
                         Names = attributes.Select(a => a.Name),
-                        ParentCommandName = attributes.Select(a => a.ParentCommandName)
+                        ParentCommandName = attributes.Select(a => a.ParentCommandName),
+                        HelpOrder = attributes.Select(a => a.HelpOrder).FirstOrDefault()
                     };
                 });
             _action = action;
@@ -79,7 +84,6 @@ namespace Azure.Functions.Cli.Actions
         public override async Task RunAsync()
         {
             var latestVersionMessageTask = VersionHelper.IsRunningAnOlderVersion();
-            ScriptHostHelpers.SetIsHelpRunning();
             if (!string.IsNullOrEmpty(_context) || !string.IsNullOrEmpty(_subContext))
             {
                 var context = Context.None;
@@ -129,6 +133,7 @@ namespace Azure.Functions.Cli.Actions
                 var versionCheckMessage = await VersionHelper.RunAsync(versionCheckTask);
                 if (!string.IsNullOrEmpty(versionCheckMessage))
                 {
+                    ColoredConsole.WriteLine();
                     ColoredConsole.WriteLine(WarningColor($"{versionCheckMessage}{Environment.NewLine}"));
                 }
             }
@@ -160,8 +165,8 @@ namespace Azure.Functions.Cli.Actions
 
                 var hasSubcontexts = contexts.Any();
                 var usageFormat = hasSubcontexts
-                    ? $"{TitleColor("Usage:")} func {context.ToLowerCaseString()} [subcontext] <action> [-/--options]"
-                    : $"{TitleColor("Usage:")} func {context.ToLowerCaseString()} <action> [-/--options]";
+                    ? $"{TitleColor("Usage:")} func {context.ToLowerCaseString()} [subcontext] <action> [-/--options] [--help]"
+                    : $"{TitleColor("Usage:")} func {context.ToLowerCaseString()} <action> [-/--options] [--help]";
 
                 ColoredConsole
                 .WriteLine(usageFormat)
@@ -171,14 +176,14 @@ namespace Azure.Functions.Cli.Actions
             else
             {
                 ColoredConsole
-                .WriteLine($"{TitleColor("Usage:")} func {context.ToLowerCaseString()} {subContext.ToLowerCaseString()} <action> [-/--options]")
+                .WriteLine($"{TitleColor("Usage:")} func {context.ToLowerCaseString()} {subContext.ToLowerCaseString()} <action> [-/--options] [--help]")
                 .WriteLine();
             }
 
             var actions = _actionTypes
                 .Where(a => a.Contexts.Contains(context))
                 .Where(a => a.SubContexts.Contains(subContext));
-            DisplayActionsHelp(actions);
+            DisplayActionsHelp(actions, showDetails: false);
         }
 
         private void DisplayActionHelp()
@@ -211,7 +216,7 @@ namespace Azure.Functions.Cli.Actions
 
             actionsToDisplay.AddRange(subCommandActionTypes);
 
-            DisplayActionsHelp(actionsToDisplay);
+            DisplayActionsHelp(actionsToDisplay, showDetails: true);
         }
 
         private void DisplayGeneralHelp()
@@ -219,7 +224,7 @@ namespace Azure.Functions.Cli.Actions
             var contexts = _actionTypes
                 .Select(a => a.Contexts)
                 .SelectMany(c => c)
-                .Where(c => c != Context.None)
+                .Where(c => c != Context.None && c != Context.Function && c != Context.Host)
                 .Distinct()
                 .OrderBy(c => c.ToLowerCaseString());
             Utilities.WarnIfPreviewVersion();
@@ -227,10 +232,40 @@ namespace Azure.Functions.Cli.Actions
             ColoredConsole
                 .WriteLine("Usage: func [context] <action> [-/--options]")
                 .WriteLine();
+            DisplayGlobalOptions();
             DisplayContextsHelp(contexts);
+
+            // Only show actions where the Context.None attribute has ShowInHelp = true
+            var contextNoneActionTypes = _typeAttributePairs
+                .Where(a => a.Attribute.Context == Context.None && a.Attribute.ShowInHelp)
+                .Select(a => a.Type)
+                .Distinct();
+
             var actions = _actionTypes
-                .Where(a => a.Contexts.Contains(Context.None));
-            DisplayActionsHelp(actions);
+                .Where(a => contextNoneActionTypes.Contains(a.Type) && a.Contexts.Contains(Context.None));
+            DisplayActionsHelp(actions, showDetails: false);
+        }
+
+        private static void DisplayGlobalOptions()
+        {
+            ColoredConsole.WriteLine(TitleColor("Options:"));
+
+            var options = new[]
+            {
+                ("--script-root <PATH>", "Set the root directory of the function app. Changes the working directory to the specified path. Defaults to the current directory."),
+                ("--verbose", "Enable verbose output for detailed logging (not supported by all commands)."),
+                ("-v | --version", "Display the version of Azure Functions Core Tools."),
+                ("-h | --help", "Display help information about Azure Functions Core Tools or a specific command.")
+            };
+
+            var longestName = options.Max(o => o.Item1.Length) + 2;
+
+            foreach (var (name, description) in options)
+            {
+                ColoredConsole.WriteLine(string.Format($"{Indent(1)}{{0, {-longestName}}} {{1}}", name.DarkGray(), description));
+            }
+
+            ColoredConsole.WriteLine();
         }
 
         private static void DisplayContextsHelp(IEnumerable<Context> contexts)
@@ -248,7 +283,7 @@ namespace Azure.Functions.Cli.Actions
             }
         }
 
-        private void DisplayActionsHelp(IEnumerable<ActionType> actions)
+        private void DisplayActionsHelp(IEnumerable<ActionType> actions, bool showDetails = false)
         {
             if (actions.Any())
             {
@@ -257,6 +292,7 @@ namespace Azure.Functions.Cli.Actions
                 // Group actions by parent command
                 var parentCommands = actions
                     .Where(a => a.ParentCommandName.All(p => string.IsNullOrEmpty(p))) // Actions with no parent
+                    .OrderBy(a => a.HelpOrder)
                     .ToList();
 
                 var subCommands = actions
@@ -271,25 +307,29 @@ namespace Azure.Functions.Cli.Actions
                 {
                     // Display parent command
                     ColoredConsole.WriteLine(GetActionHelp(parentAction, longestName));
-                    DisplaySwitches(parentAction);
 
-                    // Find and display child commands for this parent
-                    var parentName = parentAction.Names.First();
-                    var childCommands = subCommands
-                        .Where(s => s.ParentCommandName.Any(p => p.Equals(parentName, StringComparison.OrdinalIgnoreCase)))
-                        .ToList();
-
-                    if (childCommands.Any())
+                    if (showDetails)
                     {
-                        ColoredConsole.WriteLine(); // Add spacing before subcommands
+                        DisplaySwitches(parentAction);
 
-                        foreach (var childCommand in childCommands)
+                        // Find and display child commands for this parent
+                        var parentName = parentAction.Names.First();
+                        var childCommands = subCommands
+                            .Where(s => s.ParentCommandName.Any(p => p.Equals(parentName, StringComparison.OrdinalIgnoreCase)))
+                            .ToList();
+
+                        if (childCommands.Any())
                         {
-                            DisplaySubCommandHelp(childCommand);
-                        }
-                    }
+                            ColoredConsole.WriteLine(); // Add spacing before subcommands
 
-                    ColoredConsole.WriteLine();
+                            foreach (var childCommand in childCommands)
+                            {
+                                DisplaySubCommandHelp(childCommand);
+                            }
+                        }
+
+                        ColoredConsole.WriteLine();
+                    }
                 }
             }
         }

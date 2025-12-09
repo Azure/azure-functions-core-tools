@@ -8,7 +8,8 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "logs", HelpText = "Gets logs of Functions running on custom backends")]
+    [Action(Name = "logs", HelpText = "Gets logs of Functions running on custom backends.", ShowInHelp = false)]
+    [Action(Name = "logs", Context = Context.Kubernetes, HelpText = "Gets logs of Functions running on custom backends.", ShowInHelp = true)]
     internal class GetLogsAction : BaseAction
     {
         private const string KubernetesDefaultNamespace = "azure-functions";

@@ -17,8 +17,18 @@ The Azure Functions Core Tools provide a local development experience for creati
 ## Usage
 
 ```bash
-func [--version] [--help] <command> [<args>] [--verbose]
+func [context] <action> [-/--options] [--help]
 ```
+
+### Global Options
+
+These options are available for all commands:
+
+- `--script-root <PATH>`: Set the root directory of the function app. Changes the working directory to the specified path. Defaults to the current directory.
+- `-v | --version`: Display the version of Azure Functions Core Tools.
+- `-h | --help`: Display help information about Azure Functions Core Tools or a specific command.
+
+For more detailed usage information, run `func --help`.
 
 ## Versions
 
@@ -77,12 +87,13 @@ func [--version] [--help] <command> [<args>] [--verbose]
 | v3      | `brew tap azure/functions`  <br> `brew install azure-functions-core-tools@3` |
 | v2      | `brew tap azure/functions`  <br> `brew install azure-functions-core-tools@2` |
 
+If upgrading to a new version, you may have to run `brew update` to pull the latest formula
+before you run the install command. Or, you can run `brew upgrade`.
 
 > [!NOTE]
 > Homebrew allows side-by-side installation of v2 and v3. You can switch versions with:
 >
 > `brew link --overwrite azure-functions-core-tools@3`
-
 
 ### Linux
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using DurableTask.AzureStorage;
@@ -50,7 +51,18 @@ namespace Azure.Functions.Cli.Common
         public DurableManager(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
-            IsValid = TrySetConnectionStringAndTaskHubName();
+
+            if (!GlobalCoreToolsSettings.IsHelpRunning)
+            {
+                IsValid = TrySetConnectionStringAndTaskHubName();
+            }
+            else
+            {
+                // When displaying help, skip validation and just use defaults
+                _connectionStringKey = DefaultConnectionStringKey;
+                _taskHubName = DefaultTaskHubName;
+                IsValid = false;
+            }
         }
 
         public BackendType BackendType { get; private set; } = BackendType.AzureStorage;
