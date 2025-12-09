@@ -10,7 +10,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    public enum PythonDependencyManager
+    public enum PythonPackageTool
     {
         Unknown,
         Pip,
@@ -28,34 +28,34 @@ namespace Azure.Functions.Cli.Helpers
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
         /// <summary>
-        /// Determines which Python dependency manager to use based on the files present in the directory.
-        /// Priority: uv (if pyproject.toml + uv.lock) > poetry (if pyproject.toml only) > pip (if requirements.txt)
+        /// Determines which Python package tool to use based on the files present in the directory and tool availability.
+        /// Priority: uv (if pyproject.toml + uv.lock and uv is available) > poetry (if pyproject.toml and poetry is available) > pip (if requirements.txt)
         /// </summary>
-        public static PythonDependencyManager DetectPythonDependencyManager(string directory)
+        public static PythonPackageTool DetectPythonPackageTool(string directory)
         {
             var hasPyProjectToml = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.PyProjectToml));
             var hasUvLock = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.UvLock));
-            var hasRequirementsTxt = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.RequirementsTxt));
 
-            // Priority 1: uv (requires both pyproject.toml and uv.lock)
-            if (hasPyProjectToml && hasUvLock)
+            // Priority 1: uv (requires both pyproject.toml and uv.lock, and uv command available)
+            if (hasPyProjectToml && hasUvLock && CommandChecker.CommandExists("uv"))
             {
-                return PythonDependencyManager.Uv;
+                return PythonPackageTool.Uv;
             }
 
-            // Priority 2: poetry (requires pyproject.toml without uv.lock)
-            if (hasPyProjectToml)
+            // Priority 2: poetry (requires pyproject.toml and poetry command available)
+            if (hasPyProjectToml && CommandChecker.CommandExists("poetry"))
             {
-                return PythonDependencyManager.Poetry;
+                return PythonPackageTool.Poetry;
             }
 
             // Priority 3: pip (requires requirements.txt)
+            var hasRequirementsTxt = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.RequirementsTxt));
             if (hasRequirementsTxt)
             {
-                return PythonDependencyManager.Pip;
+                return PythonPackageTool.Pip;
             }
 
-            return PythonDependencyManager.Unknown;
+            return PythonPackageTool.Unknown;
         }
 
         /// <summary>
@@ -442,9 +442,9 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<bool> ArePackagesInSync(string functionAppRoot, string pythonPackages, PythonDependencyManager dependencyManager)
+        private static async Task<bool> ArePackagesInSync(string functionAppRoot, string pythonPackages, PythonPackageTool packageTool)
         {
-            var md5FileName = GetDependencyMd5FileName(dependencyManager);
+            var md5FileName = GetDependencyMd5FileName(packageTool);
             var md5File = Path.Combine(pythonPackages, md5FileName);
             if (!FileSystemHelpers.FileExists(md5File))
             {
@@ -452,46 +452,61 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             var packagesMd5 = await FileSystemHelpers.ReadAllTextFromFileAsync(md5File);
-            var currentMd5 = CalculateDependencyChecksum(functionAppRoot, dependencyManager);
+            var currentMd5 = CalculateDependencyChecksum(functionAppRoot, packageTool);
 
             return packagesMd5 == currentMd5;
         }
 
-        private static string GetDependencyFileName(PythonDependencyManager dependencyManager)
+        private static string[] GetDependencyFileNames(PythonPackageTool packageTool)
         {
-            return dependencyManager switch
+            return packageTool switch
             {
-                PythonDependencyManager.Pip => Constants.RequirementsTxt,
-                PythonDependencyManager.Poetry => Constants.PyProjectToml,
-                PythonDependencyManager.Uv => $"{Constants.PyProjectToml} + {Constants.UvLock}",
-                _ => "unknown dependency file"
+                PythonPackageTool.Pip => new[] { Constants.RequirementsTxt },
+                PythonPackageTool.Poetry => new[] { Constants.PyProjectToml },
+                PythonPackageTool.Uv => new[] { Constants.PyProjectToml, Constants.UvLock },
+                _ => Array.Empty<string>()
             };
         }
 
-        private static string GetDependencyMd5FileName(PythonDependencyManager dependencyManager)
+        private static string GetDependencyMd5FileName(PythonPackageTool packageTool)
         {
-            return dependencyManager switch
+            return packageTool switch
             {
-                PythonDependencyManager.Pip => $"{Constants.RequirementsTxt}.md5",
-                PythonDependencyManager.Poetry => $"{Constants.PyProjectToml}.md5",
-                PythonDependencyManager.Uv => "uv.md5",
+                PythonPackageTool.Pip => $"{Constants.RequirementsTxt}.md5",
+                PythonPackageTool.Poetry => $"{Constants.PyProjectToml}.md5",
+                PythonPackageTool.Uv => Constants.UvMd5FileName,
                 _ => "dependencies.md5"
             };
         }
 
-        private static string CalculateDependencyChecksum(string functionAppRoot, PythonDependencyManager dependencyManager)
+        private static string[] GetDependencyFilePaths(string functionAppRoot, PythonPackageTool packageTool)
         {
-            switch (dependencyManager)
+            return packageTool switch
             {
-                case PythonDependencyManager.Pip:
+                PythonPackageTool.Pip => new[] { Path.Combine(functionAppRoot, Constants.RequirementsTxt) },
+                PythonPackageTool.Poetry => new[] { Path.Combine(functionAppRoot, Constants.PyProjectToml) },
+                PythonPackageTool.Uv => new[] 
+                { 
+                    Path.Combine(functionAppRoot, Constants.PyProjectToml),
+                    Path.Combine(functionAppRoot, Constants.UvLock)
+                },
+                _ => Array.Empty<string>()
+            };
+        }
+
+        private static string CalculateDependencyChecksum(string functionAppRoot, PythonPackageTool packageTool)
+        {
+            switch (packageTool)
+            {
+                case PythonPackageTool.Pip:
                     var reqTxtFile = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
                     return SecurityHelpers.CalculateMd5(reqTxtFile);
 
-                case PythonDependencyManager.Poetry:
+                case PythonPackageTool.Poetry:
                     var pyProjectFile = Path.Combine(functionAppRoot, Constants.PyProjectToml);
                     return SecurityHelpers.CalculateMd5(pyProjectFile);
 
-                case PythonDependencyManager.Uv:
+                case PythonPackageTool.Uv:
                     // For uv, combine checksums of both pyproject.toml and uv.lock
                     var pyProjectFile2 = Path.Combine(functionAppRoot, Constants.PyProjectToml);
                     var uvLockFile = Path.Combine(functionAppRoot, Constants.UvLock);
@@ -504,20 +519,20 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task StoreDependencyChecksum(string functionAppRoot, string packagesLocation, PythonDependencyManager dependencyManager)
+        private static async Task StoreDependencyChecksum(string functionAppRoot, string packagesLocation, PythonPackageTool packageTool)
         {
-            var md5FileName = GetDependencyMd5FileName(dependencyManager);
+            var md5FileName = GetDependencyMd5FileName(packageTool);
             var md5FilePath = Path.Combine(packagesLocation, md5FileName);
-            var checksum = CalculateDependencyChecksum(functionAppRoot, dependencyManager);
+            var checksum = CalculateDependencyChecksum(functionAppRoot, packageTool);
             await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, checksum);
         }
 
         internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, string additionalPackages)
         {
-            // Detect which dependency manager to use based on files present
-            var dependencyManager = DetectPythonDependencyManager(functionAppRoot);
+            // Detect which package tool to use based on files present and tool availability
+            var packageTool = DetectPythonPackageTool(functionAppRoot);
             
-            if (dependencyManager == PythonDependencyManager.Unknown)
+            if (packageTool == PythonPackageTool.Unknown)
             {
                 throw new CliException($"No Python dependency files found. " +
                     $"Python function apps require either '{Constants.RequirementsTxt}' or '{Constants.PyProjectToml}' (optionally with '{Constants.UvLock}').");
@@ -528,10 +543,10 @@ namespace Azure.Functions.Cli.Helpers
             {
                 // Only update packages if checksum of dependency files does not match
                 // If build option is remote, we don't need to verify if packages are in sync, as we need to delete them regardless
-                if (buildOption != BuildOption.Remote && await ArePackagesInSync(functionAppRoot, packagesLocation, dependencyManager))
+                if (buildOption != BuildOption.Remote && await ArePackagesInSync(functionAppRoot, packagesLocation, packageTool))
                 {
-                    var dependencyFileName = GetDependencyFileName(dependencyManager);
-                    ColoredConsole.WriteLine(WarningColor($"Directory {Constants.ExternalPythonPackages} already in sync with {dependencyFileName}. Skipping restoring dependencies..."));
+                    var dependencyFileNames = string.Join(", ", GetDependencyFileNames(packageTool));
+                    ColoredConsole.WriteLine(WarningColor($"Directory {Constants.ExternalPythonPackages} already in sync with {dependencyFileNames}. Skipping restoring dependencies..."));
                     return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot, Enumerable.Empty<string>());
                 }
 
@@ -546,7 +561,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
                 {
-                    await RestorePythonRequirementsDocker(functionAppRoot, packagesLocation, additionalPackages, dependencyManager);
+                    await RestorePythonRequirementsDocker(functionAppRoot, packagesLocation, additionalPackages, packageTool);
                 }
                 else
                 {
@@ -559,37 +574,37 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                await RestorePythonRequirements(functionAppRoot, packagesLocation, dependencyManager);
+                await RestorePythonRequirements(functionAppRoot, packagesLocation, packageTool);
             }
 
             // No need to generate and compare .md5 when using remote build
             if (buildOption != BuildOption.Remote)
             {
                 // Store a checksum of dependency files
-                await StoreDependencyChecksum(functionAppRoot, packagesLocation, dependencyManager);
+                await StoreDependencyChecksum(functionAppRoot, packagesLocation, packageTool);
             }
 
             return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot, Enumerable.Empty<string>());
         }
 
-        private static async Task RestorePythonRequirements(string functionAppRoot, string packagesLocation, PythonDependencyManager dependencyManager)
+        private static async Task RestorePythonRequirements(string functionAppRoot, string packagesLocation, PythonPackageTool packageTool)
         {
-            switch (dependencyManager)
+            switch (packageTool)
             {
-                case PythonDependencyManager.Pip:
+                case PythonPackageTool.Pip:
                     await RestorePythonRequirementsWithPip(functionAppRoot, packagesLocation);
                     break;
                 
-                case PythonDependencyManager.Poetry:
+                case PythonPackageTool.Poetry:
                     await RestorePythonRequirementsWithPoetry(functionAppRoot, packagesLocation);
                     break;
                 
-                case PythonDependencyManager.Uv:
+                case PythonPackageTool.Uv:
                     await RestorePythonRequirementsWithUv(functionAppRoot, packagesLocation);
                     break;
                 
                 default:
-                    throw new CliException("Unable to determine Python dependency manager. Please ensure you have requirements.txt or pyproject.toml in your project.");
+                    throw new CliException("Unable to determine Python package tool. Please ensure you have requirements.txt or pyproject.toml in your project.");
             }
         }
 
@@ -742,7 +757,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task RestorePythonRequirementsDocker(string functionAppRoot, string packagesLocation, string additionalPackages, PythonDependencyManager dependencyManager)
+        private static async Task RestorePythonRequirementsDocker(string functionAppRoot, string packagesLocation, string additionalPackages, PythonPackageTool packageTool)
         {
             // For Docker builds with native dependencies, we need requirements.txt
             // If using poetry or uv, we'll export to requirements.txt first
@@ -751,7 +766,7 @@ namespace Azure.Functions.Cli.Helpers
 
             try
             {
-                if (dependencyManager == PythonDependencyManager.Poetry)
+                if (packageTool == PythonPackageTool.Poetry)
                 {
                     // Export from poetry to requirements.txt - run from function app root
                     if (!CommandChecker.CommandExists("poetry"))
@@ -769,7 +784,7 @@ namespace Azure.Functions.Cli.Helpers
                     }
                     createdTempRequirementsTxt = true;
                 }
-                else if (dependencyManager == PythonDependencyManager.Uv)
+                else if (packageTool == PythonPackageTool.Uv)
                 {
                     // Export from uv to requirements.txt - run from function app root
                     if (!CommandChecker.CommandExists("uv"))

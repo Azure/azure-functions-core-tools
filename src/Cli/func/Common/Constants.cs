@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Common
         public const string RequirementsTxt = "requirements.txt";
         public const string PyProjectToml = "pyproject.toml";
         public const string UvLock = "uv.lock";
+        public const string UvMd5FileName = "uv.md5";
         public const string PythonGettingStarted = "getting_started.md";
         public const string PySteinFunctionAppPy = "function_app.py";
         public const string FunctionJsonFileName = "function.json";

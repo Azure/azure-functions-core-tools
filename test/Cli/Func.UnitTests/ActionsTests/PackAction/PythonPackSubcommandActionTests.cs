@@ -111,16 +111,20 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
         public void RunPythonDependencyFilesValidation_WithRequirementsTxt_Passes()
         {
             File.WriteAllText(Path.Combine(_tempDirectory, Constants.RequirementsTxt), "flask==2.0.0");
-            // Should not throw
-            PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory);
+            // Should not throw and should pass validation
+            Exception exception = Record.Exception(() => 
+                PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory));
+            Assert.Null(exception);
         }
 
         [Fact]
         public void RunPythonDependencyFilesValidation_WithPyProjectToml_Passes()
         {
             File.WriteAllText(Path.Combine(_tempDirectory, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
-            // Should not throw
-            PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory);
+            // Should not throw and should pass validation
+            Exception exception = Record.Exception(() => 
+                PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory));
+            Assert.Null(exception);
         }
 
         [Fact]
@@ -128,8 +132,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
         {
             File.WriteAllText(Path.Combine(_tempDirectory, Constants.PyProjectToml), "[tool.poetry]\nname = \"test\"");
             File.WriteAllText(Path.Combine(_tempDirectory, Constants.UvLock), "version = 1");
-            // Should not throw
-            PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory);
+            // Should not throw and should pass validation
+            Exception exception = Record.Exception(() => 
+                PythonPackSubcommandAction.RunPythonDependencyFilesValidation(_tempDirectory));
+            Assert.Null(exception);
         }
 
         [Fact]
