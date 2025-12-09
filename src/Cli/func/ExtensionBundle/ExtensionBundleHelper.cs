@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Configuration;
@@ -17,19 +16,22 @@ namespace Azure.Functions.Cli.ExtensionBundle
     internal class ExtensionBundleHelper
     {
         private const int MaxRetries = 3;
-        private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
-        private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
-        private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         private const string ExtensionBundleStaticPropertiesUrl = "https://cdn.functions.azure.com/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/staticProperties.json";
         private const string DefaultExtensionBundleVersionRange = "[4.*, 5.0.0)";
-        
+
         // Regex patterns for version range parsing
         // Matches: [4.*, 5.0.0) or [1.*, 2.0.0) - with wildcard
         private const string VersionRangeWithWildcardPattern = @"\[(\d+(?:\.\d+(?:\.\d+)?)?|\d+)\.\*?,\s*(\d+\.\d+\.\d+)\)";
+
         // Matches: [1.0.0, 2.0.0) - without wildcard
         private const string VersionRangePattern = @"\[(\d+\.\d+\.\d+),\s*(\d+\.\d+\.\d+)\)";
+
         // Matches: [1.2.3] - exact version (treated as point range)
         private const string ExactVersionPattern = @"\[(\d+\.\d+\.\d+)\]";
+
+        private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
+        private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
@@ -91,8 +93,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <summary>
         /// Checks if the extension bundle version in host.json is deprecated.
         /// </summary>
-        /// <param name="functionAppRoot">The root directory of the function app</param>
-        /// <returns>A warning message if deprecated, null otherwise</returns>
+        /// <param name="functionAppRoot">The root directory of the function app.</param>
+        /// <returns>A warning message if deprecated, null otherwise.</returns>
         public static async Task<string> GetDeprecatedExtensionBundleWarning(string functionAppRoot)
         {
             try
@@ -105,7 +107,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
                 var hostJsonContent = await FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath);
                 var hostJson = JObject.Parse(hostJsonContent);
-                
+
                 var extensionBundle = hostJson[Constants.ExtensionBundleConfigPropertyName];
                 if (extensionBundle == null)
                 {
@@ -161,7 +163,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
         /// <summary>
         /// Checks if two version ranges intersect.
-        /// Supports format: [major.*, major.minor.patch) or [major.minor.patch, major.minor.patch)
+        /// Supports format: [major.*, major.minor.patch) or [major.minor.patch, major.minor.patch).
         /// </summary>
         internal static bool VersionRangesIntersect(string range1, string range2)
         {
@@ -176,8 +178,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 }
 
                 // Two ranges intersect if: start1 < end2 AND start2 < end1
-                return CompareVersions(parsed1.Value.start, parsed2.Value.end) < 0 &&
-                       CompareVersions(parsed2.Value.start, parsed1.Value.end) < 0;
+                return CompareVersions(parsed1.Value.Start, parsed2.Value.End) < 0 &&
+                       CompareVersions(parsed2.Value.Start, parsed1.Value.End) < 0;
             }
             catch
             {
@@ -188,9 +190,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <summary>
         /// Parses a version range string like "[1.*, 2.0.0)" or "[1.0.0, 2.0.0)" or "[1.2.3]"
         /// Returns (start, end) tuple where versions are normalized to "major.minor.patch" format
-        /// For exact versions like "[1.2.3]", treats as a point range [1.2.3, 1.2.4)
+        /// For exact versions like "[1.2.3]", treats as a point range [1.2.3, 1.2.4).
         /// </summary>
-        internal static (string start, string end)? ParseVersionRange(string range)
+        internal static (string Start, string End)? ParseVersionRange(string range)
         {
             if (string.IsNullOrEmpty(range))
             {
@@ -206,10 +208,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 if (parts.Length == 3 && int.TryParse(parts[2], out int patch))
                 {
                     // Treat [X.Y.Z] as a point range [X.Y.Z, X.Y.(Z+1))
-                    var lower = version;
-                    var upper = $"{parts[0]}.{parts[1]}.{patch + 1}";
-                    return (lower, upper);
+                    var start = version;
+                    var end = $"{parts[0]}.{parts[1]}.{patch + 1}";
+                    return (start, end);
                 }
+
                 return null;
             }
 
@@ -244,7 +247,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         }
 
         /// <summary>
-        /// Normalizes a version string to major.minor.patch format
+        /// Normalizes a version string to major.minor.patch format.
         /// </summary>
         private static string NormalizeVersion(string version)
         {
@@ -257,32 +260,40 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 return $"{parts[0]}.{parts[1]}.0";
             }
+
             return version;
         }
 
         /// <summary>
         /// Compares two version strings in major.minor.patch format
-        /// Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+        /// Returns: -1 if v1 is less than v2, 0 if equal, 1 if v1 is greater than v2.
         /// </summary>
         private static int CompareVersions(string v1, string v2)
         {
             var parts1 = v1.Split('.');
             var parts2 = v2.Split('.');
-            
+
             // Validate that all parts are numeric
             if (!parts1.All(p => int.TryParse(p, out _)) || !parts2.All(p => int.TryParse(p, out _)))
             {
                 // If we can't parse, return 0 (equal) to be safe
                 return 0;
             }
-            
+
             var intParts1 = parts1.Select(int.Parse).ToArray();
             var intParts2 = parts2.Select(int.Parse).ToArray();
 
             for (int i = 0; i < Math.Min(intParts1.Length, intParts2.Length); i++)
             {
-                if (intParts1[i] < intParts2[i]) return -1;
-                if (intParts1[i] > intParts2[i]) return 1;
+                if (intParts1[i] < intParts2[i])
+                {
+                    return -1;
+                }
+
+                if (intParts1[i] > intParts2[i])
+                {
+                    return 1;
+                }
             }
 
             return intParts1.Length.CompareTo(intParts2.Length);

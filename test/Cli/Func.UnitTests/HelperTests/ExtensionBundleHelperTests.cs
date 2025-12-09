@@ -21,15 +21,15 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("[4.*, 5.0.0)", "4.0.0", "5.0.0")]
         [InlineData("[1.0.0, 2.0.0)", "1.0.0", "2.0.0")]
         [InlineData("[2.*, 3.0.0)", "2.0.0", "3.0.0")]
-        [InlineData("[3.40.0]", "3.40.0", "3.40.1")]  // Exact version treated as point range
-        [InlineData("[4.28.0]", "4.28.0", "4.28.1")]  // Exact version treated as point range
+        [InlineData("[3.40.0]", "3.40.0", "3.40.1")] // Exact version treated as point range
+        [InlineData("[4.28.0]", "4.28.0", "4.28.1")] // Exact version treated as point range
         public void ParseVersionRange_ValidRange_ReturnsCorrectBounds(string range, string expectedStart, string expectedEnd)
         {
             var result = ExtensionBundleHelper.ParseVersionRange(range);
 
             Assert.NotNull(result);
-            Assert.Equal(expectedStart, result.Value.start);
-            Assert.Equal(expectedEnd, result.Value.end);
+            Assert.Equal(expectedStart, result.Value.Start);
+            Assert.Equal(expectedEnd, result.Value.End);
         }
 
         [Theory]
@@ -44,10 +44,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
-        [InlineData("[4.*, 5.0.0)", "[4.*, 5.0.0)", true)]  // Same ranges intersect
+        [InlineData("[4.*, 5.0.0)", "[4.*, 5.0.0)", true)] // Same ranges intersect
         [InlineData("[3.3.0, 4.0.0)", "[4.*, 5.0.0)", false)] // No overlap: 3.3.0-4.0.0 vs 4.0.0-5.0.0
         [InlineData("[4.*, 5.0.0)", "[3.3.0, 4.0.0)", false)] // No overlap (reversed)
-        [InlineData("[3.*, 5.0.0)", "[4.*, 5.0.0)", true)]  // Partial overlap: 3.0.0-5.0.0 vs 4.0.0-5.0.0
+        [InlineData("[3.*, 5.0.0)", "[4.*, 5.0.0)", true)] // Partial overlap: 3.0.0-5.0.0 vs 4.0.0-5.0.0
         [InlineData("[4.0.0, 4.5.0)", "[4.2.0, 5.0.0)", true)] // Partial overlap: 4.0.0-4.5.0 vs 4.2.0-5.0.0
         [InlineData("[1.*, 2.0.0)", "[3.*, 4.0.0)", false)] // Completely separate ranges
         public void VersionRangesIntersect_VariousRanges_ReturnsExpectedResult(string range1, string range2, bool expectedIntersect)
@@ -60,7 +60,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [Theory]
         [InlineData("[3.3.0, 4.0.0)", "[4.*, 5.0.0)", false)] // Deprecated: v3 doesn't intersect with v4
         [InlineData("[2.*, 3.0.0)", "[4.*, 5.0.0)", false)] // Deprecated: v2 doesn't intersect with v4
-        [InlineData("[4.*, 5.0.0)", "[4.*, 5.0.0)", true)]  // Not deprecated: same as default
+        [InlineData("[4.*, 5.0.0)", "[4.*, 5.0.0)", true)] // Not deprecated: same as default
         [InlineData("[4.0.0, 4.5.0)", "[4.*, 5.0.0)", true)] // Not deprecated: within v4 range
         [InlineData("[3.40.0]", "[4.*, 5.0.0)", false)] // Deprecated: exact v3 version doesn't intersect with v4
         [InlineData("[4.28.0]", "[4.*, 5.0.0)", true)] // Not deprecated: exact v4 version within v4 range
