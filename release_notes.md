@@ -19,3 +19,4 @@
 - Cleaned up `func --help` output and fixed validation errors when using the `--help` flag for specific commands (#4748)
 - Improved `func init --help` output to better display options for each worker runtime (#4748)
 - Fix F# project & template initialization via `func init | new` (#4749)
+- [Breaking] Remove support for Python 3.7 & 3.8 (#4756)
