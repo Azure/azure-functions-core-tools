@@ -180,13 +180,13 @@ namespace Azure.Functions.Cli.Helpers
 
             ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
 
-            // Python 3.[7|8|9|10|11|12] (supported)
+            // Python 3.[9|10|11|12] (supported)
             if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
 
-            // Python 3.x (but not 3.[7|8|9|10|11|12]), not recommended, may fail. E.g.: 3.4, 3.5.
+            // Python 3.x (but not 3.[9|10|11|12]), not recommended, may fail. E.g.: 3.4, 3.5.
             if (pythonVersion.Major == 3)
             {
                 if (errorIfNotSupported)
@@ -231,9 +231,6 @@ namespace Azure.Functions.Cli.Helpers
             // Linux / OSX / Venv Interpreter Entrypoints
             var python3GetVersionTask = GetVersion("python3");
             var pythonGetVersionTask = GetVersion("python");
-            var python36GetVersionTask = GetVersion("python3.6");
-            var python37GetVersionTask = GetVersion("python3.7");
-            var python38GetVersionTask = GetVersion("python3.8");
             var python39GetVersionTask = GetVersion("python3.9");
             var python310GetVersionTask = GetVersion("python3.10");
             var python311GetVersionTask = GetVersion("python3.11");
@@ -246,9 +243,6 @@ namespace Azure.Functions.Cli.Helpers
                 await pyGetVersionTask,
                 await python3GetVersionTask,
                 await pythonGetVersionTask,
-                await python36GetVersionTask,
-                await python37GetVersionTask,
-                await python38GetVersionTask,
                 await python39GetVersionTask,
                 await python310GetVersionTask,
                 await python311GetVersionTask,
@@ -605,10 +599,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
-                    case 7:
-                        return StaticResources.DockerfilePython37;
-                    case 8:
-                        return StaticResources.DockerfilePython38;
                     case 9:
                         return StaticResources.DockerfilePython39;
                     case 10:
@@ -624,7 +614,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
 
-            return StaticResources.DockerfilePython37;
+            return StaticResources.DockerfilePython39;
         }
 
         // Build environment images for building native dependencies for python function apps
@@ -634,12 +624,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
-                    case 6:
-                        return (DockerImages.LinuxPython36ImageAmd64, false);
-                    case 7:
-                        return (DockerImages.LinuxPython37ImageAmd64, false);
-                    case 8:
-                        return (DockerImages.LinuxPython38ImageAmd64, false);
                     case 9:
                         return (DockerImages.LinuxPython39ImageAmd64, false);
                     case 10:
@@ -671,9 +655,7 @@ namespace Azure.Functions.Cli.Helpers
                     case 12:
                     case 11:
                     case 10:
-                    case 9:
-                    case 8:
-                    case 7: return true;
+                    case 9: return true;
                     default: return false;
                 }
             }
