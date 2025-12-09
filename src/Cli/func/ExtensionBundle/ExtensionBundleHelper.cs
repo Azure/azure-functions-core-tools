@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
         private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         private const string ExtensionBundleStaticPropertiesUrl = "https://cdn.functions.azure.com/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/staticProperties.json";
+        private const string DefaultExtensionBundleVersionRange = "[4.*, 5.0.0)";
         
         // Regex patterns for version range parsing
         // Matches: [4.*, 5.0.0) or [1.*, 2.0.0) - with wildcard
@@ -141,6 +142,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
         /// <summary>
         /// Fetches the default extension bundle version range from Azure.
+        /// Falls back to a default range if the URL cannot be reached.
         /// </summary>
         private static async Task<string> GetDefaultExtensionBundleVersionRange()
         {
@@ -148,12 +150,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 var response = await _sharedHttpClient.GetStringAsync(ExtensionBundleStaticPropertiesUrl);
                 var json = JObject.Parse(response);
-                return json["defaultVersionRange"]?.ToString();
+                return json["defaultVersionRange"]?.ToString() ?? DefaultExtensionBundleVersionRange;
             }
             catch (Exception)
             {
-                // If we can't fetch the default range, return null to avoid blocking
-                return null;
+                // If we can't fetch the default range, use the fallback default
+                return DefaultExtensionBundleVersionRange;
             }
         }
 
