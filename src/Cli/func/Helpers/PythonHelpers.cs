@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Helpers
 
         /// <summary>
         /// Determines which Python package tool to use based on the files present in the directory and tool availability.
-        /// Priority: uv (if pyproject.toml + uv.lock and uv is available) > poetry (if pyproject.toml and poetry is available) > pip (if requirements.txt)
+        /// Priority: uv (if pyproject.toml + uv.lock and uv is available) > poetry (if pyproject.toml and poetry is available) > pip (if requirements.txt).
         /// </summary>
         public static PythonPackageTool DetectPythonPackageTool(string directory)
         {
@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             var hasRequirementsTxt = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.RequirementsTxt));
             var hasPyProjectToml = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.PyProjectToml));
-            
+
             return hasRequirementsTxt || hasPyProjectToml;
         }
 
@@ -479,23 +479,10 @@ namespace Azure.Functions.Cli.Helpers
             };
         }
 
-        private static string[] GetDependencyFilePaths(string functionAppRoot, PythonPackageTool packageTool)
-        {
-            return packageTool switch
-            {
-                PythonPackageTool.Pip => new[] { Path.Combine(functionAppRoot, Constants.RequirementsTxt) },
-                PythonPackageTool.Poetry => new[] { Path.Combine(functionAppRoot, Constants.PyProjectToml) },
-                PythonPackageTool.Uv => new[] 
-                { 
-                    Path.Combine(functionAppRoot, Constants.PyProjectToml),
-                    Path.Combine(functionAppRoot, Constants.UvLock)
-                },
-                _ => Array.Empty<string>()
-            };
-        }
-
         private static string CalculateDependencyChecksum(string functionAppRoot, PythonPackageTool packageTool)
         {
+            var pyProjectFile = Path.Combine(functionAppRoot, Constants.PyProjectToml);
+
             switch (packageTool)
             {
                 case PythonPackageTool.Pip:
@@ -503,14 +490,12 @@ namespace Azure.Functions.Cli.Helpers
                     return SecurityHelpers.CalculateMd5(reqTxtFile);
 
                 case PythonPackageTool.Poetry:
-                    var pyProjectFile = Path.Combine(functionAppRoot, Constants.PyProjectToml);
                     return SecurityHelpers.CalculateMd5(pyProjectFile);
 
                 case PythonPackageTool.Uv:
                     // For uv, combine checksums of both pyproject.toml and uv.lock
-                    var pyProjectFile2 = Path.Combine(functionAppRoot, Constants.PyProjectToml);
                     var uvLockFile = Path.Combine(functionAppRoot, Constants.UvLock);
-                    var pyProjectMd5 = SecurityHelpers.CalculateMd5(pyProjectFile2);
+                    var pyProjectMd5 = SecurityHelpers.CalculateMd5(pyProjectFile);
                     var uvLockMd5 = SecurityHelpers.CalculateMd5(uvLockFile);
                     return $"{pyProjectMd5}:{uvLockMd5}";
 
@@ -531,7 +516,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             // Detect which package tool to use based on files present and tool availability
             var packageTool = DetectPythonPackageTool(functionAppRoot);
-            
+
             if (packageTool == PythonPackageTool.Unknown)
             {
                 throw new CliException($"No Python dependency files found. " +
@@ -594,15 +579,15 @@ namespace Azure.Functions.Cli.Helpers
                 case PythonPackageTool.Pip:
                     await RestorePythonRequirementsWithPip(functionAppRoot, packagesLocation);
                     break;
-                
+
                 case PythonPackageTool.Poetry:
                     await RestorePythonRequirementsWithPoetry(functionAppRoot, packagesLocation);
                     break;
-                
+
                 case PythonPackageTool.Uv:
                     await RestorePythonRequirementsWithUv(functionAppRoot, packagesLocation);
                     break;
-                
+
                 default:
                     throw new CliException("Unable to determine Python package tool. Please ensure you have requirements.txt or pyproject.toml in your project.");
             }
@@ -613,11 +598,11 @@ namespace Azure.Functions.Cli.Helpers
             var pythonWorkerInfo = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pythonWorkerInfo, errorIfNoVersion: true);
             var pythonExe = pythonWorkerInfo.ExecutablePath;
-            
+
             var requirementsTxt = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
             var exe = new Executable(pythonExe, $"-m pip download -r \"{requirementsTxt}\" --dest \"{packagesLocation}\"");
             var sbErrors = new StringBuilder();
-            
+
             ColoredConsole.WriteLine($"{pythonExe} -m pip download -r {requirementsTxt} --dest {packagesLocation}");
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
@@ -647,7 +632,7 @@ namespace Azure.Functions.Cli.Helpers
                 // Export dependencies from poetry - run from function app root where pyproject.toml is located
                 var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{tempRequirementsTxt}\" --without-hashes", workingDirectory: functionAppRoot);
                 var sbPoetryErrors = new StringBuilder();
-                
+
                 ColoredConsole.WriteLine($"poetry export -f requirements.txt --output {tempRequirementsTxt} --without-hashes");
                 var poetryExitCode = await poetryExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbPoetryErrors.AppendLine(e));
 
@@ -660,7 +645,7 @@ namespace Azure.Functions.Cli.Helpers
                 var pythonExe = pythonWorkerInfo.ExecutablePath;
                 var pipExe = new Executable(pythonExe, $"-m pip download -r \"{tempRequirementsTxt}\" --dest \"{packagesLocation}\"");
                 var sbPipErrors = new StringBuilder();
-                
+
                 ColoredConsole.WriteLine($"{pythonExe} -m pip download -r {tempRequirementsTxt} --dest {packagesLocation}");
                 var pipExitCode = await pipExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbPipErrors.AppendLine(e));
 
@@ -698,7 +683,7 @@ namespace Azure.Functions.Cli.Helpers
                 // Export dependencies from uv - run from function app root where pyproject.toml and uv.lock are located
                 var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{tempRequirementsTxt}\" --no-hashes", workingDirectory: functionAppRoot);
                 var sbUvErrors = new StringBuilder();
-                
+
                 ColoredConsole.WriteLine($"uv export --format requirements-txt --output-file {tempRequirementsTxt} --no-hashes");
                 var uvExitCode = await uvExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbUvErrors.AppendLine(e));
 
@@ -711,7 +696,7 @@ namespace Azure.Functions.Cli.Helpers
                 var pythonExe = pythonWorkerInfo.ExecutablePath;
                 var pipExe = new Executable(pythonExe, $"-m pip download -r \"{tempRequirementsTxt}\" --dest \"{packagesLocation}\"");
                 var sbPipErrors = new StringBuilder();
-                
+
                 ColoredConsole.WriteLine($"{pythonExe} -m pip download -r {tempRequirementsTxt} --dest {packagesLocation}");
                 var pipExitCode = await pipExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbPipErrors.AppendLine(e));
 

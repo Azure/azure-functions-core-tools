@@ -183,7 +183,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         {
             var hasRequirementsTxt = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.RequirementsTxt));
             var hasPyProjectToml = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.PyProjectToml));
-            var hasUvLock = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.UvLock));
 
             var hasDependencyFiles = hasRequirementsTxt || hasPyProjectToml;
 
