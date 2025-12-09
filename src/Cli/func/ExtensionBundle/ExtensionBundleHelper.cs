@@ -20,6 +20,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
         private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        private const string ExtensionBundleStaticPropertiesUrl = "https://cdn.functions.azure.com/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/staticProperties.json";
         
         // Regex patterns for version range parsing
         // Matches: [4.*, 5.0.0) or [1.*, 2.0.0) - with wildcard
@@ -145,7 +146,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         {
             try
             {
-                var response = await _sharedHttpClient.GetStringAsync("https://aka.ms/funcStaticProperties");
+                var response = await _sharedHttpClient.GetStringAsync(ExtensionBundleStaticPropertiesUrl);
                 var json = JObject.Parse(response);
                 return json["defaultVersionRange"]?.ToString();
             }
