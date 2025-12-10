@@ -16,6 +16,7 @@
 - Enhanced dotnet installation discovery by adopting the same `Muxer` logic used by the .NET SDK itself (#4732)
 - Update .NET templates package version to 4.0.5337 (#4728)
 - Fix `func pack --build-native-deps` failure on Windows for Python 3.13+ (#4742)
+- Add deprecation warning for extension bundles during function app publish (#4700)
 - Update the TypeScript project template to improve interoperability (#4739)
   - Upgrade `typescript` from `^4.0.0` to `^5.0.0`
   - Add `"esModuleInterop": true` option to `tsconfig.json`
