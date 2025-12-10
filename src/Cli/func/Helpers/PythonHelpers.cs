@@ -572,147 +572,24 @@ namespace Azure.Functions.Cli.Helpers
             return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot, Enumerable.Empty<string>());
         }
 
+        private static PythonPackageInstaller GetPackageInstaller(PythonPackageTool packageTool, string functionAppRoot, string packagesLocation)
+        {
+            return packageTool switch
+            {
+                PythonPackageTool.Pip => new PipInstaller(functionAppRoot, packagesLocation),
+                PythonPackageTool.Poetry => new PoetryInstaller(functionAppRoot, packagesLocation),
+                PythonPackageTool.Uv => new UvInstaller(functionAppRoot, packagesLocation),
+                _ => throw new CliException("Unable to determine Python package tool. Please ensure you have requirements.txt or pyproject.toml in your project.")
+            };
+        }
+
         private static async Task RestorePythonRequirements(string functionAppRoot, string packagesLocation, PythonPackageTool packageTool)
         {
-            switch (packageTool)
-            {
-                case PythonPackageTool.Pip:
-                    await RestorePythonRequirementsWithPip(functionAppRoot, packagesLocation);
-                    break;
-
-                case PythonPackageTool.Poetry:
-                    await RestorePythonRequirementsWithPoetry(functionAppRoot, packagesLocation);
-                    break;
-
-                case PythonPackageTool.Uv:
-                    await RestorePythonRequirementsWithUv(functionAppRoot, packagesLocation);
-                    break;
-
-                default:
-                    throw new CliException("Unable to determine Python package tool. Please ensure you have requirements.txt or pyproject.toml in your project.");
-            }
-        }
-
-        private static async Task RestorePythonRequirementsWithPip(string functionAppRoot, string packagesLocation)
-        {
-            var pythonWorkerInfo = await GetEnvironmentPythonVersion();
-            AssertPythonVersion(pythonWorkerInfo, errorIfNoVersion: true);
-            var pythonExe = pythonWorkerInfo.ExecutablePath;
-
-            var requirementsTxt = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
-            var exe = new Executable(pythonExe, $"-m pip download -r \"{requirementsTxt}\" --dest \"{packagesLocation}\"");
-            var sbErrors = new StringBuilder();
-
-            ColoredConsole.WriteLine($"{pythonExe} -m pip download -r {requirementsTxt} --dest {packagesLocation}");
-            var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
-
-            if (exitCode != 0)
-            {
-                var errorMessage = "There was an error restoring dependencies. " + sbErrors.ToString();
-                throw new CliException(errorMessage);
-            }
-        }
-
-        private static void EnsureToolInstalled(string toolName, string alternativeMessage)
-        {
-            if (!CommandChecker.CommandExists(toolName))
-            {
-                throw new CliException($"{toolName} is not installed. {alternativeMessage}");
-            }
-        }
-
-        private static async Task RestorePythonRequirementsWithPoetry(string functionAppRoot, string packagesLocation)
-        {
-            EnsureToolInstalled("poetry", "Please install poetry to use pyproject.toml for dependency management. " +
-                "Alternatively, generate a requirements.txt file from your pyproject.toml.");
-
+            var installer = GetPackageInstaller(packageTool, functionAppRoot, packagesLocation);
             var pythonWorkerInfo = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pythonWorkerInfo, errorIfNoVersion: true);
 
-            // Use poetry to export dependencies to a temporary requirements.txt, then use pip to download
-            var tempRequirementsTxt = Path.Combine(Path.GetTempPath(), $"requirements-{Guid.NewGuid()}.txt");
-            try
-            {
-                // Export dependencies from poetry - run from function app root where pyproject.toml is located
-                var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{tempRequirementsTxt}\" --without-hashes", workingDirectory: functionAppRoot);
-                var sbPoetryErrors = new StringBuilder();
-
-                ColoredConsole.WriteLine($"poetry export -f requirements.txt --output {tempRequirementsTxt} --without-hashes");
-                var poetryExitCode = await poetryExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbPoetryErrors.AppendLine(e));
-
-                if (poetryExitCode != 0)
-                {
-                    throw new CliException("There was an error exporting dependencies from poetry. " + sbPoetryErrors.ToString());
-                }
-
-                // Download packages using pip
-                var pythonExe = pythonWorkerInfo.ExecutablePath;
-                var pipExe = new Executable(pythonExe, $"-m pip download -r \"{tempRequirementsTxt}\" --dest \"{packagesLocation}\"");
-                var sbPipErrors = new StringBuilder();
-
-                ColoredConsole.WriteLine($"{pythonExe} -m pip download -r {tempRequirementsTxt} --dest {packagesLocation}");
-                var pipExitCode = await pipExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbPipErrors.AppendLine(e));
-
-                if (pipExitCode != 0)
-                {
-                    throw new CliException("There was an error downloading dependencies. " + sbPipErrors.ToString());
-                }
-            }
-            finally
-            {
-                // Clean up temporary file
-                if (FileSystemHelpers.FileExists(tempRequirementsTxt))
-                {
-                    FileSystemHelpers.FileDelete(tempRequirementsTxt);
-                }
-            }
-        }
-
-        private static async Task RestorePythonRequirementsWithUv(string functionAppRoot, string packagesLocation)
-        {
-            EnsureToolInstalled("uv", "Please install uv to use uv.lock for dependency management. " +
-                "Alternatively, generate a requirements.txt file from your pyproject.toml.");
-
-            var pythonWorkerInfo = await GetEnvironmentPythonVersion();
-            AssertPythonVersion(pythonWorkerInfo, errorIfNoVersion: true);
-
-            // Use uv to export dependencies to a temporary requirements.txt, then use pip to download
-            var tempRequirementsTxt = Path.Combine(Path.GetTempPath(), $"requirements-{Guid.NewGuid()}.txt");
-            try
-            {
-                // Export dependencies from uv - run from function app root where pyproject.toml and uv.lock are located
-                var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{tempRequirementsTxt}\" --no-hashes", workingDirectory: functionAppRoot);
-                var sbUvErrors = new StringBuilder();
-
-                ColoredConsole.WriteLine($"uv export --format requirements-txt --output-file {tempRequirementsTxt} --no-hashes");
-                var uvExitCode = await uvExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbUvErrors.AppendLine(e));
-
-                if (uvExitCode != 0)
-                {
-                    throw new CliException("There was an error exporting dependencies from uv. " + sbUvErrors.ToString());
-                }
-
-                // Download packages using pip
-                var pythonExe = pythonWorkerInfo.ExecutablePath;
-                var pipExe = new Executable(pythonExe, $"-m pip download -r \"{tempRequirementsTxt}\" --dest \"{packagesLocation}\"");
-                var sbPipErrors = new StringBuilder();
-
-                ColoredConsole.WriteLine($"{pythonExe} -m pip download -r {tempRequirementsTxt} --dest {packagesLocation}");
-                var pipExitCode = await pipExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbPipErrors.AppendLine(e));
-
-                if (pipExitCode != 0)
-                {
-                    throw new CliException("There was an error downloading dependencies. " + sbPipErrors.ToString());
-                }
-            }
-            finally
-            {
-                // Clean up temporary file
-                if (FileSystemHelpers.FileExists(tempRequirementsTxt))
-                {
-                    FileSystemHelpers.FileDelete(tempRequirementsTxt);
-                }
-            }
+            await installer.RestoreDependenciesAsync(pythonWorkerInfo);
         }
 
         private static async Task RestorePythonRequirementsPackapp(string functionAppRoot, string packagesLocation)
@@ -751,32 +628,12 @@ namespace Azure.Functions.Cli.Helpers
 
             try
             {
-                if (packageTool == PythonPackageTool.Poetry)
+                if (packageTool == PythonPackageTool.Poetry || packageTool == PythonPackageTool.Uv)
                 {
-                    EnsureToolInstalled("poetry", "Please install poetry or use --no-build flag.");
+                    var installer = GetPackageInstaller(packageTool, functionAppRoot, packagesLocation);
+                    installer.EnsureToolInstalled("Please install " + installer.ToolName + " or use --no-build flag.");
 
-                    var poetryExe = new Executable("poetry", $"export -f requirements.txt --output \"{requirementsTxtPath}\" --without-hashes", workingDirectory: functionAppRoot);
-                    var sbErrors = new StringBuilder();
-                    var exitCode = await poetryExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
-
-                    if (exitCode != 0)
-                    {
-                        throw new CliException("There was an error exporting dependencies from poetry. " + sbErrors.ToString());
-                    }
-                    createdTempRequirementsTxt = true;
-                }
-                else if (packageTool == PythonPackageTool.Uv)
-                {
-                    EnsureToolInstalled("uv", "Please install uv or use --no-build flag.");
-
-                    var uvExe = new Executable("uv", $"export --format requirements-txt --output-file \"{requirementsTxtPath}\" --no-hashes", workingDirectory: functionAppRoot);
-                    var sbErrors = new StringBuilder();
-                    var exitCode = await uvExe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
-
-                    if (exitCode != 0)
-                    {
-                        throw new CliException("There was an error exporting dependencies from uv. " + sbErrors.ToString());
-                    }
+                    await installer.ExportToRequirementsTxtAsync(requirementsTxtPath);
                     createdTempRequirementsTxt = true;
                 }
 
