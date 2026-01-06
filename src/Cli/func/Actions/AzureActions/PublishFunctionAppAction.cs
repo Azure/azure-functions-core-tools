@@ -210,7 +210,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
-            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime, functionAppRoot);
+            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime, functionAppRoot, PublishLocalSettingsOnly);
 
             // Update build option
             PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
@@ -250,7 +250,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime, string functionAppRoot)
+        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime, string functionAppRoot, bool skipRuntimeUpdate = false)
         {
             var result = new Dictionary<string, string>();
 
@@ -344,7 +344,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException($"Function Apps on Flex Consumption do not support '{Constants.WebsiteRunFromPackage}'. Please remove the app setting from your Function App.");
                 }
 
-                if (result.ContainsKey(Constants.FunctionsWorkerRuntime))
+                if (result.ContainsKey(Constants.FunctionsWorkerRuntime) && !skipRuntimeUpdate)
                 {
                     await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), null, azureHelperService);
                     result.Remove(Constants.FunctionsWorkerRuntime);
@@ -352,7 +352,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
+                if (!skipRuntimeUpdate)
+                {
+                    await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
+                }
             }
 
             // Special checks for python dependencies
@@ -1295,10 +1298,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<bool> PublishLocalAppSettings(Site functionApp, IDictionary<string, string> additionalAppSettings)
         {
             var localAppSettings = _secretsManager.GetSecrets();
-            return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings);
+            return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings, skipRuntimeUpdate: PublishLocalSettingsOnly);
         }
 
-        private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
+        private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional, bool skipRuntimeUpdate = false)
         {
             string flexRuntimeName = null;
             string flexRuntimeVersion = null;
@@ -1333,7 +1336,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return false;
             }
 
-            if (functionApp.IsFlex && !string.IsNullOrEmpty(flexRuntimeName))
+            if (functionApp.IsFlex && !string.IsNullOrEmpty(flexRuntimeName) && !skipRuntimeUpdate)
             {
                 await UpdateRuntimeConfigForFlex(functionApp, flexRuntimeName, flexRuntimeVersion, new AzureHelperService(AccessToken, ManagementURL));
             }
