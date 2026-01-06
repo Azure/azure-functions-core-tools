@@ -60,9 +60,14 @@ namespace Azure.Functions.Cli.E2ETests
             return Task.CompletedTask;
         }
 
-        public async Task FuncInitWithRetryAsync(string testName, IEnumerable<string> args)
+        public async Task FuncInitWithRetryAsync(string testName, IEnumerable<string> args, string? workingDir = null)
         {
-            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
+            if (workingDir is null)
+            {
+                workingDir = WorkingDirectory;
+            }
+
+            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, workingDir, Log, args);
         }
 
         public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args, string? workerRuntime = null)

@@ -129,23 +129,23 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         public async void Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile(string targetFramework)
         {
             var workingDir = Path.Combine(WorkingDirectory, targetFramework);
+            var targetFrameworkString = targetFramework.Replace("net", string.Empty);
+            var testName = nameof(Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile);
+            var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated{targetFrameworkString}" };
 
             try
             {
-                var targetFrameworkstr = targetFramework.Replace("net", string.Empty);
                 FileSystemHelpers.EnsureDirectory(workingDir);
-                var testName = nameof(Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile);
-                var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
                 var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
-                var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated{targetFrameworkstr}" };
                 var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
                 {
                     (dockerFilePath, expectedDockerfileContent)
                 };
 
                 // Initialize dotnet-isolated function app using retry helper
-                await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework]);
+                await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework], workingDir);
 
+                var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
                 var funcInitResult = funcInitCommand
                     .WithWorkingDirectory(workingDir)
                     .Execute(["--docker-only"]);
