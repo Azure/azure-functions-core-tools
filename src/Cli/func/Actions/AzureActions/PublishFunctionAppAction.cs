@@ -169,6 +169,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Get the WorkerRuntime
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
+            // Get Stacks once for both .NET version determination and EOL checking
+            var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
+
             // Determine the appropriate default targetFramework
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
@@ -182,16 +185,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                     if (majorDotnetVersion != null)
                     {
-                        // Get Stacks
-                        var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
-                        var runtimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
-
-                        ShowEolMessage(stacks, runtimeSettings, majorDotnetVersion.Value);
-
                         // This is for future proofing with stacks API for future dotnet versions.
-                        if (runtimeSettings != null &&
-                            (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false) &&
-                            (runtimeSettings.IsDeprecatedForRuntime == null || runtimeSettings.IsDeprecatedForRuntime == false))
+                        if (!Services.RuntimeEolChecker.IsDotnetVersionDeprecated(stacks, majorDotnetVersion.Value))
                         {
                             _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
                         }
@@ -209,6 +204,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 // We do not change the default targetFramework if no .csproj file is found
             }
+
+            // Check for EOL warnings for all runtimes
+            Services.RuntimeEolChecker.CheckAndWarnIfApproachingEol(stacks, workerRuntime, functionApp);
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
@@ -1464,35 +1462,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private string GetLogPrefix()
         {
             return $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".ToString();
-        }
-
-        private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)
-        {
-            try
-            {
-                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
-                {
-                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
-                    if (nextDotnetVersion != null)
-                    {
-                        var warningMessage = EolMessages.GetAfterEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
-                        ColoredConsole.WriteLine(WarningColor(warningMessage));
-                    }
-                }
-                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
-                {
-                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
-                    if (nextDotnetVersion != null)
-                    {
-                        var warningMessage = EolMessages.GetEarlyEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
-                        ColoredConsole.WriteLine(WarningColor(warningMessage));
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // ignore. Failure to show the EOL message should not fail the deployment.
-            }
         }
 
         // For testing
