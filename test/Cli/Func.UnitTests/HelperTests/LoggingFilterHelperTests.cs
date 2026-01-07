@@ -103,7 +103,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                Environment.SetEnvironmentVariable("FUNCTIONS_USER_LOG_LEVEL", string.Empty);
+                Environment.SetEnvironmentVariable("FUNCTIONS_USER_LOG_LEVEL", null);
             }
         }
 
@@ -123,7 +123,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                Environment.SetEnvironmentVariable("FUNCTIONS_USER_LOG_LEVEL", string.Empty);
+                Environment.SetEnvironmentVariable("FUNCTIONS_USER_LOG_LEVEL", null);
             }
         }
 
