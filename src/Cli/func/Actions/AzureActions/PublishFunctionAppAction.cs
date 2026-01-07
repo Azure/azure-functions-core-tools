@@ -1306,7 +1306,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings);
             }
             
-            // For regular publish with -i flag, extract runtime settings first, then update both settings and runtime
+            // For regular publish with -i flag (PublishLocalSettings), extract runtime settings first, then update both settings and runtime
             // Extract runtime settings before they're removed by PublishAppSettings
             string flexRuntimeName = null;
             string flexRuntimeVersion = null;
