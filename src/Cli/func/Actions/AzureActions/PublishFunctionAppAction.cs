@@ -1298,30 +1298,58 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<bool> PublishLocalAppSettings(Site functionApp, IDictionary<string, string> additionalAppSettings)
         {
             var localAppSettings = _secretsManager.GetSecrets();
-            return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings, skipRuntimeUpdate: PublishLocalSettingsOnly);
+            
+            // Update app settings only when using --publish-settings-only
+            // Skip runtime updates to preserve existing runtime configuration
+            if (PublishLocalSettingsOnly)
+            {
+                return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings);
+            }
+            
+            // For regular publish with -i flag, update both settings and runtime
+            var success = await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings);
+            if (success && functionApp.IsFlex)
+            {
+                await UpdateFlexRuntimeFromLocalSettings(functionApp, localAppSettings, additionalAppSettings);
+            }
+            return success;
         }
 
-        private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional, bool skipRuntimeUpdate = false)
+        private async Task UpdateFlexRuntimeFromLocalSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
+            // if the additional keys has runtime, it would mean that runtime is already updated.
+            if (additional.ContainsKey(Constants.FunctionsWorkerRuntime))
+            {
+                return;
+            }
+
             string flexRuntimeName = null;
             string flexRuntimeVersion = null;
-            if (functionApp.IsFlex)
-            {
-                // if the additiona keys has runtime, it would mean that runtime is already updated.
-                if (!additional.ContainsKey(Constants.FunctionsWorkerRuntime))
-                {
-                    if (local.ContainsKey(Constants.FunctionsWorkerRuntime))
-                    {
-                        flexRuntimeName = local[Constants.FunctionsWorkerRuntime];
-                        local.Remove(Constants.FunctionsWorkerRuntime);
-                    }
 
-                    if (local.ContainsKey(Constants.FunctionsWorkerRuntimeVersion))
-                    {
-                        flexRuntimeVersion = local[Constants.FunctionsWorkerRuntimeVersion];
-                        local.Remove(Constants.FunctionsWorkerRuntimeVersion);
-                    }
-                }
+            if (local.ContainsKey(Constants.FunctionsWorkerRuntime))
+            {
+                flexRuntimeName = local[Constants.FunctionsWorkerRuntime];
+            }
+
+            if (local.ContainsKey(Constants.FunctionsWorkerRuntimeVersion))
+            {
+                flexRuntimeVersion = local[Constants.FunctionsWorkerRuntimeVersion];
+            }
+
+            if (!string.IsNullOrEmpty(flexRuntimeName))
+            {
+                await UpdateRuntimeConfigForFlex(functionApp, flexRuntimeName, flexRuntimeVersion, new AzureHelperService(AccessToken, ManagementURL));
+            }
+        }
+
+        private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
+        {
+            // For Flex apps, remove runtime settings from local settings dictionary as they're not regular app settings
+            // They will be handled separately via UpdateFlexRuntimeFromLocalSettings if needed
+            if (functionApp.IsFlex && !additional.ContainsKey(Constants.FunctionsWorkerRuntime))
+            {
+                local.Remove(Constants.FunctionsWorkerRuntime);
+                local.Remove(Constants.FunctionsWorkerRuntimeVersion);
             }
 
             functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
@@ -1334,11 +1362,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     .WriteLine(ErrorColor("Error updating app settings:"))
                     .WriteLine(ErrorColor(result.ErrorResult));
                 return false;
-            }
-
-            if (functionApp.IsFlex && !string.IsNullOrEmpty(flexRuntimeName) && !skipRuntimeUpdate)
-            {
-                await UpdateRuntimeConfigForFlex(functionApp, flexRuntimeName, flexRuntimeVersion, new AzureHelperService(AccessToken, ManagementURL));
             }
 
             return true;
