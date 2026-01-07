@@ -39,6 +39,9 @@ namespace Azure.Functions.Cli
         [Description("Commands for installing extensions")]
         Extensions,
 
+        [Description("Commands for managing extension bundles")]
+        Bundles,
+
         [Description("Commands for working with Durable Functions")]
         Durable,
 
