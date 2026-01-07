@@ -38,36 +38,14 @@ namespace Azure.Functions.Cli.Services
                     return;
                 }
 
+                bool isDotNetRuntime = runtime == WorkerRuntime.DotnetIsolated || runtime == WorkerRuntime.Dotnet;
                 string version = null;
                 int? dotnetMajorVersion = null;
 
                 // Get version from Function App configuration (not local project)
-                if (runtime == WorkerRuntime.DotnetIsolated || runtime == WorkerRuntime.Dotnet)
+                if (isDotNetRuntime)
                 {
-                    // For Linux .NET apps, version is in LinuxFxVersion
-                    if (functionApp.IsLinux && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
-                    {
-                        version = ExtractVersionFromLinuxFxVersion(functionApp.LinuxFxVersion, runtime);
-                    }
-
-                    // For Windows .NET apps, version is in NetFrameworkVersion
-                    else
-                    {
-                        version = functionApp.NetFrameworkVersion;
-                        if (string.IsNullOrEmpty(version) && functionApp.AzureAppSettings?.TryGetValue("netFrameworkVersion", out string netVersion) == true)
-                        {
-                            version = netVersion;
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(version))
-                    {
-                        dotnetMajorVersion = GetMajorDotnetVersion(version);
-                        if (dotnetMajorVersion.HasValue)
-                        {
-                            version = dotnetMajorVersion.Value.ToString();
-                        }
-                    }
+                    dotnetMajorVersion = ExtractDotNetMajorVersion(functionApp, runtime, out version);
                 }
                 else
                 {
@@ -79,7 +57,7 @@ namespace Azure.Functions.Cli.Services
                     return;
                 }
 
-                var eolInfo = runtime == WorkerRuntime.DotnetIsolated || runtime == WorkerRuntime.Dotnet
+                var eolInfo = isDotNetRuntime
                     ? GetDotNetEolInformation(stacks, dotnetMajorVersion.Value)
                     : GetEolInformation(stacks, runtime, version);
 
@@ -102,6 +80,45 @@ namespace Azure.Functions.Cli.Services
             var runtimeSettings = stacks.GetRuntimeSettings(majorVersion, out bool isLTS);
             return runtimeSettings != null &&
                    (runtimeSettings.IsDeprecated == true || runtimeSettings.IsDeprecatedForRuntime == true);
+        }
+
+        /// <summary>
+        /// Extracts the .NET major version from a function app's configuration.
+        /// </summary>
+        /// <param name="functionApp">The function app to extract version from</param>
+        /// <param name="runtime">The worker runtime</param>
+        /// <param name="version">The extracted version string</param>
+        /// <returns>The major version number if found, null otherwise</returns>
+        private static int? ExtractDotNetMajorVersion(Site functionApp, WorkerRuntime runtime, out string version)
+        {
+            version = null;
+
+            // For Linux .NET apps, version is in LinuxFxVersion
+            if (functionApp.IsLinux && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+            {
+                version = ExtractVersionFromLinuxFxVersion(functionApp.LinuxFxVersion, runtime);
+            }
+            // For Windows .NET apps, version is in NetFrameworkVersion
+            else
+            {
+                version = functionApp.NetFrameworkVersion;
+                if (string.IsNullOrEmpty(version) && functionApp.AzureAppSettings?.TryGetValue("netFrameworkVersion", out string netVersion) == true)
+                {
+                    version = netVersion;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(version))
+            {
+                int? majorVersion = GetMajorDotnetVersion(version);
+                if (majorVersion.HasValue)
+                {
+                    version = majorVersion.Value.ToString();
+                    return majorVersion;
+                }
+            }
+
+            return null;
         }
 
         private static string GetRuntimeVersionFromFunctionApp(WorkerRuntime runtime, Site functionApp)
@@ -227,7 +244,7 @@ namespace Azure.Functions.Cli.Services
 
             return new EolInformation
             {
-                RuntimeName = ".NET",
+                RuntimeName = Constants.DotnetDisplayName,
                 CurrentVersion = majorVersion.ToString(),
                 RecommendedVersion = nextVersion?.ToString(),
                 EolDate = runtimeSettings.EndOfLifeDate.Value
@@ -412,17 +429,6 @@ namespace Azure.Functions.Cli.Services
             }
 
             ColoredConsole.WriteLine(WarningColor(message));
-        }
-
-        private class EolInformation
-        {
-            public string RuntimeName { get; set; }
-
-            public string CurrentVersion { get; set; }
-
-            public string RecommendedVersion { get; set; }
-
-            public DateTime EolDate { get; set; }
         }
     }
 }

@@ -93,6 +93,7 @@ namespace Azure.Functions.Cli.Common
         public const string LocalSettingsJsonFileName = "local.settings.json";
         public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
         public const string Dotnet = "dotnet";
+        public const string DotnetDisplayName = ".NET";
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
         public const string EnableMcpCustomHandlerFeatureFlag = "EnableMcpCustomHandlerPreview";
