@@ -73,6 +73,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool? VerboseLogging { get; set; }
 
+        public string UserLogLevel { get; set; }
+
         public List<string> EnabledFunctions { get; private set; }
 
         public string UserSecretsId { get; private set; }
@@ -157,6 +159,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(v => VerboseLogging = v);
 
             Parser
+                .Setup<string>("user-log-level")
+                .WithDescription("Sets the minimum log level for user logs (function code and user libraries). Valid values: Trace, Debug, Information, Warning, Error, Critical, None. This does not affect system logs.")
+                .Callback(level => UserLogLevel = level);
+
+            Parser
                .Setup<bool>("dotnet-isolated-debug")
                .WithDescription("When specified, set to true, pauses the .NET Worker process until a debugger is attached.")
                .SetDefault(false)
@@ -192,7 +199,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, UserLogLevel);
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
                 GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
             {
