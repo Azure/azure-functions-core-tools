@@ -35,17 +35,21 @@ namespace Azure.Functions.Cli
                 userLogLevel = Environment.GetEnvironmentVariable("FUNCTIONS_USER_LOG_LEVEL");
             }
 
+            // Track if userLogLevel was explicitly set and successfully parsed
+            bool userLogLevelExplicitlySet = false;
+
             // If userLogLevel is specified (via CLI or env var), use it
             if (!string.IsNullOrEmpty(userLogLevel) && Enum.TryParse<LogLevel>(userLogLevel, true, out LogLevel parsedUserLogLevel))
             {
                 UserLogDefaultLogLevel = parsedUserLogLevel;
+                userLogLevelExplicitlySet = true;
             }
 
             if (Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelDefaultSection, out LogLevel logLevel))
             {
                 SystemLogDefaultLogLevel = logLevel;
                 // Only override UserLogDefaultLogLevel if it wasn't explicitly set via CLI or env var
-                if (string.IsNullOrEmpty(userLogLevel))
+                if (!userLogLevelExplicitlySet)
                 {
                     UserLogDefaultLogLevel = logLevel;
                 }
@@ -55,12 +59,12 @@ namespace Azure.Functions.Cli
         /// <summary>
         /// Gets default level for system logs.
         /// </summary>
-        public LogLevel SystemLogDefaultLogLevel { get; } = LogLevel.Warning;
+        public LogLevel SystemLogDefaultLogLevel { get; private set; } = LogLevel.Warning;
 
         /// <summary>
         /// Gets default level for user logs.
         /// </summary>
-        public LogLevel UserLogDefaultLogLevel { get; } = LogLevel.Information;
+        public LogLevel UserLogDefaultLogLevel { get; private set; } = LogLevel.Information;
 
         /// <summary>
         /// Gets a value indicating whether is set to true if `func start` is started with `--verbose` flag. If set, SystemLogDefaultLogLevel is set to Information.
