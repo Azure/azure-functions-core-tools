@@ -110,7 +110,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
             if (!string.IsNullOrEmpty(bundleId))
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId));
+                // Only set the download path if not already set by the user
+                var existingDownloadPath = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+                if (string.IsNullOrEmpty(existingDownloadPath))
+                {
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId));
+                }
+
                 Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
             }
         }
