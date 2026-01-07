@@ -7,29 +7,57 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class EolMessages
     {
-        public static string GetEarlyEolCreateMessageForDotNet(string stackVersion, DateTime eol, string link = "")
+        /// <summary>
+        /// Gets a message for when a runtime version will reach EOL in the future (create/init scenario).
+        /// </summary>
+        public static string GetEarlyEolCreateMessage(string runtimeName, string version, DateTime eol, string link = "")
         {
-            return $".NET {stackVersion} will reach EOL on {FormatDate(eol)} and will no longer be supported. {link}";
+            return $"{runtimeName} {version} will reach end-of-life on {FormatDate(eol)} and will no longer be supported. {link}".Trim();
         }
 
-        public static string GetAfterEolCreateMessageDotNet(string stackVersion, DateTime eol, string link = "")
+        /// <summary>
+        /// Gets a message for when a runtime version has already reached EOL (create/init scenario).
+        /// </summary>
+        public static string GetAfterEolCreateMessage(string runtimeName, string version, DateTime eol, string link = "")
         {
-            return $".NET {stackVersion} has reached EOL on {FormatDate(eol)} and is no longer supported. {link}";
+            return $"{runtimeName} {version} has reached end-of-life on {FormatDate(eol)} and is no longer supported. {link}".Trim();
         }
 
-        public static string GetEarlyEolUpdateMessageDotNet(string currentStackVersion, string nextStackVersion, DateTime eol, string link = "")
+        /// <summary>
+        /// Gets an upgrade message for when a runtime version will reach EOL in the future (publish/update scenario).
+        /// </summary>
+        public static string GetEarlyEolUpgradeMessage(string runtimeName, string currentVersion, string nextVersion, DateTime eol, string link = "")
         {
-            return $"Upgrade your app to .NET {nextStackVersion} as .NET {currentStackVersion} will reach EOL on {FormatDate(eol)} and will no longer be supported. {link}";
+            return $"Upgrade to {runtimeName} {nextVersion} as {runtimeName} {currentVersion} will reach end-of-life on {FormatDate(eol)} and will no longer be supported. Learn more: {link}".Trim();
         }
 
-        public static string GetAfterEolUpdateMessageDotNet(string currentStackVersion, string nextStackVersion, DateTime eol, string link = "")
+        /// <summary>
+        /// Gets an upgrade message for when a runtime version has already reached EOL (publish/update scenario).
+        /// </summary>
+        public static string GetAfterEolUpgradeMessage(string runtimeName, string currentVersion, string nextVersion, DateTime eol, string link = "")
         {
-            return $"Upgrade your app to .NET {nextStackVersion} as .NET {currentStackVersion} has reached EOL on {FormatDate(eol)} and is no longer supported. {link}";
+            return $"Upgrade to {runtimeName} {nextVersion} as {runtimeName} {currentVersion} has reached end-of-life on {FormatDate(eol)} and is no longer be supported. Learn more: {link}".Trim();
+        }
+
+        /// <summary>
+        /// Gets a generic message without upgrade recommendation for when a runtime version will reach EOL.
+        /// </summary>
+        public static string GetEarlyEolMessage(string runtimeName, string version, DateTime eol, string link = "")
+        {
+            return $"{runtimeName} {version} will reach end-of-life on {FormatDate(eol)} and will no longer be supported. Learn more: {link}".Trim();
+        }
+
+        /// <summary>
+        /// Gets a generic message without upgrade recommendation for when a runtime version has reached EOL.
+        /// </summary>
+        public static string GetAfterEolMessage(string runtimeName, string version, DateTime eol, string link = "")
+        {
+            return $"{runtimeName} {version} has reached end-of-life on {FormatDate(eol)} and is no longer supported. Learn more: {link}".Trim();
         }
 
         private static string FormatDate(DateTime dateTime)
         {
-            return dateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return dateTime.ToString("MMMM dd yyyy", CultureInfo.CurrentCulture);
         }
     }
 }
