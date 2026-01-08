@@ -98,6 +98,7 @@ namespace Azure.Functions.Cli.Services
             {
                 version = ExtractVersionFromLinuxFxVersion(functionApp.LinuxFxVersion, runtime);
             }
+
             // For Windows .NET apps, version is in NetFrameworkVersion
             else
             {
