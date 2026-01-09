@@ -115,6 +115,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             await UpdateLanguageAndRuntime();
 
+            // Check if Java runtime is being used
+            if (_workerRuntime == WorkerRuntime.Java)
+            {
+                ColoredConsole
+                    .Error
+                    .WriteLine(ErrorColor("The 'func new' command is not supported for Java runtime."))
+                    .WriteLine(ErrorColor("Please use Maven to create Java Azure Functions."))
+                    .WriteLine(ErrorColor("For more information, visit: https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local?pivots=programming-language-java"));
+                return;
+            }
+
             // Depends on UpdateLanguageAndRuntime to set 'Language'
             if (IsNewPythonProgrammingModel())
             {

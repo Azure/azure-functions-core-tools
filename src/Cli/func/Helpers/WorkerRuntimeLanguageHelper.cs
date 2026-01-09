@@ -207,7 +207,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
         {
-            if (_workerToDefaultLanguageMap.ContainsKey(worker))
+            if (!_workerToDefaultLanguageMap.ContainsKey(worker))
             {
                 throw new ArgumentException($"Worker runtime '{worker}' is not a valid worker for a template.");
             }
