@@ -183,6 +183,7 @@ namespace Azure.Functions.Cli.Helpers
             "iothubtrigger" => "iothub",
             "kafkatrigger" => "kafka",
             "kafkaoutput" => "kafkao",
+            "mcptooltrigger" => "mcptooltrigger",
             "queuetrigger" => "queue",
             "sendgrid" => "sendgrid",
             "servicebusqueuetrigger" => "squeue",
