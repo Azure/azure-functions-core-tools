@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Net.Sockets;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
@@ -123,6 +124,23 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 // Network failure after retries; mark offline and fall back to cache
                 OfflineHelper.MarkAsOffline();
                 return GetCachedBundleOrThrow(extensionBundleOptions);
+            }
+            catch (HttpRequestException)
+            {
+                // Network download failed, check for cached bundles
+                string versionRange = extensionBundleOptions.Version?.ToString();
+                if (TryGetCachedBundle(extensionBundleOptions.Id, versionRange, out string cachedBundleVersion))
+                {
+                    ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: Unable to download extension bundles. Using cached version {cachedBundleVersion}."));
+                    ColoredConsole.WriteLine(OutputTheme.AdditionalInfoColor("When you have network connectivity, you can run 'func bundle download' to update."));
+                }
+                else
+                {
+                    // No cached bundle found, show error message
+                    ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"Error: Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. Bundles must be pre-cached before you can run offline."));
+                    ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use."));
+                    ColoredConsole.Error.WriteLine();
+                }
             }
         }
 
