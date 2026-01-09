@@ -247,7 +247,7 @@ namespace Azure.Functions.Cli
 
                 argsToParse = isHelp
                     ? _args.Where(a => !a.StartsWith("-"))
-                    : _args;
+                    : FilterOutGlobalOptions(_args);
             }
 
             // We'll need to grab context arg: string, subcontext arg: string, action arg: string
@@ -262,6 +262,15 @@ namespace Azure.Functions.Cli
 
             // If isHelp, skip one and parse the rest of the command as usual.
             var argsStack = new Stack<string>(argsToParse.Reverse());
+
+            // If no arguments remain after filtering, show general help
+            if (!argsStack.Any())
+            {
+                _telemetryEvent.CommandName = "help";
+                _telemetryEvent.IActionName = typeof(HelpAction).Name;
+                _telemetryEvent.Parameters = new List<string>();
+                return new HelpAction(_actionAttributes, CreateAction);
+            }
 
             // Grab the first string, but don't pop it off the stack.
             // If it's indeed a valid context, will remove it later.
@@ -403,6 +412,46 @@ namespace Azure.Functions.Cli
                 _telemetryEvent.IsSuccessful = false;
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Filters out global options and their values from the argument list.
+        /// </summary>
+        /// <param name="args">The arguments to filter.</param>
+        /// <returns>Filtered arguments without global options.</returns>
+        private IEnumerable<string> FilterOutGlobalOptions(string[] args)
+        {
+            var result = new List<string>();
+            var skipNext = false;
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (skipNext)
+                {
+                    skipNext = false;
+                    continue;
+                }
+
+                var arg = args[i];
+                var lowerArg = arg.ToLowerInvariant();
+
+                // Global flags (no value)
+                if (lowerArg == "--verbose" || lowerArg == "--version" || lowerArg == "-v")
+                {
+                    continue;
+                }
+
+                // Global options that take values
+                if (lowerArg == "--script-root" || lowerArg == "--prefix")
+                {
+                    skipNext = true; // Skip the next argument (the value)
+                    continue;
+                }
+
+                result.Add(arg);
+            }
+
+            return result;
         }
 
         /// <summary>
