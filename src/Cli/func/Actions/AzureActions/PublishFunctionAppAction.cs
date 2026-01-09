@@ -418,18 +418,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Compare with what's currently in Azure
             var currentAzureVersion = site.FunctionAppConfig?.Runtime?.Version;
-            
+
             // If versions match, no update needed
             if (!string.IsNullOrEmpty(currentAzureVersion) && currentAzureVersion.Equals(runtimeVersion, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
-            
+
             // Versions are different, prompt user or update with force
             if (!string.IsNullOrEmpty(currentAzureVersion))
             {
                 ColoredConsole.WriteLine(WarningColor($"Your local project targets {runtimeName}|{runtimeVersion}, but Azure is configured for {runtimeName}|{currentAzureVersion}."));
-                
+
                 if (!force && !overwriteSettings)
                 {
                     ColoredConsole.WriteLine(QuestionColor($"Would you like to update the Azure runtime to {runtimeVersion}? [yes/no]"));
