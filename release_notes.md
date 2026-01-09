@@ -10,3 +10,5 @@
 #### Changes
 
 - Added end-of-life warnings for all runtime versions during `func azure functionapp publish`. (#4760)
+- Reduced console output noise by moving informational messages to verbose logging. (#4768)
+- Fixed an issue where creating an MCP Tool trigger function would fail with "Unknown template 'McpToolTrigger'" error. (#4768)
