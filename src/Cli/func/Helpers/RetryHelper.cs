@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Colors.Net;
@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Helpers
         public static Task Retry(Func<Task> func, int retryCount, bool displayError = false)
             => Retry(func, retryCount, TimeSpan.FromSeconds(1), displayError);
 
-        public static async Task Retry(Func<Task> func, int retryCount, TimeSpan retryDelay, bool displayError = false)
+        public static async Task Retry(Func<Task> func, int retryCount, TimeSpan retryDelay, bool displayError = false, Type[] nonRetryableExceptions = null)
         {
             var totalRetries = retryCount;
             while (true)
@@ -23,6 +23,12 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 catch (Exception e)
                 {
+                    // Check if this exception type should not be retried
+                    if (nonRetryableExceptions != null && nonRetryableExceptions.Any(t => t.IsAssignableFrom(e.GetType())))
+                    {
+                        throw;
+                    }
+
                     if (retryCount <= 0)
                     {
                         throw;

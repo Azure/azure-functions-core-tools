@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
@@ -7,6 +7,10 @@
     <Nullable>disable</Nullable>
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Azure.Functions.Cli.UnitTests" />
+  </ItemGroup>
 
   <PropertyGroup>
     <PackAsTool>true</PackAsTool>
@@ -64,7 +68,7 @@
       <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
     </ProjectReference>
   </ItemGroup>
-
+  
   <ItemGroup>
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="content" />
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="contentFiles/any/$(TargetFramework)" />
