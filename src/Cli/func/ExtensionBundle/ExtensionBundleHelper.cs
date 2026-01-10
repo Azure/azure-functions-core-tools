@@ -37,6 +37,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
         private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
+        internal static string BundlePath { get; private set; } = string.Empty;
+
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
             hostOptions = hostOptions ?? SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
@@ -93,10 +95,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 func: async () => await TryToGetExtensionBundlePath(extensionBundleManager, extensionBundleOptions, httpClient),
                 retryCount: MaxRetries,
                 retryDelay: _retryDelay,
-                displayError: false);
+                displayError: false,
+                nonRetryableExceptions: new[] { typeof(HttpRequestException) });
         }
 
-        private static async Task TryToGetExtensionBundlePath(ExtensionBundleManager extensionBundleManager, ExtensionBundleOptions extensionBundleOptions, HttpClient httpClient)
+        internal static async Task TryToGetExtensionBundlePath(ExtensionBundleManager extensionBundleManager, ExtensionBundleOptions extensionBundleOptions, HttpClient httpClient)
         {
             try
             {
@@ -104,12 +107,19 @@ namespace Azure.Functions.Cli.ExtensionBundle
             }
             catch (HttpRequestException)
             {
+                // If user didn't specify an extension bundle ID, no need to download extension bundle
+                if (string.IsNullOrEmpty(extensionBundleOptions.Id))
+                {
+                    return;
+                }
+
                 // Network download failed, check for cached bundles
                 string versionRange = extensionBundleOptions.Version?.ToString();
                 if (TryGetCachedBundle(extensionBundleOptions.Id, versionRange, out string cachedBundleVersion))
                 {
                     ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: Unable to download extension bundles. Using cached version {cachedBundleVersion}."));
-                    ColoredConsole.WriteLine(OutputTheme.AdditionalInfoColor("When you have network connectivity, you can run 'func bundle download' to update."));
+                    ColoredConsole.WriteLine(OutputTheme.WarningColor("When you have network connectivity, you can run 'func bundle download' to update."));
+                    ColoredConsole.WriteLine();
                 }
                 else
                 {
@@ -117,6 +127,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                     ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"Error: Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. Bundles must be pre-cached before you can run offline."));
                     ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use."));
                     ColoredConsole.Error.WriteLine();
+                    throw;
                 }
             }
         }
@@ -339,13 +350,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <param name="versionRange">The version range from host.json</param>
         /// <param name="cachedBundleVersion">The version of the cached bundle if found.</param>
         /// <returns>True if a cached bundle was found, false otherwise.</returns>
-        private static bool TryGetCachedBundle(string bundleId, string versionRange, out string cachedBundleVersion)
+        internal static bool TryGetCachedBundle(string bundleId, string versionRange, out string cachedBundleVersion)
         {
             cachedBundleVersion = null;
 
             if (string.IsNullOrEmpty(bundleId))
             {
-                ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: No bundle ID found to retrieve cached templates."));
                 return false;
             }
 
@@ -355,6 +365,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 if (FindBundleInPath(customerDownloadPath, versionRange, out cachedBundleVersion))
                 {
+                    BundlePath = customerDownloadPath;
                     return true;
                 }
 
@@ -365,6 +376,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             var defaultDownloadPath = GetBundleDownloadPath(bundleId);
             if (FindBundleInPath(defaultDownloadPath, versionRange, out cachedBundleVersion))
             {
+                BundlePath = defaultDownloadPath;
                 return true;
             }
 
@@ -378,7 +390,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <param name="versionRange">The version range to match.</param>
         /// <param name="bundleVersion">The version of the bundle found to be used.</param>
         /// <returns>True if a matching bundle was found, false otherwise.</returns>
-        private static bool FindBundleInPath(string basePath, string versionRange, out string bundleVersion)
+        internal static bool FindBundleInPath(string basePath, string versionRange, out string bundleVersion)
         {
             bundleVersion = null;
 
@@ -399,24 +411,23 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 // If version range is specified, try to find a matching version
                 if (!string.IsNullOrEmpty(versionRange))
                 {
-                    // Find all matching versions
-                    var matchingVersions = new List<(string Path, string Version)>();
+                    string latestVersion = null;
+
                     foreach (var versionDir in versionDirectories)
                     {
                         var version = Path.GetFileName(versionDir);
                         if (IsVersionInRange(version, versionRange))
                         {
-                            matchingVersions.Add((versionDir, version));
+                            if (latestVersion == null || CompareVersions(version, latestVersion) > 0)
+                            {
+                                latestVersion = version;
+                            }
                         }
                     }
 
-                    // If we have matching versions, use the latest one
-                    if (matchingVersions.Count > 0)
+                    if (latestVersion != null)
                     {
-                        var latestMatch = matchingVersions
-                            .OrderByDescending(v => v.Version)
-                            .First();
-                        bundleVersion = latestMatch.Version;
+                        bundleVersion = latestVersion;
                         return true;
                     }
                 }
@@ -436,7 +447,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <param name="version">The version to check</param>
         /// <param name="versionRange">The version range (e.g., "[4.*, 5.0.0)")</param>
         /// <returns>True if the version is in the range, false otherwise</returns>
-        private static bool IsVersionInRange(string version, string versionRange)
+        internal static bool IsVersionInRange(string version, string versionRange)
         {
             try
             {
