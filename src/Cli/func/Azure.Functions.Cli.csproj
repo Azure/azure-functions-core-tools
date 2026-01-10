@@ -8,6 +8,10 @@
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Azure.Functions.Cli.UnitTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
@@ -59,11 +63,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)GoZipTool\GoZipTool.csproj">
-      <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
-    </ProjectReference>
-  </ItemGroup>
+
 
   <ItemGroup>
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="content" />

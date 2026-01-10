@@ -35,6 +35,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
         private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
+        internal static string BundlePath { get; private set; } = string.Empty;
+
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
             hostOptions = hostOptions ?? SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
@@ -127,12 +129,19 @@ namespace Azure.Functions.Cli.ExtensionBundle
             }
             catch (HttpRequestException)
             {
+                // If user didn't specify an extension bundle ID, no need to download extension bundle
+                if (string.IsNullOrEmpty(extensionBundleOptions.Id))
+                {
+                    return;
+                }
+
                 // Network download failed, check for cached bundles
                 string versionRange = extensionBundleOptions.Version?.ToString();
                 if (TryGetCachedBundle(extensionBundleOptions.Id, versionRange, out string cachedBundleVersion))
                 {
                     ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: Unable to download extension bundles. Using cached version {cachedBundleVersion}."));
-                    ColoredConsole.WriteLine(OutputTheme.AdditionalInfoColor("When you have network connectivity, you can run 'func bundle download' to update."));
+                    ColoredConsole.WriteLine(OutputTheme.WarningColor("When you have network connectivity, you can run 'func bundle download' to update."));
+                    ColoredConsole.WriteLine();
                 }
                 else
                 {
@@ -140,6 +149,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                     ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"Error: Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. Bundles must be pre-cached before you can run offline."));
                     ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use."));
                     ColoredConsole.Error.WriteLine();
+                    throw;
                 }
             }
         }
@@ -436,6 +446,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 if (FindBundleInPath(customerDownloadPath, versionRange, out cachedBundleVersion))
                 {
+                    BundlePath = customerDownloadPath;
                     return true;
                 }
 
@@ -455,6 +466,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             var defaultDownloadPath = GetBundleDownloadPath(bundleId);
             if (FindBundleInPath(defaultDownloadPath, versionRange, out cachedBundleVersion))
             {
+                BundlePath = defaultDownloadPath;
                 return true;
             }
 
