@@ -41,7 +41,12 @@ function getPackageVersion([string]$packageName, [xml]$propsXml, [bool]$isPackag
 
     $node = Select-Xml -Xml $propsXml -XPath $xpath | Select-Object -ExpandProperty Node
     if ($node) {
-        return $node.Version
+        # Try VersionOverride first (used in host worker props), then fall back to Version
+        if ($node.VersionOverride) {
+            return $node.VersionOverride
+        } else {
+            return $node.Version
+        }
     } else {
         throw "Failed to find version for package $packageName in Packages.props"
     }
@@ -105,7 +110,7 @@ foreach ($key in $workerPropsToWorkerName.Keys) {
 
         Write-Output "CLI version: $cliWorkerVersion | Host version: $hostWorkerVersion"
 
-        if ($Update -AND $hostWorkerVersion -ne $cliWorkerVersion) {
+        if ($Update -and $hostWorkerVersion -ne $cliWorkerVersion) {
             setPackageVersionInProps $packageName $hostWorkerVersion
         } elseif ($hostWorkerVersion -ne $cliWorkerVersion) {
             Write-Output "Reference to $worker in the host ($hostWorkerVersion) does not match version in the CLI ($cliWorkerVersion)"
@@ -117,7 +122,17 @@ Write-Output "----------------------------------------------"
 
 # Save updated versions if necessary
 if ($Update) {
-    $packagesPropsXml.Save($packagesPropsPath)
+    # Create UTF-8 encoding without BOM
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    $xmlWriterSettings = New-Object System.Xml.XmlWriterSettings
+    $xmlWriterSettings.Encoding = $utf8NoBom
+    $xmlWriterSettings.Indent = $true
+    $xmlWriterSettings.IndentChars = "  "
+    
+    $xmlWriter = [System.Xml.XmlWriter]::Create($packagesPropsPath, $xmlWriterSettings)
+    $packagesPropsXml.Save($xmlWriter)
+    $xmlWriter.Close()
+    
     Write-Output "Updated worker versions! 🚀"
 } elseif ($failedValidation) {
     Write-Output "You can run './validate-worker-versions.ps1 -Update' locally to fix worker versions."
