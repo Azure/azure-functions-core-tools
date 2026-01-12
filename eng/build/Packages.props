@@ -15,6 +15,7 @@
   <!-- func -->
   <ItemGroup>
     <PackageVersion Include="Autofac" Version="4.6.2" />
+    <PackageVersion Include="Azure.Core" Version="1.47.1" />
     <PackageVersion Include="Azure.Identity" Version="1.14.2" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
     <PackageVersion Include="AccentedCommandLineParser" Version="2.0.0" />
