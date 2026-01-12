@@ -164,7 +164,7 @@ do the bundles management on the core tools side.
 
 ### 4. Version Check Optimization
 
-**Problem**: GitHub version check can timeout and delay startup unnecessarily.
+**Problem**: GitHub API version check can timeout and delay startup unnecessarily.
 
 **Proposed Changes**:
 
@@ -176,7 +176,7 @@ do the bundles management on the core tools side.
 
 ### 5. Global Offline Flag
 
-**Problem**: Have a explicit offline mode to skip network attempts entirely.
+**Problem**: Have an explicit offline mode to skip network attempts entirely.
 
 **Proposed Changes**:
 
