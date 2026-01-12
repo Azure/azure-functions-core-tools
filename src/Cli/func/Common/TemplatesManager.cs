@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.Common
         public async Task<string> GetExtensionBundleFileContent(string path)
         {
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
-            var bundlePath = ExtensionBundleHelper.BundlePath ?? await extensionBundleManager.GetExtensionBundlePath();
+            var bundlePath = await extensionBundleManager.GetExtensionBundlePath();
             string contentFilePath = Path.Combine(bundlePath, path);
 
             if (FileSystemHelpers.FileExists(contentFilePath))
