@@ -113,7 +113,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            await UpdateLanguageAndRuntime();
+            // Resolve worker runtime early to check for Java before any prompts
+            _workerRuntime = await ResolveWorkerRuntimeAsync();
 
             // Check if Java runtime is being used
             if (_workerRuntime == WorkerRuntime.Java)
@@ -126,7 +127,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            // Depends on UpdateLanguageAndRuntime to set 'Language'
+            // Load templates and resolve language
+            if (NeedsToLoadExtensionTemplates(_workerRuntime, Csx))
+            {
+                _templates = await _templatesManager.Templates;
+            }
+
+            ResolveLanguageAsync(_workerRuntime);
+
             if (IsNewPythonProgrammingModel())
             {
                 _newTemplates = await _templatesManager.NewTemplates;
