@@ -71,12 +71,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static string GetBundleDownloadPath(string bundleId)
         {
             // Return cached path if already determined
-            return BundlePath ??= Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                Constants.UserCoreToolsDirectory,
-                DefaultBundlesBasePath,
-                ScriptConstants.ExtensionBundleDirectory,
-                bundleId);
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Constants.UserCoreToolsDirectory, DefaultBundlesBasePath, ScriptConstants.ExtensionBundleDirectory, bundleId);
         }
 
         public static async Task GetExtensionBundle()
