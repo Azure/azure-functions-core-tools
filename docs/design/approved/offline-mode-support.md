@@ -270,8 +270,8 @@ When you have network connectivity, you can use `func bundles download` to downl
 - Add clear instructions of how to install bundles
 - These changes should fix the issue for both `func start and func new`
 
-### 3: Validate and shortcircuit other network calls
-- Update `func publish` to shortcircut if offline/no network available
+### 3: Validate and short circuit other network calls
+- Update `func publish` to short circuit if offline/no network available
 - Validate `func pack` works offline
 
 ### 4: Offline Flag (Needs design + review)
