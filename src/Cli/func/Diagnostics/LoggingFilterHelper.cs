@@ -49,6 +49,7 @@ namespace Azure.Functions.Cli
             if (Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelDefaultSection, out LogLevel logLevel))
             {
                 SystemLogDefaultLogLevel = logLevel;
+
                 // Only override UserLogDefaultLogLevel if it wasn't explicitly set via CLI or env var
                 if (!userLogLevelExplicitlySet)
                 {
