@@ -196,6 +196,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 return $"{parts[0]}.{parts[1]}.0";
             }
+
             return version;
         }
 

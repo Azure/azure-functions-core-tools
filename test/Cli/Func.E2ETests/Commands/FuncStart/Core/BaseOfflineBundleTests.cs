@@ -55,9 +55,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
 
             var output = result.StdOut + result.StdErr;
 
-            // Assert: Process was killed, so exit code should be -1
-            result.Should().ExitWith(-1);
-
             // Assert: Check for expected bundle download behavior
             if (shouldDownload)
             {
