@@ -20,7 +20,6 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private const int MaxRetries = 3;
         private const string ExtensionBundleStaticPropertiesUrl = "https://cdn.functions.azure.com/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/staticProperties.json";
         private const string DefaultExtensionBundleVersionRange = "[4.*, 5.0.0)";
-        private const string DefaultBundlesBasePath = "Functions";
         private const string AzureFunctionsJobHostExtensionBundleDownloadPath = "AzureFunctionsJobHost__extensionBundle__downloadPath";
 
         // Regex patterns for version range parsing
@@ -360,7 +359,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// then falls back to the default download path.
         /// </summary>
         /// <param name="bundleId">The extension bundle ID.</param>
-        /// <param name="versionRange">The version range from host.json</param>
+        /// <param name="versionRange">The version range from host.json.</param>
         /// <param name="cachedBundleVersion">The version of the cached bundle if found.</param>
         /// <returns>True if a cached bundle was found, false otherwise.</returns>
         internal static bool TryGetCachedBundle(string bundleId, string versionRange, out string cachedBundleVersion)
@@ -397,7 +396,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <summary>
         /// Searches for a valid bundle version in the specified path.
         /// </summary>
-        /// <param name="basePath">The base path to search</param>
+        /// <param name="basePath">The base path to search.</param>
         /// <param name="versionRange">The version range to match.</param>
         /// <param name="bundleVersion">The version of the bundle found to be used.</param>
         /// <returns>True if a matching bundle was found, false otherwise.</returns>
@@ -455,9 +454,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <summary>
         /// Checks if a version falls within a specified version range.
         /// </summary>
-        /// <param name="version">The version to check</param>
-        /// <param name="versionRange">The version range (e.g., "[4.*, 5.0.0)")</param>
-        /// <returns>True if the version is in the range, false otherwise</returns>
+        /// <param name="version">The version to check.</param>
+        /// <param name="versionRange">The version range (e.g., "[4.*, 5.0.0)").</param>
+        /// <returns>True if the version is in the range, false otherwise.</returns>
         internal static bool IsVersionInRange(string version, string versionRange)
         {
             try
@@ -484,7 +483,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// Detects if the system is currently offline (no network connectivity to CDN).
         /// Uses caching to avoid excessive network checks.
         /// </summary>
-        /// <returns>True if offline, false if online</returns>
+        /// <returns>True if offline, false if online.</returns>
         internal static bool IsOffline()
         {
             // Check cache first to avoid excessive network calls

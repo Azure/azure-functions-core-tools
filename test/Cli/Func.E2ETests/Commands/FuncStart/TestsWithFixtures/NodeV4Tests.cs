@@ -240,19 +240,36 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
             processWasKilledManually.Should().BeFalse();
         }
 
-        [Theory]
-        [InlineData("false", true)] // EnsureLatest=false should download
-        [InlineData("true", false)] // EnsureLatest=true should not download
-        public void FuncStart_WithEnsureLatestSetting_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
-        {
-            BaseOfflineBundleTests.TestEnsureLatestBehavior(
-                _fixture.FuncPath,
-                _fixture.WorkingDirectory,
-                "node",
-                _fixture.Log,
-                ensureLatestValue,
-                shouldDownload,
-                "v4");
+                [Theory]
+                [InlineData("false", false)] // EnsureLatest=false should skip download
+                [InlineData("true", true)] // EnsureLatest=true should download
+                public void FuncStart_NodeV4_WithEnsureLatestEnvVar_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+                {
+                    BaseOfflineBundleTests.TestEnsureLatestBehavior(
+                        _fixture.FuncPath,
+                        _fixture.WorkingDirectory,
+                        "node",
+                        _fixture.Log,
+                        ensureLatestValue,
+                        shouldDownload,
+                        "v4",
+                        EnsureLatestConfigSource.EnvironmentVariable);
+                }
+
+                [Theory]
+                [InlineData("false", false)] // EnsureLatest=false in host.json should skip download
+                [InlineData("true", true)] // EnsureLatest=true in host.json should download
+                public void FuncStart_NodeV4_WithEnsureLatestHostJson_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+                {
+                    BaseOfflineBundleTests.TestEnsureLatestBehavior(
+                        _fixture.FuncPath,
+                        _fixture.WorkingDirectory,
+                        "node",
+                        _fixture.Log,
+                        ensureLatestValue,
+                        shouldDownload,
+                        "v4",
+                        EnsureLatestConfigSource.HostJson);
+                }
+            }
         }
-    }
-}

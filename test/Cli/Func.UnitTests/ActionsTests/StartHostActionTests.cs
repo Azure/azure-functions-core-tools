@@ -496,5 +496,248 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 Environment.SetEnvironmentVariable(pythonEnvVar, originalValue);
             }
         }
+
+        [Theory]
+        [InlineData("true", true, "environment variable")] // ensureLatest=true means SHOULD download
+        [InlineData("false", false, "environment variable")] // ensureLatest=false means should NOT download
+        [InlineData("True", true, "environment variable")] // Case insensitive
+        [InlineData("False", false, "environment variable")] // Case insensitive
+        public void ShouldDownloadExtensionBundles_EnvironmentVariableTakesPrecedence(
+            string envVarValue, bool expectedShouldDownload, string expectedSource)
+        {
+            // Arrange
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", envVarValue);
+
+                var mockSecretsManager = new Mock<ISecretsManager>();
+                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
+
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
+
+                // Act
+                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
+
+                // Assert
+                Assert.Equal(expectedShouldDownload, shouldDownload);
+                Assert.Equal(expectedSource, source);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+            }
+        }
+
+        [Fact]
+        public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenNothingSet()
+        {
+            // Arrange
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+
+                var mockSecretsManager = new Mock<ISecretsManager>();
+                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
+
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
+
+                // Act
+                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
+
+                // Assert
+                Assert.True(shouldDownload);
+                Assert.Equal(string.Empty, source);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+            }
+        }
+
+        [Fact]
+        public void ShouldDownloadExtensionBundles_IgnoresInvalidEnvironmentVariableValue()
+        {
+            // Arrange
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "invalid");
+
+                var mockSecretsManager = new Mock<ISecretsManager>();
+                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
+
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
+
+                // Act
+                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
+
+                // Assert - should fall back to default (true) when env var is not a valid boolean
+                Assert.True(shouldDownload);
+                Assert.Equal(string.Empty, source);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+            }
+        }
+
+        [Theory]
+        [InlineData("true", true, "host.json")] // ensureLatest=true means SHOULD download
+        [InlineData("false", false, "host.json")] // ensureLatest=false means should NOT download
+        [InlineData("True", true, "host.json")] // Case insensitive
+        [InlineData("False", false, "host.json")] // Case insensitive
+        public void ShouldDownloadExtensionBundles_FallsBackToHostJson_WhenEnvVarNotSet(
+            string hostJsonValue, bool expectedShouldDownload, string expectedSource)
+        {
+            // Arrange
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            try
+            {
+                // Clear the environment variable to test host.json fallback
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+
+                var mockSecretsManager = new Mock<ISecretsManager>();
+                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
+
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
+
+                // Set up the host.json configuration using reflection
+                var hostJsonConfig = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string>
+                    {
+                        { "AzureFunctionsJobHost:extensionBundle:ensureLatest", hostJsonValue }
+                    })
+                    .Build();
+
+                var hostJsonConfigField = typeof(StartHostAction).GetField("_hostJsonConfig", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                hostJsonConfigField.SetValue(action, hostJsonConfig);
+
+                // Act
+                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
+
+                // Assert
+                Assert.Equal(expectedShouldDownload, shouldDownload);
+                Assert.Equal(expectedSource, source);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+            }
+        }
+
+        [Fact]
+        public void ShouldDownloadExtensionBundles_EnvironmentVariableTakesPrecedenceOverHostJson()
+        {
+            // Arrange
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            try
+            {
+                // Set env var to false (should NOT download)
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "false");
+
+                var mockSecretsManager = new Mock<ISecretsManager>();
+                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
+
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
+
+                // Set up host.json with true (would download if env var wasn't set)
+                var hostJsonConfig = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string>
+                    {
+                        { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "true" }
+                    })
+                    .Build();
+
+                var hostJsonConfigField = typeof(StartHostAction).GetField("_hostJsonConfig", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                hostJsonConfigField.SetValue(action, hostJsonConfig);
+
+                // Act
+                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
+
+                // Assert - environment variable should take precedence
+                Assert.False(shouldDownload);
+                Assert.Equal("environment variable", source);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+            }
+        }
+
+        [Fact]
+        public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenHostJsonHasInvalidValue()
+        {
+            // Arrange
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+
+                var mockSecretsManager = new Mock<ISecretsManager>();
+                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
+
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
+
+                // Set up host.json with invalid value
+                var hostJsonConfig = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string>
+                    {
+                        { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "invalid" }
+                    })
+                    .Build();
+
+                var hostJsonConfigField = typeof(StartHostAction).GetField("_hostJsonConfig", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                hostJsonConfigField.SetValue(action, hostJsonConfig);
+
+                // Act
+                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
+
+                // Assert - should fall back to default when host.json value is invalid
+                Assert.True(shouldDownload);
+                Assert.Equal(string.Empty, source);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+            }
+        }
+
+        [Fact]
+        public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenHostJsonConfigIsNull()
+        {
+            // Arrange
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+
+                var mockSecretsManager = new Mock<ISecretsManager>();
+                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
+
+                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
+
+                // Don't set _hostJsonConfig (leave it null)
+
+                // Act
+                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
+
+                // Assert
+                Assert.True(shouldDownload);
+                Assert.Equal(string.Empty, source);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+            }
+        }
     }
 }

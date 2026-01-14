@@ -270,6 +270,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 return $"{parts[0]}.{parts[1]}.0";
             }
+
             return version;
         }
 
@@ -379,7 +380,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                     out var cachedVersion);
 
                 // Assert - Should not find any cache
-                result.Should().BeTrue("no cached bundle should be found");
+                result.Should().BeFalse("no cached bundle should be found");
             }
             finally
             {

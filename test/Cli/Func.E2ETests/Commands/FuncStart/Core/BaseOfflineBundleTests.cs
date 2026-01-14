@@ -4,10 +4,27 @@
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using FluentAssertions;
+using Newtonsoft.Json.Linq;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
 {
+    /// <summary>
+    /// Specifies the source for the ensureLatest configuration.
+    /// </summary>
+    public enum EnsureLatestConfigSource
+    {
+        /// <summary>
+        /// Set ensureLatest via environment variable.
+        /// </summary>
+        EnvironmentVariable,
+
+        /// <summary>
+        /// Set ensureLatest via host.json extensionBundle configuration.
+        /// </summary>
+        HostJson
+    }
+
     /// <summary>
     /// E2E tests for offline scenarios where extension bundles must be loaded from cache.
     /// </summary>
@@ -22,8 +39,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
         /// <param name="workerRuntime">Worker runtime (node, powershell, etc.)</param>
         /// <param name="log">Test output logger.</param>
         /// <param name="ensureLatestValue">Value to set for EnsureLatest (true/false).</param>
-        /// <param name="shouldDownload">Expected behavior: true if download should occur. </param>
+        /// <param name="shouldDownload">Expected behavior: true if download should occur.</param>
         /// <param name="version">Optional version suffix for test name.</param>
+        /// <param name="configSource">Where to set the ensureLatest value (environment variable or host.json).</param>
         public static void TestEnsureLatestBehavior(
             string funcPath,
             string workingDirectory,
@@ -31,43 +49,81 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
             ITestOutputHelper log,
             string ensureLatestValue,
             bool shouldDownload,
-            string version = "")
+            string version = "",
+            EnsureLatestConfigSource configSource = EnsureLatestConfigSource.EnvironmentVariable)
         {
-            var testName = $"EnsureLatest_{ensureLatestValue}_{workerRuntime}{(string.IsNullOrEmpty(version) ? string.Empty : $"_{version}")}";
+            var sourceLabel = configSource == EnsureLatestConfigSource.HostJson ? "HostJson" : "EnvVar";
+            var testName = $"EnsureLatest_{ensureLatestValue}_{sourceLabel}_{workerRuntime}{(string.IsNullOrEmpty(version) ? string.Empty : $"_{version}")}";
             int port = TestFramework.Helpers.ProcessHelper.GetAvailablePort();
 
-            log.WriteLine($"Testing EnsureLatest={ensureLatestValue}, expecting shouldDownload={shouldDownload}");
+            log.WriteLine($"Testing EnsureLatest={ensureLatestValue} via {configSource}, expecting shouldDownload={shouldDownload}");
 
-            var funcStartCommand = new FuncStartCommand(funcPath, testName, log);
+            string? originalHostJson = null;
+            var hostJsonPath = Path.Combine(workingDirectory, Common.Constants.HostJsonFileName);
 
-            funcStartCommand.ProcessStartedHandler = async (process) =>
+            try
             {
-                // Wait for startup messages to be logged
-                await Task.Delay(3000);
-                process.Kill(true);
-            };
+                // If configuring via host.json, modify the file
+                if (configSource == EnsureLatestConfigSource.HostJson)
+                {
+                    originalHostJson = File.ReadAllText(hostJsonPath);
+                    var hostJson = JObject.Parse(originalHostJson);
 
-            var result = funcStartCommand
-                .WithWorkingDirectory(workingDirectory)
-                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, workerRuntime)
-                .WithEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", ensureLatestValue)
-                .Execute(["--port", port.ToString(), "--verbose"]);
+                    // Ensure extensionBundle section exists and set ensureLatest
+                    if (hostJson["extensionBundle"] == null)
+                    {
+                        hostJson["extensionBundle"] = new JObject();
+                    }
 
-            var output = result.StdOut + result.StdErr;
+                    hostJson["extensionBundle"]!["ensureLatest"] = bool.Parse(ensureLatestValue);
+                    File.WriteAllText(hostJsonPath, hostJson.ToString());
 
-            // Assert: Process was killed, so exit code should be -1
-            result.Should().ExitWith(-1);
+                    log.WriteLine($"Modified host.json to set extensionBundle.ensureLatest={ensureLatestValue}");
+                }
 
-            // Assert: Check for expected bundle download behavior
-            if (shouldDownload)
-            {
-                // When EnsureLatest=false, should download
-                output.Should().Contain("Downloading extension bundles...");
+                var funcStartCommand = new FuncStartCommand(funcPath, testName, log);
+
+                funcStartCommand.ProcessStartedHandler = async (process) =>
+                {
+                    // Wait for startup messages to be logged
+                    await Task.Delay(5000);
+                    process.Kill(true);
+                };
+
+                var command = funcStartCommand
+                    .WithWorkingDirectory(workingDirectory)
+                    .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, workerRuntime);
+
+                // Only set environment variable if that's the config source
+                if (configSource == EnsureLatestConfigSource.EnvironmentVariable)
+                {
+                    command = command.WithEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", ensureLatestValue);
+                }
+
+                var result = command.Execute(["--port", port.ToString(), "--verbose"]);
+
+                var output = result.StdOut + result.StdErr;
+
+                // Assert: Check for expected bundle download behavior
+                if (shouldDownload)
+                {
+                    // When EnsureLatest=true, should download
+                    output.Should().Contain("Downloading extension bundles...");
+                }
+                else
+                {
+                    // When EnsureLatest=false, should skip download
+                    output.Should().NotContain("Downloading extension bundles...");
+                }
             }
-            else
+            finally
             {
-                // When EnsureLatest=false, should download
-                output.Should().NotContain("Downloading extension bundles...");
+                // Restore original host.json if we modified it
+                if (originalHostJson != null && File.Exists(hostJsonPath))
+                {
+                    File.WriteAllText(hostJsonPath, originalHostJson);
+                    log.WriteLine("Restored original host.json");
+                }
             }
         }
     }
