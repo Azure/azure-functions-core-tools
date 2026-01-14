@@ -37,7 +37,10 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
         private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
-        internal static string BundlePath { get; private set; } = string.Empty;
+        // Cache offline status to avoid repeated network checks
+        private static readonly TimeSpan _offlineCheckInterval = TimeSpan.FromSeconds(10);
+        private static bool? _isOffline = null;
+        private static DateTime _lastOfflineCheck = DateTime.MinValue;
 
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
@@ -55,7 +58,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
             if (!string.IsNullOrEmpty(extensionBundleOption.Id))
             {
                 extensionBundleOption.DownloadPath = GetBundleDownloadPath(extensionBundleOption.Id);
-                extensionBundleOption.EnsureLatest = true;
+
+                // Only try to get latest if we're online
+                extensionBundleOption.EnsureLatest = !IsOffline();
             }
 
             var configOptions = new FunctionsHostingConfigOptions();
@@ -94,10 +99,18 @@ namespace Azure.Functions.Cli.ExtensionBundle
         {
             try
             {
+                if (IsOffline())
+                {
+                    throw new HttpRequestException("System is offline.");
+                }
+
                 await extensionBundleManager.GetExtensionBundlePath(httpClient);
             }
             catch (HttpRequestException)
             {
+                // Mark as offline for future operations
+                MarkAsOffline();
+
                 // If user didn't specify an extension bundle ID, no need to download extension bundle
                 if (string.IsNullOrEmpty(extensionBundleOptions.Id))
                 {
@@ -356,7 +369,6 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 if (FindBundleInPath(customerDownloadPath, versionRange, out cachedBundleVersion))
                 {
-                    BundlePath = customerDownloadPath;
                     return true;
                 }
 
@@ -367,7 +379,6 @@ namespace Azure.Functions.Cli.ExtensionBundle
             var defaultDownloadPath = GetBundleDownloadPath(bundleId);
             if (FindBundleInPath(defaultDownloadPath, versionRange, out cachedBundleVersion))
             {
-                BundlePath = defaultDownloadPath;
                 return true;
             }
 
@@ -458,6 +469,67 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Detects if the system is currently offline (no network connectivity to CDN).
+        /// Uses caching to avoid excessive network checks.
+        /// </summary>
+        /// <returns>True if offline, false if online</returns>
+        internal static bool IsOffline()
+        {
+            // Check cache first to avoid excessive network calls
+            if (_isOffline.HasValue && DateTime.UtcNow - _lastOfflineCheck < _offlineCheckInterval)
+            {
+                return _isOffline.Value;
+            }
+
+            // Perform quick connectivity check
+            bool offline = CheckIfOffline();
+
+            // Update cache
+            _isOffline = offline;
+            _lastOfflineCheck = DateTime.UtcNow;
+
+            return offline;
+        }
+
+        /// <summary>
+        /// Performs actual network connectivity check.
+        /// </summary>
+        private static bool CheckIfOffline()
+        {
+            try
+            {
+                // Try a quick HEAD request to the CDN
+                using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
+                var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
+                var response = quickClient.SendAsync(request).GetAwaiter().GetResult();
+                return !response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                // Unknown error - assume offline to be safe
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Marks the system as offline. Used when network failures are detected.
+        /// </summary>
+        internal static void MarkAsOffline()
+        {
+            _isOffline = true;
+            _lastOfflineCheck = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Resets the offline cache to force a fresh check.
+        /// </summary>
+        internal static void ResetOfflineCache()
+        {
+            _isOffline = null;
+            _lastOfflineCheck = DateTime.MinValue;
         }
     }
 }

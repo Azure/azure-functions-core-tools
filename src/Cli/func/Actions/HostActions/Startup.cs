@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
@@ -111,7 +111,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             if (!string.IsNullOrEmpty(bundleId))
             {
                 Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId));
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", (!ExtensionBundleHelper.IsOffline()).ToString());
             }
         }
 
