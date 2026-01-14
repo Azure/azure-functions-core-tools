@@ -43,7 +43,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 // Wait for startup messages to be logged
-                await Task.Delay(3000);
+                await Task.Delay(5000);
                 process.Kill(true);
             };
 
