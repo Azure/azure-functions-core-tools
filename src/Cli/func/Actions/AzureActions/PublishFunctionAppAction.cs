@@ -180,7 +180,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (projectFilePath != null)
                 {
                     var targetFramework = await DotnetHelpers.DetermineTargetFrameworkAsync(Path.GetDirectoryName(projectFilePath));
-                    Console.WriteLine($"Detected target framework: {targetFramework}");
+                    ColoredConsole.WriteLine($"Detected target framework: {targetFramework}");
 
                     var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
 
@@ -355,12 +355,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Remove from result since runtime update is handled above
                 result.Remove(Constants.FunctionsWorkerRuntime);
             }
-            else
+            else if (!skipRuntimeUpdate)
             {
-                if (!skipRuntimeUpdate)
-                {
-                    await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
-                }
+                await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
             }
 
             // Special checks for python dependencies
