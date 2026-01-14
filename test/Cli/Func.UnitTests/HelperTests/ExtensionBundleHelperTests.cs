@@ -340,7 +340,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetCachedBundle_SimulatesNetworkFailureNoCache_ReturnsFalse()
+        public void TryGetCachedBundle_SimulatesNetworkFailureNoCache_ReturnsTrue()
         {
             // This test simulates what happens when network fails and there's no cache
             // Arrange
