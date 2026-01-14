@@ -457,12 +457,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            // Check if user explicitly disabled EnsureLatest to skip bundle download
+            // Check if user explicitly set EnsureLatest via environment variable
+            // Default to true (download enabled) when not set or unparseable
             var ensureLatestEnvVar = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
-            var shouldDownloadBundles = !string.IsNullOrEmpty(ensureLatestEnvVar) && ensureLatestEnvVar.Equals("false", StringComparison.OrdinalIgnoreCase);
+            bool shouldDownloadBundles = true; // Default behavior: download bundles
+            if (bool.TryParse(ensureLatestEnvVar, out var ensureLatest))
+            {
+                shouldDownloadBundles = !ensureLatest;
+            }
 
-            // Download bundles if specified by user or if offline mode is detected
-            if (shouldDownloadBundles || ExtensionBundleHelper.IsOffline())
+            if (shouldDownloadBundles)
             {
                 if (isVerbose)
                 {
@@ -470,6 +474,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 }
 
                 await ExtensionBundleHelper.GetExtensionBundle();
+            }
+            else if (isVerbose)
+            {
+                ColoredConsole.WriteLine(VerboseColor("Skipping extension bundle download because AzureFunctionsJobHost__extensionBundle__ensureLatest is set to false."));
             }
 
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
