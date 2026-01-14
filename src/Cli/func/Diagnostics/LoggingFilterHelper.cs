@@ -61,17 +61,17 @@ namespace Azure.Functions.Cli
         /// <summary>
         /// Gets default level for system logs.
         /// </summary>
-        public LogLevel SystemLogDefaultLogLevel { get; private set; } = LogLevel.Warning;
+        public LogLevel SystemLogDefaultLogLevel { get; } = LogLevel.Warning;
 
         /// <summary>
         /// Gets default level for user logs.
         /// </summary>
-        public LogLevel UserLogDefaultLogLevel { get; private set; } = LogLevel.Information;
+        public LogLevel UserLogDefaultLogLevel { get; } = LogLevel.Information;
 
         /// <summary>
         /// Gets a value indicating whether is set to true if `func start` is started with `--verbose` flag. If set, SystemLogDefaultLogLevel is set to Information.
         /// </summary>
-        public bool VerboseLogging { get; private set; }
+        public bool VerboseLogging { get; }
 
         internal bool IsCiEnvironment(bool verboseLoggingArgExists)
         {
