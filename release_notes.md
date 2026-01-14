@@ -11,3 +11,5 @@
 
 - Added end-of-life warnings for all runtime versions during `func azure functionapp publish`. (#4760)
 - Fallback to cached bundles if there is no network connection during `func start` (#4772)
+- Fallback to cached bundles if there is no network connection during `func new` (#4775)
+
