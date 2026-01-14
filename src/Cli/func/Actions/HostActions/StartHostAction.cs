@@ -160,7 +160,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<string>("user-log-level")
-                .WithDescription("Sets the minimum log level for user logs (function code and user libraries). Valid values: Trace, Debug, Information, Warning, Error, Critical, None. This does not affect system logs.")
+                .WithDescription("Sets the minimum log level for displaying user logs. Valid values: Trace, Debug, Information, Warning, Error, Critical, None. This does not affect system logs.")
                 .Callback(level => UserLogLevel = level);
 
             Parser
@@ -200,6 +200,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, UserLogLevel);
+
+            // If user log level is explicitly set, configure the host to accept function logs at that level
+            // This allows --user-log-level to work without requiring host.json changes
+            ConfigureHostLoggingForUserLogLevel(loggingFilterHelper);
+
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
                 GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
             {
@@ -250,8 +255,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         // Cache LoggerFilterOptions to be used by the logger to filter logs based on content
                         var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>().Value;
 
-                        // Set min level to SystemLogDefaultLogLevel.
-                        filterOptions.MinLevel = loggingFilterHelper.SystemLogDefaultLogLevel;
+                        // Set min level to the lower of SystemLogDefaultLogLevel and UserLogDefaultLogLevel
+                        // so that the global filter doesn't prematurely filter out logs before our custom filter runs.
+                        filterOptions.MinLevel = loggingFilterHelper.SystemLogDefaultLogLevel < loggingFilterHelper.UserLogDefaultLogLevel
+                            ? loggingFilterHelper.SystemLogDefaultLogLevel
+                            : loggingFilterHelper.UserLogDefaultLogLevel;
                         return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions, JsonOutputFile);
                     });
 
@@ -895,6 +903,31 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private void PrintMigrationWarningForDotnet6Inproc()
         {
             ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
+        }
+
+        /// <summary>
+        /// Configures the host logging environment variables based on the user log level setting.
+        /// This enables the host to accept function logs at the user-specified level without
+        /// requiring host.json changes, while preserving existing system log level settings.
+        /// </summary>
+        /// <param name="loggingFilterHelper">The logging filter helper with the resolved log levels.</param>
+        private static void ConfigureHostLoggingForUserLogLevel(LoggingFilterHelper loggingFilterHelper)
+        {
+            // Only set environment variables if they're not already defined (user's config takes precedence)
+            // Set the log level for Function.* categories to enable user logs at the specified level
+            string functionLogLevelKey = "AzureFunctionsJobHost__logging__logLevel__Function";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(functionLogLevelKey)))
+            {
+                Environment.SetEnvironmentVariable(functionLogLevelKey, loggingFilterHelper.UserLogDefaultLogLevel.ToString());
+            }
+
+            // Enable debug logging for Python worker so all logs are sent to the host.
+            // The --user-log-level setting controls what's displayed, not what's sent.
+            string pythonDebugLoggingKey = "PYTHON_ENABLE_DEBUG_LOGGING";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pythonDebugLoggingKey)))
+            {
+                Environment.SetEnvironmentVariable(pythonDebugLoggingKey, "1");
+            }
         }
     }
 }
