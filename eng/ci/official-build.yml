@@ -33,6 +33,8 @@ variables:
     value: true
   - name: supportedRuntimes
     value: 'linux-x64,linux-arm64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+  - name: E2E_LOG_LEVEL
+    value: 'Minimal'  # Options: Minimal, Normal, Verbose. Can be overridden at queue time.
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
