@@ -1,6 +1,57 @@
+parameters:
+# When true, build CLI inline instead of downloading from a previous stage
+# Use for public/PR builds where we want fast parallel execution
+- name: buildCliInline
+  type: boolean
+  default: false
+
+# Artifact name to download (only used when buildCliInline is false)
+# Official builds use 'func-cli-linux-x64', public builds use 'e2e-cli-linux-x64'
+- name: artifactName
+  type: string
+  default: 'func-cli-linux-x64'
+
 jobs:
-# Run E2E tests using CLI artifact from BuildAndPublish stage
+# Build CLI job (only when buildCliInline is true)
+- ${{ if eq(parameters.buildCliInline, true) }}:
+  - job: Build_Linux_CLI
+    timeoutInMinutes: '30'
+    displayName: 'Build CLI (linux-x64)'
+
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-ubuntu-22.04
+      os: linux
+
+    steps:
+    - template: /eng/ci/templates/steps/install-tools.yml@self
+
+    - template: /eng/ci/templates/steps/restore-nuget.yml@self
+
+    - pwsh: |
+        dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
+          -c Release `
+          -f net8.0 `
+          -r linux-x64 `
+          --self-contained `
+          -o $(Build.ArtifactStagingDirectory)/artifacts/linux-x64
+      displayName: 'Publish CLI (linux-x64)'
+
+    - bash: |
+        chmod +x $(Build.ArtifactStagingDirectory)/artifacts/linux-x64/func
+        chmod +x $(Build.ArtifactStagingDirectory)/artifacts/linux-x64/gozip
+      displayName: 'Make CLI binaries executable'
+
+    - task: 1ES.PublishPipelineArtifact@1
+      displayName: 'Publish CLI Artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/artifacts/linux-x64'
+        artifactName: 'e2e-cli-linux-x64'
+
+# Run E2E tests
 - job: Linux_E2E_Test
+  ${{ if eq(parameters.buildCliInline, true) }}:
+    dependsOn: Build_Linux_CLI
   timeoutInMinutes: '60'
   displayName: 'E2E Test:'
 
@@ -33,26 +84,39 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  # Download the signed CLI artifact from BuildAndPublish stage
-  - task: DownloadPipelineArtifact@2
-    displayName: 'Download CLI Artifact from Build'
-    inputs:
-      artifactName: 'func-cli-$(runtime)'
-      targetPath: '$(Build.ArtifactStagingDirectory)/artifacts/$(runtime)'
+  # Download CLI artifact (when NOT building inline - official builds)
+  - ${{ if eq(parameters.buildCliInline, false) }}:
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download CLI Artifact from Build'
+      inputs:
+        artifactName: '${{ parameters.artifactName }}'
+        targetPath: '$(Build.ArtifactStagingDirectory)/artifacts/$(runtime)'
 
-  # Extract the CLI zip
-  - bash: |
-      cd $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
-      # Find and extract the CLI zip
-      ZIP_FILE=$(ls Azure.Functions.Cli.$(runtime).*.zip 2>/dev/null | head -1)
-      if [ -n "$ZIP_FILE" ]; then
-        echo "Extracting $ZIP_FILE..."
-        unzip -o "$ZIP_FILE"
-        rm "$ZIP_FILE"
-      fi
-      chmod +x func gozip 2>/dev/null || true
-      ls -la
-    displayName: 'Extract and prepare CLI'
+    - bash: |
+        cd $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
+        # Find and extract the CLI zip
+        ZIP_FILE=$(ls Azure.Functions.Cli.$(runtime).*.zip 2>/dev/null | head -1)
+        if [ -n "$ZIP_FILE" ]; then
+          echo "Extracting $ZIP_FILE..."
+          unzip -o "$ZIP_FILE"
+          rm "$ZIP_FILE"
+        fi
+        chmod +x func gozip 2>/dev/null || true
+        ls -la
+      displayName: 'Extract and prepare CLI'
+
+  # Download CLI artifact (when building inline - public builds)
+  - ${{ if eq(parameters.buildCliInline, true) }}:
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download CLI Artifact'
+      inputs:
+        artifactName: 'e2e-cli-linux-x64'
+        targetPath: '$(Build.ArtifactStagingDirectory)/artifacts/$(runtime)'
+
+    - bash: |
+        chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
+        chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
+      displayName: 'Make CLI binaries executable'
 
   # Cleanup temp directories before running tests
   - bash: |

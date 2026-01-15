@@ -27,6 +27,8 @@ resources:
 variables:
   - name: supportedRuntimes
     value: 'linux-x64,linux-arm64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+  - name: E2E_LOG_LEVEL
+    value: 'Minimal'  # Options: Minimal, Normal, Verbose. Can be overridden at queue time.
 
 extends:
   template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
@@ -84,8 +86,8 @@ extends:
         - template: /eng/ci/templates/public/jobs/test-unit-windows.yml@self
         - template: /eng/ci/templates/public/jobs/test-unit-linux.yml@self
 
-      # Do we want the E2E tests for the public build?
-      # Might need this at first whilst we work on building out solid unit tests
+      # E2E tests run in parallel with Build stage for faster PR feedback
+      # Each E2E stage builds its own CLI (single runtime) instead of waiting for full Build
       - stage: E2ETestWindows
         dependsOn: PreCheck
         condition: >
@@ -96,6 +98,8 @@ extends:
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+          parameters:
+            buildCliInline: true
 
       - stage: E2ETestLinux
         dependsOn: PreCheck
@@ -107,6 +111,8 @@ extends:
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+          parameters:
+            buildCliInline: true
 
       - stage: E2ETestOSX
         dependsOn: PreCheck
@@ -118,3 +124,5 @@ extends:
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self
+          parameters:
+            buildCliInline: true
