@@ -219,19 +219,19 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
-        [InlineData("js", "JavaScript")]
-        [InlineData("javascript", "JavaScript")]
-        [InlineData("node", "JavaScript")]
-        [InlineData("ts", "TypeScript")]
-        [InlineData("typescript", "TypeScript")]
-        [InlineData("py", "Python")]
-        [InlineData("python", "Python")]
-        [InlineData("pwsh", "PowerShell")]
-        [InlineData("powershell", "PowerShell")]
-        [InlineData("csharp", "C#")]
-        [InlineData("dotnet", "C#")]
-        [InlineData("dotnet-isolated", "C#")]
-        [InlineData("fsharp", "F#")]
+        [InlineData("js", "javascript")]
+        [InlineData("javascript", "javascript")]
+        [InlineData("node", "javascript")]
+        [InlineData("ts", "typescript")]
+        [InlineData("typescript", "typescript")]
+        [InlineData("py", "python")]
+        [InlineData("python", "python")]
+        [InlineData("pwsh", "powershell")]
+        [InlineData("powershell", "powershell")]
+        [InlineData("csharp", "c#")]
+        [InlineData("dotnet", "c#")]
+        [InlineData("dotnet-isolated", "c#")]
+        [InlineData("fsharp", "f#")]
         public void NormalizeLanguage_WithValidInputs_ReturnsExpectedLanguage(string input, string expected)
         {
             var result = WorkerRuntimeLanguageHelper.NormalizeLanguage(input);
@@ -265,8 +265,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             var languages = WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages[WorkerRuntime.Node];
 
-            languages.Should().Contain("JavaScript");
-            languages.Should().Contain("TypeScript");
+            languages.Should().Contain("javascript");
+            languages.Should().Contain("typescript");
         }
 
         [Fact]
@@ -274,8 +274,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             var languages = WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages[WorkerRuntime.Dotnet];
 
-            languages.Should().Contain("C#");
-            languages.Should().Contain("F#");
+            languages.Should().Contain("c#");
+            languages.Should().Contain("f#");
         }
 
         [Fact]
@@ -283,8 +283,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             var languages = WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages[WorkerRuntime.DotnetIsolated];
 
-            languages.Should().Contain("C#");
-            languages.Should().Contain("F#");
+            languages.Should().Contain("c#");
+            languages.Should().Contain("f#");
         }
     }
 }
