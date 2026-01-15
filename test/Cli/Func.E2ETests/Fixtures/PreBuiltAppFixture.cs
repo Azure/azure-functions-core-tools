@@ -95,8 +95,20 @@ namespace Azure.Functions.Cli.E2ETests.Fixtures
             Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, hiveRoot);
             Directory.CreateDirectory(hiveRoot);
 
+            // Verify source app path exists before copying
+            if (!Directory.Exists(SourceAppPath))
+            {
+                throw new DirectoryNotFoundException($"Source test app not found at '{SourceAppPath}'");
+            }
+
             // Copy the pre-built app to the working directory
             CopyDirectoryHelpers.CopyDirectory(SourceAppPath, WorkingDirectory);
+
+            // Verify copy was successful
+            if (!File.Exists(Path.Combine(WorkingDirectory, "host.json")))
+            {
+                throw new InvalidOperationException($"Failed to copy test app - host.json not found in '{WorkingDirectory}'");
+            }
 
             return Task.CompletedTask;
         }

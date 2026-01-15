@@ -37,6 +37,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
             var methodName = nameof(Start_DotnetIsolated_EnableAuthFeature);
             var uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
+            // Verify fixture was initialized correctly
+            if (!Directory.Exists(_fixture.WorkingDirectory) || !File.Exists(Path.Combine(_fixture.WorkingDirectory, "host.json")))
+            {
+                throw new InvalidOperationException($"Fixture working directory is not set up correctly. WorkingDirectory: {_fixture.WorkingDirectory}, Exists: {Directory.Exists(_fixture.WorkingDirectory)}");
+            }
+
             // Create a unique subdirectory for this test to avoid conflicts
             var workingDir = Path.Combine(Path.GetTempPath(), $"auth_test_{Guid.NewGuid():N}");
             CopyDirectoryHelpers.CopyDirectory(_fixture.WorkingDirectory, workingDir);

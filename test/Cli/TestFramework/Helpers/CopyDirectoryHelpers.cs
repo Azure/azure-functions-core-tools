@@ -7,6 +7,14 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
     {
         public static void CopyDirectory(string sourceDir, string destinationDir)
         {
+            if (!Directory.Exists(sourceDir))
+            {
+                throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
+            }
+
+            // Create destination directory if it doesn't exist
+            Directory.CreateDirectory(destinationDir);
+
             // Create all subdirectories
             foreach (string dirPath in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories))
             {
@@ -17,12 +25,26 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
             foreach (string filePath in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
             {
                 string destFile = filePath.Replace(sourceDir, destinationDir);
+                // Ensure the destination directory exists (for nested paths)
+                string? destDir = Path.GetDirectoryName(destFile);
+                if (!string.IsNullOrEmpty(destDir))
+                {
+                    Directory.CreateDirectory(destDir);
+                }
                 File.Copy(filePath, destFile, true);
             }
         }
 
         public static void CopyDirectoryWithout(string sourceDir, string destinationDir, string excludeFile)
         {
+            if (!Directory.Exists(sourceDir))
+            {
+                throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
+            }
+
+            // Create destination directory if it doesn't exist
+            Directory.CreateDirectory(destinationDir);
+
             // Create all subdirectories
             foreach (string dirPath in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories))
             {
@@ -35,6 +57,12 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                 if (!Path.GetFileName(filePath).Equals(excludeFile, StringComparison.OrdinalIgnoreCase))
                 {
                     string destFile = filePath.Replace(sourceDir, destinationDir);
+                    // Ensure the destination directory exists (for nested paths)
+                    string? destDir = Path.GetDirectoryName(destFile);
+                    if (!string.IsNullOrEmpty(destDir))
+                    {
+                        Directory.CreateDirectory(destDir);
+                    }
                     File.Copy(filePath, destFile, true);
                 }
             }
