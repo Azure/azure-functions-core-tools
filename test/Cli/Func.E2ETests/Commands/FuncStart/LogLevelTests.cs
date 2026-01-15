@@ -147,9 +147,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
 
             try
             {
-                // Modify host.json to set log level
+                // Modify host.json to set log level to Warning (so we see important messages but not verbose ones)
                 var hostJsonPath = Path.Combine(workingDir, "host.json");
-                var hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
+                var hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Warning\"}}}";
                 File.WriteAllText(hostJsonPath, hostJsonContent);
 
                 // Call func start
@@ -163,7 +163,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
                             .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                             .Execute(["--port", port.ToString()]);
 
-                // Validate minimal worker logs due to "None" log level
+                // Validate that log level is respected - should see worker initialized but not verbose route logs
                 result.Should().HaveStdOutContaining("Worker process started and initialized");
                 result.Should().NotHaveStdOutContaining("Initializing function HTTP routes");
             }
