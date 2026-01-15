@@ -89,7 +89,7 @@ extends:
       # E2E tests run in parallel with Build stage for faster PR feedback
       # Each E2E stage builds its own CLI (single runtime) instead of waiting for full Build
       - stage: E2ETestWindows
-        # dependsOn: PreCheck
+        dependsOn: 
         # condition: >
         #   or(
         #     ne(variables['Build.Reason'], 'PullRequest'),
@@ -102,7 +102,7 @@ extends:
             buildCliInline: true
 
       - stage: E2ETestLinux
-        # dependsOn: PreCheck
+        dependsOn: 
         # condition: >
         #   or(
         #     ne(variables['Build.Reason'], 'PullRequest'),
@@ -115,7 +115,7 @@ extends:
             buildCliInline: true
 
       - stage: E2ETestOSX
-        # dependsOn: PreCheck
+        dependsOn: 
         # condition: >
         #   or(
         #     ne(variables['Build.Reason'], 'PullRequest'),
