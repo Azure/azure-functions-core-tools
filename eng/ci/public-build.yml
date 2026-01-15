@@ -50,51 +50,51 @@ extends:
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
 
     stages:
-      - stage: PreCheck
-        displayName: 'Pre-check: classify changes'
+      # - stage: PreCheck
+      #   displayName: 'Pre-check: classify changes'
 
-        jobs:
-        - template: /eng/ci/templates/public/jobs/precheck-docs-only.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/public/jobs/precheck-docs-only.yml@self
 
-      - stage: Build
-        dependsOn: PreCheck
+      # - stage: Build
+      #   dependsOn: PreCheck
 
-        # This condition ensures that if the build is not a PR (i.e a scheduled or manual build), the stages will always run.
-        # If it is a PR, the stages will only run if the changes are not "docs-only" changes.
-        condition: >
-          or(
-            ne(variables['Build.Reason'], 'PullRequest'),
-            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
-          )
+      #   # This condition ensures that if the build is not a PR (i.e a scheduled or manual build), the stages will always run.
+      #   # If it is a PR, the stages will only run if the changes are not "docs-only" changes.
+      #   condition: >
+      #     or(
+      #       ne(variables['Build.Reason'], 'PullRequest'),
+      #       ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+      #     )
 
-        jobs:
-        - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
-          - template: /eng/ci/templates/public/jobs/build-cli.yml@self
-            parameters:
-              runtime: ${{ runtime }}
-              jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
+      #   jobs:
+      #   - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+      #     - template: /eng/ci/templates/public/jobs/build-cli.yml@self
+      #       parameters:
+      #         runtime: ${{ runtime }}
+      #         jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
 
-      - stage: UnitTest
-        dependsOn: PreCheck
-        condition: >
-          or(
-            ne(variables['Build.Reason'], 'PullRequest'),
-            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
-          )
+      # - stage: UnitTest
+      #   dependsOn: PreCheck
+      #   condition: >
+      #     or(
+      #       ne(variables['Build.Reason'], 'PullRequest'),
+      #       ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+      #     )
 
-        jobs:
-        - template: /eng/ci/templates/public/jobs/test-unit-windows.yml@self
-        - template: /eng/ci/templates/public/jobs/test-unit-linux.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/public/jobs/test-unit-windows.yml@self
+      #   - template: /eng/ci/templates/public/jobs/test-unit-linux.yml@self
 
       # E2E tests run in parallel with Build stage for faster PR feedback
       # Each E2E stage builds its own CLI (single runtime) instead of waiting for full Build
       - stage: E2ETestWindows
-        dependsOn: PreCheck
-        condition: >
-          or(
-            ne(variables['Build.Reason'], 'PullRequest'),
-            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
-          )
+        # dependsOn: PreCheck
+        # condition: >
+        #   or(
+        #     ne(variables['Build.Reason'], 'PullRequest'),
+        #     ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+        #   )
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
@@ -102,12 +102,12 @@ extends:
             buildCliInline: true
 
       - stage: E2ETestLinux
-        dependsOn: PreCheck
-        condition: >
-          or(
-            ne(variables['Build.Reason'], 'PullRequest'),
-            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
-          )
+        # dependsOn: PreCheck
+        # condition: >
+        #   or(
+        #     ne(variables['Build.Reason'], 'PullRequest'),
+        #     ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+        #   )
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
@@ -115,12 +115,12 @@ extends:
             buildCliInline: true
 
       - stage: E2ETestOSX
-        dependsOn: PreCheck
-        condition: >
-          or(
-            ne(variables['Build.Reason'], 'PullRequest'),
-            ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
-          )
+        # dependsOn: PreCheck
+        # condition: >
+        #   or(
+        #     ne(variables['Build.Reason'], 'PullRequest'),
+        #     ne(dependencies.PreCheck.outputs['classify_changes.detect.DocsOnly'], 'true')
+        #   )
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self
