@@ -25,12 +25,14 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
             foreach (string filePath in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
             {
                 string destFile = filePath.Replace(sourceDir, destinationDir);
+
                 // Ensure the destination directory exists (for nested paths)
                 string? destDir = Path.GetDirectoryName(destFile);
                 if (!string.IsNullOrEmpty(destDir))
                 {
                     Directory.CreateDirectory(destDir);
                 }
+
                 File.Copy(filePath, destFile, true);
             }
         }
@@ -57,12 +59,14 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                 if (!Path.GetFileName(filePath).Equals(excludeFile, StringComparison.OrdinalIgnoreCase))
                 {
                     string destFile = filePath.Replace(sourceDir, destinationDir);
+
                     // Ensure the destination directory exists (for nested paths)
                     string? destDir = Path.GetDirectoryName(destFile);
                     if (!string.IsNullOrEmpty(destDir))
                     {
                         Directory.CreateDirectory(destDir);
                     }
+
                     File.Copy(filePath, destFile, true);
                 }
             }
