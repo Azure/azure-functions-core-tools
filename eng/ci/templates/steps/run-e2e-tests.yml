@@ -64,6 +64,7 @@ steps:
     FUNC_PATH: $(FUNC_PATH)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     DURABLE_FUNCTION_PATH: $(DURABLE_FUNCTION_PATH)
+    E2E_LOG_LEVEL: Minimal  # Reduce log output in CI to prevent disk space issues
 
 - task: 1ES.PublishPipelineArtifact@1
   condition: succeededOrFailed()

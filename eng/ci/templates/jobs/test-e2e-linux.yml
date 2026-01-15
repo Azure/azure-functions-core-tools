@@ -1,6 +1,7 @@
 jobs:
+# Run E2E tests using CLI artifact from BuildAndPublish stage
 - job: Linux_E2E_Test
-  timeoutInMinutes: '180'
+  timeoutInMinutes: '60'
   displayName: 'E2E Test:'
 
   pool:
@@ -32,23 +33,45 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+  # Download the signed CLI artifact from BuildAndPublish stage
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download CLI Artifact from Build'
+    inputs:
+      artifactName: 'func-cli-$(runtime)'
+      targetPath: '$(Build.ArtifactStagingDirectory)/artifacts/$(runtime)'
 
-  - pwsh: |
-      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
-        -c Release `
-        -f net8.0 `
-        -r $(runtime) `
-        --self-contained `
-        -o $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
-    displayName: 'Publish CLI ($(runtime))'
-
+  # Extract the CLI zip
   - bash: |
-      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
-      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
-    displayName: 'Make CLI binaries executable'
+      cd $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
+      # Find and extract the CLI zip
+      ZIP_FILE=$(ls Azure.Functions.Cli.$(runtime).*.zip 2>/dev/null | head -1)
+      if [ -n "$ZIP_FILE" ]; then
+        echo "Extracting $ZIP_FILE..."
+        unzip -o "$ZIP_FILE"
+        rm "$ZIP_FILE"
+      fi
+      chmod +x func gozip 2>/dev/null || true
+      ls -la
+    displayName: 'Extract and prepare CLI'
+
+  # Cleanup temp directories before running tests
+  - bash: |
+      echo "Cleaning up temp directories..."
+      rm -rf /tmp/func-e2e-* || true
+      rm -rf ~/.azure-functions-core-tools/dotnet-templates-custom-hives || true
+      df -h
+    displayName: 'Cleanup temp directories'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
     parameters:
       worker: $(languageWorker)
       runtime: $(runtime)
+
+  # Always cleanup after tests, even on failure
+  - bash: |
+      echo "Post-test cleanup..."
+      rm -rf /tmp/func-e2e-* || true
+      rm -rf ~/.azure-functions-core-tools/dotnet-templates-custom-hives || true
+      df -h
+    displayName: 'Post-test cleanup'
+    condition: always()

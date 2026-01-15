@@ -76,21 +76,21 @@ extends:
             artifactName: 'func-cli'
             packageName: 'func-cli'
 
-      # Test Stages
+      # Test Stages - depend on BuildAndPublish to use the signed CLI artifacts
       - stage: E2ETestWindows
-        dependsOn: ''
+        dependsOn: 'BuildAndPublish'
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
 
       - stage: E2ETestLinux
-        dependsOn: ''
+        dependsOn: 'BuildAndPublish'
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
 
       - stage: E2ETestOSX
-        dependsOn: ''
+        dependsOn: 'BuildAndPublish'
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self

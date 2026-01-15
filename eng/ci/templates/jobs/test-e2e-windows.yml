@@ -1,6 +1,7 @@
 jobs:
+# Run E2E tests using CLI artifact from BuildAndPublish stage
 - job: Windows_E2E_Test
-  timeoutInMinutes: '180'
+  timeoutInMinutes: '60'
   displayName: 'E2E Test:'
 
   pool:
@@ -32,18 +33,50 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+  # Download the signed CLI artifact from BuildAndPublish stage
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download CLI Artifact from Build'
+    inputs:
+      artifactName: 'func-cli-$(runtime)'
+      targetPath: '$(Build.ArtifactStagingDirectory)/artifacts/$(runtime)'
 
+  # Extract the CLI zip
   - pwsh: |
-      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
-      -c Release `
-      -f net8.0 `
-      -r $(runtime) `
-      --self-contained `
-      -o $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
-    displayName: 'Publish CLI ($(runtime))'
+      $artifactPath = "$(Build.ArtifactStagingDirectory)/artifacts/$(runtime)"
+      Set-Location $artifactPath
+      # Find and extract the CLI zip
+      $zipFile = Get-ChildItem -Filter "Azure.Functions.Cli.$(runtime).*.zip" | Select-Object -First 1
+      if ($zipFile) {
+        Write-Host "Extracting $($zipFile.Name)..."
+        Expand-Archive -Path $zipFile.FullName -DestinationPath . -Force
+        Remove-Item $zipFile.FullName
+      }
+      Get-ChildItem
+    displayName: 'Extract and prepare CLI'
+
+  # Cleanup temp directories before running tests
+  - pwsh: |
+      Write-Host "Cleaning up temp directories..."
+      Remove-Item -Path "$env:TEMP\func-e2e-*" -Recurse -Force -ErrorAction SilentlyContinue
+      $hivePath = Join-Path $env:LOCALAPPDATA "azure-functions-core-tools\dotnet-templates-custom-hives"
+      if (Test-Path $hivePath) {
+        Remove-Item -Path $hivePath -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{N='FreeGB';E={[math]::Round($_.Free/1GB,2)}}
+    displayName: 'Cleanup temp directories'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
     parameters:
       worker: $(languageWorker)
       runtime: $(runtime)
+
+  # Always cleanup after tests, even on failure
+  - pwsh: |
+      Write-Host "Post-test cleanup..."
+      Remove-Item -Path "$env:TEMP\func-e2e-*" -Recurse -Force -ErrorAction SilentlyContinue
+      $hivePath = Join-Path $env:LOCALAPPDATA "azure-functions-core-tools\dotnet-templates-custom-hives"
+      if (Test-Path $hivePath) {
+        Remove-Item -Path $hivePath -Recurse -Force -ErrorAction SilentlyContinue
+      }
+    displayName: 'Post-test cleanup'
+    condition: always()
