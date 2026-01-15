@@ -82,7 +82,14 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
 
         public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, StreamWriter fileWriter, string functionCall = "", bool shouldDelayForLogs = false)
         {
+            var (content, _) = await ProcessStartedHandlerHelperWithStatusCode(port, process, fileWriter, functionCall, shouldDelayForLogs);
+            return content;
+        }
+
+        public static async Task<(string Content, HttpStatusCode StatusCode)> ProcessStartedHandlerHelperWithStatusCode(int port, Process process, StreamWriter fileWriter, string functionCall = "", bool shouldDelayForLogs = false)
+        {
             string capturedContent = string.Empty;
+            HttpStatusCode statusCode = HttpStatusCode.OK;
             try
             {
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
@@ -100,7 +107,9 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                 {
                     using var client = new HttpClient();
                     HttpResponseMessage response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
+                    statusCode = response.StatusCode;
                     capturedContent = await response.Content.ReadAsStringAsync();
+                    fileWriter.WriteLine($"[HANDLER] HTTP Status Code: {(int)statusCode} ({statusCode})");
                     fileWriter.WriteLine($"[HANDLER] Captured content: {capturedContent}");
                     fileWriter.Flush();
                 }
@@ -126,7 +135,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
 
             fileWriter.WriteLine($"[HANDLER] Returning captured content");
             fileWriter.Flush();
-            return capturedContent;
+            return (capturedContent, statusCode);
         }
     }
 }

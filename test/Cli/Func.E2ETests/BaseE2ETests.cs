@@ -11,6 +11,8 @@ namespace Azure.Functions.Cli.E2ETests
 {
     public abstract class BaseE2ETests(ITestOutputHelper log) : IAsyncLifetime
     {
+        private static readonly string _hiveRoot = Path.Combine(Path.GetTempPath(), "func-e2e-hives");
+
         protected ITestOutputHelper Log { get; } = log;
 
         protected string FuncPath { get; set; } = Environment.GetEnvironmentVariable(Constants.FuncPath) ?? string.Empty;
@@ -37,10 +39,9 @@ namespace Azure.Functions.Cli.E2ETests
                 }
             }
 
-            var hiveRoot = Path.Combine(Path.GetTempPath(), "func-e2e-hives");
             Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveFlag, "1");
-            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, hiveRoot);
-            Directory.CreateDirectory(hiveRoot);
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, _hiveRoot);
+            Directory.CreateDirectory(_hiveRoot);
 
             Directory.CreateDirectory(WorkingDirectory);
             return Task.CompletedTask;
@@ -48,6 +49,7 @@ namespace Azure.Functions.Cli.E2ETests
 
         public Task DisposeAsync()
         {
+            // Cleanup working directory
             try
             {
                 Directory.Delete(WorkingDirectory, true);
@@ -57,7 +59,46 @@ namespace Azure.Functions.Cli.E2ETests
                 // Cleanup failed but we shouldn't crash on this
             }
 
+            // Cleanup hive directories to prevent disk space exhaustion
+            CleanupHiveDirectories();
+
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Cleans up custom hive directories to prevent disk space exhaustion in CI.
+        /// Hive directories accumulate with each test run and are not automatically cleaned.
+        /// </summary>
+        private static void CleanupHiveDirectories()
+        {
+            try
+            {
+                if (Directory.Exists(_hiveRoot))
+                {
+                    // Delete hive subdirectories that are older than 1 hour
+                    // This prevents deleting hives that might be in use by parallel tests
+                    var cutoffTime = DateTime.UtcNow.AddHours(-1);
+                    foreach (var dir in Directory.GetDirectories(_hiveRoot))
+                    {
+                        try
+                        {
+                            var dirInfo = new DirectoryInfo(dir);
+                            if (dirInfo.CreationTimeUtc < cutoffTime)
+                            {
+                                Directory.Delete(dir, true);
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore individual directory cleanup failures
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore hive cleanup failures - not critical
+            }
         }
 
         public async Task FuncInitWithRetryAsync(string testName, IEnumerable<string> args)

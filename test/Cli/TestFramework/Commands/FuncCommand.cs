@@ -8,9 +8,49 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Commands
 {
+    /// <summary>
+    /// Log level for E2E test output. Set via E2E_LOG_LEVEL environment variable.
+    /// </summary>
+    public enum E2ELogLevel
+    {
+        /// <summary>All output is logged (default for local development).</summary>
+        Verbose,
+
+        /// <summary>Normal output, skips repetitive lines.</summary>
+        Normal,
+
+        /// <summary>Minimal output for CI to reduce disk usage.</summary>
+        Minimal
+    }
+
     public abstract class FuncCommand(ITestOutputHelper log)
     {
+        /// <summary>
+        /// Maximum log file size in bytes (5MB). After this limit, older content is truncated.
+        /// </summary>
+        public const long MaxLogFileSizeBytes = 5 * 1024 * 1024;
+
         private readonly Dictionary<string, string> _environment = [];
+        private long _currentLogFileSize = 0;
+        private bool _logTruncationWarningWritten = false;
+
+        /// <summary>
+        /// Gets the current log level from E2E_LOG_LEVEL environment variable.
+        /// Defaults to Verbose for local development, can be set to Minimal in CI.
+        /// </summary>
+        public static E2ELogLevel CurrentLogLevel
+        {
+            get
+            {
+                var level = Environment.GetEnvironmentVariable("E2E_LOG_LEVEL");
+                return level?.ToLowerInvariant() switch
+                {
+                    "minimal" => E2ELogLevel.Minimal,
+                    "normal" => E2ELogLevel.Normal,
+                    _ => E2ELogLevel.Verbose
+                };
+            }
+        }
 
         public ITestOutputHelper Log { get; } = log;
 
@@ -112,7 +152,7 @@ namespace Azure.Functions.Cli.TestFramework.Commands
                 var fileStream = new FileStream(LogFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
                 FileWriter = new StreamWriter(fileStream)
                 {
-                    AutoFlush = true
+                    AutoFlush = false // Disable AutoFlush to reduce I/O overhead
                 };
 
                 // Write initial information
@@ -121,20 +161,45 @@ namespace Azure.Functions.Cli.TestFramework.Commands
                 string? display = $"func {string.Join(" ", spec.Arguments)}";
                 FileWriter.WriteLine($"Command: {display}");
                 FileWriter.WriteLine($"Working Directory: {spec.WorkingDirectory ?? "not specified"}");
+                FileWriter.WriteLine($"Log Level: {CurrentLogLevel}");
                 FileWriter.WriteLine("====================================");
+                FileWriter.Flush();
+
+                _currentLogFileSize = fileStream.Length;
 
                 command.OnOutputLine(line =>
                 {
                     try
                     {
-                        // Write to the file if it's still open
+                        // Write to the file if it's still open and under size limit
                         if (FileWriter is not null && FileWriter.BaseStream is not null)
                         {
-                            FileWriter.WriteLine($"[STDOUT] {line}");
-                            FileWriter.Flush();
+                            if (_currentLogFileSize < MaxLogFileSizeBytes)
+                            {
+                                var logLine = $"[STDOUT] {line}";
+                                FileWriter.WriteLine(logLine);
+                                _currentLogFileSize += logLine.Length + Environment.NewLine.Length;
+
+                                // Flush periodically instead of every line (every ~100KB)
+                                if (_currentLogFileSize % (100 * 1024) < 1024)
+                                {
+                                    FileWriter.Flush();
+                                }
+                            }
+                            else if (!_logTruncationWarningWritten)
+                            {
+                                FileWriter.WriteLine($"[WARNING] Log file size limit ({MaxLogFileSizeBytes / 1024 / 1024}MB) reached. Further output truncated.");
+                                FileWriter.Flush();
+                                _logTruncationWarningWritten = true;
+                            }
                         }
 
-                        Log.WriteLine($"》   {line}");
+                        // Only write to test output if not in Minimal mode
+                        if (CurrentLogLevel != E2ELogLevel.Minimal)
+                        {
+                            Log.WriteLine($"》   {line}");
+                        }
+
                         CommandOutputHandler?.Invoke(line);
                     }
                     catch (Exception ex)
@@ -147,13 +212,19 @@ namespace Azure.Functions.Cli.TestFramework.Commands
                 {
                     try
                     {
-                        // Write to the file if it's still open
+                        // Always write errors to file (if under limit)
                         if (FileWriter is not null && FileWriter.BaseStream is not null)
                         {
-                            FileWriter.WriteLine($"[STDERR] {line}");
-                            FileWriter.Flush();
+                            if (_currentLogFileSize < MaxLogFileSizeBytes)
+                            {
+                                var logLine = $"[STDERR] {line}";
+                                FileWriter.WriteLine(logLine);
+                                _currentLogFileSize += logLine.Length + Environment.NewLine.Length;
+                                FileWriter.Flush(); // Always flush errors immediately
+                            }
                         }
 
+                        // Always write errors to test output regardless of log level
                         if (!string.IsNullOrEmpty(line))
                         {
                             Log.WriteLine($"❌   {line}");

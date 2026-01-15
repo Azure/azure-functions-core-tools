@@ -9,9 +9,21 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 {
+    /// <summary>
+    /// E2E tests for func init validation scenarios.
+    /// NOTE: Pure validation logic tests have been moved to unit tests in Func.UnitTests:
+    /// - WorkerRuntimeLanguageHelperTests covers worker runtime validation
+    /// - TargetFrameworkHelperTests covers target framework validation
+    /// These E2E tests remain to verify CLI integration and error message output.
+    /// </summary>
     public class GenericValidationInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
+        /// <summary>
+        /// E2E test to verify CLI outputs correct error message for unknown worker runtime.
+        /// Validation logic is unit tested in WorkerRuntimeLanguageHelperTests.NormalizeWorkerRuntime_WithInvalidInputs_ThrowsArgumentException
+        /// </summary>
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Custom)]
         public void Init_WithUnknownWorkerRuntime_DisplayNotValidOptionError()
         {
             const string unknownWorkerRuntime = "foo";
