@@ -3,6 +3,7 @@
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Commands/SdkCommandSpec.cs
 using System.Diagnostics;
+using System.Text;
 using Azure.Functions.Cli.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework
@@ -37,7 +38,9 @@ namespace Azure.Functions.Cli.TestFramework
             {
                 FileName = FileName,
                 Arguments = string.Join(" ", Arguments),
-                UseShellExecute = false
+                UseShellExecute = false,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
             };
 
             foreach (KeyValuePair<string, string> kvp in Environment)

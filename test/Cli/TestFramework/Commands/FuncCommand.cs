@@ -150,7 +150,7 @@ namespace Azure.Functions.Cli.TestFramework.Commands
             {
                 // Open with FileShare.Read to allow others to read but not write
                 var fileStream = new FileStream(LogFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
-                FileWriter = new StreamWriter(fileStream)
+                FileWriter = new StreamWriter(fileStream, System.Text.Encoding.UTF8)
                 {
                     AutoFlush = false // Disable AutoFlush to reduce I/O overhead
                 };

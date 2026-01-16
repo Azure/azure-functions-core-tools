@@ -58,6 +58,28 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
                     _log,
                     [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel, "--force"]);
 
+                // Build the project after modifying the function to ensure the new auth level is compiled
+                var buildProcess = new System.Diagnostics.Process
+                {
+                    StartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "dotnet",
+                        Arguments = "build --configuration Release",
+                        WorkingDirectory = workingDir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false
+                    }
+                };
+                buildProcess.Start();
+                await buildProcess.WaitForExitAsync();
+
+                if (buildProcess.ExitCode != 0)
+                {
+                    var error = await buildProcess.StandardError.ReadToEndAsync();
+                    throw new InvalidOperationException($"Failed to build project. Exit code: {buildProcess.ExitCode}. Error: {error}");
+                }
+
                 // Call func start
                 var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, methodName, _log);
 
@@ -72,7 +94,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
                 };
 
                 // Build command arguments based on enableAuth parameter
-                var commandArgs = new List<string> { "start", "--verbose", "--port", port.ToString() };
+                var commandArgs = new List<string> { "--verbose", "--port", port.ToString() };
                 if (enableAuth)
                 {
                     commandArgs.Add("--enableAuth");
