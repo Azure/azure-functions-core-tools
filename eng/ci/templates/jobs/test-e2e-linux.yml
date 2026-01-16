@@ -89,8 +89,9 @@ jobs:
   steps:
   - bash: |
       sudo apt-get update
-      sudo apt-get install -y npm
-    displayName: 'Install npm'
+      sudo apt-get install -y npm golang
+      go version
+    displayName: 'Install npm and Go'
 
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
