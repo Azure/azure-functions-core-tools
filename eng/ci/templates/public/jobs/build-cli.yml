@@ -15,9 +15,11 @@ jobs:
     os: windows
 
   steps:
-  - template: /eng/ci/templates/steps/install-tools.yml@self
-
-  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+  - task: UseDotNet@2
+    displayName: Install .NET SDK from global.json
+    inputs:
+      packageType: sdk
+      useGlobalJson: true
 
   - pwsh: ./eng/scripts/validate-worker-versions.ps1
     displayName: 'Validate worker versions'

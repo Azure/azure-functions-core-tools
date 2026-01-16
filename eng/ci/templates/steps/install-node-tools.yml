@@ -1,0 +1,12 @@
+# Install Node and .NET SDKs for Node E2E tests
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+  displayName: 'Install Node 18.x'
+
+- task: UseDotNet@2 # The pinned SDK we use to build
+  displayName: Install .NET SDK from global.json
+  inputs:
+    packageType: sdk
+    useGlobalJson: true

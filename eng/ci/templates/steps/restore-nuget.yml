@@ -1,8 +1,0 @@
-steps:
-- task: DotNetCoreCLI@2
-  displayName: 'Restore NuGet packages'
-  inputs:
-    command: 'restore'
-    projects: 'Azure.Functions.Cli.sln'
-    feedsToUse: 'config'
-    nugetConfigPath: '$(Build.SourcesDirectory)/NuGet.Config'

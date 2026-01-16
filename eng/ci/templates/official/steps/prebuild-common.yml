@@ -5,7 +5,11 @@ steps:
       Write-Host "##vso[build.addbuildtag]nightly-build"
     displayName: 'Add build tag for scheduled builds'
 
-- template: /eng/ci/templates/steps/install-tools.yml@self
+- task: UseDotNet@2
+  displayName: Install .NET SDK from global.json
+  inputs:
+    packageType: sdk
+    useGlobalJson: true
 
 - task: AzureCLI@2
   displayName: Acquire access token
@@ -18,8 +22,6 @@ steps:
       # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
-
-- template: /eng/ci/templates/steps/restore-nuget.yml@self
 
 - pwsh: ./eng/scripts/validate-worker-versions.ps1
   displayName: 'Validate worker versions'

@@ -29,9 +29,11 @@ jobs:
         go version
       displayName: 'Install Go'
 
-    - template: /eng/ci/templates/steps/install-tools.yml@self
-
-    - template: /eng/ci/templates/steps/restore-nuget.yml@self
+    - task: UseDotNet@2
+      displayName: Install .NET SDK from global.json
+      inputs:
+        packageType: sdk
+        useGlobalJson: true
 
     - pwsh: |
         dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
@@ -97,7 +99,9 @@ jobs:
       npm install -g @azure/functions
     displayName: 'Install @azure/functions'
 
-  - template: /eng/ci/templates/steps/install-tools.yml@self
+  - template: /eng/ci/templates/steps/install-e2e-tools.yml@self
+    parameters:
+      worker: $(languageWorker)
 
   # Download CLI artifact (when NOT building inline - official builds)
   - ${{ if eq(parameters.buildCliInline, false) }}:
