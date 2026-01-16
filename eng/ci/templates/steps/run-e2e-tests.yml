@@ -43,9 +43,10 @@ steps:
     $proj = '$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/Azure.Functions.Cli.E2ETests.csproj'
     $baseArgs = @(
       '--framework', 'net8.0'
-      '--blame-hang-timeout', '10m'
-      '--logger', 'console;verbosity=detailed'
+      '--blame-hang-timeout', '5m'
+      '--logger', 'console;verbosity=normal'
       '--logger', 'trx'
+      '-m:8'
     )
 
     if ($worker -ne 'Dotnet') {

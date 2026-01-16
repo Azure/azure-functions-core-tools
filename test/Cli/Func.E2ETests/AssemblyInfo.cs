@@ -5,4 +5,5 @@ using Xunit;
 
 // Configure xUnit to run test collections in parallel
 // Tests within the same collection (e.g., tests sharing a fixture) will still run sequentially
-[assembly: CollectionBehavior(DisableTestParallelization = false, MaxParallelThreads = 4)]
+// Using 8 threads for faster CI execution (matches dotnet test -m:8)
+[assembly: CollectionBehavior(DisableTestParallelization = false, MaxParallelThreads = 8)]

@@ -15,7 +15,7 @@ jobs:
 # Build CLI job (only when buildCliInline is true)
 - ${{ if eq(parameters.buildCliInline, true) }}:
   - job: Build_Windows_CLI
-    timeoutInMinutes: '30'
+    timeoutInMinutes: '10'
     displayName: 'Build CLI (win-x64)'
 
     pool:
@@ -49,7 +49,7 @@ jobs:
 - job: Windows_E2E_Test
   ${{ if eq(parameters.buildCliInline, true) }}:
     dependsOn: Build_Windows_CLI
-  timeoutInMinutes: '60'
+  timeoutInMinutes: '40'
   displayName: 'E2E Test:'
 
   pool:

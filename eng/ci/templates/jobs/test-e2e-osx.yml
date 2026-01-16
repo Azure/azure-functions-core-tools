@@ -15,7 +15,7 @@ jobs:
 # Build CLI job (only when buildCliInline is true)
 - ${{ if eq(parameters.buildCliInline, true) }}:
   - job: Build_OSX_CLI
-    timeoutInMinutes: '30'
+    timeoutInMinutes: '10'
     displayName: 'Build CLI (osx-x64)'
 
     pool:
@@ -59,7 +59,7 @@ jobs:
 - job: OSX_E2E_Test
   ${{ if eq(parameters.buildCliInline, true) }}:
     dependsOn: Build_OSX_CLI
-  timeoutInMinutes: '60'
+  timeoutInMinutes: '40'
   displayName: 'E2E Test:'
 
   pool:

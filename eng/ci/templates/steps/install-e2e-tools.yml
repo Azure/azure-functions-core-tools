@@ -47,3 +47,10 @@ steps:
   inputs:
     packageType: sdk
     useGlobalJson: true
+
+# All workers need .NET 8 runtime to run the E2E test framework
+- task: UseDotNet@2
+  displayName: Install .NET 8 runtime
+  inputs:
+    packageType: runtime
+    version: 8.x
