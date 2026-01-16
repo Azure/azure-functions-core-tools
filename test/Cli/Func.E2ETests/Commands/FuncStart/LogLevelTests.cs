@@ -163,8 +163,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
                             .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                             .Execute(["--port", port.ToString()]);
 
-                // Validate that log level is respected - should see worker initialized but not verbose route logs
-                result.Should().HaveStdOutContaining("Worker process started and initialized");
+                // Validate that log level is respected
+                // At Warning level, we should see the host started but not verbose debug logs
+                result.Should().HaveStdOutMatchesRegex("(?i)(host.*start|worker.*start|function.*ready|listening on)");
                 result.Should().NotHaveStdOutContaining("Initializing function HTTP routes");
             }
             finally

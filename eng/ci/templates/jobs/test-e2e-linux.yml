@@ -84,6 +84,12 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  - bash: |
+      sudo apt-get update
+      sudo apt-get install -y golang
+      go version
+    displayName: 'Install Go'
+
   # Download CLI artifact (when NOT building inline - official builds)
   - ${{ if eq(parameters.buildCliInline, false) }}:
     - task: DownloadPipelineArtifact@2
