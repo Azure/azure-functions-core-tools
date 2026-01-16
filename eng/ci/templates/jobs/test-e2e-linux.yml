@@ -87,13 +87,13 @@ jobs:
         runtime: 'linux-x64'
 
   steps:
-  - pwsh: ./eng/scripts/start-emulators.ps1
-    displayName: 'Start emulators (NoWait)'
-
   - bash: |
       sudo apt-get update
       sudo apt-get install -y npm
     displayName: 'Install npm'
+
+  - pwsh: ./eng/scripts/start-emulators.ps1
+    displayName: 'Start emulators (NoWait)'
 
   - template: /eng/ci/templates/steps/install-e2e-tools.yml@self
     parameters:
