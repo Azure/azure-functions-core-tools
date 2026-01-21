@@ -7,7 +7,7 @@ parameters:
 jobs:
 - job: Build_${{ parameters.jobNameSuffix }}
   displayName: 'Build ${{ parameters.runtime }}'
-  timeoutInMinutes: "180"
+  timeoutInMinutes: "30"
 
   pool:
     name: 1es-pool-azfunc-public
@@ -17,13 +17,18 @@ jobs:
   steps:
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - template: /eng/ci/templates/steps/restore-nuget.yml@self
-
   - pwsh: ./eng/scripts/validate-worker-versions.ps1
     displayName: 'Validate worker versions'
 
   - pwsh: ./eng/scripts/check-vulnerabilities.ps1
     displayName: 'Check for security vulnerabilities'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Build solution'
+    inputs:
+      command: 'build'
+      projects: 'Azure.Functions.Cli.sln'
+      arguments: '-c Debug'
 
   - pwsh: |
       $runtime = "${{ parameters.runtime }}"
@@ -40,6 +45,8 @@ jobs:
         -f net8.0 `
         -r $runtime `
         --self-contained `
+        --no-restore `
+        --no-build `
         /p:ZipAfterPublish=true `
         /p:ZipArtifactsPath="$(Build.ArtifactStagingDirectory)/artifacts-zipped" `
         $isMinified
