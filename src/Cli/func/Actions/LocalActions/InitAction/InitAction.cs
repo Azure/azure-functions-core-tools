@@ -643,14 +643,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     return;
                 }
 
-                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                // Check if EOL date has already passed
+                var isAlreadyEol = currentRuntimeSettings.EndOfLifeDate.HasValue &&
+                                   currentRuntimeSettings.EndOfLifeDate.Value < DateTime.UtcNow;
+
+                if (isAlreadyEol || currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
                 {
-                    var warningMessage = EolMessages.GetAfterEolCreateMessageDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    var warningMessage = EolMessages.GetAfterEolCreateMessage(Constants.DotnetDisplayName, majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
                 else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
                 {
-                    var warningMessage = EolMessages.GetEarlyEolCreateMessageForDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    var warningMessage = EolMessages.GetEarlyEolCreateMessage(Constants.DotnetDisplayName, majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
             }

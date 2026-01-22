@@ -57,6 +57,10 @@ export FUNC_CLI=<path-to-published-cli>
 
 # Start the host inside the test app directory
 $FUNC_CLI start
+
+# Or, you can use an alias instead
+alias testfunc="<path-to-published-cli>"
+testfunc start
 ```
 
 Windows:
