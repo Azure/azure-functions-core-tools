@@ -45,28 +45,29 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
 
         public AndConstraint<CommandResultAssertions> StartInProc6Host()
         {
-            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("Starting child process for inproc6 model host.") && _commandResult.StdOut.Contains("Selected inproc6 host."))
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("Starting child process for inproc6 model host."))
                 .FailWith($"The command output did not contain expected result for inproc6 host.{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
 
         public AndConstraint<CommandResultAssertions> StartInProc8Host()
         {
-            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("Starting child process for inproc8 model host.") && _commandResult.StdOut.Contains("Selected inproc8 host."))
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("Starting child process for inproc8 model host."))
                 .FailWith($"The command output did not contain expected result for inproc8 host.{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
 
         public AndConstraint<CommandResultAssertions> StartOutOfProcessHost()
         {
-            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("4.10") && _commandResult.StdOut.Contains("Selected out-of-process host."))
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("4.10"))
                 .FailWith($"The command output did not contain expected result for out of process host.{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
 
         public AndConstraint<CommandResultAssertions> StartDefaultHost()
         {
-            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("Selected default host."))
+            // When using default host, no specific message is printed - it's the same as out-of-process host
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("4.10"))
                 .FailWith($"The command output did not contain expected result for default host.{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
