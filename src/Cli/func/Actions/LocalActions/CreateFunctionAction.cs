@@ -123,7 +123,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     .Error
                     .WriteLine(ErrorColor("The 'func new' command is not supported for Java runtime."))
                     .WriteLine(ErrorColor("Please use Maven to create Java Azure Functions."))
-                    .WriteLine(ErrorColor("For more information, visit: https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-local?pivots=programming-language-java"));
+                    .WriteLine(ErrorColor("For more information, visit: https://learn.microsoft.com/azure/azure-functions/functions-develop-local?pivots=programming-language-java"));
                 return;
             }
 
