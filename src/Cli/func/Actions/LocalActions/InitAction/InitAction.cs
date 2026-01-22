@@ -19,8 +19,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "init", HelpText = "Initialize a new Azure Function App project.", ShowInHelp = true, HelpOrder = 1)]
     internal class InitAction : BaseAction
     {
-        // Default to .NET 8 if the target framework is not specified
-        private const string DefaultTargetFramework = Common.TargetFramework.Net8;
+        // Default to .NET 10 if the target framework is not specified
+        private const string DefaultTargetFramework = Common.TargetFramework.Net10;
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
