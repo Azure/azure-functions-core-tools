@@ -399,18 +399,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            List<FlexSku> skuList = await GetFlexSkus(site, runtimeName, helperService);
-
-            if (!skuList.Any())
-            {
-                throw new CliException($"We couldn't validate '{runtimeName}' runtime for Flex SKU in '{site.Location}'.");
-            }
-
             // If no runtime version was detected from project, don't update Azure
             if (string.IsNullOrEmpty(runtimeVersion))
             {
                 ColoredConsole.WriteLine($"No target framework version detected from project. Keeping existing Azure runtime configuration.");
                 return;
+            }
+
+            List<FlexSku> skuList = await GetFlexSkus(site, runtimeName, helperService);
+
+            if (!skuList.Any())
+            {
+                throw new CliException($"We couldn't validate '{runtimeName}' runtime for Flex SKU in '{site.Location}'.");
             }
 
             // Compare with what's currently in Azure

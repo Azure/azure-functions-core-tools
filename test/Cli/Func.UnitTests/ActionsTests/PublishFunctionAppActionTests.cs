@@ -3,7 +3,7 @@
 
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
-using FluentAssertions;
+using Azure.Functions.Cli.StacksApi;
 using Moq;
 using Xunit;
 
@@ -27,24 +27,22 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                     }
                 }
             };
-            
+
             var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
-            
+
             // Act - passing null for runtimeVersion should skip the update
             await PublishFunctionAppAction.UpdateRuntimeConfigForFlex(
-                site, 
-                "dotnet-isolated", 
+                site,
+                "dotnet-isolated",
                 null, // No version detected
                 helperServiceMock.Object,
                 force: false,
-                overwriteSettings: false
-            );
-            
+                overwriteSettings: false);
+
             // Assert - UpdateFlexRuntime should not be called
             helperServiceMock.Verify(
-                x => x.UpdateFlexRuntime(It.IsAny<Site>(), It.IsAny<string>(), It.IsAny<string>()), 
-                Times.Never
-            );
+                x => x.UpdateFlexRuntime(It.IsAny<Site>(), It.IsAny<string>(), It.IsAny<string>()),
+                Times.Never);
         }
 
         [Fact]
@@ -63,27 +61,25 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                     }
                 }
             };
-            
+
             var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
             helperServiceMock
                 .Setup(x => x.GetFlexFunctionsStacks(It.IsAny<string>(), It.IsAny<string>()))
                 .ReturnsAsync(CreateMockFlexStacks());
-            
+
             // Act - passing same version should skip the update
             await PublishFunctionAppAction.UpdateRuntimeConfigForFlex(
-                site, 
-                "dotnet-isolated", 
+                site,
+                "dotnet-isolated",
                 "9.0", // Same version as Azure
                 helperServiceMock.Object,
                 force: false,
-                overwriteSettings: false
-            );
-            
+                overwriteSettings: false);
+
             // Assert - UpdateFlexRuntime should not be called
             helperServiceMock.Verify(
-                x => x.UpdateFlexRuntime(It.IsAny<Site>(), It.IsAny<string>(), It.IsAny<string>()), 
-                Times.Never
-            );
+                x => x.UpdateFlexRuntime(It.IsAny<Site>(), It.IsAny<string>(), It.IsAny<string>()),
+                Times.Never);
         }
 
         [Fact]
@@ -102,59 +98,57 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                     }
                 }
             };
-            
+
             var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
             helperServiceMock
                 .Setup(x => x.GetFlexFunctionsStacks(It.IsAny<string>(), It.IsAny<string>()))
                 .ReturnsAsync(CreateMockFlexStacks());
-            
+
             // Act - different version with force should update
             await PublishFunctionAppAction.UpdateRuntimeConfigForFlex(
-                site, 
-                "dotnet-isolated", 
+                site,
+                "dotnet-isolated",
                 "9.0", // Different version from Azure (8.0)
                 helperServiceMock.Object,
                 force: true, // Force the update
-                overwriteSettings: false
-            );
-            
+                overwriteSettings: false);
+
             // Assert - UpdateFlexRuntime should be called
             helperServiceMock.Verify(
-                x => x.UpdateFlexRuntime(site, "dotnet-isolated", "9.0"), 
-                Times.Once
-            );
+                x => x.UpdateFlexRuntime(site, "dotnet-isolated", "9.0"),
+                Times.Once);
         }
 
         private static FlexFunctionsStacks CreateMockFlexStacks()
         {
             return new FlexFunctionsStacks
             {
-                Languages = new List<Language>
+                Languages = new List<FlexLanguage>
                 {
-                    new Language
+                    new FlexLanguage
                     {
-                        LanguageProperties = new LanguageProperties
+                        LanguageProperties = new FlexLanguageProperties
                         {
-                            MajorVersions = new List<MajorVersion>
+                            MajorVersions = new List<FlexMajorVersion>
                             {
-                                new MajorVersion
+                                new FlexMajorVersion
                                 {
-                                    MinorVersions = new List<MinorVersion>
+                                    MinorVersions = new List<FlexMinorVersion>
                                     {
-                                        new MinorVersion
+                                        new FlexMinorVersion
                                         {
-                                            StackSettings = new StackSettings
+                                            StackSettings = new FlexStackSettings
                                             {
-                                                LinuxRuntimeSettings = new LinuxRuntimeSettings
+                                                LinuxRuntimeSettings = new FlexLinuxRuntimeSettings
                                                 {
                                                     Sku = new List<FlexSku>
                                                     {
                                                         new FlexSku
                                                         {
                                                             SkuCode = "FC1",
-                                                            FunctionAppConfigProperties = new FunctionAppConfig
+                                                            FunctionAppConfigProperties = new FunctionAppConfigProperties
                                                             {
-                                                                Runtime = new Runtime
+                                                                Runtime = new FlexRuntime
                                                                 {
                                                                     Name = "dotnet-isolated",
                                                                     Version = "9.0"
