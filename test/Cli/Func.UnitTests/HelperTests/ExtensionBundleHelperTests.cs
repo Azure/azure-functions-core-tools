@@ -21,7 +21,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             // Arrange
             var customPath = Path.Combine(Path.GetTempPath(), "CustomBundlePath");
-            var bundleId = "Microsoft.Azure.Functions.ExtensionBundle";
             var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
 
             try
@@ -29,11 +28,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", customPath);
 
                 // Act
-                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(string.Empty);
 
                 // Assert
-                var expectedPath = Path.Combine(customPath, bundleId);
-                Assert.Equal(expectedPath, downloadPath);
+                Assert.Equal(customPath, downloadPath);
             }
             finally
             {
