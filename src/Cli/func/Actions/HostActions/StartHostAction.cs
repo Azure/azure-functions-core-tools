@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections;
@@ -472,7 +472,29 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            await ExtensionBundleHelper.GetExtensionBundle();
+            // Check if user explicitly set EnsureLatest via environment variable
+            // Default to true (download enabled) when not set or unparseable
+            var ensureLatestEnvVar = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            bool shouldDownloadBundles = true; // Default behavior: download bundles
+            if (bool.TryParse(ensureLatestEnvVar, out var ensureLatest))
+            {
+                shouldDownloadBundles = !ensureLatest;
+            }
+
+            if (shouldDownloadBundles)
+            {
+                if (isVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor("Downloading extension bundles..."));
+                }
+
+                await ExtensionBundleHelper.GetExtensionBundle();
+            }
+            else if (isVerbose)
+            {
+                ColoredConsole.WriteLine(VerboseColor("Skipping extension bundle download because AzureFunctionsJobHost__extensionBundle__ensureLatest is set to false."));
+            }
+
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
