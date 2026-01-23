@@ -69,12 +69,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
             if (!string.IsNullOrEmpty(customPath))
             {
-                // If custom path is set, use it directly (it should already include the bundleId)
-                // If it doesn't end with bundleId, append it
-                return customPath.EndsWith(bundleId) ? customPath : Path.Combine(customPath, bundleId);
+                // If custom path is set, use it directly
+                // The SDK uses the downloadPath as-is (structure: downloadPath/{version})
+                return customPath;
             }
 
-            // Default path
+            // Default path (structure: ~/.azure-functions-core-tools/Functions/ExtensionBundles/{bundleId}/{version})
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Constants.UserCoreToolsDirectory, "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
         }
 

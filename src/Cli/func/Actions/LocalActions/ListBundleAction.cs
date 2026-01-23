@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.ExtensionBundle;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -19,20 +18,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
-            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
-
-            if (!extensionBundleManager.IsExtensionBundleConfigured())
+            if (!BundleActionHelper.TryGetBundleContext(out var extensionBundleManager, out var options, out var bundleBasePath))
             {
-                ColoredConsole.WriteLine(WarningColor($"Extension bundle is not configured in host.json."));
-                ColoredConsole.WriteLine($"To list downloaded bundles, you must configure extension bundles in your host.json.");
+                ColoredConsole.WriteLine("To list downloaded bundles, you must configure extension bundles in your host.json.");
                 return;
             }
 
             try
             {
-                var options = ExtensionBundleHelper.GetExtensionBundleOptions();
-                var bundleBasePath = ExtensionBundleHelper.GetBundleDownloadPath(options.Id);
-
                 if (!Directory.Exists(bundleBasePath))
                 {
                     ColoredConsole.WriteLine($"No bundles downloaded yet.");
