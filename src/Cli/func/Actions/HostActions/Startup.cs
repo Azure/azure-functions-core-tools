@@ -107,14 +107,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private void SetBundlesEnvironmentVariables()
         {
-            var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
+            var extensionBundleOptions = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions);
+            var bundleId = extensionBundleOptions.Id;
             if (!string.IsNullOrEmpty(bundleId))
             {
-                // Only set the download path if not already set by the user
+                // Only set the download path if not already set via environment variable
                 var existingDownloadPath = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
                 if (string.IsNullOrEmpty(existingDownloadPath))
                 {
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId));
+                    // Use the downloadPath from host.json if configured, otherwise use default path
+                    var downloadPath = !string.IsNullOrEmpty(extensionBundleOptions.DownloadPath)
+                        ? extensionBundleOptions.DownloadPath
+                        : ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", downloadPath);
                 }
 
                 Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
