@@ -64,6 +64,24 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
         public static string GetBundleDownloadPath(string bundleId)
         {
+            // Check if customer has set a custom download path via environment variable
+            var customPath = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+
+            if (!string.IsNullOrEmpty(customPath))
+            {
+                // If custom path is set, check if it already includes the bundleId
+                if (customPath.EndsWith(bundleId))
+                {
+                    // Already includes bundleId, return as-is
+                    return customPath;
+                }
+
+                // Append bundleId to the custom path
+                // The SDK uses the downloadPath structure: customPath/{bundleId}/{version}
+                return Path.Combine(customPath, bundleId);
+            }
+
+            // Default path (structure: ~/.azure-functions-core-tools/Functions/ExtensionBundles/{bundleId}/{version})
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Constants.UserCoreToolsDirectory, "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
         }
 
