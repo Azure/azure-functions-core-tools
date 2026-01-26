@@ -31,15 +31,36 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Set up console capture
             _consoleOutput = new StringBuilder();
             _mockConsole = Substitute.For<IConsoleWriter>();
-            _mockConsole.WriteLine(Arg.Do<object>(o => _consoleOutput.AppendLine(o?.ToString()))).Returns(_mockConsole);
-            _mockConsole.Write(Arg.Do<object>(o => _consoleOutput.Append(o?.ToString()))).Returns(_mockConsole);
+
+            // Handle any WriteLine call regardless of argument type
+            _mockConsole.WriteLine(Arg.Any<object>()).Returns(x =>
+            {
+                _consoleOutput.AppendLine(x[0]?.ToString());
+                return _mockConsole;
+            });
+
+            // Handle Write calls
+            _mockConsole.Write(Arg.Any<object>()).Returns(x =>
+            {
+                _consoleOutput.Append(x[0]?.ToString());
+                return _mockConsole;
+            });
+
             ColoredConsole.Out = _mockConsole;
             ColoredConsole.Error = _mockConsole;
         }
 
         public void Dispose()
         {
-            Environment.CurrentDirectory = _originalDirectory;
+            try
+            {
+                Environment.CurrentDirectory = _originalDirectory;
+            }
+            catch
+            {
+                // Ignore directory errors, we'll clean up anyway
+            }
+
             if (Directory.Exists(_testDirectory))
             {
                 try

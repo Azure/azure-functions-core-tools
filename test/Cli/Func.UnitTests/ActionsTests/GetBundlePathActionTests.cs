@@ -29,18 +29,41 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Set up console capture
             _consoleOutput = new StringBuilder();
             _mockConsole = Substitute.For<IConsoleWriter>();
-            _mockConsole.WriteLine(Arg.Do<object>(o => _consoleOutput.AppendLine(o?.ToString()))).Returns(_mockConsole);
-            _mockConsole.Write(Arg.Do<object>(o => _consoleOutput.Append(o?.ToString()))).Returns(_mockConsole);
+            _mockConsole.WriteLine(Arg.Any<object>()).Returns(x =>
+            {
+                _consoleOutput.AppendLine(x[0]?.ToString());
+                return _mockConsole;
+            });
+            _mockConsole.Write(Arg.Any<object>()).Returns(x =>
+            {
+                _consoleOutput.Append(x[0]?.ToString());
+                return _mockConsole;
+            });
             ColoredConsole.Out = _mockConsole;
             ColoredConsole.Error = _mockConsole;
         }
 
         public void Dispose()
         {
-            Directory.SetCurrentDirectory(_originalDirectory);
+            try
+            {
+                Directory.SetCurrentDirectory(_originalDirectory);
+            }
+            catch
+            {
+                // Ignore directory errors
+            }
+
             if (Directory.Exists(_testDirectory))
             {
-                Directory.Delete(_testDirectory, recursive: true);
+                try
+                {
+                    Directory.Delete(_testDirectory, recursive: true);
+                }
+                catch
+                {
+                    // Best effort cleanup
+                }
             }
         }
 
