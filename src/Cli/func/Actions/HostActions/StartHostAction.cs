@@ -153,12 +153,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(f => EnabledFunctions = f);
 
             Parser
-                .Setup<bool>("verbose")
-                .WithDescription("When false, hides system logs other than warnings and errors.")
-                .SetDefault(false)
-                .Callback(v => VerboseLogging = v);
-
-            Parser
                 .Setup<string>("user-log-level")
                 .WithDescription("Sets the minimum log level for displaying user logs. Valid values: Trace, Debug, Information, Warning, Error, Critical, None. This does not affect system logs.")
                 .Callback(level => UserLogLevel = level);
@@ -185,16 +179,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                .WithDescription($"If provided, determines which version of the host to start. Allowed values are '{DotnetConstants.InProc6HostRuntime}', '{DotnetConstants.InProc8HostRuntime}', and 'default' (which runs the out-of-process host).")
                .Callback(startHostFromRuntime => HostRuntime = startHostFromRuntime);
 
-            var parserResult = base.ParseArgs(args);
-            bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
+            // Verbose logging now follows the global --verbose flag
+            VerboseLogging = GlobalCoreToolsSettings.IsVerbose;
 
-            // Input args do not contain --verbose flag
-            if (!VerboseLogging.Value && verboseLoggingArgExists)
-            {
-                VerboseLogging = null;
-            }
-
-            return parserResult;
+            return base.ParseArgs(args);
         }
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)

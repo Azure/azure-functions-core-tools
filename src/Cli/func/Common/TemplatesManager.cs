@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Newtonsoft.Json;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -177,7 +178,11 @@ namespace Azure.Functions.Cli.Common
             foreach (var filePath in fileList.Keys)
             {
                 RemoveFileIfExists(filePath);
-                ColoredConsole.WriteLine($"Creating a new file {filePath}");
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Creating a new file {filePath}"));
+                }
+
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileList[filePath]);
             }
         }
@@ -249,7 +254,11 @@ namespace Azure.Functions.Cli.Common
             foreach (var file in template.Files.Where(kv => !kv.Key.EndsWith(".dat")))
             {
                 var filePath = Path.Combine(path, file.Key);
-                ColoredConsole.WriteLine($"Writing {filePath}");
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Writing {filePath}"));
+                }
+
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, file.Value);
             }
 
@@ -371,7 +380,11 @@ namespace Azure.Functions.Cli.Common
             var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
             if (!FileSystemHelpers.FileExists(filePath))
             {
-                ColoredConsole.WriteLine($"Creating a new file {filePath}");
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Creating a new file {filePath}"));
+                }
+
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, sourceContent);
             }
             else
@@ -382,7 +395,11 @@ namespace Azure.Functions.Cli.Common
                 }
 
                 var fileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(filePath);
-                ColoredConsole.WriteLine($"Appending to {filePath}");
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Appending to {filePath}"));
+                }
+
                 fileContent = $"{fileContent}{Environment.NewLine}{Environment.NewLine}{sourceContent}";
 
                 // Update the file.
