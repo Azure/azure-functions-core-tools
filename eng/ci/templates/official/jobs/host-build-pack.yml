@@ -132,9 +132,9 @@ jobs:
   steps:
   - task: UseDotNet@2
     inputs:
-      version: 9.x
+      version: 10.x
       includePreviewVersions: true
-    displayName: Install .NET 9
+    displayName: Install .NET 10
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (linux-x64)
