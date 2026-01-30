@@ -188,6 +188,7 @@ namespace Azure.Functions.Cli.Helpers
             "kafkatrigger" => "kafka",
             "kafkaoutput" => "kafkao",
             "mcptooltrigger" => "mcptooltrigger",
+            "mcpresourcetrigger" => "mcpresourcetrigger",
             "queuetrigger" => "queue",
             "sendgrid" => "sendgrid",
             "servicebusqueuetrigger" => "squeue",
@@ -220,6 +221,7 @@ namespace Azure.Functions.Cli.Helpers
                 return
                 [
                     "McpToolTrigger",
+                    "McpResourceTrigger",
                     "QueueTrigger",
                     "HttpTrigger",
                     "BlobTrigger",
