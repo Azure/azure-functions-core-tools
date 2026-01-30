@@ -178,7 +178,10 @@ namespace Azure.Functions.Cli.Helpers
                 return;
             }
 
-            ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
+            if (GlobalCoreToolsSettings.IsVerbose)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
+            }
 
             // Python 3.[7|8|9|10|11|12] (supported)
             if (IsVersionSupported(pythonVersion))

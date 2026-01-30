@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
             };
 
             // Build command arguments based on enableAuth parameter
-            var commandArgs = new List<string> { "start", "--verbose", "--port", port.ToString() };
+            var commandArgs = new List<string> { "--port", port.ToString(),  "--verbose" };
             if (enableAuth)
             {
                 commandArgs.Add("--enableAuth");

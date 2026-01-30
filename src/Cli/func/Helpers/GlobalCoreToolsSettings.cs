@@ -12,8 +12,11 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static WorkerRuntime _currentWorkerRuntime;
         private static bool _isHelpRunning;
+        private static bool _isVerbose;
 
         public static bool IsHelpRunning => _isHelpRunning;
+
+        public static bool IsVerbose => _isVerbose;
 
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
@@ -23,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (_currentWorkerRuntime == WorkerRuntime.None)
                 {
-                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--dotnet-isolated, --dotnet, --javascript, --typescript, --java, --python, --powershell, --custom]"));
+                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--dotnet-isolated, --dotnet, --javascript, --typescript, --python, --powershell, --custom]"));
                     throw new CliException($"Worker runtime cannot be '{WorkerRuntime.None}'. Please set a valid runtime.");
                 }
 
@@ -48,6 +51,8 @@ namespace Azure.Functions.Cli.Helpers
 
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
+            _isVerbose = args.Contains("--verbose");
+
             try
             {
                 if (args.Contains("--csharp"))
