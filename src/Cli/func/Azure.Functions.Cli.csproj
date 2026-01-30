@@ -278,7 +278,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" />
+    <!-- <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" /> -->
     <PackageReference Include="Microsoft.Build" />
     <PackageReference Include="Microsoft.Identity.Client" />
     <PackageReference Include="Newtonsoft.Json" />
@@ -299,6 +299,10 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
   </ItemGroup>
+
+  <ItemGroup>
+     <ProjectReference Include="D:\PyFx\azure-functions-host\src\WebJobs.Script.WebHost\WebJobs.Script.WebHost.csproj" />
+ </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)GoZipTool\GoZipTool.csproj">

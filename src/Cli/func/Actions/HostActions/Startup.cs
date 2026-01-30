@@ -130,8 +130,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     }
                 });
             }
+#pragma warning disable CS0618 // IApplicationLifetime is obsolete
+            IApplicationLifetime applicationLifetime = app.ApplicationServices
+                .GetRequiredService<IApplicationLifetime>();
 
-            app.UseWebJobsScriptHost();
+            app.UseWebJobsScriptHost(applicationLifetime);
+#pragma warning restore CS0618 // Type is obsolete
         }
 
         private class ThrowingDependencyValidator : DependencyValidator
