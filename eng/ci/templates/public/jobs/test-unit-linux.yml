@@ -19,7 +19,18 @@ jobs:
       sudo apt-get -y install fuse-zip
     displayName: 'Install fuse-zip'
 
-  - template: /eng/ci/templates/steps/install-tools.yml@self
+  - task: UseDotNet@2
+    displayName: Install .NET SDK from global.json
+    inputs:
+      packageType: sdk
+      useGlobalJson: true
+  
+  - script: |
+      df -h
+      sudo rm -rf /usr/share/dotnet/sdk-manifests/*
+      sudo rm -rf /usr/share/dotnet/packs/*
+      df -h
+    displayName: "Free disk space"
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
