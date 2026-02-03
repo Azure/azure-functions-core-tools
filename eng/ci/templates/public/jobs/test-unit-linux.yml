@@ -21,13 +21,6 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - script: |
-      df -h
-      sudo rm -rf /usr/share/dotnet/sdk-manifests/*
-      sudo rm -rf /usr/share/dotnet/packs/*
-      df -h
-    displayName: "Free disk space"
-
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
   - template: /eng/ci/templates/public/steps/run-unit-tests.yml@self
