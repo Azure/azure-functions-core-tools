@@ -19,6 +19,11 @@ jobs:
       sudo apt-get -y install fuse-zip
     displayName: 'Install fuse-zip'
 
+  - task: GoTool@0
+    inputs:
+      version: '1.21'
+    displayName: 'Install Go'
+
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
