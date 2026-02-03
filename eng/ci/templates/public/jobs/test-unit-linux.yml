@@ -6,7 +6,7 @@ jobs:
 
   pool:
     name: 1es-pool-azfunc-public
-    image: 1es-ubuntu-22.04
+    image: 1es-ubuntu-24.04-min
     os: linux
 
   steps:
@@ -19,12 +19,8 @@ jobs:
       sudo apt-get -y install fuse-zip
     displayName: 'Install fuse-zip'
 
-  - task: UseDotNet@2
-    displayName: Install .NET SDK from global.json
-    inputs:
-      packageType: sdk
-      useGlobalJson: true
-  
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
   - script: |
       df -h
       sudo rm -rf /usr/share/dotnet/sdk-manifests/*
