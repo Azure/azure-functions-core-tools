@@ -11,7 +11,7 @@ jobs:
   ${{ if startsWith(parameters.arch, 'linux') }}:
     pool:
       name: 1es-pool-azfunc-public
-      image: 1es-ubuntu-22.04
+      image: 1es-ubuntu-24.04-min
       os: linux
 
   ${{ if startsWith(parameters.arch, 'osx') }}:

@@ -6,7 +6,7 @@ jobs:
 
   pool:
     name: 1es-pool-azfunc-public
-    image: 1es-ubuntu-22.04
+    image: 1es-ubuntu-24.04-min
     os: linux
 
   steps:
@@ -18,6 +18,11 @@ jobs:
       sudo apt-get update
       sudo apt-get -y install fuse-zip
     displayName: 'Install fuse-zip'
+
+  - task: GoTool@0
+    inputs:
+      version: '1.21'
+    displayName: 'Install Go'
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
