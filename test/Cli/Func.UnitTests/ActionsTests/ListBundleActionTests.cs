@@ -32,14 +32,14 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Handle any WriteLine call regardless of argument type
             _mockConsole.WriteLine(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.AppendLine(x[0]);
+                _consoleOutput.AppendLine(x[0]?.ToString());
                 return _mockConsole;
             });
 
             // Handle Write calls
             _mockConsole.Write(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.Append(x[0]);
+                _consoleOutput.Append(x[0]?.ToString());
                 return _mockConsole;
             });
 
