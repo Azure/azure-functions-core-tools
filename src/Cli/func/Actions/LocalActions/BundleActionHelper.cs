@@ -56,7 +56,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var hostJsonDownloadPath = extensionBundle["downloadPath"]?.ToString();
             if (!string.IsNullOrEmpty(hostJsonDownloadPath))
             {
-                bundleBasePath = hostJsonDownloadPath;
+                // Custom paths from host.json are used as-is, without appending bundleId
+                bundleBasePath = hostJsonDownloadPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
             else if (!string.IsNullOrEmpty(options.DownloadPath))
             {

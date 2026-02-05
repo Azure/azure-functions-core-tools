@@ -69,16 +69,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
             if (!string.IsNullOrEmpty(customPath))
             {
-                // If custom path is set, check if it already includes the bundleId
-                if (customPath.EndsWith(bundleId))
-                {
-                    // Already includes bundleId, return as-is
-                    return customPath;
-                }
-
-                // Append bundleId to the custom path
-                // The SDK uses the downloadPath structure: customPath/{bundleId}/{version}
-                return Path.Combine(customPath, bundleId);
+                // Custom paths are used as-is, without appending bundleId
+                return customPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
 
             // Default path (structure: ~/.azure-functions-core-tools/Functions/ExtensionBundles/{bundleId}/{version})

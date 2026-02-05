@@ -11,6 +11,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
+    [Collection("BundleActionTests")]
     public class GetBundlePathActionTests : IDisposable
     {
         private const string HostJsonWithBundlesAndDownloadPath = @"{""version"": ""2.0"", ""extensionBundle"": {""id"": ""Microsoft.Azure.Functions.ExtensionBundle"", ""version"": ""[4.*, 5.0.0)"", ""downloadPath"": ""bundles""}}";

@@ -9,8 +9,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "path", Context = Context.Bundles, HelpText = "Get the path to the downloaded extension bundle.")]
     internal class GetBundlePathAction : BaseAction
     {
-        public string Language { get; set; }
-
         public override async Task RunAsync()
         {
             if (!BundleActionHelper.TryGetBundleContext(out var extensionBundleManager, out _, out var bundleBasePath))
@@ -23,15 +21,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 var bundleDetails = await extensionBundleManager.GetExtensionBundleDetails();
                 var bundlePath = Path.Combine(bundleBasePath, bundleDetails.Version);
-
-                if (string.IsNullOrEmpty(bundlePath))
-                {
-                    throw new CliException("Unable to locate extension bundle.");
-                }
-                else
-                {
-                    ColoredConsole.WriteLine(bundlePath);
-                }
+                ColoredConsole.WriteLine(bundlePath);
             }
             catch (Exception e)
             {

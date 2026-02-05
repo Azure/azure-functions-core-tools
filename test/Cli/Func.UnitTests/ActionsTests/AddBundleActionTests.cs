@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         public AddBundleActionTests()
         {
             _originalDirectory = Environment.CurrentDirectory;
-            _testDirectory = Path.Combine(Path.GetTempPath(), "AddBundleActionTests_" + Guid.NewGuid().ToString());
+            _testDirectory = Path.Combine(Path.GetTempPath(), "AddBundleActionTests_" + Guid.NewGuid());
             Directory.CreateDirectory(_testDirectory);
             Environment.CurrentDirectory = _testDirectory;
 
