@@ -40,8 +40,8 @@ jobs:
         -o $(Build.Repository.LocalPath)/artifacts `
         -c Release `
         --no-build `
-        /p:NoWorkers=true `
-        /p:SkipTemplates=true `
+        /p:NoWorkers="true" `
+        /p:SkipTemplates="true"
         /p:RuntimeIdentifiers=
 
     displayName: 'Pack CLI for NuGet'
