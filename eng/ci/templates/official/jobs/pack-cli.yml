@@ -21,7 +21,8 @@ jobs:
         -f net8.0 `
         --no-restore `
         /p:NoWorkers="true" `
-        /p:SkipTemplates="true"
+        /p:SkipTemplates="true" `
+        /p:RuntimeIdentifiers=
     displayName: 'Build CLI for all platforms'
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
@@ -41,7 +42,7 @@ jobs:
         --no-build `
         /p:NoWorkers=true `
         /p:SkipTemplates=true `
-        /p:RuntimeIdentifiers=""
+        /p:RuntimeIdentifiers=
 
     displayName: 'Pack CLI for NuGet'
 
