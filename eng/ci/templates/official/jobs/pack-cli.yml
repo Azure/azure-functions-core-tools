@@ -23,7 +23,7 @@ jobs:
         /p:NoWorkers="true" `
         /p:SkipTemplates="true" `
         /p:RuntimeIdentifiers=
-    displayName: 'Build CLI for all platforms'
+    displayName: 'Build CLI'
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
