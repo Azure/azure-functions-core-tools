@@ -110,6 +110,50 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Fact]
+        public void ParseArgs_DefaultChannel_IsGA()
+        {
+            var action = new AddBundleAction();
+            var args = Array.Empty<string>();
+
+            action.ParseArgs(args);
+
+            action.Channel.Should().Be(BundleChannel.GA);
+        }
+
+        [Fact]
+        public void ParseArgs_WithChannelFlag_SetsChannelPreview()
+        {
+            var action = new AddBundleAction();
+            var args = new[] { "--channel", "Preview" };
+
+            action.ParseArgs(args);
+
+            action.Channel.Should().Be(BundleChannel.Preview);
+        }
+
+        [Fact]
+        public void ParseArgs_WithShortChannelFlag_SetsChannelExperimental()
+        {
+            var action = new AddBundleAction();
+            var args = new[] { "-c", "Experimental" };
+
+            action.ParseArgs(args);
+
+            action.Channel.Should().Be(BundleChannel.Experimental);
+        }
+
+        [Fact]
+        public void ParseArgs_WithChannelGA_SetsChannelGA()
+        {
+            var action = new AddBundleAction();
+            var args = new[] { "--channel", "GA" };
+
+            action.ParseArgs(args);
+
+            action.Channel.Should().Be(BundleChannel.GA);
+        }
+
+        [Fact]
         public void HasCorrectActionAttribute()
         {
             var actionAttribute = Attribute.GetCustomAttribute(typeof(AddBundleAction), typeof(ActionAttribute)) as ActionAttribute;
@@ -245,6 +289,80 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             var action = new AddBundleAction();
 
             action.Should().BeAssignableTo<BaseAction>();
+        }
+
+        [Fact]
+        public async Task RunAsync_WithPreviewChannel_AddsPreviewBundle()
+        {
+            var hostPath = Path.Combine(_testDirectory, ScriptConstants.HostMetadataFileName);
+            await File.WriteAllTextAsync(hostPath, "{}");
+
+            var action = new AddBundleAction { Channel = BundleChannel.Preview };
+            await action.RunAsync();
+
+            var updated = await File.ReadAllTextAsync(hostPath);
+            var hostJson = JObject.Parse(updated);
+
+            hostJson[Constants.ExtensionBundleConfigPropertyName]["id"]?.ToString()
+                .Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Preview");
+        }
+
+        [Fact]
+        public async Task RunAsync_WithExperimentalChannel_AddsExperimentalBundle()
+        {
+            var hostPath = Path.Combine(_testDirectory, ScriptConstants.HostMetadataFileName);
+            await File.WriteAllTextAsync(hostPath, "{}");
+
+            var action = new AddBundleAction { Channel = BundleChannel.Experimental };
+            await action.RunAsync();
+
+            var updated = await File.ReadAllTextAsync(hostPath);
+            var hostJson = JObject.Parse(updated);
+
+            hostJson[Constants.ExtensionBundleConfigPropertyName]["id"]?.ToString()
+                .Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Experimental");
+        }
+
+        [Fact]
+        public async Task RunAsync_WithGAChannel_AddsGABundle()
+        {
+            var hostPath = Path.Combine(_testDirectory, ScriptConstants.HostMetadataFileName);
+            await File.WriteAllTextAsync(hostPath, "{}");
+
+            var action = new AddBundleAction { Channel = BundleChannel.GA };
+            await action.RunAsync();
+
+            var updated = await File.ReadAllTextAsync(hostPath);
+            var hostJson = JObject.Parse(updated);
+
+            hostJson[Constants.ExtensionBundleConfigPropertyName]["id"]?.ToString()
+                .Should().Be("Microsoft.Azure.Functions.ExtensionBundle");
+        }
+
+        [Fact]
+        public async Task RunAsync_WithPreviewChannel_OutputsChannelInMessage()
+        {
+            var hostPath = Path.Combine(_testDirectory, ScriptConstants.HostMetadataFileName);
+            await File.WriteAllTextAsync(hostPath, "{}");
+
+            var action = new AddBundleAction { Channel = BundleChannel.Preview };
+            await action.RunAsync();
+
+            var output = _consoleOutput.ToString();
+            output.Should().Contain("(Preview)");
+        }
+
+        [Fact]
+        public async Task RunAsync_WithExperimentalChannel_OutputsChannelInMessage()
+        {
+            var hostPath = Path.Combine(_testDirectory, ScriptConstants.HostMetadataFileName);
+            await File.WriteAllTextAsync(hostPath, "{}");
+
+            var action = new AddBundleAction { Channel = BundleChannel.Experimental };
+            await action.RunAsync();
+
+            var output = _consoleOutput.ToString();
+            output.Should().Contain("(Experimental)");
         }
     }
 }

@@ -12,8 +12,44 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
+    /// <summary>
+    /// Specifies the extension bundle release channel.
+    /// </summary>
+    internal enum BundleChannel
+    {
+        /// <summary>
+        /// Generally available (stable) extension bundle.
+        /// </summary>
+        GA,
+
+        /// <summary>
+        /// Preview extension bundle with upcoming features.
+        /// </summary>
+        Preview,
+
+        /// <summary>
+        /// Experimental extension bundle with early-stage features.
+        /// </summary>
+        Experimental
+    }
+
     internal static class BundleActionHelper
     {
+        /// <summary>
+        /// Gets the bundle configuration JSON content for the specified channel.
+        /// </summary>
+        /// <param name="channel">The bundle release channel.</param>
+        /// <returns>The JSON content for the bundle configuration.</returns>
+        public static Task<string> GetBundleConfigForChannel(BundleChannel channel)
+        {
+            return channel switch
+            {
+                BundleChannel.Preview => StaticResources.BundleConfigPreview,
+                BundleChannel.Experimental => StaticResources.BundleConfigExperimental,
+                _ => StaticResources.BundleConfig
+            };
+        }
+
         public static bool TryGetBundleContext(out IExtensionBundleManager manager, out ExtensionBundleOptions options, out string bundleBasePath)
         {
             var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);

@@ -16,5 +16,5 @@
   - `func bundles download` - Download the extension bundle configured in host.json with optional `--force` flag to re-download
   - `func bundles list` - List all downloaded extension bundles
   - `func bundles path` - Get the path to the downloaded extension bundle
-  - `func bundles add` - Add extension bundle configuration to host.json
+  - `func bundles add` - Add extension bundle configuration to host.json with `--channel` flag to select GA (default), Preview, or Experimental bundles
   - Support for custom bundle download paths via `AzureFunctionsJobHost__extensionBundle__downloadPath` environment variable

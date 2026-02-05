@@ -16,12 +16,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         public bool Force { get; set; } = false;
 
+        public BundleChannel Channel { get; set; } = BundleChannel.GA;
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
                 .Setup<bool>('f', "force")
                 .WithDescription("Overwrite existing extension bundle configuration if present")
                 .Callback(force => Force = force);
+
+            Parser
+                .Setup<BundleChannel>('c', "channel")
+                .WithDescription("Extension bundle release channel: GA (default), Preview, or Experimental")
+                .SetDefault(BundleChannel.GA)
+                .Callback(channel => Channel = channel);
 
             return base.ParseArgs(args);
         }
@@ -53,8 +61,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 hostJsonObj.Remove(Constants.ExtensionBundleConfigPropertyName);
             }
 
-            // Add the extension bundle configuration
-            var bundleConfig = await StaticResources.BundleConfig;
+            // Add the extension bundle configuration based on the selected channel
+            var bundleConfig = await BundleActionHelper.GetBundleConfigForChannel(Channel);
             var bundleConfigObj = JsonConvert.DeserializeObject<JToken>(bundleConfig);
             hostJsonObj.Add(Constants.ExtensionBundleConfigPropertyName, bundleConfigObj);
 
@@ -62,7 +70,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var updatedHostJson = JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
             await FileSystemHelpers.WriteAllTextToFileAsync(hostFilePath, updatedHostJson);
 
-            ColoredConsole.WriteLine(VerboseColor($"Extension bundle configuration added to {ScriptConstants.HostMetadataFileName}:"));
+            var channelDisplay = Channel == BundleChannel.GA ? string.Empty : $" ({Channel})";
+            ColoredConsole.WriteLine(VerboseColor($"Extension bundle configuration{channelDisplay} added to {ScriptConstants.HostMetadataFileName}:"));
             ColoredConsole.WriteLine(bundleConfigObj.ToString(Formatting.Indented));
         }
     }
