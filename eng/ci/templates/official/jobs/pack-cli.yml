@@ -41,7 +41,7 @@ jobs:
         -c Release `
         --no-build `
         /p:NoWorkers="true" `
-        /p:SkipTemplates="true"
+        /p:SkipTemplates="true" `
         /p:RuntimeIdentifiers=
 
     displayName: 'Pack CLI for NuGet'
