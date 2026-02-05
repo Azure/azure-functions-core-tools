@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         public AddBundleActionTests()
         {
             _originalDirectory = Environment.CurrentDirectory;
-            _testDirectory = Path.Combine(Path.GetTempPath(), "AddBundleActionTests_" + Guid.NewGuid().ToString());
+            _testDirectory = Path.Combine(Path.GetTempPath(), "AddBundleActionTests_" + Guid.NewGuid());
             Directory.CreateDirectory(_testDirectory);
             Environment.CurrentDirectory = _testDirectory;
 
@@ -36,14 +36,14 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Handle any WriteLine call regardless of argument type
             _mockConsole.WriteLine(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.AppendLine(x[0]?.ToString());
+                _consoleOutput.AppendLine(x[0]);
                 return _mockConsole;
             });
 
             // Handle Write calls
             _mockConsole.Write(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.Append(x[0]?.ToString());
+                _consoleOutput.Append(x[0]);
                 return _mockConsole;
             });
 

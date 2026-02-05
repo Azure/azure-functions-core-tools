@@ -56,7 +56,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var hostJsonDownloadPath = extensionBundle["downloadPath"]?.ToString();
             if (!string.IsNullOrEmpty(hostJsonDownloadPath))
             {
-                bundleBasePath = hostJsonDownloadPath;
+                // host.json downloadPath should include bundleId, similar to environment variable behavior
+                bundleBasePath = NormalizeBundleBasePath(hostJsonDownloadPath, options.Id);
             }
             else if (!string.IsNullOrEmpty(options.DownloadPath))
             {
@@ -68,6 +69,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             return true;
+        }
+
+        private static string NormalizeBundleBasePath(string downloadPath, string bundleId)
+        {
+            // Normalize path separators and remove trailing separators
+            downloadPath = downloadPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            
+            // Check if the path already includes the bundleId
+            if (Path.GetFileName(downloadPath).Equals(bundleId, StringComparison.OrdinalIgnoreCase))
+            {
+                return downloadPath;
+            }
+            
+            // Append bundleId to the download path
+            return Path.Combine(downloadPath, bundleId);
         }
 
         public static void PrintNotConfiguredWarning()

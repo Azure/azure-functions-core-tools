@@ -33,12 +33,12 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             _mockConsole = Substitute.For<IConsoleWriter>();
             _mockConsole.WriteLine(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.AppendLine(x[0]?.ToString());
+                _consoleOutput.AppendLine(x[0]);
                 return _mockConsole;
             });
             _mockConsole.Write(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.Append(x[0]?.ToString());
+                _consoleOutput.Append(x[0]);
                 return _mockConsole;
             });
             ColoredConsole.Out = _mockConsole;

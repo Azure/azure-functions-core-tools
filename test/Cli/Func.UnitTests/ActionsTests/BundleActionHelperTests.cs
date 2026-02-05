@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
-    [Collection("BundleActions")]
+    [Collection("BundleActionTests")]
     public class BundleActionHelperTests : IDisposable
     {
         private readonly string _testDirectory;
@@ -31,8 +31,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 {
                     Directory.Delete(_testDirectory, true);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Console.Error.WriteLine($"Failed to delete test directory '{_testDirectory}': {ex}");
                 }
             }
         }

@@ -11,6 +11,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
+    [Collection("BundleActionTests")]
     public class GetBundlePathActionTests : IDisposable
     {
         private const string HostJsonWithBundlesAndDownloadPath = @"{""version"": ""2.0"", ""extensionBundle"": {""id"": ""Microsoft.Azure.Functions.ExtensionBundle"", ""version"": ""[4.*, 5.0.0)"", ""downloadPath"": ""bundles""}}";
@@ -31,12 +32,12 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             _mockConsole = Substitute.For<IConsoleWriter>();
             _mockConsole.WriteLine(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.AppendLine(x[0]?.ToString());
+                _consoleOutput.AppendLine(x[0]);
                 return _mockConsole;
             });
             _mockConsole.Write(Arg.Any<object>()).Returns(x =>
             {
-                _consoleOutput.Append(x[0]?.ToString());
+                _consoleOutput.Append(x[0]);
                 return _mockConsole;
             });
             ColoredConsole.Out = _mockConsole;

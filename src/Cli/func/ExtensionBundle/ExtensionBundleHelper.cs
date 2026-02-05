@@ -69,8 +69,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
             if (!string.IsNullOrEmpty(customPath))
             {
+                // Normalize path separators and remove trailing separators
+                customPath = customPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                
                 // If custom path is set, check if it already includes the bundleId
-                if (customPath.EndsWith(bundleId))
+                if (Path.GetFileName(customPath).Equals(bundleId, StringComparison.OrdinalIgnoreCase))
                 {
                     // Already includes bundleId, return as-is
                     return customPath;
