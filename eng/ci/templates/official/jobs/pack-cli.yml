@@ -16,17 +16,12 @@ jobs:
   - template: /eng/ci/templates/official/steps/prebuild-common.yml@self
 
   - pwsh: |
-      $runtimes = @('win-x64', 'win-x86', 'win-arm64', 'linux-x64', 'linux-arm64', 'osx-x64', 'osx-arm64')
-      foreach ($rid in $runtimes) {
-        Write-Host "Building for $rid..."
-        dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
-          -c Release `
-          -f net8.0 `
-          -r $rid `
-          --no-restore `
-          /p:NoWorkers="true" `
-          /p:SkipTemplates="true"
-      }
+      dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
+        -c Release `
+        -f net8.0 `
+        --no-restore `
+        /p:NoWorkers="true" `
+        /p:SkipTemplates="true"
     displayName: 'Build CLI for all platforms'
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
@@ -43,10 +38,9 @@ jobs:
       dotnet pack src/Cli/func/Azure.Functions.Cli.csproj `
         -o $(Build.Repository.LocalPath)/artifacts `
         -c Release `
-        --no-build `
         /p:NoWorkers=true `
         /p:SkipTemplates=true `
-        /p:IncludeNativeRIDs=false
+        /p:NoBuild=true
 
     displayName: 'Pack CLI for NuGet'
 
