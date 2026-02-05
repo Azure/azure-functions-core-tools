@@ -69,28 +69,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
             if (!string.IsNullOrEmpty(customPath))
             {
-                return NormalizeBundleBasePath(customPath, bundleId);
+                // Custom paths are used as-is, without appending bundleId
+                return customPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
 
             // Default path (structure: ~/.azure-functions-core-tools/Functions/ExtensionBundles/{bundleId}/{version})
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Constants.UserCoreToolsDirectory, "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
-        }
-
-        public static string NormalizeBundleBasePath(string downloadPath, string bundleId)
-        {
-            // Remove trailing separators for consistent path comparison
-            downloadPath = downloadPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            
-            // If custom path is set, check if it already includes the bundleId
-            if (Path.GetFileName(downloadPath).Equals(bundleId, StringComparison.OrdinalIgnoreCase))
-            {
-                // Already includes bundleId, return as-is
-                return downloadPath;
-            }
-
-            // Append bundleId to the custom path
-            // The SDK uses the downloadPath structure: customPath/{bundleId}/{version}
-            return Path.Combine(downloadPath, bundleId);
         }
 
         public static async Task GetExtensionBundle()
