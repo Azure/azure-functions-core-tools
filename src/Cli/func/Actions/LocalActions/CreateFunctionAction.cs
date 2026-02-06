@@ -137,51 +137,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // Load templates and resolve language
             if (NeedsToLoadExtensionTemplates(_workerRuntime, Csx))
             {
-                // Apply temporary bundle channel if specified
-                string originalHostJson = null;
-                if (BundlesChannel.HasValue)
-                {
-                    originalHostJson = await ApplyTemporaryBundleChannel(BundlesChannel.Value);
-                }
-
-                try
+                await WithTemporaryBundleChannel(async () =>
                 {
                     _templates = await _templatesManager.Templates;
-                }
-                finally
-                {
-                    // Restore original host.json if it was modified
-                    if (originalHostJson != null)
-                    {
-                        await RestoreHostJson(originalHostJson);
-                    }
-                }
+                });
             }
 
             ResolveLanguageAsync(_workerRuntime);
 
             if (IsNewPythonProgrammingModel())
             {
-                // Apply temporary bundle channel if specified
-                string originalHostJson = null;
-                if (BundlesChannel.HasValue)
-                {
-                    originalHostJson = await ApplyTemporaryBundleChannel(BundlesChannel.Value);
-                }
-
-                try
+                await WithTemporaryBundleChannel(async () =>
                 {
                     _newTemplates = await _templatesManager.NewTemplates;
                     _userPrompts = await _templatesManager.UserPrompts;
-                }
-                finally
-                {
-                    // Restore original host.json if it was modified
-                    if (originalHostJson != null)
-                    {
-                        await RestoreHostJson(originalHostJson);
-                    }
-                }
+                });
             }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) && !Csx)
@@ -701,9 +671,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     return originalContent;
                 }
             }
-            catch
+            catch (JsonException ex)
             {
-                // If parsing fails, don't modify the file
+                // Log JSON parsing errors for debugging
+                ColoredConsole.WriteLine(WarningColor($"Warning: Failed to parse host.json for bundle channel modification: {ex.Message}"));
+                return null;
+            }
+            catch (Exception ex)
+            {
+                // Log unexpected errors but don't fail the operation
+                ColoredConsole.WriteLine(WarningColor($"Warning: Unexpected error modifying host.json: {ex.Message}"));
                 return null;
             }
 
@@ -718,6 +695,32 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
             await FileSystemHelpers.WriteAllTextToFileAsync(hostFilePath, originalContent);
+        }
+
+        /// <summary>
+        /// Executes an action with a temporary bundle channel configuration if specified.
+        /// </summary>
+        /// <param name="action">The async action to execute.</param>
+        private async Task WithTemporaryBundleChannel(Func<Task> action)
+        {
+            string originalHostJson = null;
+            if (BundlesChannel.HasValue)
+            {
+                originalHostJson = await ApplyTemporaryBundleChannel(BundlesChannel.Value);
+            }
+
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                // Restore original host.json if it was modified
+                if (originalHostJson != null)
+                {
+                    await RestoreHostJson(originalHostJson);
+                }
+            }
         }
     }
 }
