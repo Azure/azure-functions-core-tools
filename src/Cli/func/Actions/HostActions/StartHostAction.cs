@@ -418,6 +418,49 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return null;
         }
 
+        private async Task<bool?> GetEnsureLatestFromHostJsonAsync()
+        {
+            var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
+            if (!FileSystemHelpers.FileExists(hostJsonPath))
+            {
+                return null;
+            }
+
+            try
+            {
+                var hostJsonContent = await FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath);
+                if (string.IsNullOrEmpty(hostJsonContent))
+                {
+                    return null;
+                }
+
+                var hostJson = JObject.Parse(hostJsonContent);
+                var extensionBundle = hostJson[Constants.ExtensionBundleConfigPropertyName];
+                if (extensionBundle == null)
+                {
+                    return null;
+                }
+
+                var ensureLatest = extensionBundle["ensureLatest"];
+                if (ensureLatest == null)
+                {
+                    return null;
+                }
+
+                if (bool.TryParse(ensureLatest.ToString(), out var ensureLatestValue))
+                {
+                    return ensureLatestValue;
+                }
+
+                return null;
+            }
+            catch
+            {
+                // If we can't parse host.json, return null to use default behavior
+                return null;
+            }
+        }
+
         public override async Task RunAsync()
         {
             await PreRunConditions();
@@ -457,14 +500,24 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            // Check if user explicitly set EnsureLatest via environment variable
-            // Default to true (download enabled) when not set or unparseable
+            // Check if user explicitly set EnsureLatest via environment variable or host.json
+            // Environment variable takes precedence over host.json
+            // Default to true (download enabled) when not set
             var ensureLatestEnvVar = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
-            bool shouldDownloadBundles = true; // Default behavior: download bundles
-            if (bool.TryParse(ensureLatestEnvVar, out var ensureLatest))
+            bool? ensureLatest = null;
+            
+            if (!string.IsNullOrEmpty(ensureLatestEnvVar) && bool.TryParse(ensureLatestEnvVar, out var ensureLatestFromEnv))
             {
-                shouldDownloadBundles = !ensureLatest;
+                ensureLatest = ensureLatestFromEnv;
             }
+            else
+            {
+                // If not set via environment variable, check host.json
+                ensureLatest = await GetEnsureLatestFromHostJsonAsync();
+            }
+
+            // Default to true (download bundles) if not configured
+            bool shouldDownloadBundles = !(ensureLatest ?? false);
 
             if (shouldDownloadBundles)
             {
@@ -477,7 +530,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (isVerbose)
             {
-                ColoredConsole.WriteLine(VerboseColor("Skipping extension bundle download because AzureFunctionsJobHost__extensionBundle__ensureLatest is set to false."));
+                ColoredConsole.WriteLine(VerboseColor("Skipping extension bundle download because ensureLatest is set to true."));
             }
 
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);

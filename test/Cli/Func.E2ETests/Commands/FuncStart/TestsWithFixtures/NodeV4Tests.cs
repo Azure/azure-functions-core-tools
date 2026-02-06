@@ -254,5 +254,20 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
                 shouldDownload,
                 "v4");
         }
+
+        [Theory]
+        [InlineData(false, true)] // ensureLatest=false in host.json should download
+        [InlineData(true, false)] // ensureLatest=true in host.json should not download
+        public void FuncStart_WithEnsureLatestInHostJson_ShowsExpectedBehavior(bool ensureLatestValue, bool shouldDownload)
+        {
+            BaseOfflineBundleTests.TestEnsureLatestInHostJson(
+                _fixture.FuncPath,
+                _fixture.WorkingDirectory,
+                "node",
+                _fixture.Log,
+                ensureLatestValue,
+                shouldDownload,
+                "v4");
+        }
     }
 }

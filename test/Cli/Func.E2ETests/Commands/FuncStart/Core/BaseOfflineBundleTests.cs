@@ -67,5 +67,89 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                 output.Should().NotContain("Downloading extension bundles...");
             }
         }
+
+        /// <summary>
+        /// Common test for EnsureLatest behavior when configured via host.json.
+        /// This can be called from fixture-based tests (NodeV4, NodeV3, PowerShell, etc.)
+        /// </summary>
+        /// <param name="funcPath">Path to func executable.</param>
+        /// <param name="workingDirectory">Working directory for the test.</param>
+        /// <param name="workerRuntime">Worker runtime (node, powershell, etc.)</param>
+        /// <param name="log">Test output logger.</param>
+        /// <param name="ensureLatestValue">Value to set for ensureLatest in host.json (true/false).</param>
+        /// <param name="shouldDownload">Expected behavior: true if download should occur.</param>
+        /// <param name="version">Optional version suffix for test name.</param>
+        public static void TestEnsureLatestInHostJson(
+            string funcPath,
+            string workingDirectory,
+            string workerRuntime,
+            ITestOutputHelper log,
+            bool ensureLatestValue,
+            bool shouldDownload,
+            string version = "")
+        {
+            var testName = $"EnsureLatestHostJson_{ensureLatestValue}_{workerRuntime}{(string.IsNullOrEmpty(version) ? string.Empty : $"_{version}")}";
+            int port = TestFramework.Helpers.ProcessHelper.GetAvailablePort();
+
+            log.WriteLine($"Testing host.json ensureLatest={ensureLatestValue}, expecting shouldDownload={shouldDownload}");
+
+            // Read existing host.json and modify it to include ensureLatest
+            var hostJsonPath = Path.Combine(workingDirectory, "host.json");
+            string originalHostJson = File.Exists(hostJsonPath) ? File.ReadAllText(hostJsonPath) : "{}";
+            
+            try
+            {
+                // Parse and modify host.json
+                var hostJson = Newtonsoft.Json.Linq.JObject.Parse(originalHostJson);
+                var extensionBundle = hostJson["extensionBundle"] as Newtonsoft.Json.Linq.JObject ?? new Newtonsoft.Json.Linq.JObject();
+                extensionBundle["ensureLatest"] = ensureLatestValue;
+                
+                // If extensionBundle doesn't have an id, add the default one
+                if (extensionBundle["id"] == null)
+                {
+                    extensionBundle["id"] = "Microsoft.Azure.Functions.ExtensionBundle";
+                }
+                
+                // If extensionBundle doesn't have a version, add a default range
+                if (extensionBundle["version"] == null)
+                {
+                    extensionBundle["version"] = "[4.*, 5.0.0)";
+                }
+                
+                hostJson["extensionBundle"] = extensionBundle;
+                File.WriteAllText(hostJsonPath, hostJson.ToString());
+
+                var funcStartCommand = new FuncStartCommand(funcPath, testName, log);
+
+                funcStartCommand.ProcessStartedHandler = async (process) =>
+                {
+                    // Wait for startup messages to be logged
+                    await Task.Delay(5000);
+                    process.Kill(true);
+                };
+
+                var result = funcStartCommand
+                    .WithWorkingDirectory(workingDirectory)
+                    .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, workerRuntime)
+                    .Execute(["--port", port.ToString(), "--verbose"]);
+
+                var output = result.StdOut + result.StdErr;
+
+                // Assert: Check for expected bundle download behavior
+                if (shouldDownload)
+                {
+                    output.Should().Contain("Downloading extension bundles...");
+                }
+                else
+                {
+                    output.Should().NotContain("Downloading extension bundles...");
+                }
+            }
+            finally
+            {
+                // Restore original host.json
+                File.WriteAllText(hostJsonPath, originalHostJson);
+            }
+        }
     }
 }
