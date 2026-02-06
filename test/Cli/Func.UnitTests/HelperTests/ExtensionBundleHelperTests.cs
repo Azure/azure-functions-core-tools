@@ -16,6 +16,80 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             Assert.Equal(expectedPath, downloadPath);
         }
 
+        [Fact]
+        public void GetBundleDownloadPath_WithCustomPathEnvironmentVariable_ReturnsCustomPath()
+        {
+            // Arrange
+            var customPath = Path.Combine(Path.GetTempPath(), "CustomBundlePath");
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", customPath);
+
+                // Act
+                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(string.Empty);
+
+                // Assert
+                Assert.Equal(customPath, downloadPath);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+            }
+        }
+
+        [Fact]
+        public void GetBundleDownloadPath_WithCustomPathAlreadyIncludingBundleId_ReturnsPathAsIs()
+        {
+            // Arrange
+            var bundleId = "Microsoft.Azure.Functions.ExtensionBundle";
+            var customPath = Path.Combine(Path.GetTempPath(), "CustomBundlePath", bundleId);
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", customPath);
+
+                // Act
+                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+
+                // Assert
+                Assert.Equal(customPath, downloadPath);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+            }
+        }
+
+        [Fact]
+        public void GetBundleDownloadPath_WithEmptyEnvironmentVariable_ReturnsDefaultPath()
+        {
+            // Arrange
+            var bundleId = "BundleId";
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", string.Empty);
+
+                // Act
+                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+
+                // Assert
+                var expectedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure-functions-core-tools", "Functions", "ExtensionBundles", bundleId);
+                Assert.Equal(expectedPath, downloadPath);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+            }
+        }
+
         [Theory]
         [InlineData("[3.3.0, 4.0.0)", "3.3.0", "4.0.0")]
         [InlineData("[4.*, 5.0.0)", "4.0.0", "5.0.0")]
