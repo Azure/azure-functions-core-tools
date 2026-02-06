@@ -900,7 +900,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// </summary>
         /// <param name="loggingFilterHelper">The logging filter helper with the resolved log levels.</param>
         /// <param name="hostJsonConfig">The host.json configuration to check for existing settings.</param>
-        private static void ConfigureHostLoggingForUserLogLevel(LoggingFilterHelper loggingFilterHelper, IConfigurationRoot hostJsonConfig)
+        internal static void ConfigureHostLoggingForUserLogLevel(LoggingFilterHelper loggingFilterHelper, IConfigurationRoot hostJsonConfig)
         {
             // Only set environment variables if they're not already defined in env var or host.json (user's config takes precedence)
             // Set the log level for Function.* categories to enable user logs at the specified level
