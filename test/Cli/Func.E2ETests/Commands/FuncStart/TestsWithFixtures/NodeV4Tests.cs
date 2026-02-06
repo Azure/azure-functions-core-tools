@@ -1,9 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core;
 using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
@@ -12,6 +13,7 @@ using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
+using static Microsoft.Azure.AppService.Proxy.Runtime.Trace;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
@@ -237,5 +239,37 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
             // Ensure process didn't have to be killed manually
             processWasKilledManually.Should().BeFalse();
         }
-    }
-}
+
+                [Theory]
+                [InlineData("false", false)] // EnsureLatest=false should skip download
+                [InlineData("true", true)] // EnsureLatest=true should download
+                public void FuncStart_NodeV4_WithEnsureLatestEnvVar_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+                {
+                    BaseOfflineBundleTests.TestEnsureLatestBehavior(
+                        _fixture.FuncPath,
+                        _fixture.WorkingDirectory,
+                        "node",
+                        _fixture.Log,
+                        ensureLatestValue,
+                        shouldDownload,
+                        "v4",
+                        EnsureLatestConfigSource.EnvironmentVariable);
+                }
+
+                [Theory]
+                [InlineData("false", false)] // EnsureLatest=false in host.json should skip download
+                [InlineData("true", true)] // EnsureLatest=true in host.json should download
+                public void FuncStart_NodeV4_WithEnsureLatestHostJson_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+                {
+                    BaseOfflineBundleTests.TestEnsureLatestBehavior(
+                        _fixture.FuncPath,
+                        _fixture.WorkingDirectory,
+                        "node",
+                        _fixture.Log,
+                        ensureLatestValue,
+                        shouldDownload,
+                        "v4",
+                        EnsureLatestConfigSource.HostJson);
+                }
+            }
+        }

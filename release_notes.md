@@ -18,3 +18,4 @@
   - `func bundles path` - Get the path to the downloaded extension bundle
   - `func bundles add` - Add extension bundle configuration to host.json with `--channel` flag to select GA (default), Preview, or Experimental bundles
   - Support for custom bundle download paths via `AzureFunctionsJobHost__extensionBundle__downloadPath` environment variable
+- Fallback to cached bundles if there is no network connection during `func start` (#4772)

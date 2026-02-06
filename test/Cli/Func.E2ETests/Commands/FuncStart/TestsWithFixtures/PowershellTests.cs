@@ -1,6 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core;
 using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
@@ -42,10 +43,40 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "powershell")
                         .Execute(["--verbose", "--port", port.ToString()]);
 
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
+                        capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
-            // Validate out-of-process host was started
-            result.Should().StartOutOfProcessHost();
-        }
-    }
-}
+                        // Validate out-of-process host was started
+                        result.Should().StartOutOfProcessHost();
+                    }
+
+                    [Theory]
+                    [InlineData("false", false)] // EnsureLatest=false should skip download
+                    [InlineData("true", true)] // EnsureLatest=true should download
+                    public void FuncStart_WithEnsureLatestEnvVar_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+                    {
+                        BaseOfflineBundleTests.TestEnsureLatestBehavior(
+                            _fixture.FuncPath,
+                            _fixture.WorkingDirectory,
+                            "powershell",
+                            _fixture.Log,
+                            ensureLatestValue,
+                            shouldDownload,
+                            configSource: EnsureLatestConfigSource.EnvironmentVariable);
+                    }
+
+                    [Theory]
+                    [InlineData("false", false)] // EnsureLatest=false in host.json should skip download
+                    [InlineData("true", true)] // EnsureLatest=true in host.json should download
+                    public void FuncStart_WithEnsureLatestHostJson_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+                    {
+                        BaseOfflineBundleTests.TestEnsureLatestBehavior(
+                            _fixture.FuncPath,
+                            _fixture.WorkingDirectory,
+                            "powershell",
+                            _fixture.Log,
+                            ensureLatestValue,
+                            shouldDownload,
+                            configSource: EnsureLatestConfigSource.HostJson);
+                    }
+                }
+            }
