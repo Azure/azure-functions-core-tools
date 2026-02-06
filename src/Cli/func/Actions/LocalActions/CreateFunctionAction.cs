@@ -59,6 +59,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public AuthorizationLevel? AuthorizationLevel { get; set; }
 
+        public BundleChannel? BundlesChannel { get; set; }
+
         public WorkerRuntime WorkerRuntime => _workerRuntime;
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -92,6 +94,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("csx")
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
+
+            Parser
+                .Setup<BundleChannel?>('c', "bundles-channel")
+                .WithDescription("Extension bundle release channel: GA (default), Preview, or Experimental. Temporarily uses the specified bundle for template loading.")
+                .Callback(channel => BundlesChannel = channel);
 
             _initAction.ParseArgs(args);
 
@@ -130,15 +137,51 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // Load templates and resolve language
             if (NeedsToLoadExtensionTemplates(_workerRuntime, Csx))
             {
-                _templates = await _templatesManager.Templates;
+                // Apply temporary bundle channel if specified
+                string originalHostJson = null;
+                if (BundlesChannel.HasValue)
+                {
+                    originalHostJson = await ApplyTemporaryBundleChannel(BundlesChannel.Value);
+                }
+
+                try
+                {
+                    _templates = await _templatesManager.Templates;
+                }
+                finally
+                {
+                    // Restore original host.json if it was modified
+                    if (originalHostJson != null)
+                    {
+                        await RestoreHostJson(originalHostJson);
+                    }
+                }
             }
 
             ResolveLanguageAsync(_workerRuntime);
 
             if (IsNewPythonProgrammingModel())
             {
-                _newTemplates = await _templatesManager.NewTemplates;
-                _userPrompts = await _templatesManager.UserPrompts;
+                // Apply temporary bundle channel if specified
+                string originalHostJson = null;
+                if (BundlesChannel.HasValue)
+                {
+                    originalHostJson = await ApplyTemporaryBundleChannel(BundlesChannel.Value);
+                }
+
+                try
+                {
+                    _newTemplates = await _templatesManager.NewTemplates;
+                    _userPrompts = await _templatesManager.UserPrompts;
+                }
+                finally
+                {
+                    // Restore original host.json if it was modified
+                    if (originalHostJson != null)
+                    {
+                        await RestoreHostJson(originalHostJson);
+                    }
+                }
             }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) && !Csx)
@@ -619,6 +662,62 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private bool CurrentPathHasLocalSettings()
         {
             return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json"));
+        }
+
+        /// <summary>
+        /// Applies a temporary bundle channel configuration to host.json for template loading.
+        /// </summary>
+        /// <param name="channel">The bundle channel to apply.</param>
+        /// <returns>The original host.json content, or null if no changes were made.</returns>
+        private async Task<string> ApplyTemporaryBundleChannel(BundleChannel channel)
+        {
+            var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
+            
+            if (!File.Exists(hostFilePath))
+            {
+                // No host.json exists, nothing to modify
+                return null;
+            }
+
+            // Read and backup original host.json
+            var originalContent = await FileSystemHelpers.ReadAllTextFromFileAsync(hostFilePath);
+            
+            try
+            {
+                var hostJsonObj = JsonConvert.DeserializeObject<JObject>(originalContent);
+                
+                // Check if extension bundle is configured
+                if (hostJsonObj.TryGetValue(Constants.ExtensionBundleConfigPropertyName, out var existingBundle))
+                {
+                    // Replace with the specified channel's bundle config
+                    var bundleConfig = await BundleActionHelper.GetBundleConfigForChannel(channel);
+                    var bundleConfigObj = JsonConvert.DeserializeObject<JToken>(bundleConfig);
+                    hostJsonObj[Constants.ExtensionBundleConfigPropertyName] = bundleConfigObj;
+                    
+                    // Write the temporary config
+                    var updatedHostJson = JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+                    await FileSystemHelpers.WriteAllTextToFileAsync(hostFilePath, updatedHostJson);
+                    
+                    return originalContent;
+                }
+            }
+            catch
+            {
+                // If parsing fails, don't modify the file
+                return null;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Restores the original host.json content.
+        /// </summary>
+        /// <param name="originalContent">The original host.json content to restore.</param>
+        private async Task RestoreHostJson(string originalContent)
+        {
+            var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
+            await FileSystemHelpers.WriteAllTextToFileAsync(hostFilePath, originalContent);
         }
     }
 }
