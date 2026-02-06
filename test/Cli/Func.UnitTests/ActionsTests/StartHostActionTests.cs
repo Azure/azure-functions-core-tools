@@ -354,5 +354,145 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 Assert.Equal("Development", result["AZURE_FUNCTIONS_ENVIRONMENT"]);
             }
         }
+
+        [Fact]
+        public void ConfigureHostLoggingForUserLogLevel_SetsEnvironmentVariable_WhenNeitherEnvVarNorHostJsonAreSet()
+        {
+            // Arrange
+            var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
+            var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Debug");
+            
+            // Clear environment variable if it exists
+            string envVarName = Constants.FunctionLogLevel;
+            string originalValue = Environment.GetEnvironmentVariable(envVarName);
+            Environment.SetEnvironmentVariable(envVarName, null);
+
+            try
+            {
+                // Act
+                StartHostAction.ConfigureHostLoggingForUserLogLevel(loggingFilterHelper, hostJsonConfig);
+
+                // Assert
+                string actualValue = Environment.GetEnvironmentVariable(envVarName);
+                Assert.Equal("Debug", actualValue);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable(envVarName, originalValue);
+            }
+        }
+
+        [Fact]
+        public void ConfigureHostLoggingForUserLogLevel_DoesNotSetEnvironmentVariable_WhenEnvVarAlreadySet()
+        {
+            // Arrange
+            var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
+            var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Debug");
+            
+            string envVarName = Constants.FunctionLogLevel;
+            string originalValue = Environment.GetEnvironmentVariable(envVarName);
+            Environment.SetEnvironmentVariable(envVarName, "Warning");
+
+            try
+            {
+                // Act
+                StartHostAction.ConfigureHostLoggingForUserLogLevel(loggingFilterHelper, hostJsonConfig);
+
+                // Assert - should preserve existing env var value
+                string actualValue = Environment.GetEnvironmentVariable(envVarName);
+                Assert.Equal("Warning", actualValue);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable(envVarName, originalValue);
+            }
+        }
+
+        [Fact]
+        public void ConfigureHostLoggingForUserLogLevel_DoesNotSetEnvironmentVariable_WhenHostJsonHasFunctionLogLevel()
+        {
+            // Arrange
+            var hostJsonSettings = new Dictionary<string, string>
+            {
+                ["logging:logLevel:Function"] = "Error"
+            };
+            var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(hostJsonSettings);
+            var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Debug");
+            
+            string envVarName = Constants.FunctionLogLevel;
+            string originalValue = Environment.GetEnvironmentVariable(envVarName);
+            Environment.SetEnvironmentVariable(envVarName, null);
+
+            try
+            {
+                // Act
+                StartHostAction.ConfigureHostLoggingForUserLogLevel(loggingFilterHelper, hostJsonConfig);
+
+                // Assert - should not set env var since host.json has the setting
+                string actualValue = Environment.GetEnvironmentVariable(envVarName);
+                Assert.Null(actualValue);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable(envVarName, originalValue);
+            }
+        }
+
+        [Fact]
+        public void ConfigureHostLoggingForUserLogLevel_AlwaysSetsPythonDebugLogging()
+        {
+            // Arrange
+            var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
+            var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Information");
+            
+            string pythonEnvVar = "PYTHON_ENABLE_DEBUG_LOGGING";
+            string originalValue = Environment.GetEnvironmentVariable(pythonEnvVar);
+            Environment.SetEnvironmentVariable(pythonEnvVar, null);
+
+            try
+            {
+                // Act
+                StartHostAction.ConfigureHostLoggingForUserLogLevel(loggingFilterHelper, hostJsonConfig);
+
+                // Assert
+                string actualValue = Environment.GetEnvironmentVariable(pythonEnvVar);
+                Assert.Equal("1", actualValue);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable(pythonEnvVar, originalValue);
+            }
+        }
+
+        [Fact]
+        public void ConfigureHostLoggingForUserLogLevel_DoesNotOverridePythonDebugLogging_WhenAlreadySet()
+        {
+            // Arrange
+            var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
+            var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Information");
+            
+            string pythonEnvVar = "PYTHON_ENABLE_DEBUG_LOGGING";
+            string originalValue = Environment.GetEnvironmentVariable(pythonEnvVar);
+            Environment.SetEnvironmentVariable(pythonEnvVar, "0");
+
+            try
+            {
+                // Act
+                StartHostAction.ConfigureHostLoggingForUserLogLevel(loggingFilterHelper, hostJsonConfig);
+
+                // Assert - should preserve existing value
+                string actualValue = Environment.GetEnvironmentVariable(pythonEnvVar);
+                Assert.Equal("0", actualValue);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable(pythonEnvVar, originalValue);
+            }
+        }
     }
 }
