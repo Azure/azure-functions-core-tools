@@ -576,20 +576,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (extensionBundle)
             {
-                if (ResolvedProgrammingModel == Common.ProgrammingModel.V2 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Python)
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
-                }
-                else if (ResolvedProgrammingModel == Common.ProgrammingModel.V4 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Node)
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigNodeV4);
-                }
-                else
-                {
-                    // Use the specified bundle channel (GA, Preview, or Experimental)
-                    var bundleConfig = await BundleActionHelper.GetBundleConfigForChannel(BundlesChannel);
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, Task.FromResult(bundleConfig));
-                }
+                // Use the specified bundle channel (GA, Preview, or Experimental)
+                var bundleConfig = await BundleActionHelper.GetBundleConfigForChannel(BundlesChannel);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, Task.FromResult(bundleConfig));
             }
 
             if (workerRuntime == Helpers.WorkerRuntime.Custom)
