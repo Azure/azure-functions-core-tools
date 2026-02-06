@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
+using Colors.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -16,6 +17,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -120,6 +123,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         ? extensionBundleOptions.DownloadPath
                         : ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
                     Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", downloadPath);
+                }
+                else if (!string.IsNullOrEmpty(extensionBundleOptions.DownloadPath))
+                {
+                    // Both env var and host.json are configured - inform user env var takes precedence
+                    ColoredConsole.WriteLine(WarningColor($"Extension bundle downloadPath is configured in both host.json and environment variable. Using environment variable value: {existingDownloadPath}"));
                 }
 
                 Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
