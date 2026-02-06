@@ -21,7 +21,8 @@ jobs:
         -f net8.0 `
         --no-restore `
         /p:NoWorkers="true" `
-        /p:SkipTemplates="true"
+        /p:SkipTemplates="true" `
+        /p:RuntimeIdentifiers=
     displayName: 'Build CLI'
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
@@ -35,12 +36,14 @@ jobs:
       signPatterns: $(thirdPartyBinariesToSign)
 
   - pwsh: |
-      dotnet pack src/Cli/func/Azure.Functions.Cli.csproj  `
+      dotnet pack src/Cli/func/Azure.Functions.Cli.csproj `
         -o $(Build.Repository.LocalPath)/artifacts `
         -c Release `
         --no-build `
         /p:NoWorkers="true" `
-        /p:SkipTemplates="true"
+        /p:SkipTemplates="true" `
+        /p:RuntimeIdentifiers=
+
     displayName: 'Pack CLI for NuGet'
 
   - pwsh: |
