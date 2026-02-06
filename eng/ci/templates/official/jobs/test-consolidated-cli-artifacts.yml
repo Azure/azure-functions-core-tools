@@ -31,6 +31,16 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  # For win-x86, we need to install x86 versions of the .NET SDK because the test runs x86 binaries.
+  - ${{ if eq(parameters.arch, 'win-x86') }}:
+    - task: UseDotNet@2
+      displayName: Install .NET 10 (x86)
+      inputs:
+        packageType: sdk
+        version: 10.x
+        architecture: x86
+        performMultiLevelLookup: true
+
   - task: GoTool@0
     displayName: 'Install Go'
     inputs:
@@ -39,6 +49,13 @@ jobs:
   - download: current
     displayName: 'Download artifact'
     artifact: func-cli-${{ parameters.arch }}
+
+  # The minimal Linux image doesn't have unzip installed, so we need to install it.
+  - ${{ if startsWith(parameters.arch, 'linux') }}:
+    - bash: |
+        sudo apt-get update
+        sudo apt-get install -y unzip
+      displayName: 'Install unzip'
 
   - ${{ if startsWith(parameters.arch, 'min.') }}:
     - task: ExtractFiles@1
