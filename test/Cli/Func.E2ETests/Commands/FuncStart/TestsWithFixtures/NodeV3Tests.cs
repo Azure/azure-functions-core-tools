@@ -49,9 +49,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Theory]
-        [InlineData("false", true)] // EnsureLatest=false should not skip download
-        [InlineData("true", false)] // EnsureLatest=true should skip download
-        public void FuncStart_NodeV3_WithEnsureLatestSetting_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+        [InlineData("false", false)] // EnsureLatest=false should skip download
+        [InlineData("true", true)] // EnsureLatest=true should download
+        public void FuncStart_NodeV3_WithEnsureLatestEnvVar_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
         {
             BaseOfflineBundleTests.TestEnsureLatestBehavior(
                 _fixture.FuncPath,
@@ -60,7 +60,24 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
                 _fixture.Log,
                 ensureLatestValue,
                 shouldDownload,
-                "v3");
+                "v3",
+                EnsureLatestConfigSource.EnvironmentVariable);
+        }
+
+        [Theory]
+        [InlineData("false", false)] // EnsureLatest=false in host.json should skip download
+        [InlineData("true", true)] // EnsureLatest=true in host.json should download
+        public void FuncStart_NodeV3_WithEnsureLatestHostJson_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+        {
+            BaseOfflineBundleTests.TestEnsureLatestBehavior(
+                _fixture.FuncPath,
+                _fixture.WorkingDirectory,
+                "node",
+                _fixture.Log,
+                ensureLatestValue,
+                shouldDownload,
+                "v3",
+                EnsureLatestConfigSource.HostJson);
         }
     }
 }
