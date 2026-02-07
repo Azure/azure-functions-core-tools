@@ -7,12 +7,6 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)bundleConfigPyStein.json">
-      <LogicalName>$(AssemblyName).bundleConfigPyStein.json</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)bundleConfigNodeV4.json">
-      <LogicalName>$(AssemblyName).bundleConfigNodeV4.json</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)bundleConfigPreview.json">
       <LogicalName>$(AssemblyName).bundleConfigPreview.json</LogicalName>
     </EmbeddedResource>
