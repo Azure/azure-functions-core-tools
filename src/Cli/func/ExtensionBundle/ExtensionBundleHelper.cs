@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
@@ -35,6 +34,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
         private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
         private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+
+        // Thread synchronization for offline state
+        private static readonly object _offlineLock = new object();
 
         // Cache offline status to avoid repeated network checks
         private static readonly TimeSpan _offlineCheckInterval = TimeSpan.FromSeconds(10);
@@ -423,9 +425,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 {
                     string latestVersion = null;
 
-                    foreach (var versionDir in versionDirectories)
+                    foreach (var version in versionDirectories.Select(Path.GetFileName))
                     {
-                        var version = Path.GetFileName(versionDir);
                         if (IsVersionInRange(version, versionRange) &&
                             (latestVersion == null || CompareVersions(version, latestVersion) > 0))
                         {
@@ -484,18 +485,24 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// <returns>True if offline, false if online.</returns>
         internal static bool IsOffline()
         {
-            // Check cache first to avoid excessive network calls
-            if (_isOffline.HasValue && DateTime.UtcNow - _lastOfflineCheck < _offlineCheckInterval)
+            lock (_offlineLock)
             {
-                return _isOffline.Value;
+                // Check cache first to avoid excessive network calls
+                if (_isOffline.HasValue && DateTime.UtcNow - _lastOfflineCheck < _offlineCheckInterval)
+                {
+                    return _isOffline.Value;
+                }
             }
 
-            // Perform quick connectivity check
+            // Perform quick connectivity check outside the lock to avoid blocking other threads
             bool offline = CheckIfOffline();
 
-            // Update cache
-            _isOffline = offline;
-            _lastOfflineCheck = DateTime.UtcNow;
+            lock (_offlineLock)
+            {
+                // Update cache
+                _isOffline = offline;
+                _lastOfflineCheck = DateTime.UtcNow;
+            }
 
             return offline;
         }
@@ -530,8 +537,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// </summary>
         internal static void MarkAsOffline()
         {
-            _isOffline = true;
-            _lastOfflineCheck = DateTime.UtcNow;
+            lock (_offlineLock)
+            {
+                _isOffline = true;
+                _lastOfflineCheck = DateTime.UtcNow;
+            }
         }
 
         /// <summary>
@@ -539,8 +549,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// </summary>
         internal static void ResetOfflineCache()
         {
-            _isOffline = null;
-            _lastOfflineCheck = DateTime.MinValue;
+            lock (_offlineLock)
+            {
+                _isOffline = null;
+                _lastOfflineCheck = DateTime.MinValue;
+            }
         }
     }
 }

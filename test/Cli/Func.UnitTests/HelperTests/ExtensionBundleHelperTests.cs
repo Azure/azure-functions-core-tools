@@ -592,7 +592,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             ExtensionBundleHelper.ResetOfflineCache();
 
             // Act
-            var isOffline = ExtensionBundleHelper.IsOffline();
+            ExtensionBundleHelper.IsOffline();
 
             // If we get here without exception, test passes
         }
@@ -623,7 +623,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // After reset, next call will perform fresh check
             // We can't guarantee the result, but verify it doesn't throw
-            var result = ExtensionBundleHelper.IsOffline();
+            ExtensionBundleHelper.IsOffline();
 
             // If we get here without exception, test passes
         }
