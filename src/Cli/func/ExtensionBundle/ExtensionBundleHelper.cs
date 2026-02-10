@@ -1,7 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Net.Sockets;
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
@@ -426,12 +426,10 @@ namespace Azure.Functions.Cli.ExtensionBundle
                     foreach (var versionDir in versionDirectories)
                     {
                         var version = Path.GetFileName(versionDir);
-                        if (IsVersionInRange(version, versionRange))
+                        if (IsVersionInRange(version, versionRange) &&
+                            (latestVersion == null || CompareVersions(version, latestVersion) > 0))
                         {
-                            if (latestVersion == null || CompareVersions(version, latestVersion) > 0)
-                            {
-                                latestVersion = version;
-                            }
+                            latestVersion = version;
                         }
                     }
 
@@ -511,8 +509,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 // Try a quick HEAD request to the CDN
                 using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
-                var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
-                var response = quickClient.SendAsync(request).GetAwaiter().GetResult();
+                using var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
+                using var response = quickClient.SendAsync(request).GetAwaiter().GetResult();
                 return !response.IsSuccessStatusCode;
             }
             catch
