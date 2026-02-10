@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 if (TryGetCachedBundle(extensionBundleOptions.Id, versionRange, out string cachedBundleVersion))
                 {
                     ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: Unable to download extension bundles. Using cached version {cachedBundleVersion}."));
-                    ColoredConsole.WriteLine(OutputTheme.WarningColor("When you have network connectivity, you can run 'func bundle download' to update."));
+                    ColoredConsole.WriteLine(OutputTheme.WarningColor("When you have network connectivity, you can run `func bundles download` to update."));
                     ColoredConsole.WriteLine();
                 }
                 else

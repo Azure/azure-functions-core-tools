@@ -647,5 +647,57 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 ExtensionBundleHelper.ResetOfflineCache();
             }
         }
+
+        [Fact]
+        public void GetExtensionBundleManager_WhenOffline_SetsEnsureLatestToFalse()
+        {
+            // Arrange
+            ExtensionBundleHelper.MarkAsOffline();
+            var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
+            {
+                Id = "Microsoft.Azure.Functions.ExtensionBundle",
+                Version = NuGet.Versioning.VersionRange.Parse("[4.*, 5.0.0)")
+            };
+
+            try
+            {
+                // Act
+                ExtensionBundleHelper.GetExtensionBundleManager(options);
+
+                // Assert - EnsureLatest should be false when offline
+                options.EnsureLatest.Should().BeFalse("EnsureLatest should be false when system is offline");
+            }
+            finally
+            {
+                ExtensionBundleHelper.ResetOfflineCache();
+            }
+        }
+
+        [Fact]
+        public void GetExtensionBundleManager_WhenOnline_SetsEnsureLatestToTrue()
+        {
+            // Arrange
+            ExtensionBundleHelper.ResetOfflineCache();
+            var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
+            {
+                Id = "Microsoft.Azure.Functions.ExtensionBundle",
+                Version = NuGet.Versioning.VersionRange.Parse("[4.*, 5.0.0)")
+            };
+
+            try
+            {
+                // Act
+                ExtensionBundleHelper.GetExtensionBundleManager(options);
+
+                // Assert - EnsureLatest should be true when online (or at least not explicitly false)
+                // Note: This test may be flaky if network is unavailable during test run
+                // The key behavior is that EnsureLatest = !IsOffline()
+                options.EnsureLatest.Should().BeTrue("EnsureLatest should be true when system is online");
+            }
+            finally
+            {
+                ExtensionBundleHelper.ResetOfflineCache();
+            }
+        }
     }
 }
