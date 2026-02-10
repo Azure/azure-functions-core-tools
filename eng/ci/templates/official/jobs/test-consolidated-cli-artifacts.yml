@@ -31,6 +31,23 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  # For win-x86, we need to install x86 .NET 10 runtime. The install-tools.yml installs x64 versions.
+  # The x86 func CLI spawns x86 worker processes that look for .NET in 'C:\Program Files (x86)\dotnet\'.
+  # We install 'aspnetcore' runtime which includes both Microsoft.NETCore.App and Microsoft.AspNetCore.App.
+  - ${{ if eq(parameters.arch, 'win-x86') }}:
+    - task: PowerShell@2
+      displayName: Install .NET 10 runtime (x86)
+      inputs:
+        targetType: 'inline'
+        pwsh: true
+        script: |
+          $installScript = "$env:TEMP\dotnet-install.ps1"
+          Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installScript
+          & $installScript -Channel 10.0 -Runtime aspnetcore -Architecture x86 -InstallDir 'C:\Program Files (x86)\dotnet'
+          Write-Host "Installed .NET runtimes in 'C:\Program Files (x86)\dotnet':"
+          Get-ChildItem 'C:\Program Files (x86)\dotnet\shared\Microsoft.NETCore.App'
+          Get-ChildItem 'C:\Program Files (x86)\dotnet\shared\Microsoft.AspNetCore.App'
+
   - task: GoTool@0
     displayName: 'Install Go'
     inputs:
@@ -39,6 +56,13 @@ jobs:
   - download: current
     displayName: 'Download artifact'
     artifact: func-cli-${{ parameters.arch }}
+
+  # The minimal Linux image doesn't have unzip installed, so we need to install it.
+  - ${{ if startsWith(parameters.arch, 'linux') }}:
+    - bash: |
+        sudo apt-get update
+        sudo apt-get install -y unzip
+      displayName: 'Install unzip'
 
   - ${{ if startsWith(parameters.arch, 'min.') }}:
     - task: ExtractFiles@1
