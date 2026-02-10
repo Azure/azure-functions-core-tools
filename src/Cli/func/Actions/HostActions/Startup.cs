@@ -130,7 +130,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(WarningColor($"Extension bundle downloadPath is configured in both host.json and environment variable. Using environment variable value: {existingDownloadPath}"));
                 }
 
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", ExtensionBundleHelper.IsOffline() ? "false" : "true");
+                // Check offline status
+                var isOffline = ExtensionBundleHelper.IsOfflineAsync().GetAwaiter().GetResult();
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", isOffline ? "false" : "true");
             }
         }
 

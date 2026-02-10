@@ -20,10 +20,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
             var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
             if (!string.IsNullOrEmpty(bundleId))
             {
+                // Blocking call is acceptable in configuration builder context
+                var isOffline = ExtensionBundleHelper.IsOfflineAsync().GetAwaiter().GetResult();
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
                     { "AzureFunctionsJobHost:extensionBundle:downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
-                    { "AzureFunctionsJobHost:extensionBundle:ensureLatest", (!ExtensionBundleHelper.IsOffline()).ToString() }
+                    { "AzureFunctionsJobHost:extensionBundle:ensureLatest", (!isOffline).ToString() }
                 });
             }
         }

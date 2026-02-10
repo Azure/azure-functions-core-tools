@@ -47,19 +47,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 BundleChannel.Preview => StaticResources.BundleConfigPreview,
                 BundleChannel.Experimental => StaticResources.BundleConfigExperimental,
                 _ => StaticResources.BundleConfig
-            };
-        }
+                };
+            }
 
-        public static bool TryGetBundleContext(out IExtensionBundleManager manager, out ExtensionBundleOptions options, out string bundleBasePath)
+        public static async Task<(bool Success, IExtensionBundleManager Manager, ExtensionBundleOptions Options, string BundleBasePath)> TryGetBundleContextAsync()
         {
             var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
             if (!File.Exists(hostFilePath))
             {
                 PrintNotConfiguredWarning();
-                options = null;
-                bundleBasePath = null;
-                manager = null;
-                return false;
+                return (false, null, null, null);
             }
 
             JObject hostJson;
@@ -70,25 +67,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             catch
             {
                 PrintNotConfiguredWarning();
-                options = null;
-                bundleBasePath = null;
-                manager = null;
-                return false;
+                return (false, null, null, null);
             }
 
             var extensionBundle = hostJson[Constants.ExtensionBundleConfigPropertyName] as JObject;
             if (extensionBundle == null)
             {
                 PrintNotConfiguredWarning();
-                options = null;
-                bundleBasePath = null;
-                manager = null;
-                return false;
+                return (false, null, null, null);
             }
 
-            manager = ExtensionBundleHelper.GetExtensionBundleManager();
-            options = ExtensionBundleHelper.GetExtensionBundleOptions();
+            var manager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
+            var options = ExtensionBundleHelper.GetExtensionBundleOptions();
 
+            string bundleBasePath;
             var hostJsonDownloadPath = extensionBundle["downloadPath"]?.ToString();
             if (!string.IsNullOrEmpty(hostJsonDownloadPath))
             {
@@ -104,7 +96,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 bundleBasePath = ExtensionBundleHelper.GetBundleDownloadPath(options.Id);
             }
 
-            return true;
+            return (true, manager, options, bundleBasePath);
         }
 
         public static void PrintNotConfiguredWarning()

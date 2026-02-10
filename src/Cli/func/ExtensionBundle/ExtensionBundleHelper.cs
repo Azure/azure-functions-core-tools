@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             return options;
         }
 
-        public static ExtensionBundleManager GetExtensionBundleManager(ExtensionBundleOptions extensionBundleOption = null)
+        public static async Task<ExtensionBundleManager> GetExtensionBundleManagerAsync(ExtensionBundleOptions extensionBundleOption = null)
         {
             extensionBundleOption = extensionBundleOption ?? GetExtensionBundleOptions();
             if (!string.IsNullOrEmpty(extensionBundleOption.Id))
@@ -61,7 +61,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 extensionBundleOption.DownloadPath = GetBundleDownloadPath(extensionBundleOption.Id);
 
                 // Only try to get latest if we're online
-                extensionBundleOption.EnsureLatest = !IsOffline();
+                extensionBundleOption.EnsureLatest = !await IsOfflineAsync();
             }
 
             var configOptions = new FunctionsHostingConfigOptions();
@@ -69,9 +69,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
             return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance, configOptions, httpClientFactory);
         }
 
-        public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()
+        public static async Task<ExtensionBundleContentProvider> GetExtensionBundleContentProviderAsync()
         {
-            return new ExtensionBundleContentProvider(GetExtensionBundleManager(), NullLogger<ExtensionBundleContentProvider>.Instance);
+            return new ExtensionBundleContentProvider(await GetExtensionBundleManagerAsync(), NullLogger<ExtensionBundleContentProvider>.Instance);
         }
 
         public static string GetBundleDownloadPath(string bundleId)
@@ -92,7 +92,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static async Task GetExtensionBundle()
         {
             var extensionBundleOptions = GetExtensionBundleOptions();
-            var extensionBundleManager = GetExtensionBundleManager(extensionBundleOptions);
+            var extensionBundleManager = await GetExtensionBundleManagerAsync(extensionBundleOptions);
 
             using var httpClient = new HttpClient { Timeout = _httpTimeout };
 
@@ -109,7 +109,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         {
             try
             {
-                if (IsOffline())
+                if (await IsOfflineAsync())
                 {
                     throw new HttpRequestException("System is offline.");
                 }
@@ -483,7 +483,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// Uses caching to avoid excessive network checks.
         /// </summary>
         /// <returns>True if offline, false if online.</returns>
-        internal static bool IsOffline()
+        internal static async Task<bool> IsOfflineAsync()
         {
             lock (_offlineLock)
             {
@@ -495,7 +495,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             }
 
             // Perform quick connectivity check outside the lock to avoid blocking other threads
-            bool offline = CheckIfOffline();
+            bool offline = await CheckIfOfflineAsync();
 
             lock (_offlineLock)
             {
@@ -509,21 +509,16 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
         /// <summary>
         /// Performs actual network connectivity check.
-        /// Uses Task.Run to avoid potential deadlocks when called from a synchronization context.
         /// </summary>
-        private static bool CheckIfOffline()
+        private static async Task<bool> CheckIfOfflineAsync()
         {
             try
             {
                 // Try a quick HEAD request to the CDN
-                // Use Task.Run to execute on thread pool, avoiding sync context deadlocks
-                return Task.Run(async () =>
-                {
-                    using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
-                    using var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
-                    using var response = await quickClient.SendAsync(request);
-                    return !response.IsSuccessStatusCode;
-                }).GetAwaiter().GetResult();
+                using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
+                using var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
+                using var response = await quickClient.SendAsync(request);
+                return !response.IsSuccessStatusCode;
             }
             catch
             {

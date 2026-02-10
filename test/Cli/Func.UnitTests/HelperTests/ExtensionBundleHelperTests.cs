@@ -240,20 +240,20 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void GetExtensionBundleManager_WithNullOptions_UsesDefaultOptions()
+        public async Task GetExtensionBundleManagerAsync_WithNullOptions_UsesDefaultOptions()
         {
             // Act
-            var manager = ExtensionBundleHelper.GetExtensionBundleManager(null);
+            var manager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync(null);
 
             // Assert
             manager.Should().NotBeNull();
         }
 
         [Fact]
-        public void GetExtensionBundleContentProvider_ReturnsValidProvider()
+        public async Task GetExtensionBundleContentProviderAsync_ReturnsValidProvider()
         {
             // Act
-            var provider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+            var provider = await ExtensionBundleHelper.GetExtensionBundleContentProviderAsync();
 
             // Assert
             provider.Should().NotBeNull();
@@ -586,50 +586,50 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void IsOffline_InitialCheck_PerformsNetworkTest()
+        public async Task IsOfflineAsync_InitialCheck_PerformsNetworkTest()
         {
             // Reset cache to ensure fresh check
             ExtensionBundleHelper.ResetOfflineCache();
 
             // Act
-            ExtensionBundleHelper.IsOffline();
+            await ExtensionBundleHelper.IsOfflineAsync();
 
             // If we get here without exception, test passes
         }
 
         [Fact]
-        public void MarkAsOffline_SetsOfflineState()
+        public async Task MarkAsOffline_SetsOfflineState()
         {
             // Arrange
             ExtensionBundleHelper.ResetOfflineCache();
 
             // Act
             ExtensionBundleHelper.MarkAsOffline();
-            var isOffline = ExtensionBundleHelper.IsOffline();
+            var isOffline = await ExtensionBundleHelper.IsOfflineAsync();
 
             // Assert
             isOffline.Should().BeTrue("should be marked as offline");
         }
 
         [Fact]
-        public void ResetOfflineCache_ClearsCache()
+        public async Task ResetOfflineCache_ClearsCache()
         {
             // Arrange
             ExtensionBundleHelper.MarkAsOffline();
-            ExtensionBundleHelper.IsOffline().Should().BeTrue();
+            (await ExtensionBundleHelper.IsOfflineAsync()).Should().BeTrue();
 
             // Act
             ExtensionBundleHelper.ResetOfflineCache();
 
             // After reset, next call will perform fresh check
             // We can't guarantee the result, but verify it doesn't throw
-            ExtensionBundleHelper.IsOffline();
+            await ExtensionBundleHelper.IsOfflineAsync();
 
             // If we get here without exception, test passes
         }
 
         [Fact]
-        public void GetExtensionBundleManager_WhenOffline_CreatesManager()
+        public async Task GetExtensionBundleManagerAsync_WhenOffline_CreatesManager()
         {
             // Arrange
             ExtensionBundleHelper.MarkAsOffline();
@@ -637,7 +637,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             try
             {
                 // Act
-                var manager = ExtensionBundleHelper.GetExtensionBundleManager();
+                var manager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
 
                 // Assert
                 manager.Should().NotBeNull();
@@ -649,7 +649,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void GetExtensionBundleManager_WhenOffline_SetsEnsureLatestToFalse()
+        public async Task GetExtensionBundleManagerAsync_WhenOffline_SetsEnsureLatestToFalse()
         {
             // Arrange
             ExtensionBundleHelper.MarkAsOffline();
@@ -662,7 +662,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             try
             {
                 // Act
-                ExtensionBundleHelper.GetExtensionBundleManager(options);
+                await ExtensionBundleHelper.GetExtensionBundleManagerAsync(options);
 
                 // Assert - EnsureLatest should be false when offline
                 options.EnsureLatest.Should().BeFalse("EnsureLatest should be false when system is offline");
@@ -674,7 +674,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void GetExtensionBundleManager_WhenOnline_SetsEnsureLatestToTrue()
+        public async Task GetExtensionBundleManagerAsync_WhenOnline_SetsEnsureLatestToTrue()
         {
             // Arrange
             ExtensionBundleHelper.ResetOfflineCache();
@@ -687,12 +687,77 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             try
             {
                 // Act
-                ExtensionBundleHelper.GetExtensionBundleManager(options);
+                await ExtensionBundleHelper.GetExtensionBundleManagerAsync(options);
 
                 // Assert - EnsureLatest should be true when online (or at least not explicitly false)
                 // Note: This test may be flaky if network is unavailable during test run
-                // The key behavior is that EnsureLatest = !IsOffline()
+                // The key behavior is that EnsureLatest = !IsOfflineAsync()
                 options.EnsureLatest.Should().BeTrue("EnsureLatest should be true when system is online");
+            }
+            finally
+            {
+                ExtensionBundleHelper.ResetOfflineCache();
+            }
+        }
+
+        [Fact]
+        public async Task IsOfflineAsync_WhenMarkedOffline_ReturnsTrueFromCache()
+        {
+            // Arrange
+            ExtensionBundleHelper.ResetOfflineCache();
+            ExtensionBundleHelper.MarkAsOffline();
+
+            try
+            {
+                // Act
+                var isOffline = await ExtensionBundleHelper.IsOfflineAsync();
+
+                // Assert - should return cached offline state without making network call
+                isOffline.Should().BeTrue("should return cached offline state");
+            }
+            finally
+            {
+                ExtensionBundleHelper.ResetOfflineCache();
+            }
+        }
+
+        [Fact]
+        public async Task IsOfflineAsync_AfterReset_PerformsNetworkCheck()
+        {
+            // Arrange
+            ExtensionBundleHelper.MarkAsOffline();
+            ExtensionBundleHelper.ResetOfflineCache();
+
+            try
+            {
+                // Act - this will perform actual network check
+                await ExtensionBundleHelper.IsOfflineAsync();
+
+                // Assert - if we get here without exception, the async method works correctly
+                // The actual result depends on network availability
+            }
+            finally
+            {
+                ExtensionBundleHelper.ResetOfflineCache();
+            }
+        }
+
+        [Fact]
+        public async Task IsOfflineAsync_CachesResult_ForSubsequentCalls()
+        {
+            // Arrange
+            ExtensionBundleHelper.ResetOfflineCache();
+            ExtensionBundleHelper.MarkAsOffline();
+
+            try
+            {
+                // Act - make multiple calls
+                var result1 = await ExtensionBundleHelper.IsOfflineAsync();
+                var result2 = await ExtensionBundleHelper.IsOfflineAsync();
+
+                // Assert - both should return the same cached value
+                result1.Should().Be(result2, "cached results should be consistent");
+                result1.Should().BeTrue("should return cached offline state");
             }
             finally
             {
