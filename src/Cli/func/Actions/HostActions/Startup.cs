@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
+using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -115,14 +117,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             if (!string.IsNullOrEmpty(bundleId))
             {
                 // Only set the download path if not already set via environment variable
-                var existingDownloadPath = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+                var existingDownloadPath = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
                 if (string.IsNullOrEmpty(existingDownloadPath))
                 {
                     // Use the downloadPath from host.json if configured, otherwise use default path
                     var downloadPath = !string.IsNullOrEmpty(extensionBundleOptions.DownloadPath)
                         ? extensionBundleOptions.DownloadPath
                         : ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", downloadPath);
+                    Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, downloadPath);
                 }
                 else if (!string.IsNullOrEmpty(extensionBundleOptions.DownloadPath))
                 {
@@ -130,7 +132,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(WarningColor($"Extension bundle downloadPath is configured in both host.json and environment variable. Using environment variable value: {existingDownloadPath}"));
                 }
 
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
+                // Check offline status using the centralized OfflineHelper
+                var isOffline = OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult();
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, isOffline ? "false" : "true");
             }
         }
 

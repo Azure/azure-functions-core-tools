@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Net.Sockets;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
@@ -17,10 +16,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
 {
     internal class ExtensionBundleHelper
     {
-        private const int MaxRetries = 3;
         private const string ExtensionBundleStaticPropertiesUrl = "https://cdn.functions.azure.com/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/staticProperties.json";
         private const string DefaultExtensionBundleVersionRange = "[4.*, 5.0.0)";
-        private const string AzureFunctionsJobHostExtensionBundleDownloadPath = "AzureFunctionsJobHost__extensionBundle__downloadPath";
+        private const int MaxRetries = 3;
 
         // Regex patterns for version range parsing
         // Matches: [4.*, 5.0.0) or [1.*, 2.0.0) - with wildcard
@@ -32,14 +30,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
         // Matches: [1.2.3] - exact version (treated as point range)
         private const string ExactVersionPattern = @"\[(\d+\.\d+\.\d+)\]";
 
-        private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan _httpTimeout = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(2);
         private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-
-        // Cache offline status to avoid repeated network checks
-        private static readonly TimeSpan _offlineCheckInterval = TimeSpan.FromSeconds(10);
-        private static bool? _isOffline = null;
-        private static DateTime _lastOfflineCheck = DateTime.MinValue;
 
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
@@ -51,7 +44,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             return options;
         }
 
-        public static ExtensionBundleManager GetExtensionBundleManager(ExtensionBundleOptions extensionBundleOption = null)
+        public static async Task<ExtensionBundleManager> GetExtensionBundleManagerAsync(ExtensionBundleOptions extensionBundleOption = null)
         {
             extensionBundleOption = extensionBundleOption ?? GetExtensionBundleOptions();
             if (!string.IsNullOrEmpty(extensionBundleOption.Id))
@@ -59,7 +52,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 extensionBundleOption.DownloadPath = GetBundleDownloadPath(extensionBundleOption.Id);
 
                 // Only try to get latest if we're online
-                extensionBundleOption.EnsureLatest = !IsOffline();
+                extensionBundleOption.EnsureLatest = !await OfflineHelper.IsOfflineAsync();
             }
 
             var configOptions = new FunctionsHostingConfigOptions();
@@ -67,15 +60,15 @@ namespace Azure.Functions.Cli.ExtensionBundle
             return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance, configOptions, httpClientFactory);
         }
 
-        public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()
+        public static async Task<ExtensionBundleContentProvider> GetExtensionBundleContentProviderAsync()
         {
-            return new ExtensionBundleContentProvider(GetExtensionBundleManager(), NullLogger<ExtensionBundleContentProvider>.Instance);
+            return new ExtensionBundleContentProvider(await GetExtensionBundleManagerAsync(), NullLogger<ExtensionBundleContentProvider>.Instance);
         }
 
         public static string GetBundleDownloadPath(string bundleId)
         {
             // Check if customer has set a custom download path via environment variable
-            var customPath = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+            var customPath = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
             if (!string.IsNullOrEmpty(customPath))
             {
@@ -90,57 +83,51 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static async Task GetExtensionBundle()
         {
             var extensionBundleOptions = GetExtensionBundleOptions();
-            var extensionBundleManager = GetExtensionBundleManager(extensionBundleOptions);
+            var extensionBundleManager = await GetExtensionBundleManagerAsync(extensionBundleOptions);
+
+            // If already offline, skip network call entirely and fall back to cache
+            if (await OfflineHelper.IsOfflineAsync())
+            {
+                HandleOfflineBundleFallback(extensionBundleOptions);
+                return;
+            }
 
             using var httpClient = new HttpClient { Timeout = _httpTimeout };
 
-            // Attempt to get the extension bundle path, which will trigger the download if not already present
             await RetryHelper.Retry(
-                func: async () => await TryToGetExtensionBundlePath(extensionBundleManager, extensionBundleOptions, httpClient),
+                func: async () => await extensionBundleManager.GetExtensionBundlePath(httpClient),
                 retryCount: MaxRetries,
                 retryDelay: _retryDelay,
-                displayError: false,
-                nonRetryableExceptions: new[] { typeof(HttpRequestException) });
+                shouldRetry: async () => !await OfflineHelper.IsOfflineAsync());
         }
 
-        internal static async Task TryToGetExtensionBundlePath(ExtensionBundleManager extensionBundleManager, ExtensionBundleOptions extensionBundleOptions, HttpClient httpClient)
+        /// <summary>
+        /// Handles the fallback logic when the system is offline or a network failure occurs.
+        /// Attempts to use a cached extension bundle; logs warnings or errors accordingly.
+        /// </summary>
+        private static void HandleOfflineBundleFallback(ExtensionBundleOptions extensionBundleOptions)
         {
-            try
+            // If user didn't specify an extension bundle ID, no need to download extension bundle
+            if (string.IsNullOrEmpty(extensionBundleOptions.Id))
             {
-                if (IsOffline())
-                {
-                    throw new HttpRequestException("System is offline.");
-                }
-
-                await extensionBundleManager.GetExtensionBundlePath(httpClient);
+                return;
             }
-            catch (HttpRequestException)
+
+            // Network download failed, check for cached bundles
+            string versionRange = extensionBundleOptions.Version?.ToString();
+            if (TryGetCachedBundle(extensionBundleOptions.Id, versionRange, out string cachedBundleVersion))
             {
-                // Mark as offline for future operations
-                MarkAsOffline();
-
-                // If user didn't specify an extension bundle ID, no need to download extension bundle
-                if (string.IsNullOrEmpty(extensionBundleOptions.Id))
-                {
-                    return;
-                }
-
-                // Network download failed, check for cached bundles
-                string versionRange = extensionBundleOptions.Version?.ToString();
-                if (TryGetCachedBundle(extensionBundleOptions.Id, versionRange, out string cachedBundleVersion))
-                {
-                    ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: Unable to download extension bundles. Using cached version {cachedBundleVersion}."));
-                    ColoredConsole.WriteLine(OutputTheme.WarningColor("When you have network connectivity, you can run 'func bundle download' to update."));
-                    ColoredConsole.WriteLine();
-                }
-                else
-                {
-                    // No cached bundle found, show error message
-                    ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"Error: Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. Bundles must be pre-cached before you can run offline."));
-                    ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use."));
-                    ColoredConsole.Error.WriteLine();
-                    throw;
-                }
+                ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: Unable to download extension bundles. Using cached version {cachedBundleVersion}."));
+                ColoredConsole.WriteLine(OutputTheme.WarningColor("When you have network connectivity, you can run `func bundles download` to update."));
+                ColoredConsole.WriteLine();
+            }
+            else
+            {
+                // No cached bundle found, show error message
+                ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"Error: Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. Bundles must be pre-cached before you can run offline."));
+                ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use."));
+                ColoredConsole.Error.WriteLine();
+                throw new HttpRequestException($"Extension bundle '{extensionBundleOptions.Id}' is not available offline and no cached version was found.");
             }
         }
 
@@ -372,7 +359,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             }
 
             // First, check the customer-configured download path (if set via environment variable)
-            var customerDownloadPath = Environment.GetEnvironmentVariable(AzureFunctionsJobHostExtensionBundleDownloadPath);
+            var customerDownloadPath = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
             if (!string.IsNullOrEmpty(customerDownloadPath))
             {
                 if (FindBundleInPath(customerDownloadPath, versionRange, out cachedBundleVersion))
@@ -423,15 +410,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 {
                     string latestVersion = null;
 
-                    foreach (var versionDir in versionDirectories)
+                    foreach (var version in versionDirectories.Select(Path.GetFileName))
                     {
-                        var version = Path.GetFileName(versionDir);
-                        if (IsVersionInRange(version, versionRange))
+                        if (IsVersionInRange(version, versionRange) &&
+                            (latestVersion == null || CompareVersions(version, latestVersion) > 0))
                         {
-                            if (latestVersion == null || CompareVersions(version, latestVersion) > 0)
-                            {
-                                latestVersion = version;
-                            }
+                            latestVersion = version;
                         }
                     }
 
@@ -477,67 +461,6 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 return false;
             }
-        }
-
-        /// <summary>
-        /// Detects if the system is currently offline (no network connectivity to CDN).
-        /// Uses caching to avoid excessive network checks.
-        /// </summary>
-        /// <returns>True if offline, false if online.</returns>
-        internal static bool IsOffline()
-        {
-            // Check cache first to avoid excessive network calls
-            if (_isOffline.HasValue && DateTime.UtcNow - _lastOfflineCheck < _offlineCheckInterval)
-            {
-                return _isOffline.Value;
-            }
-
-            // Perform quick connectivity check
-            bool offline = CheckIfOffline();
-
-            // Update cache
-            _isOffline = offline;
-            _lastOfflineCheck = DateTime.UtcNow;
-
-            return offline;
-        }
-
-        /// <summary>
-        /// Performs actual network connectivity check.
-        /// </summary>
-        private static bool CheckIfOffline()
-        {
-            try
-            {
-                // Try a quick HEAD request to the CDN
-                using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
-                var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
-                var response = quickClient.SendAsync(request).GetAwaiter().GetResult();
-                return !response.IsSuccessStatusCode;
-            }
-            catch
-            {
-                // Unknown error - assume offline to be safe
-                return true;
-            }
-        }
-
-        /// <summary>
-        /// Marks the system as offline. Used when network failures are detected.
-        /// </summary>
-        internal static void MarkAsOffline()
-        {
-            _isOffline = true;
-            _lastOfflineCheck = DateTime.UtcNow;
-        }
-
-        /// <summary>
-        /// Resets the offline cache to force a fresh check.
-        /// </summary>
-        internal static void ResetOfflineCache()
-        {
-            _isOffline = null;
-            _lastOfflineCheck = DateTime.MinValue;
         }
     }
 }

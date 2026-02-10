@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
+using Azure.Functions.Cli.Helpers;
 using FluentAssertions;
 using Xunit;
 
@@ -22,11 +24,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             // Arrange
             var customPath = Path.Combine(Path.GetTempPath(), "CustomBundlePath");
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", customPath);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, customPath);
 
                 // Act
                 var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(string.Empty);
@@ -37,7 +39,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, originalValue);
             }
         }
 
@@ -47,11 +49,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             // Arrange
             var bundleId = "Microsoft.Azure.Functions.ExtensionBundle";
             var customPath = Path.Combine(Path.GetTempPath(), "CustomBundlePath", bundleId);
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", customPath);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, customPath);
 
                 // Act
                 var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
@@ -62,7 +64,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, originalValue);
             }
         }
 
@@ -71,11 +73,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             // Arrange
             var bundleId = "BundleId";
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", string.Empty);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, string.Empty);
 
                 // Act
                 var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
@@ -87,7 +89,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, originalValue);
             }
         }
 
@@ -206,8 +208,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // We can infer the behavior by checking if the version would be in range
             var normalizedVersion = NormalizeVersionForTest(version);
-            var isInRange = CompareVersionsForTest(normalizedVersion, parsedRange.Value.Start) >= 0 &&
-                           CompareVersionsForTest(normalizedVersion, parsedRange.Value.End) < 0;
+            var isInRange = CompareVersionStrings(normalizedVersion, parsedRange.Value.Start) >= 0 &&
+                           CompareVersionStrings(normalizedVersion, parsedRange.Value.End) < 0;
 
             isInRange.Should().Be(expectedResult);
         }
@@ -240,20 +242,20 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void GetExtensionBundleManager_WithNullOptions_UsesDefaultOptions()
+        public async Task GetExtensionBundleManagerAsync_WithNullOptions_UsesDefaultOptions()
         {
             // Act
-            var manager = ExtensionBundleHelper.GetExtensionBundleManager(null);
+            var manager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync(null);
 
             // Assert
             manager.Should().NotBeNull();
         }
 
         [Fact]
-        public void GetExtensionBundleContentProvider_ReturnsValidProvider()
+        public async Task GetExtensionBundleContentProviderAsync_ReturnsValidProvider()
         {
             // Act
-            var provider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+            var provider = await ExtensionBundleHelper.GetExtensionBundleContentProviderAsync();
 
             // Assert
             provider.Should().NotBeNull();
@@ -272,27 +274,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
 
             return version;
-        }
-
-        private int CompareVersionsForTest(string v1, string v2)
-        {
-            var parts1 = v1.Split('.').Select(int.Parse).ToArray();
-            var parts2 = v2.Split('.').Select(int.Parse).ToArray();
-
-            for (int i = 0; i < Math.Min(parts1.Length, parts2.Length); i++)
-            {
-                if (parts1[i] < parts2[i])
-                {
-                    return -1;
-                }
-
-                if (parts1[i] > parts2[i])
-                {
-                    return 1;
-                }
-            }
-
-            return parts1.Length.CompareTo(parts2.Length);
         }
 
         private int CompareVersionStrings(string v1, string v2)
@@ -327,12 +308,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var bundlePath = Path.Combine(testCacheDir, bundleVersion);
             Directory.CreateDirectory(bundlePath);
 
-            var originalEnvVar = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+            var originalEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
             try
             {
                 Environment.SetEnvironmentVariable(
-                    "AzureFunctionsJobHost__extensionBundle__downloadPath",
+                    Constants.ExtensionBundleDownloadPath,
                     testCacheDir);
 
                 // Act - This simulates the cache lookup that happens during network failure
@@ -353,7 +334,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 }
 
                 Environment.SetEnvironmentVariable(
-                    "AzureFunctionsJobHost__extensionBundle__downloadPath",
+                    Constants.ExtensionBundleDownloadPath,
                     originalEnvVar);
             }
         }
@@ -365,12 +346,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             // Arrange
             var bundleId = "Microsoft.Azure.Functions.ExtensionBundle";
             var nonExistentPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            var originalEnvVar = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+            var originalEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
             try
             {
                 Environment.SetEnvironmentVariable(
-                    "AzureFunctionsJobHost__extensionBundle__downloadPath",
+                    Constants.ExtensionBundleDownloadPath,
                     nonExistentPath);
 
                 // Act - This simulates the cache lookup that happens during network failure
@@ -385,7 +366,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             finally
             {
                 Environment.SetEnvironmentVariable(
-                    "AzureFunctionsJobHost__extensionBundle__downloadPath",
+                    Constants.ExtensionBundleDownloadPath,
                     originalEnvVar);
             }
         }
@@ -467,12 +448,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var bundleVersion = "4.7.0";
             Directory.CreateDirectory(Path.Combine(customPath, bundleVersion));
 
-            var originalEnvVar = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+            var originalEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
             try
             {
                 Environment.SetEnvironmentVariable(
-                    "AzureFunctionsJobHost__extensionBundle__downloadPath",
+                    Constants.ExtensionBundleDownloadPath,
                     customPath);
 
                 // Act
@@ -493,7 +474,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 }
 
                 Environment.SetEnvironmentVariable(
-                    "AzureFunctionsJobHost__extensionBundle__downloadPath",
+                    Constants.ExtensionBundleDownloadPath,
                     originalEnvVar);
             }
         }
@@ -607,65 +588,74 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void IsOffline_InitialCheck_PerformsNetworkTest()
-        {
-            // Reset cache to ensure fresh check
-            ExtensionBundleHelper.ResetOfflineCache();
-
-            // Act
-            var isOffline = ExtensionBundleHelper.IsOffline();
-
-            // If we get here without exception, test passes
-        }
-
-        [Fact]
-        public void MarkAsOffline_SetsOfflineState()
+        public async Task GetExtensionBundleManagerAsync_WhenOffline_CreatesManager()
         {
             // Arrange
-            ExtensionBundleHelper.ResetOfflineCache();
-
-            // Act
-            ExtensionBundleHelper.MarkAsOffline();
-            var isOffline = ExtensionBundleHelper.IsOffline();
-
-            // Assert
-            isOffline.Should().BeTrue("should be marked as offline");
-        }
-
-        [Fact]
-        public void ResetOfflineCache_ClearsCache()
-        {
-            // Arrange
-            ExtensionBundleHelper.MarkAsOffline();
-            ExtensionBundleHelper.IsOffline().Should().BeTrue();
-
-            // Act
-            ExtensionBundleHelper.ResetOfflineCache();
-
-            // After reset, next call will perform fresh check
-            // We can't guarantee the result, but verify it doesn't throw
-            var result = ExtensionBundleHelper.IsOffline();
-
-            // If we get here without exception, test passes
-        }
-
-        [Fact]
-        public void GetExtensionBundleManager_WhenOffline_CreatesManager()
-        {
-            // Arrange
-            ExtensionBundleHelper.MarkAsOffline();
+            OfflineHelper.MarkAsOffline();
 
             try
             {
                 // Act
-                var manager = ExtensionBundleHelper.GetExtensionBundleManager();
+                var manager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
 
                 // Assert
                 manager.Should().NotBeNull();
             }
             finally
             {
-                ExtensionBundleHelper.ResetOfflineCache();
+                OfflineHelper.ResetOfflineCache();
+            }
+        }
+
+        [Fact]
+        public async Task GetExtensionBundleManagerAsync_WhenOffline_SetsEnsureLatestToFalse()
+        {
+            // Arrange
+            OfflineHelper.MarkAsOffline();
+            var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
+            {
+                Id = "Microsoft.Azure.Functions.ExtensionBundle",
+                Version = NuGet.Versioning.VersionRange.Parse("[4.*, 5.0.0)")
+            };
+
+            try
+            {
+                // Act
+                await ExtensionBundleHelper.GetExtensionBundleManagerAsync(options);
+
+                // Assert - EnsureLatest should be false when offline
+                options.EnsureLatest.Should().BeFalse("EnsureLatest should be false when system is offline");
+            }
+            finally
+            {
+                OfflineHelper.ResetOfflineCache();
+            }
+        }
+
+        [Fact]
+        public async Task GetExtensionBundleManagerAsync_WhenOnline_SetsEnsureLatestToTrue()
+        {
+            // Arrange
+            OfflineHelper.ResetOfflineCache();
+            var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
+            {
+                Id = "Microsoft.Azure.Functions.ExtensionBundle",
+                Version = NuGet.Versioning.VersionRange.Parse("[4.*, 5.0.0)")
+            };
+
+            try
+            {
+                // Act
+                await ExtensionBundleHelper.GetExtensionBundleManagerAsync(options);
+
+                // Assert - EnsureLatest should be true when online (or at least not explicitly false)
+                // Note: This test may be flaky if network is unavailable during test run
+                // The key behavior is that EnsureLatest = !IsOfflineAsync()
+                options.EnsureLatest.Should().BeTrue("EnsureLatest should be true when system is online");
+            }
+            finally
+            {
+                OfflineHelper.ResetOfflineCache();
             }
         }
     }

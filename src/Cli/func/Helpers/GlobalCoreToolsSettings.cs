@@ -13,10 +13,13 @@ namespace Azure.Functions.Cli.Helpers
         private static WorkerRuntime _currentWorkerRuntime;
         private static bool _isHelpRunning;
         private static bool _isVerbose;
+        private static bool _isOfflineMode;
 
         public static bool IsHelpRunning => _isHelpRunning;
 
         public static bool IsVerbose => _isVerbose;
+
+        public static bool IsOfflineMode => _isOfflineMode;
 
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
@@ -52,6 +55,7 @@ namespace Azure.Functions.Cli.Helpers
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
             _isVerbose = args.Contains("--verbose");
+            _isOfflineMode = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
 
             try
             {

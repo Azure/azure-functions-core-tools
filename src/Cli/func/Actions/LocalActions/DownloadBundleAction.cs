@@ -27,7 +27,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
-            if (!BundleActionHelper.TryGetBundleContext(out var extensionBundleManager, out var options, out var bundleBasePath))
+            var (success, extensionBundleManager, options, bundleBasePath) = await BundleActionHelper.TryGetBundleContextAsync();
+            if (!success)
             {
                 return;
             }
@@ -49,13 +50,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 // Set the download path so the SDK downloads to the correct location
                 // This is needed because DownloadBundleAction doesn't go through Startup.cs
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", bundleBasePath);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, bundleBasePath);
 
                 // Perform the download
                 await ExtensionBundleHelper.GetExtensionBundle();
 
                 // Get a fresh manager to verify the download at the correct location
-                var verifyManager = ExtensionBundleHelper.GetExtensionBundleManager();
+                var verifyManager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
                 var bundlePath = await verifyManager.GetExtensionBundlePath();
 
                 if (!string.IsNullOrEmpty(bundlePath) && Directory.Exists(bundlePath))

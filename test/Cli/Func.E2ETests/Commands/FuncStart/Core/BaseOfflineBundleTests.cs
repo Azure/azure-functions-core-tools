@@ -97,7 +97,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                 // Only set environment variable if that's the config source
                 if (configSource == EnsureLatestConfigSource.EnvironmentVariable)
                 {
-                    command = command.WithEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", ensureLatestValue);
+                    command = command.WithEnvironmentVariable(Common.Constants.ExtensionBundleEnsureLatest, ensureLatestValue);
                 }
 
                 var result = command.Execute(["--port", port.ToString(), "--verbose"]);

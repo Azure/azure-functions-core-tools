@@ -8,10 +8,6 @@
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
   </PropertyGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="Azure.Functions.Cli.UnitTests" />
-  </ItemGroup>
-
   <PropertyGroup>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
@@ -62,7 +58,13 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
   </ItemGroup>
-  
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)GoZipTool\GoZipTool.csproj">
+      <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
+    </ProjectReference>
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="content" />
     <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="contentFiles/any/$(TargetFramework)" />
@@ -70,7 +72,9 @@
   </ItemGroup>
 
   <Target Name="ExcludeWorkersFromReadyToRun">
-    <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
+    <CreateItem Include="%(None.Filename)%(None.Extension)"
+      Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))"
+      PreserveExistingMetadata="false">
       <Output TaskParameter="Include" ItemName="PublishReadyToRunExclude" />
     </CreateItem>
   </Target>

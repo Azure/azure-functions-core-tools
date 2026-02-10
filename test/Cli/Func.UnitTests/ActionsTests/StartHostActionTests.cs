@@ -506,10 +506,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             string envVarValue, bool expectedShouldDownload, string expectedSource)
         {
             // Arrange
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", envVarValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, envVarValue);
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
                 mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
@@ -526,7 +526,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
 
@@ -534,10 +534,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenNothingSet()
         {
             // Arrange
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
                 mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
@@ -554,7 +554,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
 
@@ -562,10 +562,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         public void ShouldDownloadExtensionBundles_IgnoresInvalidEnvironmentVariableValue()
         {
             // Arrange
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "invalid");
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, "invalid");
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
                 mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
@@ -582,7 +582,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
 
@@ -595,11 +595,11 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             string hostJsonValue, bool expectedShouldDownload, string expectedSource)
         {
             // Arrange
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
                 // Clear the environment variable to test host.json fallback
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
                 mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
@@ -627,7 +627,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
 
@@ -635,11 +635,11 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         public void ShouldDownloadExtensionBundles_EnvironmentVariableTakesPrecedenceOverHostJson()
         {
             // Arrange
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
                 // Set env var to false (should NOT download)
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "false");
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, "false");
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
                 mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
@@ -667,7 +667,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
 
@@ -675,10 +675,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenHostJsonHasInvalidValue()
         {
             // Arrange
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
                 mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
@@ -706,7 +706,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
 
@@ -714,10 +714,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenHostJsonConfigIsNull()
         {
             // Arrange
-            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest");
+            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", null);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
                 mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
@@ -736,7 +736,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 // Cleanup
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", originalValue);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
     }

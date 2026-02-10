@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
-            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+            var extensionBundleManager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
                 var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
