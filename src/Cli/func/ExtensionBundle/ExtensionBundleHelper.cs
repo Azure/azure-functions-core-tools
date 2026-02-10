@@ -502,16 +502,21 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
         /// <summary>
         /// Performs actual network connectivity check.
+        /// Uses Task.Run to avoid potential deadlocks when called from a synchronization context.
         /// </summary>
         private static bool CheckIfOffline()
         {
             try
             {
                 // Try a quick HEAD request to the CDN
-                using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
-                using var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
-                using var response = quickClient.SendAsync(request).GetAwaiter().GetResult();
-                return !response.IsSuccessStatusCode;
+                // Use Task.Run to execute on thread pool, avoiding sync context deadlocks
+                return Task.Run(async () =>
+                {
+                    using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
+                    using var request = new HttpRequestMessage(HttpMethod.Head, ExtensionBundleStaticPropertiesUrl);
+                    using var response = await quickClient.SendAsync(request);
+                    return !response.IsSuccessStatusCode;
+                }).GetAwaiter().GetResult();
             }
             catch
             {

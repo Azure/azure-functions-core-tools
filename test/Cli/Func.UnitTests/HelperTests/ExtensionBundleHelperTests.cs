@@ -206,8 +206,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // We can infer the behavior by checking if the version would be in range
             var normalizedVersion = NormalizeVersionForTest(version);
-            var isInRange = CompareVersionsForTest(normalizedVersion, parsedRange.Value.Start) >= 0 &&
-                           CompareVersionsForTest(normalizedVersion, parsedRange.Value.End) < 0;
+            var isInRange = CompareVersionStrings(normalizedVersion, parsedRange.Value.Start) >= 0 &&
+                           CompareVersionStrings(normalizedVersion, parsedRange.Value.End) < 0;
 
             isInRange.Should().Be(expectedResult);
         }
@@ -272,27 +272,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
 
             return version;
-        }
-
-        private int CompareVersionsForTest(string v1, string v2)
-        {
-            var parts1 = v1.Split('.').Select(int.Parse).ToArray();
-            var parts2 = v2.Split('.').Select(int.Parse).ToArray();
-
-            for (int i = 0; i < Math.Min(parts1.Length, parts2.Length); i++)
-            {
-                if (parts1[i] < parts2[i])
-                {
-                    return -1;
-                }
-
-                if (parts1[i] > parts2[i])
-                {
-                    return 1;
-                }
-            }
-
-            return parts1.Length.CompareTo(parts2.Length);
         }
 
         private int CompareVersionStrings(string v1, string v2)
