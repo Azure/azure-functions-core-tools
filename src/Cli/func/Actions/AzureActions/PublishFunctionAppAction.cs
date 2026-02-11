@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private const string HostVersion = "4";
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
-        private static string _requiredNetFrameworkVersion = "8.0";
+        private static string _requiredNetFrameworkVersion = null;
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -180,6 +180,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (projectFilePath != null)
                 {
                     var targetFramework = await DotnetHelpers.DetermineTargetFrameworkAsync(Path.GetDirectoryName(projectFilePath));
+                    ColoredConsole.WriteLine($"Detected target framework: {targetFramework}");
 
                     var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
 
@@ -198,7 +199,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     else
                     {
                         ColoredConsole.WriteLine(WarningColor(
-                            $"Can not interpret target framework '{targetFramework}', assuming framework '{_requiredNetFrameworkVersion}'"));
+                            $"Warning: Could not interpret target framework '{targetFramework}' from project file."));
                     }
                 }
 
@@ -210,7 +211,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
-            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime, functionAppRoot);
+            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime, functionAppRoot, PublishLocalSettingsOnly);
 
             // Update build option
             PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
@@ -250,7 +251,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime, string functionAppRoot)
+        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime, string functionAppRoot, bool skipRuntimeUpdate = false)
         {
             var result = new Dictionary<string, string>();
 
@@ -344,13 +345,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException($"Function Apps on Flex Consumption do not support '{Constants.WebsiteRunFromPackage}'. Please remove the app setting from your Function App.");
                 }
 
-                if (result.ContainsKey(Constants.FunctionsWorkerRuntime))
+                // Always check and update runtime config BEFORE code deployment when we have a detected TFM
+                // This is critical because you can't deploy net9 code to a net8 runtime
+                if (!skipRuntimeUpdate && workerRuntime == WorkerRuntime.DotnetIsolated)
                 {
-                    await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), null, azureHelperService);
-                    result.Remove(Constants.FunctionsWorkerRuntime);
+                    await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), _requiredNetFrameworkVersion, azureHelperService, Force, OverwriteSettings);
                 }
+
+                // Remove from result since runtime update is handled above
+                result.Remove(Constants.FunctionsWorkerRuntime);
             }
-            else
+            else if (!skipRuntimeUpdate)
             {
                 await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
             }
@@ -387,10 +392,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return result;
         }
 
-        public static async Task UpdateRuntimeConfigForFlex(Site site, string runtimeName, string runtimeVersion, AzureHelperService helperService)
+        public static async Task UpdateRuntimeConfigForFlex(Site site, string runtimeName, string runtimeVersion, AzureHelperService helperService, bool force = false, bool overwriteSettings = false)
         {
             if (string.IsNullOrEmpty(runtimeName))
             {
+                return;
+            }
+
+            // If no runtime version was detected from project, don't update Azure
+            if (string.IsNullOrEmpty(runtimeVersion))
+            {
+                ColoredConsole.WriteLine($"No target framework version detected from project. Keeping existing Azure runtime configuration.");
                 return;
             }
 
@@ -401,15 +413,30 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"We couldn't validate '{runtimeName}' runtime for Flex SKU in '{site.Location}'.");
             }
 
-            if (string.IsNullOrEmpty(runtimeVersion))
-            {
-                var defaultSku = skuList.FirstOrDefault(s => s.IsDefault);
-                if (defaultSku == null)
-                {
-                    defaultSku = skuList.FirstOrDefault();
-                }
+            // Compare with what's currently in Azure
+            var currentAzureVersion = site.FunctionAppConfig?.Runtime?.Version;
 
-                runtimeVersion = defaultSku?.FunctionAppConfigProperties.Runtime.Version;
+            // If versions match, no update needed
+            if (!string.IsNullOrEmpty(currentAzureVersion) && currentAzureVersion.Equals(runtimeVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // Versions are different, prompt user or update with force
+            if (!string.IsNullOrEmpty(currentAzureVersion))
+            {
+                ColoredConsole.WriteLine(WarningColor($"Your local project targets {runtimeName}|{runtimeVersion}, but Azure is configured for {runtimeName}|{currentAzureVersion}."));
+
+                if (!force && !overwriteSettings)
+                {
+                    ColoredConsole.WriteLine(QuestionColor($"Would you like to update the Azure runtime to {runtimeVersion}? [yes/no]"));
+                    var answer = Console.ReadLine();
+                    if (!answer.Equals("yes", StringComparison.OrdinalIgnoreCase) && !answer.Equals("y", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ColoredConsole.WriteLine(WarningColor($"Keeping Azure runtime at {runtimeName}|{currentAzureVersion}. This may cause issues if the runtime versions are incompatible."));
+                        return;
+                    }
+                }
             }
 
             ColoredConsole.WriteLine($"Updating function app runtime setting with '{runtimeName} {runtimeVersion}'.");
@@ -1295,30 +1322,27 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<bool> PublishLocalAppSettings(Site functionApp, IDictionary<string, string> additionalAppSettings)
         {
             var localAppSettings = _secretsManager.GetSecrets();
+
+            // Update app settings only when using --publish-settings-only
+            // Skip runtime updates to preserve existing runtime configuration
+            if (PublishLocalSettingsOnly)
+            {
+                return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings);
+            }
+
+            // Runtime configuration is handled in ValidateFunctionAppPublish before code deployment
+            // Here we only update app settings
             return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings);
         }
 
         private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
-            string flexRuntimeName = null;
-            string flexRuntimeVersion = null;
-            if (functionApp.IsFlex)
+            // For Flex apps, remove runtime settings from local settings dictionary as they're not regular app settings
+            // They are handled separately by the caller (PublishLocalAppSettings) when not using --publish-settings-only
+            if (functionApp.IsFlex && !additional.ContainsKey(Constants.FunctionsWorkerRuntime))
             {
-                // if the additiona keys has runtime, it would mean that runtime is already updated.
-                if (!additional.ContainsKey(Constants.FunctionsWorkerRuntime))
-                {
-                    if (local.ContainsKey(Constants.FunctionsWorkerRuntime))
-                    {
-                        flexRuntimeName = local[Constants.FunctionsWorkerRuntime];
-                        local.Remove(Constants.FunctionsWorkerRuntime);
-                    }
-
-                    if (local.ContainsKey(Constants.FunctionsWorkerRuntimeVersion))
-                    {
-                        flexRuntimeVersion = local[Constants.FunctionsWorkerRuntimeVersion];
-                        local.Remove(Constants.FunctionsWorkerRuntimeVersion);
-                    }
-                }
+                local.Remove(Constants.FunctionsWorkerRuntime);
+                local.Remove(Constants.FunctionsWorkerRuntimeVersion);
             }
 
             functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
@@ -1333,11 +1357,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return false;
             }
 
-            if (functionApp.IsFlex && !string.IsNullOrEmpty(flexRuntimeName))
-            {
-                await UpdateRuntimeConfigForFlex(functionApp, flexRuntimeName, flexRuntimeVersion, new AzureHelperService(AccessToken, ManagementURL));
-            }
-
             return true;
         }
 
@@ -1350,7 +1369,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (result.ContainsKeyCaseInsensitive(pair.Key) &&
                     !result.GetValueCaseInsensitive(pair.Key).Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
                 {
-                    ColoredConsole.WriteLine($"App setting {pair.Key} is different between azure and {SecretsManager.AppSettingsFileName}");
+                    ColoredConsole.WriteLine(WarningColor($"App setting {pair.Key} is different between Azure and {SecretsManager.AppSettingsFileName}"));
                     if (OverwriteSettings)
                     {
                         ColoredConsole.WriteLine("Overwriting setting in azure with local value because '--overwrite-settings [-y]' was specified.");
@@ -1361,7 +1380,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         string answer;
                         do
                         {
-                            ColoredConsole.WriteLine(QuestionColor("Would you like to overwrite value in azure? [yes/no/show]"));
+                            ColoredConsole.WriteLine(QuestionColor("Would you like to overwrite value in Azure? [yes/no/show]"));
                             answer = Console.ReadLine();
                             if (answer.Equals("show", StringComparison.OrdinalIgnoreCase))
                             {

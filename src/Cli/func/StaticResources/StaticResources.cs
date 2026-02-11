@@ -72,6 +72,10 @@ namespace Azure.Functions.Cli
 
         public static Task<string> BundleConfig => GetValue("bundleConfig.json");
 
+        public static Task<string> BundleConfigPreview => GetValue("bundleConfigPreview.json");
+
+        public static Task<string> BundleConfigExperimental => GetValue("bundleConfigExperimental.json");
+
         public static Task<string> BundleConfigPyStein => GetValue("bundleConfigPyStein.json");
 
         public static Task<string> BundleConfigNodeV4 => GetValue("bundleConfigNodeV4.json");

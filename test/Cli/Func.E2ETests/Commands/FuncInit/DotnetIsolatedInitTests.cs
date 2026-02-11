@@ -74,7 +74,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             var testName = nameof(Init_WithDotnetIsolatedAndDockerFlag_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
-            var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated8.0" };
+            var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated10.0" };
             var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
             {
                 (dockerFilePath, expectedDockerfileContent)

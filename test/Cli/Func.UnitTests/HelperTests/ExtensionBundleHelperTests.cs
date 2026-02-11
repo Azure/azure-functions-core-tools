@@ -18,19 +18,78 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void GetBundleDownloadPath_WithBundleId_ReturnsCorrectPath()
+        public void GetBundleDownloadPath_WithCustomPathEnvironmentVariable_ReturnsCustomPath()
         {
-            var bundleId = "TestBundle";
-            var expectedPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".azure-functions-core-tools",
-                "Functions",
-                "ExtensionBundles",
-                bundleId);
+            // Arrange
+            var customPath = Path.Combine(Path.GetTempPath(), "CustomBundlePath");
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
 
-            var result = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", customPath);
 
-            result.Should().Be(expectedPath);
+                // Act
+                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(string.Empty);
+
+                // Assert
+                Assert.Equal(customPath, downloadPath);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+            }
+        }
+
+        [Fact]
+        public void GetBundleDownloadPath_WithCustomPathAlreadyIncludingBundleId_ReturnsPathAsIs()
+        {
+            // Arrange
+            var bundleId = "Microsoft.Azure.Functions.ExtensionBundle";
+            var customPath = Path.Combine(Path.GetTempPath(), "CustomBundlePath", bundleId);
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", customPath);
+
+                // Act
+                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+
+                // Assert
+                Assert.Equal(customPath, downloadPath);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+            }
+        }
+
+        [Fact]
+        public void GetBundleDownloadPath_WithEmptyEnvironmentVariable_ReturnsDefaultPath()
+        {
+            // Arrange
+            var bundleId = "BundleId";
+            var originalValue = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+
+            try
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", string.Empty);
+
+                // Act
+                var downloadPath = ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+
+                // Assert
+                var expectedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure-functions-core-tools", "Functions", "ExtensionBundles", bundleId);
+                Assert.Equal(expectedPath, downloadPath);
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", originalValue);
+            }
+>>>>>>> origin/main
         }
 
         [Theory]

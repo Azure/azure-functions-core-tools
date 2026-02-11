@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
+using Colors.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -16,6 +17,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -107,10 +110,27 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private void SetBundlesEnvironmentVariables()
         {
-            var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
+            var extensionBundleOptions = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions);
+            var bundleId = extensionBundleOptions.Id;
             if (!string.IsNullOrEmpty(bundleId))
             {
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId));
+                // Only set the download path if not already set via environment variable
+                var existingDownloadPath = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+                if (string.IsNullOrEmpty(existingDownloadPath))
+                {
+                    // Use the downloadPath from host.json if configured, otherwise use default path
+                    var downloadPath = !string.IsNullOrEmpty(extensionBundleOptions.DownloadPath)
+                        ? extensionBundleOptions.DownloadPath
+                        : ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", downloadPath);
+                }
+                else if (!string.IsNullOrEmpty(extensionBundleOptions.DownloadPath))
+                {
+                    // Both env var and host.json are configured - inform user env var takes precedence
+                    ColoredConsole.WriteLine(WarningColor($"Extension bundle downloadPath is configured in both host.json and environment variable. Using environment variable value: {existingDownloadPath}"));
+                }
+
+                // Set ensureLatest based on offline status
                 Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", (!ExtensionBundleHelper.IsOffline()).ToString());
             }
         }

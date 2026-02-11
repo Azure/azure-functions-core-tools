@@ -19,8 +19,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "init", HelpText = "Initialize a new Azure Function App project.", ShowInHelp = true, HelpOrder = 1)]
     internal class InitAction : BaseAction
     {
-        // Default to .NET 8 if the target framework is not specified
-        private const string DefaultTargetFramework = Common.TargetFramework.Net8;
+        // Default to .NET 10 if the target framework is not specified
+        private const string DefaultTargetFramework = Common.TargetFramework.Net10;
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
@@ -649,12 +649,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (isAlreadyEol || currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
                 {
-                    var warningMessage = EolMessages.GetAfterEolCreateMessage(".NET", majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    var warningMessage = EolMessages.GetAfterEolCreateMessage(Constants.DotnetDisplayName, majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
                 else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
                 {
-                    var warningMessage = EolMessages.GetEarlyEolCreateMessage(".NET", majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    var warningMessage = EolMessages.GetEarlyEolCreateMessage(Constants.DotnetDisplayName, majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
             }

@@ -22,8 +22,12 @@ namespace Azure.Functions.Cli
         private readonly IContainer _container;
         private readonly string[] _args;
         private readonly IEnumerable<TypeAttributePair> _actionAttributes;
-        private readonly string[] _helpArgs = new[] { "help", "h", "?" };
+        private readonly string[] _helpArgs = ["help", "h", "?"];
         private readonly TelemetryEvent _telemetryEvent;
+
+        // Global options that should be filtered out during action parsing
+        private static readonly HashSet<string> _globalFlags = new(StringComparer.OrdinalIgnoreCase) { "--version", "--verbose" };
+        private static readonly HashSet<string> _globalOptionsWithValues = new(StringComparer.OrdinalIgnoreCase) { "--script-root", "--prefix" };
 
         internal ConsoleApp(string[] args, Assembly assembly, IContainer container)
         {
@@ -247,7 +251,7 @@ namespace Azure.Functions.Cli
 
                 argsToParse = isHelp
                     ? _args.Where(a => !a.StartsWith("-"))
-                    : _args;
+                    : FilterOutGlobalOptions(_args);
             }
 
             // We'll need to grab context arg: string, subcontext arg: string, action arg: string
@@ -262,6 +266,15 @@ namespace Azure.Functions.Cli
 
             // If isHelp, skip one and parse the rest of the command as usual.
             var argsStack = new Stack<string>(argsToParse.Reverse());
+
+            // If no arguments remain after filtering, show general help
+            if (!argsStack.Any())
+            {
+                _telemetryEvent.CommandName = "help";
+                _telemetryEvent.IActionName = typeof(HelpAction).Name;
+                _telemetryEvent.Parameters = new List<string>();
+                return new HelpAction(_actionAttributes, CreateAction);
+            }
 
             // Grab the first string, but don't pop it off the stack.
             // If it's indeed a valid context, will remove it later.
@@ -406,43 +419,59 @@ namespace Azure.Functions.Cli
         }
 
         /// <summary>
+        /// Filters out global options and their values from the argument list.
+        /// Global flags: --version, --verbose
+        /// Global options with values: --script-root, --prefix.
+        /// </summary>
+        private static IEnumerable<string> FilterOutGlobalOptions(string[] args)
+        {
+            for (int i = 0; i < args.Length; i++)
+            {
+                var arg = args[i];
+
+                if (_globalFlags.Contains(arg))
+                {
+                    continue;
+                }
+
+                if (_globalOptionsWithValues.Contains(arg))
+                           {
+                    i++; // Skip the next argument (the value)
+                    continue;
+                }
+
+                yield return arg;
+            }
+        }
+
+        /// <summary>
         /// This method will update Environment.CurrentDirectory
         /// if there is a --script-root or a --prefix provided on the commandline.
         /// </summary>
-        /// <param name="args">args to check for --prefix or --script-root.</param>
         private void UpdateCurrentDirectory(string[] args)
         {
-            // assume index of -1 means the string is not there
-            int index = -1;
             for (var i = 0; i < args.Length; i++)
             {
-                if (args[i].Equals("--script-root", StringComparison.OrdinalIgnoreCase)
-                    || args[i].Equals("--prefix", StringComparison.OrdinalIgnoreCase))
+                if (_globalOptionsWithValues.Contains(args[i]) && i + 1 < args.Length)
                 {
-                    // update the index to point to the following entry in args
-                    // which should contain the path for a prefix
-                    index = i + 1;
                     _telemetryEvent.PrefixOrScriptRoot = true;
-                    break;
-                }
-            }
 
-            // make sure index still in the array
-            if (index != -1 && index < args.Length)
-            {
                 // Path.Combine takes care of checking if the path is full path or not.
                 // For example, Path.Combine(@"C:\temp", @"dir\dir")    => "C:\temp\dir\dir"
                 //              Path.Combine(@"C:\temp", @"C:\Windows") => "C:\Windows"
                 //              Path.Combine("/usr/bin", "dir/dir")     => "/usr/bin/dir/dir"
                 //              Path.Combine("/usr/bin", "/opt/dir")    => "/opt/dir"
-                var path = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, args[index]));
-                if (FileSystemHelpers.DirectoryExists(path))
-                {
-                    Environment.CurrentDirectory = path;
-                }
-                else
-                {
-                    throw new CliException($"\"{path}\" doesn't exist.");
+                    var path = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, args[i + 1]));
+                    if (FileSystemHelpers.DirectoryExists(path))
+                    {
+                        Environment.CurrentDirectory = path;
+                    }
+                    else
+                    {
+                        throw new CliException($"\"{path}\" doesn't exist.");
+                    }
+
+                    return;
                 }
             }
         }

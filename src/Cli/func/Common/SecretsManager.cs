@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
+using static Azure.Functions.Cli.Common.OutputTheme;
 using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Common
@@ -27,7 +28,11 @@ namespace Azure.Functions.Cli.Common
                 });
                 var secretsFilePath = Path.Combine(rootPath, secretsFile);
 
-                ColoredConsole.WriteLine(DarkGray($"'{secretsFile}' found in root directory ({rootPath})."));
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"'{secretsFile}' found in root directory ({rootPath})."));
+                }
+
                 return secretsFilePath;
             }
         }

@@ -126,15 +126,15 @@ jobs:
   displayName: '[Linux] Build CoreToolsHost'
   pool:
     name: 1es-pool-azfunc
-    image: 1es-ubuntu-22.04
+    image: 1es-ubuntu-24.04-min
     os: linux
 
   steps:
   - task: UseDotNet@2
     inputs:
-      version: 9.x
+      version: 10.x
       includePreviewVersions: true
-    displayName: Install .NET 9
+    displayName: Install .NET 10
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (linux-x64)
@@ -167,7 +167,7 @@ jobs:
   dependsOn: BuildCoreToolsHostLinux
   pool:
     name: 1es-pool-azfunc
-    image: 1es-ubuntu-22.04
+    image: 1es-ubuntu-24.04-min
     os: linux
 
   steps:

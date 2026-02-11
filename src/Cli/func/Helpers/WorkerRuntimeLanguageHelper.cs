@@ -177,12 +177,16 @@ namespace Azure.Functions.Cli.Helpers
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
             var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
-                          ?? secretsManager.GetSecrets(refreshSecrets).FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+                          ?? secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
 
             try
             {
                 WorkerRuntime workerRuntime = NormalizeWorkerRuntime(setting);
-                ColoredConsole.WriteLine($"Resolving worker runtime to '{GetRuntimeMoniker(workerRuntime)}'.");
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving worker runtime to '{GetRuntimeMoniker(workerRuntime)}'."));
+                }
+
                 return workerRuntime;
             }
             catch
@@ -207,7 +211,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
         {
-            if (_workerToDefaultLanguageMap.ContainsKey(worker))
+            if (!_workerToDefaultLanguageMap.ContainsKey(worker))
             {
                 throw new ArgumentException($"Worker runtime '{worker}' is not a valid worker for a template.");
             }
