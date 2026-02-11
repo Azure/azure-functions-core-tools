@@ -55,6 +55,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool ExtensionBundle { get; set; } = true;
 
+        public BundleChannel BundlesChannel { get; set; } = BundleChannel.GA;
+
         public bool GeneratePythonDocumentation { get; set; } = true;
 
         public string Language { get; set; }
@@ -107,6 +109,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("no-bundle")
                 .WithDescription("Do not configure extension bundle in host.json. Only applicable when initializing a new non-.NET project.")
                 .Callback(e => ExtensionBundle = !e);
+
+            Parser
+                .Setup<BundleChannel>('c', "bundles-channel")
+                .WithDescription("Extension bundle release channel: GA (default), Preview, or Experimental. Only applicable when initializing a new non-.NET project.")
+                .SetDefault(BundleChannel.GA)
+                .Callback(channel => BundlesChannel = channel);
 
             Parser
                 .Setup<bool>("force")
@@ -568,18 +576,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (extensionBundle)
             {
-                if (ResolvedProgrammingModel == Common.ProgrammingModel.V2 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Python)
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
-                }
-                else if (ResolvedProgrammingModel == Common.ProgrammingModel.V4 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Node)
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigNodeV4);
-                }
-                else
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
-                }
+                // Use the specified bundle channel (GA, Preview, or Experimental)
+                var bundleConfig = await BundleActionHelper.GetBundleConfigForChannel(BundlesChannel);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, Task.FromResult(bundleConfig));
             }
 
             if (workerRuntime == Helpers.WorkerRuntime.Custom)
