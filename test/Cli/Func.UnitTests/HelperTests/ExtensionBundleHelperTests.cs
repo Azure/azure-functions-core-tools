@@ -591,7 +591,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public async Task GetExtensionBundleManagerAsync_WhenOffline_CreatesManager()
         {
             // Arrange
-            GlobalCoreToolsSettings.SetOfflineMode(true);
+            OfflineHelper.MarkAsOffline();
 
             try
             {
@@ -603,7 +603,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                GlobalCoreToolsSettings.SetOfflineMode(false);
+                OfflineHelper.MarkAsOnline();
             }
         }
 
@@ -611,7 +611,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public async Task GetExtensionBundleManagerAsync_WhenOffline_SetsEnsureLatestToFalse()
         {
             // Arrange
-            GlobalCoreToolsSettings.SetOfflineMode(true);
+            OfflineHelper.MarkAsOffline();
             var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
             {
                 Id = "Microsoft.Azure.Functions.ExtensionBundle",
@@ -628,7 +628,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                GlobalCoreToolsSettings.SetOfflineMode(false);
+                OfflineHelper.MarkAsOnline();
             }
         }
 
@@ -636,7 +636,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public async Task GetExtensionBundleManagerAsync_WhenOnline_SetsEnsureLatestToTrue()
         {
             // Arrange
-            GlobalCoreToolsSettings.SetOfflineMode(false);
+            OfflineHelper.MarkAsOnline();
             var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
             {
                 Id = "Microsoft.Azure.Functions.ExtensionBundle",
@@ -653,7 +653,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                GlobalCoreToolsSettings.SetOfflineMode(false);
+                OfflineHelper.MarkAsOnline();
             }
         }
     }

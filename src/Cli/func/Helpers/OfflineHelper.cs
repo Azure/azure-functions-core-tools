@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly object _probeLock = new object();
         private static readonly TimeSpan _probeInterval = TimeSpan.FromSeconds(10);
         private static DateTime _lastProbeTime = DateTime.MinValue;
+        private static bool _lastProbeResult;
 
         /// <summary>
         /// Probes for network connectivity and updates <see cref="GlobalCoreToolsSettings.IsOfflineMode"/>.
@@ -24,7 +25,6 @@ namespace Azure.Functions.Cli.Helpers
         /// <returns>True if offline, false if online.</returns>
         internal static async Task<bool> IsOfflineAsync()
         {
-            // If the user explicitly requested offline mode, skip probing entirely
             if (GlobalCoreToolsSettings.HasUserRequestedOfflineMode())
             {
                 return true;
@@ -32,25 +32,21 @@ namespace Azure.Functions.Cli.Helpers
 
             lock (_probeLock)
             {
-                // Return the current global state if we probed recently
                 if (DateTime.UtcNow - _lastProbeTime < _probeInterval)
                 {
-                    return GlobalCoreToolsSettings.IsOfflineMode;
+                    return _lastProbeResult;
                 }
             }
 
-            // Perform quick connectivity check outside the lock to avoid blocking other threads
             bool offline = await CheckIfOfflineAsync();
 
             lock (_probeLock)
             {
                 _lastProbeTime = DateTime.UtcNow;
+                _lastProbeResult = offline;
             }
 
-            // Update the single source of truth.
-            // SetOfflineMode guards against overriding explicit --offline / env var.
-            GlobalCoreToolsSettings.SetOfflineMode(offline);
-            return GlobalCoreToolsSettings.IsOfflineMode;
+            return offline;
         }
 
         /// <summary>
@@ -60,7 +56,6 @@ namespace Azure.Functions.Cli.Helpers
         {
             try
             {
-                // Try a quick HEAD request to the CDN
                 using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
                 using var request = new HttpRequestMessage(HttpMethod.Head, ConnectivityCheckUrl);
                 using var response = await quickClient.SendAsync(request);
@@ -68,23 +63,33 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch
             {
-                // Unknown error — assume offline to be safe
                 return true;
             }
         }
 
         /// <summary>
-        /// Marks the system as offline immediately.
-        /// Updates <see cref="GlobalCoreToolsSettings.IsOfflineMode"/> and resets the
-        /// probe timer so the next <see cref="IsOfflineAsync"/> call will re-check.
+        /// Marks the system as offline immediately and caches the result
+        /// so that <see cref="IsOfflineAsync"/> returns true without probing.
         /// </summary>
         internal static void MarkAsOffline()
         {
-            GlobalCoreToolsSettings.SetOfflineMode(true);
-
             lock (_probeLock)
             {
                 _lastProbeTime = DateTime.UtcNow;
+                _lastProbeResult = true;
+            }
+        }
+
+        /// <summary>
+        /// Marks the system as online immediately and caches the result
+        /// so that <see cref="IsOfflineAsync"/> returns false without probing.
+        /// </summary>
+        internal static void MarkAsOnline()
+        {
+            lock (_probeLock)
+            {
+                _lastProbeTime = DateTime.UtcNow;
+                _lastProbeResult = false;
             }
         }
 

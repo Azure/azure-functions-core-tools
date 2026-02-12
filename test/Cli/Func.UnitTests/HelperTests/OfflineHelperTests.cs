@@ -24,15 +24,15 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, null);
 
             // Start each test with a clean state
-            OfflineHelper.ResetOfflineCache();
-            GlobalCoreToolsSettings.SetOfflineMode(false);
+            OfflineHelper.MarkAsOnline();
+            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
         }
 
         public void Dispose()
         {
-            OfflineHelper.ResetOfflineCache();
-            GlobalCoreToolsSettings.SetOfflineMode(false);
+            OfflineHelper.MarkAsOnline();
             Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, _previousEnvVar);
+            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
         }
 
         // ─── IsOfflineAsync ───────────────────────────────────────────────
@@ -142,41 +142,41 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void SetOfflineMode_WhenUserRequestedOffline_CannotBeOverriddenToOnline()
+        public void ExplicitOffline_CannotBeOverriddenByProbe()
         {
             // Arrange – simulate --offline flag
             Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, "true");
             GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
 
-            // Act – try to set online (as a network probe would)
-            GlobalCoreToolsSettings.SetOfflineMode(false);
+            // Act – mark as online (as a network probe would)
+            OfflineHelper.MarkAsOnline();
 
             // Assert – should remain offline because the user explicitly requested it
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
                 "user-requested offline cannot be overridden by network probes");
         }
 
-        // ─── SetOfflineMode guards ────────────────────────────────────────
+        // ─── MarkAsOffline / MarkAsOnline ─────────────────────────────────
         [Fact]
-        public void SetOfflineMode_WhenTrue_SetsGlobalOffline()
+        public void MarkAsOffline_SetsGlobalOfflineMode()
         {
             // Act
-            GlobalCoreToolsSettings.SetOfflineMode(true);
+            OfflineHelper.MarkAsOffline();
 
             // Assert
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
         }
 
         [Fact]
-        public void SetOfflineMode_WhenFalse_CanResetDetectedOffline()
+        public void MarkAsOnline_ResetsDetectedOffline()
         {
             // Arrange – simulate a network-detected offline
-            GlobalCoreToolsSettings.SetOfflineMode(true);
+            OfflineHelper.MarkAsOffline();
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
 
             // Act – network comes back, probe sets online
-            GlobalCoreToolsSettings.SetOfflineMode(false);
+            OfflineHelper.MarkAsOnline();
 
             // Assert – should be online again
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeFalse(

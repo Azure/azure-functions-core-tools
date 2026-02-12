@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Helpers
         public static Task Retry(Func<Task> func, int retryCount, bool displayError = false)
             => Retry(func, retryCount, TimeSpan.FromSeconds(1), displayError);
 
-        public static async Task Retry(Func<Task> func, int retryCount, TimeSpan retryDelay, bool displayError = false, Func<Task<bool>> shouldRetry = null)
+        public static async Task Retry(Func<Task> func, int retryCount, TimeSpan retryDelay, bool displayError = false)
         {
             var totalRetries = retryCount;
             while (true)
@@ -24,12 +24,6 @@ namespace Azure.Functions.Cli.Helpers
                 catch (Exception e)
                 {
                     if (retryCount <= 0)
-                    {
-                        throw;
-                    }
-
-                    // If a shouldRetry predicate is provided and says stop, don't retry
-                    if (shouldRetry is not null && !await shouldRetry())
                     {
                         throw;
                     }

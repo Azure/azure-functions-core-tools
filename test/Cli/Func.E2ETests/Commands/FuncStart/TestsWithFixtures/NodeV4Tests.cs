@@ -240,8 +240,8 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Theory]
-        [InlineData("false", false)] // EnsureLatest=false should skip download
-        [InlineData("true", true)] // EnsureLatest=true should download
+        [InlineData("false", true)] // EnsureLatest=false: func start should download
+        [InlineData("true", false)] // EnsureLatest=true: host handles download, skip
         public void FuncStart_NodeV4_WithEnsureLatestEnvVar_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
         {
             BaseOfflineBundleTests.TestEnsureLatestBehavior(
@@ -256,8 +256,8 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Theory]
-        [InlineData("false", false)] // EnsureLatest=false in host.json should skip download
-        [InlineData("true", true)] // EnsureLatest=true in host.json should download
+        [InlineData("false", true)] // EnsureLatest=false in host.json: func start should download
+        [InlineData("true", false)] // EnsureLatest=true in host.json: host handles download, skip
         public void FuncStart_NodeV4_WithEnsureLatestHostJson_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
         {
             BaseOfflineBundleTests.TestEnsureLatestBehavior(

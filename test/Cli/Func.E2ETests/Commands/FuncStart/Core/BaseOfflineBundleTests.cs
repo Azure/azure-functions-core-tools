@@ -107,12 +107,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                 // Assert: Check for expected bundle download behavior
                 if (shouldDownload)
                 {
-                    // When EnsureLatest=true, should download
+                    // When EnsureLatest=false or not set, func start should download
                     output.Should().Contain("Downloading extension bundles...");
                 }
                 else
                 {
-                    // When EnsureLatest=false, should skip download
+                    // When EnsureLatest=true, host handles download so func start skips it
                     output.Should().NotContain("Downloading extension bundles...");
                 }
             }

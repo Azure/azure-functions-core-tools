@@ -83,7 +83,6 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static async Task GetExtensionBundle()
         {
             var extensionBundleOptions = GetExtensionBundleOptions();
-            var extensionBundleManager = await GetExtensionBundleManagerAsync(extensionBundleOptions);
 
             // If already offline, skip network call entirely and fall back to cache
             if (GlobalCoreToolsSettings.IsOfflineMode)
@@ -92,13 +91,18 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 return;
             }
 
+            if (GlobalCoreToolsSettings.IsVerbose)
+            {
+                ColoredConsole.WriteLine(OutputTheme.VerboseColor("Downloading extension bundles..."));
+            }
+
             using var httpClient = new HttpClient { Timeout = _httpTimeout };
+            var extensionBundleManager = await GetExtensionBundleManagerAsync(extensionBundleOptions);
 
             await RetryHelper.Retry(
                 func: async () => await extensionBundleManager.GetExtensionBundlePath(httpClient),
                 retryCount: MaxRetries,
-                retryDelay: _retryDelay,
-                shouldRetry: async () => !await OfflineHelper.IsOfflineAsync());
+                retryDelay: _retryDelay);
         }
 
         /// <summary>
@@ -123,11 +127,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
             }
             else
             {
-                // No cached bundle found, show error message
-                ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"Error: Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. Bundles must be pre-cached before you can run offline."));
-                ColoredConsole.Error.WriteLine(OutputTheme.ErrorColor($"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use."));
-                ColoredConsole.Error.WriteLine();
-                throw new HttpRequestException($"Extension bundle '{extensionBundleOptions.Id}' is not available offline and no cached version was found.");
+                // No cached bundle found
+                throw new HttpRequestException(
+                    $"Error: Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. " +
+                    $"Bundles must be pre-cached before you can run offline. \n" +
+                    $"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use.");
             }
         }
 
