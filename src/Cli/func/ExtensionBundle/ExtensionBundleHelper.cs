@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 extensionBundleOption.DownloadPath = GetBundleDownloadPath(extensionBundleOption.Id);
 
                 // Only try to get latest if we're online
-                extensionBundleOption.EnsureLatest = !await OfflineHelper.IsOfflineAsync();
+                extensionBundleOption.EnsureLatest = !GlobalCoreToolsSettings.IsOfflineMode;
             }
 
             var configOptions = new FunctionsHostingConfigOptions();
@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             var extensionBundleManager = await GetExtensionBundleManagerAsync(extensionBundleOptions);
 
             // If already offline, skip network call entirely and fall back to cache
-            if (await OfflineHelper.IsOfflineAsync())
+            if (GlobalCoreToolsSettings.IsOfflineMode)
             {
                 HandleOfflineBundleFallback(extensionBundleOptions);
                 return;

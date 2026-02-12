@@ -13,12 +13,19 @@ namespace Azure.Functions.Cli.Helpers
         private static WorkerRuntime _currentWorkerRuntime;
         private static bool _isHelpRunning;
         private static bool _isVerbose;
+        private static bool _isExplicitOffline;
         private static bool _isOfflineMode;
 
         public static bool IsHelpRunning => _isHelpRunning;
 
         public static bool IsVerbose => _isVerbose;
 
+        /// <summary>
+        /// Gets a value indicating whether the CLI is currently in offline mode.
+        /// This is the single source of truth for offline state across the CLI.
+        /// Set by the --offline flag, the FUNCTIONS_CORE_TOOLS_OFFLINE env var,
+        /// or automatically when a network connectivity failure is detected.
+        /// </summary>
         public static bool IsOfflineMode => _isOfflineMode;
 
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
@@ -52,10 +59,18 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string CurrentLanguageOrNull { get; private set; } = null;
 
+        /// <summary>
+        /// Returns whether the user explicitly requested offline mode
+        /// via the --offline flag or FUNCTIONS_CORE_TOOLS_OFFLINE env var.
+        /// When true, offline mode is permanent and network probing is skipped.
+        /// </summary>
+        internal static bool HasUserRequestedOfflineMode() => _isExplicitOffline;
+
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
             _isVerbose = args.Contains("--verbose");
-            _isOfflineMode = args.Contains("--offline");
+            _isExplicitOffline = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
+            _isOfflineMode = _isExplicitOffline;
 
             try
             {
@@ -111,6 +126,22 @@ namespace Azure.Functions.Cli.Helpers
             {
                 _currentWorkerRuntime = WorkerRuntime.None;
             }
+        }
+
+        /// <summary>
+        /// Updates the offline mode state. Called by <see cref="OfflineHelper"/> when
+        /// network connectivity changes are detected.
+        /// If the user explicitly requested offline mode (--offline / env var),
+        /// the state cannot be overridden back to online.
+        /// </summary>
+        internal static void SetOfflineMode(bool offline)
+        {
+            if (_isExplicitOffline)
+            {
+                return;
+            }
+
+            _isOfflineMode = offline;
         }
 
         internal static void SetIsHelpRunning(bool value)

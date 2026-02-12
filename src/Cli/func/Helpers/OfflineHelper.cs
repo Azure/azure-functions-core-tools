@@ -1,10 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Net;
-using System.Net.Sockets;
-using Azure.Functions.Cli.Common;
-
 namespace Azure.Functions.Cli.Helpers
 {
     /// <summary>
@@ -16,48 +12,45 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string ConnectivityCheckUrl = "https://cdn.functions.azure.com/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/staticProperties.json";
 
-        // Thread synchronization for offline state
-        private static readonly object _offlineLock = new object();
-
-        // Cache offline status to avoid repeated network checks
-        private static readonly TimeSpan _offlineCheckInterval = TimeSpan.FromSeconds(10);
-        private static bool? _isOffline = null;
-        private static DateTime _lastOfflineCheck = DateTime.MinValue;
+        // Controls how often we re-probe network connectivity
+        private static readonly object _probeLock = new object();
+        private static readonly TimeSpan _probeInterval = TimeSpan.FromSeconds(10);
+        private static DateTime _lastProbeTime = DateTime.MinValue;
 
         /// <summary>
-        /// Detects if the system is currently offline (no network connectivity to CDN).
-        /// Respects the global --offline flag or FUNCTIONS_CORE_TOOLS_OFFLINE environment variable.
-        /// Uses caching to avoid excessive network checks.
+        /// Probes for network connectivity and updates <see cref="GlobalCoreToolsSettings.IsOfflineMode"/>.
+        /// Results are cached for 10 seconds to avoid excessive network checks.
         /// </summary>
         /// <returns>True if offline, false if online.</returns>
         internal static async Task<bool> IsOfflineAsync()
         {
-            // If global offline mode is set via --offline flag or env var, always return true
-            if (GlobalCoreToolsSettings.IsOfflineMode || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline))
+            // If the user explicitly requested offline mode, skip probing entirely
+            if (GlobalCoreToolsSettings.HasUserRequestedOfflineMode())
             {
                 return true;
             }
 
-            lock (_offlineLock)
+            lock (_probeLock)
             {
-                // Check cache first to avoid excessive network calls
-                if (_isOffline.HasValue && DateTime.UtcNow - _lastOfflineCheck < _offlineCheckInterval)
+                // Return the current global state if we probed recently
+                if (DateTime.UtcNow - _lastProbeTime < _probeInterval)
                 {
-                    return _isOffline.Value;
+                    return GlobalCoreToolsSettings.IsOfflineMode;
                 }
             }
 
             // Perform quick connectivity check outside the lock to avoid blocking other threads
             bool offline = await CheckIfOfflineAsync();
 
-            lock (_offlineLock)
+            lock (_probeLock)
             {
-                // Update cache
-                _isOffline = offline;
-                _lastOfflineCheck = DateTime.UtcNow;
+                _lastProbeTime = DateTime.UtcNow;
             }
 
-            return offline;
+            // Update the single source of truth.
+            // SetOfflineMode guards against overriding explicit --offline / env var.
+            GlobalCoreToolsSettings.SetOfflineMode(offline);
+            return GlobalCoreToolsSettings.IsOfflineMode;
         }
 
         /// <summary>
@@ -75,32 +68,35 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch
             {
-                // Unknown error - assume offline to be safe
+                // Unknown error — assume offline to be safe
                 return true;
             }
         }
 
         /// <summary>
-        /// Marks the system as offline. Used when network failures are detected.
+        /// Marks the system as offline immediately.
+        /// Updates <see cref="GlobalCoreToolsSettings.IsOfflineMode"/> and resets the
+        /// probe timer so the next <see cref="IsOfflineAsync"/> call will re-check.
         /// </summary>
         internal static void MarkAsOffline()
         {
-            lock (_offlineLock)
+            GlobalCoreToolsSettings.SetOfflineMode(true);
+
+            lock (_probeLock)
             {
-                _isOffline = true;
-                _lastOfflineCheck = DateTime.UtcNow;
+                _lastProbeTime = DateTime.UtcNow;
             }
         }
 
         /// <summary>
-        /// Resets the offline cache to force a fresh check.
+        /// Resets the probe timer so the next <see cref="IsOfflineAsync"/> call
+        /// performs a fresh connectivity check.
         /// </summary>
         internal static void ResetOfflineCache()
         {
-            lock (_offlineLock)
+            lock (_probeLock)
             {
-                _isOffline = null;
-                _lastOfflineCheck = DateTime.MinValue;
+                _lastProbeTime = DateTime.MinValue;
             }
         }
     }

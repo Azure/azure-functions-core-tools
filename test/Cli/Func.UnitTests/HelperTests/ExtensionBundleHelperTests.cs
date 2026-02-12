@@ -591,7 +591,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public async Task GetExtensionBundleManagerAsync_WhenOffline_CreatesManager()
         {
             // Arrange
-            OfflineHelper.MarkAsOffline();
+            GlobalCoreToolsSettings.SetOfflineMode(true);
 
             try
             {
@@ -603,7 +603,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                OfflineHelper.ResetOfflineCache();
+                GlobalCoreToolsSettings.SetOfflineMode(false);
             }
         }
 
@@ -611,7 +611,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public async Task GetExtensionBundleManagerAsync_WhenOffline_SetsEnsureLatestToFalse()
         {
             // Arrange
-            OfflineHelper.MarkAsOffline();
+            GlobalCoreToolsSettings.SetOfflineMode(true);
             var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
             {
                 Id = "Microsoft.Azure.Functions.ExtensionBundle",
@@ -628,7 +628,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                OfflineHelper.ResetOfflineCache();
+                GlobalCoreToolsSettings.SetOfflineMode(false);
             }
         }
 
@@ -636,7 +636,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public async Task GetExtensionBundleManagerAsync_WhenOnline_SetsEnsureLatestToTrue()
         {
             // Arrange
-            OfflineHelper.ResetOfflineCache();
+            GlobalCoreToolsSettings.SetOfflineMode(false);
             var options = new Microsoft.Azure.WebJobs.Script.Configuration.ExtensionBundleOptions
             {
                 Id = "Microsoft.Azure.Functions.ExtensionBundle",
@@ -648,14 +648,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 // Act
                 await ExtensionBundleHelper.GetExtensionBundleManagerAsync(options);
 
-                // Assert - EnsureLatest should be true when online (or at least not explicitly false)
-                // Note: This test may be flaky if network is unavailable during test run
-                // The key behavior is that EnsureLatest = !IsOfflineAsync()
+                // Assert - EnsureLatest should be true when online
                 options.EnsureLatest.Should().BeTrue("EnsureLatest should be true when system is online");
             }
             finally
             {
-                OfflineHelper.ResetOfflineCache();
+                GlobalCoreToolsSettings.SetOfflineMode(false);
             }
         }
     }

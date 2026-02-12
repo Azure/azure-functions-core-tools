@@ -22,12 +22,10 @@ namespace Azure.Functions.Cli.ExtensionBundle
             var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
             if (!string.IsNullOrEmpty(bundleId))
             {
-                // Blocking call is acceptable in configuration builder context
-                var isOffline = OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult();
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
                     { Constants.ExtensionBundleDownloadPath.Replace("__", ":"), ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
-                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), (!isOffline).ToString() }
+                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), (!GlobalCoreToolsSettings.IsOfflineMode).ToString() }
                 });
             }
         }
