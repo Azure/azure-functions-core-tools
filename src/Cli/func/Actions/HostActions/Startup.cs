@@ -132,9 +132,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(WarningColor($"Extension bundle downloadPath is configured in both host.json and environment variable. Using environment variable value: {existingDownloadPath}"));
                 }
 
-                // Check offline status using the centralized OfflineHelper
-                var isOffline = OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult();
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, isOffline ? "false" : "true");
+                // Check offline status from the global setting
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, GlobalCoreToolsSettings.IsOfflineMode ? "false" : "true");
             }
         }
 

@@ -498,10 +498,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Theory]
-        [InlineData("true", true, "environment variable")] // ensureLatest=true means SHOULD download
-        [InlineData("false", false, "environment variable")] // ensureLatest=false means should NOT download
-        [InlineData("True", true, "environment variable")] // Case insensitive
-        [InlineData("False", false, "environment variable")] // Case insensitive
+        [InlineData("true", false, "environment variable")] // ensureLatest=true: host handles download
+        [InlineData("false", true, "environment variable")] // ensureLatest=false: func start should download
+        [InlineData("True", false, "environment variable")] // Case insensitive
+        [InlineData("False", true, "environment variable")] // Case insensitive
         public void ShouldDownloadExtensionBundles_EnvironmentVariableTakesPrecedence(
             string envVarValue, bool expectedShouldDownload, string expectedSource)
         {
@@ -587,10 +587,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Theory]
-        [InlineData("true", true, "host.json")] // ensureLatest=true means SHOULD download
-        [InlineData("false", false, "host.json")] // ensureLatest=false means should NOT download
-        [InlineData("True", true, "host.json")] // Case insensitive
-        [InlineData("False", false, "host.json")] // Case insensitive
+        [InlineData("true", false, "host.json")] // ensureLatest=true: host handles download
+        [InlineData("false", true, "host.json")] // ensureLatest=false: func start should download
+        [InlineData("True", false, "host.json")] // Case insensitive
+        [InlineData("False", true, "host.json")] // Case insensitive
         public void ShouldDownloadExtensionBundles_FallsBackToHostJson_WhenEnvVarNotSet(
             string hostJsonValue, bool expectedShouldDownload, string expectedSource)
         {
@@ -638,7 +638,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             try
             {
-                // Set env var to false (should NOT download)
+                // Set env var to false (should still download)
                 Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, "false");
 
                 var mockSecretsManager = new Mock<ISecretsManager>();
@@ -646,7 +646,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
                 var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
 
-                // Set up host.json with true (would download if env var wasn't set)
+                // Set up host.json with true (would skip download if env var wasn't set)
                 var hostJsonConfig = new ConfigurationBuilder()
                     .AddInMemoryCollection(new Dictionary<string, string>
                     {
@@ -660,8 +660,8 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 // Act
                 var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
 
-                // Assert - environment variable should take precedence
-                Assert.False(shouldDownload);
+                // Assert - environment variable (false) means func start should download
+                Assert.True(shouldDownload);
                 Assert.Equal("environment variable", source);
             }
             finally

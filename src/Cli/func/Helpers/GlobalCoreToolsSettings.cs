@@ -13,13 +13,30 @@ namespace Azure.Functions.Cli.Helpers
         private static WorkerRuntime _currentWorkerRuntime;
         private static bool _isHelpRunning;
         private static bool _isVerbose;
-        private static bool _isOfflineMode;
+        private static bool _isExplicitOffline;
 
         public static bool IsHelpRunning => _isHelpRunning;
 
         public static bool IsVerbose => _isVerbose;
 
-        public static bool IsOfflineMode => _isOfflineMode;
+        /// <summary>
+        /// Gets a value indicating whether the CLI is currently in offline mode.
+        /// This is the single source of truth for offline state across the CLI.
+        /// Returns the cached value if the probe timer is still valid;
+        /// otherwise triggers a network probe via <see cref="OfflineHelper"/>.
+        /// </summary>
+        public static bool IsOfflineMode
+        {
+            get
+            {
+                if (_isExplicitOffline)
+                {
+                    return true;
+                }
+
+                return OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult();
+            }
+        }
 
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
@@ -52,10 +69,17 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string CurrentLanguageOrNull { get; private set; } = null;
 
+        /// <summary>
+        /// Returns whether the user explicitly requested offline mode
+        /// via the --offline flag or FUNCTIONS_CORE_TOOLS_OFFLINE env var.
+        /// When true, offline mode is permanent and network probing is skipped.
+        /// </summary>
+        internal static bool HasUserRequestedOfflineMode() => _isExplicitOffline;
+
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
             _isVerbose = args.Contains("--verbose");
-            _isOfflineMode = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
+            _isExplicitOffline = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
 
             try
             {

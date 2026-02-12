@@ -466,16 +466,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (shouldDownloadBundles)
             {
-                if (isVerbose)
-                {
-                    ColoredConsole.WriteLine(VerboseColor("Downloading extension bundles..."));
-                }
-
                 await ExtensionBundleHelper.GetExtensionBundle();
             }
             else if (isVerbose)
             {
-                ColoredConsole.WriteLine(VerboseColor($"Skipping extension bundle download because ensureLatest is set to false in {source}."));
+                ColoredConsole.WriteLine(VerboseColor($"Skipping extension bundle download: {source}."));
             }
 
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
@@ -923,9 +918,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var ensureLatestEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             if (bool.TryParse(ensureLatestEnvVar, out var ensureLatestFromEnv))
             {
-                // ensureLatest=false means we should NOT download (skip to use cached)
-                // ensureLatest=true means we SHOULD download
-                return (ensureLatestFromEnv, "environment variable");
+                // ensureLatest=true: the host will download the latest bundle on startup,
+                // so func start doesn't need to pre-download.
+                return (!ensureLatestFromEnv, "environment variable");
             }
 
             // 2. Check host.json configuration (secondary option)
@@ -934,7 +929,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var ensureLatestFromHostJson = _hostJsonConfig[hostJsonConfigKey];
                 if (bool.TryParse(ensureLatestFromHostJson, out var ensureLatestFromConfig))
                 {
-                    return (ensureLatestFromConfig, "host.json");
+                    return (!ensureLatestFromConfig, "host.json");
                 }
             }
 
