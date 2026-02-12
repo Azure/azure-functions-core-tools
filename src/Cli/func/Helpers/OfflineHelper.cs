@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Helpers
         internal static async Task<bool> IsOfflineAsync()
         {
             // If global offline mode is set via --offline flag or env var, always return true
-            if (GlobalCoreToolsSettings.IsOfflineMode)
+            if (GlobalCoreToolsSettings.IsOfflineMode || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline))
             {
                 return true;
             }
@@ -102,31 +102,6 @@ namespace Azure.Functions.Cli.Helpers
                 _isOffline = null;
                 _lastOfflineCheck = DateTime.MinValue;
             }
-        }
-
-        /// <summary>
-        /// Determines whether an <see cref="HttpRequestException"/> indicates a network
-        /// connectivity issue (DNS failure, socket error, etc.) rather than a server-side
-        /// HTTP error.  If the exception carries an HTTP status code the server was reached,
-        /// so this returns <c>false</c>.
-        /// </summary>
-        internal static bool IsNetworkConnectivityException(HttpRequestException ex)
-        {
-            // If we got an HTTP status code back, the server was reached – not a connectivity issue.
-            if (ex.StatusCode.HasValue)
-            {
-                return false;
-            }
-
-            // A SocketException inner exception is a clear sign of a connectivity problem.
-            if (ex.InnerException is SocketException)
-            {
-                return true;
-            }
-
-            // No status code and no specific inner exception – could be DNS failure or
-            // similar connectivity issue, so treat as a network problem.
-            return true;
         }
     }
 }

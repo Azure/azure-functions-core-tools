@@ -28,7 +28,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         // ─── IsOfflineAsync ───────────────────────────────────────────────
-
         [Fact]
         public async Task IsOfflineAsync_InitialCheck_PerformsNetworkTest()
         {
@@ -104,7 +103,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         // ─── MarkAsOffline ────────────────────────────────────────────────
-
         [Fact]
         public async Task MarkAsOffline_SetsOfflineState()
         {
@@ -117,7 +115,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         // ─── ResetOfflineCache ────────────────────────────────────────────
-
         [Fact]
         public async Task ResetOfflineCache_ClearsCache()
         {
@@ -131,48 +128,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             // After reset, next call will perform a fresh check.
             // We cannot guarantee the result, but verify it does not throw.
             await OfflineHelper.IsOfflineAsync();
-        }
-
-        // ─── IsNetworkConnectivityException ───────────────────────────────
-
-        [Fact]
-        public void IsNetworkConnectivityException_WithSocketException_ReturnsTrue()
-        {
-            // Arrange
-            var socketEx = new SocketException((int)SocketError.HostNotFound);
-            var httpEx = new HttpRequestException("DNS failure", socketEx);
-
-            // Act
-            var result = OfflineHelper.IsNetworkConnectivityException(httpEx);
-
-            // Assert
-            result.Should().BeTrue("SocketException indicates a connectivity issue");
-        }
-
-        [Fact]
-        public void IsNetworkConnectivityException_WithHttpStatusCode_ReturnsFalse()
-        {
-            // Arrange – a 500 response means the server was reached
-            var httpEx = new HttpRequestException("Server error", null, HttpStatusCode.InternalServerError);
-
-            // Act
-            var result = OfflineHelper.IsNetworkConnectivityException(httpEx);
-
-            // Assert
-            result.Should().BeFalse("receiving an HTTP status code means we reached the server");
-        }
-
-        [Fact]
-        public void IsNetworkConnectivityException_NoStatusCodeNoSocketException_ReturnsTrue()
-        {
-            // Arrange – no status code and no socket exception could be DNS failure
-            var httpEx = new HttpRequestException("Unknown error");
-
-            // Act
-            var result = OfflineHelper.IsNetworkConnectivityException(httpEx);
-
-            // Assert
-            result.Should().BeTrue("no status code and no socket exception may indicate DNS or connectivity failure");
         }
     }
 }

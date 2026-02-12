@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Helpers
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
             _isVerbose = args.Contains("--verbose");
-            _isOfflineMode = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
+            _isOfflineMode = args.Contains("--offline");
 
             try
             {
