@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Configuration;
 
@@ -21,11 +23,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
             if (!string.IsNullOrEmpty(bundleId))
             {
                 // Blocking call is acceptable in configuration builder context
-                var isOffline = ExtensionBundleHelper.IsOfflineAsync().GetAwaiter().GetResult();
+                var isOffline = OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult();
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
-                    { "AzureFunctionsJobHost:extensionBundle:downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
-                    { "AzureFunctionsJobHost:extensionBundle:ensureLatest", (!isOffline).ToString() }
+                    { Constants.ExtensionBundleDownloadPath.Replace("__", ":"), ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
+                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), (!isOffline).ToString() }
                 });
             }
         }

@@ -917,11 +917,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// <returns>A tuple indicating whether to download bundles and the source of the setting.</returns>
         internal (bool ShouldDownload, string Source) ShouldDownloadExtensionBundles()
         {
-            const string envVarKey = "AzureFunctionsJobHost__extensionBundle__ensureLatest";
             const string hostJsonConfigKey = "AzureFunctionsJobHost:extensionBundle:ensureLatest";
 
             // 1. Check environment variable first (highest priority)
-            var ensureLatestEnvVar = Environment.GetEnvironmentVariable(envVarKey);
+            var ensureLatestEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
             if (bool.TryParse(ensureLatestEnvVar, out var ensureLatestFromEnv))
             {
                 // ensureLatest=false means we should NOT download (skip to use cached)

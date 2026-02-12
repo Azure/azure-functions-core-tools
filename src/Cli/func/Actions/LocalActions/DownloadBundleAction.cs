@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 // Set the download path so the SDK downloads to the correct location
                 // This is needed because DownloadBundleAction doesn't go through Startup.cs
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", bundleBasePath);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, bundleBasePath);
 
                 // Perform the download
                 await ExtensionBundleHelper.GetExtensionBundle();
