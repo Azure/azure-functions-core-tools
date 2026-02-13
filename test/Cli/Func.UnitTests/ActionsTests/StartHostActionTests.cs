@@ -361,7 +361,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Arrange
             var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
             var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Debug");
-            
+
             // Clear environment variable if it exists
             string envVarName = Constants.FunctionLogLevel;
             string originalValue = Environment.GetEnvironmentVariable(envVarName);
@@ -389,7 +389,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Arrange
             var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
             var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Debug");
-            
+
             string envVarName = Constants.FunctionLogLevel;
             string originalValue = Environment.GetEnvironmentVariable(envVarName);
             Environment.SetEnvironmentVariable(envVarName, "Warning");
@@ -420,7 +420,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             };
             var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(hostJsonSettings);
             var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Debug");
-            
+
             string envVarName = Constants.FunctionLogLevel;
             string originalValue = Environment.GetEnvironmentVariable(envVarName);
             Environment.SetEnvironmentVariable(envVarName, null);
@@ -447,7 +447,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Arrange
             var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
             var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Information");
-            
+
             string pythonEnvVar = "PYTHON_ENABLE_DEBUG_LOGGING";
             string originalValue = Environment.GetEnvironmentVariable(pythonEnvVar);
             Environment.SetEnvironmentVariable(pythonEnvVar, null);
@@ -474,7 +474,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Arrange
             var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(new Dictionary<string, string>());
             var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Information");
-            
+
             string pythonEnvVar = "PYTHON_ENABLE_DEBUG_LOGGING";
             string originalValue = Environment.GetEnvironmentVariable(pythonEnvVar);
             Environment.SetEnvironmentVariable(pythonEnvVar, "0");
