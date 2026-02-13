@@ -19,8 +19,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "init", HelpText = "Initialize a new Azure Function App project.", ShowInHelp = true, HelpOrder = 1)]
     internal class InitAction : BaseAction
     {
-        // Default to .NET 8 if the target framework is not specified
-        private const string DefaultTargetFramework = Common.TargetFramework.Net8;
+        // Default to .NET 10 if the target framework is not specified
+        private const string DefaultTargetFramework = Common.TargetFramework.Net10;
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
@@ -54,6 +54,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public bool Csx { get; set; }
 
         public bool ExtensionBundle { get; set; } = true;
+
+        public BundleChannel BundlesChannel { get; set; } = BundleChannel.GA;
 
         public bool GeneratePythonDocumentation { get; set; } = true;
 
@@ -107,6 +109,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("no-bundle")
                 .WithDescription("Do not configure extension bundle in host.json. Only applicable when initializing a new non-.NET project.")
                 .Callback(e => ExtensionBundle = !e);
+
+            Parser
+                .Setup<BundleChannel>('c', "bundles-channel")
+                .WithDescription("Extension bundle release channel: GA (default), Preview, or Experimental. Only applicable when initializing a new non-.NET project.")
+                .SetDefault(BundleChannel.GA)
+                .Callback(channel => BundlesChannel = channel);
 
             Parser
                 .Setup<bool>("force")
@@ -568,18 +576,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (extensionBundle)
             {
-                if (ResolvedProgrammingModel == Common.ProgrammingModel.V2 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Python)
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
-                }
-                else if (ResolvedProgrammingModel == Common.ProgrammingModel.V4 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Node)
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigNodeV4);
-                }
-                else
-                {
-                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
-                }
+                // Use the specified bundle channel (GA, Preview, or Experimental)
+                var bundleConfig = await BundleActionHelper.GetBundleConfigForChannel(BundlesChannel);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, Task.FromResult(bundleConfig));
             }
 
             if (workerRuntime == Helpers.WorkerRuntime.Custom)
@@ -643,14 +642,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     return;
                 }
 
-                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                // Check if EOL date has already passed
+                var isAlreadyEol = currentRuntimeSettings.EndOfLifeDate.HasValue &&
+                                   currentRuntimeSettings.EndOfLifeDate.Value < DateTime.UtcNow;
+
+                if (isAlreadyEol || currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
                 {
-                    var warningMessage = EolMessages.GetAfterEolCreateMessageDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    var warningMessage = EolMessages.GetAfterEolCreateMessage(Constants.DotnetDisplayName, majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
                 else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
                 {
-                    var warningMessage = EolMessages.GetEarlyEolCreateMessageForDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    var warningMessage = EolMessages.GetEarlyEolCreateMessage(Constants.DotnetDisplayName, majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
             }

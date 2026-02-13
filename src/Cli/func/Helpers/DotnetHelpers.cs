@@ -129,7 +129,11 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
-            ColoredConsole.WriteLine($"{Environment.NewLine}Creating dotnet function...");
+            if (GlobalCoreToolsSettings.IsVerbose)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"{Environment.NewLine}Creating dotnet function..."));
+            }
+
             await TemplateOperationAsync(
                 async () =>
                 {
@@ -183,6 +187,7 @@ namespace Azure.Functions.Cli.Helpers
             "iothubtrigger" => "iothub",
             "kafkatrigger" => "kafka",
             "kafkaoutput" => "kafkao",
+            "mcptooltrigger" => "mcptooltrigger",
             "queuetrigger" => "queue",
             "sendgrid" => "sendgrid",
             "servicebusqueuetrigger" => "squeue",

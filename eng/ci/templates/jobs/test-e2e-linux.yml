@@ -5,7 +5,7 @@ jobs:
 
   pool:
     name: 1es-pool-azfunc-public
-    image: 1es-ubuntu-22.04
+    image: 1es-ubuntu-24.04-min
     os: linux
 
   strategy:
@@ -27,12 +27,17 @@ jobs:
         runtime: 'linux-x64'
 
   steps:
-  - pwsh: ./eng/scripts/start-emulators.ps1
-    displayName: 'Start emulators (NoWait)'
-
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+  - bash: |
+      sudo apt-get update
+      sudo apt-get install -y npm golang
+      npm --version
+      go version
+    displayName: 'Install npm and Go'
+
+  - pwsh: ./eng/scripts/start-emulators.ps1
+    displayName: 'Start emulators (NoWait)'
 
   - pwsh: |
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
