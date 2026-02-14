@@ -18,7 +18,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
-            if (!BundleActionHelper.TryGetBundleContext(out var extensionBundleManager, out var options, out var bundleBasePath))
+            var (success, extensionBundleManager, options, bundleBasePath) = await BundleActionHelper.TryGetBundleContextAsync();
+            if (!success)
             {
                 ColoredConsole.WriteLine("To list downloaded bundles, you must configure extension bundles in your host.json.");
                 return;

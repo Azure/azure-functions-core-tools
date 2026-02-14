@@ -259,7 +259,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", TemplateName);
 
-                    var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+                    var extensionBundleManager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
                     if (template.Metadata.Extensions != null && !extensionBundleManager.IsExtensionBundleConfigured() && !CommandChecker.CommandExists("dotnet"))
                     {
                         throw new CliException($"The {template.Metadata.Name} template has extensions. {Constants.Errors.ExtensionsNeedDotnet}");

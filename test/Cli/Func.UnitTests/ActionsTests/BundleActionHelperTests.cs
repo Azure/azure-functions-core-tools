@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Fact]
-        public void TryGetBundleContext_ReturnsFalse_WhenHostJsonMissing()
+        public async Task TryGetBundleContextAsync_ReturnsFalse_WhenHostJsonMissing()
         {
             var hostJsonPath = Path.Combine(_testDirectory, ScriptConstants.HostMetadataFileName);
             if (File.Exists(hostJsonPath))
@@ -47,16 +47,16 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 File.Delete(hostJsonPath);
             }
 
-            var result = BundleActionHelper.TryGetBundleContext(out var manager, out var options, out var basePath);
+            var (success, manager, options, basePath) = await BundleActionHelper.TryGetBundleContextAsync();
 
-            result.Should().BeFalse();
+            success.Should().BeFalse();
             options.Should().BeNull();
             basePath.Should().BeNull();
             manager.Should().BeNull();
         }
 
         [Fact]
-        public void TryGetBundleContext_UsesDownloadPath_FromHostJson()
+        public async Task TryGetBundleContextAsync_UsesDownloadPath_FromHostJson()
         {
             var customPath = Path.Combine(_testDirectory, "custom-bundles");
             Directory.CreateDirectory(customPath);
@@ -71,9 +71,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 }";
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
-            var result = BundleActionHelper.TryGetBundleContext(out var manager, out var options, out var basePath);
+            var (success, manager, options, basePath) = await BundleActionHelper.TryGetBundleContextAsync();
 
-            result.Should().BeTrue();
+            success.Should().BeTrue();
             manager.Should().NotBeNull();
             options.Should().NotBeNull();
             basePath.Should().Be(customPath);
