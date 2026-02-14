@@ -905,8 +905,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // Only set environment variables if they're not already defined in env var or host.json (user's config takes precedence)
             // Set the log level for Function.* categories to enable user logs at the specified level
             string functionLogLevelHostJsonPath = "logging:logLevel:Function";
-            bool functionLogLevelDefined = Utilities.JobHostConfigSectionExists(hostJsonConfig, functionLogLevelHostJsonPath)
-                || hostJsonConfig.GetSection(functionLogLevelHostJsonPath).Exists();
+            bool functionLogLevelDefined = Utilities.JobHostConfigSectionExists(hostJsonConfig, functionLogLevelHostJsonPath);
 
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.FunctionLogLevel)) &&
                 !functionLogLevelDefined)
