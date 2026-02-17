@@ -203,5 +203,54 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
 
             return new AndConstraint<CommandResultAssertions>(this);
         }
+
+        public AndConstraint<CommandResultAssertions> ValidateZipDoesNotContain(string zipFilePath, string[] unexpectedContents, ITestOutputHelper? logger)
+        {
+            string tempExtractDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            try
+            {
+                logger?.WriteLine($"Extracting zip to: {tempExtractDir}");
+                Directory.CreateDirectory(tempExtractDir);
+
+                ZipFile.ExtractToDirectory(zipFilePath, tempExtractDir, overwriteFiles: true);
+
+                string[] extractedFiles = Directory.GetFiles(tempExtractDir, "*", SearchOption.AllDirectories);
+                logger?.WriteLine($"Found {extractedFiles.Length} files in the zip:");
+                foreach (string file in extractedFiles)
+                {
+                    var relativePath = file.Replace(tempExtractDir, string.Empty).TrimStart(Path.DirectorySeparatorChar);
+                    logger?.WriteLine($"  - {relativePath}");
+                }
+
+                foreach (string pattern in unexpectedContents)
+                {
+                    // Check for exact file match
+                    string filePath = Path.Combine(tempExtractDir, pattern);
+                    Execute.Assertion.ForCondition(!File.Exists(filePath))
+                        .FailWith($"File '{pattern}' should NOT be in the zip contents but was found.");
+
+                    // Check for directory match
+                    string dirPath = Path.Combine(tempExtractDir, pattern);
+                    Execute.Assertion.ForCondition(!Directory.Exists(dirPath) || !Directory.EnumerateFileSystemEntries(dirPath).Any())
+                        .FailWith($"Directory '{pattern}' should NOT have entries in the zip contents but was found.");
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(tempExtractDir))
+                {
+                    try
+                    {
+                        Directory.Delete(tempExtractDir, recursive: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.WriteLine($"Warning: Failed to delete temporary directory: {ex.Message}");
+                    }
+                }
+            }
+
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
     }
 }

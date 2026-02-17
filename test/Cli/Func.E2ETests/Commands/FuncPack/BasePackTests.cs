@@ -83,6 +83,62 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncPack
             File.Delete(zipFiles.First());
         }
 
+        internal static void TestFuncIgnoreExcludesFiles(
+            string workingDir,
+            string testName,
+            string funcPath,
+            ITestOutputHelper log,
+            string[] filesToValidatePresent,
+            string[] filesToValidateAbsent,
+            string funcIgnoreContent,
+            string[]? additionalPackArgs = null)
+        {
+            // Write a .funcignore file to the project
+            var funcIgnorePath = Path.Combine(workingDir, ".funcignore");
+            var hadExistingFuncIgnore = File.Exists(funcIgnorePath);
+            string? originalContent = hadExistingFuncIgnore ? File.ReadAllText(funcIgnorePath) : null;
+
+            File.WriteAllText(funcIgnorePath, funcIgnoreContent);
+
+            try
+            {
+                var args = additionalPackArgs ?? [];
+
+                var funcPackCommand = new FuncPackCommand(funcPath, testName, log);
+                var packResult = funcPackCommand
+                    .WithWorkingDirectory(workingDir)
+                    .Execute(args);
+
+                packResult.Should().ExitWith(0);
+                packResult.Should().HaveStdOutContaining("Creating a new package");
+
+                var zipFiles = Directory.GetFiles(workingDir, "*.zip");
+                Assert.True(zipFiles.Length > 0, $"No zip files found in {workingDir}");
+
+                var zipFile = zipFiles.First();
+
+                // Validate expected files ARE present
+                packResult.Should().ValidateZipContents(zipFile, filesToValidatePresent, log);
+
+                // Validate excluded files are NOT present
+                packResult.Should().ValidateZipDoesNotContain(zipFile, filesToValidateAbsent, log);
+
+                File.Delete(zipFile);
+            }
+            finally
+            {
+                // Restore original .funcignore
+                if (hadExistingFuncIgnore && originalContent != null)
+                {
+                    File.WriteAllText(funcIgnorePath, originalContent);
+                }
+                else if (!hadExistingFuncIgnore)
+                {
+                    File.Delete(funcIgnorePath);
+                }
+            }
+        }
+
         internal static void TestPackWithPathArgument(
             string funcInvocationWorkingDir,
             string projectAbsoluteDir,
