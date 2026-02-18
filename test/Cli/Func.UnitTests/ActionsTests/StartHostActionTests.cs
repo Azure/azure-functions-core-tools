@@ -11,6 +11,8 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using FluentAssertions;
+using Microsoft.Azure.WebJobs.Script.Configuration;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using NSubstitute;
 using Xunit;
@@ -416,7 +418,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             // Arrange
             var hostJsonSettings = new Dictionary<string, string>
             {
-                ["logging:logLevel:Function"] = "Error"
+                [ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "logging:logLevel:Function")] = "Error"
             };
             var hostJsonConfig = TestUtilities.CreateSetupWithConfiguration(hostJsonSettings);
             var loggingFilterHelper = new LoggingFilterHelper(hostJsonConfig, false, "Debug");
