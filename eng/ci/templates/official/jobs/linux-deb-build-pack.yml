@@ -85,6 +85,12 @@ jobs:
         chmod +x $(Build.SourcesDirectory)/eng/scripts/validate-deb-arch.sh
         bash $(Build.SourcesDirectory)/eng/scripts/validate-deb-arch.sh /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact
 
+  - task: UseDotNet@2
+    displayName: 'Install .NET SDK'
+    inputs:
+      packageType: 'sdk'
+      version: '8.x'
+
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
