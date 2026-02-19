@@ -67,6 +67,7 @@ namespace Azure.Functions.Cli.Common
         public const string UseGoZip = "FUNCTIONS_CORE_TOOLS_USE_GOZIP";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
         public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
+        public const string FunctionLogLevel = "AzureFunctionsJobHost__logging__logLevel__Function";
         public const long DefaultMaxRequestBodySize = 104857600;
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
