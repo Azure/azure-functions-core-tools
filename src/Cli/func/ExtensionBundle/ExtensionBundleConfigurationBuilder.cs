@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
                     { Constants.ExtensionBundleDownloadPath.Replace("__", ":"), ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
-                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), "false" }
+                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), bool.FalseString }
                 });
             }
         }

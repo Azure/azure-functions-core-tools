@@ -817,6 +817,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData(typeof(HttpRequestException))]
         [InlineData(typeof(System.Net.Sockets.SocketException))]
         [InlineData(typeof(TaskCanceledException))]
+        [InlineData(typeof(OperationCanceledException))]
         public void IsNetworkException_NetworkErrorTypes_ReturnsTrue(Type exceptionType)
         {
             var ex = (Exception)Activator.CreateInstance(exceptionType);

@@ -137,7 +137,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var existingEnsureLatest = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
                 if (string.IsNullOrEmpty(existingEnsureLatest))
                 {
-                    Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, "false");
+                    Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, bool.FalseString);
                 }
             }
         }

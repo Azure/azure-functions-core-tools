@@ -112,7 +112,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 var extensionBundleManager = GetExtensionBundleManager(extensionBundleOptions);
 
                 var bundlePath = await RetryHelper.Retry(
-                    func: async () => await extensionBundleManager.GetExtensionBundlePath(httpClient),
+                    func: () => extensionBundleManager.GetExtensionBundlePath(httpClient),
                     retryCount: MaxRetries,
                     retryDelay: _retryDelay);
 
@@ -165,8 +165,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
                     return true;
                 }
 
-                // HttpClient throws TaskCanceledException when a request times out
-                if (ex is TaskCanceledException)
+                // HttpClient throws TaskCanceledException (or its base OperationCanceledException) when a request times out
+                if (ex is OperationCanceledException)
                 {
                     return true;
                 }
