@@ -44,6 +44,62 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
+        [InlineData(WorkerRuntime.Dotnet)]
+        [InlineData(WorkerRuntime.DotnetIsolated)]
+        public async Task TemplateOperationAsync_InstallCallsAlwaysIncludeForceFlag(WorkerRuntime workerRuntime)
+        {
+            var calls = new List<string>();
+            var original = DotnetHelpers.RunDotnetNewFunc;
+            try
+            {
+                DotnetHelpers.RunDotnetNewFunc = args =>
+                {
+                    calls.Add(args);
+                    return Task.FromResult(0);
+                };
+
+                GlobalCoreToolsSettings.SetOffline(false);
+
+                await DotnetHelpers.TemplateOperationAsync(() => Task.CompletedTask, workerRuntime);
+
+                var installCalls = calls.Where(a => a.Contains("new install", StringComparison.OrdinalIgnoreCase)).ToList();
+                Assert.True(installCalls.Count >= 2, $"Expected at least 2 install calls, got {installCalls.Count}");
+                Assert.All(installCalls, call => Assert.Contains("--force", call, StringComparison.OrdinalIgnoreCase));
+            }
+            finally
+            {
+                DotnetHelpers.RunDotnetNewFunc = original;
+            }
+        }
+
+        [Theory]
+        [InlineData(WorkerRuntime.Dotnet)]
+        [InlineData(WorkerRuntime.DotnetIsolated)]
+        public async Task TemplateOperationAsync_UninstallCallsDoNotIncludeForceFlag(WorkerRuntime workerRuntime)
+        {
+            var calls = new List<string>();
+            var original = DotnetHelpers.RunDotnetNewFunc;
+            try
+            {
+                DotnetHelpers.RunDotnetNewFunc = args =>
+                {
+                    calls.Add(args);
+                    return Task.FromResult(0);
+                };
+
+                await DotnetHelpers.TemplateOperationAsync(() => Task.CompletedTask, workerRuntime);
+
+                var uninstallCalls = calls.Where(a => a.Contains("new uninstall", StringComparison.OrdinalIgnoreCase)).ToList();
+                Assert.True(uninstallCalls.Count >= 2, $"Expected at least 2 uninstall calls, got {uninstallCalls.Count}");
+                Assert.All(uninstallCalls, call => Assert.DoesNotContain("--force", call, StringComparison.OrdinalIgnoreCase));
+            }
+            finally
+            {
+                DotnetHelpers.RunDotnetNewFunc = original;
+            }
+        }
+
+        [Theory]
         [InlineData(WorkerRuntime.Dotnet, "")]
         [InlineData(WorkerRuntime.DotnetIsolated, "net-isolated")]
         public async Task TemplateOperationAsync_Isolated_InstallsAndUninstalls_InOrder(WorkerRuntime workerRuntime, string path)

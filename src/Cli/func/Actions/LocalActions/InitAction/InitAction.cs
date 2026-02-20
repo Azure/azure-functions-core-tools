@@ -607,6 +607,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (workerRuntime == Helpers.WorkerRuntime.Node && programmingModel == Common.ProgrammingModel.V4)
             {
+                if (GlobalCoreToolsSettings.IsOfflineMode)
+                {
+                    ColoredConsole.WriteLine(WarningColor("Skipping \"npm install\" because the CLI is running in offline mode. You must run \"npm install\" manually when network is available."));
+                    return;
+                }
+
                 try
                 {
                     await NpmHelper.Install();

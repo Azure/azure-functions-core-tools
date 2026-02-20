@@ -455,7 +455,13 @@ namespace Azure.Functions.Cli.Helpers
             foreach (var nupkg in list)
             {
                 TryGetCustomHiveArg(workerRuntime, out string customHive);
-                var args = $"new {action} \"{nupkg}\" {customHive}";
+
+                // Always pass --force to suppress the NuGet update check that
+                // 'dotnet new install' performs by default. Templates are always
+                // installed from bundled .nupkg files, so the check is unnecessary.
+                var forceArg = action == "install" ? " --force" : string.Empty;
+
+                var args = $"new {action} \"{nupkg}\"{forceArg} {customHive}";
                 await RunDotnetNewAsync(args);
             }
         }
