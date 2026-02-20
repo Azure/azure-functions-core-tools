@@ -49,34 +49,16 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
             result.Should().StartOutOfProcessHost();
         }
 
-        [Theory]
-        [InlineData("false", true)] // EnsureLatest=false: func start should download
-        [InlineData("true", false)] // EnsureLatest=true: host handles download, skip
-        public void FuncStart_WithEnsureLatestEnvVar_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+        [Fact]
+        public void Start_Powershell_OfflineWithCachedBundles_UsesCachedVersion()
         {
-            BaseOfflineBundleTests.TestEnsureLatestBehavior(
-                _fixture.FuncPath,
-                _fixture.WorkingDirectory,
-                "powershell",
-                _fixture.Log,
-                ensureLatestValue,
-                shouldDownload,
-                configSource: EnsureLatestConfigSource.EnvironmentVariable);
+            BaseOfflineBundleTests.RunOfflineWithCachedBundlesTest(_fixture, "powershell", nameof(Start_Powershell_OfflineWithCachedBundles_UsesCachedVersion));
         }
 
-        [Theory]
-        [InlineData("false", true)] // EnsureLatest=false in host.json: func start should download
-        [InlineData("true", false)] // EnsureLatest=true in host.json: host handles download, skip
-        public void FuncStart_WithEnsureLatestHostJson_ShowsExpectedBehavior(string ensureLatestValue, bool shouldDownload)
+        [Fact]
+        public void Start_Powershell_OfflineWithoutCachedBundles_FailsWithNoCacheError()
         {
-            BaseOfflineBundleTests.TestEnsureLatestBehavior(
-                _fixture.FuncPath,
-                _fixture.WorkingDirectory,
-                "powershell",
-                _fixture.Log,
-                ensureLatestValue,
-                shouldDownload,
-                configSource: EnsureLatestConfigSource.HostJson);
+            BaseOfflineBundleTests.RunOfflineWithoutCachedBundlesTest(_fixture, "powershell", nameof(Start_Powershell_OfflineWithoutCachedBundles_FailsWithNoCacheError));
         }
     }
 }

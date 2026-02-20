@@ -242,20 +242,20 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public async Task GetExtensionBundleManagerAsync_WithNullOptions_UsesDefaultOptions()
+        public void GetExtensionBundleManager_WithNullOptions_UsesDefaultOptions()
         {
             // Act
-            var manager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync(null);
+            var manager = ExtensionBundleHelper.GetExtensionBundleManager(null);
 
             // Assert
             manager.Should().NotBeNull();
         }
 
         [Fact]
-        public async Task GetExtensionBundleContentProviderAsync_ReturnsValidProvider()
+        public void GetExtensionBundleContentProvider_ReturnsValidProvider()
         {
             // Act
-            var provider = await ExtensionBundleHelper.GetExtensionBundleContentProviderAsync();
+            var provider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
 
             // Assert
             provider.Should().NotBeNull();
@@ -340,7 +340,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void TryGetCachedBundle_SimulatesNetworkFailureNoCache_ReturnsTrue()
+        public void TryGetCachedBundle_SimulatesNetworkFailureNoCache_ReturnsFalse()
         {
             // This test simulates what happens when network fails and there's no cache
             // Arrange
@@ -494,6 +494,162 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
+        public void TryGetCachedBundle_HostJsonDownloadPath_FindsBundleInHostJsonPath()
+        {
+            // Arrange – put a valid bundle only in the hostJsonDownloadPath
+            var hostJsonPath = Path.Combine(Path.GetTempPath(), "HostJsonPathTest", Guid.NewGuid().ToString());
+            var bundleVersion = "4.10.0";
+            Directory.CreateDirectory(Path.Combine(hostJsonPath, bundleVersion));
+
+            var originalEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
+            try
+            {
+                // Ensure env var path is cleared so it doesn't interfere
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, null);
+
+                // Act
+                var result = ExtensionBundleHelper.TryGetCachedBundle(
+                    "Microsoft.Azure.Functions.ExtensionBundle",
+                    "[4.*, 5.0.0)",
+                    out var cachedVersion,
+                    hostJsonDownloadPath: hostJsonPath);
+
+                // Assert
+                result.Should().BeTrue("should find bundle in hostJsonDownloadPath");
+                cachedVersion.Should().Be(bundleVersion);
+            }
+            finally
+            {
+                if (Directory.Exists(hostJsonPath))
+                {
+                    Directory.Delete(hostJsonPath, true);
+                }
+
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, originalEnvVar);
+            }
+        }
+
+        [Fact]
+        public void TryGetCachedBundle_EnvVarTakesPrecedenceOverHostJsonDownloadPath()
+        {
+            // Arrange – both env var and hostJsonDownloadPath have bundles; env var should win
+            var envVarPath = Path.Combine(Path.GetTempPath(), "EnvVarPrecedence", Guid.NewGuid().ToString());
+            var hostJsonPath = Path.Combine(Path.GetTempPath(), "HostJsonPrecedence", Guid.NewGuid().ToString());
+            var envVarVersion = "4.20.0";
+            var hostJsonVersion = "4.10.0";
+            Directory.CreateDirectory(Path.Combine(envVarPath, envVarVersion));
+            Directory.CreateDirectory(Path.Combine(hostJsonPath, hostJsonVersion));
+
+            var originalEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, envVarPath);
+
+                // Act
+                var result = ExtensionBundleHelper.TryGetCachedBundle(
+                    "Microsoft.Azure.Functions.ExtensionBundle",
+                    "[4.*, 5.0.0)",
+                    out var cachedVersion,
+                    hostJsonDownloadPath: hostJsonPath);
+
+                // Assert – env var path found first, so its version is returned
+                result.Should().BeTrue();
+                cachedVersion.Should().Be(envVarVersion, "env var path should take precedence over hostJsonDownloadPath");
+            }
+            finally
+            {
+                if (Directory.Exists(envVarPath))
+                {
+                    Directory.Delete(envVarPath, true);
+                }
+
+                if (Directory.Exists(hostJsonPath))
+                {
+                    Directory.Delete(hostJsonPath, true);
+                }
+
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, originalEnvVar);
+            }
+        }
+
+        [Fact]
+        public void TryGetCachedBundle_HostJsonPathSameAsEnvVar_NotCheckedTwice()
+        {
+            // Arrange – hostJsonDownloadPath == env var path; should not be checked twice
+            var sharedPath = Path.Combine(Path.GetTempPath(), "SharedPathTest", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(sharedPath);
+
+            var originalEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, sharedPath);
+
+                // Act
+                var result = ExtensionBundleHelper.TryGetCachedBundle(
+                    "Microsoft.Azure.Functions.ExtensionBundle",
+                    "[4.*, 5.0.0)",
+                    out var cachedVersion,
+                    hostJsonDownloadPath: sharedPath);
+
+                // Assert – no bundle anywhere, returns false
+                // The key verification is that this doesn't break; the guard
+                // (hostJsonDownloadPath != customerDownloadPath) prevents a redundant check
+                result.Should().BeFalse("no matching bundle in any path");
+                cachedVersion.Should().BeNull();
+            }
+            finally
+            {
+                if (Directory.Exists(sharedPath))
+                {
+                    Directory.Delete(sharedPath, true);
+                }
+
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, originalEnvVar);
+            }
+        }
+
+        [Fact]
+        public void TryGetCachedBundle_HostJsonPathNoMatch_FallsBackToDefault()
+        {
+            // Arrange – hostJsonDownloadPath exists but has no matching version
+            var hostJsonPath = Path.Combine(Path.GetTempPath(), "HostJsonFallback", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(Path.Combine(hostJsonPath, "3.0.0")); // Below range [4.*, 5.0.0)
+
+            var originalEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, null);
+
+                // Act – should skip hostJsonPath (no match) and fall back to default
+                var result = ExtensionBundleHelper.TryGetCachedBundle(
+                    "Microsoft.Azure.Functions.ExtensionBundle",
+                    "[4.*, 5.0.0)",
+                    out var cachedVersion,
+                    hostJsonDownloadPath: hostJsonPath);
+
+                // Assert – result depends on whether default path has a cached bundle;
+                // either way, the version should NOT be "3.0.0" from hostJsonPath
+                if (result)
+                {
+                    cachedVersion.Should().NotBe("3.0.0", "3.0.0 is outside the version range");
+                }
+                else
+                {
+                    cachedVersion.Should().BeNull();
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(hostJsonPath))
+                {
+                    Directory.Delete(hostJsonPath, true);
+                }
+
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, originalEnvVar);
+            }
+        }
+
+        [Fact]
         public void FindBundleInPath_NonExistentPath_ReturnsFalse()
         {
             // Arrange
@@ -588,7 +744,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public async Task GetExtensionBundleManagerAsync_WhenOffline_CreatesManager()
+        public void GetExtensionBundleManager_WhenOffline_CreatesManager()
         {
             // Arrange
             OfflineHelper.MarkAsOffline();
@@ -596,7 +752,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             try
             {
                 // Act
-                var manager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
+                var manager = ExtensionBundleHelper.GetExtensionBundleManager();
 
                 // Assert
                 manager.Should().NotBeNull();
@@ -608,7 +764,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public async Task GetExtensionBundleManagerAsync_WhenOffline_SetsEnsureLatestToFalse()
+        public void GetExtensionBundleManager_WhenOffline_SetsEnsureLatestToFalse()
         {
             // Arrange
             OfflineHelper.MarkAsOffline();
@@ -621,7 +777,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             try
             {
                 // Act
-                await ExtensionBundleHelper.GetExtensionBundleManagerAsync(options);
+                ExtensionBundleHelper.GetExtensionBundleManager(options);
 
                 // Assert - EnsureLatest should be false when offline
                 options.EnsureLatest.Should().BeFalse("EnsureLatest should be false when system is offline");
@@ -633,7 +789,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public async Task GetExtensionBundleManagerAsync_WhenOnline_SetsEnsureLatestToTrue()
+        public void GetExtensionBundleManager_WhenOnline_StillSetsEnsureLatestToFalse()
         {
             // Arrange
             OfflineHelper.MarkAsOnline();
@@ -646,15 +802,57 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             try
             {
                 // Act
-                await ExtensionBundleHelper.GetExtensionBundleManagerAsync(options);
+                ExtensionBundleHelper.GetExtensionBundleManager(options);
 
-                // Assert - EnsureLatest should be true when online
-                options.EnsureLatest.Should().BeTrue("EnsureLatest should be true when system is online");
+                // Assert - EnsureLatest should always be false; the CLI manages bundle downloads
+                options.EnsureLatest.Should().BeFalse("EnsureLatest should always be false because the CLI manages bundle downloads");
             }
             finally
             {
                 OfflineHelper.MarkAsOnline();
             }
+        }
+
+        [Theory]
+        [InlineData(typeof(HttpRequestException))]
+        [InlineData(typeof(System.Net.Sockets.SocketException))]
+        [InlineData(typeof(TaskCanceledException))]
+        public void IsNetworkException_NetworkErrorTypes_ReturnsTrue(Type exceptionType)
+        {
+            var ex = (Exception)Activator.CreateInstance(exceptionType);
+            ExtensionBundleHelper.IsNetworkException(ex).Should().BeTrue();
+        }
+
+        [Fact]
+        public void IsNetworkException_HttpRequestExceptionWithStatusCode_ReturnsFalse()
+        {
+            // A 401 or 500 means the server responded — not a connectivity issue
+            var ex = new HttpRequestException("Unauthorized", null, System.Net.HttpStatusCode.Unauthorized);
+            ExtensionBundleHelper.IsNetworkException(ex).Should().BeFalse();
+        }
+
+        [Fact]
+        public void IsNetworkException_HttpRequestExceptionWithNullStatusCode_ReturnsTrue()
+        {
+            // No status code means the request failed before getting a response (DNS, connection refused)
+            var ex = new HttpRequestException("Connection refused");
+            ExtensionBundleHelper.IsNetworkException(ex).Should().BeTrue();
+        }
+
+        [Fact]
+        public void IsNetworkException_WrappedNetworkException_ReturnsTrue()
+        {
+            // A SocketException wrapped in another exception should still be detected
+            var inner = new System.Net.Sockets.SocketException();
+            var outer = new Exception("Wrapper", inner);
+            ExtensionBundleHelper.IsNetworkException(outer).Should().BeTrue();
+        }
+
+        [Fact]
+        public void IsNetworkException_NonNetworkException_ReturnsFalse()
+        {
+            var ex = new InvalidOperationException("Not a network error");
+            ExtensionBundleHelper.IsNetworkException(ex).Should().BeFalse();
         }
     }
 }

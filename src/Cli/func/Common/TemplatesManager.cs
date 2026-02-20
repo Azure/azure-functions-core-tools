@@ -51,7 +51,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task<string> GetExtensionBundleFileContent(string path)
         {
-            var extensionBundleManager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             var bundlePath = await extensionBundleManager.GetExtensionBundlePath();
             string contentFilePath = Path.Combine(bundlePath, path);
 
@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.Common
 
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
-            var extensionBundleManager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             string templatesJson;
 
             if (extensionBundleManager.IsExtensionBundleConfigured())
@@ -75,7 +75,7 @@ namespace Azure.Functions.Cli.Common
                 templatesJson = await FileLockHelper.WithFileLockAsync(BundleTemplatesLockFileName, async () =>
                 {
                     await ExtensionBundleHelper.GetExtensionBundle();
-                    var contentProvider = await ExtensionBundleHelper.GetExtensionBundleContentProviderAsync();
+                    var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                     return await contentProvider.GetTemplates();
                 });
             }
@@ -290,7 +290,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task<IEnumerable<NewTemplate>> GetV2Templates()
         {
-            var extensionBundleManager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             string templateJson;
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
@@ -311,7 +311,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task<IEnumerable<UserPrompt>> GetV2UserPrompts()
         {
-            var extensionBundleManager = await ExtensionBundleHelper.GetExtensionBundleManagerAsync();
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
 
             string userPromptJson;
             if (extensionBundleManager.IsExtensionBundleConfigured())

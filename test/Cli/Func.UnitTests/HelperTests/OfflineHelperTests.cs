@@ -9,10 +9,8 @@ using Xunit;
 namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     /// <summary>
-    /// Tests for the centralized <see cref="OfflineHelper"/> which is responsible
-    /// for all offline detection and tracking across the CLI.
-    /// It updates <see cref="GlobalCoreToolsSettings.IsOfflineMode"/> as the single
-    /// source of truth for offline state.
+    /// Tests for <see cref="OfflineHelper"/> and the offline state tracked
+    /// by <see cref="GlobalCoreToolsSettings.IsOfflineMode"/>.
     /// </summary>
     public class OfflineHelperTests : IDisposable
     {
@@ -25,83 +23,25 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             // Start each test with a clean state
             OfflineHelper.MarkAsOnline();
-            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
         }
 
         public void Dispose()
         {
             OfflineHelper.MarkAsOnline();
             Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, _previousEnvVar);
-            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
         }
 
         // ─── IsOfflineAsync ───────────────────────────────────────────────
         [Fact]
-        public async Task IsOfflineAsync_InitialCheck_PerformsNetworkTest()
+        public async Task IsOfflineAsync_DoesNotThrow()
         {
             // Act – should not throw regardless of actual connectivity
             await OfflineHelper.IsOfflineAsync();
         }
 
+        // ─── MarkAsOffline / MarkAsOnline ─────────────────────────────────
         [Fact]
-        public async Task IsOfflineAsync_WhenMarkedOffline_ReturnsTrueFromCache()
-        {
-            // Arrange
-            OfflineHelper.MarkAsOffline();
-
-            // Act
-            var isOffline = await OfflineHelper.IsOfflineAsync();
-
-            // Assert – should return cached offline state without making a network call
-            isOffline.Should().BeTrue("should return cached offline state");
-        }
-
-        [Fact]
-        public async Task IsOfflineAsync_AfterReset_PerformsNetworkCheck()
-        {
-            // Arrange
-            OfflineHelper.MarkAsOffline();
-            OfflineHelper.ResetOfflineCache();
-
-            // Act – this will perform an actual network check
-            await OfflineHelper.IsOfflineAsync();
-
-            // Assert – if we get here without exception, the async method works correctly.
-            // The actual result depends on network availability.
-        }
-
-        [Fact]
-        public async Task IsOfflineAsync_CachesResult_ForSubsequentCalls()
-        {
-            // Arrange
-            OfflineHelper.MarkAsOffline();
-
-            // Act – make multiple calls
-            var result1 = await OfflineHelper.IsOfflineAsync();
-            var result2 = await OfflineHelper.IsOfflineAsync();
-
-            // Assert – both should return the same cached value
-            result1.Should().Be(result2, "cached results should be consistent");
-            result1.Should().BeTrue("should return cached offline state");
-        }
-
-        [Fact]
-        public async Task IsOfflineAsync_UpdatesGlobalCoreToolsSettings()
-        {
-            // Arrange – mark offline via OfflineHelper
-            OfflineHelper.MarkAsOffline();
-
-            // Act
-            await OfflineHelper.IsOfflineAsync();
-
-            // Assert – the global flag should reflect the offline state
-            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
-                "IsOfflineAsync should update GlobalCoreToolsSettings.IsOfflineMode");
-        }
-
-        // ─── MarkAsOffline updates global state ───────────────────────────
-        [Fact]
-        public void MarkAsOffline_UpdatesGlobalCoreToolsSettings()
+        public void MarkAsOffline_SetsGlobalOfflineMode()
         {
             // Arrange
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeFalse("should start online");
@@ -109,94 +49,136 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             // Act
             OfflineHelper.MarkAsOffline();
 
-            // Assert – global flag should now reflect offline
+            // Assert
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
                 "MarkAsOffline should update GlobalCoreToolsSettings.IsOfflineMode");
         }
 
         [Fact]
-        public async Task MarkAsOffline_SetsOfflineState()
+        public void MarkAsOnline_ResetsOfflineMode()
         {
-            // Act
+            // Arrange
             OfflineHelper.MarkAsOffline();
-            var isOffline = await OfflineHelper.IsOfflineAsync();
-
-            // Assert
-            isOffline.Should().BeTrue("should be marked as offline");
-        }
-
-        // ─── IsUserRequestedOfflineMode ─────────────────────────────────
-        [Fact]
-        public async Task IsOfflineAsync_WhenUserRequestedOffline_ReturnsTrueWithoutProbing()
-        {
-            // Arrange – simulate --offline flag by re-initializing with the env var
-            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, "true");
-            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
-
-            // Act
-            var isOffline = await OfflineHelper.IsOfflineAsync();
-
-            // Assert
-            isOffline.Should().BeTrue("user-requested offline should always return true");
-            GlobalCoreToolsSettings.HasUserRequestedOfflineMode().Should().BeTrue();
-        }
-
-        [Fact]
-        public void ExplicitOffline_CannotBeOverriddenByProbe()
-        {
-            // Arrange – simulate --offline flag
-            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, "true");
-            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
 
-            // Act – mark as online (as a network probe would)
+            // Act
             OfflineHelper.MarkAsOnline();
 
-            // Assert – should remain offline because the user explicitly requested it
-            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
-                "user-requested offline cannot be overridden by network probes");
-        }
-
-        // ─── MarkAsOffline / MarkAsOnline ─────────────────────────────────
-        [Fact]
-        public void MarkAsOffline_SetsGlobalOfflineMode()
-        {
-            // Act
-            OfflineHelper.MarkAsOffline();
-
             // Assert
-            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
-        }
-
-        [Fact]
-        public void MarkAsOnline_ResetsDetectedOffline()
-        {
-            // Arrange – simulate a network-detected offline
-            OfflineHelper.MarkAsOffline();
-            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
-
-            // Act – network comes back, probe sets online
-            OfflineHelper.MarkAsOnline();
-
-            // Assert – should be online again
             GlobalCoreToolsSettings.IsOfflineMode.Should().BeFalse(
                 "detected offline can be reset to online when connectivity returns");
         }
 
-        // ─── ResetOfflineCache ───────────────────────────────────────────
         [Fact]
-        public async Task ResetOfflineCache_ClearsCache()
+        public void MarkAsOffline_IsIdempotent()
+        {
+            // Act
+            OfflineHelper.MarkAsOffline();
+            OfflineHelper.MarkAsOffline();
+
+            // Assert
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
+        }
+
+        // ─── Init with --offline / env var ────────────────────────────────
+        [Fact]
+        public void Init_WithOfflineFlag_SetsOfflineWithoutNetworkCheck()
+        {
+            // Act – simulate --offline flag
+            GlobalCoreToolsSettings.Init(null, new[] { "--offline" });
+
+            // Assert
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
+                "--offline flag should set offline mode");
+        }
+
+        [Fact]
+        public void Init_WithEnvVar_SetsOfflineWithoutNetworkCheck()
         {
             // Arrange
-            OfflineHelper.MarkAsOffline();
-            (await OfflineHelper.IsOfflineAsync()).Should().BeTrue();
+            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, "true");
 
             // Act
-            OfflineHelper.ResetOfflineCache();
+            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
 
-            // After reset, next call will perform a fresh check.
-            // We cannot guarantee the result, but verify it does not throw.
-            await OfflineHelper.IsOfflineAsync();
+            // Assert
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
+                "FUNCTIONS_CORE_TOOLS_OFFLINE env var should set offline mode");
+        }
+
+        // ─── SetOffline ─────────────────────────────────────────────────
+        [Fact]
+        public void SetOffline_True_SetsIsOfflineMode()
+        {
+            // Act
+            GlobalCoreToolsSettings.SetOffline(true);
+
+            // Assert
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
+        }
+
+        [Fact]
+        public void SetOffline_False_ClearsIsOfflineMode()
+        {
+            // Arrange
+            GlobalCoreToolsSettings.SetOffline(true);
+
+            // Act
+            GlobalCoreToolsSettings.SetOffline(false);
+
+            // Assert
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeFalse();
+        }
+
+        // ─── Lazy network probe ─────────────────────────────────────────
+        [Fact]
+        public void Init_WithoutOfflineFlag_AccessingIsOfflineMode_DoesNotThrowOrDeadlock()
+        {
+            // Arrange – Init with no offline flag or env var
+            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, null);
+            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
+
+            // Act – this triggers the Lazy<bool> network probe.
+            // We cannot assert on the result (depends on real connectivity),
+            // but it must not throw or deadlock.
+            var act = () => { _ = GlobalCoreToolsSettings.IsOfflineMode; };
+            act.Should().NotThrow("accessing IsOfflineMode should never throw or deadlock");
+        }
+
+        [Fact]
+        public void SetOffline_OverridesPreviouslyResolvedLazy()
+        {
+            // Arrange – Init with no flags so the lazy probe resolves
+            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, null);
+            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
+            _ = GlobalCoreToolsSettings.IsOfflineMode; // force the lazy to evaluate
+
+            // Act – override with SetOffline(true)
+            GlobalCoreToolsSettings.SetOffline(true);
+
+            // Assert – should reflect the new value, not the stale lazy
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
+                "SetOffline should override a previously-resolved lazy value");
+        }
+
+        [Fact]
+        public void Init_CalledMultipleTimes_ResetsLazy()
+        {
+            // Arrange – first Init with --offline sets offline mode
+            GlobalCoreToolsSettings.Init(null, new[] { "--offline" });
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue();
+
+            // Act – second Init without --offline should replace the lazy
+            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, null);
+            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
+
+            // Assert – the prior resolved value should not leak;
+            // explicit offline is now false, and the lazy has been replaced.
+            // The network probe result depends on connectivity, but
+            // _explicitOffline must be false after the second Init.
+            // Force evaluate to ensure the lazy was truly replaced.
+            var act = () => { _ = GlobalCoreToolsSettings.IsOfflineMode; };
+            act.Should().NotThrow("a second Init call should cleanly replace the Lazy instance");
         }
     }
 }

@@ -460,17 +460,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            // Determine if we should download extension bundles
-            // Priority: 1) Environment variable, 2) host.json, 3) Default (download enabled)
-            var (shouldDownloadBundles, source) = ShouldDownloadExtensionBundles();
-
-            if (shouldDownloadBundles)
+            if (RequiresExtensionBundles(GlobalCoreToolsSettings.CurrentWorkerRuntime))
             {
                 await ExtensionBundleHelper.GetExtensionBundle();
-            }
-            else if (isVerbose)
-            {
-                ColoredConsole.WriteLine(VerboseColor($"Skipping extension bundle download: {source}."));
             }
 
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
@@ -565,6 +557,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // If the host runtime parameter is not set and the app is not in-proc, we should default to out-of-process host
             PrintVerboseForHostSelection("out-of-process");
             return false;
+        }
+
+        /// <summary>
+        /// Determines whether extension bundles are required for the given worker runtime.
+        /// Extension bundles are not needed for dotnet and dotnet-isolated runtimes.
+        /// </summary>
+        internal static bool RequiresExtensionBundles(WorkerRuntime workerRuntime)
+        {
+            return !WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime);
         }
 
         internal async Task ValidateHostRuntimeAsync(
@@ -903,38 +904,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private void PrintMigrationWarningForDotnet6Inproc()
         {
             ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
-        }
-
-        /// <summary>
-        /// Determines whether extension bundles should be downloaded.
-        /// Priority: 1) Environment variable, 2) host.json, 3) Default (download enabled).
-        /// </summary>
-        /// <returns>A tuple indicating whether to download bundles and the source of the setting.</returns>
-        internal (bool ShouldDownload, string Source) ShouldDownloadExtensionBundles()
-        {
-            const string hostJsonConfigKey = "AzureFunctionsJobHost:extensionBundle:ensureLatest";
-
-            // 1. Check environment variable first (highest priority)
-            var ensureLatestEnvVar = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            if (bool.TryParse(ensureLatestEnvVar, out var ensureLatestFromEnv))
-            {
-                // ensureLatest=true: the host will download the latest bundle on startup,
-                // so func start doesn't need to pre-download.
-                return (!ensureLatestFromEnv, "environment variable");
-            }
-
-            // 2. Check host.json configuration (secondary option)
-            if (_hostJsonConfig != null)
-            {
-                var ensureLatestFromHostJson = _hostJsonConfig[hostJsonConfigKey];
-                if (bool.TryParse(ensureLatestFromHostJson, out var ensureLatestFromConfig))
-                {
-                    return (!ensureLatestFromConfig, "host.json");
-                }
-            }
-
-            // 3. Default behavior: download bundles (shouldDownload = true)
-            return (true, string.Empty);
         }
 
         /// <summary>

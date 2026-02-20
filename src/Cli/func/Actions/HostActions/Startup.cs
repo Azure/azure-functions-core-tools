@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
-using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -132,8 +131,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(WarningColor($"Extension bundle downloadPath is configured in both host.json and environment variable. Using environment variable value: {existingDownloadPath}"));
                 }
 
-                // Check offline status from the global setting
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, GlobalCoreToolsSettings.IsOfflineMode ? "false" : "true");
+                // Only set ensureLatest if not already set via environment variable.
+                // Default to "false" so the host does not download bundles on its own;
+                // the CLI manages bundle downloads.
+                var existingEnsureLatest = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
+                if (string.IsNullOrEmpty(existingEnsureLatest))
+                {
+                    Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, "false");
+                }
             }
         }
 

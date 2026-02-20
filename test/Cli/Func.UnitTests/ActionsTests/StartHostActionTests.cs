@@ -315,6 +315,21 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             Assert.False(expectException, "Expected validation failure.");
         }
 
+        [Theory]
+        [InlineData(WorkerRuntime.Dotnet, false)]
+        [InlineData(WorkerRuntime.DotnetIsolated, false)]
+        [InlineData(WorkerRuntime.Node, true)]
+        [InlineData(WorkerRuntime.Python, true)]
+        [InlineData(WorkerRuntime.Java, true)]
+        [InlineData(WorkerRuntime.Powershell, true)]
+        [InlineData(WorkerRuntime.Custom, true)]
+        [InlineData(WorkerRuntime.None, true)]
+        public void RequiresExtensionBundles_ReturnsExpectedResult(WorkerRuntime runtime, bool expected)
+        {
+            var result = StartHostAction.RequiresExtensionBundles(runtime);
+            result.Should().Be(expected);
+        }
+
         [Fact]
         public async Task GetConfigurationSettings_OverwritesAzFuncEnvironment_WhenAlreadyInSecrets()
         {
@@ -494,249 +509,6 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             {
                 // Cleanup
                 Environment.SetEnvironmentVariable(pythonEnvVar, originalValue);
-            }
-        }
-
-        [Theory]
-        [InlineData("true", false, "environment variable")] // ensureLatest=true: host handles download
-        [InlineData("false", true, "environment variable")] // ensureLatest=false: func start should download
-        [InlineData("True", false, "environment variable")] // Case insensitive
-        [InlineData("False", true, "environment variable")] // Case insensitive
-        public void ShouldDownloadExtensionBundles_EnvironmentVariableTakesPrecedence(
-            string envVarValue, bool expectedShouldDownload, string expectedSource)
-        {
-            // Arrange
-            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            try
-            {
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, envVarValue);
-
-                var mockSecretsManager = new Mock<ISecretsManager>();
-                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
-
-                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
-
-                // Act
-                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
-
-                // Assert
-                Assert.Equal(expectedShouldDownload, shouldDownload);
-                Assert.Equal(expectedSource, source);
-            }
-            finally
-            {
-                // Cleanup
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
-            }
-        }
-
-        [Fact]
-        public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenNothingSet()
-        {
-            // Arrange
-            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            try
-            {
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
-
-                var mockSecretsManager = new Mock<ISecretsManager>();
-                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
-
-                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
-
-                // Act
-                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
-
-                // Assert
-                Assert.True(shouldDownload);
-                Assert.Equal(string.Empty, source);
-            }
-            finally
-            {
-                // Cleanup
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
-            }
-        }
-
-        [Fact]
-        public void ShouldDownloadExtensionBundles_IgnoresInvalidEnvironmentVariableValue()
-        {
-            // Arrange
-            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            try
-            {
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, "invalid");
-
-                var mockSecretsManager = new Mock<ISecretsManager>();
-                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
-
-                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
-
-                // Act
-                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
-
-                // Assert - should fall back to default (true) when env var is not a valid boolean
-                Assert.True(shouldDownload);
-                Assert.Equal(string.Empty, source);
-            }
-            finally
-            {
-                // Cleanup
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
-            }
-        }
-
-        [Theory]
-        [InlineData("true", false, "host.json")] // ensureLatest=true: host handles download
-        [InlineData("false", true, "host.json")] // ensureLatest=false: func start should download
-        [InlineData("True", false, "host.json")] // Case insensitive
-        [InlineData("False", true, "host.json")] // Case insensitive
-        public void ShouldDownloadExtensionBundles_FallsBackToHostJson_WhenEnvVarNotSet(
-            string hostJsonValue, bool expectedShouldDownload, string expectedSource)
-        {
-            // Arrange
-            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            try
-            {
-                // Clear the environment variable to test host.json fallback
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
-
-                var mockSecretsManager = new Mock<ISecretsManager>();
-                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
-
-                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
-
-                // Set up the host.json configuration using reflection
-                var hostJsonConfig = new ConfigurationBuilder()
-                    .AddInMemoryCollection(new Dictionary<string, string>
-                    {
-                        { "AzureFunctionsJobHost:extensionBundle:ensureLatest", hostJsonValue }
-                    })
-                    .Build();
-
-                var hostJsonConfigField = typeof(StartHostAction).GetField("_hostJsonConfig", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                hostJsonConfigField.SetValue(action, hostJsonConfig);
-
-                // Act
-                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
-
-                // Assert
-                Assert.Equal(expectedShouldDownload, shouldDownload);
-                Assert.Equal(expectedSource, source);
-            }
-            finally
-            {
-                // Cleanup
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
-            }
-        }
-
-        [Fact]
-        public void ShouldDownloadExtensionBundles_EnvironmentVariableTakesPrecedenceOverHostJson()
-        {
-            // Arrange
-            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            try
-            {
-                // Set env var to false (should still download)
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, "false");
-
-                var mockSecretsManager = new Mock<ISecretsManager>();
-                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
-
-                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
-
-                // Set up host.json with true (would skip download if env var wasn't set)
-                var hostJsonConfig = new ConfigurationBuilder()
-                    .AddInMemoryCollection(new Dictionary<string, string>
-                    {
-                        { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "true" }
-                    })
-                    .Build();
-
-                var hostJsonConfigField = typeof(StartHostAction).GetField("_hostJsonConfig", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                hostJsonConfigField.SetValue(action, hostJsonConfig);
-
-                // Act
-                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
-
-                // Assert - environment variable (false) means func start should download
-                Assert.True(shouldDownload);
-                Assert.Equal("environment variable", source);
-            }
-            finally
-            {
-                // Cleanup
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
-            }
-        }
-
-        [Fact]
-        public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenHostJsonHasInvalidValue()
-        {
-            // Arrange
-            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            try
-            {
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
-
-                var mockSecretsManager = new Mock<ISecretsManager>();
-                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
-
-                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
-
-                // Set up host.json with invalid value
-                var hostJsonConfig = new ConfigurationBuilder()
-                    .AddInMemoryCollection(new Dictionary<string, string>
-                    {
-                        { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "invalid" }
-                    })
-                    .Build();
-
-                var hostJsonConfigField = typeof(StartHostAction).GetField("_hostJsonConfig", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                hostJsonConfigField.SetValue(action, hostJsonConfig);
-
-                // Act
-                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
-
-                // Assert - should fall back to default when host.json value is invalid
-                Assert.True(shouldDownload);
-                Assert.Equal(string.Empty, source);
-            }
-            finally
-            {
-                // Cleanup
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
-            }
-        }
-
-        [Fact]
-        public void ShouldDownloadExtensionBundles_DefaultsToTrueWhenHostJsonConfigIsNull()
-        {
-            // Arrange
-            var originalValue = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
-            try
-            {
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, null);
-
-                var mockSecretsManager = new Mock<ISecretsManager>();
-                mockSecretsManager.Setup(s => s.GetSecrets(false)).Returns(new Dictionary<string, string>());
-
-                var action = new StartHostAction(mockSecretsManager.Object, Mock.Of<IProcessManager>());
-
-                // Don't set _hostJsonConfig (leave it null)
-
-                // Act
-                var (shouldDownload, source) = action.ShouldDownloadExtensionBundles();
-
-                // Assert
-                Assert.True(shouldDownload);
-                Assert.Equal(string.Empty, source);
-            }
-            finally
-            {
-                // Cleanup
-                Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, originalValue);
             }
         }
     }

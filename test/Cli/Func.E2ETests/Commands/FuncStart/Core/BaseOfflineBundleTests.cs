@@ -1,128 +1,113 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.E2ETests.Fixtures;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
+using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Newtonsoft.Json.Linq;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
 {
     /// <summary>
-    /// Specifies the source for the ensureLatest configuration.
+    /// Reusable test logic for offline extension bundle scenarios.
+    /// Designed to be called from fixture-based test classes.
     /// </summary>
-    public enum EnsureLatestConfigSource
+    public static class BaseOfflineBundleTests
     {
-        /// <summary>
-        /// Set ensureLatest via environment variable.
-        /// </summary>
-        EnvironmentVariable,
+        private const string DefaultBundleId = "Microsoft.Azure.Functions.ExtensionBundle";
 
         /// <summary>
-        /// Set ensureLatest via host.json extensionBundle configuration.
+        /// Runs func start with --offline when extension bundles have already been cached
+        /// (from the fixture's initialization). The host should start successfully
+        /// and emit a warning indicating it is using the cached version.
         /// </summary>
-        HostJson
-    }
-
-    /// <summary>
-    /// E2E tests for offline scenarios where extension bundles must be loaded from cache.
-    /// </summary>
-    public class BaseOfflineBundleTests(ITestOutputHelper log) : BaseE2ETests(log)
-    {
-        /// <summary>
-        /// Common test for EnsureLatest behavior across different worker runtimes.
-        /// This can be called from fixture-based tests (NodeV4, NodeV3, PowerShell, etc.)
-        /// </summary>
-        /// <param name="funcPath">Path to func executable.</param>
-        /// <param name="workingDirectory">Working directory for the test.</param>
-        /// <param name="workerRuntime">Worker runtime (node, powershell, etc.)</param>
-        /// <param name="log">Test output logger.</param>
-        /// <param name="ensureLatestValue">Value to set for EnsureLatest (true/false).</param>
-        /// <param name="shouldDownload">Expected behavior: true if download should occur.</param>
-        /// <param name="version">Optional version suffix for test name.</param>
-        /// <param name="configSource">Where to set the ensureLatest value (environment variable or host.json).</param>
-        public static void TestEnsureLatestBehavior(
-            string funcPath,
-            string workingDirectory,
-            string workerRuntime,
-            ITestOutputHelper log,
-            string ensureLatestValue,
-            bool shouldDownload,
-            string version = "",
-            EnsureLatestConfigSource configSource = EnsureLatestConfigSource.EnvironmentVariable)
+        public static void RunOfflineWithCachedBundlesTest(BaseFunctionAppFixture fixture, string language, string testName)
         {
-            var sourceLabel = configSource == EnsureLatestConfigSource.HostJson ? "HostJson" : "EnvVar";
-            var testName = $"EnsureLatest_{ensureLatestValue}_{sourceLabel}_{workerRuntime}{(string.IsNullOrEmpty(version) ? string.Empty : $"_{version}")}";
-            int port = TestFramework.Helpers.ProcessHelper.GetAvailablePort();
+            int port = ProcessHelper.GetAvailablePort();
 
-            log.WriteLine($"Testing EnsureLatest={ensureLatestValue} via {configSource}, expecting shouldDownload={shouldDownload}");
+            var funcStartCommand = new FuncStartCommand(fixture.FuncPath, testName, fixture.Log);
 
-            string? originalHostJson = null;
-            var hostJsonPath = Path.Combine(workingDirectory, Common.Constants.HostJsonFileName);
+            funcStartCommand.ProcessStartedHandler = async (process) =>
+            {
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
+            };
+
+            var result = funcStartCommand
+                .WithWorkingDirectory(fixture.WorkingDirectory)
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
+                .Execute(["--offline", "--verbose", "--port", port.ToString()]);
+
+            result.Should().HaveStdOutContaining("Using cached version");
+        }
+
+        /// <summary>
+        /// Runs func start with --offline after temporarily moving the cached extension bundles.
+        /// The host should fail to start and emit an error indicating that no cached
+        /// version is available and bundles must be pre-cached for offline use.
+        /// The cached bundles are restored after the test completes to avoid long re-download times.
+        /// </summary>
+        public static void RunOfflineWithoutCachedBundlesTest(BaseFunctionAppFixture fixture, string language, string testName)
+        {
+            int port = ProcessHelper.GetAvailablePort();
+
+            // Temporarily move the cached bundles so they appear absent during the test
+            var defaultBundlePath = ExtensionBundleHelper.GetBundleDownloadPath(DefaultBundleId);
+            var backupPath = defaultBundlePath + "_backup";
+            bool movedCache = false;
+
+            if (Directory.Exists(defaultBundlePath))
+            {
+                try
+                {
+                    Directory.Move(defaultBundlePath, backupPath);
+                    movedCache = true;
+                }
+                catch
+                {
+                    // Best effort; test will still validate behavior
+                }
+            }
 
             try
             {
-                // If configuring via host.json, modify the file
-                if (configSource == EnsureLatestConfigSource.HostJson)
-                {
-                    originalHostJson = File.ReadAllText(hostJsonPath);
-                    var hostJson = JObject.Parse(originalHostJson);
-
-                    // Ensure extensionBundle section exists and set ensureLatest
-                    if (hostJson["extensionBundle"] == null)
-                    {
-                        hostJson["extensionBundle"] = new JObject();
-                    }
-
-                    hostJson["extensionBundle"]!["ensureLatest"] = bool.Parse(ensureLatestValue);
-                    File.WriteAllText(hostJsonPath, hostJson.ToString());
-
-                    log.WriteLine($"Modified host.json to set extensionBundle.ensureLatest={ensureLatestValue}");
-                }
-
-                var funcStartCommand = new FuncStartCommand(funcPath, testName, log);
+                // Start with --offline; bundles should NOT be available
+                var funcStartCommand = new FuncStartCommand(fixture.FuncPath, testName, fixture.Log);
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
-                    // Wait for startup messages to be logged
-                    await Task.Delay(5000);
+                    // Give it a bit of time to fail, then kill the process
+                    await Task.Delay(10000);
                     process.Kill(true);
                 };
 
-                var command = funcStartCommand
-                    .WithWorkingDirectory(workingDirectory)
-                    .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, workerRuntime);
+                var result = funcStartCommand
+                    .WithWorkingDirectory(fixture.WorkingDirectory)
+                    .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
+                    .Execute(["--offline", "--verbose", "--port", port.ToString()]);
 
-                // Only set environment variable if that's the config source
-                if (configSource == EnsureLatestConfigSource.EnvironmentVariable)
-                {
-                    command = command.WithEnvironmentVariable(Common.Constants.ExtensionBundleEnsureLatest, ensureLatestValue);
-                }
-
-                var result = command.Execute(["--port", port.ToString(), "--verbose"]);
-
-                var output = result.StdOut + result.StdErr;
-
-                // Assert: Check for expected bundle download behavior
-                if (shouldDownload)
-                {
-                    // When EnsureLatest=false or not set, func start should download
-                    output.Should().Contain("Downloading extension bundles...");
-                }
-                else
-                {
-                    // When EnsureLatest=true, host handles download so func start skips it
-                    output.Should().NotContain("Downloading extension bundles...");
-                }
+                result.Should().HaveStdErrContaining("no cached version available");
             }
             finally
             {
-                // Restore original host.json if we modified it
-                if (originalHostJson != null && File.Exists(hostJsonPath))
+                // Restore the cached bundles so subsequent tests don't need to re-download
+                if (movedCache && Directory.Exists(backupPath))
                 {
-                    File.WriteAllText(hostJsonPath, originalHostJson);
-                    log.WriteLine("Restored original host.json");
+                    try
+                    {
+                        if (Directory.Exists(defaultBundlePath))
+                        {
+                            Directory.Delete(defaultBundlePath, recursive: true);
+                        }
+
+                        Directory.Move(backupPath, defaultBundlePath);
+                    }
+                    catch
+                    {
+                        // Best effort restore
+                    }
                 }
             }
         }

@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Helpers;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Configuration;
 
@@ -25,7 +24,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
                     { Constants.ExtensionBundleDownloadPath.Replace("__", ":"), ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
-                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), (!GlobalCoreToolsSettings.IsOfflineMode).ToString() }
+                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), "false" }
                 });
             }
         }
