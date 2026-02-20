@@ -118,15 +118,7 @@ namespace Azure.Functions.Cli.Helpers
                     var connectionString = $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\"";
                     TryGetCustomHiveArg(workerRuntime, out string customHive);
                     var exe = new Executable("dotnet", $"new func {frameworkString} {languageString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{customHive}");
-                    var exitCode = await exe.RunAsync(o => { }, e =>
-                    {
-                        if (IsNuGetUpdateCheckWarning(e))
-                        {
-                            return;
-                        }
-
-                        ColoredConsole.Error.WriteLine(ErrorColor(e));
-                    });
+                    var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
                         throw new CliException("Error creating project template");
@@ -165,11 +157,6 @@ namespace Azure.Functions.Cli.Helpers
                     string dotnetNewErrorMessage = string.Empty;
                     var exitCode = await exe.RunAsync(o => { }, e =>
                     {
-                        if (IsNuGetUpdateCheckWarning(e))
-                        {
-                            return;
-                        }
-
                         dotnetNewErrorMessage = string.Concat(dotnetNewErrorMessage, Environment.NewLine, e);
                     });
 
@@ -469,23 +456,14 @@ namespace Azure.Functions.Cli.Helpers
             {
                 TryGetCustomHiveArg(workerRuntime, out string customHive);
 
-                // When installing templates offline, pass --force to suppress the NuGet update check
-                // that would otherwise produce a confusing "Failed to check update" warning.
-                var forceArg = action == "install" && GlobalCoreToolsSettings.IsOfflineMode ? " --force" : string.Empty;
+                // Always pass --force to suppress the NuGet update check that
+                // 'dotnet new install' performs by default. Templates are always
+                // installed from bundled .nupkg files, so the check is unnecessary.
+                var forceArg = action == "install" ? " --force" : string.Empty;
 
                 var args = $"new {action} \"{nupkg}\"{forceArg} {customHive}";
                 await RunDotnetNewAsync(args);
             }
         }
-
-        /// <summary>
-        /// Returns true when the stderr line is a benign NuGet update-check warning
-        /// that should be suppressed in offline mode (e.g.
-        /// "Failed to check update for …: no NuGet feeds are configured or they are invalid.").
-        /// </summary>
-        internal static bool IsNuGetUpdateCheckWarning(string stderrLine)
-            => GlobalCoreToolsSettings.IsOfflineMode
-               && !string.IsNullOrEmpty(stderrLine)
-               && stderrLine.Contains("Failed to check update", StringComparison.OrdinalIgnoreCase);
     }
 }
