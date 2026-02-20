@@ -1,9 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core;
 using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
@@ -236,6 +237,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
 
             // Ensure process didn't have to be killed manually
             processWasKilledManually.Should().BeFalse();
+        }
+
+        [Fact]
+        public void Start_NodeV4_OfflineWithCachedBundles_UsesCachedVersion()
+        {
+            BaseOfflineBundleTests.RunOfflineWithCachedBundlesTest(_fixture, "node", nameof(Start_NodeV4_OfflineWithCachedBundles_UsesCachedVersion));
+        }
+
+        [Fact]
+        public void Start_NodeV4_OfflineWithoutCachedBundles_FailsWithNoCacheError()
+        {
+            BaseOfflineBundleTests.RunOfflineWithoutCachedBundlesTest(_fixture, "node", nameof(Start_NodeV4_OfflineWithoutCachedBundles_FailsWithNoCacheError));
         }
     }
 }

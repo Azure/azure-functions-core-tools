@@ -254,6 +254,7 @@ namespace Azure.Functions.Cli.Actions
             {
                 ("--script-root <PATH>", "Set the root directory of the function app. Changes the working directory to the specified path. Defaults to the current directory."),
                 ("--verbose", "Enable verbose output for detailed logging (not supported by all commands)."),
+                ("--offline", "Run the function app in offline mode. Supported by func start."),
                 ("-v | --version", "Display the version of Azure Functions Core Tools."),
                 ("-h | --help", "Display help information about Azure Functions Core Tools or a specific command.")
             };

@@ -13,10 +13,21 @@ namespace Azure.Functions.Cli.Helpers
         private static WorkerRuntime _currentWorkerRuntime;
         private static bool _isHelpRunning;
         private static bool _isVerbose;
+        private static bool _explicitOffline;
+        private static Lazy<bool> _networkOffline = new Lazy<bool>(() => false);
 
         public static bool IsHelpRunning => _isHelpRunning;
 
         public static bool IsVerbose => _isVerbose;
+
+        /// <summary>
+        /// Gets a value indicating whether the CLI is currently in offline mode.
+        /// Returns true immediately if the user explicitly requested offline mode
+        /// (via --offline flag or FUNCTIONS_CORE_TOOLS_OFFLINE env var).
+        /// Otherwise, lazily performs a one-time network probe on first access so
+        /// commands that never check offline state (e.g. func --help) pay no cost.
+        /// </summary>
+        public static bool IsOfflineMode => _explicitOffline || _networkOffline.Value;
 
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
@@ -52,6 +63,14 @@ namespace Azure.Functions.Cli.Helpers
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
             _isVerbose = args.Contains("--verbose");
+            _explicitOffline = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
+
+            // Lazy network probe — only runs on first access of IsOfflineMode when no explicit offline flag was set.
+            // No SynchronizationContext in this CLI app, so .GetAwaiter().GetResult() is safe without Task.Run.
+            _networkOffline = new Lazy<bool>(() =>
+                _explicitOffline
+                    ? true
+                    : OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult());
 
             try
             {
@@ -112,6 +131,16 @@ namespace Azure.Functions.Cli.Helpers
         internal static void SetIsHelpRunning(bool value)
         {
             _isHelpRunning = value;
+        }
+
+        /// <summary>
+        /// Sets the explicit offline state and resets the lazy network probe.
+        /// Called by <see cref="OfflineHelper"/> when offline state changes.
+        /// </summary>
+        internal static void SetOffline(bool isOffline)
+        {
+            _explicitOffline = isOffline;
+            _networkOffline = new Lazy<bool>(() => isOffline);
         }
 
         // Test helper method to set _currentWorkerRuntime for testing purpose

@@ -23,3 +23,5 @@
   - `func bundles add` - Add extension bundle configuration to host.json with `--channel` flag to select GA (default), Preview, or Experimental bundles
   - Support for custom bundle download paths via `AzureFunctionsJobHost__extensionBundle__downloadPath` environment variable
 - Added `--bundles-channel` option to `func init` command to specify extension bundle channel (GA, Preview, or Experimental) during project initialization
+- Fallback to cached bundles if there is no network connection during `func start` (#4772)
+  - Added global `--offline` variable to run in offline mode (#4772)

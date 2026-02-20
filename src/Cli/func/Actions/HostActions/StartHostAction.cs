@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections;
@@ -460,7 +460,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            await ExtensionBundleHelper.GetExtensionBundle();
+            if (RequiresExtensionBundles(GlobalCoreToolsSettings.CurrentWorkerRuntime))
+            {
+                await ExtensionBundleHelper.GetExtensionBundle();
+            }
+
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
@@ -553,6 +557,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // If the host runtime parameter is not set and the app is not in-proc, we should default to out-of-process host
             PrintVerboseForHostSelection("out-of-process");
             return false;
+        }
+
+        /// <summary>
+        /// Determines whether extension bundles are required for the given worker runtime.
+        /// Extension bundles are not needed for dotnet and dotnet-isolated runtimes.
+        /// </summary>
+        internal static bool RequiresExtensionBundles(WorkerRuntime workerRuntime)
+        {
+            return !WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime);
         }
 
         internal async Task ValidateHostRuntimeAsync(

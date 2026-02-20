@@ -315,6 +315,21 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             Assert.False(expectException, "Expected validation failure.");
         }
 
+        [Theory]
+        [InlineData(WorkerRuntime.Dotnet, false)]
+        [InlineData(WorkerRuntime.DotnetIsolated, false)]
+        [InlineData(WorkerRuntime.Node, true)]
+        [InlineData(WorkerRuntime.Python, true)]
+        [InlineData(WorkerRuntime.Java, true)]
+        [InlineData(WorkerRuntime.Powershell, true)]
+        [InlineData(WorkerRuntime.Custom, true)]
+        [InlineData(WorkerRuntime.None, true)]
+        public void RequiresExtensionBundles_ReturnsExpectedResult(WorkerRuntime runtime, bool expected)
+        {
+            var result = StartHostAction.RequiresExtensionBundles(runtime);
+            result.Should().Be(expected);
+        }
+
         [Fact]
         public async Task GetConfigurationSettings_OverwritesAzFuncEnvironment_WhenAlreadyInSecrets()
         {
