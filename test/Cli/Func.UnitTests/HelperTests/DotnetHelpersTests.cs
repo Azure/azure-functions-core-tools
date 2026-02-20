@@ -44,9 +44,9 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
-        [InlineData(WorkerRuntime.Dotnet, "")]
-        [InlineData(WorkerRuntime.DotnetIsolated, "net-isolated")]
-        public async Task TemplateOperationAsync_OfflineMode_InstallCallsIncludeForceFlag(WorkerRuntime workerRuntime, string path)
+        [InlineData(WorkerRuntime.Dotnet)]
+        [InlineData(WorkerRuntime.DotnetIsolated)]
+        public async Task TemplateOperationAsync_InstallCallsAlwaysIncludeForceFlag(WorkerRuntime workerRuntime)
         {
             var calls = new List<string>();
             var original = DotnetHelpers.RunDotnetNewFunc;
@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                     return Task.FromResult(0);
                 };
 
-                GlobalCoreToolsSettings.SetOffline(true);
+                GlobalCoreToolsSettings.SetOffline(false);
 
                 await DotnetHelpers.TemplateOperationAsync(() => Task.CompletedTask, workerRuntime);
 
@@ -68,15 +68,14 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                GlobalCoreToolsSettings.SetOffline(false);
                 DotnetHelpers.RunDotnetNewFunc = original;
             }
         }
 
         [Theory]
-        [InlineData(WorkerRuntime.Dotnet, "")]
-        [InlineData(WorkerRuntime.DotnetIsolated, "net-isolated")]
-        public async Task TemplateOperationAsync_OnlineMode_InstallCallsDoNotIncludeForceFlag(WorkerRuntime workerRuntime, string path)
+        [InlineData(WorkerRuntime.Dotnet)]
+        [InlineData(WorkerRuntime.DotnetIsolated)]
+        public async Task TemplateOperationAsync_UninstallCallsDoNotIncludeForceFlag(WorkerRuntime workerRuntime)
         {
             var calls = new List<string>();
             var original = DotnetHelpers.RunDotnetNewFunc;
@@ -88,13 +87,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                     return Task.FromResult(0);
                 };
 
-                GlobalCoreToolsSettings.SetOffline(false);
-
                 await DotnetHelpers.TemplateOperationAsync(() => Task.CompletedTask, workerRuntime);
 
-                var installCalls = calls.Where(a => a.Contains("new install", StringComparison.OrdinalIgnoreCase)).ToList();
-                Assert.True(installCalls.Count >= 2, $"Expected at least 2 install calls, got {installCalls.Count}");
-                Assert.All(installCalls, call => Assert.DoesNotContain("--force", call, StringComparison.OrdinalIgnoreCase));
+                var uninstallCalls = calls.Where(a => a.Contains("new uninstall", StringComparison.OrdinalIgnoreCase)).ToList();
+                Assert.True(uninstallCalls.Count >= 2, $"Expected at least 2 uninstall calls, got {uninstallCalls.Count}");
+                Assert.All(uninstallCalls, call => Assert.DoesNotContain("--force", call, StringComparison.OrdinalIgnoreCase));
             }
             finally
             {
@@ -152,33 +149,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 DotnetHelpers.RunDotnetNewFunc = original;
             }
-        }
-
-        [Theory]
-        [InlineData("Failed to check update for Microsoft.Azure.Functions.Worker.ProjectTemplates::4.0.5337: no NuGet feeds are configured or they are invalid.", true)]
-        [InlineData("Failed to check update for SomePackage::1.0.0: unable to load the service index.", true)]
-        [InlineData("Error: something completely different", false)]
-        [InlineData("", false)]
-        [InlineData(null, false)]
-        public void IsNuGetUpdateCheckWarning_OfflineMode_ReturnsExpected(string input, bool expected)
-        {
-            try
-            {
-                GlobalCoreToolsSettings.SetOffline(true);
-                Assert.Equal(expected, DotnetHelpers.IsNuGetUpdateCheckWarning(input));
-            }
-            finally
-            {
-                GlobalCoreToolsSettings.SetOffline(false);
-            }
-        }
-
-        [Fact]
-        public void IsNuGetUpdateCheckWarning_OnlineMode_AlwaysReturnsFalse()
-        {
-            GlobalCoreToolsSettings.SetOffline(false);
-            Assert.False(DotnetHelpers.IsNuGetUpdateCheckWarning(
-                "Failed to check update for Microsoft.Azure.Functions.Worker.ProjectTemplates::4.0.5337: no NuGet feeds are configured or they are invalid."));
         }
     }
 }
