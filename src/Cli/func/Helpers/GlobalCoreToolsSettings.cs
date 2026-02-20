@@ -65,11 +65,12 @@ namespace Azure.Functions.Cli.Helpers
             _isVerbose = args.Contains("--verbose");
             _explicitOffline = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
 
-            // Lazy network probe — only runs on first access of IsOfflineMode when no explicit offline flag was set
+            // Lazy network probe — only runs on first access of IsOfflineMode when no explicit offline flag was set.
+            // No SynchronizationContext in this CLI app, so .GetAwaiter().GetResult() is safe without Task.Run.
             _networkOffline = new Lazy<bool>(() =>
                 _explicitOffline
                     ? true
-                    : Task.Run(() => OfflineHelper.IsOfflineAsync()).GetAwaiter().GetResult());
+                    : OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult());
 
             try
             {
