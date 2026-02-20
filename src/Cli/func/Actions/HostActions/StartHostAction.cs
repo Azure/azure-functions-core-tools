@@ -464,10 +464,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 await ExtensionBundleHelper.GetExtensionBundle();
             }
-            else if (isVerbose)
-            {
-                ColoredConsole.WriteLine(VerboseColor("Skipping extension bundle download because AzureFunctionsJobHost__extensionBundle__ensureLatest is set to false."));
-            }
 
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();

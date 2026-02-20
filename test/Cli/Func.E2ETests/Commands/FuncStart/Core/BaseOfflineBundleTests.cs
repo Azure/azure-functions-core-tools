@@ -76,14 +76,14 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                 // Start with --offline; bundles should NOT be available
                 var funcStartCommand = new FuncStartCommand(fixture.FuncPath, testName, fixture.Log);
 
-            funcStartCommand.ProcessStartedHandler = async (process) =>
-            {
+                funcStartCommand.ProcessStartedHandler = async (process) =>
+                {
                     // Give it a bit of time to fail, then kill the process
                     await Task.Delay(10000);
-                process.Kill(true);
-            };
+                    process.Kill(true);
+                };
 
-            var result = funcStartCommand
+                var result = funcStartCommand
                     .WithWorkingDirectory(fixture.WorkingDirectory)
                     .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
                     .Execute(["--offline", "--verbose", "--port", port.ToString()]);
@@ -98,14 +98,14 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                     try
                     {
                         if (Directory.Exists(defaultBundlePath))
-            {
+                        {
                             Directory.Delete(defaultBundlePath, recursive: true);
                         }
 
                         Directory.Move(backupPath, defaultBundlePath);
-            }
+                    }
                     catch
-            {
+                    {
                         // Best effort restore
                     }
                 }

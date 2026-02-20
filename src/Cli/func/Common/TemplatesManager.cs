@@ -77,7 +77,7 @@ namespace Azure.Functions.Cli.Common
                     await ExtensionBundleHelper.GetExtensionBundle();
 
                     // Get content provider if not offline; otherwise just get templates within CLI
-                    if (!ExtensionBundleHelper.IsOffline())
+                    if (!GlobalCoreToolsSettings.IsOfflineMode)
                     {
                         var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                         return await contentProvider.GetTemplates();
