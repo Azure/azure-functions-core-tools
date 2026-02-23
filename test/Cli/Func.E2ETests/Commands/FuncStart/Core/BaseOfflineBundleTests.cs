@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
                 .Execute(["--offline", "--verbose", "--port", port.ToString()]);
 
-            result.Should().HaveStdOutContaining("Using cached");
+            result.Should().HaveStdOutContaining("Running in offline mode. Using cached extension bundle version");
         }
 
         /// <summary>
@@ -88,7 +88,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                     .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
                     .Execute(["--offline", "--verbose", "--port", port.ToString()]);
 
-                result.Should().HaveStdErrContaining("no cached version");
+                result.Should().HaveStdErrContaining("Running in offline mode but no cached version of extension bundle");
             }
             finally
             {
