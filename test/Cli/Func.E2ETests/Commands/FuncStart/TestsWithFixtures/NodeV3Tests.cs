@@ -1,6 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core;
 using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
@@ -45,6 +46,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
                         .Execute(["--verbose", "--port", port.ToString()]);
 
             capturedContent.Should().Be("This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.");
+        }
+
+        [Fact]
+        public void Start_NodeV3_OfflineWithCachedBundles_UsesCachedVersion()
+        {
+            BaseOfflineBundleTests.RunOfflineWithCachedBundlesTest(_fixture, "node", nameof(Start_NodeV3_OfflineWithCachedBundles_UsesCachedVersion));
+        }
+
+        [Fact]
+        public void Start_NodeV3_OfflineWithoutCachedBundles_FailsWithNoCacheError()
+        {
+            BaseOfflineBundleTests.RunOfflineWithoutCachedBundlesTest(_fixture, "node", nameof(Start_NodeV3_OfflineWithoutCachedBundles_FailsWithNoCacheError));
         }
     }
 }

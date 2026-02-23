@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
+using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
@@ -27,6 +28,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
+            if (GlobalCoreToolsSettings.IsOfflineMode)
+            {
+                throw new CliException(
+                    "Cannot download extension bundles while in offline mode. " +
+                    "Please ensure you have network connectivity and try again.");
+            }
+
             if (!BundleActionHelper.TryGetBundleContext(out var extensionBundleManager, out var options, out var bundleBasePath))
             {
                 return;
@@ -49,14 +57,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 // Set the download path so the SDK downloads to the correct location
                 // This is needed because DownloadBundleAction doesn't go through Startup.cs
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", bundleBasePath);
+                Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, bundleBasePath);
 
-                // Perform the download
-                await ExtensionBundleHelper.GetExtensionBundle();
-
-                // Get a fresh manager to verify the download at the correct location
-                var verifyManager = ExtensionBundleHelper.GetExtensionBundleManager();
-                var bundlePath = await verifyManager.GetExtensionBundlePath();
+                // Perform the download and get the bundle path
+                var bundlePath = await ExtensionBundleHelper.GetExtensionBundle();
 
                 if (!string.IsNullOrEmpty(bundlePath) && Directory.Exists(bundlePath))
                 {

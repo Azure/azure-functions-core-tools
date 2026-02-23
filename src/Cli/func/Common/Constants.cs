@@ -67,6 +67,8 @@ namespace Azure.Functions.Cli.Common
         public const string UseGoZip = "FUNCTIONS_CORE_TOOLS_USE_GOZIP";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
         public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
+        public const string ExtensionBundleDownloadPath = "AzureFunctionsJobHost__extensionBundle__downloadPath";
+        public const string ExtensionBundleEnsureLatest = "AzureFunctionsJobHost__extensionBundle__ensureLatest";
         public const string FunctionLogLevel = "AzureFunctionsJobHost__logging__logLevel__Function";
         public const long DefaultMaxRequestBodySize = 104857600;
         public const int DefaultGetFunctionReadinessTime = 30000;
@@ -98,6 +100,7 @@ namespace Azure.Functions.Cli.Common
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
         public const string EnableMcpCustomHandlerFeatureFlag = "EnableMcpCustomHandlerPreview";
+        public const string FunctionsCoreToolsOffline = "FUNCTIONS_CORE_TOOLS_OFFLINE";
 
         // forwardedHttpUrl sample format: https://n12abc3t-<port>.asse.devtunnels.ms/
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";

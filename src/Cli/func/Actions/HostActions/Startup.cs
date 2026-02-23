@@ -1,7 +1,8 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
 using Colors.Net;
@@ -115,14 +116,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             if (!string.IsNullOrEmpty(bundleId))
             {
                 // Only set the download path if not already set via environment variable
-                var existingDownloadPath = Environment.GetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath");
+                var existingDownloadPath = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
                 if (string.IsNullOrEmpty(existingDownloadPath))
                 {
                     // Use the downloadPath from host.json if configured, otherwise use default path
                     var downloadPath = !string.IsNullOrEmpty(extensionBundleOptions.DownloadPath)
                         ? extensionBundleOptions.DownloadPath
                         : ExtensionBundleHelper.GetBundleDownloadPath(bundleId);
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", downloadPath);
+                    Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, downloadPath);
                 }
                 else if (!string.IsNullOrEmpty(extensionBundleOptions.DownloadPath))
                 {
@@ -130,7 +131,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(WarningColor($"Extension bundle downloadPath is configured in both host.json and environment variable. Using environment variable value: {existingDownloadPath}"));
                 }
 
-                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
+                // Only set ensureLatest if not already set via environment variable.
+                // Default to "false" so the host does not download bundles on its own;
+                // the CLI manages bundle downloads.
+                var existingEnsureLatest = Environment.GetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest);
+                if (string.IsNullOrEmpty(existingEnsureLatest))
+                {
+                    Environment.SetEnvironmentVariable(Constants.ExtensionBundleEnsureLatest, bool.FalseString);
+                }
             }
         }
 
