@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
@@ -28,6 +29,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 using var quickClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
                 using var request = new HttpRequestMessage(HttpMethod.Head, ConnectivityCheckUrl);
+                request.Headers.Add("User-Agent", Constants.CliUserAgent);
                 using var response = await quickClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
 
                 // Any HTTP response (even 4xx/5xx) means the network is reachable

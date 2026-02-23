@@ -21,6 +21,14 @@ namespace Azure.Functions.Cli.Helpers
         public static bool IsVerbose => _isVerbose;
 
         /// <summary>
+        /// Gets a value indicating whether the user explicitly requested offline mode
+        /// (via --offline flag or FUNCTIONS_CORE_TOOLS_OFFLINE env var),
+        /// as opposed to offline being auto-detected via a failed network probe.
+        /// Used to tailor user-facing messages.
+        /// </summary>
+        public static bool IsExplicitOffline => _explicitOffline;
+
+        /// <summary>
         /// Gets a value indicating whether the CLI is currently in offline mode.
         /// Returns true immediately if the user explicitly requested offline mode
         /// (via --offline flag or FUNCTIONS_CORE_TOOLS_OFFLINE env var).

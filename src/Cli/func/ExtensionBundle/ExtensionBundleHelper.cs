@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         /// Returns the resolved bundle path, or null if no bundle is configured.
         /// On network failure, marks the system as offline and falls back to a cached bundle.
         /// </summary>
-        public static async Task<string> GetExtensionBundle()
+        internal static async Task<string> GetExtensionBundle()
         {
             var extensionBundleOptions = GetExtensionBundleOptions();
 
@@ -135,7 +135,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
             string versionRange = extensionBundleOptions.Version?.ToString();
             if (TryGetCachedBundle(extensionBundleOptions.Id, versionRange, out string cachedVersion, extensionBundleOptions.DownloadPath))
             {
-                ColoredConsole.WriteLine(OutputTheme.WarningColor($"Warning: Unable to download extension bundles. Using cached version {cachedVersion}."));
+                var warningMessage = GlobalCoreToolsSettings.IsExplicitOffline
+                    ? $"Running in offline mode. Using cached extension bundle version {cachedVersion}."
+                    : $"Warning: Unable to download extension bundles. Using cached version {cachedVersion}.";
+
+                ColoredConsole.WriteLine(OutputTheme.WarningColor(warningMessage));
                 ColoredConsole.WriteLine(OutputTheme.WarningColor("When you have network connectivity, you can run `func bundles download` to update."));
                 ColoredConsole.WriteLine();
 
@@ -145,10 +149,15 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 return Path.Combine(downloadPath, cachedVersion);
             }
 
-            throw new CliException(
-                $"Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available. " +
-                $"Bundles must be pre-cached before you can run offline. \n" +
-                $"When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use.");
+            var reason = GlobalCoreToolsSettings.IsExplicitOffline
+                ? $"Running in offline mode but no cached version of extension bundle '{extensionBundleOptions.Id}' is available."
+                : $"Unable to download extension bundle '{extensionBundleOptions.Id}' and no cached version available.";
+
+            var errorMessage = $"{reason} " +
+                "Bundles must be pre-cached before you can run offline. \n" +
+                "When you have network connectivity, you can use `func bundles download` to download bundles and pre-cache them for offline use.";
+
+            throw new CliException(errorMessage);
         }
 
         /// <summary>
