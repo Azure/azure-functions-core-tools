@@ -28,3 +28,4 @@
   - Added global `--offline` variable to run in offline mode 
 - Fallback to cached bundles if there is no network connection during `func start` (#4772)
 - Fallback to cached bundles if there is no network connection during `func new` (#4775)
+- Enable offline support for `func init` and `func new` (#4775)
