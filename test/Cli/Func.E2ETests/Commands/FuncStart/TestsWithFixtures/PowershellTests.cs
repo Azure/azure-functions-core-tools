@@ -1,6 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core;
 using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
@@ -46,6 +47,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.TestsWithFixtures
 
             // Validate out-of-process host was started
             result.Should().StartOutOfProcessHost();
+        }
+
+        [Fact]
+        public void Start_Powershell_OfflineWithCachedBundles_UsesCachedVersion()
+        {
+            BaseOfflineBundleTests.RunOfflineWithCachedBundlesTest(_fixture, "powershell", nameof(Start_Powershell_OfflineWithCachedBundles_UsesCachedVersion));
+        }
+
+        [Fact]
+        public void Start_Powershell_OfflineWithoutCachedBundles_FailsWithNoCacheError()
+        {
+            BaseOfflineBundleTests.RunOfflineWithoutCachedBundlesTest(_fixture, "powershell", nameof(Start_Powershell_OfflineWithoutCachedBundles_FailsWithNoCacheError));
         }
     }
 }

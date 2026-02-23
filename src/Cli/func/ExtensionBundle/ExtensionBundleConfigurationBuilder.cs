@@ -1,6 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Configuration;
 
@@ -22,8 +23,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
-                    { "AzureFunctionsJobHost:extensionBundle:downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
-                    { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "true" }
+                    { Constants.ExtensionBundleDownloadPath.Replace("__", ":"), ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
+                    { Constants.ExtensionBundleEnsureLatest.Replace("__", ":"), bool.FalseString }
                 });
             }
         }
