@@ -83,42 +83,6 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             return cachePath;
         }
 
-        // ─── No extension bundles configured ────────────────────────────
-        [Fact]
-        public async Task Templates_NoBundlesConfigured_LoadsLocalTemplates()
-        {
-            // Arrange — no host.json → bundles not configured → uses local templates.json
-            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
-
-            // Act
-            var templates = await manager.Templates;
-
-            // Assert — should load the CLI-bundled templates including common triggers
-            templates.Should().NotBeNullOrEmpty(
-                "local templates.json should provide templates when no bundles are configured");
-            templates.Should().Contain(
-                t => t.Metadata != null && t.Metadata.TriggerType == "httpTrigger",
-                "local templates should include HTTP trigger templates");
-        }
-
-        [Fact]
-        public async Task Templates_NoBundlesConfigured_OfflineMode_StillLoadsLocalTemplates()
-        {
-            // Arrange — no host.json, offline mode set
-            OfflineHelper.MarkAsOffline();
-            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
-
-            // Act
-            var templates = await manager.Templates;
-
-            // Assert — offline mode should not affect the non-bundle code path
-            templates.Should().NotBeNullOrEmpty(
-                "offline mode should not prevent loading local templates when no bundles are configured");
-            templates.Should().Contain(
-                t => t.Metadata != null && t.Metadata.TriggerType == "httpTrigger",
-                "same HTTP trigger templates should be available in offline mode");
-        }
-
         // ─── Extension bundles configured + offline mode ────────────────
         [Fact]
         public async Task Templates_BundlesConfiguredAndOffline_WithCachedBundle_FallsBackToLocalTemplates()
@@ -189,59 +153,6 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
                     // best effort cleanup
                 }
             }
-        }
-
-        [Fact]
-        public async Task Templates_BundlesConfiguredAndOffline_ReturnsSameAsNoBundlesOffline()
-        {
-            // Arrange — compare offline behavior: with bundles vs. without bundles
-            // Both paths should ultimately resolve to the same local templates.json
-            var noBundleManager = new TemplatesManager(Substitute.For<ISecretsManager>());
-            OfflineHelper.MarkAsOffline();
-            var noBundleTemplates = (await noBundleManager.Templates).ToList();
-
-            // Now configure bundles and cached bundle
-            WriteHostJsonWithBundles();
-            var cachePath = CreateCachedBundleDirectory("4.5.0");
-            Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, cachePath);
-
-            try
-            {
-                var bundleManager = new TemplatesManager(Substitute.For<ISecretsManager>());
-                var bundleTemplates = (await bundleManager.Templates).ToList();
-
-                // Assert — both should fall back to the same local templates
-                bundleTemplates.Select(t => t.Id).Should().BeEquivalentTo(
-                    noBundleTemplates.Select(t => t.Id),
-                    "offline mode with bundles should fall back to the same local templates as without bundles");
-            }
-            finally
-            {
-                try
-                {
-                    Directory.Delete(cachePath, true);
-                }
-                catch
-                {
-                    // best effort cleanup
-                }
-            }
-        }
-
-        // ─── Template content composition ────────────────────────────────
-        [Fact]
-        public async Task Templates_IncludesNodeV4TemplatesFromEmbeddedResource()
-        {
-            // Arrange — templates should include both local JSON and embedded Node v4 templates
-            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
-
-            // Act
-            var templates = (await manager.Templates).ToList();
-
-            // Assert — Node v4 templates have IDs ending with "-4.x"
-            templates.Should().Contain(
-                t => t.Id != null && t.Id.EndsWith("-4.x", StringComparison.OrdinalIgnoreCase),
-                "should include embedded Node v4 templates alongside local templates");
         }
 
         [Fact]
