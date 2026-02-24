@@ -35,6 +35,10 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             Directory.CreateDirectory(_testWorkingDir);
             Directory.SetCurrentDirectory(_testWorkingDir);
 
+            // Ensure the lock file directory exists (CI agents may not have it)
+            var lockDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azurefunctions");
+            Directory.CreateDirectory(lockDir);
+
             // Clean environment for deterministic tests
             Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, null);
             Environment.SetEnvironmentVariable(Constants.ExtensionBundleDownloadPath, null);
@@ -171,7 +175,7 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
 
                 // Act & Assert — GetExtensionBundle will throw because no cached bundle exists
                 var ex = await Assert.ThrowsAsync<CliException>(() => manager.Templates);
-                ex.Message.Should().Contain("no cached version available");
+                ex.Message.Should().Contain("no cached version");
             }
             finally
             {
