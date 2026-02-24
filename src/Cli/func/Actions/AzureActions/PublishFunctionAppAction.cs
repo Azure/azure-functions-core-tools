@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
+using System.Net.Http;
 using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
 using Azure.Functions.Cli.Actions.LocalActions;
@@ -240,13 +241,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                if (PublishLocalSettingsOnly)
+                try
                 {
-                    await PublishLocalAppSettings(functionApp, additionalAppSettings);
+                    if (PublishLocalSettingsOnly)
+                    {
+                        await PublishLocalAppSettings(functionApp, additionalAppSettings);
+                    }
+                    else
+                    {
+                        await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings);
+                    }
                 }
-                else
+                catch (HttpRequestException ex)
                 {
-                    await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings);
+                    // HttpRequestException is thrown for connectivity failures (SSL, socket, DNS)
+                    // not for HTTP status errors, which are handled by CheckResponseStatusAsync as CliException.
+                    throw new CliException($"{Constants.Errors.PublishNetworkingError}{Environment.NewLine}Details: {ex.Message}", ex);
                 }
             }
         }

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Globalization;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -204,7 +205,7 @@ namespace Azure.Functions.Cli.Services
             }
 
             var versionStr = targetFramework.ToLower().Replace("net", string.Empty).Replace("v", string.Empty);
-            if (double.TryParse(versionStr, out double version))
+            if (double.TryParse(versionStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double version))
             {
                 return (int)version;
             }
