@@ -455,7 +455,6 @@ namespace Azure.Functions.Cli.Helpers
             foreach (var nupkg in list)
             {
                 TryGetCustomHiveArg(workerRuntime, out string customHive);
-
                 var args = $"new {action} \"{nupkg}\" {customHive}";
                 await RunDotnetNewAsync(args);
             }
