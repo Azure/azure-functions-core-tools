@@ -75,8 +75,15 @@ namespace Azure.Functions.Cli.Common
                 templatesJson = await FileLockHelper.WithFileLockAsync(BundleTemplatesLockFileName, async () =>
                 {
                     await ExtensionBundleHelper.GetExtensionBundle();
-                    var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
-                    return await contentProvider.GetTemplates();
+
+                    // Get content provider if not offline; otherwise just get templates within CLI
+                    if (!GlobalCoreToolsSettings.IsOfflineMode)
+                    {
+                        var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+                        return await contentProvider.GetTemplates();
+                    }
+
+                    return GetTemplatesJson();
                 });
             }
             else
