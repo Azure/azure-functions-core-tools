@@ -41,6 +41,10 @@ function getPackageVersion([string]$packageName, [xml]$propsXml, [bool]$isPackag
 
     $node = Select-Xml -Xml $propsXml -XPath $xpath | Select-Object -ExpandProperty Node
     if ($node) {
+        # Host repo changed from Version to VersionOverride; support both
+        if ($node.VersionOverride) {
+            return $node.VersionOverride
+        }
         return $node.Version
     } else {
         throw "Failed to find version for package $packageName in Packages.props"
