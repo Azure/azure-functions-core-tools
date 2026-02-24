@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [Theory]
         [InlineData(WorkerRuntime.Dotnet)]
         [InlineData(WorkerRuntime.DotnetIsolated)]
-        public async Task TemplateOperationAsync_InstallCallsAlwaysIncludeForceFlag(WorkerRuntime workerRuntime)
+        public async Task TemplateOperationAsync_InstallCallsDoNotIncludeForceFlag(WorkerRuntime workerRuntime)
         {
             var calls = new List<string>();
             var original = DotnetHelpers.RunDotnetNewFunc;
@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
                 var installCalls = calls.Where(a => a.Contains("new install", StringComparison.OrdinalIgnoreCase)).ToList();
                 Assert.True(installCalls.Count >= 2, $"Expected at least 2 install calls, got {installCalls.Count}");
-                Assert.All(installCalls, call => Assert.Contains("--force", call, StringComparison.OrdinalIgnoreCase));
+                Assert.All(installCalls, call => Assert.DoesNotContain("--force", call, StringComparison.OrdinalIgnoreCase));
             }
             finally
             {
