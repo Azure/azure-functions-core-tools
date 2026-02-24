@@ -15,6 +15,7 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
     /// fallback behavior introduced to skip the extension bundle content provider
     /// when the CLI is running in offline mode.
     /// </summary>
+    [Collection("BundleActionTests")]
     public class TemplatesManagerTests : IDisposable
     {
         private readonly string _previousWorkingDir;
