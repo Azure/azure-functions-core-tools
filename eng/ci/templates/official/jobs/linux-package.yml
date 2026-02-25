@@ -9,10 +9,11 @@ jobs:
   steps:
   - bash: |
       sudo apt-get update
-      sudo apt-get install -y npm golang
+      sudo apt-get install -y npm golang dotnet-sdk-8.0
       npm --version
       go version
-    displayName: 'Install npm and Go'
+      dotnet --version
+    displayName: 'Install npm, Go, and .NET'
   # Bash v3
   # Run a Bash script on macOS, Linux, or Windows.
   - task: Bash@3

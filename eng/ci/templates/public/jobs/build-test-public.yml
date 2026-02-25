@@ -79,10 +79,11 @@ jobs:
   steps:
   - bash: |
       sudo apt-get update
-      sudo apt-get install -y npm golang
+      sudo apt-get install -y npm golang dotnet-sdk-8.0
       npm --version
       go version
-    displayName: 'Install npm and Go'
+      dotnet --version
+    displayName: 'Install npm, Go, and .NET'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
