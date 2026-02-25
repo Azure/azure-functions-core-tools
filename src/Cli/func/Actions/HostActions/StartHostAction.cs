@@ -189,10 +189,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, UserLogLevel);
 
-            // If user log level is explicitly set, configure the host to accept function logs at that level
-            // This allows --user-log-level to work without requiring host.json changes
-            ConfigureHostLoggingForUserLogLevel(loggingFilterHelper, _hostJsonConfig);
-
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
                 GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
             {
@@ -203,6 +199,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             _keyVaultReferencesManager.ResolveKeyVaultReferences(settings);
             UpdateEnvironmentVariables(settings);
+
+            // Configure host logging for user log level *after* loading local.settings.json and user secrets,
+            // so that user-defined values for AzureFunctionsJobHost__logging__logLevel__Function take precedence.
+            ConfigureHostLoggingForUserLogLevel(loggingFilterHelper, _hostJsonConfig);
 
             if (settings.ContainsKey("CONTAINER_NAME"))
             {
