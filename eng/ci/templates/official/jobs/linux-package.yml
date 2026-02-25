@@ -12,7 +12,14 @@ jobs:
       sudo apt-get install -y npm golang
       npm --version
       go version
-    displayName: 'Install npm and Go'
+      # Install .NET 8.0 SDK to /usr/share/dotnet so all SDKs are in one location
+      curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+      chmod +x dotnet-install.sh
+      sudo ./dotnet-install.sh --install-dir /usr/share/dotnet --channel 8.0
+      sudo chmod -R a+rwx /usr/share/dotnet
+      echo "##vso[task.prependpath]/usr/share/dotnet"
+      /usr/share/dotnet/dotnet --version
+    displayName: 'Install npm, Go, and .NET'
   # Bash v3
   # Run a Bash script on macOS, Linux, or Windows.
   - task: Bash@3
