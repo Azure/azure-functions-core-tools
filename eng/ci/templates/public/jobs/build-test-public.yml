@@ -85,7 +85,7 @@ jobs:
       # Install .NET 8.0 SDK to /usr/share/dotnet so all SDKs are in one location
       curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
       chmod +x dotnet-install.sh
-      ./dotnet-install.sh --install-dir /usr/share/dotnet --channel 8.0
+      sudo ./dotnet-install.sh --install-dir /usr/share/dotnet --channel 8.0
       echo "##vso[task.prependpath]/usr/share/dotnet"
       /usr/share/dotnet/dotnet --version
     displayName: 'Install npm, Go, and .NET'
