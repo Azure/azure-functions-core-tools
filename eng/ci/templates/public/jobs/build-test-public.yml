@@ -74,9 +74,15 @@ jobs:
   timeoutInMinutes: "180"
   pool:
     name: 1es-pool-azfunc-public
-    image: '1es-ubuntu-22.04'
+    image: 1es-ubuntu-24.04-min
     os: 'linux'
   steps:
+  - bash: |
+      sudo apt-get update
+      sudo apt-get install -y npm golang
+      npm --version
+      go version
+    displayName: 'Install npm and Go'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet

@@ -4,9 +4,15 @@ jobs:
   timeoutInMinutes: "120"
   pool:
     name: 1es-pool-azfunc
-    image: 1es-ubuntu-22.04
+    image: 1es-ubuntu-24.04-min
     os: linux
   steps:
+  - bash: |
+      sudo apt-get update
+      sudo apt-get install -y npm golang
+      npm --version
+      go version
+    displayName: 'Install npm and Go'
   # Bash v3
   # Run a Bash script on macOS, Linux, or Windows.
   - task: Bash@3
