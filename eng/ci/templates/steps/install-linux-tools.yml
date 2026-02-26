@@ -4,11 +4,12 @@ steps:
     sudo apt-get install -y npm golang
     npm --version
     go version
-    # Install .NET 8.0 SDK to /usr/share/dotnet so all SDKs are in one location
+    # Install .NET SDKs to /usr/share/dotnet so all SDKs are in one location
     curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
     chmod +x dotnet-install.sh
+    sudo ./dotnet-install.sh --install-dir /usr/share/dotnet --channel 6.0
     sudo ./dotnet-install.sh --install-dir /usr/share/dotnet --channel 8.0
     sudo chmod -R a+rx /usr/share/dotnet
     echo "##vso[task.prependpath]/usr/share/dotnet"
-    /usr/share/dotnet/dotnet --version
+    dotnet --list-sdks
   displayName: 'Install npm, Go, and .NET'
