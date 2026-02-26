@@ -11,5 +11,5 @@ steps:
     sudo ./dotnet-install.sh --install-dir /usr/share/dotnet --channel 8.0
     sudo chmod -R a+rx /usr/share/dotnet
     echo "##vso[task.prependpath]/usr/share/dotnet"
-    dotnet --list-sdks
+    /usr/share/dotnet/dotnet --version
   displayName: 'Install npm, Go, and .NET'
