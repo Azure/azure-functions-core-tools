@@ -10,9 +10,9 @@ jobs:
   variables:
     drop_path: $(Build.ArtifactStagingDirectory)
     pkg_drop_path: $(drop_path)/drop_debian
-    pkg_drop_path_newkey: $(drop_path)/drop_debian_newkey
+    pkg_drop_path_newkey: $(drop_path)/drop_debian_CP-500207-Pgp
     artifact_path: /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact
-    artifact_path_newkey: /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact-newkey
+    artifact_path_newkey: /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact-CP-500207-Pgp
 
   templateContext:
     inputs:
@@ -30,7 +30,7 @@ jobs:
     - output: pipelineArtifact
       displayName: Publish debian package (new key)
       path: $(pkg_drop_path_newkey)
-      artifact: drop_debian_newkey
+      artifact: drop_debian_CP-500207-Pgp
 
   steps:
   - script: |
@@ -170,8 +170,8 @@ jobs:
         # Upload new-key-signed packages
         $filePathNew = "$env:ArtifactPathNewKey/$fileName"
         $filePathMajorNew = "$env:ArtifactPathNewKey/$fileNameMajor"
-        az storage blob upload -f $filePathNew -c signed-newkey -n $fileName --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-        az storage blob upload -f $filePathMajorNew -c signed-newkey -n $fileNameMajor --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+        az storage blob upload -f $filePathNew -c signed-CP-500207-Pgp -n $fileName --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+        az storage blob upload -f $filePathMajorNew -c signed-CP-500207-Pgp -n $fileNameMajor --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
       }
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
