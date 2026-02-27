@@ -25,7 +25,9 @@ namespace Azure.Functions.Cli.Helpers
         [DisplayString("powershell")]
         Powershell,
         [DisplayString("custom")]
-        Custom
+        Custom,
+        [DisplayString("golang")]
+        Golang
     }
 
     public static class WorkerRuntimeLanguageHelper
@@ -38,7 +40,8 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Python, new[] { "py" } },
             { WorkerRuntime.Java, new string[] { } },
             { WorkerRuntime.Powershell, new[] { "pwsh" } },
-            { WorkerRuntime.Custom, new string[] { } }
+            { WorkerRuntime.Custom, new string[] { } },
+            { WorkerRuntime.Golang, new[] { "go" } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
@@ -53,6 +56,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Python, Constants.Languages.Python },
             { WorkerRuntime.Powershell, Constants.Languages.Powershell },
             { WorkerRuntime.Custom, Constants.Languages.Custom },
+            { WorkerRuntime.Golang, Constants.Languages.Golang },
         };
 
         private static readonly IDictionary<string, IEnumerable<string>> _languageToAlias = new Dictionary<string, IEnumerable<string>>
@@ -67,7 +71,8 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.CSharp, new[] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.FSharp, new[] { "fsharp" } },
             { Constants.Languages.Java, new string[] { } },
-            { Constants.Languages.Custom, new string[] { } }
+            { Constants.Languages.Custom, new string[] { } },
+            { Constants.Languages.Golang, new[] { "go" } }
         };
 
         public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = _languageToAlias
@@ -110,6 +115,8 @@ namespace Azure.Functions.Cli.Helpers
                     return "powershell";
                 case WorkerRuntime.Custom:
                     return "custom";
+                case WorkerRuntime.Golang:
+                    return "golang";
                 default:
                     return "None";
             }
