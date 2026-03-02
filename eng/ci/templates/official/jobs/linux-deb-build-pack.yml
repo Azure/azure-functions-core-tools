@@ -11,8 +11,8 @@ jobs:
     drop_path: $(Build.ArtifactStagingDirectory)
     pkg_drop_path: $(drop_path)/drop_debian
     pkg_drop_path_newkey: $(drop_path)/drop_debian_CP-500207-Pgp
-    artifact_path: /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact
-    artifact_path_newkey: /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact-CP-500207-Pgp
+    artifact_path: $(Build.SourcesDirectory)/eng/tools/publish-tools/artifact
+    artifact_path_newkey: $(Build.SourcesDirectory)/eng/tools/publish-tools/artifact-CP-500207-Pgp
 
   templateContext:
     inputs:
@@ -187,13 +187,8 @@ jobs:
     inputs:
       targetType: 'inline'
       script: |
-        mkdir -p $drop
-        cp -r $ARTIFACT_PATH/* $drop
+        mkdir -p $(pkg_drop_path)
+        cp -r $(artifact_path)/* $(pkg_drop_path)
 
-        mkdir -p $drop_newkey
-        cp -r $ARTIFACT_PATH_NEWKEY/* $drop_newkey
-    env:
-      drop: $(pkg_drop_path)
-      drop_newkey: $(pkg_drop_path_newkey)
-      ARTIFACT_PATH: $(artifact_path)
-      ARTIFACT_PATH_NEWKEY: $(artifact_path_newkey)
+        mkdir -p $(pkg_drop_path_newkey)
+        cp -r $(artifact_path_newkey)/* $(pkg_drop_path_newkey)
