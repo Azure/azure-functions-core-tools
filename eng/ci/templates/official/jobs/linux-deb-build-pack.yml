@@ -10,6 +10,9 @@ jobs:
   variables:
     drop_path: $(Build.ArtifactStagingDirectory)
     pkg_drop_path: $(drop_path)/drop_debian
+    pkg_drop_path_newkey: $(drop_path)/drop_debian_CP-500207-Pgp
+    artifact_path: $(Build.SourcesDirectory)/eng/tools/publish-tools/artifact
+    artifact_path_newkey: $(Build.SourcesDirectory)/eng/tools/publish-tools/artifact-CP-500207-Pgp
 
   templateContext:
     inputs:
@@ -21,9 +24,13 @@ jobs:
     outputParentDirectory: $(drop_path)
     outputs:
     - output: pipelineArtifact
-      displayName: Publish debian package
+      displayName: Publish debian package (legacy key)
       path: $(pkg_drop_path)
       artifact: drop_debian
+    - output: pipelineArtifact
+      displayName: Publish debian package (new key)
+      path: $(pkg_drop_path_newkey)
+      artifact: drop_debian_CP-500207-Pgp
 
   steps:
   - script: |
@@ -83,7 +90,18 @@ jobs:
       targetType: 'inline'
       script: |
         chmod +x $(Build.SourcesDirectory)/eng/scripts/validate-deb-arch.sh
-        bash $(Build.SourcesDirectory)/eng/scripts/validate-deb-arch.sh /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact
+        bash $(Build.SourcesDirectory)/eng/scripts/validate-deb-arch.sh $(artifact_path)
+
+  - task: Bash@3
+    displayName: 'Copy artifacts for new key signing'
+    inputs:
+      targetType: 'inline'
+      script: |
+        set -euo pipefail
+        mkdir -p $(artifact_path_newkey)
+        cp -r $(artifact_path)/* $(artifact_path_newkey)/
+        echo "Copied artifacts for new key signing:"
+        ls -la $(artifact_path_newkey)/
 
   - task: UseDotNet@2
     displayName: 'Install .NET SDK'
@@ -91,10 +109,11 @@ jobs:
       packageType: 'sdk'
       version: '8.x'
 
+  # Sign with legacy key (CP-450779-Pgp) for Debian <=12, Ubuntu <=25.04, etc.
   - template: ci/sign-files.yml@eng
     parameters:
-      displayName: 'Sign'
-      folderPath: '/mnt/vss/_work/1/s/eng/tools/publish-tools/artifact'
+      displayName: 'Sign with legacy key (CP-450779-Pgp)'
+      folderPath: '$(artifact_path)'
       pattern: '*.deb'
       signType: inline
       inlineOperation: |
@@ -108,8 +127,25 @@ jobs:
           }
         ]
 
+  # Sign with new key (CP-500207-Pgp) for Debian 13+, Ubuntu 25.10+, RHEL 10+, etc.
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Sign with new key (CP-500207-Pgp)'
+      folderPath: '$(artifact_path_newkey)'
+      pattern: '*.deb'
+      signType: inline
+      inlineOperation: |
+        [
+          {
+            "keyCode": "CP-500207-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "signtool.exe",
+            "toolVersion": "1.0"
+          }
+        ]
+
   - pwsh: |
-      echo $env:LinuxPackageAccountName
       $buildTag = $env:LinuxPackageBuildTag
       $majorVersion = [math]::Floor([double]$buildTag.Split(".")[0])
 
@@ -123,26 +159,36 @@ jobs:
 
       foreach ($arch in @("x64", "arm64")) {
         $fileName = "azure-functions-core-tools_${debianVersion}_${arch}.deb"
-        $filePath = "/mnt/vss/_work/1/s/eng/tools/publish-tools/artifact/$fileName"
-        az storage blob upload -f $filePath -c signed -n $fileName --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-
         $fileNameMajor = "azure-functions-core-tools-$($majorVersion)_${debianVersion}_${arch}.deb"
-        $filePathMajor = "/mnt/vss/_work/1/s/eng/tools/publish-tools/artifact/$fileNameMajor"
+
+        # Upload legacy-signed packages
+        $filePath = "$env:ArtifactPath/$fileName"
+        $filePathMajor = "$env:ArtifactPath/$fileNameMajor"
+        az storage blob upload -f $filePath -c signed -n $fileName --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
         az storage blob upload -f $filePathMajor -c signed -n $fileNameMajor --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+
+        # Upload new-key-signed packages
+        $filePathNew = "$env:ArtifactPathNewKey/$fileName"
+        $filePathMajorNew = "$env:ArtifactPathNewKey/$fileNameMajor"
+        az storage blob upload -f $filePathNew -c signed-CP-500207-Pgp -n $fileName --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+        az storage blob upload -f $filePathMajorNew -c signed-CP-500207-Pgp -n $fileNameMajor --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
       }
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
       LinuxPackageBuildTag: $(DefaultArtifactVersion)
-    displayName: 'Upload Core Tools Signed Linux Package to the storage'
+      ArtifactPath: $(artifact_path)
+      ArtifactPathNewKey: $(artifact_path_newkey)
+    displayName: 'Upload Core Tools Signed Linux Packages to storage'
     condition: eq(variables['UploadSignedPackages'], 'true') # This is a UI variable that defaults to false
 
   - task: Bash@3
-    displayName: 'Copy DEB package to drop'
+    displayName: 'Copy DEB packages to drop'
     inputs:
       targetType: 'inline'
       script: |
-        mkdir -p $drop
-        cp -r /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact/* $drop
-    env:
-      drop: $(pkg_drop_path)
+        mkdir -p $(pkg_drop_path)
+        cp -r $(artifact_path)/* $(pkg_drop_path)
+
+        mkdir -p $(pkg_drop_path_newkey)
+        cp -r $(artifact_path_newkey)/* $(pkg_drop_path_newkey)
