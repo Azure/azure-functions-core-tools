@@ -3,7 +3,7 @@
 
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
-using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.StacksApi;
 using Moq;
 using Xunit;
@@ -133,11 +133,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             {
                 Kind = "functionapp", // Windows (no "linux" in Kind)
                 Sku = "dynamic",
-                NetFrameworkVersion = "v6.0",
-                AzureAppSettings = new Dictionary<string, string>
-                {
-                    ["FUNCTIONS_WORKER_RUNTIME"] = workerRuntime.ToString()
-                }
+                NetFrameworkVersion = "v6.0"
             };
 
             var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
