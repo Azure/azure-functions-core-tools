@@ -242,9 +242,9 @@
       "license": "ISC"
     },
     "node_modules/minimatch": {
-      "version": "8.0.4",
-      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-8.0.4.tgz",
-      "integrity": "sha512-W0Wvr9HyFXZRGIDgCicunpQ299OKXs9RgZfaukz4qAW/pJhcpUfupc9c+OObPOFueNy8VSrZgEmDtk6Kh4WzDA==",
+      "version": "8.0.7",
+      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-8.0.7.tgz",
+      "integrity": "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg==",
       "license": "ISC",
       "dependencies": {
         "brace-expansion": "^2.0.1"
@@ -527,9 +527,9 @@
       "integrity": "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
     },
     "minimatch": {
-      "version": "8.0.4",
-      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-8.0.4.tgz",
-      "integrity": "sha512-W0Wvr9HyFXZRGIDgCicunpQ299OKXs9RgZfaukz4qAW/pJhcpUfupc9c+OObPOFueNy8VSrZgEmDtk6Kh4WzDA==",
+      "version": "8.0.7",
+      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-8.0.7.tgz",
+      "integrity": "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg==",
       "requires": {
         "brace-expansion": "^2.0.1"
       }
