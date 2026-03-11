@@ -125,28 +125,78 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData(WorkerRuntime.Node)]
         [InlineData(WorkerRuntime.Python)]
         [InlineData(WorkerRuntime.Java)]
-        public async Task UpdateFrameworkVersions_NonDotnetWindowsApp_DoesNotThrow(WorkerRuntime workerRuntime)
+        public async Task UpdateFrameworkVersions_NonDotnetWindowsApp_NoDotnetVersion_DoesNotCallUpdateWebSettings(WorkerRuntime workerRuntime)
         {
-            // Arrange - simulate a Windows function app with a non-.NET runtime and no dotnet version specified.
-            // This is the exact scenario that caused "Value cannot be null. (Parameter 'input')" in v4.7.0.
+            // Arrange — Windows function app, non-.NET runtime, no --dotnet-version specified.
+            // This is the exact scenario that caused ArgumentNullException in v4.7.0.
             var site = new Site("test-site")
             {
-                Kind = "functionapp", // Windows (no "linux" in Kind)
+                Kind = "functionapp",
                 Sku = "dynamic",
                 NetFrameworkVersion = "v6.0"
             };
 
             var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
 
-            // Act - calling with null dotnetVersion (no --dotnet-version specified) should not throw.
-            // In v4.7.0 this threw ArgumentNullException: Value cannot be null. (Parameter 'input').
+            // Act — null dotnetVersion means --dotnet-version was not specified
             var exception = await Record.ExceptionAsync(() =>
                 PublishFunctionAppAction.UpdateFrameworkVersions(site, workerRuntime, null, false, helperServiceMock.Object));
 
-            // Assert
+            // Assert — should not throw and should never attempt to update web settings
             Assert.Null(exception);
+            helperServiceMock.Verify(
+                x => x.UpdateWebSettings(It.IsAny<Site>(), It.IsAny<Dictionary<string, string>>()),
+                Times.Never);
+        }
 
-            // Should not try to update the web settings since there is no version to apply
+        [Theory]
+        [InlineData(WorkerRuntime.Powershell)]
+        [InlineData(WorkerRuntime.Node)]
+        [InlineData(WorkerRuntime.Python)]
+        [InlineData(WorkerRuntime.Java)]
+        public async Task UpdateFrameworkVersions_NonDotnetWindowsApp_ExplicitDotnetVersion_DoesNotUpdateWebSettings(WorkerRuntime workerRuntime)
+        {
+            // Arrange — Windows function app, non-.NET runtime, explicit --dotnet-version 8.0.
+            // --dotnet-version only applies to DotnetIsolated (per its own help text), so even
+            // when specified, non-.NET runtimes should not attempt to update NetFrameworkVersion.
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp",
+                Sku = "dynamic",
+                NetFrameworkVersion = "v6.0"
+            };
+
+            var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
+
+            // Act
+            var exception = await Record.ExceptionAsync(() =>
+                PublishFunctionAppAction.UpdateFrameworkVersions(site, workerRuntime, "8.0", false, helperServiceMock.Object));
+
+            // Assert — should not throw and should not try to update web settings
+            Assert.Null(exception);
+            helperServiceMock.Verify(
+                x => x.UpdateWebSettings(It.IsAny<Site>(), It.IsAny<Dictionary<string, string>>()),
+                Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdateFrameworkVersions_NonDotnetLinuxApp_NoDotnetVersion_DoesNotThrow()
+        {
+            // Arrange — Linux dynamic function app, non-.NET runtime.
+            // Linux dynamic apps don't hit UpdateNetFrameworkVersionWindows at all,
+            // but verify this path is also safe.
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp,linux",
+                Sku = "dynamic"
+            };
+
+            var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
+
+            var exception = await Record.ExceptionAsync(() =>
+                PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.Node, null, false, helperServiceMock.Object));
+
+            Assert.Null(exception);
             helperServiceMock.Verify(
                 x => x.UpdateWebSettings(It.IsAny<Site>(), It.IsAny<Dictionary<string, string>>()),
                 Times.Never);

@@ -492,10 +492,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await UpdateDotNetIsolatedFrameworkVersion(functionApp, requestedDotNetVersion, helperService);
             }
-            else if (!functionApp.IsLinux)
-            {
-                await UpdateNetFrameworkVersionWindows(functionApp, requestedDotNetVersion, helperService);
-            }
             else if (!functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
                 // If linuxFxVersion does not match any of our images
