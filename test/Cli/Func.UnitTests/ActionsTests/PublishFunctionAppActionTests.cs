@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.StacksApi;
 using Moq;
 using Xunit;
@@ -117,6 +118,42 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             helperServiceMock.Verify(
                 x => x.UpdateFlexRuntime(site, "dotnet-isolated", "9.0"),
                 Times.Once);
+        }
+
+        [Theory]
+        [InlineData(WorkerRuntime.Powershell)]
+        [InlineData(WorkerRuntime.Node)]
+        [InlineData(WorkerRuntime.Python)]
+        [InlineData(WorkerRuntime.Java)]
+        public async Task UpdateFrameworkVersions_NonDotnetWindowsApp_DoesNotThrow(WorkerRuntime workerRuntime)
+        {
+            // Arrange - simulate a Windows function app with a non-.NET runtime and no dotnet version specified.
+            // This is the exact scenario that caused "Value cannot be null. (Parameter 'input')" in v4.7.0.
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp", // Windows (no "linux" in Kind)
+                Sku = "dynamic",
+                NetFrameworkVersion = "v6.0",
+                AzureAppSettings = new Dictionary<string, string>
+                {
+                    ["FUNCTIONS_WORKER_RUNTIME"] = workerRuntime.ToString()
+                }
+            };
+
+            var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
+
+            // Act - calling with null dotnetVersion (no --dotnet-version specified) should not throw.
+            // In v4.7.0 this threw ArgumentNullException: Value cannot be null. (Parameter 'input').
+            var exception = await Record.ExceptionAsync(() =>
+                PublishFunctionAppAction.UpdateFrameworkVersions(site, workerRuntime, null, false, helperServiceMock.Object));
+
+            // Assert
+            Assert.Null(exception);
+
+            // Should not try to update the web settings since there is no version to apply
+            helperServiceMock.Verify(
+                x => x.UpdateWebSettings(It.IsAny<Site>(), It.IsAny<Dictionary<string, string>>()),
+                Times.Never);
         }
 
         private static FlexFunctionsStacks CreateMockFlexStacks()
