@@ -7,5 +7,6 @@
   - CLI Version: 4.4.0
   - Host Runtime Version: 4.46.100 (includes 4.846.100, 4.646.100)
 
-#### Breaking Changes
 #### Changes
+
+- Fix `AzureFunctionsJobHost__logging__logLevel__Function` override from `local.settings.json` being ignored due to the host pre-setting the environment variable before user configuration was loaded (#4815)
