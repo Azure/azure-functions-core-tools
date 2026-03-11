@@ -108,6 +108,7 @@ Installation for Linux requires two steps:
 
 | OS Version             | Installation Commands                                                                                                                    |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Ubuntu 24.04           | `wget -q https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb` <br> `sudo dpkg -i packages-microsoft-prod.deb` |
 | Ubuntu 22.04           | `wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb` <br> `sudo dpkg -i packages-microsoft-prod.deb` |
 | Ubuntu 20.04           | `wget -q https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb` <br> `sudo dpkg -i packages-microsoft-prod.deb` |
 | Ubuntu 19.04           | `wget -q https://packages.microsoft.com/config/ubuntu/19.04/packages-microsoft-prod.deb` <br> `sudo dpkg -i packages-microsoft-prod.deb` |
