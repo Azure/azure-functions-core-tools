@@ -492,10 +492,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await UpdateDotNetIsolatedFrameworkVersion(functionApp, requestedDotNetVersion, helperService);
             }
-            else if (!functionApp.IsLinux)
-            {
-                await UpdateNetFrameworkVersionWindows(functionApp, requestedDotNetVersion, helperService);
-            }
             else if (!functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
                 // If linuxFxVersion does not match any of our images
@@ -551,6 +547,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFrameworkVersion);
 
+            // If no version was specified or detected from the project, skip the update.
+            if (normalizedVersion == null)
+            {
+                return;
+            }
+
             // Websites ensure it begins with 'v'.
             string version = $"v{normalizedVersion}";
             if (!string.Equals(functionApp.NetFrameworkVersion, version, StringComparison.OrdinalIgnoreCase))
@@ -575,6 +577,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private static async Task DotnetIsolatedLinuxValidation(Site functionApp, string dotnetFramworkVersion, AzureHelperService helperService)
         {
             string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
+
+            // If no version was specified or detected from the project, skip the update.
+            if (normalizedVersion == null)
+            {
+                return;
+            }
 
             string linuxFxVersion = $"DOTNET-ISOLATED|{normalizedVersion}";
 
@@ -1465,6 +1473,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private static string NormalizeDotnetFrameworkVersion(string version)
         {
+            // If no version was explicitly specified and none was detected from the project, return null.
+            // Callers are expected to skip the update when null is returned.
+            if (version == null && string.IsNullOrEmpty(_requiredNetFrameworkVersion))
+            {
+                return null;
+            }
+
             Version parsedVersion;
 
             if (version == null)

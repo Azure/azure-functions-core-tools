@@ -10,3 +10,4 @@
 #### Changes
 
 - Fix `AzureFunctionsJobHost__logging__logLevel__Function` override from `local.settings.json` being ignored due to the host pre-setting the environment variable before user configuration was loaded (#4815)
+- Fix `ArgumentNullException: Value cannot be null. (Parameter 'input')` during `func azure functionapp publish` for non-.NET runtimes (PowerShell, Node.js, Python, Java) on Windows function apps (#4822)
