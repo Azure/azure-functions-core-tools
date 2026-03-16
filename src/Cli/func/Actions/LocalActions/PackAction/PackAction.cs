@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
@@ -84,17 +85,32 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 Environment.CurrentDirectory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, FolderPath));
             }
 
-            // Detect the runtime and set the runtime
+            // Detect the runtime from environment variable or local.settings.json
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
 
-            // If no runtime is detected and NoBuild is true, check for .dll files to infer .NET runtime
-            // This is because when we run dotnet publish, there is no local.settings.json anymore to determine runtime.
-            if (workerRuntime == WorkerRuntime.None && NoBuild)
+            // Fall back to project-file inference when the runtime cannot be determined from settings.
+            // This is the common case in CI/CD pipelines where local.settings.json is gitignored.
+            if (workerRuntime == WorkerRuntime.None)
             {
-                var files = Directory.GetFiles(FolderPath, "*.dll", SearchOption.AllDirectories);
-                if (files.Length > 0)
+                ColoredConsole.WriteLine(WarningColor(
+                    $"Warning: Could not determine worker runtime from '{Constants.LocalSettingsJsonFileName}' " +
+                    $"or '{Constants.FunctionsWorkerRuntime}' environment variable. " +
+                    "Attempting to infer from project files..."));
+
+                workerRuntime = InferWorkerRuntimeFromProjectFiles(Environment.CurrentDirectory);
+
+                if (workerRuntime == WorkerRuntime.None)
                 {
-                    workerRuntime = WorkerRuntime.Dotnet;
+                    throw new CliException(
+                        "Unable to determine the worker runtime for this project. " +
+                        $"Set '{Constants.FunctionsWorkerRuntime}' in '{Constants.LocalSettingsJsonFileName}' or as an environment variable. " +
+                        $"Valid values: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}.");
+                }
+
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor(
+                        $"Inferred worker runtime '{WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)}' from project files."));
                 }
             }
 
