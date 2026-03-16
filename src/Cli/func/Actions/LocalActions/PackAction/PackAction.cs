@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
@@ -116,5 +117,57 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 WorkerRuntime.Custom => new CustomPackSubcommandAction().RunAsync(packOptions),
                 _ => throw new CliException($"Unsupported runtime: {runtime}")
             });
+
+        internal static WorkerRuntime InferWorkerRuntimeFromProjectFiles(string directory)
+        {
+            // .csproj — check for isolated worker reference to distinguish isolated vs in-proc
+            var csprojFiles = Directory.GetFiles(directory, "*.csproj", SearchOption.TopDirectoryOnly);
+            if (csprojFiles.Length > 0)
+            {
+                foreach (var csprojFile in csprojFiles)
+                {
+                    var content = File.ReadAllText(csprojFile);
+                    if (content.Contains("Microsoft.Azure.Functions.Worker", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return WorkerRuntime.DotnetIsolated;
+                    }
+                }
+
+                return WorkerRuntime.Dotnet;
+            }
+
+            // Python
+            if (File.Exists(Path.Combine(directory, Constants.RequirementsTxt)) ||
+                File.Exists(Path.Combine(directory, Constants.PySteinFunctionAppPy)))
+            {
+                return WorkerRuntime.Python;
+            }
+
+            // Node
+            if (File.Exists(Path.Combine(directory, Constants.PackageJsonFileName)))
+            {
+                return WorkerRuntime.Node;
+            }
+
+            // PowerShell
+            if (File.Exists(Path.Combine(directory, "profile.ps1")) ||
+                Directory.GetFiles(directory, "*.psd1", SearchOption.TopDirectoryOnly).Length > 0)
+            {
+                return WorkerRuntime.Powershell;
+            }
+
+            // Build-output signals (--no-build scenarios)
+            if (File.Exists(Path.Combine(directory, "functions.metadata")))
+            {
+                return WorkerRuntime.DotnetIsolated;
+            }
+
+            if (Directory.GetFiles(directory, "*.dll", SearchOption.AllDirectories).Length > 0)
+            {
+                return WorkerRuntime.Dotnet;
+            }
+
+            return WorkerRuntime.None;
+        }
     }
 }
