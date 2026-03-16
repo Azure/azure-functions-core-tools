@@ -88,30 +88,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // Detect the runtime from environment variable or local.settings.json
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
 
-            // Fall back to project-file inference when the runtime cannot be determined from settings.
-            // This is the common case in CI/CD pipelines where local.settings.json is gitignored.
             if (workerRuntime == WorkerRuntime.None)
             {
-                ColoredConsole.WriteLine(WarningColor(
-                    $"Warning: Could not determine worker runtime from '{Constants.LocalSettingsJsonFileName}' " +
-                    $"or '{Constants.FunctionsWorkerRuntime}' environment variable. " +
-                    "Attempting to infer from project files..."));
-
-                workerRuntime = InferWorkerRuntimeFromProjectFiles(Environment.CurrentDirectory);
-
-                if (workerRuntime == WorkerRuntime.None)
-                {
-                    throw new CliException(
-                        "Unable to determine the worker runtime for this project. " +
-                        $"Set '{Constants.FunctionsWorkerRuntime}' in '{Constants.LocalSettingsJsonFileName}' or as an environment variable. " +
-                        $"Valid values: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}.");
-                }
-
-                if (GlobalCoreToolsSettings.IsVerbose)
-                {
-                    ColoredConsole.WriteLine(VerboseColor(
-                        $"Inferred worker runtime '{WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)}' from project files."));
-                }
+                throw new CliException(
+                    $"Unable to determine the worker runtime for this project. " +
+                    $"Set the '{Constants.FunctionsWorkerRuntime}' value in '{Constants.LocalSettingsJsonFileName}' or as an environment variable. " +
+                    $"Valid values: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}.");
             }
 
             GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
@@ -133,57 +115,5 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 WorkerRuntime.Custom => new CustomPackSubcommandAction().RunAsync(packOptions),
                 _ => throw new CliException($"Unsupported runtime: {runtime}")
             });
-
-        internal static WorkerRuntime InferWorkerRuntimeFromProjectFiles(string directory)
-        {
-            // .csproj — check for isolated worker reference to distinguish isolated vs in-proc
-            var csprojFiles = Directory.GetFiles(directory, "*.csproj", SearchOption.TopDirectoryOnly);
-            if (csprojFiles.Length > 0)
-            {
-                foreach (var csprojFile in csprojFiles)
-                {
-                    var content = File.ReadAllText(csprojFile);
-                    if (content.Contains("Microsoft.Azure.Functions.Worker", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return WorkerRuntime.DotnetIsolated;
-                    }
-                }
-
-                return WorkerRuntime.Dotnet;
-            }
-
-            // Python
-            if (File.Exists(Path.Combine(directory, Constants.RequirementsTxt)) ||
-                File.Exists(Path.Combine(directory, Constants.PySteinFunctionAppPy)))
-            {
-                return WorkerRuntime.Python;
-            }
-
-            // Node
-            if (File.Exists(Path.Combine(directory, Constants.PackageJsonFileName)))
-            {
-                return WorkerRuntime.Node;
-            }
-
-            // PowerShell
-            if (File.Exists(Path.Combine(directory, "profile.ps1")) ||
-                Directory.GetFiles(directory, "*.psd1", SearchOption.TopDirectoryOnly).Length > 0)
-            {
-                return WorkerRuntime.Powershell;
-            }
-
-            // Build-output signals (--no-build scenarios)
-            if (File.Exists(Path.Combine(directory, "functions.metadata")))
-            {
-                return WorkerRuntime.DotnetIsolated;
-            }
-
-            if (Directory.GetFiles(directory, "*.dll", SearchOption.AllDirectories).Length > 0)
-            {
-                return WorkerRuntime.Dotnet;
-            }
-
-            return WorkerRuntime.None;
-        }
     }
 }
