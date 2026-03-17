@@ -88,6 +88,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // Detect the runtime from environment variable or local.settings.json
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
 
+            if (workerRuntime == WorkerRuntime.None && NoBuild)
+            {
+                // Narrow to top-level only to avoid false positives in node_modules/, venvs, etc.
+                var dlls = Directory.GetFiles(Environment.CurrentDirectory, "*.dll", SearchOption.TopDirectoryOnly);
+                if (dlls.Length > 0)
+                {
+                    workerRuntime = WorkerRuntime.Dotnet;
+                    ColoredConsole.WriteLine(WarningColor(
+                        $"Warning: No '{Constants.FunctionsWorkerRuntime}' setting found. " +
+                        $"Defaulting to '{WorkerRuntimeLanguageHelper.GetRuntimeMoniker(WorkerRuntime.Dotnet)}' " +
+                        $"based on .dll files. This fallback is deprecated and will be removed in a future release. " +
+                        $"Set '{Constants.FunctionsWorkerRuntime}' in '{Constants.LocalSettingsJsonFileName}' " +
+                        $"or as an environment variable."));
+                }
+            }
+
             if (workerRuntime == WorkerRuntime.None)
             {
                 throw new CliException(
