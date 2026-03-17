@@ -77,5 +77,39 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             var ex = await act.Should().ThrowAsync<CliException>();
             ex.Which.Message.Should().NotContain("Unable to determine the worker runtime");
         }
+
+        [Fact]
+        public async Task RunAsync_NoBuildWithDllFiles_DoesNotThrowRuntimeError()
+        {
+            // Arrange: --no-build mode with a top-level .dll present (legacy dotnet in-proc build output)
+            File.WriteAllText(Path.Combine(_tempDir, "MyApp.dll"), string.Empty);
+            Environment.CurrentDirectory = _tempDir;
+            var action = new FuncPackAction(_mockSecretsManager.Object);
+            action.ParseArgs(["--no-build"]);
+
+            // Act
+            Func<Task> act = () => action.RunAsync();
+
+            // Assert: must NOT throw the "Unable to determine" CliException.
+            // The action will fail later (no project to pack) but runtime detection must succeed.
+            var ex = await act.Should().ThrowAsync<CliException>();
+            ex.Which.Message.Should().NotContain("Unable to determine the worker runtime");
+        }
+
+        [Fact]
+        public async Task RunAsync_NoBuildWithNoDllFiles_ThrowsCliExceptionWithActionableMessage()
+        {
+            // Arrange: --no-build with no .dll files and no runtime signals
+            Environment.CurrentDirectory = _tempDir;
+            var action = new FuncPackAction(_mockSecretsManager.Object);
+            action.ParseArgs(["--no-build"]);
+
+            // Act
+            Func<Task> act = () => action.RunAsync();
+
+            // Assert
+            var ex = await act.Should().ThrowAsync<CliException>();
+            ex.Which.Message.Should().Contain("Unable to determine the worker runtime");
+        }
     }
 }
