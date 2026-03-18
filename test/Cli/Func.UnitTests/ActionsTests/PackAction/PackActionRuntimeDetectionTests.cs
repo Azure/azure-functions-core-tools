@@ -51,14 +51,11 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             Environment.CurrentDirectory = _tempDir;
             var action = new FuncPackAction(_mockSecretsManager.Object);
 
-            // Act
-            Func<Task> act = () => action.RunAsync();
-
-            // Assert
-            var ex = await act.Should().ThrowAsync<CliException>();
-            ex.Which.Message.Should().Contain("Unable to determine the worker runtime");
-            ex.Which.Message.Should().Contain(Constants.FunctionsWorkerRuntime);
-            ex.Which.Message.Should().Contain(Constants.LocalSettingsJsonFileName);
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<CliException>(() => action.RunAsync());
+            ex.Message.Should().Contain("Unable to determine the worker runtime");
+            ex.Message.Should().Contain(Constants.FunctionsWorkerRuntime);
+            ex.Message.Should().Contain(Constants.LocalSettingsJsonFileName);
         }
 
         [Fact]
@@ -69,13 +66,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             Environment.CurrentDirectory = _tempDir;
             var action = new FuncPackAction(_mockSecretsManager.Object);
 
-            // Act
-            Func<Task> act = () => action.RunAsync();
-
-            // Assert: must NOT throw the "Unable to determine" CliException.
+            // Act & Assert: must NOT throw the "Unable to determine" CliException.
             // The action will still fail (no .csproj to build), but that's a different error.
-            var ex = await act.Should().ThrowAsync<CliException>();
-            ex.Which.Message.Should().NotContain("Unable to determine the worker runtime");
+            var ex = await Assert.ThrowsAsync<CliException>(() => action.RunAsync());
+            ex.Message.Should().NotContain("Unable to determine the worker runtime");
         }
 
         [Fact]
@@ -87,13 +81,19 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             var action = new FuncPackAction(_mockSecretsManager.Object);
             action.ParseArgs(["--no-build"]);
 
-            // Act
-            Func<Task> act = () => action.RunAsync();
+            // Act & Assert: runtime detection succeeds, packing completes (no exception thrown).
+            // The .dll fallback sets Dotnet runtime, and --no-build packs the current directory.
+            Exception thrownException = null;
+            try
+            {
+                await action.RunAsync();
+            }
+            catch (Exception ex)
+            {
+                thrownException = ex;
+            }
 
-            // Assert: must NOT throw the "Unable to determine" CliException.
-            // The action will fail later (no project to pack) but runtime detection must succeed.
-            var ex = await act.Should().ThrowAsync<CliException>();
-            ex.Which.Message.Should().NotContain("Unable to determine the worker runtime");
+            thrownException?.Message.Should().NotContain("Unable to determine the worker runtime");
         }
 
         [Fact]
@@ -104,12 +104,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             var action = new FuncPackAction(_mockSecretsManager.Object);
             action.ParseArgs(["--no-build"]);
 
-            // Act
-            Func<Task> act = () => action.RunAsync();
-
-            // Assert
-            var ex = await act.Should().ThrowAsync<CliException>();
-            ex.Which.Message.Should().Contain("Unable to determine the worker runtime");
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<CliException>(() => action.RunAsync());
+            ex.Message.Should().Contain("Unable to determine the worker runtime");
         }
     }
 }
