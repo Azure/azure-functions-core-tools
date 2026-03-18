@@ -108,5 +108,24 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             var ex = await Assert.ThrowsAsync<CliException>(() => action.RunAsync());
             ex.Message.Should().Contain("Unable to determine the worker runtime");
         }
+
+        [Fact]
+        public async Task RunAsync_WorkerRuntimeSetInLocalSettings_DoesNotThrowRuntimeError()
+        {
+            // Arrange: local.settings.json contains FUNCTIONS_WORKER_RUNTIME (simulated via secrets manager)
+            _mockSecretsManager
+                .Setup(s => s.GetSecrets(It.IsAny<bool>()))
+                .Returns(new Dictionary<string, string>
+                {
+                    [Constants.FunctionsWorkerRuntime] = "dotnet-isolated"
+                });
+            Environment.CurrentDirectory = _tempDir;
+            var action = new FuncPackAction(_mockSecretsManager.Object);
+
+            // Act & Assert: must NOT throw the "Unable to determine" CliException.
+            // The action will still fail (no .csproj to build), but that's a different error.
+            var ex = await Assert.ThrowsAsync<CliException>(() => action.RunAsync());
+            ex.Message.Should().NotContain("Unable to determine the worker runtime");
+        }
     }
 }
