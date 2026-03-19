@@ -40,9 +40,13 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             Environment.CurrentDirectory = _originalDirectory;
             Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
-            if (Directory.Exists(_tempDir))
+            try
             {
                 Directory.Delete(_tempDir, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup; files may still be locked by the test host.
             }
         }
 
