@@ -24,9 +24,9 @@ It extracts: command name, context, help text, visibility, arguments (name, type
 
 | Secret | Description |
 |--------|-------------|
-| `AZURE_DOCS_REPO_PAT` | GitHub PAT with `repo` scope on `MicrosoftDocs/azure-docs-pr`. Needed to create branches and PRs in the docs repo. |
+| `AZURE_DOCS_REPO_PAT` | GitHub PAT with `Contents: write` + `Pull requests: write` on `MicrosoftDocs/azure-docs-pr`. Needed to create branches and PRs in the docs repo. |
 
-> **PAT Expiry:** A [monthly reminder workflow](../.github/workflows/pat-expiry-reminder.yml) opens a GitHub Issue 30 days before the PAT expires. When renewing the PAT, update the `PAT_EXPIRY_DATE` env var in that workflow file.
+> **If the PAT expires:** The workflow will automatically open a GitHub Issue with troubleshooting steps and renewal instructions when it fails to push to the docs repo.
 
 ## Triggering
 
