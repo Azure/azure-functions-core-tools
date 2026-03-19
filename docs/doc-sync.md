@@ -24,7 +24,7 @@ It extracts: command name, context, help text, visibility, arguments (name, type
 
 | Secret | Description |
 |--------|-------------|
-| `DOCS_REPO_PAT` | GitHub PAT with `repo` scope on `MicrosoftDocs/azure-docs-pr`. Needed to create branches and PRs in the docs repo. |
+| `AZURE_DOCS_REPO_PAT` | GitHub PAT with `repo` scope on `MicrosoftDocs/azure-docs-pr`. Needed to create branches and PRs in the docs repo. |
 
 ## Triggering
 

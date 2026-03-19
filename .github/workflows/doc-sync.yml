@@ -136,7 +136,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.DOCS_REPO }}
-          token: ${{ secrets.DOCS_REPO_PAT }}
+          token: ${{ secrets.AZURE_DOCS_REPO_PAT }}
           path: docs-repo
 
       - name: Read release notes
@@ -150,7 +150,7 @@ jobs:
 
       - name: Create docs branch and PR
         env:
-          GH_TOKEN: ${{ secrets.DOCS_REPO_PAT }}
+          GH_TOKEN: ${{ secrets.AZURE_DOCS_REPO_PAT }}
           NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
           OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
           CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
