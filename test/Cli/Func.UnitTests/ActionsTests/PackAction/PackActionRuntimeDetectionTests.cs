@@ -41,7 +41,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
             if (Directory.Exists(_tempDir))
+            {
                 Directory.Delete(_tempDir, recursive: true);
+            }
         }
 
         [Fact]
