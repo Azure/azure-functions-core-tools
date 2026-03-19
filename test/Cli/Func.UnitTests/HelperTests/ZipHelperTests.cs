@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
@@ -82,17 +82,22 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 files.Add(file);
             }
 
-            // walk up to the 'test' directory
+            // Find the repo root by walking up until we find the solution file
             var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-            dir = dir.Parent!.Parent!.Parent!.Parent!;
+            while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Azure.Functions.Cli.sln")))
+            {
+                dir = dir.Parent;
+            }
 
-            // build the project for the rid
-            var csproj = dir.GetFiles($"{proj}.csproj", SearchOption.AllDirectories).FirstOrDefault();
-            var csprojDir = csproj!.Directory!.FullName;
+            Assert.True(dir is not null, "Could not find repo root (Azure.Functions.Cli.sln).");
+
+            // Use the known path directly — no recursive search needed
+            var csprojDir = Path.Combine(dir!.FullName, "test", "ZippedExe");
+            Assert.True(File.Exists(Path.Combine(csprojDir, $"{proj}.csproj")), $"{proj}.csproj not found at {csprojDir}");
 
             ProcessHelper.RunProcess("dotnet", $"build -r {rid}", csprojDir, writeOutput: WriteOutput);
 
-            string outPath = Path.GetFullPath(Path.Combine(csprojDir, "..", "..", "out", "bin", "ZippedExe", $"debug_{rid}"));
+            string outPath = Path.Combine(dir.FullName, "out", "bin", "ZippedExe", $"debug_{rid}");
 
             // copy the files to the zip dir
             foreach (string fileName in new[] { exe, dll, config })
