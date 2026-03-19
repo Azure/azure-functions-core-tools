@@ -1,0 +1,236 @@
+name: Doc Sync — Detect CLI Changes & Open Docs PR
+
+# Triggers on new releases/tags in azure-functions-core-tools.
+# Extracts CLI command metadata, diffs against the previous release,
+# and opens a PR in MicrosoftDocs/azure-docs-pr with a change summary
+# for Copilot (or a human) to generate documentation updates.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      previous_tag:
+        description: "Previous release tag to diff against (leave empty for auto-detect)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  DOCS_REPO: MicrosoftDocs/azure-docs-pr
+  DOCS_BRANCH_PREFIX: doc-sync/core-tools
+
+jobs:
+  extract-and-diff:
+    name: Extract command changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.diff.outputs.has_changes }}
+      summary: ${{ steps.diff.outputs.summary }}
+      new_tag: ${{ steps.tags.outputs.new_tag }}
+      old_tag: ${{ steps.tags.outputs.old_tag }}
+    steps:
+      - name: Checkout current release
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Determine tags
+        id: tags
+        run: |
+          NEW_TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ -n "${{ inputs.previous_tag }}" ]; then
+            OLD_TAG="${{ inputs.previous_tag }}"
+          else
+            # Auto-detect: get the tag before the current one
+            OLD_TAG=$(git tag --sort=-version:refname | grep -A1 "^${NEW_TAG}$" | tail -1)
+            if [ "$OLD_TAG" = "$NEW_TAG" ] || [ -z "$OLD_TAG" ]; then
+              # Fallback: get second-newest tag
+              OLD_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+            fi
+          fi
+
+          echo "old_tag=$OLD_TAG" >> "$GITHUB_OUTPUT"
+          echo "Comparing $OLD_TAG → $NEW_TAG"
+
+      - name: Extract commands from previous release
+        run: |
+          OLD_TAG="${{ steps.tags.outputs.old_tag }}"
+          WORK_DIR=$(mktemp -d)
+          git worktree add "$WORK_DIR" "$OLD_TAG" --detach 2>/dev/null || {
+            echo "::warning::Could not checkout old tag $OLD_TAG — skipping diff"
+            echo '{}' > /tmp/old_commands.json
+            exit 0
+          }
+          # Copy the extraction script into the worktree (it may not exist in old tags)
+          cp .github/scripts/extract_commands.py "$WORK_DIR/.github/scripts/" 2>/dev/null || {
+            mkdir -p "$WORK_DIR/.github/scripts"
+            cp .github/scripts/extract_commands.py "$WORK_DIR/.github/scripts/"
+          }
+          python "$WORK_DIR/.github/scripts/extract_commands.py" "$WORK_DIR" --output /tmp/old_commands.json
+          git worktree remove "$WORK_DIR" --force 2>/dev/null || true
+
+      - name: Extract commands from current release
+        run: |
+          python .github/scripts/extract_commands.py . --output /tmp/new_commands.json
+
+      - name: Diff command manifests
+        id: diff
+        run: |
+          python .github/scripts/extract_commands.py . \
+            --diff /tmp/old_commands.json \
+            --output /tmp/diff.json
+
+          python .github/scripts/extract_commands.py . \
+            --diff /tmp/old_commands.json \
+            --summary \
+            --output /tmp/change_summary.md
+
+          HAS_CHANGES=$(python3 -c "import json; print(json.load(open('/tmp/diff.json'))['has_changes'])")
+          echo "has_changes=$HAS_CHANGES" >> "$GITHUB_OUTPUT"
+
+          # Store summary for later use (handle multiline)
+          {
+            echo "summary<<SUMMARY_EOF"
+            cat /tmp/change_summary.md
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "--- Diff Results ---"
+          cat /tmp/change_summary.md
+
+      - name: Upload artifacts
+        if: steps.diff.outputs.has_changes == 'True'
+        uses: actions/upload-artifact@v4
+        with:
+          name: command-diff
+          path: |
+            /tmp/old_commands.json
+            /tmp/new_commands.json
+            /tmp/diff.json
+            /tmp/change_summary.md
+          retention-days: 30
+
+  open-docs-pr:
+    name: Open documentation PR
+    needs: extract-and-diff
+    if: needs.extract-and-diff.outputs.has_changes == 'True'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download diff artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: command-diff
+          path: /tmp/artifacts
+
+      - name: Checkout docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DOCS_REPO }}
+          token: ${{ secrets.DOCS_REPO_PAT }}
+          path: docs-repo
+
+      - name: Read release notes
+        id: release_notes
+        run: |
+          {
+            echo "body<<RELEASE_EOF"
+            echo "${{ github.event.release.body || 'No release notes provided.' }}"
+            echo "RELEASE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create docs branch and PR
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_REPO_PAT }}
+          NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
+          OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
+          CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
+          RELEASE_NOTES: ${{ steps.release_notes.outputs.body }}
+          RELEASE_URL: https://github.com/Azure/azure-functions-core-tools/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
+          WORKFLOW_URL: https://github.com/Azure/azure-functions-core-tools/blob/main/.github/workflows/doc-sync.yml
+        run: |
+          cd docs-repo
+
+          BRANCH="${DOCS_BRANCH_PREFIX}/${NEW_TAG}"
+          git checkout -b "$BRANCH"
+
+          # Create the change tracking file for the PR
+          mkdir -p .doc-sync
+          cp /tmp/artifacts/diff.json ".doc-sync/core-tools-${NEW_TAG}-diff.json"
+          cp /tmp/artifacts/change_summary.md ".doc-sync/core-tools-${NEW_TAG}-summary.md"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .doc-sync/
+          git commit -m "doc-sync: Azure Functions Core Tools ${NEW_TAG} command changes
+
+          Automated change detection from ${OLD_TAG} → ${NEW_TAG}.
+          See .doc-sync/ for full diff details.
+
+          Source: ${RELEASE_URL}"
+
+          git push origin "$BRANCH"
+
+          # Read diff JSON for inclusion in PR body
+          DIFF_JSON=$(cat /tmp/artifacts/diff.json)
+
+          # Build PR body
+          PR_BODY="## 📝 Documentation Update Required — Azure Functions Core Tools
+
+          **Release:** [\`${NEW_TAG}\`](${RELEASE_URL})
+          **Previous:** \`${OLD_TAG}\`
+          **Source repo:** [Azure/azure-functions-core-tools](https://github.com/Azure/azure-functions-core-tools)
+
+          ---
+
+          ${CHANGE_SUMMARY}
+
+          ---
+
+          ### 📋 Release Notes
+
+          ${RELEASE_NOTES}
+
+          ---
+
+          ### 🤖 Next Steps
+
+          1. Review the command changes above
+          2. Update the relevant documentation pages in \`articles/azure-functions/\`
+          3. Pay special attention to:
+             - New commands → need new doc sections or pages
+             - Modified arguments → update parameter tables and examples
+             - Changed help text → update command descriptions
+             - Removed commands → add deprecation notices
+
+          > **Tip:** Assign this PR to **Copilot** (\`@copilot\`) to auto-generate doc updates based on the change summary above.
+
+          ---
+          <details>
+          <summary>Full diff JSON</summary>
+
+          \`\`\`json
+          ${DIFF_JSON}
+          \`\`\`
+          </details>
+
+          ---
+          *This PR was auto-generated by the [doc-sync workflow](${WORKFLOW_URL}).*"
+
+          gh pr create \
+            --repo "$DOCS_REPO" \
+            --base main \
+            --head "$BRANCH" \
+            --title "doc-sync: Azure Functions Core Tools ${NEW_TAG} — CLI command changes" \
+            --body "$PR_BODY" \
+            --label "doc-sync,azure-functions,core-tools" \
+            --assignee "@copilot"
