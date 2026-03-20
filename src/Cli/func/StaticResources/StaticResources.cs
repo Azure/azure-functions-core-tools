@@ -54,6 +54,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfilePowershell72 => GetValue("Dockerfile.powershell7.2");
 
+        public static Task<string> DockerfilePowershell74 => GetValue("Dockerfile.powershell7.4");
+
         public static Task<string> DockerfileJavaScript => GetValue("Dockerfile.javascript");
 
         public static Task<string> DockerfileTypeScript => GetValue("Dockerfile.typescript");

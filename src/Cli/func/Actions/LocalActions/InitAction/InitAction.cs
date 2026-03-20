@@ -484,7 +484,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.Powershell)
             {
-                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfilePowershell72);
+                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfilePowershell74);
             }
             else if (workerRuntime == Helpers.WorkerRuntime.Custom)
             {
