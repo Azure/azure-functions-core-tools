@@ -87,7 +87,7 @@ $workerPropsToWorkerName = @{
     "eng/build/Workers.Node.props"      = @("NodeJsWorker")
     "eng/build/Workers.Java.props"      = @("JavaWorker")
     "eng/build/Workers.Python.props"    = @("PythonWorker")
-    "eng/build/Workers.Powershell.props" = @("PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PowerShellWorker.PS7.4")
+    "eng/build/Workers.Powershell.props" = @("PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PowerShellWorker.PS7.4", "PowerShellWorker.PS7.6")
 }
 
 $failedValidation = $false
