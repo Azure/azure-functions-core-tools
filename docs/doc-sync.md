@@ -24,9 +24,17 @@ It extracts: command name, context, help text, visibility, arguments (name, type
 
 | Secret | Description |
 |--------|-------------|
-| `AZURE_DOCS_REPO_PAT` | GitHub PAT with `Contents: write` + `Pull requests: write` on `MicrosoftDocs/azure-docs-pr`. Needed to create branches and PRs in the docs repo. |
+| `AZURE_DOCS_REPO_PAT` | GitHub PAT (from `azfuncgh` service account) with `Contents: write` + `Pull requests: write` on the fork `azfuncgh/azure-docs-pr`. Needed to push branches and open PRs. |
 
-> **If the PAT expires:** The workflow will automatically open a GitHub Issue with troubleshooting steps and renewal instructions when it fails to push to the docs repo.
+### Fork Setup
+
+The workflow pushes branches to a **fork** (`azfuncgh/azure-docs-pr`) and opens PRs into the upstream (`MicrosoftDocs/azure-docs-pr`). This is required because the core-tools team doesn't have direct write access to the upstream docs repo.
+
+1. Fork `MicrosoftDocs/azure-docs-pr` under the `azfuncgh` account (if not already done)
+2. Create a fine-grained PAT under `azfuncgh` scoped to the fork with `Contents: write` + `Pull requests: write`
+3. Add it as a secret named `AZURE_DOCS_REPO_PAT` in `Azure/azure-functions-core-tools`
+
+> **If the workflow fails** (expired PAT, missing fork, etc.), it automatically opens a GitHub Issue in this repo with the full change summary and troubleshooting steps.
 
 ## Triggering
 
