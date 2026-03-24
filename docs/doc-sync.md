@@ -30,6 +30,7 @@ It extracts: command name, context, help text, visibility, arguments (name, type
 |----------|---------------|---------|
 | `DOCS_FORK_REPO` | `liliankasem/azure-docs-pr` | Fork where branches are pushed (head of the PR) |
 | `DOCS_UPSTREAM_REPO` | `MicrosoftDocs/azure-docs-pr` | Upstream docs repo where the PR targets (base of the PR) |
+| `DOC_SYNC_REVIEWERS` | `liliankasem` | Comma-separated GitHub usernames to @mention on notification issues |
 
 > If these variables are not set, the workflow falls back to the defaults shown above.
 
@@ -87,6 +88,7 @@ Via CLI:
 ```bash
 gh variable set DOCS_FORK_REPO --repo Azure/azure-functions-core-tools --body "liliankasem/azure-docs-pr"
 gh variable set DOCS_UPSTREAM_REPO --repo Azure/azure-functions-core-tools --body "MicrosoftDocs/azure-docs-pr"
+gh variable set DOC_SYNC_REVIEWERS --repo Azure/azure-functions-core-tools --body "liliankasem"
 ```
 
 Or via the UI: **https://github.com/Azure/azure-functions-core-tools/settings/variables/actions** → **New repository variable**
@@ -124,6 +126,7 @@ If the fork owner leaves the team or you need to switch to a different fork (e.g
 - [ ] `DOC_SYNC_APP_ID` secret updated
 - [ ] `DOC_SYNC_APP_PRIVATE_KEY` secret updated
 - [ ] `DOCS_FORK_REPO` variable updated
+- [ ] `DOC_SYNC_REVIEWERS` variable updated with new reviewer usernames
 - [ ] Workflow tested via `workflow_dispatch`
 
 ## Triggering
