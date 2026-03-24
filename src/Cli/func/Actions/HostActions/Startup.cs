@@ -157,6 +157,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     }
                 });
             }
+
             app.UseWebJobsScriptHost();
         }
 
