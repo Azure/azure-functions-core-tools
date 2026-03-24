@@ -21,7 +21,7 @@ permissions:
 
 env:
   # Upstream docs repo where the PR targets (base of the PR)
-  DOCS_UPSTREAM_REPO: MicrosoftDocs/azure-docs-pr
+  DOCS_UPSTREAM_REPO: ${{ vars.DOCS_UPSTREAM_REPO || 'MicrosoftDocs/azure-docs-pr' }}
   # Fork repo where branches are pushed (head of the PR).
   # Override by setting the DOCS_FORK_REPO repository variable.
   DOCS_FORK_REPO: ${{ vars.DOCS_FORK_REPO || 'liliankasem/azure-docs-pr' }}
@@ -182,8 +182,8 @@ jobs:
           OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
           CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
           RELEASE_NOTES: ${{ steps.release_notes.outputs.body }}
-          RELEASE_URL: https://github.com/Azure/azure-functions-core-tools/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
-          WORKFLOW_URL: https://github.com/Azure/azure-functions-core-tools/blob/main/.github/workflows/doc-sync.yml
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/.github/workflows/doc-sync.yml
         run: |
           cd docs-repo
 
@@ -215,7 +215,7 @@ jobs:
 
           **Release:** [\`${NEW_TAG}\`](${RELEASE_URL})
           **Previous:** \`${OLD_TAG}\`
-          **Source repo:** [Azure/azure-functions-core-tools](https://github.com/Azure/azure-functions-core-tools)
+          **Source repo:** [\`${{ github.repository }}\`](${{ github.server_url }}/${{ github.repository }})
 
           ---
 
@@ -293,7 +293,7 @@ jobs:
           OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
           CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          RELEASE_URL: https://github.com/Azure/azure-functions-core-tools/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
         run: |
           gh issue create \
             --repo "${{ github.repository }}" \
