@@ -159,13 +159,6 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           path: docs-repo
 
-      - name: Sync fork with upstream
-        run: |
-          cd docs-repo
-          git remote add upstream "https://github.com/${DOCS_UPSTREAM_REPO}.git"
-          git fetch upstream main
-          git checkout -B main upstream/main
-
       - name: Read release notes
         id: release_notes
         run: |
