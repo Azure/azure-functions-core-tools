@@ -2,16 +2,18 @@
 
 Automated documentation change detection for Azure Functions Core Tools.
 
-## What It Does
+When a new release is published, this workflow extracts CLI command metadata, diffs it against the previous release, and opens a PR in the docs repo with a detailed change summary.
 
-When a new release is published, this workflow:
+## How It Works
 
-1. **Extracts** CLI command metadata (names, help text, arguments) from the current and previous release
-2. **Diffs** the two manifests to find added, removed, or modified commands
-3. **Opens a PR** in [`MicrosoftDocs/azure-docs-pr`](https://github.com/MicrosoftDocs/azure-docs-pr) with a detailed change summary
-4. **Assigns Copilot** to the PR so it can auto-generate documentation updates
+```
+Release published
+  → extract-and-diff job: parses [Action(...)] attributes + .Setup<T>() args from C# source
+  → open-docs-pr job: pushes branch to fork, opens PR into upstream docs repo
+  → fallback-issue job: if PR fails, opens a GitHub Issue here with the changes + troubleshooting
+```
 
-## How Commands Are Detected
+### What It Detects
 
 The extraction script (`.github/scripts/extract_commands.py`) parses:
 
@@ -20,31 +22,109 @@ The extraction script (`.github/scripts/extract_commands.py`) parses:
 
 It extracts: command name, context, help text, visibility, arguments (name, type, description, defaults).
 
-## Required Secrets
+## Current Configuration
 
-| Secret | Description |
-|--------|-------------|
+### Repository Variables (Settings → Variables → Actions)
+
+| Variable | Current Value | Purpose |
+|----------|---------------|---------|
+| `DOCS_FORK_REPO` | `liliankasem/azure-docs-pr` | Fork where branches are pushed (head of the PR) |
+| `DOCS_UPSTREAM_REPO` | `MicrosoftDocs/azure-docs-pr` | Upstream docs repo where the PR targets (base of the PR) |
+
+> If these variables are not set, the workflow falls back to the defaults shown above.
+
+### Repository Secrets (Settings → Secrets → Actions)
+
+| Secret | Purpose |
+|--------|---------|
 | `DOC_SYNC_APP_ID` | The GitHub App's numeric ID |
 | `DOC_SYNC_APP_PRIVATE_KEY` | The GitHub App's private key (`.pem` file contents) |
 
-### GitHub App Setup
+## Setup Guide
 
-The workflow uses a **GitHub App** for authentication (no PAT expiry to manage). The App is installed on the fork `liliankasem/azure-docs-pr` and generates short-lived tokens automatically.
+### 1. Create the GitHub App
 
-1. Create a GitHub App at https://github.com/settings/apps/new with:
+1. Go to **https://github.com/settings/apps/new** (logged in as the fork owner)
+2. Fill in:
+   - **App name:** `core-tools-doc-sync` (must be globally unique)
+   - **Homepage URL:** `https://github.com/Azure/azure-functions-core-tools`
+   - **Webhook:** Uncheck **Active** (not needed)
+3. Under **Permissions → Repository permissions**, set:
    - **Contents:** Read and write
    - **Pull requests:** Read and write
-   - Webhooks disabled
-2. Install the App on `liliankasem/azure-docs-pr`
-3. Add the App ID and private key as secrets in `Azure/azure-functions-core-tools`:
-   - `DOC_SYNC_APP_ID`
-   - `DOC_SYNC_APP_PRIVATE_KEY`
+   - **Metadata:** Read-only (auto-selected)
+4. Under **Where can this GitHub App be installed?** → select **Only on this account**
+5. Click **Create GitHub App**
+6. On the App page, note the **App ID** (number near the top)
+7. Scroll to **Private keys** → click **Generate a private key** → save the downloaded `.pem` file
 
-### Fork Setup
+### 2. Install the App on the fork
 
-The workflow pushes branches to a **fork** (`liliankasem/azure-docs-pr`) and opens PRs into the upstream (`MicrosoftDocs/azure-docs-pr`). This is required because the core-tools team doesn't have direct write access to the upstream docs repo.
+1. Go to **https://github.com/settings/apps** → find your app → click **Edit**
+2. In the left sidebar, click **Install App**
+3. Click **Install** next to your account
+4. Select **Only select repositories** → choose the fork repo (e.g., `azure-docs-pr`)
+5. Click **Install**
 
-> **If the workflow fails** (App misconfigured, missing fork, etc.), it automatically opens a GitHub Issue in this repo with the full change summary and troubleshooting steps.
+### 3. Add secrets to `azure-functions-core-tools`
+
+Via CLI:
+
+```bash
+# App ID (just the number, e.g., 123456)
+gh secret set DOC_SYNC_APP_ID --repo Azure/azure-functions-core-tools
+
+# Private key (the .pem file)
+gh secret set DOC_SYNC_APP_PRIVATE_KEY --repo Azure/azure-functions-core-tools < ~/Downloads/core-tools-doc-sync.*.pem
+```
+
+Or via the UI: **https://github.com/Azure/azure-functions-core-tools/settings/secrets/actions** → **New repository secret**
+
+### 4. Set repository variables
+
+Via CLI:
+
+```bash
+gh variable set DOCS_FORK_REPO --repo Azure/azure-functions-core-tools --body "liliankasem/azure-docs-pr"
+gh variable set DOCS_UPSTREAM_REPO --repo Azure/azure-functions-core-tools --body "MicrosoftDocs/azure-docs-pr"
+```
+
+Or via the UI: **https://github.com/Azure/azure-functions-core-tools/settings/variables/actions** → **New repository variable**
+
+## Changing the Fork
+
+If the fork owner leaves the team or you need to switch to a different fork (e.g., from `liliankasem/azure-docs-pr` to `azfuncgh/azure-docs-pr`), follow these steps. **No code changes are needed.**
+
+### Step-by-step
+
+1. **Create or identify the new fork** of `MicrosoftDocs/azure-docs-pr` under the new owner/org
+
+2. **Create a new GitHub App** under the new fork owner's account (see [Setup Guide](#1-create-the-github-app) above), or transfer the existing App if same owner
+
+3. **Install the App** on the new fork repo (see [Step 2](#2-install-the-app-on-the-fork) above)
+
+4. **Update the secrets** in `Azure/azure-functions-core-tools`:
+   ```bash
+   gh secret set DOC_SYNC_APP_ID --repo Azure/azure-functions-core-tools
+   gh secret set DOC_SYNC_APP_PRIVATE_KEY --repo Azure/azure-functions-core-tools < new-app.pem
+   ```
+
+5. **Update the repository variable:**
+   ```bash
+   gh variable set DOCS_FORK_REPO --repo Azure/azure-functions-core-tools --body "new-owner/azure-docs-pr"
+   ```
+
+6. **Test** by triggering the workflow manually from the Actions tab using `workflow_dispatch`
+
+### Checklist
+
+- [ ] New fork exists and is synced with upstream
+- [ ] GitHub App created under new fork owner
+- [ ] App installed on new fork repo with Contents + Pull requests permissions
+- [ ] `DOC_SYNC_APP_ID` secret updated
+- [ ] `DOC_SYNC_APP_PRIVATE_KEY` secret updated
+- [ ] `DOCS_FORK_REPO` variable updated
+- [ ] Workflow tested via `workflow_dispatch`
 
 ## Triggering
 
@@ -62,6 +142,16 @@ python3 .github/scripts/extract_commands.py . --output commands.json
 # Diff against a saved manifest from a previous release
 python3 .github/scripts/extract_commands.py . --diff old_commands.json --summary
 ```
+
+## Troubleshooting
+
+| Problem | Likely Cause | Fix |
+|---------|-------------|-----|
+| Workflow can't checkout fork | App not installed on fork, or wrong `DOCS_FORK_REPO` | Verify App installation and variable value |
+| Can't push branch to fork | App missing `Contents: write` permission | Edit App permissions at https://github.com/settings/apps |
+| Can't open PR in upstream | Fork owner can't open PRs in upstream repo | Request access from MicrosoftDocs team |
+| Branch already exists | Re-run for same release tag | Delete the old branch from the fork first |
+| No workflow in Actions tab | Workflow not on `main` yet | Merge the workflow PR first |
 
 ## Files
 
