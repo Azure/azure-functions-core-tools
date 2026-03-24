@@ -22,7 +22,7 @@
     <PackageVersion Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
     <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1047.100" />
     <PackageVersion Include="Microsoft.Build" Version="17.0.0" />
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.73.1" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.78.0" />
     <PackageVersion Include="NuGet.Packaging" Version="5.11.6" />
     <PackageVersion Include="System.Formats.Asn1" Version="6.0.1" />
     <PackageVersion Include="YamlDotNet" Version="6.0.0" />
