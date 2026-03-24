@@ -22,8 +22,9 @@ permissions:
 env:
   # Upstream docs repo where the PR targets (base of the PR)
   DOCS_UPSTREAM_REPO: MicrosoftDocs/azure-docs-pr
-  # Fork repo where branches are pushed (head of the PR)
-  DOCS_FORK_REPO: liliankasem/azure-docs-pr
+  # Fork repo where branches are pushed (head of the PR).
+  # Override by setting the DOCS_FORK_REPO repository variable.
+  DOCS_FORK_REPO: ${{ vars.DOCS_FORK_REPO || 'liliankasem/azure-docs-pr' }}
   DOCS_BRANCH_PREFIX: doc-sync/core-tools
 
 jobs:
@@ -130,14 +131,20 @@ jobs:
     if: needs.extract-and-diff.outputs.has_changes == 'True'
     runs-on: ubuntu-latest
     steps:
+      - name: Parse fork owner and repo
+        id: fork
+        run: |
+          echo "owner=${DOCS_FORK_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "repo=${DOCS_FORK_REPO##*/}" >> "$GITHUB_OUTPUT"
+
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.DOC_SYNC_APP_ID }}
           private-key: ${{ secrets.DOC_SYNC_APP_PRIVATE_KEY }}
-          owner: liliankasem
-          repositories: azure-docs-pr
+          owner: ${{ steps.fork.outputs.owner }}
+          repositories: ${{ steps.fork.outputs.repo }}
 
       - name: Download diff artifacts
         uses: actions/download-artifact@v4
