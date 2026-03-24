@@ -23,7 +23,7 @@ env:
   # Upstream docs repo where the PR targets (base of the PR)
   DOCS_UPSTREAM_REPO: MicrosoftDocs/azure-docs-pr
   # Fork repo where branches are pushed (head of the PR)
-  DOCS_FORK_REPO: azfuncgh/azure-docs-pr
+  DOCS_FORK_REPO: liliankasem/azure-docs-pr
   DOCS_BRANCH_PREFIX: doc-sync/core-tools
 
 jobs:
@@ -130,6 +130,15 @@ jobs:
     if: needs.extract-and-diff.outputs.has_changes == 'True'
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DOC_SYNC_APP_ID }}
+          private-key: ${{ secrets.DOC_SYNC_APP_PRIVATE_KEY }}
+          owner: liliankasem
+          repositories: azure-docs-pr
+
       - name: Download diff artifacts
         uses: actions/download-artifact@v4
         with:
@@ -140,7 +149,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.DOCS_FORK_REPO }}
-          token: ${{ secrets.AZURE_DOCS_REPO_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
           path: docs-repo
 
       - name: Sync fork with upstream
@@ -161,7 +170,7 @@ jobs:
 
       - name: Create docs branch and PR
         env:
-          GH_TOKEN: ${{ secrets.AZURE_DOCS_REPO_PAT }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
           OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
           CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
@@ -295,24 +304,22 @@ jobs:
 
           The [doc-sync workflow](${RUN_URL}) failed to push a PR to \`${DOCS_UPSTREAM_REPO}\` via the fork \`${DOCS_FORK_REPO}\`. This is likely due to one of:
 
-          #### 🔑 Expired or invalid PAT
-          The \`AZURE_DOCS_REPO_PAT\` secret may have expired or been revoked.
+          #### 🔑 GitHub App misconfigured
+          The \`DOC_SYNC_APP_ID\` or \`DOC_SYNC_APP_PRIVATE_KEY\` secrets may be missing, incorrect, or the App may have been uninstalled.
 
           **To fix:**
-          1. Log in as the \`azfuncgh\` service account
-          2. Go to [GitHub Fine-grained tokens](https://github.com/settings/tokens?type=beta)
-          3. Create a new token scoped to \`${DOCS_FORK_REPO}\` with:
-             - **Contents:** Read and write
-             - **Pull requests:** Read and write
-          4. Set expiration to 90 days (max allowed)
-          5. Update the secret at [Repo Settings → Secrets → Actions](${{ github.server_url }}/${{ github.repository }}/settings/secrets/actions) — name: \`AZURE_DOCS_REPO_PAT\`
-          6. Re-run the [failed workflow](${RUN_URL})
+          1. Verify the GitHub App is installed on \`${DOCS_FORK_REPO}\` at https://github.com/settings/apps
+          2. Check that the App has **Contents: Read and write** and **Pull requests: Read and write** permissions
+          3. Verify both secrets exist at [Repo Settings → Secrets → Actions](${{ github.server_url }}/${{ github.repository }}/settings/secrets/actions):
+             - \`DOC_SYNC_APP_ID\` — the App's numeric ID
+             - \`DOC_SYNC_APP_PRIVATE_KEY\` — the App's private key (.pem)
+          4. Re-run the [failed workflow](${RUN_URL})
 
           #### 🍴 Fork does not exist
-          The fork \`${DOCS_FORK_REPO}\` may not exist. Create it by forking \`${DOCS_UPSTREAM_REPO}\` under the \`azfuncgh\` account.
+          The fork \`${DOCS_FORK_REPO}\` may not exist or may have been deleted.
 
           #### 🔒 No access to upstream
-          The \`azfuncgh\` account needs permission to open PRs in \`${DOCS_UPSTREAM_REPO}\`. Check with the MicrosoftDocs team.
+          The fork owner needs permission to open PRs in \`${DOCS_UPSTREAM_REPO}\`. Check with the MicrosoftDocs team.
 
           #### 🌿 Branch conflict
           A branch \`doc-sync/core-tools/${NEW_TAG}\` may already exist in the fork from a previous attempt.
