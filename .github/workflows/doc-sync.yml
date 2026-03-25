@@ -227,7 +227,7 @@ jobs:
           Automated documentation update from ${OLD_TAG} → ${NEW_TAG}.
           Source: ${RELEASE_URL}"
 
-          git push origin "$BRANCH"
+          git push --force origin "${BRANCH}:${BRANCH}"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Build PR body
