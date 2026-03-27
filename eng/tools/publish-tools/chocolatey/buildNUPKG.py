@@ -3,7 +3,7 @@
 # depends on chocolaty
 import os
 from re import sub
-import wget
+import requests
 import sys
 from string import Template
 from shared import constants
@@ -52,7 +52,11 @@ def preparePackage():
         # output to local folder
         if not os.path.exists(fileName):
             print(f"downloading from {url}")
-            wget.download(url)
+            with requests.get(url, stream=True, timeout=600) as r:
+                r.raise_for_status()
+                with open(fileName, 'wb') as dl:
+                    for chunk in r.iter_content(chunk_size=8 * 1024 * 1024):
+                        dl.write(chunk)
 
         # get the checksums
         fileHash = produceHashForfile(fileName, HASH)
