@@ -4,7 +4,9 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Fclp;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
@@ -83,18 +85,31 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 Environment.CurrentDirectory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, FolderPath));
             }
 
-            // Detect the runtime and set the runtime
+            // Detect the runtime from environment variable or local.settings.json
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
 
-            // If no runtime is detected and NoBuild is true, check for .dll files to infer .NET runtime
-            // This is because when we run dotnet publish, there is no local.settings.json anymore to determine runtime.
             if (workerRuntime == WorkerRuntime.None && NoBuild)
             {
-                var files = Directory.GetFiles(FolderPath, "*.dll", SearchOption.AllDirectories);
-                if (files.Length > 0)
+                // Narrow to top-level only to avoid false positives in node_modules/, venvs, etc.
+                var dlls = Directory.GetFiles(Environment.CurrentDirectory, "*.dll", SearchOption.TopDirectoryOnly);
+                if (dlls.Length > 0)
                 {
                     workerRuntime = WorkerRuntime.Dotnet;
+                    ColoredConsole.WriteLine(WarningColor(
+                        $"Warning: No '{Constants.FunctionsWorkerRuntime}' setting found. " +
+                        $"Defaulting to '{WorkerRuntimeLanguageHelper.GetRuntimeMoniker(WorkerRuntime.Dotnet)}' " +
+                        $"based on .dll files. This fallback is deprecated and will be removed in a future release. " +
+                        $"Set '{Constants.FunctionsWorkerRuntime}' in '{Constants.LocalSettingsJsonFileName}' " +
+                        $"or as an environment variable."));
                 }
+            }
+
+            if (workerRuntime == WorkerRuntime.None)
+            {
+                throw new CliException(
+                    $"Unable to determine the worker runtime for this project. " +
+                    $"Set the '{Constants.FunctionsWorkerRuntime}' value in '{Constants.LocalSettingsJsonFileName}' or as an environment variable. " +
+                    $"Valid values: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}.");
             }
 
             GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
