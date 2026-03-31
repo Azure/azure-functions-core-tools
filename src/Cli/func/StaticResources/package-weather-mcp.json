@@ -1,0 +1,40 @@
+{
+  "name": "weather-mcp-app",
+  "version": "1.0.0",
+  "description": "Weather MCP App - Model Context Protocol Application with Real-time Weather Widget",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "func start",
+    "dev": "concurrently \"npm run watch\" \"npm run start\"",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "concurrently": "^8.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "prettier": "^3.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": "^18.0.0 || ^20.0.0"
+  },
+  "keywords": [
+    "azure-functions",
+    "mcp",
+    "weather-widget",
+    "serverless"
+  ],
+  "author": "Azure Functions Team",
+  "license": "MIT"
+}
