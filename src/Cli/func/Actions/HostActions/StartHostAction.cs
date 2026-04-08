@@ -25,7 +25,6 @@ using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -186,7 +185,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return base.ParseArgs(args);
         }
 
-        private async Task<IHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
+#pragma warning disable ASPDEPR008 // Startup implements IStartup which requires IWebHost lifecycle
+        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, UserLogLevel);
 
@@ -210,41 +210,28 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 ColoredConsole.WriteLine(ErrorColor("CONTAINER_NAME is a reserved environment variable for the Functions Host. Please remove or rename this setting."));
             }
 
-            return Host.CreateDefaultBuilder(Array.Empty<string>())
-                .ConfigureWebHostDefaults(webBuilder =>
+            var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
+
+            if (UseHttps)
+            {
+                defaultBuilder
+                .UseKestrel(options =>
                 {
-                    if (UseHttps)
+                    options.Listen(IPAddress.Any, listenAddress.Port, listenOptins =>
                     {
-                        webBuilder.UseKestrel(options =>
-                        {
-                            options.Listen(IPAddress.Any, listenAddress.Port, listenOptins =>
-                            {
-                                listenOptins.UseHttps(certificate);
-                            });
-                        });
-                    }
+                        listenOptins.UseHttps(certificate);
+                    });
+                });
+            }
 
-                    webBuilder
-                        .ConfigureKestrel(o =>
-                        {
-                            // Setting it to match the default RequestBodySize in host
-                            o.Limits.MaxRequestBodySize = Constants.DefaultMaxRequestBodySize;
-                        })
-                        .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
-                        .UseUrls(listenAddress.ToString())
-                        .ConfigureServices((context, services) =>
-                        {
-                            services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile));
-
-                            if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
-                            {
-                                services.AddSingleton<IConfigureBuilder<IServiceCollection>>(_ => new DotNetIsolatedDebugConfigureBuilder());
-                            }
-
-                            // We do not need diagnostic events for local development, so we replace it with a null repository
-                            services.AddSingleton<IDiagnosticEventRepository, DiagnosticEventNullRepository>();
-                        });
+            return defaultBuilder
+                .ConfigureKestrel(o =>
+                {
+                    // Setting it to match the default RequestBodySize in host
+                    o.Limits.MaxRequestBodySize = Constants.DefaultMaxRequestBodySize;
                 })
+                .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
+                .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
                 {
                     configBuilder.AddEnvironmentVariables();
@@ -281,8 +268,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         return !isSharedMemoryWarning && !isAppInsightsExtensionWarning;
                     });
                 })
+                .ConfigureServices((context, services) =>
+                {
+                    services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile));
+
+                    if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
+                    {
+                        services.AddSingleton<IConfigureBuilder<IServiceCollection>>(_ => new DotNetIsolatedDebugConfigureBuilder());
+                    }
+
+                    // We do not need diagnostic events for local development, so we replace it with a null repository
+                    services.AddSingleton<IDiagnosticEventRepository, DiagnosticEventNullRepository>();
+                })
                 .Build();
         }
+#pragma warning restore ASPDEPR008
 
         internal async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
@@ -467,7 +467,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 await ExtensionBundleHelper.GetExtensionBundle();
             }
 
-            IHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
+#pragma warning disable ASPDEPR008
+            IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
+#pragma warning restore ASPDEPR008
             var runTask = host.RunAsync();
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
 

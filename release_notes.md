@@ -11,7 +11,6 @@
 
 - Updated target framework to .NET 10
 - Migrated from deprecated `Microsoft.DotNet.PlatformAbstractions` to `System.Runtime.InteropServices.RuntimeInformation`
-- Migrated from `IWebHost` to `IHost` in `StartHostAction`
 - Migrated from deprecated `X509Certificate2` constructor to `X509CertificateLoader`
 - Bumped `Microsoft.Extensions.DependencyInjection` to 10.0.0
 - Bumped `Microsoft.Extensions.Logging` / `Logging.Abstractions` to 10.0.0 / 10.0.3
