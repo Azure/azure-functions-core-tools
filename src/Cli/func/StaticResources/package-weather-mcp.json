@@ -1,7 +1,7 @@
 {
-  "name": "weather-mcp-app",
+  "name": "mcp-resource-app",
   "version": "1.0.0",
-  "description": "Weather MCP App - Model Context Protocol Application with Real-time Weather Widget",
+  "description": "MCP Resource App - Model Context Protocol Application with a scaffolded UI",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -32,7 +32,7 @@
   "keywords": [
     "azure-functions",
     "mcp",
-    "weather-widget",
+    "mcp-resource",
     "serverless"
   ],
   "author": "Azure Functions Team",

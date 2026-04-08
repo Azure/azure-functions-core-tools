@@ -176,8 +176,7 @@ namespace Azure.Functions.Cli.Common
             // Running the validations here. There is no change in the user data in this loop.
             foreach (var file in templateFiles)
             {
-                fileName = fileName ?? ReplaceFunctionNamePlaceholder(file.Key, functionName);
-                var filePath = Path.Combine(Path.Combine(Environment.CurrentDirectory, "src", "functions"), fileName);
+                var filePath = ResolveNodeProgrammingModelFilePath(fileName, file.Key, functionName);
                 AskToRemoveFileIfExists(filePath, functionName);
                 fileList.Add(filePath, ReplaceFunctionNamePlaceholder(file.Value, functionName));
             }
@@ -190,6 +189,7 @@ namespace Azure.Functions.Cli.Common
                     ColoredConsole.WriteLine(VerboseColor($"Creating a new file {filePath}"));
                 }
 
+                FileSystemHelpers.EnsureDirectory(Path.GetDirectoryName(filePath));
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileList[filePath]);
             }
         }
@@ -293,6 +293,48 @@ namespace Azure.Functions.Cli.Common
         private string ReplaceFunctionNamePlaceholder(string str, string functionName)
         {
             return str?.Replace("%functionName%", functionName) ?? str;
+        }
+
+        private string ResolveNodeProgrammingModelFileName(string requestedFileName, string templateFileName, string functionName)
+        {
+            if (!string.IsNullOrWhiteSpace(requestedFileName) && templateFileName.Contains("%functionName%", StringComparison.OrdinalIgnoreCase))
+            {
+                return requestedFileName;
+            }
+
+            return ReplaceFunctionNamePlaceholder(templateFileName, functionName);
+        }
+
+        private string ResolveNodeProgrammingModelFilePath(string requestedFileName, string templateFileName, string functionName)
+        {
+            var resolvedFileName = ResolveNodeProgrammingModelFileName(requestedFileName, templateFileName, functionName);
+            var normalizedFileName = NormalizeNodeProgrammingModelFilePath(resolvedFileName);
+
+            if (IsNodeProgrammingModelProjectRelativePath(templateFileName))
+            {
+                return Path.Combine(Environment.CurrentDirectory, normalizedFileName);
+            }
+
+            return Path.Combine(Environment.CurrentDirectory, "src", "functions", normalizedFileName);
+        }
+
+        private static bool IsNodeProgrammingModelProjectRelativePath(string templateFileName)
+        {
+            return templateFileName.Contains('/')
+                || templateFileName.Contains('\\')
+                || templateFileName.StartsWith(".", StringComparison.Ordinal);
+        }
+
+        private static string NormalizeNodeProgrammingModelFilePath(string filePath)
+        {
+            if (filePath.StartsWith("./", StringComparison.Ordinal) || filePath.StartsWith(".\\", StringComparison.Ordinal))
+            {
+                filePath = filePath[2..];
+            }
+
+            return filePath
+                .Replace('/', Path.DirectorySeparatorChar)
+                .Replace('\\', Path.DirectorySeparatorChar);
         }
 
         public async Task<IEnumerable<NewTemplate>> GetV2Templates()
