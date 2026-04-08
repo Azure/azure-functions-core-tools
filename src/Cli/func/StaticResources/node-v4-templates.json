@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "id": "BlobTrigger-JavaScript-4.x",
     "runtime": "2",
@@ -648,6 +648,48 @@
       "name": "MCP Tool Trigger",
       "language": "JavaScript",
       "triggerType": "mcpToolTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "McpResourceTrigger-Typescript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\n\n// Handler returns the content for the MCP resource when a client reads it.\nexport async function mcpResourceHello(_resourceContext: unknown, context: InvocationContext): Promise<string> {\n    context.log('MCP Resource trigger function processed a request.');\n    return 'Hello from MCP Resource!';\n}\n\n// Register a file-style MCP resource clients can discover and read.\napp.mcpResource('mcpFileResource', {\n    uri: 'file://mcpFileResource.txt',\n    resourceName: 'mcpFileResource',\n    description: 'Simple MCP Resource that returns text content.',\n    mimeType: 'text/plain',\n    handler: mcpResourceHello\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpResourceTrigger",
+      "description": "$McpResourceTrigger_description",
+      "name": "MCP Resource Trigger",
+      "language": "TypeScript",
+      "triggerType": "mcpResourceTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "McpResourceTrigger-Javascript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\n\n// Handler returns the content for the MCP resource when a client reads it.\nasync function mcpResourceHello(_resourceContext, context) {\n    context.log('MCP Resource trigger function processed a request.');\n    return 'Hello from MCP Resource!';\n}\n\n// Register a file-style MCP resource clients can discover and read.\napp.mcpResource('mcpFileResource', {\n    uri: 'file://mcpFileResource.txt',\n    resourceName: 'mcpFileResource',\n    description: 'Simple MCP Resource that returns text content.',\n    mimeType: 'text/plain',\n    handler: mcpResourceHello\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpResourceTrigger",
+      "description": "$McpResourceTrigger_description",
+      "name": "MCP Resource Trigger",
+      "language": "JavaScript",
+      "triggerType": "mcpResourceTrigger",
       "category": [
         "$temp_category_core",
         "$temp_category_dataProcessing"
