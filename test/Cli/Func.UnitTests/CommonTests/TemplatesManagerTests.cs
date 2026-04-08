@@ -165,5 +165,71 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             manager.Should().NotBeNull();
             manager.Should().BeAssignableTo<ITemplatesManager>();
         }
+
+        [Fact]
+        public async Task Deploy_NodeV4MultiFileTemplate_CreatesEachFileOnce()
+        {
+            // Arrange
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = new Template
+            {
+                Id = "McpResourceTrigger-Javascript-4.x",
+                Files = new Dictionary<string, string>
+                {
+                    ["%functionName%.js"] = "module.exports = '%functionName%';",
+                    ["weatherService.js"] = "module.exports = 'weather';"
+                },
+                Metadata = new TemplateMetadata
+                {
+                    Name = "MCP Resource - Weather Widget",
+                    DefaultFunctionName = "weatherMcpApp",
+                    Language = "JavaScript",
+                    TriggerType = "mcpResourceTrigger"
+                }
+            };
+
+            // Act
+            await manager.Deploy("weatherMcpApp", null, template);
+
+            // Assert
+            var functionsDirectory = Path.Combine(_testWorkingDir, "src", "functions");
+            File.Exists(Path.Combine(functionsDirectory, "weatherMcpApp.js")).Should().BeTrue();
+            File.Exists(Path.Combine(functionsDirectory, "weatherService.js")).Should().BeTrue();
+            Directory.GetFiles(functionsDirectory).Should().HaveCount(2);
+        }
+
+        [Fact]
+        public async Task Deploy_NodeV4Template_WithProjectRelativeFiles_CreatesNestedAndRootArtifacts()
+        {
+            // Arrange
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = new Template
+            {
+                Id = "McpResourceTrigger-Typescript-4.x",
+                Files = new Dictionary<string, string>
+                {
+                    ["%functionName%.ts"] = "export const name = '%functionName%';",
+                    ["./README.mcp-resource.md"] = "# MCP Resource",
+                    ["src/app/package.json"] = "{\"name\":\"app\"}",
+                    ["src/app/src/weather-app.ts"] = "console.log('weather app');"
+                },
+                Metadata = new TemplateMetadata
+                {
+                    Name = "MCP Resource - Weather Widget",
+                    DefaultFunctionName = "weatherMcpApp",
+                    Language = "TypeScript",
+                    TriggerType = "mcpResourceTrigger"
+                }
+            };
+
+            // Act
+            await manager.Deploy("weatherMcpApp", null, template);
+
+            // Assert
+            File.Exists(Path.Combine(_testWorkingDir, "src", "functions", "weatherMcpApp.ts")).Should().BeTrue();
+            File.Exists(Path.Combine(_testWorkingDir, "README.mcp-resource.md")).Should().BeTrue();
+            File.Exists(Path.Combine(_testWorkingDir, "src", "app", "package.json")).Should().BeTrue();
+            File.Exists(Path.Combine(_testWorkingDir, "src", "app", "src", "weather-app.ts")).Should().BeTrue();
+        }
     }
 }

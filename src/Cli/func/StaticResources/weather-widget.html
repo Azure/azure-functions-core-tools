@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Widget - MCP App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .weather-widget {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .search-section {
+            margin-bottom: 30px;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        #locationInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        #locationInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #searchBtn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #searchBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        #searchBtn:active {
+            transform: translateY(0);
+        }
+
+        #searchBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .weather-display {
+            display: none;
+        }
+
+        .weather-display.active {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .location-name {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .weather-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .info-label {
+            color: #666;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            color: #333;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .condition-card {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .condition-card .info-label {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .condition-card .info-value {
+            color: white;
+            font-size: 24px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            background: #f5f7fa;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .detail-label {
+            color: #666;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-value {
+            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .error-message {
+            display: none;
+            background: #fee;
+            border: 2px solid #fcc;
+            border-radius: 10px;
+            padding: 15px;
+            color: #c33;
+            text-align: center;
+            margin-top: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+
+        .powered-by {
+            margin-top: 10px;
+            font-size: 11px;
+        }
+
+        .powered-by a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .powered-by a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .weather-widget {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            .search-container {
+                flex-direction: column;
+            }
+
+            .info-card {
+                padding: 15px;
+            }
+
+            .info-value {
+                font-size: 24px;
+            }
+
+            .details-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="weather-widget">
+            <div class="header">
+                <h1>🌤️ Weather App</h1>
+                <p class="subtitle">MCP Resource Widget - Real-time weather information</p>
+            </div>
+
+            <div class="search-section">
+                <div class="search-container">
+                    <input 
+                        type="text" 
+                        id="locationInput" 
+                        placeholder="Enter city name (e.g., Seattle, London, Tokyo)"
+                        autocomplete="off"
+                    >
+                    <button id="searchBtn">Search</button>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Fetching weather data...</p>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="weather-display" id="weatherDisplay">
+                <div class="location-name" id="locationName"></div>
+
+                <div class="weather-info">
+                    <div class="info-card">
+                        <div class="info-label">Temperature (°C)</div>
+                        <div class="info-value"><span id="tempC">--</span>°</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Temperature (°F)</div>
+                        <div class="info-value"><span id="tempF">--</span>°</div>
+                    </div>
+                    <div class="info-card condition-card">
+                        <div class="info-label">Condition</div>
+                        <div class="info-value" id="condition">--</div>
+                    </div>
+                </div>
+
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">💧 Humidity</div>
+                        <div class="detail-value"><span id="humidity">--</span>%</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">💨 Wind Speed</div>
+                        <div class="detail-value"><span id="windSpeed">--</span> km/h</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">📊 Source</div>
+                        <div class="detail-value" id="source">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>Enter a city name above to get current weather information</p>
+                <div class="powered-by">
+                    Powered by <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> API
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const locationInput = document.getElementById('locationInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const weatherDisplay = document.getElementById('weatherDisplay');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Event listeners
+        searchBtn.addEventListener('click', fetchWeather);
+        locationInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                fetchWeather();
+            }
+        });
+
+        async function fetchWeather() {
+            const location = locationInput.value.trim();
+            
+            if (!location) {
+                showError('Please enter a city name');
+                return;
+            }
+
+            showLoading(true);
+            errorMessage.classList.remove('active');
+            weatherDisplay.classList.remove('active');
+
+            try {
+                // This will call the MCP getWeather tool
+                // In a real MCP environment, this would be connected to the actual tool
+                const response = await callMCPTool('getWeather', { location });
+                
+                if (response.Error) {
+                    showError(response.Error);
+                } else {
+                    displayWeather(response);
+                }
+            } catch (error) {
+                showError(`Failed to fetch weather: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayWeather(data) {
+            document.getElementById('locationName').textContent = data.Location;
+            document.getElementById('tempC').textContent = Math.round(data.TemperatureC);
+            document.getElementById('tempF').textContent = Math.round(data.TemperatureF);
+            document.getElementById('condition').textContent = data.Condition;
+            document.getElementById('humidity').textContent = data.Humidity;
+            document.getElementById('windSpeed').textContent = Math.round(data.WindSpeedKmh);
+            document.getElementById('source').textContent = data.Source.split('/')[0];
+
+            weatherDisplay.classList.add('active');
+        }
+
+        function showError(message) {
+            errorMessage.textContent = '⚠️ ' + message;
+            errorMessage.classList.add('active');
+        }
+
+        function showLoading(isLoading) {
+            if (isLoading) {
+                loading.classList.add('active');
+            } else {
+                loading.classList.remove('active');
+            }
+        }
+
+        // Placeholder for MCP Tool call
+        // In a real MCP environment, this would be connected to the actual tool
+        async function callMCPTool(toolName, args) {
+            // This is a mock implementation
+            // In production, this would communicate with the MCP server
+            console.log(`Calling MCP tool: ${toolName} with args:`, args);
+            
+            // For demo purposes, return mock data
+            return {
+                Location: args.location,
+                TemperatureC: 22,
+                TemperatureF: 72,
+                Condition: 'Partly Cloudy',
+                Humidity: 65,
+                WindSpeedKmh: 12,
+                Source: 'api.open-meteo.com'
+            };
+        }
+
+        // Initialize with a default location on load
+        window.addEventListener('load', () => {
+            locationInput.value = 'London';
+            locationInput.focus();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+MCP Resource Trigger (TypeScript)
+====================================================
+
+A Model Context Protocol (MCP) Resource Trigger that demonstrates rendering an interactive weather widget as an MCP resource and providing weather data through an MCP tool.
+
+This template includes:
+- Weather widget resource that serves HTML UI for rendering
+- Weather tool that fetches real-time weather data using the Open-Meteo API
+- Integration with geocoding for location resolution
+- Full error handling and fallback mechanisms
+- Type-safe implementations with TypeScript
+
+The weather widget provides:
+- Interactive search for city names
+- Real-time temperature display (Celsius and Fahrenheit)
+- Weather condition information
+- Humidity and wind speed metrics
+- Responsive design for desktop and mobile
+
+Project Structure:
+- weatherMcpApp.ts - Main MCP application with resource and tool definitions
+- weatherService.ts - Weather API integration and geocoding logic
+
+Requirements:
+- Azure Functions Node.js runtime 4.x with TypeScript support
+- TypeScript 5.0 or later
+- Internet access for weather API calls (api.open-meteo.com)
+
+Key Interfaces:
+- WeatherResult: Contains temperature, condition, humidity, and wind data
+- WeatherError: Contains error information for failed requests
+- WeatherService: Handles API calls and data transformation
+
+Resources:
+- MCP Documentation: https://modelcontextprotocol.io/
+- Open-Meteo API: https://open-meteo.com/
+- Azure Functions: https://docs.microsoft.com/azure/azure-functions/
+- TypeScript: https://www.typescriptlang.org/
