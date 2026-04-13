@@ -9,4 +9,4 @@
 
 #### Changes
 
-- Fixed `func pack --python` stripping `.dist-info` directories from packaged dependencies (#4852)
+- Fixed `func pack --python` stripping `.dist-info` directories from packaged dependencies (#4853)
