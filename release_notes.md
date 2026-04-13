@@ -8,3 +8,5 @@
   - Host Runtime Version: 4.46.100 (includes 4.846.100, 4.646.100)
 
 #### Changes
+
+- Fixed `func pack --python` stripping `.dist-info` directories from packaged dependencies (#4852)

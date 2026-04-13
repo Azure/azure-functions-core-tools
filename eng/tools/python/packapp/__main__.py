@@ -45,8 +45,10 @@ class Wheel:
                     
                 # Determine destination based on file location in wheel
                 if member.startswith(f'{info_dir}/'):
-                    # Skip dist-info for now - we don't need it for basic installation
-                    continue
+                    # Preserve dist-info (entry_points.txt, METADATA, etc.)
+                    # needed by importlib.metadata for entry-point discovery
+                    dest_dir = paths['purelib']
+                    dest_path = os.path.join(dest_dir, member)
                 elif member.startswith(f'{data_dir}/'):
                     # Handle data files
                     rel_path = member[len(f'{data_dir}/'):]
