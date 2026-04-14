@@ -215,6 +215,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
 
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Native)
+                {
+                    ColoredConsole.WriteLine(WarningColor("[preview] The native worker runtime is currently in preview. Features and behavior may change in future releases."));
+                }
+
                 // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
                 // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
                 // before attempting to resolve the programming model.
@@ -280,9 +285,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (!string.IsNullOrEmpty(workerRuntimeString))
             {
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeString);
-                language = !string.IsNullOrEmpty(languageString)
-                    ? WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString)
-                    : WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
+                if (!string.IsNullOrEmpty(languageString))
+                {
+                    language = WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString);
+                }
+                else if (WorkerRuntimeLanguageHelper.TryNormalizeLanguage(workerRuntimeString, out var inferredLanguage))
+                {
+                    language = inferredLanguage;
+                }
+                else
+                {
+                    language = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
+                }
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
