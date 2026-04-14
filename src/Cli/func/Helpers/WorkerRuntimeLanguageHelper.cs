@@ -176,7 +176,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentNullException(nameof(languageString), "language can't be empty");
             }
-            else if (_normalizeMap.ContainsKey(languageString))
+            else if (WorkerRuntimeStringToLanguage.ContainsKey(languageString))
             {
                 return WorkerRuntimeStringToLanguage[languageString];
             }
@@ -184,6 +184,18 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentException($"Language '{languageString}' is not available. Available language strings are {WorkerRuntimeStringToLanguage.Keys}");
             }
+        }
+
+        public static bool TryNormalizeLanguage(string languageString, out string normalized)
+        {
+            if (!string.IsNullOrWhiteSpace(languageString) && WorkerRuntimeStringToLanguage.ContainsKey(languageString))
+            {
+                normalized = WorkerRuntimeStringToLanguage[languageString];
+                return true;
+            }
+
+            normalized = null;
+            return false;
         }
 
         public static IEnumerable<string> LanguagesForWorker(WorkerRuntime worker)
