@@ -180,6 +180,7 @@ namespace Azure.Functions.Cli.Services
                 WorkerRuntime.Powershell => "POWERSHELL",
                 WorkerRuntime.Dotnet => "DOTNET",
                 WorkerRuntime.DotnetIsolated => "DOTNET-ISOLATED",
+                WorkerRuntime.Native => "NATIVE",
                 _ => null
             };
 

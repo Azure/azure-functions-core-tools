@@ -71,6 +71,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool SkipNpmInstall { get; set; } = false;
 
+        public bool SkipGoModTidy { get; set; } = false;
+
         public WorkerRuntime ResolvedWorkerRuntime { get; set; }
 
         public string ResolvedLanguage { get; set; }
@@ -146,6 +148,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<bool>("skip-npm-install")
                 .Callback(skip => SkipNpmInstall = skip);
+
+            Parser
+                .Setup<bool>("skip-go-mod-tidy")
+                .Callback(skip => SkipGoModTidy = skip);
 
             Parser
                 .Setup<string>('m', "model")
@@ -238,7 +244,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation);
+                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation, SkipGoModTidy);
                 await WriteFiles();
 
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
@@ -276,7 +282,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeString);
                 language = !string.IsNullOrEmpty(languageString)
                     ? WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString)
-                    : WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntimeString);
+                    : WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
@@ -304,7 +310,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (workerRuntime == Helpers.WorkerRuntime.Node
                 || workerRuntime == Helpers.WorkerRuntime.DotnetIsolated
-                || workerRuntime == Helpers.WorkerRuntime.Dotnet)
+                || workerRuntime == Helpers.WorkerRuntime.Dotnet
+                || workerRuntime == Helpers.WorkerRuntime.Native)
             {
                 if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
                     && languages.Count() != 0)
@@ -324,7 +331,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string language,
             ProgrammingModel programmingModel,
             bool managedDependenciesOption,
-            bool generatePythonDocumentation = true)
+            bool generatePythonDocumentation = true,
+            bool skipGoModTidy = false)
         {
             switch (workerRuntime)
             {
@@ -368,6 +376,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     break;
                 case Helpers.WorkerRuntime.Node:
                     await NodeJSHelpers.SetupProject(programmingModel, language);
+                    break;
+                case Helpers.WorkerRuntime.Native:
+                    await GoHelpers.SetupProject(
+                        Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-_."),
+                        skipGoModTidy);
+                    await FileSystemHelpers.WriteFileIfNotExists("main.go", await StaticResources.MainGo);
+                    await FileSystemHelpers.WriteFileIfNotExists(Constants.FuncIgnoreFile, await StaticResources.FuncIgnore);
                     break;
             }
         }
@@ -489,6 +504,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (workerRuntime == Helpers.WorkerRuntime.Custom)
             {
                 await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCustom);
+            }
+            else if (workerRuntime == Helpers.WorkerRuntime.Native)
+            {
+                ColoredConsole.WriteLine(WarningColor("Docker support for the native worker runtime is not yet available. Skipping Dockerfile creation."));
+                return;
             }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
             {

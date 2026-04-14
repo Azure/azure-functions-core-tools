@@ -25,7 +25,9 @@ namespace Azure.Functions.Cli.Helpers
         [DisplayString("powershell")]
         Powershell,
         [DisplayString("custom")]
-        Custom
+        Custom,
+        [DisplayString("native")]
+        Native
     }
 
     public static class WorkerRuntimeLanguageHelper
@@ -38,7 +40,8 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Python, new[] { "py" } },
             { WorkerRuntime.Java, new string[] { } },
             { WorkerRuntime.Powershell, new[] { "pwsh" } },
-            { WorkerRuntime.Custom, new string[] { } }
+            { WorkerRuntime.Custom, new string[] { } },
+            { WorkerRuntime.Native, new[] { "go", "golang" } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
@@ -53,6 +56,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Python, Constants.Languages.Python },
             { WorkerRuntime.Powershell, Constants.Languages.Powershell },
             { WorkerRuntime.Custom, Constants.Languages.Custom },
+            { WorkerRuntime.Native, Constants.Languages.Golang },
         };
 
         private static readonly IDictionary<string, IEnumerable<string>> _languageToAlias = new Dictionary<string, IEnumerable<string>>
@@ -67,7 +71,8 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.CSharp, new[] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.FSharp, new[] { "fsharp" } },
             { Constants.Languages.Java, new string[] { } },
-            { Constants.Languages.Custom, new string[] { } }
+            { Constants.Languages.Custom, new string[] { } },
+            { Constants.Languages.Golang, new[] { "go" } }
         };
 
         public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = _languageToAlias
@@ -79,7 +84,8 @@ namespace Azure.Functions.Cli.Helpers
         {
             { WorkerRuntime.Node, new[] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
             { WorkerRuntime.Dotnet, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
-            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } }
+            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
+            { WorkerRuntime.Native, new[] { Constants.Languages.Golang } }
         };
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => _availableWorkersRuntime.Keys
@@ -110,6 +116,8 @@ namespace Azure.Functions.Cli.Helpers
                     return "powershell";
                 case WorkerRuntime.Custom:
                     return "custom";
+                case WorkerRuntime.Native:
+                    return "native";
                 default:
                     return "None";
             }
@@ -145,7 +153,16 @@ namespace Azure.Functions.Cli.Helpers
             }
             else if (_normalizeMap.ContainsKey(workerRuntime))
             {
-                return _normalizeMap[workerRuntime];
+                var resolved = _normalizeMap[workerRuntime];
+
+                if (resolved == WorkerRuntime.Native
+                    && !string.Equals(workerRuntime, "native", StringComparison.OrdinalIgnoreCase))
+                {
+                    ColoredConsole.WriteLine(WarningColor(
+                        $"'{workerRuntime}' is not a worker runtime. Golang is supported under the 'native' worker runtime. Resolving to --worker-runtime native."));
+                }
+
+                return resolved;
             }
             else
             {
