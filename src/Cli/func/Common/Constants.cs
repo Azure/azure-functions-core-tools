@@ -113,7 +113,8 @@ namespace Azure.Functions.Cli.Common
             { WorkerRuntime.Dotnet, new[] { "mcr.microsoft.com/azure-functions/dotnet", "microsoft/azure-functions-dotnet-core2.0", "mcr.microsoft.com/azure-functions/base", "microsoft/azure-functions-base" } },
             { WorkerRuntime.Node, new[] { "mcr.microsoft.com/azure-functions/node", "microsoft/azure-functions-node8" } },
             { WorkerRuntime.Python, new[] { "mcr.microsoft.com/azure-functions/python", "microsoft/azure-functions-python3.6" } },
-            { WorkerRuntime.Powershell, new[] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } }
+            { WorkerRuntime.Powershell, new[] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } },
+            { WorkerRuntime.Native, new string[] { } }
         };
 
         public static readonly string[] TriggersWithoutStorage =
@@ -161,6 +162,7 @@ namespace Azure.Functions.Cli.Common
             public const string Powershell = "powershell";
             public const string Java = "java";
             public const string Custom = "custom";
+            public const string Golang = "golang";
         }
 
         public static class ArmConstants

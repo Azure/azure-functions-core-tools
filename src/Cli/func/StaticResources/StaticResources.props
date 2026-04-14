@@ -1,6 +1,9 @@
 <Project>
   <!-- Static resources embedded into the assembly -->
   <ItemGroup>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)main.go">
+      <LogicalName>$(AssemblyName).main.go</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)stacks.json">
       <LogicalName>$(AssemblyName).stacks.json</LogicalName>
     </EmbeddedResource>
