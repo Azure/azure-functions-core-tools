@@ -62,40 +62,53 @@ namespace Azure.Functions.Cli.Helpers
             var goVersion = await GetEnvironmentGoVersion();
             AssertGoVersion(goVersion);
 
-            // Initialize: Run go mod init
-            var modInitExe = new Executable("go", $"mod init {moduleName}");
-            var modInitExitCode = await modInitExe.RunAsync(
-                l => ColoredConsole.WriteLine(l),
-                e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-            if (modInitExitCode != 0)
-            {
-                throw new CliException($"Failed to initialize Go module. 'go mod init {moduleName}' exited with code {modInitExitCode}.");
-            }
-
-            // Fetch the Azure Functions Go worker dependency
-            var goGetExe = new Executable("go", "get github.com/azure/azure-functions-golang-worker");
-            var goGetExitCode = await goGetExe.RunAsync(
-                l => ColoredConsole.WriteLine(l),
-                e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-            if (goGetExitCode != 0)
-            {
-                throw new CliException("Failed to add Azure Functions Go worker dependency. 'go get' exited with a non-zero code.");
-            }
+            await RunGoCommandAsync($"mod init {moduleName}", "Failed to initialize Go module.");
+            await RunGoCommandAsync("get github.com/azure/azure-functions-golang-worker", "Failed to add Azure Functions Go worker dependency.");
 
             if (!skipGoModTidy)
             {
-                var tidyExe = new Executable("go", "mod tidy");
-                var tidyExitCode = await tidyExe.RunAsync(
-                    l => ColoredConsole.WriteLine(l),
-                    e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-                if (tidyExitCode != 0)
-                {
-                    ColoredConsole.WriteLine(WarningColor("Warning: 'go mod tidy' exited with a non-zero code. You may need to run it manually."));
-                }
+                await RunGoCommandAsync("mod tidy", null, throwOnFailure: false);
             }
             else
             {
                 ColoredConsole.WriteLine(AdditionalInfoColor("Skipped \"go mod tidy\". You must run \"go mod tidy\" manually."));
+            }
+
+            await FileSystemHelpers.WriteFileIfNotExists("main.go", await StaticResources.MainGo);
+            await FileSystemHelpers.WriteFileIfNotExists(Constants.FuncIgnoreFile, await StaticResources.FuncIgnore);
+        }
+
+        private static async Task RunGoCommandAsync(string arguments, string errorMessage, bool throwOnFailure = true)
+        {
+            var exe = new Executable("go", arguments);
+            var stderr = new StringBuilder();
+            var exitCode = await exe.RunAsync(
+                l =>
+                {
+                    if (GlobalCoreToolsSettings.IsVerbose)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor(l));
+                    }
+                },
+                e =>
+                {
+                    stderr.AppendLine(e);
+                    if (GlobalCoreToolsSettings.IsVerbose)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor(e));
+                    }
+                });
+
+            if (exitCode != 0)
+            {
+                var stderrOutput = stderr.ToString().Trim();
+                if (throwOnFailure)
+                {
+                    var detail = string.IsNullOrEmpty(stderrOutput) ? string.Empty : $" {stderrOutput}";
+                    throw new CliException($"{errorMessage}{detail}");
+                }
+
+                ColoredConsole.WriteLine(WarningColor($"Warning: 'go {arguments}' exited with a non-zero code. You may need to run it manually."));
             }
         }
 
@@ -119,9 +132,12 @@ namespace Azure.Functions.Cli.Helpers
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Go is not installed or not on PATH
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Unable to detect Go version: {ex.Message}"));
+                }
             }
 
             return null;

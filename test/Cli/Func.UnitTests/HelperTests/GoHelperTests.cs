@@ -67,6 +67,27 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             var action = () => GoHelpers.AssertGoVersion(null);
             action.Should().Throw<CliException>().Which.Message.Should().Contain("Could not find a Go installation");
         }
+
+        [Theory]
+        [InlineData("beta1")]
+        [InlineData("notaversion")]
+        public void AssertGoVersion_UnparseableVersion_ThrowsCliException(string version)
+        {
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Native, version, "go");
+
+            var action = () => GoHelpers.AssertGoVersion(worker);
+            action.Should().Throw<CliException>().Which.Message.Should().Contain("Unable to parse Go version");
+        }
+
+        [Theory]
+        [InlineData("1.24.2.1")]
+        [InlineData("1.25.0-rc1")]
+        public void AssertGoVersion_ExtraVersionParts_DoesNotThrow(string version)
+        {
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Native, version, "go");
+
+            GoHelpers.AssertGoVersion(worker);
+        }
     }
 
     public sealed class SkipIfGoNonExistFact : FactAttribute

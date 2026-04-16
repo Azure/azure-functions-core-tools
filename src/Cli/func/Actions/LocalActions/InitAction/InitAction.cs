@@ -215,10 +215,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
 
-                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Native)
-                {
-                    ColoredConsole.WriteLine(WarningColor("[preview] The native worker runtime is currently in preview. Features and behavior may change in future releases."));
-                }
+                Utilities.WarnIfNativeWorkerRuntime(ResolvedWorkerRuntime);
 
                 // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
                 // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
@@ -249,7 +246,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation, SkipGoModTidy);
+
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Native)
+                {
+                    await GoHelpers.SetupProject(
+                        Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-_"),
+                        SkipGoModTidy);
+                }
+                else
+                {
+                    await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation);
+                }
+
                 await WriteFiles();
 
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
@@ -295,7 +303,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
                 else
                 {
-                    language = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
+                    language = LanguageSelectionIfRelevant(workerRuntime);
+                    if (string.IsNullOrEmpty(language))
+                    {
+                        language = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
+                    }
                 }
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
@@ -345,8 +357,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string language,
             ProgrammingModel programmingModel,
             bool managedDependenciesOption,
-            bool generatePythonDocumentation = true,
-            bool skipGoModTidy = false)
+            bool generatePythonDocumentation = true)
         {
             switch (workerRuntime)
             {
@@ -390,13 +401,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     break;
                 case Helpers.WorkerRuntime.Node:
                     await NodeJSHelpers.SetupProject(programmingModel, language);
-                    break;
-                case Helpers.WorkerRuntime.Native:
-                    await GoHelpers.SetupProject(
-                        Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-_."),
-                        skipGoModTidy);
-                    await FileSystemHelpers.WriteFileIfNotExists("main.go", await StaticResources.MainGo);
-                    await FileSystemHelpers.WriteFileIfNotExists(Constants.FuncIgnoreFile, await StaticResources.FuncIgnore);
                     break;
             }
         }

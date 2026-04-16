@@ -91,5 +91,38 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             funcInitResult.Should().HaveStdOutContaining("Docker support for the native worker runtime is not yet available");
             File.Exists(Path.Combine(workingDir, "Dockerfile")).Should().BeFalse("Expected no Dockerfile for native runtime");
         }
+
+        [Fact]
+        public void Init_WithGoAlias_ResolvesToNativeAndGeneratesProject()
+        {
+            var workingDir = WorkingDirectory;
+            var testName = nameof(Init_WithGoAlias_ResolvesToNativeAndGeneratesProject);
+            var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
+
+            var funcInitResult = funcInitCommand
+                .WithWorkingDirectory(workingDir)
+                .Execute(["--worker-runtime", "go"]);
+
+            funcInitResult.Should().ExitWith(0);
+            funcInitResult.Should().HaveStdOutContaining("maps to the 'native' worker runtime");
+            File.Exists(Path.Combine(workingDir, "main.go")).Should().BeTrue("Expected main.go to exist");
+            File.Exists(Path.Combine(workingDir, "go.mod")).Should().BeTrue("Expected go.mod to exist");
+        }
+
+        [Fact]
+        public void Init_InNonEmptyDirectory_WithoutForceFlag_Fails()
+        {
+            var workingDir = WorkingDirectory;
+            File.WriteAllText(Path.Combine(workingDir, "existing.txt"), "test");
+
+            var testName = nameof(Init_InNonEmptyDirectory_WithoutForceFlag_Fails);
+            var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
+
+            var funcInitResult = funcInitCommand
+                .WithWorkingDirectory(workingDir)
+                .Execute(["--worker-runtime", "native", "--language", "golang"]);
+
+            funcInitResult.ExitCode.Should().NotBe(0, "Expected init to fail in non-empty directory without --force");
+        }
     }
 }
