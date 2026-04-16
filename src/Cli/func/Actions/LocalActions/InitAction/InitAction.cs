@@ -141,7 +141,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(tf => TargetFramework = tf);
 
             Parser
-                .Setup<string>("language")
+                .Setup<string>('l', "language")
                 .SetDefault(null)
                 .Callback(l => Language = l);
 
