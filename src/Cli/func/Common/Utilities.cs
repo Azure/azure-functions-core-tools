@@ -64,6 +64,19 @@ namespace Azure.Functions.Cli
             ColoredConsole.WriteLine();
         }
 
+        internal static void WarnIfNativeWorkerRuntime(Helpers.WorkerRuntime workerRuntime)
+        {
+            if (workerRuntime != Helpers.WorkerRuntime.Native)
+            {
+                return;
+            }
+
+            ColoredConsole
+                .WriteLine("The native worker runtime is currently in preview. Features and behavior may change in future releases.".DarkYellow());
+
+            ColoredConsole.WriteLine();
+        }
+
         internal static void PrintSupportInformation()
         {
             Architecture arch = RuntimeInformation.ProcessArchitecture;

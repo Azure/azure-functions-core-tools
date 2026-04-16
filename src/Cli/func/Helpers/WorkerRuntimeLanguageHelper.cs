@@ -159,7 +159,7 @@ namespace Azure.Functions.Cli.Helpers
                     && !string.Equals(workerRuntime, "native", StringComparison.OrdinalIgnoreCase))
                 {
                     ColoredConsole.WriteLine(WarningColor(
-                        $"'{workerRuntime}' is not a worker runtime. Golang is supported under the 'native' worker runtime. Resolving to --worker-runtime native."));
+                        $"'{workerRuntime}' maps to the 'native' worker runtime. Resolving to --worker-runtime native."));
                 }
 
                 return resolved;
