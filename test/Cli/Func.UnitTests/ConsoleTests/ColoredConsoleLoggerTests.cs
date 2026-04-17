@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Security.Authentication;
 using System.Text;
 using Azure.Functions.Cli.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -89,6 +90,58 @@ namespace Azure.Functions.Cli.UnitTests.ConsoleTests
             var functionLogsRule = coloredConsoleLogger.SelectRule("Function.TestFunction", customFilterOptions);
             Assert.NotNull(functionLogsRule.LogLevel);
             Assert.Equal(LogLevel.Information, functionLogsRule.LogLevel);
+        }
+
+        [Theory]
+        [InlineData("CERTIFICATE_VERIFY_FAILED", true)]
+        [InlineData("certificate signed by unknown authority", true)]
+        [InlineData("The remote certificate is invalid according to the validation procedure", true)]
+        [InlineData("The SSL connection could not be established", true)]
+        [InlineData("SSL handshake failed", true)]
+        [InlineData("certificate verify failed", true)]
+        [InlineData("The operation has timed out.", false)]
+        [InlineData("Worker process started and initialized.", false)]
+        [InlineData("gRPC channel failed", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void ContainsSslKeywords_Tests(string message, bool expected)
+        {
+            Assert.Equal(expected, ColoredConsoleLogger.ContainsSslKeywords(message));
+        }
+
+        [Fact]
+        public void IsSslCertificateException_WithAuthenticationException_ReturnsTrue()
+        {
+            var exception = new AuthenticationException("The remote certificate is invalid.");
+            Assert.True(ColoredConsoleLogger.IsSslCertificateException(exception));
+        }
+
+        [Fact]
+        public void IsSslCertificateException_WithNestedAuthenticationException_ReturnsTrue()
+        {
+            var inner = new AuthenticationException("SSL handshake failed");
+            var outer = new Exception("Connection failed", inner);
+            Assert.True(ColoredConsoleLogger.IsSslCertificateException(outer));
+        }
+
+        [Fact]
+        public void IsSslCertificateException_WithSslKeywordInMessage_ReturnsTrue()
+        {
+            var exception = new Exception("CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate");
+            Assert.True(ColoredConsoleLogger.IsSslCertificateException(exception));
+        }
+
+        [Fact]
+        public void IsSslCertificateException_WithUnrelatedExceptions_ReturnsFalse()
+        {
+            var exception = new Exception("The operation has timed out.");
+            Assert.False(ColoredConsoleLogger.IsSslCertificateException(exception));
+        }
+
+        [Fact]
+        public void IsSslCertificateException_WithNull_ReturnsFalse()
+        {
+            Assert.False(ColoredConsoleLogger.IsSslCertificateException(null));
         }
     }
 }

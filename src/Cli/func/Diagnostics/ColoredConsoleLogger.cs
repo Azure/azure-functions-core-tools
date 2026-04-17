@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Security.Authentication;
 using System.Text;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -103,6 +104,7 @@ namespace Azure.Functions.Cli.Diagnostics
             if (DoesMessageStartsWithAllowedLogsPrefix(formattedMessage))
             {
                 LogToConsole(logLevel, exception, formattedMessage);
+                MaybeLogSslCertificateHint(exception, formattedMessage);
                 return;
             }
 
@@ -112,6 +114,62 @@ namespace Azure.Functions.Cli.Diagnostics
             }
 
             LogToConsole(logLevel, exception, formattedMessage);
+            MaybeLogSslCertificateHint(exception, formattedMessage);
+        }
+
+        /// <summary>
+        /// If the exception or message indicates an SSL/TLS certificate validation failure,
+        /// logs an additional warning with actionable guidance for SSL inspection environments.
+        /// </summary>
+        private void MaybeLogSslCertificateHint(Exception exception, string formattedMessage)
+        {
+            if (IsSslCertificateException(exception) || ContainsSslKeywords(formattedMessage))
+            {
+                LogToConsole(LogLevel.Warning, null, Constants.Errors.SslCertificateErrorDetected);
+                LogToConsole(LogLevel.Warning, null, Constants.Errors.SslCertificateHint);
+            }
+        }
+
+        /// <summary>
+        /// Walks the exception chain looking for SSL/TLS certificate validation errors.
+        /// </summary>
+        internal static bool IsSslCertificateException(Exception exception)
+        {
+            var current = exception;
+            while (current != null)
+            {
+                if (current is AuthenticationException)
+                {
+                    return true;
+                }
+
+                if (ContainsSslKeywords(current.Message))
+                {
+                    return true;
+                }
+
+                current = current.InnerException;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns true if the message contains keywords associated with SSL/TLS certificate failures.
+        /// </summary>
+        internal static bool ContainsSslKeywords(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return false;
+            }
+
+            return message.IndexOf("CERTIFICATE_VERIFY_FAILED", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("certificate signed by unknown authority", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("The remote certificate is invalid", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("The SSL connection could not be established", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("SSL handshake failed", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("certificate verify failed", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void LogToConsole(LogLevel logLevel, Exception exception, string formattedMessage, bool includeTimeStamp = true)

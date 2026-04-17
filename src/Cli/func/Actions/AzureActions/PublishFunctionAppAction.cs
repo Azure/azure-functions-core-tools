@@ -7,6 +7,7 @@ using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
@@ -256,6 +257,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     // HttpRequestException is thrown for connectivity failures (SSL, socket, DNS)
                     // not for HTTP status errors, which are handled by CheckResponseStatusAsync as CliException.
+                    if (ColoredConsoleLogger.IsSslCertificateException(ex))
+                    {
+                        throw new CliException($"{Constants.Errors.SslCertificateErrorDetected}{Environment.NewLine}{Constants.Errors.SslCertificateHint}{Environment.NewLine}Details: {ex.Message}", ex);
+                    }
+
                     throw new CliException($"{Constants.Errors.PublishNetworkingError}{Environment.NewLine}Details: {ex.Message}", ex);
                 }
             }

@@ -149,6 +149,8 @@ namespace Azure.Functions.Cli.Common
             public const string AppSettingNotFound = "Warning: Cannot find value named '{0}' in {1} that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5}.";
             public const string AppSettingNotFoundWithUserSecrets = "Warning: Cannot find value named '{0}' in {1} or User Secrets that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5} or User Secrets.";
             public const string ProxiesNotSupported = $"Warning: Proxies are not supported in Azure Functions v4. Instead of '{Constants.ProxiesJsonFileName}', try Azure API Management: https://aka.ms/AAfiueq";
+            public const string SslCertificateErrorDetected = "SSL/TLS certificate validation failed. This may be caused by an SSL inspection proxy (e.g., Zscaler, Cisco Umbrella) intercepting HTTPS connections.";
+            public const string SslCertificateHint = "Hint: If you are behind an SSL inspection proxy, add the proxy's root certificate to your system's trusted certificate store. See https://aka.ms/functions-ssl-inspection for more information.";
         }
 
         public static class Languages
