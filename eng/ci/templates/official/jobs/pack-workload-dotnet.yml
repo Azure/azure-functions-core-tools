@@ -1,0 +1,29 @@
+jobs:
+- job: Pack
+  displayName: 'Pack NuGet'
+  timeoutInMinutes: 15
+
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-windows-2022
+    os: windows
+
+  templateContext:
+    outputs:
+    - output: pipelineArtifact
+      displayName: 'Publish NuGet artifact'
+      targetPath: $(Build.ArtifactStagingDirectory)/nupkg
+      artifactName: workload-dotnet-nupkg
+
+  steps:
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Pack dotnet workload NuGet'
+    inputs:
+      command: 'pack'
+      packagesToPack: '**/Func.Cli.Workload.Dotnet.csproj'
+      packDirectory: $(Build.ArtifactStagingDirectory)/nupkg
+      configuration: Release

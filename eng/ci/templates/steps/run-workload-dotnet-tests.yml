@@ -1,0 +1,15 @@
+steps:
+- task: DotNetCoreCLI@2
+  displayName: 'Run dotnet workload unit tests'
+  inputs:
+    command: 'test'
+    projects: '**/Func.Cli.Workload.Dotnet.Tests.csproj'
+
+- task: PublishTestResults@2
+  displayName: 'Publish test results'
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '**/*.trx'
+    failTaskOnFailedTests: true
+    searchFolder: $(Agent.TempDirectory)
+  condition: succeededOrFailed()

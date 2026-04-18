@@ -26,7 +26,8 @@ azure-functions-core-tools/
 │       ├── cli-official-build.yml     # CLI release builds
 │       ├── abstractions-public-build.yml  # Abstractions PR validation
 │       ├── abstractions-official-build.yml # Abstractions release + NuGet pack
-│       └── workload-dotnet-build.yml  # Dotnet workload CI
+│       ├── workload-dotnet-public-build.yml   # Dotnet workload public CI
+│       └── workload-dotnet-official-build.yml # Dotnet workload official CI
 ├── docs/                              # Developer documentation
 ├── out/                               # Build artifacts (gitignored)
 └── nupkg/                             # NuGet package output (gitignored)
@@ -108,7 +109,8 @@ Each project has its own CI pipeline with **path-scoped triggers**, enabling ind
 | CLI official build | `eng/ci/cli-official-build.yml` | Release branches |
 | Abstractions public | `eng/ci/abstractions-public-build.yml` | PRs touching `src/Func.Cli.Abstractions/` |
 | Abstractions official | `eng/ci/abstractions-official-build.yml` | Release builds, NuGet pack |
-| Dotnet workload | `eng/ci/workload-dotnet-build.yml` | Changes to `src/Func.Cli.Workload.Dotnet/` |
+| Dotnet workload (public) | `eng/ci/workload-dotnet-public-build.yml` | Changes to `src/Func.Cli.Workload.Dotnet/` |
+| Dotnet workload (official) | `eng/ci/workload-dotnet-official-build.yml` | Changes to `src/Func.Cli.Workload.Dotnet/` |
 | Code mirror | `eng/ci/code-mirror.yml` | Mirror to engineering repo |
 
 ## Test Patterns

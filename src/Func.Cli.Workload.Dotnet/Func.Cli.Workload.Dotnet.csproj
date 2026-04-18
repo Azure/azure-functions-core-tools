@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="Templates.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Azure.Functions.Cli.Workload.Dotnet</RootNamespace>
+    <AssemblyName>Azure.Functions.Cli.Workload.Dotnet</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Cli.Workload.Dotnet</PackageId>
+    <Description>Azure Functions CLI dotnet workload — .NET project templates and function triggers for the isolated worker model.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Func.Cli.Workload.Dotnet.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

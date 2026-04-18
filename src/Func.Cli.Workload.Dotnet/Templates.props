@@ -1,0 +1,58 @@
+<Project>
+
+  <!--
+    Single source of truth for template pack versions shipped with
+    the dotnet workload. Update these when new template versions are released.
+    
+    At runtime the workload will try to resolve the latest stable version
+    from NuGet. If offline or NuGet is unreachable, it falls back to these
+    bundled versions.
+  -->
+  <PropertyGroup>
+    <WorkerItemTemplatesVersion>4.0.5337</WorkerItemTemplatesVersion>
+    <WorkerProjectTemplatesVersion>4.0.5337</WorkerProjectTemplatesVersion>
+  </PropertyGroup>
+
+  <!-- Download template nupkgs at build time so they ship with the workload -->
+  <ItemGroup>
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ItemTemplates" Version="[$(WorkerItemTemplatesVersion)]" />
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ProjectTemplates" Version="[$(WorkerProjectTemplatesVersion)]" />
+  </ItemGroup>
+
+  <!-- Resolve nupkg paths from the NuGet cache and bundle them in output -->
+  <ItemGroup>
+    <_BundledTemplate Include="microsoft.azure.functions.worker.itemtemplates" Version="$(WorkerItemTemplatesVersion)" />
+    <_BundledTemplate Include="microsoft.azure.functions.worker.projecttemplates" Version="$(WorkerProjectTemplatesVersion)" />
+  </ItemGroup>
+
+  <Target Name="BundleTemplates" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_ResolvedTemplate Include="@(_BundledTemplate)">
+        <NupkgPath>$(NuGetPackageRoot)%(Identity)/%(Version)/%(Identity).%(Version).nupkg</NupkgPath>
+        <OutputName>%(Identity).%(Version).nupkg</OutputName>
+      </_ResolvedTemplate>
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(_ResolvedTemplate->'%(NupkgPath)')"
+      DestinationFiles="@(_ResolvedTemplate->'$(OutputPath)templates/%(OutputName)')"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Inject the version as a compile-time constant so runtime code can read it -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);TEMPLATES_BUNDLED</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>WorkerItemTemplatesVersion</_Parameter1>
+      <_Parameter2>$(WorkerItemTemplatesVersion)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>WorkerProjectTemplatesVersion</_Parameter1>
+      <_Parameter2>$(WorkerProjectTemplatesVersion)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>
