@@ -2,6 +2,20 @@ steps:
 - task: NuGetAuthenticate@1
   displayName: 'Authenticate NuGet feeds'
 
+# Remove direct nuget.org source in CI — CFSClean policy blocks api.nuget.org.
+# The nuget-upstream feed proxies nuget.org packages via its upstream source.
+# Direct nuget.org is kept in NuGet.Config for local development.
+- pwsh: |
+    $configPath = "$(Build.SourcesDirectory)/NuGet.Config"
+    [xml]$config = Get-Content $configPath
+    $nugetOrg = $config.configuration.packageSources.add | Where-Object { $_.key -eq 'nuget.org' }
+    if ($nugetOrg) {
+      $config.configuration.packageSources.RemoveChild($nugetOrg) | Out-Null
+      $config.Save($configPath)
+      Write-Host "Removed direct nuget.org source (CFS network restriction)"
+    }
+  displayName: 'Configure NuGet for CI'
+
 - task: DotNetCoreCLI@2
   displayName: 'Restore NuGet packages'
   inputs:

@@ -60,6 +60,7 @@ extends:
          compiled:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
+    settings:
     stages:
       - stage: Test
         displayName: 'Build & Test'
