@@ -44,7 +44,7 @@ extends:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
     settings:
-      networkIsolationPolicy: Permissive
+      networkIsolationPolicy: Preferred, GitHub, CFSClean2
     stages:
       - stage: Build
         displayName: 'Build & Test'
