@@ -2,9 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Diagnostics;
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Spectre.Console;
@@ -17,9 +19,15 @@ var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSetti
 });
 
 builder.Services.AddSingleton<IInteractionService, SpectreInteractionService>();
+builder.Services.AddSingleton<ITelemetry>(sp =>
+{
+    var client = new AppInsightsTelemetryClient();
+    return client.IsEnabled ? client : new NoOpTelemetryClient();
+});
 
 var host = builder.Build();
 var interaction = host.Services.GetRequiredService<IInteractionService>();
+var telemetry = host.Services.GetRequiredService<ITelemetry>();
 
 // Create the command tree
 var rootCommand = Parser.CreateCommand(interaction);
@@ -47,10 +55,24 @@ Console.CancelKeyPress += (_, e) =>
 var versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
 
 // Parse and invoke asynchronously
+var commandName = ResolveCommandName(args);
+Activity? commandActivity = null;
+var stopwatch = Stopwatch.StartNew();
+
 try
 {
+    // Start telemetry span wrapping the entire command execution
+    if (telemetry is AppInsightsTelemetryClient aiClient)
+    {
+        commandActivity = aiClient.StartCommandActivity(commandName);
+    }
+
     var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
     var exitCode = await rootCommand.Parse(args).InvokeAsync(config, cts.Token);
+
+    stopwatch.Stop();
+    telemetry.TrackCommand(commandName, isSuccess: exitCode == 0, durationMs: stopwatch.ElapsedMilliseconds);
+    commandActivity?.Stop();
 
     // Print version update notice if available (bounded wait)
     await PrintVersionNotice(interaction, versionCheckTask);
@@ -59,10 +81,17 @@ try
 }
 catch (OperationCanceledException)
 {
+    commandActivity?.SetStatus(ActivityStatusCode.Error, "Cancelled");
+    commandActivity?.Stop();
     return 130; // Standard Unix exit code for SIGINT
 }
 catch (GracefulException ex)
 {
+    stopwatch.Stop();
+    telemetry.TrackCommand(commandName, isSuccess: false, durationMs: stopwatch.ElapsedMilliseconds);
+    telemetry.TrackException(ex);
+    commandActivity?.Stop();
+
     interaction.WriteError(ex.Message);
 
     if (ex.VerboseMessage is not null)
@@ -74,12 +103,50 @@ catch (GracefulException ex)
 }
 catch (Exception ex)
 {
+    stopwatch.Stop();
+    telemetry.TrackCommand(commandName, isSuccess: false, durationMs: stopwatch.ElapsedMilliseconds);
+    telemetry.TrackException(ex);
+    commandActivity?.Stop();
+
     interaction.WriteError($"An unexpected error occurred: {ex.Message}");
     return 2;
 }
 finally
 {
+    telemetry.Flush();
+    (telemetry as IDisposable)?.Dispose();
     host.Dispose();
+}
+
+/// <summary>
+/// Resolves the command name from args for telemetry.
+/// </summary>
+static string ResolveCommandName(string[] args)
+{
+    if (args.Length == 0)
+    {
+        return "help";
+    }
+
+    // Take command args (skip options starting with -)
+    var parts = new List<string>();
+    foreach (var arg in args)
+    {
+        if (arg.StartsWith('-'))
+        {
+            break;
+        }
+
+        parts.Add(arg);
+
+        // At most 2 levels (e.g., "workload install", "host start")
+        if (parts.Count >= 2)
+        {
+            break;
+        }
+    }
+
+    return parts.Count > 0 ? string.Join(" ", parts) : "unknown";
 }
 
 /// <summary>
