@@ -25,10 +25,18 @@ public static class Parser
         // Create built-in commands
         var helpCommand = new HelpCommand(interaction, rootCommand);
         var versionCommand = new VersionCommand(interaction);
+        var initCommand = new InitCommand(interaction);
+        var newCommand = new NewCommand(interaction);
+        var packCommand = new PackCommand(interaction);
+        var startCommand = new StartCommand(interaction);
 
         // Register built-in commands
         rootCommand.Subcommands.Add(versionCommand);
         rootCommand.Subcommands.Add(helpCommand);
+        rootCommand.Subcommands.Add(initCommand);
+        rootCommand.Subcommands.Add(newCommand);
+        rootCommand.Subcommands.Add(packCommand);
+        rootCommand.Subcommands.Add(startCommand);
 
         // Replace built-in help rendering with Spectre on all commands
         ReplaceHelpAction(rootCommand, helpCommand);

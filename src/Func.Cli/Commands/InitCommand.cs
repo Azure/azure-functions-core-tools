@@ -1,0 +1,68 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.CommandLine;
+using Azure.Functions.Cli.Console;
+
+namespace Azure.Functions.Cli.Commands;
+
+/// <summary>
+/// Initializes a new Azure Functions project. The full implementation requires
+/// a language workload to be installed — this defines the command skeleton and options.
+/// </summary>
+public class InitCommand : BaseCommand
+{
+    public static readonly Option<string?> WorkerRuntimeOption = new("--worker-runtime", "-w")
+    {
+        Description = "The worker runtime for the project"
+    };
+
+    public static readonly Option<string?> NameOption = new("--name", "-n")
+    {
+        Description = "The name of the function app project"
+    };
+
+    public static readonly Option<string?> LanguageOption = new("--language", "-l")
+    {
+        Description = "The programming language (e.g., C#, F#, JavaScript, TypeScript, Python)"
+    };
+
+    public static readonly Option<bool> ForceOption = new("--force")
+    {
+        Description = "Force initialization even if the folder is not empty"
+    };
+
+    private readonly IInteractionService _interaction;
+
+    public InitCommand(IInteractionService interaction)
+        : base("init", "Initialize a new Azure Functions project.")
+    {
+        _interaction = interaction;
+
+        AddPathArgument();
+        Options.Add(WorkerRuntimeOption);
+        Options.Add(NameOption);
+        Options.Add(LanguageOption);
+        Options.Add(ForceOption);
+    }
+
+    protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    {
+        ApplyPath(parseResult, createIfNotExists: true);
+
+        _interaction.WriteError("No language workloads installed.");
+        _interaction.WriteBlankLine();
+        _interaction.WriteMarkupLine(
+            "[grey]Install a workload to initialize a project:[/]");
+        _interaction.WriteBlankLine();
+        _interaction.WriteMarkupLine("  [white]func workload install dotnet[/]       [grey]C#, F#[/]");
+        _interaction.WriteMarkupLine("  [white]func workload install node[/]         [grey]JavaScript, TypeScript[/]");
+        _interaction.WriteMarkupLine("  [white]func workload install python[/]       [grey]Python[/]");
+        _interaction.WriteMarkupLine("  [white]func workload install java[/]         [grey]Java[/]");
+        _interaction.WriteMarkupLine("  [white]func workload install powershell[/]   [grey]PowerShell[/]");
+        _interaction.WriteBlankLine();
+        _interaction.WriteMarkupLine("[grey]Run[/] [white]func workload search[/] [grey]to discover available workloads.[/]");
+
+        return Task.FromResult(1);
+    }
+}
