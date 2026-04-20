@@ -22,7 +22,7 @@
     <PackageVersion Include="Microsoft.ApplicationInsights" Version="2.23.0" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageVersion Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1049.100-ci.26208.6" /> <!-- //todo: update to production version -->
+    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1049.200" />
     <PackageVersion Include="Microsoft.Build" Version="17.0.0" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.83.3" />
     <PackageVersion Include="NuGet.Packaging" Version="5.11.6" />
