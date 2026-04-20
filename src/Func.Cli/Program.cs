@@ -7,6 +7,7 @@ using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Spectre.Console;
@@ -24,13 +25,15 @@ builder.Services.AddSingleton<ITelemetry>(sp =>
     var client = new AppInsightsTelemetryClient();
     return client.IsEnabled ? client : new NoOpTelemetryClient();
 });
+builder.Services.AddSingleton<IWorkloadManager, WorkloadManager>();
 
 var host = builder.Build();
 var interaction = host.Services.GetRequiredService<IInteractionService>();
 var telemetry = host.Services.GetRequiredService<ITelemetry>();
+var workloadManager = host.Services.GetRequiredService<IWorkloadManager>();
 
-// Create the command tree
-var rootCommand = Parser.CreateCommand(interaction);
+// Create the command tree (including workload-contributed commands)
+var rootCommand = Parser.CreateCommand(interaction, workloadManager);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.
@@ -73,6 +76,9 @@ try
     stopwatch.Stop();
     telemetry.TrackCommand(commandName, isSuccess: exitCode == 0, durationMs: stopwatch.ElapsedMilliseconds);
     commandActivity?.Stop();
+
+    // Print any workload update notices (non-blocking, best-effort)
+    await workloadManager.PrintUpdateNoticesAsync();
 
     // Print version update notice if available (bounded wait)
     await PrintVersionNotice(interaction, versionCheckTask);

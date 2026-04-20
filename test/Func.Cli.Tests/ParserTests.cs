@@ -32,9 +32,16 @@ public class ParserTests
         var root = Parser.CreateCommand(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
+        // Visible commands
+        Assert.Contains("init", names);
+        Assert.Contains("new", names);
+        Assert.Contains("start", names);
+        // help and version are hidden (accessible via --help/--version)
         Assert.Contains("version", names);
         Assert.Contains("help", names);
     }
+
+
 
     [Fact]
     public void CreateCommand_HasGlobalOptions()
@@ -45,14 +52,49 @@ public class ParserTests
         Assert.Contains("--verbose", optionNames);
     }
 
+    [Fact]
+    public void Parse_StartWithPath_DoesNotProduceErrors()
+    {
+        var root = Parser.CreateCommand(_interaction);
+        var result = root.Parse("start /tmp");
+
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void Parse_InitWithPath_DoesNotProduceErrors()
+    {
+        var root = Parser.CreateCommand(_interaction);
+        var result = root.Parse("init /tmp/myproject");
+
+        Assert.Empty(result.Errors);
+    }
+
     [Theory]
     [InlineData("version")]
     [InlineData("help")]
+    [InlineData("init")]
+    [InlineData("new")]
+    [InlineData("start")]
     public void Parse_ValidCommand_DoesNotProduceErrors(string commandName)
     {
         var root = Parser.CreateCommand(_interaction);
         var result = root.Parse(commandName);
 
         Assert.Empty(result.Errors);
+    }
+
+
+
+    [Fact]
+    public void Commands_AreBaseCommandInstances()
+    {
+        var root = Parser.CreateCommand(_interaction);
+        var visibleCommands = root.Subcommands.Where(c => !c.Hidden).ToList();
+
+        foreach (var cmd in visibleCommands)
+        {
+            Assert.True(cmd is BaseCommand, $"Command '{cmd.Name}' should inherit BaseCommand");
+        }
     }
 }

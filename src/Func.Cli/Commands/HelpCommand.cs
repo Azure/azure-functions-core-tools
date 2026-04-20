@@ -92,6 +92,10 @@ public class HelpCommand : BaseCommand
         _interaction.WriteMarkupLine($"[grey]Documentation: {Constants.DocsUrl}[/]");
         _interaction.WriteBlankLine();
 
+        _interaction.WriteMarkupLine("[yellow bold]💡[/] [white]Extend the CLI with workloads for Durable Functions, Kubernetes, and more.[/]");
+        _interaction.WriteMarkupLine("[white]   Run[/] [blue]func workload search[/] [white]to explore available workloads.[/]");
+        _interaction.WriteBlankLine();
+
         return 0;
     }
 
