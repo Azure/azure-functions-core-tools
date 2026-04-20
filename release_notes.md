@@ -20,3 +20,13 @@
 - Removed unnecessary transitive pinning of `System.Text.Json`, `System.Formats.Asn1`, `System.Private.Uri`
 - Updated worker versions to match host requirements (NodeJs 3.13.0, PS7.4 4.0.4759, Python 4.44.0)
 
+    - Migrated from deprecated `Microsoft.DotNet.PlatformAbstractions` to `System.Runtime.InteropServices.RuntimeInformation`
+    - Migrated from deprecated `X509Certificate2` constructor to `X509CertificateLoader`
+    - Bumped `Microsoft.Extensions.DependencyInjection` to 10.0.0
+    - Bumped `Microsoft.Extensions.Logging` / `Logging.Abstractions` to 10.0.0 / 10.0.3
+    - Bumped `Azure.Identity` to 1.17.1, `Azure.Security.KeyVault.Secrets` to 4.6.0
+    - Bumped `Microsoft.Identity.Client` to 4.83.3
+    - Bumped `WindowsAzure.Storage` to 9.3.3
+    - Removed unnecessary transitive pinning of `System.Text.Json`, `System.Formats.Asn1`, `System.Private.Uri`
+    - Updated worker versions to match host requirements (NodeJs 3.13.0, PS7.4 4.0.4759, Python 4.44.0)
+- Fixed `func pack --python` stripping `.dist-info` directories from packaged dependencies (#4853)
