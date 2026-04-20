@@ -1,0 +1,22 @@
+trigger:
+  branches:
+    include:
+    - main
+    - vnext
+    - feature/*
+    - release/*
+
+resources:
+  repositories:
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+variables:
+  - template: ci/variables/cfs.yml@eng
+  - name: DisableKubernetesDeploymentDetector
+    value: true
+
+extends:
+  template: ci/code-mirror.yml@eng

@@ -1,0 +1,5 @@
+$PACKAGENAME ($DEBIANVERSION) unstable; urgency=medium
+
+  * https://github.com/Azure/$PACKAGENAME/releases/tag/$VERSION
+
+ -- Ahmed ElSayed <ahmels@microsoft.com>  $DATETIME -0800

@@ -1,0 +1,69 @@
+pr: none
+
+trigger:
+  branches:
+    include:
+    - main
+    - vnext
+    - feature/*
+    - release/*
+  paths:
+    include:
+    - src/Func.Cli.Abstractions/**
+    - eng/ci/abstractions-official-build.yml
+    - eng/ci/templates/jobs/test-abstractions.yml
+    - eng/ci/templates/steps/build-abstractions.yml
+    - eng/ci/templates/official/jobs/pack-abstractions.yml
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+variables:
+  - template: /ci/variables/cfs.yml@eng
+  - name: DisableKubernetesDeploymentDetector
+    value: true
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc
+      image: 1es-windows-2022
+      os: windows
+    sdl:
+      codeql:
+         compiled:
+           enabled: true
+         runSourceLanguagesInSourceAnalysis: true
+    stages:
+      - stage: Build
+        displayName: 'Build & Test'
+        jobs:
+        - template: /eng/ci/templates/jobs/test-abstractions.yml@self
+          parameters:
+            name: Windows
+            pool:
+              name: 1es-pool-azfunc
+              image: 1es-windows-2022
+              os: windows
+        - template: /eng/ci/templates/jobs/test-abstractions.yml@self
+          parameters:
+            name: Linux
+            pool:
+              name: 1es-pool-azfunc
+              image: 1es-ubuntu-24.04-min
+              os: linux
+
+      - stage: Pack
+        displayName: 'Pack NuGet'
+        dependsOn: Build
+        jobs:
+        - template: /eng/ci/templates/official/jobs/pack-abstractions.yml@self

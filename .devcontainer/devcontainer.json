@@ -1,0 +1,22 @@
+{
+  "name": "Azure Functions Core Tools",
+  "image": "mcr.microsoft.com/dotnet/sdk:10.0",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "Azure.Functions.Cli.sln"
+      }
+    }
+  },
+  "postCreateCommand": "dotnet restore",
+  "remoteUser": "vscode"
+}

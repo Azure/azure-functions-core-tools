@@ -1,0 +1,25 @@
+name: Bug Report
+description: Create a report to help us improve
+labels: ["potential-bug"]
+body: 
+- id: version
+  type: textarea
+  attributes:
+    label: Version
+    placeholder: Please provide the Core Tools version exhibiting the problem.
+  validations:
+    required: true
+- id: description
+  type: textarea
+  attributes:
+    label: Description
+    placeholder: Please provide a succinct description of the issue.
+  validations:
+    required: true
+- id: repro
+  type: textarea
+  attributes:
+    label: Steps to reproduce
+    placeholder: Please provide the steps required to reproduce the problem.
+  validations:
+    required: true

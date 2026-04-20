@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run func cli",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/out/bin/Func.Cli/debug/func.dll",
+            "env": {
+                "CLI_DEBUG": "1"
+            },
+            "args": "${input:funcArgs}",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "funcArgs",
+            "type": "promptString",
+            "description": "Args to pass to the 'func' command (e.g. 'init MyApp -w dotnet')",
+            "default": "--version"
+        }
+    ]
+}

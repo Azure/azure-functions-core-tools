@@ -1,0 +1,72 @@
+schedules:
+- cron: "0 7 * * *"   # 11pm PST
+  displayName: Nightly Build
+  branches:
+    include:
+      - main
+      - vnext
+  always: true
+
+trigger: none
+
+pr:
+  branches:
+    include:
+    - main
+    - vnext
+    - feature/*
+    - release/*
+  paths:
+    include:
+    - src/Func.Cli/**
+    - test/Func.Cli.Tests/**
+    - eng/**
+    - Directory.Build.props
+    - Directory.Build.targets
+    - Directory.Packages.props
+    - global.json
+    - eng/ci/cli-public-build.yml
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-windows-2022
+      os: windows
+      ${{ if eq( variables['Build.Reason'], 'Schedule' ) }}:
+        demands:
+        - Priority -equals Low
+    sdl:
+      codeql:
+         compiled:
+           enabled: true
+         runSourceLanguagesInSourceAnalysis: true
+    settings:
+      skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
+
+    stages:
+      - stage: Test
+        displayName: 'Build & Test'
+        jobs:
+        - template: /eng/ci/templates/jobs/test-cli.yml@self
+          parameters:
+            name: Windows
+            pool:
+              name: 1es-pool-azfunc-public
+              image: 1es-windows-2022
+              os: windows
+        - template: /eng/ci/templates/jobs/test-cli.yml@self
+          parameters:
+            name: Linux
+            pool:
+              name: 1es-pool-azfunc-public
+              image: 1es-ubuntu-24.04-min
+              os: linux

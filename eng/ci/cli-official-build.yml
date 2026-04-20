@@ -1,0 +1,107 @@
+schedules:
+- cron: "0 8 * * *"   # 12am PST
+  displayName: Nightly Build
+  branches:
+    include:
+      - main
+      - vnext
+  always: true
+
+pr: none
+
+trigger:
+  branches:
+    include:
+    - main
+    - vnext
+    - feature/*
+    - release/*
+  paths:
+    include:
+    - src/Func.Cli/**
+    - test/Func.Cli.Tests/**
+    - eng/**
+    - Directory.Build.props
+    - Directory.Build.targets
+    - Directory.Packages.props
+    - global.json
+    - eng/ci/cli-official-build.yml
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+variables:
+  - template: /ci/variables/cfs.yml@eng
+  - name: DisableKubernetesDeploymentDetector
+    value: true
+  - name: supportedRuntimes
+    value: 'linux-x64,linux-arm64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86'
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc
+      image: 1es-windows-2022
+      os: windows
+      ${{ if eq( variables['Build.Reason'], 'Schedule' ) }}:
+        demands:
+        - Priority -equals Low
+    sdl:
+      codeql:
+         compiled:
+           enabled: true
+         runSourceLanguagesInSourceAnalysis: true
+    stages:
+      - stage: Test
+        displayName: 'Build & Test'
+        jobs:
+        - template: /eng/ci/templates/jobs/test-cli.yml@self
+          parameters:
+            name: Windows
+            pool:
+              name: 1es-pool-azfunc
+              image: 1es-windows-2022
+              os: windows
+        - template: /eng/ci/templates/jobs/test-cli.yml@self
+          parameters:
+            name: Linux
+            pool:
+              name: 1es-pool-azfunc
+              image: 1es-ubuntu-24.04-min
+              os: linux
+
+      - stage: BuildAndPublish
+        dependsOn: Test
+        jobs:
+        - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+          - template: /eng/ci/templates/official/jobs/publish-cli.yml@self
+            parameters:
+              runtime: ${{ runtime }}
+              jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
+
+        - template: /eng/ci/templates/official/jobs/pack-cli.yml@self
+
+      - stage: Merge
+        dependsOn: 'BuildAndPublish'
+
+        jobs:
+        - template: /eng/ci/templates/official/jobs/merge-pipeline-artifacts.yml@self
+
+      - stage: UploadToNightlyFeed
+        dependsOn: 'Merge'
+        condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
+
+        jobs:
+        - template: /eng/ci/templates/official/jobs/upload-artifact-to-feed.yml@self
+          parameters:
+            artifactName: 'func-cli'
+            packageName: 'func-cli'

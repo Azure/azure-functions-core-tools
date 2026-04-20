@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Azure.Functions.Cli</RootNamespace>
+    <AssemblyName>Azure.Functions.Cli.Abstractions</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Cli.Abstractions</PackageId>
+    <Description>Shared interfaces and contracts for building Azure Functions CLI workloads.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+</Project>

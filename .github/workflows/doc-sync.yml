@@ -1,0 +1,440 @@
+name: Doc Sync — Detect CLI Changes & Open Docs PR
+
+# Triggers on new releases/tags in azure-functions-core-tools.
+# Extracts CLI command metadata, diffs against the previous release,
+# and opens a PR from the fork into MicrosoftDocs/azure-docs-pr.
+# If the PR fails, opens an issue in this repo as a fallback.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      previous_tag:
+        description: "Previous release tag to diff against (leave empty for auto-detect)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  # Upstream docs repo where the PR targets (base of the PR)
+  DOCS_UPSTREAM_REPO: ${{ vars.DOCS_UPSTREAM_REPO || 'MicrosoftDocs/azure-docs-pr' }}
+  # Fork repo where branches are pushed (head of the PR).
+  # Override by setting the DOCS_FORK_REPO repository variable.
+  DOCS_FORK_REPO: ${{ vars.DOCS_FORK_REPO || 'liliankasem/azure-docs-pr' }}
+  # Comma-separated GitHub usernames to @mention on doc-sync issues.
+  # Override by setting the DOC_SYNC_REVIEWERS repository variable.
+  DOC_SYNC_REVIEWERS: ${{ vars.DOC_SYNC_REVIEWERS || 'liliankasem' }}
+  DOCS_BRANCH_PREFIX: doc-sync/core-tools
+
+jobs:
+  extract-and-diff:
+    name: Extract command changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.diff.outputs.has_changes }}
+      summary: ${{ steps.diff.outputs.summary }}
+      new_tag: ${{ steps.tags.outputs.new_tag }}
+      old_tag: ${{ steps.tags.outputs.old_tag }}
+    steps:
+      - name: Checkout current release
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Determine tags
+        id: tags
+        run: |
+          NEW_TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ -n "${{ inputs.previous_tag }}" ]; then
+            OLD_TAG="${{ inputs.previous_tag }}"
+          else
+            # Auto-detect: get the tag before the current one
+            OLD_TAG=$(git tag --sort=-version:refname | grep -A1 "^${NEW_TAG}$" | tail -1)
+            if [ "$OLD_TAG" = "$NEW_TAG" ] || [ -z "$OLD_TAG" ]; then
+              # Fallback: get second-newest tag
+              OLD_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+            fi
+          fi
+
+          echo "old_tag=$OLD_TAG" >> "$GITHUB_OUTPUT"
+          echo "Comparing $OLD_TAG → $NEW_TAG"
+
+      - name: Extract commands from previous release
+        run: |
+          OLD_TAG="${{ steps.tags.outputs.old_tag }}"
+          WORK_DIR=$(mktemp -d)
+          git worktree add "$WORK_DIR" "$OLD_TAG" --detach 2>/dev/null || {
+            echo "::warning::Could not checkout old tag $OLD_TAG — skipping diff"
+            echo '{}' > /tmp/old_commands.json
+            exit 0
+          }
+          # Copy the extraction script into the worktree (it may not exist in old tags)
+          cp .github/scripts/extract_commands.py "$WORK_DIR/.github/scripts/" 2>/dev/null || {
+            mkdir -p "$WORK_DIR/.github/scripts"
+            cp .github/scripts/extract_commands.py "$WORK_DIR/.github/scripts/"
+          }
+          python "$WORK_DIR/.github/scripts/extract_commands.py" "$WORK_DIR" --output /tmp/old_commands.json
+          git worktree remove "$WORK_DIR" --force 2>/dev/null || true
+
+      - name: Extract commands from current release
+        run: |
+          python .github/scripts/extract_commands.py . --output /tmp/new_commands.json
+
+      - name: Diff command manifests
+        id: diff
+        run: |
+          python .github/scripts/extract_commands.py . \
+            --diff /tmp/old_commands.json \
+            --output /tmp/diff.json
+
+          python .github/scripts/extract_commands.py . \
+            --diff /tmp/old_commands.json \
+            --summary \
+            --output /tmp/change_summary.md
+
+          HAS_CHANGES=$(python3 -c "import json; print(json.load(open('/tmp/diff.json'))['has_changes'])")
+          echo "has_changes=$HAS_CHANGES" >> "$GITHUB_OUTPUT"
+
+          # Store summary for later use (handle multiline)
+          {
+            echo "summary<<SUMMARY_EOF"
+            cat /tmp/change_summary.md
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "--- Diff Results ---"
+          cat /tmp/change_summary.md
+
+      - name: Upload artifacts
+        if: steps.diff.outputs.has_changes == 'True'
+        uses: actions/upload-artifact@v4
+        with:
+          name: command-diff
+          path: |
+            /tmp/old_commands.json
+            /tmp/new_commands.json
+            /tmp/diff.json
+            /tmp/change_summary.md
+          retention-days: 30
+
+  open-docs-pr:
+    name: Open documentation PR
+    needs: extract-and-diff
+    if: needs.extract-and-diff.outputs.has_changes == 'True'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse fork owner and repo
+        id: fork
+        run: |
+          echo "owner=${DOCS_FORK_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "repo=${DOCS_FORK_REPO##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DOC_SYNC_APP_ID }}
+          private-key: ${{ secrets.DOC_SYNC_APP_PRIVATE_KEY }}
+          owner: ${{ steps.fork.outputs.owner }}
+          repositories: ${{ steps.fork.outputs.repo }}
+
+      - name: Download diff artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: command-diff
+          path: /tmp/artifacts
+
+      - name: Checkout core-tools repo (for scripts)
+        uses: actions/checkout@v4
+        with:
+          path: core-tools
+          sparse-checkout: .github/scripts
+
+      - name: Checkout fork repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DOCS_FORK_REPO }}
+          token: ${{ steps.app-token.outputs.token }}
+          path: docs-repo
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update documentation files
+        id: update_docs
+        run: |
+          DOC_FILE="docs-repo/articles/azure-functions/functions-core-tools-reference.md"
+          if [ ! -f "$DOC_FILE" ]; then
+            echo "::warning::Doc file not found at $DOC_FILE"
+            echo "doc_updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          python core-tools/.github/scripts/update_docs.py \
+            "$DOC_FILE" \
+            /tmp/artifacts/diff.json | tee /tmp/update_log.txt
+
+          # Check if the file was actually modified
+          cd docs-repo
+          if git diff --quiet; then
+            echo "No documentation changes needed."
+            echo "doc_updated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "doc_updated=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read release notes
+        id: release_notes
+        run: |
+          {
+            echo "body<<RELEASE_EOF"
+            echo "${{ github.event.release.body || 'No release notes provided.' }}"
+            echo "RELEASE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Push docs branch
+        id: push_branch
+        if: steps.update_docs.outputs.doc_updated == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
+          OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
+        run: |
+          cd docs-repo
+
+          BRANCH="${DOCS_BRANCH_PREFIX}/${NEW_TAG}"
+          git checkout -b "$BRANCH"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add articles/
+          git commit -m "doc-sync: Update Core Tools reference for ${NEW_TAG}
+
+          Automated documentation update from ${OLD_TAG} → ${NEW_TAG}.
+          Source: ${RELEASE_URL}"
+
+          git push --force origin "${BRANCH}:${BRANCH}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Build PR body
+        id: pr_body
+        if: steps.push_branch.outcome == 'success'
+        env:
+          NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
+          OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
+          CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
+          RELEASE_NOTES: ${{ steps.release_notes.outputs.body }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/.github/workflows/doc-sync.yml
+        run: |
+          UPDATE_LOG=$(cat /tmp/update_log.txt)
+
+          {
+            echo "body<<PR_BODY_EOF"
+            cat <<PRBODY
+          ## 📝 Documentation Update — Azure Functions Core Tools ${NEW_TAG}
+
+          **Release:** [\`${NEW_TAG}\`](${RELEASE_URL})
+          **Previous:** \`${OLD_TAG}\`
+          **Source repo:** [\`${{ github.repository }}\`](${{ github.server_url }}/${{ github.repository }})
+
+          ---
+
+          ### Changes applied to \`functions-core-tools-reference.md\`
+
+          \`\`\`
+          ${UPDATE_LOG}
+          \`\`\`
+
+          ---
+
+          ${CHANGE_SUMMARY}
+
+          ---
+
+          ### 📋 Release Notes
+
+          ${RELEASE_NOTES}
+
+          ---
+
+          > ⚠️ **Please review the changes carefully.** The documentation was auto-updated by a script. Verify that descriptions, formatting, and context are correct.
+
+          ---
+          *This PR was auto-generated by the [doc-sync workflow](${WORKFLOW_URL}).*
+          PRBODY
+            echo "PR_BODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create cross-fork PR (best effort)
+        id: create_pr
+        if: steps.push_branch.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
+          BRANCH: ${{ steps.push_branch.outputs.branch }}
+        run: |
+          FORK_OWNER=$(echo "$DOCS_FORK_REPO" | cut -d'/' -f1)
+
+          gh pr create \
+            --repo "$DOCS_UPSTREAM_REPO" \
+            --base main \
+            --head "${FORK_OWNER}:${BRANCH}" \
+            --title "doc-sync: Update Core Tools reference for ${NEW_TAG}" \
+            --body "${{ steps.pr_body.outputs.body }}"
+
+      - name: Output PR instructions
+        if: steps.push_branch.outcome == 'success'
+        id: pr_url
+        env:
+          NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
+          BRANCH: ${{ steps.push_branch.outputs.branch }}
+        run: |
+          FORK_OWNER=$(echo "$DOCS_FORK_REPO" | cut -d'/' -f1)
+          UPSTREAM_REPO_NAME=$(echo "$DOCS_UPSTREAM_REPO" | cut -d'/' -f2)
+          PR_URL="https://github.com/${DOCS_UPSTREAM_REPO}/compare/main...${FORK_OWNER}:${UPSTREAM_REPO_NAME}:${BRANCH}?expand=1"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ steps.create_pr.outcome }}" == "success" ]; then
+            echo "## ✅ Cross-fork PR created successfully" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## 📝 Doc-sync branch ready — manual PR needed" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "The branch \`${BRANCH}\` has been pushed to \`${DOCS_FORK_REPO}\` with documentation updates for **${NEW_TAG}**." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**👉 [Click here to create the cross-fork PR](${PR_URL})**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "> The automated PR creation failed because the GitHub App doesn't have access to \`${DOCS_UPSTREAM_REPO}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "> Open the link above while signed in as someone with access to the upstream docs repo." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Notify reviewers via issue
+        if: steps.push_branch.outcome == 'success' && steps.create_pr.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
+          OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
+          PR_URL: ${{ steps.pr_url.outputs.url }}
+          CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Build @mention list from comma-separated usernames
+          MENTIONS=""
+          IFS=',' read -ra USERS <<< "$DOC_SYNC_REVIEWERS"
+          for user in "${USERS[@]}"; do
+            user=$(echo "$user" | xargs)  # trim whitespace
+            MENTIONS="${MENTIONS} @${user}"
+          done
+
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "📝 Doc-sync ready: Core Tools ${NEW_TAG} — PR needs manual creation" \
+            --label "doc-sync" \
+            --body "## 📝 Documentation branch ready for ${NEW_TAG}
+
+          A doc-sync branch has been pushed to \`${DOCS_FORK_REPO}\` with automated updates to \`functions-core-tools-reference.md\`.
+
+          ### 👉 [Click here to create the cross-fork PR](${PR_URL})
+
+          Open the link above while signed in with access to \`${DOCS_UPSTREAM_REPO}\`, review the changes, and submit the PR.
+
+          ---
+
+          ${CHANGE_SUMMARY}
+
+          ---
+
+          **Workflow run:** [View logs](${RUN_URL})
+          **Reviewers:**${MENTIONS}
+
+          ---
+          *Auto-generated by the [doc-sync workflow](${{ github.server_url }}/${{ github.repository }}/blob/main/.github/workflows/doc-sync.yml). Close this issue after the PR is created.*"
+
+  fallback-issue:
+    name: Open issue with changes (fallback)
+    needs: [extract-and-diff, open-docs-pr]
+    if: >-
+      always()
+      && needs.extract-and-diff.outputs.has_changes == 'True'
+      && needs.open-docs-pr.result == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for existing issue
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COUNT=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "doc-sync" \
+            --state open \
+            --json number \
+            --jq 'length')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Open doc-sync issue
+        if: steps.existing.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_TAG: ${{ needs.extract-and-diff.outputs.new_tag }}
+          OLD_TAG: ${{ needs.extract-and-diff.outputs.old_tag }}
+          CHANGE_SUMMARY: ${{ needs.extract-and-diff.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.extract-and-diff.outputs.new_tag }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "📝 Doc update needed: CLI changes in ${NEW_TAG}" \
+            --label "doc-sync" \
+            --body "## Documentation Update Required
+
+          CLI command changes were detected in release **[${NEW_TAG}](${RELEASE_URL})** (compared to \`${OLD_TAG}\`), but the workflow could not open a PR in the docs repo.
+
+          ### What changed
+
+          ${CHANGE_SUMMARY}
+
+          ### Why this issue was opened
+
+          The [doc-sync workflow](${RUN_URL}) failed to push a PR to \`${DOCS_UPSTREAM_REPO}\` via the fork \`${DOCS_FORK_REPO}\`. This is likely due to one of:
+
+          #### 🔑 GitHub App misconfigured
+          The \`DOC_SYNC_APP_ID\` or \`DOC_SYNC_APP_PRIVATE_KEY\` secrets may be missing, incorrect, or the App may have been uninstalled.
+
+          **To fix:**
+          1. Verify the GitHub App is installed on \`${DOCS_FORK_REPO}\` at https://github.com/settings/apps
+          2. Check that the App has **Contents: Read and write** and **Pull requests: Read and write** permissions
+          3. Verify both secrets exist at [Repo Settings → Secrets → Actions](${{ github.server_url }}/${{ github.repository }}/settings/secrets/actions):
+             - \`DOC_SYNC_APP_ID\` — the App's numeric ID
+             - \`DOC_SYNC_APP_PRIVATE_KEY\` — the App's private key (.pem)
+          4. Re-run the [failed workflow](${RUN_URL})
+
+          #### 🍴 Fork does not exist
+          The fork \`${DOCS_FORK_REPO}\` may not exist or may have been deleted.
+
+          #### 🔒 No access to upstream
+          The fork owner needs permission to open PRs in \`${DOCS_UPSTREAM_REPO}\`. Check with the MicrosoftDocs team.
+
+          #### 🌿 Branch conflict
+          A branch \`doc-sync/core-tools/${NEW_TAG}\` may already exist in the fork from a previous attempt.
+
+          ### Manual action needed
+          If the workflow cannot be fixed, please manually update the documentation based on the changes listed above.
+
+          ---
+          *Auto-generated by the [doc-sync workflow](${{ github.server_url }}/${{ github.repository }}/blob/main/.github/workflows/doc-sync.yml).*"

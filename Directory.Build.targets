@@ -1,0 +1,5 @@
+<Project>
+
+  <Import Project="$(EngBuildRoot)Engineering.targets" />
+
+</Project>

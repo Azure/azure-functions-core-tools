@@ -1,0 +1,28 @@
+<Project>
+  <!-- abstractions -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.6" />
+    <PackageVersion Include="Spectre.Console" Version="0.49.1" />
+  </ItemGroup>
+  <!-- telemetry -->
+  <ItemGroup>
+    <PackageVersion Include="OpenTelemetry" Version="1.15.1" />
+    <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
+  </ItemGroup>
+  <!-- analyzers -->
+  <ItemGroup>
+    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
+  </ItemGroup>
+  <!-- test projects -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>
