@@ -60,6 +60,10 @@ extends:
          compiled:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
+    settings:
+      # CFSClean blocks api.nuget.org which is needed for vnext packages.
+      # TODO: tighten policy once CFS exception syntax is confirmed.
+      networkIsolationPolicy: Permissive
     stages:
       - stage: Test
         displayName: 'Build & Test'

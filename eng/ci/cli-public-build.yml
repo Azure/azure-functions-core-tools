@@ -51,6 +51,9 @@ extends:
          runSourceLanguagesInSourceAnalysis: true
     settings:
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
+      # CFSClean blocks api.nuget.org which is needed for vnext packages.
+      # TODO: tighten policy once CFS exception syntax is confirmed.
+      networkIsolationPolicy: Permissive
 
     stages:
       - stage: Test
