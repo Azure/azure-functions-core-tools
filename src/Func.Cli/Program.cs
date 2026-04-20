@@ -2,12 +2,18 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Diagnostics;
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
+using Azure.Functions.Cli.Telemetry;
+using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 // Build the host with DI
 var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings
@@ -21,6 +27,25 @@ builder.Services.AddSingleton<IInteractionService, SpectreInteractionService>();
 
 var host = builder.Build();
 var interaction = host.Services.GetRequiredService<IInteractionService>();
+
+// Wire up the OpenTelemetry SDK only when telemetry is configured (build has
+// a real instrumentation key and the user has not opted out). When it isn't,
+// no listener is subscribed and ActivitySource/Meter calls become no-ops.
+TracerProvider? tracerProvider = null;
+MeterProvider? meterProvider = null;
+var connectionString = CliTelemetry.GetConnectionString();
+if (connectionString is not null)
+{
+    tracerProvider = Sdk.CreateTracerProviderBuilder()
+        .AddSource(CliTelemetry.SourceName)
+        .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString)
+        .Build();
+
+    meterProvider = Sdk.CreateMeterProviderBuilder()
+        .AddMeter(CliTelemetry.SourceName)
+        .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString)
+        .Build();
+}
 
 // Create the command tree
 var rootCommand = Parser.CreateCommand(interaction);
@@ -48,39 +73,99 @@ Console.CancelKeyPress += (_, e) =>
 var versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
 
 // Parse and invoke asynchronously
+var commandName = ResolveCommandName(args);
+var stopwatch = Stopwatch.StartNew();
+int exitCode;
+
+using (Activity? activity = CliTelemetry.Source.StartCommandActivity(commandName))
+{
+    try
+    {
+        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+        exitCode = await rootCommand.Parse(args).InvokeAsync(config, cts.Token);
+
+        stopwatch.Stop();
+        activity?.SetCommandResult(exitCode == 0);
+        CliTelemetry.TrackCommand(commandName, isSuccess: exitCode == 0, durationMs: stopwatch.ElapsedMilliseconds);
+    }
+    catch (OperationCanceledException)
+    {
+        activity?.SetCommandResult(isSuccess: false, "Cancelled");
+        exitCode = 130; // Standard Unix exit code for SIGINT
+    }
+    catch (GracefulException ex)
+    {
+        stopwatch.Stop();
+        activity?.SetCommandResult(isSuccess: false, ex.Message);
+        activity?.AddException(ex);
+        CliTelemetry.TrackCommand(commandName, isSuccess: false, durationMs: stopwatch.ElapsedMilliseconds);
+
+        interaction.WriteError(ex.Message);
+
+        if (ex.VerboseMessage is not null)
+        {
+            interaction.WriteHint(ex.VerboseMessage);
+        }
+
+        exitCode = ex.IsUserError ? 1 : 2;
+    }
+    catch (Exception ex)
+    {
+        stopwatch.Stop();
+        activity?.SetCommandResult(isSuccess: false, ex.Message);
+        activity?.AddException(ex);
+        CliTelemetry.TrackCommand(commandName, isSuccess: false, durationMs: stopwatch.ElapsedMilliseconds);
+
+        interaction.WriteError($"An unexpected error occurred: {ex.Message}");
+        exitCode = 2;
+    }
+} // activity disposed (and stopped) here, before flush
+
 try
 {
-    var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-    var exitCode = await rootCommand.Parse(args).InvokeAsync(config, cts.Token);
-
     // Print version update notice if available (bounded wait)
     await PrintVersionNotice(interaction, versionCheckTask);
-
-    return exitCode;
-}
-catch (OperationCanceledException)
-{
-    return 130; // Standard Unix exit code for SIGINT
-}
-catch (GracefulException ex)
-{
-    interaction.WriteError(ex.Message);
-
-    if (ex.VerboseMessage is not null)
-    {
-        interaction.WriteHint(ex.VerboseMessage);
-    }
-
-    return ex.IsUserError ? 1 : 2;
-}
-catch (Exception ex)
-{
-    interaction.WriteError($"An unexpected error occurred: {ex.Message}");
-    return 2;
 }
 finally
 {
+    tracerProvider?.ForceFlush(3000);
+    meterProvider?.ForceFlush(3000);
+    tracerProvider?.Dispose();
+    meterProvider?.Dispose();
     host.Dispose();
+}
+
+return exitCode;
+
+/// <summary>
+/// Resolves the command name from args for telemetry.
+/// </summary>
+static string ResolveCommandName(string[] args)
+{
+    if (args.Length == 0)
+    {
+        return "help";
+    }
+
+    // Take command args (skip options starting with -)
+    var parts = new List<string>();
+    foreach (var arg in args)
+    {
+        if (arg.StartsWith('-'))
+        {
+            break;
+        }
+
+        parts.Add(arg);
+
+        // At most 2 levels (e.g., "workload install", "host start")
+        if (parts.Count >= 2)
+        {
+            break;
+        }
+    }
+
+    return parts.Count > 0 ? string.Join(" ", parts) : "unknown";
 }
 
 /// <summary>
