@@ -23,6 +23,8 @@
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
     <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="NuGet.Protocol" />
+    <PackageReference Include="NuGet.Packaging" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />

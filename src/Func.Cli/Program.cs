@@ -6,6 +6,7 @@ using System.Diagnostics;
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,14 +27,20 @@ builder.Services.AddSingleton<ITelemetry>(sp =>
     return client.IsEnabled ? client : new NoOpTelemetryClient();
 });
 builder.Services.AddSingleton<IWorkloadManager, WorkloadManager>();
+builder.Services.AddSingleton<IHostResolver, HostResolver>();
+builder.Services.AddSingleton<IHostManager, NuGetHostManager>();
+builder.Services.AddSingleton<IHostRunner, HostRunner>();
 
 var host = builder.Build();
 var interaction = host.Services.GetRequiredService<IInteractionService>();
 var telemetry = host.Services.GetRequiredService<ITelemetry>();
 var workloadManager = host.Services.GetRequiredService<IWorkloadManager>();
+var hostResolver = host.Services.GetRequiredService<IHostResolver>();
+var hostManager = host.Services.GetRequiredService<IHostManager>();
+var hostRunner = host.Services.GetRequiredService<IHostRunner>();
 
 // Create the command tree (including workload-contributed commands)
-var rootCommand = Parser.CreateCommand(interaction, workloadManager);
+var rootCommand = Parser.CreateCommand(interaction, workloadManager, hostRunner, hostManager, hostResolver);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.

@@ -11,6 +11,8 @@
   </ItemGroup>
   <!-- telemetry -->
   <ItemGroup>
+    <PackageVersion Include="NuGet.Protocol" Version="6.12.4" />
+    <PackageVersion Include="NuGet.Packaging" Version="6.12.4" />
     <PackageVersion Include="OpenTelemetry" Version="1.15.1" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
   </ItemGroup>

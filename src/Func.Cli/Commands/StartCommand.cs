@@ -3,12 +3,12 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Launches the Azure Functions host runtime. Supports 'func start' and
-/// Placeholder for 'func start' (not yet implemented).
+/// Launches the Azure Functions host runtime: func start [path] [options].
 /// </summary>
 public class StartCommand : BaseCommand
 {
@@ -30,7 +30,8 @@ public class StartCommand : BaseCommand
     public static readonly Option<string[]?> FunctionsOption = new("--functions")
     {
         Description = "A space-separated list of functions to load",
-        Arity = ArgumentArity.ZeroOrMore
+        Arity = ArgumentArity.ZeroOrMore,
+        AllowMultipleArgumentsPerToken = true
     };
 
     public static readonly Option<bool> NoBuildOption = new("--no-build")
@@ -49,11 +50,13 @@ public class StartCommand : BaseCommand
     };
 
     private readonly IInteractionService _interaction;
+    private readonly IHostRunner _hostRunner;
 
-    public StartCommand(IInteractionService interaction)
+    public StartCommand(IInteractionService interaction, IHostRunner hostRunner)
         : base("start", "Launch the Azure Functions host runtime.")
     {
         _interaction = interaction;
+        _hostRunner = hostRunner;
 
         AddPathArgument();
         Options.Add(PortOption);
@@ -68,8 +71,28 @@ public class StartCommand : BaseCommand
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         ApplyPath(parseResult);
-        _interaction.WriteWarning("The 'start' command is not yet implemented in this version.");
-        _interaction.WriteMarkupLine("[grey]This is a preview build of Azure Functions CLI vNext.[/]");
-        return Task.FromResult(1);
+
+        var scriptRoot = Directory.GetCurrentDirectory();
+
+        if (!HostConfiguration.ValidateScriptRoot(scriptRoot, _interaction))
+        {
+            return Task.FromResult(1);
+        }
+
+        var port = parseResult.GetValue(PortOption) ?? HostConfiguration.DefaultPort;
+
+        var config = new HostConfiguration(scriptRoot)
+        {
+            Port = port,
+            CorsOrigins = parseResult.GetValue(CorsOption),
+            CorsCredentials = parseResult.GetValue(CorsCredentialsOption),
+            FunctionsFilter = parseResult.GetValue(FunctionsOption),
+            NoBuild = parseResult.GetValue(NoBuildOption),
+            EnableAuth = parseResult.GetValue(EnableAuthOption),
+            Verbose = parseResult.GetValue(FuncRootCommand.VerboseOption),
+            HostVersion = parseResult.GetValue(HostVersionOption),
+        };
+
+        return Task.FromResult(_hostRunner.Start(config, cancellationToken));
     }
 }

@@ -5,6 +5,7 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli;
@@ -20,7 +21,12 @@ public static class Parser
     /// <summary>
     /// Creates and configures the root CLI command with all subcommands registered.
     /// </summary>
-    public static FuncRootCommand CreateCommand(IInteractionService interaction, IWorkloadManager? workloadManager = null)
+    public static FuncRootCommand CreateCommand(
+        IInteractionService interaction,
+        IWorkloadManager? workloadManager = null,
+        IHostRunner? hostRunner = null,
+        IHostManager? hostManager = null,
+        IHostResolver? hostResolver = null)
     {
         var rootCommand = new FuncRootCommand();
 
@@ -30,7 +36,11 @@ public static class Parser
         var initCommand = new InitCommand(interaction, workloadManager);
         var newCommand = new NewCommand(interaction, workloadManager);
         var packCommand = new PackCommand(interaction, workloadManager);
-        var startCommand = new StartCommand(interaction);
+
+        // StartCommand requires IHostRunner; create a stub if not provided (e.g., in tests)
+        var startCommand = hostRunner is not null
+            ? new StartCommand(interaction, hostRunner)
+            : new StartCommand(interaction, new StubHostRunner());
 
         // Register built-in commands
         rootCommand.Subcommands.Add(versionCommand);
@@ -39,6 +49,12 @@ public static class Parser
         rootCommand.Subcommands.Add(newCommand);
         rootCommand.Subcommands.Add(packCommand);
         rootCommand.Subcommands.Add(startCommand);
+
+        // Add host management command when hosting services are available
+        if (hostManager is not null && hostResolver is not null)
+        {
+            rootCommand.Subcommands.Add(new HostCommand(interaction, hostManager, hostResolver));
+        }
 
         // Add workload management command
         if (workloadManager is not null)
@@ -106,4 +122,12 @@ public static class Parser
             return helpCommand.ShowGeneralHelp();
         });
     }
+}
+
+/// <summary>
+/// No-op host runner used when the real IHostRunner is not available (e.g., in Parser tests).
+/// </summary>
+internal sealed class StubHostRunner : IHostRunner
+{
+    public int Start(HostConfiguration config, CancellationToken cancellationToken = default) => 1;
 }

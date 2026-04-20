@@ -124,7 +124,7 @@ public class HelpCommand : BaseCommand
     internal void RenderCommandHelp(Command command)
     {
         var isRoot = command is RootCommand;
-        var commandPath = isRoot ? "func" : $"func {command.Name}";
+        var commandPath = isRoot ? "func" : BuildCommandPath(command);
 
         _interaction.WriteBlankLine();
         _interaction.WriteMarkupLine($"[bold blue]{commandPath}[/]");
@@ -197,6 +197,25 @@ public class HelpCommand : BaseCommand
         }
 
         return string.Join(" ", parts);
+    }
+
+    /// <summary>
+    /// Walks up the parent chain to build the full command path (e.g., "func host use").
+    /// </summary>
+    private static string BuildCommandPath(Command command)
+    {
+        var segments = new List<string>();
+        var current = command;
+
+        while (current is not null and not RootCommand)
+        {
+            segments.Add(current.Name);
+            current = current.Parents.OfType<Command>().FirstOrDefault();
+        }
+
+        segments.Add("func");
+        segments.Reverse();
+        return string.Join(" ", segments);
     }
 
     private static string FormatOptionName(Option option)
