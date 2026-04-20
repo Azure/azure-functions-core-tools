@@ -165,6 +165,11 @@ dotnet build
 dotnet test
 ```
 
+## Git Commit Conventions
+
+- **Do NOT** add `Co-authored-by` trailers to commits (including Copilot co-author trailers).
+- Write clear, concise commit messages with a summary line and optional body.
+
 ## Build & Test Commands
 
 ```bash
