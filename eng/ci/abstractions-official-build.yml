@@ -44,6 +44,7 @@ extends:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
     settings:
+      networkIsolationPolicy: Preferred, GitHub, NuGet
     stages:
       - stage: Build
         displayName: 'Build & Test'
