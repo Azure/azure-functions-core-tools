@@ -18,7 +18,7 @@ jobs:
   - pwsh: |
       dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
         -c Release `
-        -f net8.0 `
+        -f net10.0 `
         --no-restore `
         /p:NoWorkers="true" `
         /p:SkipTemplates="true" `

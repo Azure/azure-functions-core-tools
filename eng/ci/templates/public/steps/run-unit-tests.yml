@@ -4,7 +4,7 @@ steps:
   inputs:
     command: 'test'
     projects: '**/Azure.Functions.Cli.UnitTests.csproj'
-    arguments: '--framework net8.0'
+    arguments: '--framework net10.0'
 
 - task: PublishTestResults@2
   displayName: 'Publish test results'

@@ -5,9 +5,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security;
-using Microsoft.DotNet.PlatformAbstractions;
 using Microsoft.Win32;
-using RuntimeEnvironment = Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment;
 
 namespace Azure.Functions.Cli.Telemetry
 {
@@ -53,7 +51,7 @@ namespace Azure.Functions.Cli.Telemetry
         /// </summary>
         internal static string GetProductType()
         {
-            if (RuntimeEnvironment.OperatingSystemPlatform != Platform.Windows)
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 return string.Empty;
             }
@@ -96,7 +94,7 @@ namespace Azure.Functions.Cli.Telemetry
         /// </summary>
         internal static string GetLibcRelease()
         {
-            if (RuntimeEnvironment.OperatingSystemPlatform == Platform.Windows)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 return string.Empty;
             }
@@ -121,7 +119,7 @@ namespace Azure.Functions.Cli.Telemetry
         /// </summary>
         internal static string GetLibcVersion()
         {
-            if (RuntimeEnvironment.OperatingSystemPlatform == Platform.Windows)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 return string.Empty;
             }
