@@ -1,4 +1,8 @@
 {
+  "_comments": {
+    "NuGet.Packaging": "Pinned to 5.11.6 transitively by the Functions host (Microsoft.Azure.WebJobs.Script.WebHost -> NuGet.ProjectModel -> NuGet.DependencyResolver.Core -> NuGet.Protocol -> NuGet.Packaging). Cannot upgrade independently until the host moves to NuGet 6.x. Advisory: GHSA-g4vj-cjjj-v7hg (Low)."
+  },
   "packages": [
+    "NuGet.Packaging"
   ]
 }
