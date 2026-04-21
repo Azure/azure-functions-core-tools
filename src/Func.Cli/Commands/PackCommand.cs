@@ -58,8 +58,7 @@ public class PackCommand : BaseCommand
         }
 
         _interaction.WriteError($"No pack provider for runtime '{detectedRuntime}'.");
-        _interaction.WriteMarkupLine(
-            $"[grey]Install the workload:[/] [white]func workload install {detectedRuntime}[/]");
+        _interaction.WriteMarkupLine($"[grey]Install the workload:[/] [white]func workload install {detectedRuntime}[/]");
         return Task.FromResult(1);
     }
 }

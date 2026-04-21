@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Commands;
@@ -46,14 +47,9 @@ public class NewCommand : BaseCommand
 
         _interaction.WriteError("No language workloads installed.");
         _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine(
-            "[grey]Install a workload to create functions from templates:[/]");
+        _interaction.WriteMarkupLine("[grey]Install a workload to create functions from templates:[/]");
         _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine("  [white]func workload install dotnet[/]       [grey]C#, F#[/]");
-        _interaction.WriteMarkupLine("  [white]func workload install node[/]         [grey]JavaScript, TypeScript[/]");
-        _interaction.WriteMarkupLine("  [white]func workload install python[/]       [grey]Python[/]");
-        _interaction.WriteMarkupLine("  [white]func workload install java[/]         [grey]Java[/]");
-        _interaction.WriteMarkupLine("  [white]func workload install powershell[/]   [grey]PowerShell[/]");
+        WorkerRuntimes.WriteWorkloadInstallHints(_interaction);
         _interaction.WriteBlankLine();
         _interaction.WriteMarkupLine("[grey]Run[/] [white]func workload search[/] [grey]to discover available workloads.[/]");
 

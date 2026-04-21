@@ -7,8 +7,7 @@ using Azure.Functions.Cli.Console;
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Launches the Azure Functions host runtime. Supports 'func start' and
-/// Placeholder for 'func start' (not yet implemented).
+/// Launches the Azure Functions host runtime via 'func start'.
 /// </summary>
 public class StartCommand : BaseCommand
 {
