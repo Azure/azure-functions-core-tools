@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -43,83 +42,42 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Fact]
-        public void ParseArgs_WorkerRuntimeNative_Parses()
+        public void ParseArgs_WorkerRuntimeGo_Parses()
         {
             var action = CreateAction();
 
-            action.ParseArgs(new[] { "--worker-runtime", "native" });
+            action.ParseArgs(new[] { "--worker-runtime", "go" });
 
-            action.WorkerRuntime.Should().Be("native");
-        }
-
-        [Fact]
-        public void ParseArgs_WorkerRuntimeNativeWithLanguageGolang_Parses()
-        {
-            var action = CreateAction();
-
-            action.ParseArgs(new[] { "--worker-runtime", "native", "--language", "golang" });
-
-            action.WorkerRuntime.Should().Be("native");
-            action.Language.Should().Be("golang");
+            action.WorkerRuntime.Should().Be("go");
         }
 
         [Theory]
-        [InlineData("native")]
         [InlineData("go")]
         [InlineData("golang")]
-        [InlineData("Native")]
         [InlineData("Go")]
         [InlineData("Golang")]
-        public void NormalizeWorkerRuntime_NativeAliases_ResolveToNative(string input)
+        public void NormalizeWorkerRuntime_GoAliases_ResolveToGo(string input)
         {
             var result = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(input);
 
-            result.Should().Be(WorkerRuntime.Native);
-        }
-
-        [Theory]
-        [InlineData("golang", "golang")]
-        [InlineData("go", "golang")]
-        public void NormalizeLanguage_GoAliases_ResolveToGolang(string input, string expected)
-        {
-            var result = WorkerRuntimeLanguageHelper.NormalizeLanguage(input);
-
-            result.Should().Be(expected);
+            result.Should().Be(WorkerRuntime.Go);
         }
 
         [Fact]
-        public void GetRuntimeMoniker_Native_ReturnsNative()
+        public void GetRuntimeMoniker_Go_ReturnsGo()
         {
-            var result = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(WorkerRuntime.Native);
+            var result = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(WorkerRuntime.Go);
 
-            result.Should().Be("native");
+            result.Should().Be("go");
         }
 
         [Fact]
-        public void GetDefaultTemplateLanguageFromWorker_Native_ReturnsGolang()
+        public void ProgrammingModelHelper_Go_DefaultsToV1()
         {
-            var result = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(WorkerRuntime.Native);
-
-            result.Should().Be(Constants.Languages.Golang);
-        }
-
-        [Fact]
-        public void WorkerToSupportedLanguages_Native_ContainsGolang()
-        {
-            WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages
-                .Should().ContainKey(WorkerRuntime.Native);
-
-            WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages[WorkerRuntime.Native]
-                .Should().Contain(Constants.Languages.Golang);
-        }
-
-        [Fact]
-        public void ProgrammingModelHelper_Native_DefaultsToV1()
-        {
-            var supportedModels = ProgrammingModelHelper.GetSupportedProgrammingModels(WorkerRuntime.Native);
+            var supportedModels = ProgrammingModelHelper.GetSupportedProgrammingModels(WorkerRuntime.Go);
             supportedModels.Should().Contain(ProgrammingModel.V1);
 
-            var resolved = ProgrammingModelHelper.ResolveProgrammingModel(null, WorkerRuntime.Native, Constants.Languages.Golang);
+            var resolved = ProgrammingModelHelper.ResolveProgrammingModel(null, WorkerRuntime.Go, string.Empty);
             resolved.Should().Be(ProgrammingModel.V1);
         }
     }

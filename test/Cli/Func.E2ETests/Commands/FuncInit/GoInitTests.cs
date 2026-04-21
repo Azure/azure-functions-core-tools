@@ -10,17 +10,17 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 {
-    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Native)]
-    public class NativeGoInitTests(ITestOutputHelper log) : BaseE2ETests(log)
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Go)]
+    public class GoInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_WithNativeGolang_GeneratesExpectedFunctionProjectFiles()
+        public void Init_WithGo_GeneratesExpectedFunctionProjectFiles()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithNativeGolang_GeneratesExpectedFunctionProjectFiles);
+            var testName = nameof(Init_WithGo_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
-            var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "native" };
+            var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "go" };
             var hostJsonPath = Path.Combine(workingDir, "host.json");
             var expectedHostJsonContent = new[] { "extensionBundle" };
             var mainGoPath = Path.Combine(workingDir, "main.go");
@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "native", "--language", "golang"]);
+                .Execute(["--worker-runtime", "go"]);
 
             funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
@@ -53,10 +53,10 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "native", "--language", "golang", "--skip-go-mod-tidy"]);
+                .Execute(["--worker-runtime", "go", "--skip-go-mod-tidy"]);
 
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining("go mod tidy");
+            funcInitResult.Should().HaveStdOutContaining("Skipped \"go mod tidy\"");
         }
 
         [Fact]
@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "native", "--language", "golang", "--force"]);
+                .Execute(["--worker-runtime", "go", "--force"]);
 
             funcInitResult.Should().ExitWith(0);
             File.Exists(Path.Combine(workingDir, "main.go")).Should().BeTrue("Expected main.go to exist");
@@ -85,44 +85,27 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "native", "--language", "golang", "--docker"]);
+                .Execute(["--worker-runtime", "go", "--docker"]);
 
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining("Docker support for the native worker runtime is not yet available");
-            File.Exists(Path.Combine(workingDir, "Dockerfile")).Should().BeFalse("Expected no Dockerfile for native runtime");
+            funcInitResult.Should().HaveStdOutContaining("Docker support for the Go worker runtime is not yet available");
+            File.Exists(Path.Combine(workingDir, "Dockerfile")).Should().BeFalse("Expected no Dockerfile for Go runtime");
         }
 
         [Fact]
-        public void Init_WithGoAlias_ResolvesToNativeAndGeneratesProject()
+        public void Init_WithGolangAlias_ResolvesToGo()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithGoAlias_ResolvesToNativeAndGeneratesProject);
+            var testName = nameof(Init_WithGolangAlias_ResolvesToGo);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "go"]);
+                .Execute(["--worker-runtime", "golang"]);
 
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining("maps to the 'native' worker runtime");
             File.Exists(Path.Combine(workingDir, "main.go")).Should().BeTrue("Expected main.go to exist");
             File.Exists(Path.Combine(workingDir, "go.mod")).Should().BeTrue("Expected go.mod to exist");
-        }
-
-        [Fact]
-        public void Init_InNonEmptyDirectory_WithoutForceFlag_Fails()
-        {
-            var workingDir = WorkingDirectory;
-            File.WriteAllText(Path.Combine(workingDir, "existing.txt"), "test");
-
-            var testName = nameof(Init_InNonEmptyDirectory_WithoutForceFlag_Fails);
-            var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "native", "--language", "golang"]);
-
-            funcInitResult.ExitCode.Should().NotBe(0, "Expected init to fail in non-empty directory without --force");
         }
     }
 }

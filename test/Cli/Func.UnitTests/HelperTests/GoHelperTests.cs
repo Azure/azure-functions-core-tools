@@ -30,12 +30,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [SkipIfGoNonExistFact]
-        public async Task WorkerInfoRuntimeShouldBeNative()
+        public async Task WorkerInfoRuntimeShouldBeGo()
         {
             WorkerLanguageVersionInfo worker = await GoHelpers.GetEnvironmentGoVersion();
 
             worker.Should().NotBeNull();
-            worker.Runtime.Should().Be(WorkerRuntime.Native, "Worker runtime should be Native for Go");
+            worker.Runtime.Should().Be(WorkerRuntime.Go, "Worker runtime should be Go");
         }
 
         [Theory]
@@ -48,7 +48,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("2.0.0", false)]
         public void AssertGoVersion_ValidatesMinimumVersion(string goVersion, bool expectException)
         {
-            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Native, goVersion, "go");
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Go, goVersion, "go");
 
             if (!expectException)
             {
@@ -73,7 +73,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("notaversion")]
         public void AssertGoVersion_UnparseableVersion_ThrowsCliException(string version)
         {
-            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Native, version, "go");
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Go, version, "go");
 
             var action = () => GoHelpers.AssertGoVersion(worker);
             action.Should().Throw<CliException>().Which.Message.Should().Contain("Unable to parse Go version");
@@ -84,7 +84,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("1.25.0-rc1")]
         public void AssertGoVersion_ExtraVersionParts_DoesNotThrow(string version)
         {
-            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Native, version, "go");
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Go, version, "go");
 
             GoHelpers.AssertGoVersion(worker);
         }

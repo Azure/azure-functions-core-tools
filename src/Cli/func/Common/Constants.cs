@@ -161,7 +161,6 @@ namespace Azure.Functions.Cli.Common
             public const string Powershell = "powershell";
             public const string Java = "java";
             public const string Custom = "custom";
-            public const string Golang = "golang";
         }
 
         public static class ArmConstants

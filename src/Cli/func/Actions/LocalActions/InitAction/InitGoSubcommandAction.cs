@@ -1,21 +1,15 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Helpers;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "init native", ParentCommandName = "init", ShowInHelp = true, HelpText = "Options specific to native runtime apps when running func init")]
-    internal class InitNativeSubcommandAction : BaseAction
+    [Action(Name = "init go", ParentCommandName = "init", ShowInHelp = true, HelpText = "Options specific to Go runtime apps when running func init")]
+    internal class InitGoSubcommandAction : BaseAction
     {
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            Parser
-                .Setup<string>('l', "language")
-                .WithDescription($"The language for the function app. Options: {string.Join(", ", WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages[WorkerRuntime.Native])}.")
-                .Callback(_ => { });
-
             Parser
                 .Setup<bool>("skip-go-mod-tidy")
                 .WithDescription("Skip running 'go mod tidy' after Go project creation.")

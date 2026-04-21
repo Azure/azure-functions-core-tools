@@ -215,7 +215,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
 
-                Utilities.WarnIfNativeWorkerRuntime(ResolvedWorkerRuntime);
+                Utilities.WarnIfGoWorkerRuntime(ResolvedWorkerRuntime);
 
                 // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
                 // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
@@ -247,7 +247,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
 
-                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Native)
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Go)
                 {
                     await GoHelpers.SetupProject(
                         Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-_"),
@@ -293,6 +293,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (!string.IsNullOrEmpty(workerRuntimeString))
             {
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeString);
+                if (workerRuntime == Helpers.WorkerRuntime.Go)
+                {
+                    return (workerRuntime, string.Empty);
+                }
+
                 if (!string.IsNullOrEmpty(languageString))
                 {
                     language = WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString);
@@ -324,6 +329,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+                if (workerRuntime == Helpers.WorkerRuntime.Go)
+                {
+                    return (workerRuntime, string.Empty);
+                }
+
                 language = GlobalCoreToolsSettings.CurrentLanguageOrNull
                     ?? (!string.IsNullOrEmpty(languageString) ? WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString) : null)
                     ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
@@ -336,8 +346,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (workerRuntime == Helpers.WorkerRuntime.Node
                 || workerRuntime == Helpers.WorkerRuntime.DotnetIsolated
-                || workerRuntime == Helpers.WorkerRuntime.Dotnet
-                || workerRuntime == Helpers.WorkerRuntime.Native)
+                || workerRuntime == Helpers.WorkerRuntime.Dotnet)
             {
                 if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
                     && languages.Count() != 0)
@@ -523,9 +532,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCustom);
             }
-            else if (workerRuntime == Helpers.WorkerRuntime.Native)
+            else if (workerRuntime == Helpers.WorkerRuntime.Go)
             {
-                ColoredConsole.WriteLine(WarningColor("Docker support for the native worker runtime is not yet available. Skipping Dockerfile creation."));
+                ColoredConsole.WriteLine(WarningColor("Docker support for the Go worker runtime is not yet available. Skipping Dockerfile creation."));
                 return;
             }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
