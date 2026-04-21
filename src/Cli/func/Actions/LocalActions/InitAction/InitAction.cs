@@ -449,7 +449,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
         {
             string localSettingsJsonContent = await StaticResources.LocalSettingsJson;
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
+
+            // The Go worker is registered with the host under the "native" runtime identifier,
+            // so FUNCTIONS_WORKER_RUNTIME in local.settings.json must be "native" even though
+            // the CLI exposes the runtime as "go" everywhere else.
+            string workerRuntimeSetting = workerRuntime == Helpers.WorkerRuntime.Go
+                ? "native"
+                : WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntimeSetting);
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", Constants.StorageEmulatorConnectionString);
 
             if (workerRuntime == Helpers.WorkerRuntime.Powershell)
