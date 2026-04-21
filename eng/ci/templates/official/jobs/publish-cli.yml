@@ -33,7 +33,7 @@ jobs:
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
         -o "$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}" `
         -c Release `
-        -f net8.0 `
+        -f net10.0 `
         -r $runtime `
         --self-contained `
         --no-restore `
