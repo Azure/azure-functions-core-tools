@@ -2,9 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.CommandLine.Help;
 using System.CommandLine.Invocation;
-using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Commands;
 
