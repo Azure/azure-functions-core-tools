@@ -128,7 +128,7 @@ namespace Azure.Functions.Cli.Helpers
                     var match = Regex.Match(output, @"go(\d+\.\d+(?:\.\d+)?)");
                     if (match.Success)
                     {
-                        return new WorkerLanguageVersionInfo(WorkerRuntime.Native, match.Groups[1].Value, goExe);
+                        return new WorkerLanguageVersionInfo(WorkerRuntime.Go, match.Groups[1].Value, goExe);
                     }
                 }
             }
