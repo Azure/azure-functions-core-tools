@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Azure.Functions.Cli.Workload.Sdk</RootNamespace>
+    <AssemblyName>Azure.Functions.Cli.Workload.Sdk</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Cli.Workload.Sdk</PackageId>
+    <Description>SDK for building out-of-process Azure Functions CLI workloads. Provides the JSON-RPC stdio server runtime.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

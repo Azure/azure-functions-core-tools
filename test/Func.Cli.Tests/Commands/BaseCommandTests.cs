@@ -36,7 +36,7 @@ public class BaseCommandTests : IDisposable
     [Fact]
     public async Task PathArgument_ChangesWorkingDirectory()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = WorkloadTestFactory.CreateParser(_interaction);
         var result = root.Parse($"start {_tempDir}");
 
         await result.InvokeAsync();
@@ -50,7 +50,7 @@ public class BaseCommandTests : IDisposable
     public async Task PathArgument_NonExistentDir_ThrowsGracefulException()
     {
         var nonExistent = Path.Combine(_tempDir, "does-not-exist");
-        var root = Parser.CreateCommand(_interaction);
+        var root = WorkloadTestFactory.CreateParser(_interaction);
         var result = root.Parse($"start {nonExistent}");
 
         // Match production behavior: disable default exception handler so GracefulException propagates
@@ -67,7 +67,7 @@ public class BaseCommandTests : IDisposable
         Assert.False(Directory.Exists(newDir));
 
         // Init uses createIfNotExists: true
-        var root = Parser.CreateCommand(_interaction);
+        var root = WorkloadTestFactory.CreateParser(_interaction);
         var result = root.Parse($"init {newDir}");
         await result.InvokeAsync();
 
@@ -77,7 +77,7 @@ public class BaseCommandTests : IDisposable
     [Fact]
     public void PathArgument_DashPrefix_RejectsAsUnrecognizedOption()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = WorkloadTestFactory.CreateParser(_interaction);
         var result = root.Parse("init --bogus");
 
         Assert.NotEmpty(result.Errors);
@@ -88,7 +88,7 @@ public class BaseCommandTests : IDisposable
     {
         Directory.SetCurrentDirectory(_tempDir);
 
-        var root = Parser.CreateCommand(_interaction);
+        var root = WorkloadTestFactory.CreateParser(_interaction);
         var result = root.Parse("start");
         await result.InvokeAsync();
 

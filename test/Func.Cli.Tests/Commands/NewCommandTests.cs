@@ -8,17 +8,13 @@ namespace Azure.Functions.Cli.Tests.Commands;
 
 public class NewCommandTests
 {
-    private readonly TestInteractionService _interaction;
-
-    public NewCommandTests()
-    {
-        _interaction = new TestInteractionService();
-    }
+    private readonly TestInteractionService _interaction = new();
 
     [Fact]
     public void NewCommand_HasExpectedOptions()
     {
-        var cmd = new NewCommand(_interaction);
+        var (host, _, _) = WorkloadTestFactory.Create(_interaction);
+        var cmd = new NewCommand(_interaction, host);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--name", optionNames);
@@ -29,7 +25,7 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_RegisteredInParser()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = WorkloadTestFactory.CreateParser(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
         Assert.Contains("new", names);
@@ -38,7 +34,8 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasPathArgument()
     {
-        var cmd = new NewCommand(_interaction);
+        var (host, _, _) = WorkloadTestFactory.Create(_interaction);
+        var cmd = new NewCommand(_interaction, host);
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
     }

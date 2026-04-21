@@ -8,17 +8,13 @@ namespace Azure.Functions.Cli.Tests.Commands;
 
 public class InitCommandTests
 {
-    private readonly TestInteractionService _interaction;
-
-    public InitCommandTests()
-    {
-        _interaction = new TestInteractionService();
-    }
+    private readonly TestInteractionService _interaction = new();
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
     {
-        var cmd = new InitCommand(_interaction);
+        var (host, _, _) = WorkloadTestFactory.Create(_interaction);
+        var cmd = new InitCommand(_interaction, host);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--worker-runtime", optionNames);
@@ -30,7 +26,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_RegisteredInParser()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = WorkloadTestFactory.CreateParser(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
         Assert.Contains("init", names);
@@ -39,7 +35,8 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_HasPathArgument()
     {
-        var cmd = new InitCommand(_interaction);
+        var (host, _, _) = WorkloadTestFactory.Create(_interaction);
+        var cmd = new InitCommand(_interaction, host);
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
     }

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "sample",
+  "version": "1.0.0",
+  "displayName": "Sample workload (in-tree)",
+  "description": "Reference implementation of the OOP workload protocol used for demos and tests.",
+  "workerRuntimes": [ "sample" ],
+  "languages": [ "Demo" ],
+  "protocolVersion": "1.0",
+  "executable": "dotnet",
+  "executableArgs": [ "func-workload-sample.dll" ],
+  "capabilities": [ "project.detect", "project.init", "templates", "pack" ],
+  "projectMarkers": [ "*.sampleproj" ]
+}

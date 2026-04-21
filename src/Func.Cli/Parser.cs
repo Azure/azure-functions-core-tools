@@ -5,6 +5,7 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli;
 
@@ -18,17 +19,21 @@ public static class Parser
     /// <summary>
     /// Creates and configures the root CLI command with all subcommands registered.
     /// </summary>
-    public static FuncRootCommand CreateCommand(IInteractionService interaction)
+    public static FuncRootCommand CreateCommand(
+        IInteractionService interaction,
+        IWorkloadHost workloadHost,
+        IWorkloadInstaller workloadInstaller)
     {
         var rootCommand = new FuncRootCommand();
 
         // Create built-in commands
         var helpCommand = new HelpCommand(interaction, rootCommand);
         var versionCommand = new VersionCommand(interaction);
-        var initCommand = new InitCommand(interaction);
-        var newCommand = new NewCommand(interaction);
-        var packCommand = new PackCommand(interaction);
+        var initCommand = new InitCommand(interaction, workloadHost);
+        var newCommand = new NewCommand(interaction, workloadHost);
+        var packCommand = new PackCommand(interaction, workloadHost);
         var startCommand = new StartCommand(interaction);
+        var workloadCommand = new WorkloadCommand(interaction, workloadInstaller, workloadHost);
 
         // Register built-in commands
         rootCommand.Subcommands.Add(versionCommand);
@@ -37,6 +42,7 @@ public static class Parser
         rootCommand.Subcommands.Add(newCommand);
         rootCommand.Subcommands.Add(packCommand);
         rootCommand.Subcommands.Add(startCommand);
+        rootCommand.Subcommands.Add(workloadCommand);
 
         // Replace built-in help rendering with Spectre on all commands
         ReplaceHelpAction(rootCommand, helpCommand);

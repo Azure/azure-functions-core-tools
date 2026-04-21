@@ -7,6 +7,7 @@ using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Spectre.Console;
@@ -24,13 +25,17 @@ builder.Services.AddSingleton<ITelemetry>(sp =>
     var client = new AppInsightsTelemetryClient();
     return client.IsEnabled ? client : new NoOpTelemetryClient();
 });
+builder.Services.AddSingleton<IWorkloadInstaller, WorkloadInstaller>();
+builder.Services.AddSingleton<IWorkloadHost, WorkloadHost>();
 
 var host = builder.Build();
 var interaction = host.Services.GetRequiredService<IInteractionService>();
 var telemetry = host.Services.GetRequiredService<ITelemetry>();
+var workloadHost = host.Services.GetRequiredService<IWorkloadHost>();
+var workloadInstaller = host.Services.GetRequiredService<IWorkloadInstaller>();
 
 // Create the command tree
-var rootCommand = Parser.CreateCommand(interaction);
+var rootCommand = Parser.CreateCommand(interaction, workloadHost, workloadInstaller);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.

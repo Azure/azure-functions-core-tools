@@ -3,13 +3,13 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Packages an Azure Functions project into a zip ready for deployment.
-/// The full implementation requires a language workload — this defines
-/// the command skeleton and options.
+/// Packages an Azure Functions project into a zip ready for deployment by
+/// routing to the workload that owns the project's runtime.
 /// </summary>
 public class PackCommand : BaseCommand
 {
@@ -24,42 +24,46 @@ public class PackCommand : BaseCommand
     };
 
     private readonly IInteractionService _interaction;
+    private readonly IWorkloadHost _workloadHost;
 
-    public PackCommand(IInteractionService interaction)
+    public PackCommand(IInteractionService interaction, IWorkloadHost workloadHost)
         : base("pack", "Package the function app into a zip ready for deployment.")
     {
         _interaction = interaction;
+        _workloadHost = workloadHost;
 
         AddPathArgument();
         Options.Add(OutputOption);
         Options.Add(NoBuildOption);
     }
 
-    protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         ApplyPath(parseResult);
-
         var projectPath = Directory.GetCurrentDirectory();
 
-        // Verify this is a Functions project
-        if (!File.Exists(Path.Combine(projectPath, "host.json")))
+        var detection = await _workloadHost.DetectProjectAsync(projectPath, cancellationToken);
+        if (detection is null)
         {
-            _interaction.WriteError("No Azure Functions project found. Run func init first.");
-            return Task.FromResult(1);
+            _interaction.WriteError("Could not determine the worker runtime for this project.");
+            _interaction.WriteMarkupLine("[grey]Install the matching workload, or run from a project directory.[/]");
+            return 1;
         }
 
-        // Detect the runtime
-        var detectedRuntime = ProjectDetector.DetectRuntime(projectPath);
-        if (detectedRuntime is null)
-        {
-            _interaction.WriteError("Could not detect the worker runtime for this project.");
-            _interaction.WriteMarkupLine("[grey]Ensure the project contains the expected project files (e.g., .csproj, package.json).[/]");
-            return Task.FromResult(1);
-        }
+        var (workload, _) = detection.Value;
+        await using var client = await _workloadHost.StartByIdAsync(workload.Manifest.Id, cancellationToken);
 
-        _interaction.WriteError($"No pack provider for runtime '{detectedRuntime}'.");
-        _interaction.WriteMarkupLine(
-            $"[grey]Install the workload:[/] [white]func workload install {detectedRuntime}[/]");
-        return Task.FromResult(1);
+        var result = await client.InvokeAsync(
+            WorkloadProtocol.Methods.PackRun,
+            new PackRunParams(
+                ProjectPath: projectPath,
+                OutputPath: parseResult.GetValue(OutputOption),
+                NoBuild: parseResult.GetValue(NoBuildOption)),
+            WorkloadJsonContext.Default.PackRunParams,
+            WorkloadJsonContext.Default.PackRunResult,
+            cancellationToken);
+
+        _interaction.WriteSuccess($"Packed: {result.OutputPath}");
+        return 0;
     }
 }

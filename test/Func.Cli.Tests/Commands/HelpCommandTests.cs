@@ -18,7 +18,7 @@ public class HelpCommandTests
     {
         _interaction = new TestInteractionService();
         // Use the full Parser to get a real command tree
-        _rootCommand = Parser.CreateCommand(_interaction);
+        _rootCommand = WorkloadTestFactory.CreateParser(_interaction);
         _helpCommand = _rootCommand.Subcommands.OfType<HelpCommand>().First();
     }
 
