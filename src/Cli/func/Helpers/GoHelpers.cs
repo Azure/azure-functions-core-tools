@@ -63,7 +63,12 @@ namespace Azure.Functions.Cli.Helpers
             AssertGoVersion(goVersion);
 
             await RunGoCommandAsync($"mod init {moduleName}", "Failed to initialize Go module.");
-            await RunGoCommandAsync("get github.com/azure/azure-functions-golang-worker", "Failed to add Azure Functions Go worker dependency.");
+            await RunGoCommandAsync("get github.com/azure/azure-functions-golang-worker@latest", "Failed to add Azure Functions Go worker dependency.");
+
+            // Write main.go and .funcignore before running "go mod tidy" so that tidy
+            // can resolve the sdk/worker subpackages referenced by the sample.
+            await FileSystemHelpers.WriteFileIfNotExists("main.go", await StaticResources.MainGo);
+            await FileSystemHelpers.WriteFileIfNotExists(Constants.FuncIgnoreFile, await StaticResources.FuncIgnore);
 
             if (!skipGoModTidy)
             {
@@ -73,9 +78,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 ColoredConsole.WriteLine(AdditionalInfoColor("Skipped \"go mod tidy\". You must run \"go mod tidy\" manually."));
             }
-
-            await FileSystemHelpers.WriteFileIfNotExists("main.go", await StaticResources.MainGo);
-            await FileSystemHelpers.WriteFileIfNotExists(Constants.FuncIgnoreFile, await StaticResources.FuncIgnore);
         }
 
         private static async Task RunGoCommandAsync(string arguments, string errorMessage, bool throwOnFailure = true)
