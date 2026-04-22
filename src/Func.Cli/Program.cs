@@ -9,17 +9,12 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
-using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-var services = new ServiceCollection();
-services.AddSingleton<ITheme, DefaultTheme>();
-services.AddSingleton<IInteractionService, SpectreInteractionService>();
-
-await using var serviceProvider = services.BuildServiceProvider();
-var interaction = serviceProvider.GetRequiredService<IInteractionService>();
+ITheme theme = new DefaultTheme();
+IInteractionService interaction = new SpectreInteractionService(theme);
 
 // Wire up the OpenTelemetry SDK only when telemetry is configured (build has
 // a real instrumentation key and the user has not opted out). When it isn't,
