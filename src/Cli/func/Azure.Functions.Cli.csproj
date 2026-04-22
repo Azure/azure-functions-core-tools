@@ -56,6 +56,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.6" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
   </ItemGroup>
 
