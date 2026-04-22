@@ -119,7 +119,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
                 return bundlePath;
             }
-            catch (Exception ex) when (ColoredConsoleLogger.IsSslCertificateException(ex))
+            catch (Exception ex) when (SslCertificateErrorHelper.IsSslCertificateException(ex))
             {
                 // SSL certificate validation failure — likely an SSL inspection proxy
                 ColoredConsole.WriteLine(OutputTheme.ErrorColor(Constants.Errors.SslCertificateErrorDetected));

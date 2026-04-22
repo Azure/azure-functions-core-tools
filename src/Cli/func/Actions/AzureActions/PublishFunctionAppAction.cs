@@ -257,7 +257,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     // HttpRequestException is thrown for connectivity failures (SSL, socket, DNS)
                     // not for HTTP status errors, which are handled by CheckResponseStatusAsync as CliException.
-                    if (ColoredConsoleLogger.IsSslCertificateException(ex))
+                    if (SslCertificateErrorHelper.IsSslCertificateException(ex))
                     {
                         throw new CliException($"{Constants.Errors.SslCertificateErrorDetected}{Environment.NewLine}{Constants.Errors.SslCertificateHint}{Environment.NewLine}Details: {ex.Message}", ex);
                     }
