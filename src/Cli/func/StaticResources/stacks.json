@@ -931,7 +931,7 @@
                                 "stackSettings": {
                                     "windowsRuntimeSettings": {
                                         "runtimeVersion": "~24",
-                                        "isPreview": true,
+                                        "isPreview": false,
                                         "isDefault": false,
                                         "isHidden": false,
                                         "remoteDebuggingSupported": false,
@@ -964,7 +964,7 @@
                                     },
                                     "linuxRuntimeSettings": {
                                         "runtimeVersion": "Node|24",
-                                        "isPreview": true,
+                                        "isPreview": false,
                                         "isDefault": false,
                                         "isHidden": false,
                                         "remoteDebuggingSupported": false,
@@ -993,7 +993,36 @@
                                             }
                                         ],
                                         "endOfLifeDate": "Mon Apr 30 2029 00:00:00 GMT+0000 (Coordinated Universal Time)",
-                                        "Sku": null
+                                        "Sku": [
+                                            {
+                                                "skuCode": "FC1",
+                                                "instanceMemoryMB": [
+                                                    {
+                                                        "size": 512,
+                                                        "isDefault": false
+                                                    },
+                                                    {
+                                                        "size": 2048,
+                                                        "isDefault": true
+                                                    },
+                                                    {
+                                                        "size": 4096,
+                                                        "isDefault": false
+                                                    }
+                                                ],
+                                                "maximumInstanceCount": {
+                                                    "lowestMaximumInstanceCount": 40,
+                                                    "highestMaximumInstanceCount": 1000,
+                                                    "defaultValue": 100
+                                                },
+                                                "functionAppConfigProperties": {
+                                                    "runtime": {
+                                                        "name": "node",
+                                                        "version": "24"
+                                                    }
+                                                }
+                                            }
+                                        ]
                                     }
                                 }
                             }
