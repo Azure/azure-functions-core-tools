@@ -18,13 +18,13 @@ namespace Azure.Functions.Cli.Telemetry;
 public static class MeterExtensions
 {
     private static readonly Counter<long> _commandCount =
-        CliTelemetry.Meter.CreateCounter<long>(
+        CliTelemetry.Metric.CreateCounter<long>(
             TelemetryConventions.CommandCountInstrument,
             unit: "{command}",
             description: "Number of CLI commands invoked.");
 
     private static readonly Histogram<double> _commandDuration =
-        CliTelemetry.Meter.CreateHistogram<double>(
+        CliTelemetry.Metric.CreateHistogram<double>(
             TelemetryConventions.CommandDurationInstrument,
             unit: "ms",
             description: "Duration of CLI command execution.");
@@ -37,9 +37,9 @@ public static class MeterExtensions
         /// exit-code conventions (0 == success).
         /// </summary>
         /// <remarks>
-        /// The instruments are bound to <see cref="CliTelemetry.Meter"/>; the
+        /// The instruments are bound to <see cref="CliTelemetry.Metric"/>; the
         /// receiver is required by the extension shape but is not otherwise
-        /// inspected. Call as <c>CliTelemetry.Meter.RecordCommand(...)</c>.
+        /// inspected. Call as <c>CliTelemetry.Metric.RecordCommand(...)</c>.
         /// </remarks>
         public void RecordCommand(string commandName, int exitCode, long durationMs)
         {

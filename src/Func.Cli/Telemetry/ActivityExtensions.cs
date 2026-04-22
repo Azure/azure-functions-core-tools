@@ -20,15 +20,15 @@ namespace Azure.Functions.Cli.Telemetry;
 /// </remarks>
 public static class ActivityExtensions
 {
-    extension(ActivitySource)
+    extension(ActivitySource source)
     {
         /// <summary>
         /// Starts an <see cref="Activity"/> that represents the execution of
         /// a CLI command. Returns <c>null</c> when no listener is subscribed.
         /// </summary>
-        public static Activity? StartCommandActivity(string commandName)
+        public Activity? StartCommandActivity(string commandName)
         {
-            var activity = CliTelemetry.Source.StartActivity(commandName, ActivityKind.Internal);
+            var activity = source.StartActivity(commandName, ActivityKind.Internal);
             activity?.SetTag(TelemetryConventions.CliCommandName, commandName);
             return activity;
         }

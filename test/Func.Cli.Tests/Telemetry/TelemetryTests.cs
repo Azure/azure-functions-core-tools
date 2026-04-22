@@ -23,15 +23,15 @@ public class TelemetryTests
     {
         // Without an OTel listener subscribed, ActivitySource.StartActivity
         // returns null and the extension propagates that.
-        Assert.Null(ActivitySource.StartCommandActivity("test"));
+        Assert.Null(CliTelemetry.Trace.StartCommandActivity("test"));
     }
 
     [Fact]
     public void RecordCommand_NoListener_DoesNotThrow()
     {
         // Metric instruments record nothing when no MeterListener is wired up.
-        CliTelemetry.Meter.RecordCommand("test", exitCode: 0, durationMs: 100);
-        CliTelemetry.Meter.RecordCommand("test", exitCode: 1, durationMs: 50);
+        CliTelemetry.Metric.RecordCommand("test", exitCode: 0, durationMs: 100);
+        CliTelemetry.Metric.RecordCommand("test", exitCode: 1, durationMs: 50);
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class TelemetryTests
     {
         using var listener = SubscribeListener();
 
-        using var activity = ActivitySource.StartCommandActivity("workload install");
+        using var activity = CliTelemetry.Trace.StartCommandActivity("workload install");
         Assert.NotNull(activity);
 
         Assert.Equal("workload install", activity.GetTagItem("cli.command.name"));
@@ -51,7 +51,7 @@ public class TelemetryTests
     {
         using var listener = SubscribeListener();
 
-        using var activity = ActivitySource.StartCommandActivity("test");
+        using var activity = CliTelemetry.Trace.StartCommandActivity("test");
         Assert.NotNull(activity);
 
         var ex = new InvalidOperationException("boom");

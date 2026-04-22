@@ -38,25 +38,36 @@ public static class CliTelemetry
 
     public static readonly string CliVersion = ResolveCliVersion();
 
-    public static readonly ActivitySource Source = new(SourceName, CliVersion);
+    public static readonly ActivitySource Trace = new(SourceName, CliVersion);
 
-    public static readonly Meter Meter = new(SourceName, CliVersion);
+    public static readonly Meter Metric = new(SourceName, CliVersion);
 
     /// <summary>
-    /// Builds the <see cref="ResourceBuilder"/> shared by every span and
-    /// metric exported from the CLI. Putting <c>service.version</c>, OS, and
-    /// runtime on the resource avoids re-tagging every span.
+    /// Returns the OS / runtime attributes that should be applied to the OTel
+    /// resource (in addition to <c>service.name</c> / <c>service.version</c>,
+    /// which are added via <c>AddService</c>).
+    /// </summary>
+    public static IEnumerable<KeyValuePair<string, object>> GetResourceAttributes()
+    {
+        return new KeyValuePair<string, object>[]
+        {
+            new(TelemetryConventions.OsType, RuntimeInformation.OSDescription),
+            new(TelemetryConventions.OsArchitecture, RuntimeInformation.OSArchitecture.ToString()),
+            new(TelemetryConventions.ProcessRuntimeDescription, RuntimeInformation.FrameworkDescription),
+        };
+    }
+
+    /// <summary>
+    /// Builds a standalone <see cref="ResourceBuilder"/> with the same
+    /// service/OS/runtime attributes used by the live exporters. Intended
+    /// for tests and tooling that need the resource without going through
+    /// the host.
     /// </summary>
     public static ResourceBuilder CreateResourceBuilder()
     {
         return ResourceBuilder.CreateDefault()
             .AddService(serviceName: SourceName, serviceVersion: CliVersion)
-            .AddAttributes(new KeyValuePair<string, object>[]
-            {
-                new(TelemetryConventions.OsType, RuntimeInformation.OSDescription),
-                new(TelemetryConventions.OsArchitecture, RuntimeInformation.OSArchitecture.ToString()),
-                new(TelemetryConventions.ProcessRuntimeDescription, RuntimeInformation.FrameworkDescription),
-            });
+            .AddAttributes(GetResourceAttributes());
     }
 
     /// <summary>
