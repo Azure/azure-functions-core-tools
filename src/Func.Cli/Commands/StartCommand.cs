@@ -68,7 +68,7 @@ public class StartCommand : BaseCommand
     {
         ApplyPath(parseResult);
         _interaction.WriteWarning("The 'start' command is not yet implemented in this version.");
-        _interaction.WriteMarkupLine("[grey]This is a preview build of Azure Functions CLI vNext.[/]");
+        _interaction.WriteHint("This is a preview build of Azure Functions CLI vNext.");
         return Task.FromResult(1);
     }
 }

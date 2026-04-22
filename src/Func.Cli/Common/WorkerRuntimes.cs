@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections.Frozen;
+using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Common;
 
@@ -21,15 +22,12 @@ public static class WorkerRuntimes
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Writes the workload install hints for all known runtimes.
+    /// Writes the workload install hints for all known runtimes as an aligned list.
     /// </summary>
-    public static void WriteWorkloadInstallHints(Console.IInteractionService interaction)
+    public static void WriteWorkloadInstallHints(IInteractionService interaction)
     {
-        foreach (var (worker, languages) in LanguageMap)
-        {
-            var langList = string.Join(", ", languages);
-            var padded = $"func workload install {worker}".PadRight(38);
-            interaction.WriteMarkupLine($"  [white]{padded}[/][grey]{langList}[/]");
-        }
+        var items = LanguageMap.Select(static kvp => new DefinitionItem($"func workload install {kvp.Key}", string.Join(", ", kvp.Value)));
+
+        interaction.WriteDefinitionList(items);
     }
 }

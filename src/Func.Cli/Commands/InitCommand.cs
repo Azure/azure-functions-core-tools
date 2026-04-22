@@ -53,11 +53,14 @@ public class InitCommand : BaseCommand
 
         _interaction.WriteError("No language workloads installed.");
         _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine("[grey]Install a workload to initialize a project:[/]");
+        _interaction.WriteHint("Install a workload to initialize a project:");
         _interaction.WriteBlankLine();
         WorkerRuntimes.WriteWorkloadInstallHints(_interaction);
         _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine("[grey]Run[/] [white]func workload search[/] [grey]to discover available workloads.[/]");
+        _interaction.WriteLine(l => l
+            .Muted("Run ")
+            .Command("func workload search")
+            .Muted(" to discover available workloads."));
 
         return Task.FromResult(1);
     }
