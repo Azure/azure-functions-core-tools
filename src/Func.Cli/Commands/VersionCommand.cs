@@ -28,22 +28,21 @@ public class VersionCommand : BaseCommand
     }
 
     /// <summary>
-    /// Prints detailed version info including build hash when --verbose is specified.
+    /// Prints detailed version info.
     /// </summary>
     internal int ExecuteDetailed()
     {
-        _interaction.WriteMarkupLine("[bold blue]Azure Functions CLI[/]");
+        _interaction.WriteTitle("Azure Functions CLI");
         _interaction.WriteBlankLine();
         _interaction.WriteTable(
             ["Property", "Value"],
-            new string[][]
-            {
+            [
                 ["Version", GetVersion()],
                 ["Build", GetInformationalVersion()],
                 ["Runtime", System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription],
                 ["OS", System.Runtime.InteropServices.RuntimeInformation.OSDescription],
                 ["Architecture", System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString()],
-            }
+            ]
         );
 
         return 0;

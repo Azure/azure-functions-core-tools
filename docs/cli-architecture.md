@@ -112,21 +112,47 @@ AddPathArgument(); // adds optional [path] argument
 
 ## Console / UI Layer
 
-**All console I/O goes through `IInteractionService`** — never `Console.Write*` directly. This enables testability (in-memory capture) and non-interactive mode (prompts return defaults).
+**All console I/O goes through `IInteractionService`** — never `Console.Write*` and
+never raw Spectre markup (`[red]…[/]`). This enables testability (in-memory
+capture), non-interactive mode (prompts return defaults), and theming.
+
+### Theming
+
+A single `ITheme` exposes `Style` values for semantic roles (`Command`,
+`Placeholder`, `Path`, `Muted`, `Heading`, `Success`, `Error`, `Warning`, etc.).
+`DefaultTheme` holds the production palette. Swapping the DI registration is the
+only change required to add a no-color or high-contrast variant.
 
 ### Output Methods
 
 | Method | Goes To | Purpose |
 |--------|---------|---------|
-| `WriteLine(text)` | stdout | Plain text output |
-| `WriteMarkup(markup)` | stdout | Spectre markup (colors, styles) |
-| `WriteMarkupLine(markup)` | stdout | Spectre markup with newline |
-| `WriteSuccess(message)` | stdout | Green `✓ message` |
-| `WriteError(message)` | stderr | Red `Error: message` |
-| `WriteWarning(message)` | stderr | Yellow `Warning: message` |
-| `WriteTable(columns, rows)` | stdout | Formatted table |
-| `WriteRule(title)` | stdout | Horizontal rule with title |
+| `WriteLine(text)` | stdout | Plain text |
+| `WriteLine(l => l.Muted("Run ").Command("func new"))` | stdout | Composed styled line via `InlineLine` |
+| `Write(IRenderable)` | stdout | Spectre `Grid`/`Table`/`Panel` escape hatch |
+| `WriteTitle(text)` | stdout | Product / document title |
+| `WriteSectionHeader(title)` | stdout | Horizontal rule with title |
+| `WriteHint(message)` | stdout | Muted informational text |
+| `WriteSuccess(message)` | stdout | `✓ message` in success color |
+| `WriteError(message)` | stderr | `Error: message` in error color |
+| `WriteWarning(message)` | stderr | `Warning: message` in warning color |
+| `WriteDefinitionList(items)` | stdout | Aligned `label    description` rows (Spectre `Grid` — no manual padding) |
+| `WriteTable(columns, rows)` | stdout | Bordered data table |
 | `WriteBlankLine()` | stdout | Empty line |
+
+### `InlineLine` composition
+
+`WriteLine(Action<InlineLine>)` provides a fluent, theme-aware builder for lines
+that mix multiple styles. Role-named methods (`.Command(...)`, `.Placeholder(...)`,
+`.Path(...)`, `.Muted(...)`, …) append styled segments. Literal content is escaped
+automatically — callers never type `[...]` tags or call `EscapeMarkup()`.
+
+```csharp
+interaction.WriteLine(l => l
+    .Muted("Run ")
+    .Command("func workload search")
+    .Muted(" to discover available workloads."));
+```
 
 ### Interactive Prompts
 

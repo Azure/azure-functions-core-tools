@@ -5,13 +5,11 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
-using Spectre.Console;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Displays rich help information using Spectre.Console. Generates help from
-/// real Command objects — no separate source of truth for command metadata.
+/// Renders rich help generated from real <see cref="Command"/> metadata.
 /// </summary>
 public class HelpCommand : BaseCommand
 {
@@ -37,67 +35,64 @@ public class HelpCommand : BaseCommand
     {
         var commandName = parseResult.GetValue(CommandArgument);
 
-        if (!string.IsNullOrEmpty(commandName))
-        {
-            return Task.FromResult(ShowCommandHelp(commandName));
-        }
-
-        return Task.FromResult(ShowGeneralHelp());
+        return Task.FromResult(string.IsNullOrEmpty(commandName)
+            ? ShowGeneralHelp()
+            : ShowCommandHelp(commandName));
     }
 
-    /// <summary>
-    /// Shows the top-level help with all available commands and global options.
-    /// </summary>
+    /// <summary>Shows top-level help: product banner, command list, global options.</summary>
     internal int ShowGeneralHelp()
     {
         var version = VersionCommand.GetVersion();
 
         _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine($"[bold blue]{Constants.ProductName}[/] [dim]({version})[/]");
+        _interaction.WriteLine(l => l
+            .Title(Constants.ProductName)
+            .Plain(" ")
+            .Muted($"({version})"));
         _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine("[grey]Create, develop, test, and deploy Azure Functions from the command line.[/]");
-        _interaction.WriteBlankLine();
-
-        _interaction.WriteRule("Usage");
-        _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine("  [white]func[/] [green]<command>[/] [cyan][[path]][/] [grey][[options]][/]");
+        _interaction.WriteHint("Create, develop, test, and deploy Azure Functions from the command line.");
         _interaction.WriteBlankLine();
 
-        // Generate command list from real registered commands
+        _interaction.WriteSectionHeader("Usage");
+        _interaction.WriteBlankLine();
+        _interaction.WriteLine(l => l
+            .Plain("  ")
+            .Command("func ")
+            .Placeholder("<command> ")
+            .OptionalArg("[path] ")
+            .Muted("[options]"));
+        _interaction.WriteBlankLine();
+
         var commands = _rootCommand.Subcommands
             .Where(c => !c.Hidden)
-            .Select(c => (c.Name, c.Description ?? string.Empty))
+            .Select(c => new DefinitionItem(c.Name, c.Description ?? string.Empty))
             .ToList();
         if (commands.Count > 0)
         {
-            _interaction.WriteRule("Commands");
+            _interaction.WriteSectionHeader("Commands");
             _interaction.WriteBlankLine();
-            WriteAlignedList(commands);
+            _interaction.WriteDefinitionList(commands);
             _interaction.WriteBlankLine();
         }
 
-        // Generate global options from real root command options
-        _interaction.WriteRule("Global Options");
+        _interaction.WriteSectionHeader("Global Options");
         _interaction.WriteBlankLine();
-        var globalOptions = _rootCommand.Options
+        var options = _rootCommand.Options
             .Where(o => o is not HelpOption && o.Name != "--version")
-            .Select(o => (FormatOptionName(o), o.Description ?? string.Empty));
-        // Always include --help and --version in the display (with our formatting)
-        var allOptions = globalOptions
-            .Append(("--help, -h, -?", "Show help information"))
-            .Append(("--version", "Display the current version"));
-        WriteAlignedList(allOptions);
+            .Select(o => new DefinitionItem(FormatOptionName(o), o.Description ?? string.Empty))
+            .Append(new DefinitionItem("--help, -h, -?", "Show help information"))
+            .Append(new DefinitionItem("--version", "Display the current version"));
+        _interaction.WriteDefinitionList(options);
         _interaction.WriteBlankLine();
 
-        _interaction.WriteMarkupLine($"[grey]Documentation: {Constants.DocsUrl}[/]");
+        _interaction.WriteLine(l => l.Muted($"Documentation: {Constants.DocsUrl}"));
         _interaction.WriteBlankLine();
 
         return 0;
     }
 
-    /// <summary>
-    /// Shows help for a specific named command, generated from the command's metadata.
-    /// </summary>
+    /// <summary>Shows help for a named subcommand.</summary>
     internal int ShowCommandHelp(string commandName)
     {
         var command = _rootCommand.Subcommands
@@ -114,8 +109,8 @@ public class HelpCommand : BaseCommand
     }
 
     /// <summary>
-    /// Renders help for any System.CommandLine Command, used by both
-    /// 'func help <command>' and the SpectreHelpAction (--help/-h/-?).
+    /// Renders help for any <see cref="Command"/>. Used by both <c>func help &lt;command&gt;</c>
+    /// and the global <c>--help</c> / <c>-h</c> / <c>-?</c> handler.
     /// </summary>
     internal void RenderCommandHelp(Command command)
     {
@@ -123,76 +118,84 @@ public class HelpCommand : BaseCommand
         var commandPath = isRoot ? "func" : $"func {command.Name}";
 
         _interaction.WriteBlankLine();
-        _interaction.WriteMarkupLine($"[bold blue]{commandPath}[/]");
+        _interaction.WriteTitle(commandPath);
         _interaction.WriteBlankLine();
 
         if (!string.IsNullOrEmpty(command.Description))
         {
-            _interaction.WriteMarkupLine($"[grey]{command.Description.EscapeMarkup()}[/]");
+            _interaction.WriteHint(command.Description);
             _interaction.WriteBlankLine();
         }
 
-        // Usage
-        _interaction.WriteRule("Usage");
+        _interaction.WriteSectionHeader("Usage");
         _interaction.WriteBlankLine();
-        var usage = BuildUsageString(command, commandPath);
-        _interaction.WriteMarkupLine($"  {usage}");
+        WriteUsageLine(command, commandPath);
         _interaction.WriteBlankLine();
 
-        // Arguments
         var args = command.Arguments.Where(a => !a.Hidden).ToList();
         if (args.Count > 0)
         {
-            _interaction.WriteRule("Arguments");
+            _interaction.WriteSectionHeader("Arguments");
             _interaction.WriteBlankLine();
-            WriteAlignedList(args.Select(a => ($"<{a.Name}>", a.Description ?? string.Empty)));
+            _interaction.WriteDefinitionList(
+                args.Select(a => new DefinitionItem($"<{a.Name}>", a.Description ?? string.Empty)));
             _interaction.WriteBlankLine();
         }
 
-        // Subcommands
         var subcommands = command.Subcommands.Where(c => !c.Hidden).ToList();
         if (subcommands.Count > 0)
         {
-            _interaction.WriteRule("Commands");
+            _interaction.WriteSectionHeader("Commands");
             _interaction.WriteBlankLine();
-            WriteAlignedList(subcommands.Select(c => (c.Name, c.Description ?? string.Empty)));
+            _interaction.WriteDefinitionList(
+                subcommands.Select(c => new DefinitionItem(c.Name, c.Description ?? string.Empty)));
             _interaction.WriteBlankLine();
         }
 
-        // Options (exclude the built-in help option to avoid clutter)
         var options = command.Options.Where(o => !o.Hidden && o is not HelpOption).ToList();
         if (options.Count > 0)
         {
-            _interaction.WriteRule("Options");
+            _interaction.WriteSectionHeader("Options");
             _interaction.WriteBlankLine();
-            WriteAlignedList(options.Select(o => (FormatOptionName(o), o.Description ?? string.Empty)));
+            _interaction.WriteDefinitionList(
+                options.Select(o => new DefinitionItem(FormatOptionName(o), o.Description ?? string.Empty)));
             _interaction.WriteBlankLine();
         }
     }
 
-    private static string BuildUsageString(Command command, string commandPath)
+    /// <summary>
+    /// Writes the usage line for a command, composing each token with its
+    /// semantic style (command, placeholder, optional arg, options hint).
+    /// </summary>
+    private void WriteUsageLine(Command command, string commandPath)
     {
-        var parts = new List<string> { $"[white]{commandPath}[/]" };
-
-        foreach (var arg in command.Arguments.Where(a => !a.Hidden))
+        _interaction.WriteLine(line =>
         {
-            var argStr = arg.Arity.MinimumNumberOfValues > 0
-                ? $"<{arg.Name}>"
-                : $"[[{arg.Name}]]";
-            parts.Add($"[cyan]{argStr}[/]");
-        }
+            line.Plain("  ").Command(commandPath);
 
-        if (command.Subcommands.Any(c => !c.Hidden))
-        {
-            parts.Add("[green]<command>[/]");
-        }
+            foreach (var arg in command.Arguments.Where(a => !a.Hidden))
+            {
+                line.Plain(" ");
+                if (arg.Arity.MinimumNumberOfValues > 0)
+                {
+                    line.Placeholder($"<{arg.Name}>");
+                }
+                else
+                {
+                    line.OptionalArg($"[{arg.Name}]");
+                }
+            }
 
-        if (command.Options.Any(o => !o.Hidden && o is not HelpOption))
-        {
-            parts.Add("[grey][[options]][/]");
-        }
+            if (command.Subcommands.Any(c => !c.Hidden))
+            {
+                line.Plain(" ").Placeholder("<command>");
+            }
 
-        return string.Join(" ", parts);
+            if (command.Options.Any(o => !o.Hidden && o is not HelpOption))
+            {
+                line.Plain(" ").Muted("[options]");
+            }
+        });
     }
 
     private static string FormatOptionName(Option option)
@@ -200,21 +203,5 @@ public class HelpCommand : BaseCommand
         var names = new List<string> { option.Name };
         names.AddRange(option.Aliases.Where(a => a != option.Name));
         return string.Join(", ", names);
-    }
-
-    private void WriteAlignedList(IEnumerable<(string Label, string Description)> items)
-    {
-        var itemList = items.ToList();
-        if (itemList.Count == 0) return;
-
-        int maxLabelWidth = itemList.Max(i => Markup.Remove(i.Label).Length);
-        int padding = maxLabelWidth + 4;
-
-        foreach (var (label, description) in itemList)
-        {
-            int plainLength = Markup.Remove(label).Length;
-            string gap = new(' ', padding - plainLength);
-            _interaction.WriteMarkupLine($"  [green]{label.EscapeMarkup()}[/]{gap}[grey]{description.EscapeMarkup()}[/]");
-        }
     }
 }

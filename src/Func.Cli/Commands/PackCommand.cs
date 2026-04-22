@@ -53,12 +53,14 @@ public class PackCommand : BaseCommand
         if (detectedRuntime is null)
         {
             _interaction.WriteError("Could not detect the worker runtime for this project.");
-            _interaction.WriteMarkupLine("[grey]Ensure the project contains the expected project files (e.g., .csproj, package.json).[/]");
+            _interaction.WriteHint("Ensure the project contains the expected project files (e.g., .csproj, package.json).");
             return Task.FromResult(1);
         }
 
         _interaction.WriteError($"No pack provider for runtime '{detectedRuntime}'.");
-        _interaction.WriteMarkupLine($"[grey]Install the workload:[/] [white]func workload install {detectedRuntime}[/]");
+        _interaction.WriteLine(l => l
+            .Muted("Install the workload: ")
+            .Command($"func workload install {detectedRuntime}"));
         return Task.FromResult(1);
     }
 }

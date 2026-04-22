@@ -5,9 +5,9 @@ using System.CommandLine;
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Spectre.Console;
 
 // Build the host with DI
 var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings
@@ -16,6 +16,7 @@ var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSetti
     DisableDefaults = true
 });
 
+builder.Services.AddSingleton<ITheme, DefaultTheme>();
 builder.Services.AddSingleton<IInteractionService, SpectreInteractionService>();
 
 var host = builder.Build();
@@ -67,7 +68,7 @@ catch (GracefulException ex)
 
     if (ex.VerboseMessage is not null)
     {
-        interaction.WriteMarkupLine($"[grey]{ex.VerboseMessage.EscapeMarkup()}[/]");
+        interaction.WriteHint(ex.VerboseMessage);
     }
 
     return ex.IsUserError ? 1 : 2;
@@ -101,10 +102,11 @@ static async Task PrintVersionNotice(IInteractionService interaction, Task<strin
         if (latestVersion is not null)
         {
             interaction.WriteBlankLine();
-            interaction.WriteMarkupLine(
-                $"[yellow]A newer version of Azure Functions Core Tools is available ({latestVersion}).[/]");
-            interaction.WriteMarkupLine(
-                "[grey]Update with:[/] [white]npm i -g azure-functions-core-tools@5 --unsafe-perm true[/]");
+            interaction.WriteLine(l => l
+                .Warning($"A newer version of Azure Functions Core Tools is available ({latestVersion})."));
+            interaction.WriteLine(l => l
+                .Muted("Update with: ")
+                .Code("npm i -g azure-functions-core-tools@5 --unsafe-perm true"));
         }
     }
     catch

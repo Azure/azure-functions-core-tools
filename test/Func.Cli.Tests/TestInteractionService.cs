@@ -2,11 +2,16 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
+using Spectre.Console.Rendering;
 
 namespace Azure.Functions.Cli.Tests;
 
 /// <summary>
-/// A test interaction service that captures all output for assertions.
+/// Test double that captures output as plain text for assertions.
+/// Styles are discarded; semantic roles are captured as prefixes
+/// (ERROR:, WARNING:, SUCCESS:, HINT:, TITLE:, RULE:, STATUS:…)
+/// so tests can assert on both content and role.
 /// Interactive methods return defaults (non-interactive mode).
 /// </summary>
 public class TestInteractionService : IInteractionService
@@ -16,25 +21,57 @@ public class TestInteractionService : IInteractionService
     public IReadOnlyList<string> Lines => _lines;
     public string AllOutput => string.Join(Environment.NewLine, _lines);
     public bool IsInteractive => false;
+    public ITheme Theme { get; } = new DefaultTheme();
+
+    // --- Plain output ---
 
     public void WriteLine(string text) => _lines.Add(text);
-    public void WriteMarkup(string markup) => _lines.Add(StripMarkup(markup));
-    public void WriteMarkupLine(string markup) => _lines.Add(StripMarkup(markup));
-    public void WriteError(string message) => _lines.Add($"ERROR: {message}");
-    public void WriteWarning(string message) => _lines.Add($"WARNING: {message}");
+
+    public void WriteBlankLine() => _lines.Add(string.Empty);
+
+    // --- Composed styled output ---
+
+    public void WriteLine(Action<InlineLine> build)
+    {
+        var line = new InlineLine(Theme);
+        build(line);
+        _lines.Add(line.ToPlainString());
+    }
+
+    public void Write(IRenderable renderable) => _lines.Add($"RENDERABLE: {renderable.GetType().Name}");
+
+    // --- Semantic output ---
+
+    public void WriteTitle(string text) => _lines.Add($"TITLE: {text}");
+
+    public void WriteSectionHeader(string title) => _lines.Add($"RULE: {title}");
+
+    public void WriteHint(string message) => _lines.Add($"HINT: {message}");
+
     public void WriteSuccess(string message) => _lines.Add($"SUCCESS: {message}");
+
+    public void WriteError(string message) => _lines.Add($"ERROR: {message}");
+
+    public void WriteWarning(string message) => _lines.Add($"WARNING: {message}");
+
+    public void WriteDefinitionList(IEnumerable<DefinitionItem> items)
+    {
+        foreach (var item in items)
+        {
+            _lines.Add($"  {item.Label}    {item.Description}");
+        }
+    }
 
     public void WriteTable(string[] columns, IEnumerable<string[]> rows)
     {
         _lines.Add($"TABLE: [{string.Join(", ", columns)}]");
         foreach (var row in rows)
         {
-            _lines.Add($"  ROW: [{string.Join(", ", row.Select(StripMarkup))}]");
+            _lines.Add($"  ROW: [{string.Join(", ", row)}]");
         }
     }
 
-    public void WriteRule(string title) => _lines.Add($"RULE: {StripMarkup(title)}");
-    public void WriteBlankLine() => _lines.Add("");
+    // --- Interactive ---
 
     public async Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
     {
@@ -70,10 +107,5 @@ public class TestInteractionService : IInteractionService
         cancellationToken.ThrowIfCancellationRequested();
         _lines.Add($"INPUT: {prompt} (default: {defaultValue})");
         return Task.FromResult(defaultValue ?? string.Empty);
-    }
-
-    private static string StripMarkup(string text)
-    {
-        return System.Text.RegularExpressions.Regex.Replace(text, @"\[/?[^\]]*\]", "");
     }
 }
