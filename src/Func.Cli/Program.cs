@@ -14,9 +14,6 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-// DI container — kept deliberately minimal. We only need to resolve a few
-// singletons; we don't run hosted services, configuration, or logging
-// pipelines, so a bare ServiceProvider is enough.
 var services = new ServiceCollection();
 services.AddSingleton<ITheme, DefaultTheme>();
 services.AddSingleton<IInteractionService, SpectreInteractionService>();
@@ -72,13 +69,6 @@ Console.CancelKeyPress += (_, e) =>
 var versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
 
 // Parse and invoke asynchronously.
-//
-// Exit-code policy: we deliberately defer to System.CommandLine's defaults
-// (typically 1 for any failure). The catch on GracefulException exists
-// purely to suppress the stack-trace dump and print a clean one-line
-// message — it does not customize the exit code. If/when we want a
-// distinct code for "user misuse" vs "tool bug" (e.g. 2 vs 1), that's a
-// separate change.
 var commandName = ResolveCommandName(args);
 var stopwatch = Stopwatch.StartNew();
 int exitCode = 0;
