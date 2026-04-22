@@ -58,6 +58,9 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.powershell7.2">
       <LogicalName>$(AssemblyName).Dockerfile.powershell7.2</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.powershell7.4">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell7.4</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.9">
       <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
     </EmbeddedResource>
