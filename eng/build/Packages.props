@@ -12,6 +12,7 @@
   <!-- telemetry -->
   <ItemGroup>
     <PackageVersion Include="OpenTelemetry" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.1" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
   </ItemGroup>
   <!-- analyzers -->
