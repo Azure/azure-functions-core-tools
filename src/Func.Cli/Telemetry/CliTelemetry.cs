@@ -2,25 +2,33 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
+using OpenTelemetry.Resources;
 
 namespace Azure.Functions.Cli.Telemetry;
 
 /// <summary>
-/// Holds the singleton <see cref="ActivitySource"/>, <see cref="Meter"/>,
-/// and metric instruments used to emit CLI telemetry.
+/// Holds the singleton <see cref="ActivitySource"/> and <see cref="Meter"/>
+/// used to emit CLI telemetry, and exposes the resource attributes that all
+/// spans and metrics share.
 /// </summary>
 /// <remarks>
 /// No OpenTelemetry SDK is wired up here. <c>Program.cs</c> conditionally
-/// attaches the Azure Monitor exporter at startup; when it doesn't,
-/// <see cref="ActivitySource.StartActivity(string, ActivityKind)"/> returns
-/// <c>null</c> and metric instruments record nothing — so the call sites
-/// stay free of opt-out branches.
+/// attaches the Azure Monitor exporter at startup; when it doesn't, no
+/// listener is subscribed and the .NET diagnostic APIs are effectively
+/// no-ops — so call sites stay free of opt-out branches.
 /// </remarks>
 public static class CliTelemetry
 {
-    public const string SourceName = "Azure.Functions.Cli";
+    /// <summary>
+    /// OTel source / service name. Lowercase, dotted form to match the
+    /// convention used by the Functions host (<c>azure.functions.host</c>).
+    /// </summary>
+    public const string SourceName = "azure.functions.cli";
 
     /// <summary>
     /// Sentinel value used in dev/local builds where the real instrumentation
@@ -28,33 +36,42 @@ public static class CliTelemetry
     /// </summary>
     private const string EmptyInstrumentationKey = "00000000-0000-0000-0000-000000000000";
 
-    public static readonly ActivitySource Source = new(SourceName, ActivityExtensions.CliVersion);
+    public static readonly string CliVersion = ResolveCliVersion();
 
-    public static readonly Meter Meter = new(SourceName, ActivityExtensions.CliVersion);
+    public static readonly ActivitySource Source = new(SourceName, CliVersion);
 
-    private static readonly Counter<long> _commandCounter =
-        Meter.CreateCounter<long>("func.cli.command.count", unit: "{command}", description: "Number of CLI commands invoked.");
-
-    private static readonly Histogram<double> _commandDuration =
-        Meter.CreateHistogram<double>("func.cli.command.duration", unit: "ms", description: "Duration of CLI command execution.");
+    public static readonly Meter Meter = new(SourceName, CliVersion);
 
     /// <summary>
-    /// True when this build has a real instrumentation key and the user has
-    /// not opted out. <c>Program.cs</c> uses this to decide whether to wire
-    /// up the OpenTelemetry SDK.
+    /// Builds the <see cref="ResourceBuilder"/> shared by every span and
+    /// metric exported from the CLI. Putting <c>service.version</c>, OS, and
+    /// runtime on the resource avoids re-tagging every span.
     /// </summary>
-    public static bool IsConfigured => GetConnectionString() is not null;
+    public static ResourceBuilder CreateResourceBuilder()
+    {
+        return ResourceBuilder.CreateDefault()
+            .AddService(serviceName: SourceName, serviceVersion: CliVersion)
+            .AddAttributes(new KeyValuePair<string, object>[]
+            {
+                new(TelemetryConventions.OsType, RuntimeInformation.OSDescription),
+                new(TelemetryConventions.OsArchitecture, RuntimeInformation.OSArchitecture.ToString()),
+                new(TelemetryConventions.ProcessRuntimeDescription, RuntimeInformation.FrameworkDescription),
+            });
+    }
 
     /// <summary>
     /// Returns the Azure Monitor connection string when telemetry is
-    /// configured and not opted out, otherwise <c>null</c>.
+    /// configured (build has a real instrumentation key) and the user has
+    /// not opted out.
     /// </summary>
-    public static string? GetConnectionString()
+    public static bool TryGetConnectionString([NotNullWhen(true)] out string? connectionString)
     {
+        connectionString = null;
+
         var key = Constants.TelemetryInstrumentationKey;
         if (string.IsNullOrEmpty(key) || key == EmptyInstrumentationKey)
         {
-            return null;
+            return false;
         }
 
         var optOut = Environment.GetEnvironmentVariable(Constants.TelemetryOptOutEnvVar);
@@ -62,34 +79,17 @@ public static class CliTelemetry
             !(optOut.Equals("0", StringComparison.OrdinalIgnoreCase) ||
               optOut.Equals("false", StringComparison.OrdinalIgnoreCase)))
         {
-            return null;
+            return false;
         }
 
-        return $"InstrumentationKey={key}";
+        connectionString = $"InstrumentationKey={key}";
+        return true;
     }
 
-    /// <summary>
-    /// Records a command-execution metric (count + duration histogram).
-    /// No-op when no <see cref="MeterListener"/> is subscribed.
-    /// </summary>
-    public static void TrackCommand(string commandName, bool isSuccess, long durationMs, IDictionary<string, string>? properties = null)
+    private static string ResolveCliVersion()
     {
-        var tags = new TagList
-        {
-            { "command.name", commandName },
-            { "command.success", isSuccess },
-            { "cli.version", ActivityExtensions.CliVersion },
-        };
-
-        if (properties is not null)
-        {
-            foreach (var (key, value) in properties)
-            {
-                tags.Add($"command.{key}", value);
-            }
-        }
-
-        _commandCounter.Add(1, tags);
-        _commandDuration.Record(durationMs, tags);
+        return typeof(CliTelemetry).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion ?? "unknown";
     }
 }

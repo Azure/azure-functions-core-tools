@@ -2,63 +2,50 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
-using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace Azure.Functions.Cli.Telemetry;
 
 /// <summary>
-/// Helpers for starting and tagging <see cref="Activity"/> instances used by
-/// the CLI. Caller owns the activity's lifetime; these helpers only attach
-/// tags. When no listener is subscribed to the underlying
-/// <see cref="ActivitySource"/>, <see cref="ActivitySource.StartActivity(string, ActivityKind)"/>
-/// returns <c>null</c> and the tagging helpers are skipped.
+/// Extension members for working with <see cref="ActivitySource"/> /
+/// <see cref="Activity"/> from CLI code.
 /// </summary>
+/// <remarks>
+/// Naming and span shape follow the (experimental) OTel CLI semantic
+/// conventions: <see cref="ActivityKind.Internal"/> kind, span name set to
+/// the subcommand path, and the <c>cli.command.name</c> attribute.
+/// Resource-level attributes (<c>service.name</c>, <c>service.version</c>,
+/// <c>os.*</c>, <c>process.runtime.*</c>) are configured once on the
+/// <see cref="OpenTelemetry.Resources.ResourceBuilder"/> and inherited by
+/// every span — they should not be set per span here.
+/// </remarks>
 public static class ActivityExtensions
 {
-    private static readonly string _cliVersion = ResolveCliVersion();
-
-    internal static string CliVersion => _cliVersion;
-
-    /// <summary>
-    /// Starts an <see cref="Activity"/> that represents the execution of a
-    /// CLI command. Returns <c>null</c> when no listener is subscribed.
-    /// </summary>
-    public static Activity? StartCommandActivity(this ActivitySource source, string commandName)
+    extension(ActivitySource)
     {
-        var activity = source.StartActivity($"func {commandName}", ActivityKind.Client);
-        return activity?.SetCommandTags(commandName);
+        /// <summary>
+        /// Starts an <see cref="Activity"/> that represents the execution of
+        /// a CLI command. Returns <c>null</c> when no listener is subscribed.
+        /// </summary>
+        public static Activity? StartCommandActivity(string commandName)
+        {
+            var activity = CliTelemetry.Source.StartActivity(commandName, ActivityKind.Internal);
+            activity?.SetTag(TelemetryConventions.CliCommandName, commandName);
+            return activity;
+        }
     }
 
-    /// <summary>
-    /// Tags the activity with the command name and the standard CLI
-    /// environment tags (version, OS, runtime).
-    /// </summary>
-    public static Activity SetCommandTags(this Activity activity, string commandName)
+    extension(Activity activity)
     {
-        activity.SetTag("command.name", commandName);
-        activity.SetTag("cli.version", _cliVersion);
-        activity.SetTag("os.type", RuntimeInformation.OSDescription);
-        activity.SetTag("os.architecture", RuntimeInformation.OSArchitecture.ToString());
-        activity.SetTag("runtime.framework", RuntimeInformation.FrameworkDescription);
-        return activity;
-    }
-
-    /// <summary>
-    /// Marks the activity with success or failure status.
-    /// </summary>
-    public static Activity SetCommandResult(this Activity activity, bool isSuccess, string? errorDescription = null)
-    {
-        activity.SetStatus(
-            isSuccess ? ActivityStatusCode.Ok : ActivityStatusCode.Error,
-            isSuccess ? null : errorDescription);
-        return activity;
-    }
-
-    private static string ResolveCliVersion()
-    {
-        return typeof(ActivityExtensions).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion ?? "unknown";
+        /// <summary>
+        /// Records the exception on the activity and marks its status as
+        /// <see cref="ActivityStatusCode.Error"/>. Use this on the failure
+        /// path; success is the default and does not need to be set.
+        /// </summary>
+        public Activity Fail(Exception exception)
+        {
+            activity.AddException(exception);
+            activity.SetStatus(ActivityStatusCode.Error, exception.Message);
+            return activity;
+        }
     }
 }

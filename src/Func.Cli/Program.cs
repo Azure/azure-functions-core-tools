@@ -33,15 +33,18 @@ var interaction = host.Services.GetRequiredService<IInteractionService>();
 // no listener is subscribed and ActivitySource/Meter calls become no-ops.
 TracerProvider? tracerProvider = null;
 MeterProvider? meterProvider = null;
-var connectionString = CliTelemetry.GetConnectionString();
-if (connectionString is not null)
+if (CliTelemetry.TryGetConnectionString(out var connectionString))
 {
+    var resourceBuilder = CliTelemetry.CreateResourceBuilder();
+
     tracerProvider = Sdk.CreateTracerProviderBuilder()
+        .SetResourceBuilder(resourceBuilder)
         .AddSource(CliTelemetry.SourceName)
         .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString)
         .Build();
 
     meterProvider = Sdk.CreateMeterProviderBuilder()
+        .SetResourceBuilder(resourceBuilder)
         .AddMeter(CliTelemetry.SourceName)
         .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString)
         .Build();
@@ -75,31 +78,23 @@ var versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
 // Parse and invoke asynchronously
 var commandName = ResolveCommandName(args);
 var stopwatch = Stopwatch.StartNew();
-int exitCode;
+int exitCode = 0;
 
-using (Activity? activity = CliTelemetry.Source.StartCommandActivity(commandName))
+using (Activity? activity = ActivitySource.StartCommandActivity(commandName))
 {
     try
     {
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         exitCode = await rootCommand.Parse(args).InvokeAsync(config, cts.Token);
-
-        stopwatch.Stop();
-        activity?.SetCommandResult(exitCode == 0);
-        CliTelemetry.TrackCommand(commandName, isSuccess: exitCode == 0, durationMs: stopwatch.ElapsedMilliseconds);
     }
     catch (OperationCanceledException)
     {
-        activity?.SetCommandResult(isSuccess: false, "Cancelled");
-        exitCode = 130; // Standard Unix exit code for SIGINT
+        // SIGINT — not a failure to record on the activity.
+        exitCode = 130;
     }
     catch (GracefulException ex)
     {
-        stopwatch.Stop();
-        activity?.SetCommandResult(isSuccess: false, ex.Message);
-        activity?.AddException(ex);
-        CliTelemetry.TrackCommand(commandName, isSuccess: false, durationMs: stopwatch.ElapsedMilliseconds);
-
+        activity?.Fail(ex);
         interaction.WriteError(ex.Message);
 
         if (ex.VerboseMessage is not null)
@@ -107,17 +102,19 @@ using (Activity? activity = CliTelemetry.Source.StartCommandActivity(commandName
             interaction.WriteHint(ex.VerboseMessage);
         }
 
-        exitCode = ex.IsUserError ? 1 : 2;
+        // Standard Unix convention: 1 = general error, 2 = misuse.
+        exitCode = ex.IsUserError ? 2 : 1;
     }
     catch (Exception ex)
     {
-        stopwatch.Stop();
-        activity?.SetCommandResult(isSuccess: false, ex.Message);
-        activity?.AddException(ex);
-        CliTelemetry.TrackCommand(commandName, isSuccess: false, durationMs: stopwatch.ElapsedMilliseconds);
-
+        activity?.Fail(ex);
         interaction.WriteError($"An unexpected error occurred: {ex.Message}");
-        exitCode = 2;
+        exitCode = 1;
+    }
+    finally
+    {
+        stopwatch.Stop();
+        CliTelemetry.Meter.RecordCommand(commandName, exitCode, stopwatch.ElapsedMilliseconds);
     }
 } // activity disposed (and stopped) here, before flush
 
