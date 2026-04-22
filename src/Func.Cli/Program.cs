@@ -10,42 +10,41 @@ using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using OpenTelemetry;
 using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
-// Build the host with DI
-var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings
-{
-    Args = args,
-    DisableDefaults = true
-});
+// DI container — kept deliberately minimal. We only need to resolve a few
+// singletons; we don't run hosted services, configuration, or logging
+// pipelines, so a bare ServiceProvider is enough.
+var services = new ServiceCollection();
+services.AddSingleton<ITheme, DefaultTheme>();
+services.AddSingleton<IInteractionService, SpectreInteractionService>();
 
-builder.Services.AddSingleton<ITheme, DefaultTheme>();
-builder.Services.AddSingleton<IInteractionService, SpectreInteractionService>();
+await using var serviceProvider = services.BuildServiceProvider();
+var interaction = serviceProvider.GetRequiredService<IInteractionService>();
 
 // Wire up the OpenTelemetry SDK only when telemetry is configured (build has
 // a real instrumentation key and the user has not opted out). When it isn't,
 // no listener is subscribed and ActivitySource/Meter calls become no-ops.
-// The host owns the providers and flushes/disposes them on shutdown.
+TracerProvider? tracerProvider = null;
+MeterProvider? meterProvider = null;
 if (CliTelemetry.TryGetConnectionString(out var connectionString))
 {
-    builder.Services
-        .AddOpenTelemetry()
-        .ConfigureResource(r => r
-            .AddService(serviceName: CliTelemetry.SourceName, serviceVersion: CliTelemetry.CliVersion)
-            .AddAttributes(CliTelemetry.GetResourceAttributes()))
-        .WithTracing(t => t
-            .AddSource(CliTelemetry.SourceName)
-            .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString))
-        .WithMetrics(m => m
-            .AddMeter(CliTelemetry.SourceName)
-            .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
-}
+    var resourceBuilder = CliTelemetry.CreateResourceBuilder();
 
-var host = builder.Build();
-var interaction = host.Services.GetRequiredService<IInteractionService>();
+    tracerProvider = Sdk.CreateTracerProviderBuilder()
+        .SetResourceBuilder(resourceBuilder)
+        .AddSource(CliTelemetry.SourceName)
+        .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString)
+        .Build();
+
+    meterProvider = Sdk.CreateMeterProviderBuilder()
+        .SetResourceBuilder(resourceBuilder)
+        .AddMeter(CliTelemetry.SourceName)
+        .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString)
+        .Build();
+}
 
 // Create the command tree
 var rootCommand = Parser.CreateCommand(interaction);
@@ -72,7 +71,14 @@ Console.CancelKeyPress += (_, e) =>
 // Fire background version check (non-blocking, best-effort)
 var versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
 
-// Parse and invoke asynchronously
+// Parse and invoke asynchronously.
+//
+// Exit-code policy: we deliberately defer to System.CommandLine's defaults
+// (typically 1 for any failure). The catch on GracefulException exists
+// purely to suppress the stack-trace dump and print a clean one-line
+// message — it does not customize the exit code. If/when we want a
+// distinct code for "user misuse" vs "tool bug" (e.g. 2 vs 1), that's a
+// separate change.
 var commandName = ResolveCommandName(args);
 var stopwatch = Stopwatch.StartNew();
 int exitCode = 0;
@@ -99,8 +105,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
             interaction.WriteHint(ex.VerboseMessage);
         }
 
-        // Standard Unix convention: 1 = general error, 2 = misuse.
-        exitCode = ex.IsUserError ? 2 : 1;
+        exitCode = 1;
     }
     catch (Exception ex)
     {
@@ -122,10 +127,12 @@ try
 }
 finally
 {
-    // Disposing the host stops hosted services and disposes everything in the
-    // DI container — including the OTel TracerProvider/MeterProvider, which
-    // flush pending telemetry on dispose.
-    host.Dispose();
+    // Flush + dispose the OTel providers explicitly. The bare ServiceProvider
+    // doesn't own them (they were built outside DI), so we manage them here.
+    tracerProvider?.ForceFlush(3000);
+    meterProvider?.ForceFlush(3000);
+    tracerProvider?.Dispose();
+    meterProvider?.Dispose();
 }
 
 return exitCode;
