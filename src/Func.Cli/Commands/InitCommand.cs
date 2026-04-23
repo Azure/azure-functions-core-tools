@@ -72,7 +72,7 @@ public class InitCommand : BaseCommand
 
         var workerRuntime = parseResult.GetValue(WorkerRuntimeOption);
 
-        var initializer = SelectInitializer(workerRuntime);
+        var initializer = await SelectInitializerAsync(workerRuntime, cancellationToken);
         if (initializer is null)
         {
             WorkloadHints.WriteNoMatchingWorkload(
@@ -100,19 +100,39 @@ public class InitCommand : BaseCommand
         return 0;
     }
 
-    private IProjectInitializer? SelectInitializer(string? workerRuntime)
+    private async Task<IProjectInitializer?> SelectInitializerAsync(string? workerRuntime, CancellationToken cancellationToken)
     {
         if (_initializers.Count == 0)
         {
             return null;
         }
 
-        if (string.IsNullOrEmpty(workerRuntime))
+        if (!string.IsNullOrEmpty(workerRuntime))
         {
-            // Auto-select only when exactly one initializer is registered.
-            return _initializers.Count == 1 ? _initializers[0] : null;
+            return _initializers.FirstOrDefault(i => i.CanHandle(workerRuntime));
         }
 
-        return _initializers.FirstOrDefault(i => i.CanHandle(workerRuntime));
+        // No runtime specified — auto-select if there's only one initializer
+        // installed (the common case for engineers using a single language).
+        if (_initializers.Count == 1)
+        {
+            return _initializers[0];
+        }
+
+        // Multiple initializers — prompt the user to pick. In non-interactive
+        // mode we fall back to the "no match" error so scripts get a clear
+        // failure instead of silently picking the first option.
+        if (!_interaction.IsInteractive)
+        {
+            return null;
+        }
+
+        var choices = _initializers.Select(i => i.WorkerRuntime).ToList();
+        var picked = await _interaction.PromptForSelectionAsync(
+            "Select a worker runtime:",
+            choices,
+            cancellationToken);
+
+        return _initializers.FirstOrDefault(i => i.WorkerRuntime == picked);
     }
 }

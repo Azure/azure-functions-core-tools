@@ -78,7 +78,7 @@ public class NewCommand : BaseCommand
         var templateName = parseResult.GetValue(TemplateOption);
         var functionName = parseResult.GetValue(NameOption);
 
-        var provider = SelectProvider(workerRuntime);
+        var provider = await SelectProviderAsync(workerRuntime, cancellationToken);
         if (provider is null)
         {
             WorkloadHints.WriteNoMatchingWorkload(
@@ -91,15 +91,26 @@ public class NewCommand : BaseCommand
 
         if (string.IsNullOrEmpty(templateName))
         {
-            await ListTemplatesAsync(provider, cancellationToken);
-            return 0;
+            templateName = await SelectTemplateAsync(provider, cancellationToken);
+            if (templateName is null)
+            {
+                return 1;
+            }
         }
 
         if (string.IsNullOrEmpty(functionName))
         {
-            throw new GracefulException(
-                "Missing required option '--name <function-name>'.",
-                isUserError: true);
+            if (!_interaction.IsInteractive)
+            {
+                throw new GracefulException(
+                    "Missing required option '--name <function-name>'.",
+                    isUserError: true);
+            }
+
+            functionName = await _interaction.PromptForInputAsync(
+                "Function name:",
+                defaultValue: templateName,
+                cancellationToken);
         }
 
         var context = new FunctionScaffoldContext(
@@ -121,32 +132,59 @@ public class NewCommand : BaseCommand
         return 0;
     }
 
-    private async Task ListTemplatesAsync(ITemplateProvider provider, CancellationToken ct)
+    private async Task<string?> SelectTemplateAsync(ITemplateProvider provider, CancellationToken cancellationToken)
     {
-        var templates = await provider.GetTemplatesAsync(ct);
+        var templates = await provider.GetTemplatesAsync(cancellationToken);
         if (templates.Count == 0)
         {
             _interaction.WriteHint($"Workload '{provider.WorkerRuntime}' exposes no templates.");
-            return;
+            return null;
         }
 
-        _interaction.WriteHint($"Templates for {provider.WorkerRuntime}:");
-        var items = templates.Select(t => new DefinitionItem(t.Name, t.Description));
-        _interaction.WriteDefinitionList(items);
+        // Non-interactive: surface the list so the user can re-run with --template.
+        if (!_interaction.IsInteractive)
+        {
+            _interaction.WriteHint($"Templates for {provider.WorkerRuntime}:");
+            var items = templates.Select(t => new DefinitionItem(t.Name, t.Description));
+            _interaction.WriteDefinitionList(items);
+            _interaction.WriteBlankLine();
+            _interaction.WriteHint("Re-run with --template <name> to scaffold one.");
+            return null;
+        }
+
+        return await _interaction.PromptForSelectionAsync(
+            "Select a template:",
+            templates.Select(t => t.Name),
+            cancellationToken);
     }
 
-    private ITemplateProvider? SelectProvider(string? workerRuntime)
+    private async Task<ITemplateProvider?> SelectProviderAsync(string? workerRuntime, CancellationToken cancellationToken)
     {
         if (_providers.Count == 0)
         {
             return null;
         }
 
-        if (string.IsNullOrEmpty(workerRuntime))
+        if (!string.IsNullOrEmpty(workerRuntime))
         {
-            return _providers.Count == 1 ? _providers[0] : null;
+            return _providers.FirstOrDefault(p => p.CanHandle(workerRuntime));
         }
 
-        return _providers.FirstOrDefault(p => p.CanHandle(workerRuntime));
+        if (_providers.Count == 1)
+        {
+            return _providers[0];
+        }
+
+        if (!_interaction.IsInteractive)
+        {
+            return null;
+        }
+
+        var picked = await _interaction.PromptForSelectionAsync(
+            "Select a worker runtime:",
+            _providers.Select(p => p.WorkerRuntime),
+            cancellationToken);
+
+        return _providers.FirstOrDefault(p => p.WorkerRuntime == picked);
     }
 }
