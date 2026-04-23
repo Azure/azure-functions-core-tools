@@ -79,18 +79,18 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithDockerFlag_EmitsWarning()
+        public void Init_WithDockerFlag_FailsLoudly()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithDockerFlag_EmitsWarning);
+            var testName = nameof(Init_WithDockerFlag_FailsLoudly);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
                 .Execute(["--worker-runtime", "go", "--docker"]);
 
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining("Docker support for the Go worker runtime is not yet available");
+            funcInitResult.Should().ExitWith(1);
+            funcInitResult.Should().HaveStdErrContaining("Docker support for the Go worker runtime is not yet available");
             File.Exists(Path.Combine(workingDir, "Dockerfile")).Should().BeFalse("Expected no Dockerfile for Go runtime");
         }
 

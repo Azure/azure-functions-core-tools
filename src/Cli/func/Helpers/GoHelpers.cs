@@ -14,12 +14,6 @@ namespace Azure.Functions.Cli.Helpers
         private const int MinimumGoMajorVersion = 1;
         private const int MinimumGoMinorVersion = 24;
 
-        // Pinned to a known-good release so that `func init` is reproducible and
-        // breaking SDK changes are caught by a Core Tools PR, not user first-runs.
-        // Bump this alongside any corresponding updates to StaticResources/main.go.
-        private const string GoWorkerModule = "github.com/azure/azure-functions-golang-worker";
-        private const string GoWorkerModuleVersion = "v0.2.0-preview";
-
         public static async Task<WorkerLanguageVersionInfo> GetEnvironmentGoVersion()
         {
             return await GetVersion("go");
@@ -68,11 +62,12 @@ namespace Azure.Functions.Cli.Helpers
             var goVersion = await GetEnvironmentGoVersion();
             AssertGoVersion(goVersion);
 
-            await RunGoCommandAsync($"mod init {moduleName}", "Failed to initialize Go module.");
-            await RunGoCommandAsync($"get {GoWorkerModule}@{GoWorkerModuleVersion}", "Failed to add Azure Functions Go worker dependency.");
-
-            // Write main.go and .funcignore before running "go mod tidy" so that tidy
-            // can resolve the sdk/worker subpackages referenced by the sample.
+            // Scaffold go.mod, main.go, and .funcignore from embedded templates.
+            // The SDK version is pinned inside go.mod.template so that contributors
+            // bumping the SDK only touch template files (no C# change required) and
+            // `go mod tidy` resolves the pinned version deterministically.
+            var goModContent = (await StaticResources.GoMod).Replace("{ModuleName}", moduleName);
+            await FileSystemHelpers.WriteFileIfNotExists("go.mod", goModContent);
             await FileSystemHelpers.WriteFileIfNotExists("main.go", await StaticResources.MainGo);
             await FileSystemHelpers.WriteFileIfNotExists(Constants.FuncIgnoreFile, await StaticResources.FuncIgnore);
 

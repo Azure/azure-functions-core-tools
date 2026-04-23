@@ -541,8 +541,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.Go)
             {
-                ColoredConsole.WriteLine(WarningColor("Docker support for the Go worker runtime is not yet available. Skipping Dockerfile creation."));
-                return;
+                throw new CliException("Docker support for the Go worker runtime is not yet available.");
             }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
             {
