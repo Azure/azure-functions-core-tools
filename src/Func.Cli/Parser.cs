@@ -4,53 +4,71 @@
 using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Workloads;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli;
 
 /// <summary>
-/// Assembles the root command tree. Keeps an explicit composition root
-/// (commands are constructed here, not auto-discovered) so the command
-/// tree is deterministic and easy to reason about.
+/// Assembles the root command tree from DI. Built-in commands are still
+/// constructed explicitly here (composition root) so the tree is deterministic;
+/// workloads contribute either via DI (consumed by built-in commands) or via
+/// <see cref="ICommandContributor"/> for entirely new subcommands.
 /// </summary>
 public static class Parser
 {
     /// <summary>
-    /// Creates and configures the root CLI command with all subcommands registered.
+    /// Convenience overload for tests/scenarios that don't need workloads —
+    /// bootstraps an empty host with just the supplied interaction service.
     /// </summary>
-    public static FuncRootCommand CreateCommand(IInteractionService interaction)
+    public static FuncRootCommand CreateCommand(Console.IInteractionService interaction)
     {
+        var builder = new Hosting.FuncCliHostBuilder(interaction);
+        return CreateCommand(builder.Build());
+    }
+
+    /// <summary>
+    /// Creates and configures the root CLI command, resolving built-in commands
+    /// from <paramref name="services"/> and inviting workload contributors to
+    /// add their own subcommands.
+    /// </summary>
+    public static FuncRootCommand CreateCommand(IServiceProvider services)
+    {
+        var interaction = services.GetRequiredService<IInteractionService>();
         var rootCommand = new FuncRootCommand();
 
-        // Create built-in commands
         var helpCommand = new HelpCommand(interaction, rootCommand);
         var versionCommand = new VersionCommand(interaction);
-        var initCommand = new InitCommand(interaction);
-        var newCommand = new NewCommand(interaction);
+        var initCommand = ActivatorUtilities.CreateInstance<InitCommand>(services);
+        var newCommand = ActivatorUtilities.CreateInstance<NewCommand>(services);
         var packCommand = new PackCommand(interaction);
         var startCommand = new StartCommand(interaction);
 
-        // Register built-in commands
+        var workloadListCommand = ActivatorUtilities.CreateInstance<WorkloadListCommand>(services);
+        var workloadCommand = new WorkloadCommand(workloadListCommand);
+
         rootCommand.Subcommands.Add(versionCommand);
         rootCommand.Subcommands.Add(helpCommand);
         rootCommand.Subcommands.Add(initCommand);
         rootCommand.Subcommands.Add(newCommand);
         rootCommand.Subcommands.Add(packCommand);
         rootCommand.Subcommands.Add(startCommand);
+        rootCommand.Subcommands.Add(workloadCommand);
 
-        // Replace built-in help rendering with Spectre on all commands
+        // Let feature workloads add brand-new subcommands.
+        foreach (var contributor in services.GetServices<ICommandContributor>())
+        {
+            contributor.Contribute(rootCommand);
+        }
+
         ReplaceHelpAction(rootCommand, helpCommand);
-
-        // Wire the root action (no-args → help, --verbose → detailed version)
         ConfigureRootAction(rootCommand, helpCommand, versionCommand);
 
         return rootCommand;
     }
 
-    /// <summary>
-    /// Replaces the built-in System.CommandLine help action on every command
-    /// so that --help, -h, and -? all render uniform Spectre-based output.
-    /// </summary>
     private static void ReplaceHelpAction(FuncRootCommand rootCommand, HelpCommand helpCommand)
     {
         var spectreHelp = new SpectreHelpAction(helpCommand);

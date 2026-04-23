@@ -7,6 +7,7 @@ using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
+using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using OpenTelemetry;
@@ -38,8 +39,14 @@ if (CliTelemetry.TryGetConnectionString(out var connectionString))
         .Build();
 }
 
+// Build the host: register workloads, then build the DI container the
+// command tree is composed from.
+var hostBuilder = new FuncCliHostBuilder(interaction);
+WorkloadRegistration.RegisterKnownWorkloads(hostBuilder);
+await using var services = hostBuilder.Build();
+
 // Create the command tree
-var rootCommand = Parser.CreateCommand(interaction);
+var rootCommand = Parser.CreateCommand(services);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.

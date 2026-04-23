@@ -18,7 +18,7 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasExpectedOptions()
     {
-        var cmd = new NewCommand(_interaction);
+        var cmd = new NewCommand(_interaction, [], []);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--name", optionNames);
@@ -38,7 +38,7 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasPathArgument()
     {
-        var cmd = new NewCommand(_interaction);
+        var cmd = new NewCommand(_interaction, [], []);
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
     }

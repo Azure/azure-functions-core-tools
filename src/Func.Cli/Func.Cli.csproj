@@ -18,11 +18,16 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj" />
+    <!-- Static workload registration for the prototype. Replaced by the
+         workload loader in a follow-up; that loader will load workload
+         assemblies at runtime instead of via a project reference. -->
+    <ProjectReference Include="..\Func.Cli.Workload.Dotnet\Func.Cli.Workload.Dotnet.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
     <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="OpenTelemetry" />
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
   </ItemGroup>
