@@ -41,7 +41,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Java, new string[] { } },
             { WorkerRuntime.Powershell, new[] { "pwsh" } },
             { WorkerRuntime.Custom, new string[] { } },
-            { WorkerRuntime.Go, new[] { "golang" } }
+            { WorkerRuntime.Go, new[] { "go", "golang" } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
