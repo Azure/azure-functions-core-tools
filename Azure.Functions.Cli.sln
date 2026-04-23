@@ -13,8 +13,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Func.Cli.Tests", "test\Func
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Func.Cli.Abstractions", "src\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj", "{9EDC7E42-3409-4B59-9F83-BDC40E779706}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Func.Cli.Workload.Dotnet", "src\Func.Cli.Workload.Dotnet\Func.Cli.Workload.Dotnet.csproj", "{7CFAF701-F7AF-44DC-AE49-0556619682BF}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -61,18 +59,6 @@ Global
 		{9EDC7E42-3409-4B59-9F83-BDC40E779706}.Release|x64.Build.0 = Release|Any CPU
 		{9EDC7E42-3409-4B59-9F83-BDC40E779706}.Release|x86.ActiveCfg = Release|Any CPU
 		{9EDC7E42-3409-4B59-9F83-BDC40E779706}.Release|x86.Build.0 = Release|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Debug|x64.Build.0 = Debug|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Debug|x86.Build.0 = Debug|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Release|x64.ActiveCfg = Release|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Release|x64.Build.0 = Release|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Release|x86.ActiveCfg = Release|Any CPU
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -81,7 +67,6 @@ Global
 		{AC5C7EDC-91EF-4F9F-B3D2-9889CE5905D5} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
 		{FD96A3E2-4880-4F54-A11F-951C7FC62EE7} = {342A349A-D343-8551-4064-2E2800C39E13}
 		{9EDC7E42-3409-4B59-9F83-BDC40E779706} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
-		{7CFAF701-F7AF-44DC-AE49-0556619682BF} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FA1E01D6-A57B-4061-A333-EDC511D283C0}
