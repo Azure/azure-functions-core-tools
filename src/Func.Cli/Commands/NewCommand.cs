@@ -116,7 +116,7 @@ public class NewCommand : BaseCommand
         var project = new FunctionProjectContext(
             ProjectPath: Directory.GetCurrentDirectory(),
             WorkerRuntime: provider.WorkerRuntime,
-            Language: parseResult.GetValue(LanguageOption) ?? string.Empty);
+            Language: parseResult.GetValue(LanguageOption));
 
         await provider.ScaffoldAsync(project, templateName, functionName, parseResult, cancellationToken);
 

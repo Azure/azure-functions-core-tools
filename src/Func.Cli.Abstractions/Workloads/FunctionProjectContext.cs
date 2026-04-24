@@ -13,8 +13,8 @@ namespace Azure.Functions.Cli.Workloads;
 /// </summary>
 /// <param name="ProjectPath">The project directory.</param>
 /// <param name="WorkerRuntime">The worker runtime the project was initialized for (e.g. "dotnet").</param>
-/// <param name="Language">Programming language of the project (e.g. "C#", "TypeScript").</param>
+/// <param name="Language">Programming language of the project (e.g. "C#", "TypeScript"). May be null when the runtime has a single language or it cannot be determined.</param>
 public record FunctionProjectContext(
     string ProjectPath,
     string WorkerRuntime,
-    string Language);
+    string? Language);
