@@ -30,9 +30,25 @@ public interface ITemplateProvider
     public Task<IReadOnlyList<FunctionTemplate>> GetTemplatesAsync(
         CancellationToken cancellationToken = default);
 
-    /// <summary>Materializes the selected template into the target project.</summary>
+    /// <summary>
+    /// Materializes the selected template into the target project.
+    /// </summary>
+    /// <remarks>
+    /// Design note: <see cref="FunctionProjectContext"/> exists so providers
+    /// don't each re-implement project-on-disk discovery, and so this signature
+    /// can grow without churn. An alternative is to drop the type entirely and
+    /// have providers read everything they need from <paramref name="parseResult"/>;
+    /// we may revisit if the context never accumulates more than CLI inputs.
+    /// </remarks>
+    /// <param name="project">The target project this scaffold runs against.</param>
+    /// <param name="templateName">The selected template id (resolved by <c>func new</c> after any prompting).</param>
+    /// <param name="functionName">The function name the user chose (resolved by <c>func new</c> after any prompting).</param>
+    /// <param name="parseResult">The full parse result, for reading provider-contributed options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public Task ScaffoldAsync(
-        FunctionScaffoldContext context,
+        FunctionProjectContext project,
+        string templateName,
+        string functionName,
         ParseResult parseResult,
         CancellationToken cancellationToken = default);
 }

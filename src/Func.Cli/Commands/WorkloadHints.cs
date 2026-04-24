@@ -13,7 +13,7 @@ internal static class WorkloadHints
 {
     public static void WriteNoMatchingWorkload(
         IInteractionService interaction,
-        IReadOnlyList<IWorkload> workloads,
+        IReadOnlyList<WorkloadSummary> workloads,
         string actionDescription,
         string? requestedRuntime = null)
     {
@@ -45,10 +45,11 @@ internal static class WorkloadHints
         interaction.WriteHint("Installed workloads:");
         foreach (var workload in workloads)
         {
+            var aliases = workload.Aliases.Count == 0 ? "—" : string.Join(", ", workload.Aliases);
             interaction.WriteLine(l => l
                 .Muted("  ")
-                .Code(workload.Id)
-                .Muted($" — {workload.Description}"));
+                .Code(aliases)
+                .Muted($" — {workload.DisplayName} ({workload.PackageId})"));
         }
     }
 }

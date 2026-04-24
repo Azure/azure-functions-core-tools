@@ -27,6 +27,26 @@ public sealed class FuncCliHostBuilder
         // Built-in singletons every command may consume.
         Services.AddSingleton(interaction);
         Services.AddSingleton<IReadOnlyList<IWorkload>>(_ => _workloads);
+
+        // Lazy: aliases come from each workload's contributions, which aren't
+        // resolvable until the provider is built.
+        Services.AddSingleton<IReadOnlyList<WorkloadSummary>>(sp =>
+        {
+            var initializers = sp.GetServices<WorkloadContribution<IProjectInitializer>>().ToList();
+            var templates = sp.GetServices<WorkloadContribution<ITemplateProvider>>().ToList();
+
+            return _workloads
+                .Select(w =>
+                {
+                    var aliases = initializers.Where(c => ReferenceEquals(c.Owner, w)).Select(c => c.Service.WorkerRuntime)
+                        .Concat(templates.Where(c => ReferenceEquals(c.Owner, w)).Select(c => c.Service.WorkerRuntime))
+                        .Where(a => !string.IsNullOrWhiteSpace(a))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    return new WorkloadSummary(w.PackageId, w.DisplayName, w.Description, aliases);
+                })
+                .ToList();
+        });
     }
 
     /// <summary>The DI service collection. Exposed for advanced bootstrap scenarios.</summary>

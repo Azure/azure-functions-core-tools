@@ -6,15 +6,15 @@ using System.CommandLine;
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Adds workload-defined subcommands to the CLI's root command. Use this for
-/// "feature" workloads that aren't tied to a worker runtime (e.g. a Durable
-/// Functions workload contributing <c>func durable …</c>).
+/// Provides workload-defined subcommands to the CLI's root command. Use this
+/// for "feature" workloads that aren't tied to a worker runtime (e.g. a
+/// Durable Functions workload providing <c>func durable …</c>).
 ///
 /// Implementations are registered via DI; the host invokes
-/// <see cref="Contribute"/> once after the built-in command tree is built.
+/// <see cref="Provide"/> once after the built-in command tree is built.
 /// </summary>
-public interface ICommandContributor
+public interface ICommandProvider
 {
     /// <summary>Adds subcommands to <paramref name="rootCommand"/>.</summary>
-    public void Contribute(Command rootCommand);
+    public void Provide(Command rootCommand);
 }

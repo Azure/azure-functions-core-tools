@@ -14,25 +14,32 @@ namespace Azure.Functions.Cli.Commands.Workload;
 public class WorkloadListCommand : BaseCommand
 {
     private readonly IInteractionService _interaction;
-    private readonly IReadOnlyList<IWorkload> _workloads;
+    private readonly IReadOnlyList<WorkloadSummary> _summaries;
 
-    public WorkloadListCommand(IInteractionService interaction, IReadOnlyList<IWorkload> workloads)
+    public WorkloadListCommand(IInteractionService interaction, IReadOnlyList<WorkloadSummary> summaries)
         : base("list", "List installed workloads.")
     {
         _interaction = interaction;
-        _workloads = workloads;
+        _summaries = summaries;
     }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        if (_workloads.Count == 0)
+        if (_summaries.Count == 0)
         {
             _interaction.WriteHint("No workloads installed.");
             return Task.FromResult(0);
         }
 
-        var items = _workloads.Select(w => new DefinitionItem(w.Id, $"{w.DisplayName} — {w.Description}"));
-        _interaction.WriteDefinitionList(items);
+        var rows = _summaries.Select(s => new[]
+        {
+            s.PackageId,
+            s.Aliases.Count == 0 ? "—" : string.Join(", ", s.Aliases),
+            s.DisplayName,
+            s.Description,
+        });
+
+        _interaction.WriteTable(["Package", "Aliases", "Name", "Description"], rows);
         return Task.FromResult(0);
     }
 }

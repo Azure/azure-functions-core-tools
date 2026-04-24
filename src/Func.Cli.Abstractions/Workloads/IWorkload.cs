@@ -12,12 +12,19 @@ namespace Azure.Functions.Cli.Workloads;
 /// What a workload contributes is expressed by the services it registers:
 /// register an <see cref="IProjectInitializer"/> to extend <c>func init</c>,
 /// an <see cref="ITemplateProvider"/> to extend <c>func new</c>, or an
-/// <see cref="ICommandContributor"/> to add brand-new commands.
+/// <see cref="ICommandProvider"/> to add brand-new commands.
 /// </summary>
 public interface IWorkload
 {
-    /// <summary>Stable, lowercase identifier (e.g. "dotnet", "node").</summary>
-    public string Id { get; }
+    /// <summary>
+    /// Globally unique package identifier — typically the assembly / NuGet
+    /// package name (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>). This
+    /// is what <c>func workload install/uninstall</c> consumes; user-facing
+    /// short names (<c>-w dotnet</c>) come from each contribution's
+    /// <see cref="IProjectInitializer.WorkerRuntime"/> /
+    /// <see cref="ITemplateProvider.WorkerRuntime"/>.
+    /// </summary>
+    public string PackageId { get; }
 
     /// <summary>Human-readable name shown in <c>func workload list</c>.</summary>
     public string DisplayName { get; }

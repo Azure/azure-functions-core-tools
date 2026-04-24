@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli;
 /// Assembles the root command tree from DI. Built-in commands are still
 /// constructed explicitly here (composition root) so the tree is deterministic;
 /// workloads contribute either via DI (consumed by built-in commands) or via
-/// <see cref="ICommandContributor"/> for entirely new subcommands.
+/// <see cref="ICommandProvider"/> for entirely new subcommands.
 /// </summary>
 public static class Parser
 {
@@ -58,9 +58,9 @@ public static class Parser
         rootCommand.Subcommands.Add(workloadCommand);
 
         // Let feature workloads add brand-new subcommands.
-        foreach (var contributor in services.GetServices<ICommandContributor>())
+        foreach (var provider in services.GetServices<ICommandProvider>())
         {
-            contributor.Contribute(rootCommand);
+            provider.Provide(rootCommand);
         }
 
         ReplaceHelpAction(rootCommand, helpCommand);

@@ -42,12 +42,12 @@ public class NewCommand : BaseCommand
 
     private readonly IInteractionService _interaction;
     private readonly IReadOnlyList<ITemplateProvider> _providers;
-    private readonly IReadOnlyList<IWorkload> _workloads;
+    private readonly IReadOnlyList<WorkloadSummary> _workloads;
 
     public NewCommand(
         IInteractionService interaction,
         IEnumerable<ITemplateProvider> providers,
-        IReadOnlyList<IWorkload> workloads)
+        IReadOnlyList<WorkloadSummary> workloads)
         : base("new", "Create a new function from a template.")
     {
         _interaction = interaction;
@@ -113,13 +113,12 @@ public class NewCommand : BaseCommand
                 cancellationToken);
         }
 
-        var context = new FunctionScaffoldContext(
-            TemplateName: templateName,
-            FunctionName: functionName,
-            OutputPath: Directory.GetCurrentDirectory(),
-            Language: parseResult.GetValue(LanguageOption));
+        var project = new FunctionProjectContext(
+            ProjectPath: Directory.GetCurrentDirectory(),
+            WorkerRuntime: provider.WorkerRuntime,
+            Language: parseResult.GetValue(LanguageOption) ?? string.Empty);
 
-        await provider.ScaffoldAsync(context, parseResult, cancellationToken);
+        await provider.ScaffoldAsync(project, templateName, functionName, parseResult, cancellationToken);
 
         _interaction.WriteLine(l => l
             .Success("✓ ")

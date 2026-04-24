@@ -37,12 +37,12 @@ public class InitCommand : BaseCommand
 
     private readonly IInteractionService _interaction;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
-    private readonly IReadOnlyList<IWorkload> _workloads;
+    private readonly IReadOnlyList<WorkloadSummary> _workloads;
 
     public InitCommand(
         IInteractionService interaction,
         IEnumerable<IProjectInitializer> initializers,
-        IReadOnlyList<IWorkload> workloads)
+        IReadOnlyList<WorkloadSummary> workloads)
         : base("init", "Initialize a new Azure Functions project.")
     {
         _interaction = interaction;
