@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
@@ -117,6 +118,14 @@ namespace Azure.Functions.Cli.ExtensionBundle
                     retryDelay: _retryDelay);
 
                 return bundlePath;
+            }
+            catch (Exception ex) when (SslCertificateErrorHelper.IsSslCertificateException(ex))
+            {
+                // SSL certificate validation failure — likely an SSL inspection proxy
+                ColoredConsole.WriteLine(OutputTheme.ErrorColor(Constants.Errors.SslCertificateErrorDetected));
+                ColoredConsole.WriteLine(OutputTheme.WarningColor(Constants.Errors.SslCertificateHint));
+                OfflineHelper.MarkAsOffline();
+                return GetCachedBundleOrThrow(extensionBundleOptions);
             }
             catch (Exception ex) when (IsNetworkException(ex))
             {

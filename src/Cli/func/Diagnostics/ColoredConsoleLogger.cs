@@ -102,7 +102,7 @@ namespace Azure.Functions.Cli.Diagnostics
 
             if (DoesMessageStartsWithAllowedLogsPrefix(formattedMessage))
             {
-                LogToConsole(logLevel, exception, formattedMessage);
+                LogToConsoleWithSslHint(logLevel, exception, formattedMessage);
                 return;
             }
 
@@ -111,7 +111,22 @@ namespace Azure.Functions.Cli.Diagnostics
                 return;
             }
 
+            LogToConsoleWithSslHint(logLevel, exception, formattedMessage);
+        }
+
+        /// <summary>
+        /// Logs the message to the console, then emits SSL certificate hint lines if the
+        /// exception or message indicates an SSL/TLS certificate validation failure.
+        /// </summary>
+        private void LogToConsoleWithSslHint(LogLevel logLevel, Exception exception, string formattedMessage)
+        {
             LogToConsole(logLevel, exception, formattedMessage);
+            if (SslCertificateErrorHelper.IsSslCertificateException(exception)
+                || SslCertificateErrorHelper.ContainsSslKeywords(formattedMessage))
+            {
+                LogToConsole(LogLevel.Warning, null, Constants.Errors.SslCertificateErrorDetected);
+                LogToConsole(LogLevel.Warning, null, Constants.Errors.SslCertificateHint);
+            }
         }
 
         private void LogToConsole(LogLevel logLevel, Exception exception, string formattedMessage, bool includeTimeStamp = true)
