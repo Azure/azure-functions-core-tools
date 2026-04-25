@@ -116,4 +116,3 @@ dotnet test test/Func.Cli.Tests/        # CLI tests only
 |--------|---------|
 | `main` | Stable v4 release branch |
 | `vnext` | Base branch for v5 development |
-| `liliankasem/workloads/*` | Stacked PRs landing the v5 workload extensibility model |
