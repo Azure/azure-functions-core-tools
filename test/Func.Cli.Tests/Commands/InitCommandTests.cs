@@ -18,7 +18,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_HasExpectedOptions()
     {
-        var cmd = new InitCommand(_interaction);
+        var cmd = new InitCommand(_interaction, []);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--stack", optionNames);
@@ -39,7 +39,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_HasPathArgument()
     {
-        var cmd = new InitCommand(_interaction);
+        var cmd = new InitCommand(_interaction, []);
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
     }

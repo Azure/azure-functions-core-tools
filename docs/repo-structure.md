@@ -4,7 +4,7 @@ This document describes the Azure Functions Core Tools v5 codebase — projects,
 
 ## Overview
 
-The v5 CLI is built with [System.CommandLine](https://github.com/dotnet/command-line-api) and [Spectre.Console](https://spectreconsole.net/), targeting **.NET 10**. It is being designed around a **workload model** (similar to the `dotnet` CLI) where the base CLI provides core commands and infrastructure while language-specific functionality (templates, init, pack) is delivered via independently installable workload packages. The base CLI and the abstractions library are in the tree today; the workload runtime + first-party workload packages are being staged in follow-up PRs.
+The v5 CLI is built with [System.CommandLine](https://github.com/dotnet/command-line-api) and [Spectre.Console](https://spectreconsole.net/), targeting **.NET 10**. It follows a **workload model** (similar to the `dotnet` CLI) where the base CLI provides core commands and infrastructure while language-specific functionality (templates, init, pack) is delivered via independently installable workload packages. The base CLI, the host that loads workloads, and the public abstractions library are in the tree today; the runtime workload loader and `func workload install` / `uninstall` commands land in a follow-up PR.
 
 ## Project Layout
 
@@ -37,23 +37,29 @@ azure-functions-core-tools/
 
 The main tool users install and run. Assembly name is `func`.
 
-| Directory         | Purpose |
-|-------------------|---------|
-| `Commands/`       | All CLI commands (init, new, pack, start, version, help) + `BaseCommand`, `FuncRootCommand`, `ProjectDetector`, `SpectreHelpAction` |
-| `Console/`        | `IInteractionService` abstraction + Spectre.Console implementation, theme |
-| `Common/`         | Shared utilities — `Constants`, `Stacks` (stack registry), `VersionChecker` |
-| `Telemetry/`      | `CliTelemetry` (ActivitySource + Meter), Azure Monitor exporter wiring, activity / metric extensions |
-| `Program.cs`      | Entry point — telemetry setup, command tree, error handling |
-| `Parser.cs`       | Command tree composition — registers all commands, wires Spectre help |
+| Directory          | Purpose |
+|--------------------|---------|
+| `Commands/`        | Built-in commands (init, new, pack, start, version, help) + `BaseCommand`, `FuncRootCommand`, `ProjectDetector`, `SpectreHelpAction`, `WorkloadHints` |
+| `Commands/Workload/` | `func workload` parent command + `func workload list` |
+| `Console/`         | `IInteractionService` abstraction + Spectre.Console implementation, theme |
+| `Common/`          | Shared utilities — `Constants`, `Stacks` (stack registry), `VersionChecker` |
+| `Hosting/`         | `FunctionsCliBuilder` (internal `IFunctionsCliBuilder` impl) and `WorkloadRegistration` (workload bootstrap seam) |
+| `Telemetry/`       | `CliTelemetry` (ActivitySource + Meter), Azure Monitor exporter wiring, activity / metric extensions |
+| `Program.cs`       | Entry point — host, telemetry, command tree, error handling |
+| `Parser.cs`        | Command tree composition — resolves built-ins from DI, picks up workload-contributed `Command` services, wires Spectre help |
 
 ### `src/Func.Cli.Abstractions` — Workload Contracts
 
-A packable NuGet library (`Azure.Functions.Cli.Abstractions`) intended to host the public types that workload authors will reference. Workload authors will reference this package — they will never reference `Func.Cli` directly.
+A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public types workload authors program against. Workload authors reference this package — they never reference `Func.Cli` directly.
 
-Today it contains:
-- **`GracefulException`** — User-friendly exception used by the CLI (and, eventually, by workloads) to surface a primary message plus optional verbose detail and to drive a non-zero exit code.
-
-The remaining workload extension types (`IWorkload`, `IProjectInitializer`, `ITemplateProvider`, `IPackProvider`, related context records) are being added in follow-up PRs.
+| File / Type | Role |
+|-------------|------|
+| `Common/GracefulException` | User-friendly exception with optional verbose detail; drives non-zero exit codes |
+| `Workloads/IWorkload` | Workload entry point — identity properties + `Configure(IFunctionsCliBuilder)` |
+| `Workloads/IFunctionsCliBuilder` | DI seam — exposes `IServiceCollection` to workloads |
+| `Workloads/IProjectInitializer` | `func init` extension point for a stack |
+| `Workloads/WorkloadContext`, `InitContext` | Records carrying inputs to providers |
+| `Workloads/InstalledWorkload`, `WorkloadType` | View model + categorization for `func workload list` |
 
 ## Build System
 
