@@ -71,6 +71,18 @@ internal static class CliTelemetry
     }
 
     /// <summary>
+    /// Applies the standard CLI service / OS / runtime attributes to an
+    /// existing <see cref="ResourceBuilder"/>. Used by the OTel hosting
+    /// integration via <c>ConfigureResource</c>.
+    /// </summary>
+    public static ResourceBuilder ConfigureResource(ResourceBuilder builder)
+    {
+        return builder
+            .AddService(serviceName: SourceName, serviceVersion: CliVersion)
+            .AddAttributes(GetResourceAttributes());
+    }
+
+    /// <summary>
     /// Returns the Azure Monitor connection string when telemetry is
     /// configured (build has a real instrumentation key) and the user has
     /// not opted out.
