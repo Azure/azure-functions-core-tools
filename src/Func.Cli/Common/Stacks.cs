@@ -7,9 +7,9 @@ using Azure.Functions.Cli.Console;
 namespace Azure.Functions.Cli.Common;
 
 /// <summary>
-/// Central registry of worker runtimes and their supported languages.
+/// Central registry of stacks (language / runtime targets) and their supported languages.
 /// </summary>
-public static class WorkerRuntimes
+public static class Stacks
 {
     public static readonly FrozenDictionary<string, string[]> LanguageMap =
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
@@ -22,7 +22,7 @@ public static class WorkerRuntimes
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Writes the workload install hints for all known runtimes as an aligned list.
+    /// Writes the workload install hints for all known stacks as an aligned list.
     /// </summary>
     public static void WriteWorkloadInstallHints(IInteractionService interaction)
     {

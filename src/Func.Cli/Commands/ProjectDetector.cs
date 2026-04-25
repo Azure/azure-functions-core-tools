@@ -4,14 +4,14 @@
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Shared utility for detecting the worker runtime and language of a Functions project.
+/// Shared utility for detecting the stack and language of a Functions project.
 /// </summary>
 internal static class ProjectDetector
 {
     /// <summary>
-    /// Detects the worker runtime and language from the project files in the given directory.
+    /// Detects the stack and language from the project files in the given directory.
     /// </summary>
-    public static (string? Runtime, string? Language) DetectRuntimeAndLanguage(string directory)
+    public static (string? Stack, string? Language) DetectStackAndLanguage(string directory)
     {
         // Check for .csproj → dotnet C#
         if (Directory.EnumerateFiles(directory, "*.csproj").Any())
@@ -55,8 +55,8 @@ internal static class ProjectDetector
     }
 
     /// <summary>
-    /// Detects just the worker runtime from the project files in the given directory.
+    /// Detects just the stack from the project files in the given directory.
     /// </summary>
-    public static string? DetectRuntime(string directory)
-        => DetectRuntimeAndLanguage(directory).Runtime;
+    public static string? DetectStack(string directory)
+        => DetectStackAndLanguage(directory).Stack;
 }

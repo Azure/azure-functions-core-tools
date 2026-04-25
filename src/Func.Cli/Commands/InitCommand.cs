@@ -13,9 +13,9 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 public class InitCommand : BaseCommand
 {
-    public static readonly Option<string?> WorkerRuntimeOption = new("--worker-runtime", "-w")
+    public static readonly Option<string?> StackOption = new("--stack", "-s")
     {
-        Description = "The worker runtime for the project"
+        Description = "The stack (language / runtime) for the project"
     };
 
     public static readonly Option<string?> NameOption = new("--name", "-n")
@@ -41,7 +41,7 @@ public class InitCommand : BaseCommand
         _interaction = interaction;
 
         AddPathArgument();
-        Options.Add(WorkerRuntimeOption);
+        Options.Add(StackOption);
         Options.Add(NameOption);
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
@@ -55,7 +55,7 @@ public class InitCommand : BaseCommand
         _interaction.WriteBlankLine();
         _interaction.WriteHint("Install a workload to initialize a project:");
         _interaction.WriteBlankLine();
-        WorkerRuntimes.WriteWorkloadInstallHints(_interaction);
+        Stacks.WriteWorkloadInstallHints(_interaction);
         _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
             .Muted("Run ")

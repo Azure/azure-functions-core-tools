@@ -48,19 +48,19 @@ public class PackCommand : BaseCommand
             return Task.FromResult(1);
         }
 
-        // Detect the runtime
-        var detectedRuntime = ProjectDetector.DetectRuntime(projectPath);
-        if (detectedRuntime is null)
+        // Detect the stack
+        var detectedStack = ProjectDetector.DetectStack(projectPath);
+        if (detectedStack is null)
         {
-            _interaction.WriteError("Could not detect the worker runtime for this project.");
+            _interaction.WriteError("Could not detect the stack for this project.");
             _interaction.WriteHint("Ensure the project contains the expected project files (e.g., .csproj, package.json).");
             return Task.FromResult(1);
         }
 
-        _interaction.WriteError($"No pack provider for runtime '{detectedRuntime}'.");
+        _interaction.WriteError($"No pack provider for stack '{detectedStack}'.");
         _interaction.WriteLine(l => l
             .Muted("Install the workload: ")
-            .Command($"func workload install {detectedRuntime}"));
+            .Command($"func workload install {detectedStack}"));
         return Task.FromResult(1);
     }
 }

@@ -49,7 +49,7 @@ public class NewCommand : BaseCommand
         _interaction.WriteBlankLine();
         _interaction.WriteHint("Install a workload to create functions from templates:");
         _interaction.WriteBlankLine();
-        WorkerRuntimes.WriteWorkloadInstallHints(_interaction);
+        Stacks.WriteWorkloadInstallHints(_interaction);
         _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
             .Muted("Run ")
