@@ -15,9 +15,9 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 public class InitCommand : BaseCommand
 {
-    public static readonly Option<string?> WorkerRuntimeOption = new("--worker-runtime", "-w")
+    public static readonly Option<string?> StackOption = new("--stack", "-s")
     {
-        Description = "The worker runtime for the project"
+        Description = "The stack for the project (e.g. dotnet, node, python)"
     };
 
     public static readonly Option<string?> NameOption = new("--name", "-n")
@@ -37,20 +37,17 @@ public class InitCommand : BaseCommand
 
     private readonly IInteractionService _interaction;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
-    private readonly IReadOnlyList<WorkloadSummary> _workloads;
 
     public InitCommand(
         IInteractionService interaction,
-        IEnumerable<IProjectInitializer> initializers,
-        IReadOnlyList<WorkloadSummary> workloads)
+        IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         _interaction = interaction;
         _initializers = initializers.ToList();
-        _workloads = workloads;
 
         AddPathArgument();
-        Options.Add(WorkerRuntimeOption);
+        Options.Add(StackOption);
         Options.Add(NameOption);
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
@@ -70,20 +67,21 @@ public class InitCommand : BaseCommand
     {
         ApplyPath(parseResult, createIfNotExists: true);
 
-        var workerRuntime = parseResult.GetValue(WorkerRuntimeOption);
+        var stack = parseResult.GetValue(StackOption);
 
-        var initializer = await SelectInitializerAsync(workerRuntime, cancellationToken);
+        var initializer = await SelectInitializerAsync(stack, cancellationToken);
         if (initializer is null)
         {
+            var installed = _initializers.Select(i => i.Stack).ToArray();
             WorkloadHints.WriteNoMatchingWorkload(
                 _interaction,
-                _workloads,
+                installed,
                 actionDescription: "initialize a project",
-                requestedRuntime: workerRuntime);
+                requestedStack: stack);
             return 1;
         }
 
-        var context = new ProjectInitContext(
+        var context = new InitContext(
             ProjectPath: Directory.GetCurrentDirectory(),
             ProjectName: parseResult.GetValue(NameOption),
             Language: parseResult.GetValue(LanguageOption),
@@ -94,25 +92,25 @@ public class InitCommand : BaseCommand
         _interaction.WriteLine(l => l
             .Success("✓ ")
             .Muted("Project initialized for ")
-            .Code(initializer.WorkerRuntime)
+            .Code(initializer.Stack)
             .Muted("."));
 
         return 0;
     }
 
-    private async Task<IProjectInitializer?> SelectInitializerAsync(string? workerRuntime, CancellationToken cancellationToken)
+    private async Task<IProjectInitializer?> SelectInitializerAsync(string? stack, CancellationToken cancellationToken)
     {
         if (_initializers.Count == 0)
         {
             return null;
         }
 
-        if (!string.IsNullOrEmpty(workerRuntime))
+        if (!string.IsNullOrEmpty(stack))
         {
-            return _initializers.FirstOrDefault(i => i.CanHandle(workerRuntime));
+            return _initializers.FirstOrDefault(i => i.CanHandle(stack));
         }
 
-        // No runtime specified — auto-select if there's only one initializer
+        // No stack specified — auto-select if there's only one initializer
         // installed (the common case for engineers using a single language).
         if (_initializers.Count == 1)
         {
@@ -127,12 +125,12 @@ public class InitCommand : BaseCommand
             return null;
         }
 
-        var choices = _initializers.Select(i => i.WorkerRuntime).ToList();
+        var choices = _initializers.Select(i => i.Stack).ToList();
         var picked = await _interaction.PromptForSelectionAsync(
-            "Select a worker runtime:",
+            "Select a stack:",
             choices,
             cancellationToken);
 
-        return _initializers.FirstOrDefault(i => i.WorkerRuntime == picked);
+        return _initializers.FirstOrDefault(i => i.Stack == picked);
     }
 }

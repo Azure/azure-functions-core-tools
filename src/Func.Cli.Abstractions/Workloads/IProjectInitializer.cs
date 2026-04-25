@@ -7,7 +7,7 @@ using System.CommandLine.Parsing;
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Scaffolds a new Azure Functions project for a specific worker runtime.
+/// Scaffolds a new Azure Functions project for a specific stack.
 /// Implementations are registered via DI and consumed by <c>func init</c>.
 ///
 /// An initializer may also contribute additional <see cref="Option"/>s to the
@@ -16,17 +16,17 @@ namespace Azure.Functions.Cli.Workloads;
 /// </summary>
 public interface IProjectInitializer
 {
-    /// <summary>The canonical worker runtime id this initializer owns (e.g. "dotnet").</summary>
-    public string WorkerRuntime { get; }
+    /// <summary>The canonical stack id this initializer owns (e.g. "dotnet").</summary>
+    public string Stack { get; }
 
     /// <summary>Display labels for the languages this initializer supports (e.g. "C#", "F#").</summary>
     public IReadOnlyList<string> SupportedLanguages { get; }
 
     /// <summary>
-    /// Returns true if this initializer should handle the given <paramref name="workerRuntime"/>.
+    /// Returns true if this initializer should handle the given <paramref name="stack"/>.
     /// Allows aliases (e.g. "csharp" → dotnet initializer).
     /// </summary>
-    public bool CanHandle(string workerRuntime);
+    public bool CanHandle(string stack);
 
     /// <summary>
     /// Options this initializer contributes to the <c>func init</c> command.
@@ -34,9 +34,9 @@ public interface IProjectInitializer
     /// </summary>
     public IReadOnlyList<Option> GetInitOptions();
 
-    /// <summary>Scaffolds a new project at <see cref="ProjectInitContext.ProjectPath"/>.</summary>
+    /// <summary>Scaffolds a new project at <see cref="WorkloadContext.ProjectPath"/>.</summary>
     public Task InitializeAsync(
-        ProjectInitContext context,
+        InitContext context,
         ParseResult parseResult,
         CancellationToken cancellationToken = default);
 }

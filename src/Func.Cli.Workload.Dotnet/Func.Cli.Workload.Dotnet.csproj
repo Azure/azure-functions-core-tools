@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Azure.Functions.Cli.Workload.Dotnet</RootNamespace>
+    <AssemblyName>Azure.Functions.Cli.Workload.Dotnet</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Cli.Workload.Dotnet</PackageId>
+    <Description>Adds C#/F# project support to the Azure Functions Core Tools CLI.</Description>
+    <!-- Tags become workload aliases at install time. -->
+    <PackageTags>dotnet;csharp;fsharp</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

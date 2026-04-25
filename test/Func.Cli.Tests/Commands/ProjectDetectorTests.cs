@@ -25,130 +25,130 @@ public class ProjectDetectorTests : IDisposable
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_CSharpProject_ReturnsDotnetCSharp()
+    public void DetectStackAndLanguage_CSharpProject_ReturnsDotnetCSharp()
     {
         File.WriteAllText(Path.Combine(_tempDir, "MyApp.csproj"), "<Project/>");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("dotnet", runtime);
+        Assert.Equal("dotnet", stack);
         Assert.Equal("C#", language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_FSharpProject_ReturnsDotnetFSharp()
+    public void DetectStackAndLanguage_FSharpProject_ReturnsDotnetFSharp()
     {
         File.WriteAllText(Path.Combine(_tempDir, "MyApp.fsproj"), "<Project/>");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("dotnet", runtime);
+        Assert.Equal("dotnet", stack);
         Assert.Equal("F#", language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_NodeProject_ReturnsNode()
+    public void DetectStackAndLanguage_NodeProject_ReturnsNode()
     {
         File.WriteAllText(Path.Combine(_tempDir, "package.json"), "{}");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("node", runtime);
+        Assert.Equal("node", stack);
         Assert.Null(language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_PythonRequirements_ReturnsPython()
+    public void DetectStackAndLanguage_PythonRequirements_ReturnsPython()
     {
         File.WriteAllText(Path.Combine(_tempDir, "requirements.txt"), "");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("python", runtime);
+        Assert.Equal("python", stack);
         Assert.Null(language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_PyProject_ReturnsPython()
+    public void DetectStackAndLanguage_PyProject_ReturnsPython()
     {
         File.WriteAllText(Path.Combine(_tempDir, "pyproject.toml"), "");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("python", runtime);
+        Assert.Equal("python", stack);
         Assert.Null(language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_PomXml_ReturnsJava()
+    public void DetectStackAndLanguage_PomXml_ReturnsJava()
     {
         File.WriteAllText(Path.Combine(_tempDir, "pom.xml"), "<project/>");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("java", runtime);
+        Assert.Equal("java", stack);
         Assert.Null(language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_BuildGradle_ReturnsJava()
+    public void DetectStackAndLanguage_BuildGradle_ReturnsJava()
     {
         File.WriteAllText(Path.Combine(_tempDir, "build.gradle"), "");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("java", runtime);
+        Assert.Equal("java", stack);
         Assert.Null(language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_ProfilePs1_ReturnsPowerShell()
+    public void DetectStackAndLanguage_ProfilePs1_ReturnsPowerShell()
     {
         File.WriteAllText(Path.Combine(_tempDir, "profile.ps1"), "");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("powershell", runtime);
+        Assert.Equal("powershell", stack);
         Assert.Null(language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_EmptyDir_ReturnsNulls()
+    public void DetectStackAndLanguage_EmptyDir_ReturnsNulls()
     {
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Null(runtime);
+        Assert.Null(stack);
         Assert.Null(language);
     }
 
     [Fact]
-    public void DetectRuntimeAndLanguage_CSharpTakesPriorityOverNode()
+    public void DetectStackAndLanguage_CSharpTakesPriorityOverNode()
     {
         // If both .csproj and package.json exist, .csproj wins
         File.WriteAllText(Path.Combine(_tempDir, "MyApp.csproj"), "<Project/>");
         File.WriteAllText(Path.Combine(_tempDir, "package.json"), "{}");
 
-        var (runtime, language) = ProjectDetector.DetectRuntimeAndLanguage(_tempDir);
+        var (stack, language) = ProjectDetector.DetectStackAndLanguage(_tempDir);
 
-        Assert.Equal("dotnet", runtime);
+        Assert.Equal("dotnet", stack);
         Assert.Equal("C#", language);
     }
 
     [Fact]
-    public void DetectRuntime_ReturnRuntimeOnly()
+    public void DetectStack_ReturnStackOnly()
     {
         File.WriteAllText(Path.Combine(_tempDir, "MyApp.fsproj"), "<Project/>");
 
-        var runtime = ProjectDetector.DetectRuntime(_tempDir);
+        var stack = ProjectDetector.DetectStack(_tempDir);
 
-        Assert.Equal("dotnet", runtime);
+        Assert.Equal("dotnet", stack);
     }
 
     [Fact]
-    public void DetectRuntime_EmptyDir_ReturnsNull()
+    public void DetectStack_EmptyDir_ReturnsNull()
     {
-        var runtime = ProjectDetector.DetectRuntime(_tempDir);
+        var stack = ProjectDetector.DetectStack(_tempDir);
 
-        Assert.Null(runtime);
+        Assert.Null(stack);
     }
 }

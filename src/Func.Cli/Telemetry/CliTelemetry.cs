@@ -58,6 +58,18 @@ public static class CliTelemetry
     }
 
     /// <summary>
+    /// Adds the CLI's standard service/OS/runtime resource attributes to the
+    /// supplied <see cref="ResourceBuilder"/>. Used by the hosted OTel
+    /// integration in <c>Program.cs</c>.
+    /// </summary>
+    public static void ConfigureResource(ResourceBuilder builder)
+    {
+        builder
+            .AddService(serviceName: SourceName, serviceVersion: CliVersion)
+            .AddAttributes(GetResourceAttributes());
+    }
+
+    /// <summary>
     /// Builds a standalone <see cref="ResourceBuilder"/> with the same
     /// service/OS/runtime attributes used by the live exporters. Intended
     /// for tests and tooling that need the resource without going through
@@ -65,9 +77,9 @@ public static class CliTelemetry
     /// </summary>
     public static ResourceBuilder CreateResourceBuilder()
     {
-        return ResourceBuilder.CreateDefault()
-            .AddService(serviceName: SourceName, serviceVersion: CliVersion)
-            .AddAttributes(GetResourceAttributes());
+        var builder = ResourceBuilder.CreateDefault();
+        ConfigureResource(builder);
+        return builder;
     }
 
     /// <summary>

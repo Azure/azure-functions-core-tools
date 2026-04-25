@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Func.Cli\Func.Cli.csproj" />
+    <!-- Sample workload built alongside tests so installer fixtures can use a real IWorkload assembly. -->
+    <ProjectReference Include="..\..\src\Func.Cli.Workload.Dotnet\Func.Cli.Workload.Dotnet.csproj" />
   </ItemGroup>
 
 </Project>

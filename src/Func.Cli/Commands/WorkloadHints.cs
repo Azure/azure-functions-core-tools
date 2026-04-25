@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Console;
-using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -13,17 +12,17 @@ internal static class WorkloadHints
 {
     public static void WriteNoMatchingWorkload(
         IInteractionService interaction,
-        IReadOnlyList<WorkloadSummary> workloads,
+        IReadOnlyList<string> installedStacks,
         string actionDescription,
-        string? requestedRuntime = null)
+        string? requestedStack = null)
     {
-        if (workloads.Count == 0)
+        if (installedStacks.Count == 0)
         {
             interaction.WriteError($"No language workloads installed.");
             interaction.WriteBlankLine();
             interaction.WriteHint($"Install a workload to {actionDescription}:");
             interaction.WriteBlankLine();
-            Common.WorkerRuntimes.WriteWorkloadInstallHints(interaction);
+            Common.Stacks.WriteWorkloadInstallHints(interaction);
             interaction.WriteBlankLine();
             interaction.WriteLine(l => l
                 .Muted("Run ")
@@ -32,24 +31,22 @@ internal static class WorkloadHints
             return;
         }
 
-        if (requestedRuntime is not null)
+        if (requestedStack is not null)
         {
-            interaction.WriteError($"No installed workload supports worker runtime '{requestedRuntime}'.");
+            interaction.WriteError($"No installed workload supports stack '{requestedStack}'.");
         }
         else
         {
-            interaction.WriteError("No worker runtime specified and the installed workloads couldn't be auto-selected.");
+            interaction.WriteError("No stack specified and the installed workloads couldn't be auto-selected.");
         }
 
         interaction.WriteBlankLine();
-        interaction.WriteHint("Installed workloads:");
-        foreach (var workload in workloads)
+        interaction.WriteHint("Installed stacks:");
+        foreach (var stack in installedStacks)
         {
-            var aliases = workload.Aliases.Count == 0 ? "—" : string.Join(", ", workload.Aliases);
             interaction.WriteLine(l => l
                 .Muted("  ")
-                .Code(aliases)
-                .Muted($" — {workload.DisplayName} ({workload.PackageId})"));
+                .Code(stack));
         }
     }
 }

@@ -8,38 +8,41 @@ using Azure.Functions.Cli.Workloads;
 namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
-/// Lists every workload registered with the host. Intentionally minimal — the
-/// real list command will read manifests, show install paths and source feeds.
+/// Lists workloads recorded in the global manifest. Source of truth is
+/// <see cref="InstalledWorkload"/>, populated by the install / discovery
+/// layer from each package's <c>workload.json</c>.
 /// </summary>
 public class WorkloadListCommand : BaseCommand
 {
     private readonly IInteractionService _interaction;
-    private readonly IReadOnlyList<WorkloadSummary> _summaries;
+    private readonly IReadOnlyList<InstalledWorkload> _workloads;
 
-    public WorkloadListCommand(IInteractionService interaction, IReadOnlyList<WorkloadSummary> summaries)
+    public WorkloadListCommand(IInteractionService interaction, IReadOnlyList<InstalledWorkload> workloads)
         : base("list", "List installed workloads.")
     {
         _interaction = interaction;
-        _summaries = summaries;
+        _workloads = workloads;
     }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        if (_summaries.Count == 0)
+        if (_workloads.Count == 0)
         {
             _interaction.WriteHint("No workloads installed.");
             return Task.FromResult(0);
         }
 
-        var rows = _summaries.Select(s => new[]
+        var rows = _workloads.Select(w => new[]
         {
-            s.PackageId,
-            s.Aliases.Count == 0 ? "—" : string.Join(", ", s.Aliases),
-            s.DisplayName,
-            s.Description,
+            w.PackageId,
+            w.Type.ToString(),
+            w.Aliases.Count == 0 ? "—" : string.Join(", ", w.Aliases),
+            w.DisplayName,
+            w.Description,
+            w.Version,
         });
 
-        _interaction.WriteTable(["Package", "Aliases", "Name", "Description"], rows);
+        _interaction.WriteTable(["Package", "Type", "Aliases", "Name", "Description", "Version"], rows);
         return Task.FromResult(0);
     }
 }

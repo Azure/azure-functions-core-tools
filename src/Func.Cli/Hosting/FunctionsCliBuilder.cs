@@ -7,18 +7,15 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
-/// Default <see cref="IWorkloadBuilder"/> implementation. Internal to the host;
+/// Default <see cref="IFunctionsCliBuilder"/> implementation. Internal so
 /// workloads only see the abstraction.
 /// </summary>
-internal sealed class WorkloadBuilder : IWorkloadBuilder
+internal sealed class FunctionsCliBuilder : IFunctionsCliBuilder
 {
-    public WorkloadBuilder(IWorkload workload, IServiceCollection services)
+    public FunctionsCliBuilder(IServiceCollection services)
     {
-        Workload = workload;
         Services = services;
     }
-
-    public IWorkload Workload { get; }
 
     public IServiceCollection Services { get; }
 }

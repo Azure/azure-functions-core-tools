@@ -21,17 +21,19 @@ public static class Parser
 {
     /// <summary>
     /// Convenience overload for tests/scenarios that don't need workloads —
-    /// bootstraps an empty host with just the supplied interaction service.
+    /// builds a minimal service provider with just the supplied interaction service.
     /// </summary>
-    public static FuncRootCommand CreateCommand(Console.IInteractionService interaction)
+    public static FuncRootCommand CreateCommand(IInteractionService interaction)
     {
-        var builder = new Hosting.FuncCliHostBuilder(interaction);
-        return CreateCommand(builder.Build());
+        var services = new ServiceCollection();
+        services.AddSingleton(interaction);
+        services.AddSingleton<IReadOnlyList<InstalledWorkload>>(Array.Empty<InstalledWorkload>());
+        return CreateCommand(services.BuildServiceProvider());
     }
 
     /// <summary>
     /// Creates and configures the root CLI command, resolving built-in commands
-    /// from <paramref name="services"/> and inviting workload contributors to
+    /// from <paramref name="services"/> and inviting workload providers to
     /// add their own subcommands.
     /// </summary>
     public static FuncRootCommand CreateCommand(IServiceProvider services)
@@ -42,12 +44,14 @@ public static class Parser
         var helpCommand = new HelpCommand(interaction, rootCommand);
         var versionCommand = new VersionCommand(interaction);
         var initCommand = ActivatorUtilities.CreateInstance<InitCommand>(services);
-        var newCommand = ActivatorUtilities.CreateInstance<NewCommand>(services);
+        var newCommand = new NewCommand(interaction);
         var packCommand = new PackCommand(interaction);
         var startCommand = new StartCommand(interaction);
 
         var workloadListCommand = ActivatorUtilities.CreateInstance<WorkloadListCommand>(services);
-        var workloadCommand = new WorkloadCommand(workloadListCommand);
+        var workloadInstallCommand = new WorkloadInstallCommand(interaction);
+        var workloadUninstallCommand = new WorkloadUninstallCommand(interaction);
+        var workloadCommand = new WorkloadCommand(workloadListCommand, workloadInstallCommand, workloadUninstallCommand);
 
         rootCommand.Subcommands.Add(versionCommand);
         rootCommand.Subcommands.Add(helpCommand);

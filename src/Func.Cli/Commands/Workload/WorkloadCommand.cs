@@ -7,14 +7,18 @@ namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
 /// Parent <c>func workload</c> command. Subcommands manage workload installation,
-/// inspection, and updates. v1 prototype only ships <c>list</c>; install/search/update
-/// land alongside the real workload loader.
+/// inspection, and updates.
 /// </summary>
 public class WorkloadCommand : Command
 {
-    public WorkloadCommand(WorkloadListCommand listCommand)
+    public WorkloadCommand(
+        WorkloadListCommand listCommand,
+        WorkloadInstallCommand installCommand,
+        WorkloadUninstallCommand uninstallCommand)
         : base("workload", "Manage Func CLI workloads.")
     {
         Subcommands.Add(listCommand);
+        Subcommands.Add(installCommand);
+        Subcommands.Add(uninstallCommand);
     }
 }

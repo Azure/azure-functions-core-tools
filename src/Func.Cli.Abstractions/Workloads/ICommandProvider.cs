@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
 /// Provides workload-defined subcommands to the CLI's root command. Use this
-/// for "feature" workloads that aren't tied to a worker runtime (e.g. a
+/// for "feature" workloads that aren't tied to a stack (e.g. a
 /// Durable Functions workload providing <c>func durable …</c>).
 ///
 /// Implementations are registered via DI; the host invokes

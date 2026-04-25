@@ -4,27 +4,36 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// A workload extends the Func CLI with language- or feature-specific behavior.
-/// Implementations must have a parameterless constructor; the CLI instantiates
-/// the workload during bootstrap and calls <see cref="Register"/>, where the
-/// workload contributes services to the DI container.
+/// Implemented by a workload's entry-point class. The CLI loader instantiates
+/// the type named by the workload's manifest (<c>workload.json</c>
+/// <c>entryPoint</c>), then invokes <see cref="Configure"/> so the workload
+/// can register its services with <see cref="IFunctionsCliBuilder"/>.
 ///
-/// What a workload contributes is expressed by the services it registers:
-/// register an <see cref="IProjectInitializer"/> to extend <c>func init</c>,
-/// an <see cref="ITemplateProvider"/> to extend <c>func new</c>, or an
-/// <see cref="ICommandProvider"/> to add brand-new commands.
+/// Mirrors the shape of WebJobs' <c>IWebJobsStartup</c>. Implementations must
+/// have a parameterless constructor.
 /// </summary>
 public interface IWorkload
 {
     /// <summary>
     /// Globally unique package identifier — typically the assembly / NuGet
-    /// package name (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>). This
-    /// is what <c>func workload install/uninstall</c> consumes; user-facing
-    /// short names (<c>-w dotnet</c>) come from each contribution's
-    /// <see cref="IProjectInitializer.WorkerRuntime"/> /
-    /// <see cref="ITemplateProvider.WorkerRuntime"/>.
+    /// package name (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>).
+    /// Used to identify the workload in the manifest and CLI output.
     /// </summary>
     public string PackageId { get; }
+
+    /// <summary>
+    /// Workload version. Authored on the workload itself rather than read
+    /// from the NuGet package metadata so the running code is the source of
+    /// truth for what version of the workload is installed.
+    /// </summary>
+    public string PackageVersion { get; }
+
+    /// <summary>
+    /// Workload category (stack / tool / extension). Surfaces in
+    /// <c>func workload list</c> and lets the CLI group or filter workloads
+    /// by kind.
+    /// </summary>
+    public WorkloadType Type { get; }
 
     /// <summary>Human-readable name shown in <c>func workload list</c>.</summary>
     public string DisplayName { get; }
@@ -33,8 +42,8 @@ public interface IWorkload
     public string Description { get; }
 
     /// <summary>
-    /// Registers the workload's services with the DI container. Called once
-    /// during CLI bootstrap, before the root command tree is built.
+    /// Registers the workload's services with the host. Called once during
+    /// CLI bootstrap, before the root command tree is built.
     /// </summary>
-    public void Register(IWorkloadBuilder builder);
+    public void Configure(IFunctionsCliBuilder builder);
 }
