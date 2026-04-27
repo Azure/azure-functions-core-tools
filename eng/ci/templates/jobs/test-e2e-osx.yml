@@ -35,7 +35,9 @@ jobs:
 
   - script: |
       brew install go
-      go version
+      GO_BIN="$(brew --prefix go)/bin"
+      echo "##vso[task.prependpath]${GO_BIN}"
+      "${GO_BIN}/go" version
     displayName: 'Install Go'
 
   - script: |
