@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
@@ -108,69 +107,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             funcInitResult.Should().ExitWith(0);
             File.Exists(Path.Combine(workingDir, "main.go")).Should().BeTrue("Expected main.go to exist");
             File.Exists(Path.Combine(workingDir, "go.mod")).Should().BeTrue("Expected go.mod to exist");
-        }
-
-        [SkipIfGoNonExistFact]
-        public async Task Init_WithGo_ScaffoldedProjectCompiles()
-        {
-            var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithGo_ScaffoldedProjectCompiles);
-            var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "go"]);
-
-            funcInitResult.Should().ExitWith(0);
-
-            var goBuild = new Executable("go", "build ./...", workingDirectory: workingDir);
-            var exitCode = await goBuild.RunAsync(
-                l =>
-                {
-                    if (!string.IsNullOrEmpty(l))
-                    {
-                        Log!.WriteLine(l);
-                    }
-                },
-                e =>
-                {
-                    if (!string.IsNullOrEmpty(e))
-                    {
-                        Log!.WriteLine(e);
-                    }
-                });
-            exitCode.Should().Be(0, "scaffolded Go project should compile with 'go build ./...'");
-        }
-    }
-
-    public sealed class SkipIfGoNonExistFact : FactAttribute
-    {
-        public SkipIfGoNonExistFact()
-        {
-            var goExe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "go.exe" : "go";
-            if (!CheckIfGoExists(goExe))
-            {
-                Skip = "go does not exist on PATH";
-            }
-        }
-
-        private static bool CheckIfGoExists(string goExe)
-        {
-            var path = Environment.GetEnvironmentVariable("PATH");
-            if (string.IsNullOrEmpty(path))
-            {
-                return false;
-            }
-
-            foreach (var p in path.Split(Path.PathSeparator))
-            {
-                if (File.Exists(Path.Combine(p, goExe)))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

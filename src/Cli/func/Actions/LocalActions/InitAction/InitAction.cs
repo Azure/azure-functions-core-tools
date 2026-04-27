@@ -237,6 +237,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
+            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Go && InitDocker)
+            {
+                throw new CliException("Docker support for the Go worker runtime is not yet available.");
+            }
+
             ValidateTargetFramework();
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
@@ -541,6 +546,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.Go)
             {
+                // Docker support for Go is validated up-front in RunAsync; this branch is unreachable in practice.
                 throw new CliException("Docker support for the Go worker runtime is not yet available.");
             }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
