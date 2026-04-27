@@ -19,6 +19,7 @@ public class SpectreInteractionService : IInteractionService
 
     public SpectreInteractionService(ITheme theme, IAnsiConsole? stdout = null, IAnsiConsole? stderr = null)
     {
+        ArgumentNullException.ThrowIfNull(theme);
         _theme = theme;
         _stdout = stdout ?? AnsiConsole.Console;
         _stderr = stderr ?? AnsiConsole.Create(new AnsiConsoleSettings

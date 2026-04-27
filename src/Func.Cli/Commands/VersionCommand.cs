@@ -17,6 +17,7 @@ public class VersionCommand : BaseCommand
     public VersionCommand(IInteractionService interaction)
         : base("version", "Display the current Azure Functions CLI version.")
     {
+        ArgumentNullException.ThrowIfNull(interaction);
         Hidden = true;
         _interaction = interaction;
     }

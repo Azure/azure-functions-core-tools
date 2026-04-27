@@ -33,6 +33,7 @@ public class NewCommand : BaseCommand
     public NewCommand(IInteractionService interaction)
         : base("new", "Create a new function from a template.")
     {
+        ArgumentNullException.ThrowIfNull(interaction);
         _interaction = interaction;
 
         AddPathArgument();

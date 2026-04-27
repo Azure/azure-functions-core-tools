@@ -25,6 +25,8 @@ public class HelpCommand : BaseCommand
     public HelpCommand(IInteractionService interaction, FuncRootCommand rootCommand)
         : base("help", "Show help information for Azure Functions CLI.")
     {
+        ArgumentNullException.ThrowIfNull(interaction);
+        ArgumentNullException.ThrowIfNull(rootCommand);
         Hidden = true;
         _interaction = interaction;
         _rootCommand = rootCommand;
