@@ -34,6 +34,11 @@ jobs:
     displayName: 'Start emulators (NoWait)'
 
   - script: |
+      brew install go
+      go version
+    displayName: 'Install Go'
+
+  - script: |
       sudo chown -R $(id -u):$(id -g) ~/.npm
       npm install -g @azure/functions
     displayName: 'Install @azure/functions'
