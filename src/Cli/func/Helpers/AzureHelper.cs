@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Arm;
@@ -17,6 +17,8 @@ namespace Azure.Functions.Cli.Helpers
     public static class AzureHelper
     {
         private static readonly string _storageApiVersion = "2018-02-01";
+
+        internal static Func<Func<Task<object>>, Task<object>> ArmCallOverrideAsync { get; set; }
 
         internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null, Func<Site, string, string, Task<Site>> loadFunction = null)
         {
@@ -288,20 +290,63 @@ namespace Azure.Functions.Cli.Helpers
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
             foreach (var subscription in subscriptions)
             {
-                var storageAccount =
-                    await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
-                        HttpMethod.Get,
-                        ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(managementURL, new
-                        {
-                            subscriptionId = subscription.SubscriptionId,
-                            resourceName = storageAccountName,
-                            resourceType = "Microsoft.Storage/storageAccounts"
-                        }),
-                        accessToken);
-
-                if (storageAccount.Value.Any())
+                try
                 {
-                    return await GetStorageAccount(storageAccount.Value.First(), accessToken, managementURL);
+                    // List all storage accounts in the subscription
+                    var listUrl = new Uri(
+                        $"{managementURL}/subscriptions/{subscription.SubscriptionId}" +
+                        $"/providers/Microsoft.Storage/storageAccounts" +
+                        $"?api-version={_storageApiVersion}");
+
+                    var accounts =
+                        await ExecuteArmCallAsync(() => ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
+                            HttpMethod.Get,
+                            listUrl,
+                            accessToken));
+
+                    if (accounts?.Value == null || !accounts.Value.Any())
+                    {
+                        continue;
+                    }
+
+                    // Filter in-memory by storage account name
+                    var match = accounts?.Value?
+                        .FirstOrDefault(a => string.Equals(
+                            a.Name,
+                            storageAccountName,
+                            StringComparison.OrdinalIgnoreCase));
+
+                    if (match == null)
+                    {
+                        continue;
+                    }
+
+                    var resourceGroup = ExtractResourceGroupFromId(match.Id);
+
+                    // Fetch storage account using RG-specific endpoint
+                    var getUrl = new Uri(
+                        $"{managementURL}/subscriptions/{subscription.SubscriptionId}" +
+                        $"/resourceGroups/{resourceGroup}" +
+                        $"/providers/Microsoft.Storage/storageAccounts/{storageAccountName}" +
+                        $"?api-version={_storageApiVersion}");
+
+                    var storageAccount =
+                        await ArmHttpAsync<ArmWrapper<ArmGenericResource>>(
+                            HttpMethod.Get,
+                            getUrl,
+                            accessToken);
+
+                    if (storageAccount != null)
+                    {
+                        return await GetStorageAccount(storageAccount, accessToken, managementURL);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
+                    }
                 }
             }
 
@@ -758,6 +803,32 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return null;
             }
+        }
+
+        private static string ExtractResourceGroupFromId(string resourceId)
+        {
+            var parts = resourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i].Equals("resourceGroups", StringComparison.OrdinalIgnoreCase))
+                {
+                    return parts[i + 1];
+                }
+            }
+
+            throw new InvalidOperationException("Resource group not found in resource ID");
+        }
+
+        private static async Task<T> ExecuteArmCallAsync<T>(Func<Task<T>> actualCall)
+        {
+            if (ArmCallOverrideAsync != null)
+            {
+                var result = await ArmCallOverrideAsync(() => actualCall().ContinueWith(t => (object)t.Result));
+                return (T)result;
+            }
+
+            return await actualCall();
         }
     }
 }
