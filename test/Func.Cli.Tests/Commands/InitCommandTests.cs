@@ -21,7 +21,7 @@ public class InitCommandTests
         var cmd = new InitCommand(_interaction);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
-        Assert.Contains("--worker-runtime", optionNames);
+        Assert.Contains("--stack", optionNames);
         Assert.Contains("--name", optionNames);
         Assert.Contains("--language", optionNames);
         Assert.Contains("--force", optionNames);
