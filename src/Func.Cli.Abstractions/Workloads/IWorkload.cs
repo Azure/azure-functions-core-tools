@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// Implemented by a workload's entry-point class. The CLI loader instantiates
 /// the type named by the workload's manifest (<c>workload.json</c>
 /// <c>entryPoint</c>), then invokes <see cref="Configure"/> so the workload
-/// can register its services with <see cref="IFunctionsCliBuilder"/>.
+/// can register its services with <see cref="FunctionsCliBuilder"/>.
 ///
 /// Mirrors the shape of WebJobs' <c>IWebJobsStartup</c>. Implementations must
 /// have a parameterless constructor.
@@ -28,13 +28,6 @@ public interface IWorkload
     /// </summary>
     public string PackageVersion { get; }
 
-    /// <summary>
-    /// Workload category (stack / tool / extension). Surfaces in
-    /// <c>func workload list</c> and lets the CLI group or filter workloads
-    /// by kind.
-    /// </summary>
-    public WorkloadType Type { get; }
-
     /// <summary>Human-readable name shown in <c>func workload list</c>.</summary>
     public string DisplayName { get; }
 
@@ -45,5 +38,5 @@ public interface IWorkload
     /// Registers the workload's services with the host. Called once during
     /// CLI bootstrap, before the root command tree is built.
     /// </summary>
-    public void Configure(IFunctionsCliBuilder builder);
+    public void Configure(FunctionsCliBuilder builder);
 }

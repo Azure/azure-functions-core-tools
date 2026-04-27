@@ -40,10 +40,14 @@ if (CliTelemetry.TryGetConnectionString(out var connectionString))
             .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
 }
 
+// Register built-in commands so they flow through DI alongside any
+// workload-contributed commands.
+hostBuilder.Services.AddBuiltInCommands();
+
 // Let installed workloads contribute services. The builder exposes the same
 // IServiceCollection the host uses, so anything a workload registers is
 // resolvable when commands are built below.
-WorkloadRegistration.RegisterWorkloads(new FunctionsCliBuilder(hostBuilder.Services));
+WorkloadRegistration.RegisterWorkloads(new DefaultFunctionsCliBuilder(hostBuilder.Services));
 
 using var host = hostBuilder.Build();
 

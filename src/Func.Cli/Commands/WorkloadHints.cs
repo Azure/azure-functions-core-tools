@@ -18,26 +18,26 @@ internal static class WorkloadHints
     {
         if (installedStacks.Count == 0)
         {
-            interaction.WriteError($"No language workloads installed.");
+            interaction.WriteError("No stacks installed.");
             interaction.WriteBlankLine();
-            interaction.WriteHint($"Install a workload to {actionDescription}:");
+            interaction.WriteHint($"Install a stack to {actionDescription}:");
             interaction.WriteBlankLine();
             Common.Stacks.WriteWorkloadInstallHints(interaction);
             interaction.WriteBlankLine();
             interaction.WriteLine(l => l
                 .Muted("Run ")
                 .Command("func workload search")
-                .Muted(" to discover available workloads."));
+                .Muted(" to discover available stacks."));
             return;
         }
 
         if (requestedStack is not null)
         {
-            interaction.WriteError($"No installed workload supports stack '{requestedStack}'.");
+            interaction.WriteError($"No installed stack matches '{requestedStack}'.");
         }
         else
         {
-            interaction.WriteError("No stack specified and the installed workloads couldn't be auto-selected.");
+            interaction.WriteHint("Multiple stacks installed; pass --stack <name> to choose.");
         }
 
         interaction.WriteBlankLine();

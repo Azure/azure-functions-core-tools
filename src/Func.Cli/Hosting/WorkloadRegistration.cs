@@ -16,14 +16,15 @@ namespace Azure.Functions.Cli.Hosting;
 ///
 /// At this stage the loader/installer haven't landed yet.
 /// <see cref="RegisterWorkloads"/> registers an empty
-/// <see cref="InstalledWorkload"/> list so DI consumers (e.g.
+/// <see cref="WorkloadInfo"/> list so DI consumers (e.g.
 /// <c>func workload list</c>) get a deterministic empty result; the real
 /// loader will replace this in a follow-up PR.
 /// </summary>
 internal static class WorkloadRegistration
 {
-    public static void RegisterWorkloads(IFunctionsCliBuilder builder)
+    public static void RegisterWorkloads(FunctionsCliBuilder builder)
     {
-        builder.Services.AddSingleton<IReadOnlyList<InstalledWorkload>>(Array.Empty<InstalledWorkload>());
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>());
     }
 }

@@ -17,7 +17,7 @@ internal class InitCommand : BaseCommand
 {
     public static readonly Option<string?> StackOption = new("--stack", "-s")
     {
-        Description = "The stack for the project (e.g. dotnet, node, python)"
+        Description = "The stack to use. Run `func workload list` to see what's installed."
     };
 
     public static readonly Option<string?> NameOption = new("--name", "-n")
@@ -44,8 +44,25 @@ internal class InitCommand : BaseCommand
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
+        ArgumentNullException.ThrowIfNull(initializers);
+
         _interaction = interaction;
         _initializers = initializers.ToList();
+
+        // Two workloads claiming the same stack is unrecoverable — `--stack`
+        // would be ambiguous and auto-select would silently pick whichever DI
+        // returned first. Fail fast at startup with a clear message instead.
+        var dupes = _initializers
+            .GroupBy(i => i.Stack, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+        if (dupes.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Multiple workloads register an IProjectInitializer for the same stack: {string.Join(", ", dupes)}. " +
+                "Each stack must be owned by exactly one workload.");
+        }
 
         AddPathArgument();
         Options.Add(StackOption);

@@ -10,11 +10,12 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// inspection, and updates. Today the only subcommand wired in is
 /// <see cref="WorkloadListCommand"/>; install / uninstall land in a follow-up PR.
 /// </summary>
-public class WorkloadCommand : Command
+internal sealed class WorkloadCommand : Command
 {
     public WorkloadCommand(WorkloadListCommand listCommand)
         : base("workload", "Manage Func CLI workloads.")
     {
+        ArgumentNullException.ThrowIfNull(listCommand);
         Subcommands.Add(listCommand);
     }
 }

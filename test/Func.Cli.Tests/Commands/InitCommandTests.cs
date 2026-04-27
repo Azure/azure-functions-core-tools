@@ -30,7 +30,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_RegisteredInParser()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
         Assert.Contains("init", names);

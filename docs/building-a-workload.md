@@ -17,7 +17,7 @@ This guide walks through building a workload for the Azure Functions Core Tools 
 ┌─────────────────────────────────┐
 │  Func.Cli.Abstractions          │
 │  NuGet package with interfaces  │
-│  IWorkload, IFunctionsCliBuilder│
+│  IWorkload, FunctionsCliBuilder│
 │  IProjectInitializer, …         │
 └──────────┬──────────────────────┘
            │ referenced by (compile-time)
@@ -34,7 +34,7 @@ This guide walks through building a workload for the Azure Functions Core Tools 
 
 ## How a Workload Plugs In
 
-The CLI builds a `HostApplicationBuilder` at startup. Each installed workload is loaded into its own `AssemblyLoadContext`, instantiated, and handed an `IFunctionsCliBuilder`:
+The CLI builds a `HostApplicationBuilder` at startup. Each installed workload is loaded into its own `AssemblyLoadContext`, instantiated, and handed a `FunctionsCliBuilder`:
 
 ```
 1. CLI builds the host (HostApplicationBuilder)
@@ -49,7 +49,7 @@ The CLI builds a `HostApplicationBuilder` at startup. Each installed workload is
 4. Command dispatch
 ```
 
-The shape mirrors WebJobs' `IWebJobsStartup` — `Configure(IFunctionsCliBuilder)` is the workload's only seam, and everything beyond it is plain .NET DI.
+The shape mirrors WebJobs' `IWebJobsStartup` — `Configure(FunctionsCliBuilder)` is the workload's only seam, and everything beyond it is plain .NET DI.
 
 ## Quick Start
 
@@ -109,11 +109,10 @@ public sealed class NodeWorkload : IWorkload
 {
     public string PackageId      => "Azure.Functions.Cli.Workload.Node";
     public string PackageVersion => "1.0.0";   // typically read from assembly metadata
-    public WorkloadType Type     => WorkloadType.Stack;
     public string DisplayName    => "Node.js";
     public string Description    => "func init / func new / func pack support for Node.js and TypeScript.";
 
-    public void Configure(IFunctionsCliBuilder builder)
+    public void Configure(FunctionsCliBuilder builder)
     {
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         // builder.Services.AddSingleton<Command>(new NodeTopLevelCommand());
@@ -122,7 +121,7 @@ public sealed class NodeWorkload : IWorkload
 }
 ```
 
-The properties surface in `func workload list`. `Type` is a hint for grouping/filtering (`Stack`, `Tool`, or `Extension`).
+The properties surface in `func workload list`.
 
 ## Step 3: Implement IProjectInitializer
 
@@ -209,11 +208,10 @@ public sealed class DurableWorkload : IWorkload
 {
     public string PackageId      => "Azure.Functions.Cli.Workload.Durable";
     public string PackageVersion => "1.0.0";
-    public WorkloadType Type     => WorkloadType.Extension;
     public string DisplayName    => "Durable Functions";
     public string Description    => "Durable Functions management commands.";
 
-    public void Configure(IFunctionsCliBuilder builder)
+    public void Configure(FunctionsCliBuilder builder)
     {
         builder.Services.AddSingleton<Command>(new DurableCommand());
     }
@@ -251,9 +249,9 @@ public void Configure_RegistersInitializer()
     Assert.IsType<NodeProjectInitializer>(initializers[0]);
 }
 
-private sealed class TestBuilder(IServiceCollection services) : IFunctionsCliBuilder
+private sealed class TestBuilder(IServiceCollection services) : FunctionsCliBuilder
 {
-    public IServiceCollection Services { get; } = services;
+    public override IServiceCollection Services { get; } = services;
 }
 ```
 
@@ -274,7 +272,7 @@ Add path-scoped public + official CI pipelines in `eng/ci/` (mirror the abstract
 
 - [ ] New project in `src/Func.Cli.Workload.<Name>/`, references `Func.Cli.Abstractions` only
 - [ ] `IWorkload` with parameterless constructor and the five identity properties (`PackageId`, `PackageVersion`, `Type`, `DisplayName`, `Description`)
-- [ ] `Configure(IFunctionsCliBuilder)` registers an `IProjectInitializer` and/or top-level `Command` services
+- [ ] `Configure(FunctionsCliBuilder)` registers an `IProjectInitializer` and/or top-level `Command` services
 - [ ] `IProjectInitializer.GetInitOptions()` returns any extra options the initializer needs
 - [ ] Test project in `test/Func.Cli.Workload.<Name>.Tests/`
 - [ ] `Directory.Build.props`, `Directory.Build.targets`, `Directory.Version.props` created

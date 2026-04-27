@@ -4,21 +4,20 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Render-ready view of a workload entry from the global manifest
-/// (<c>~/.azure-functions/workloads.json</c>). Populated by the install /
-/// discovery layer; consumed by <c>func workload list</c> and other
-/// commands that need to describe what's available.
+/// CLI-side view of a workload entry from the global manifest
+/// (<c>~/.azure-functions/workloads.json</c>). Hydrated by the install /
+/// discovery layer; consumed by <c>func workload list</c> and other commands
+/// that need to describe what's available. Internal — workload authors
+/// implement <see cref="IWorkload"/>; they don't see this type.
 /// </summary>
 /// <param name="PackageId">NuGet package id (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>).</param>
+/// <param name="PackageVersion">Installed package version. Same field name as <see cref="IWorkload.PackageVersion"/>.</param>
 /// <param name="DisplayName">Human-readable name.</param>
 /// <param name="Description">One-line description.</param>
 /// <param name="Aliases">User-facing tokens accepted by <c>-s</c> (e.g. <c>["dotnet", "dotnet-isolated"]</c>).</param>
-/// <param name="Version">Installed package version.</param>
-/// <param name="Type">Workload category (stack / tool / extension).</param>
-public sealed record InstalledWorkload(
+internal sealed record WorkloadInfo(
     string PackageId,
+    string PackageVersion,
     string DisplayName,
     string Description,
-    IReadOnlyList<string> Aliases,
-    string Version,
-    WorkloadType Type);
+    IReadOnlyList<string> Aliases);

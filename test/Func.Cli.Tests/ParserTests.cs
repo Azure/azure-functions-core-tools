@@ -20,7 +20,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_ReturnsRootCommand()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = TestParser.CreateRoot(_interaction);
 
         Assert.NotNull(root);
         Assert.IsType<FuncRootCommand>(root);
@@ -29,7 +29,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_HasExpectedSubcommands()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
         Assert.Contains("version", names);
@@ -39,7 +39,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_HasGlobalOptions()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = TestParser.CreateRoot(_interaction);
         var optionNames = root.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--verbose", optionNames);
@@ -50,7 +50,7 @@ public class ParserTests
     [InlineData("help")]
     public void Parse_ValidCommand_DoesNotProduceErrors(string commandName)
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = TestParser.CreateRoot(_interaction);
         var result = root.Parse(commandName);
 
         Assert.Empty(result.Errors);

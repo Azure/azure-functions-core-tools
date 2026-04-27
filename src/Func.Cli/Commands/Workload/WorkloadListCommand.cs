@@ -9,20 +9,14 @@ namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
 /// Lists workloads recorded in the global manifest. Source of truth is
-/// <see cref="InstalledWorkload"/>, populated by the install / discovery
-/// layer from each package's <c>workload.json</c>.
+/// <see cref="WorkloadInfo"/>, populated by the install / discovery layer
+/// from each package's <c>workload.json</c>.
 /// </summary>
-public class WorkloadListCommand : BaseCommand
+internal sealed class WorkloadListCommand(IInteractionService interaction, IReadOnlyList<WorkloadInfo> workloads)
+    : BaseCommand("list", "List installed workloads.")
 {
-    private readonly IInteractionService _interaction;
-    private readonly IReadOnlyList<InstalledWorkload> _workloads;
-
-    public WorkloadListCommand(IInteractionService interaction, IReadOnlyList<InstalledWorkload> workloads)
-        : base("list", "List installed workloads.")
-    {
-        _interaction = interaction;
-        _workloads = workloads;
-    }
+    private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+    private readonly IReadOnlyList<WorkloadInfo> _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
@@ -35,14 +29,13 @@ public class WorkloadListCommand : BaseCommand
         var rows = _workloads.Select(w => new[]
         {
             w.PackageId,
-            w.Type.ToString(),
             w.Aliases.Count == 0 ? "—" : string.Join(", ", w.Aliases),
             w.DisplayName,
             w.Description,
-            w.Version,
+            w.PackageVersion,
         });
 
-        _interaction.WriteTable(["Package", "Type", "Aliases", "Name", "Description", "Version"], rows);
+        _interaction.WriteTable(["Package", "Aliases", "Name", "Description", "Version"], rows);
         return Task.FromResult(0);
     }
 }

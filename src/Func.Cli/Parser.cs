@@ -4,70 +4,51 @@
 using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Console;
-using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli;
 
 /// <summary>
-/// Assembles the root command tree from DI. Built-in commands are still
-/// constructed explicitly here (composition root) so the tree is deterministic;
-/// workloads contribute either via DI services consumed by built-in commands
-/// (e.g. <see cref="Workloads.IProjectInitializer"/>) or by registering a
-/// <see cref="Command"/> in DI for entirely new subcommands.
+/// Assembles the root command tree from DI. Every top-level command —
+/// built-in or workload-contributed — is resolved as a <see cref="Command"/>
+/// from the container so the composition path is uniform. HelpCommand is
+/// constructed inline because it needs a back-reference to the constructed
+/// root.
 /// </summary>
 internal static class Parser
 {
     /// <summary>
-    /// Convenience overload for tests/scenarios that don't need workloads —
-    /// builds a minimal service provider with just the supplied interaction service.
-    /// </summary>
-    public static FuncRootCommand CreateCommand(IInteractionService interaction)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(interaction);
-        services.AddSingleton<IReadOnlyList<InstalledWorkload>>(Array.Empty<InstalledWorkload>());
-        return CreateCommand(services.BuildServiceProvider());
-    }
-
-    /// <summary>
-    /// Creates and configures the root CLI command, resolving built-in commands
-    /// from <paramref name="services"/> and inviting workload providers to
-    /// add their own subcommands.
+    /// Creates and configures the root CLI command, resolving all
+    /// <see cref="Command"/> services from <paramref name="services"/>.
+    /// Throws if two registered commands share a name.
     /// </summary>
     public static FuncRootCommand CreateCommand(IServiceProvider services)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         var interaction = services.GetRequiredService<IInteractionService>();
         var rootCommand = new FuncRootCommand();
 
+        // HelpCommand needs the constructed root, so it can't be DI-resolved
+        // ahead of the root. Built inline and added first.
         var helpCommand = new HelpCommand(interaction, rootCommand);
-        var versionCommand = new VersionCommand(interaction);
-        var initCommand = ActivatorUtilities.CreateInstance<InitCommand>(services);
-        var newCommand = new NewCommand(interaction);
-        var packCommand = new PackCommand(interaction);
-        var startCommand = new StartCommand(interaction);
-
-        var workloadListCommand = ActivatorUtilities.CreateInstance<WorkloadListCommand>(services);
-        var workloadCommand = new WorkloadCommand(workloadListCommand);
-
-        rootCommand.Subcommands.Add(versionCommand);
         rootCommand.Subcommands.Add(helpCommand);
-        rootCommand.Subcommands.Add(initCommand);
-        rootCommand.Subcommands.Add(newCommand);
-        rootCommand.Subcommands.Add(packCommand);
-        rootCommand.Subcommands.Add(startCommand);
-        rootCommand.Subcommands.Add(workloadCommand);
 
-        // Workloads contribute new top-level subcommands by registering
-        // Command instances in DI (e.g. builder.Services.AddSingleton<Command>(new MyCommand())).
-        // Built-ins above are constructed inline rather than registered, so we
-        // never double-add them here.
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
         foreach (var command in services.GetServices<Command>())
         {
+            if (!seenNames.Add(command.Name))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate top-level command name '{command.Name}'. " +
+                    "A workload registered a Command that collides with a built-in or another workload.");
+            }
+
             rootCommand.Subcommands.Add(command);
         }
+
+        var versionCommand = services.GetRequiredService<VersionCommand>();
 
         ReplaceHelpAction(rootCommand, helpCommand);
         ConfigureRootAction(rootCommand, helpCommand, versionCommand);

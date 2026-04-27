@@ -1,0 +1,42 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.CommandLine;
+using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Workload;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Azure.Functions.Cli.Hosting;
+
+/// <summary>
+/// Registers the CLI's built-in top-level commands with DI so they flow
+/// through the same composition path as workload-contributed commands.
+/// HelpCommand is the lone exception — it requires the constructed root as
+/// a back-reference, so Parser builds it after assembling the tree.
+/// </summary>
+internal static class BuiltInCommands
+{
+    public static IServiceCollection AddBuiltInCommands(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // VersionCommand is also resolved by Parser to wire `func` (no args)
+        // to detailed-version output, so register the concrete type and
+        // surface it as a top-level Command.
+        services.AddSingleton<VersionCommand>();
+        services.AddSingleton<Command>(sp => sp.GetRequiredService<VersionCommand>());
+
+        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<InitCommand>(sp));
+        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<NewCommand>(sp));
+        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<PackCommand>(sp));
+        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<StartCommand>(sp));
+
+        // WorkloadCommand has WorkloadListCommand as a subcommand. Register
+        // the list command as its own concrete type (not as Command) so it
+        // doesn't get added at the top level by GetServices<Command>().
+        services.AddSingleton<WorkloadListCommand>();
+        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<WorkloadCommand>(sp));
+
+        return services;
+    }
+}

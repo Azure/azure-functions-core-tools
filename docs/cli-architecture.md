@@ -205,18 +205,19 @@ The abstractions library exposes the surface workload authors program against:
 
 | Type | Role |
 |------|------|
-| `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `Type`, `DisplayName`, `Description`) plus `Configure(IFunctionsCliBuilder)`. |
-| `IFunctionsCliBuilder` | The DI seam handed to a workload — exposes `IServiceCollection` for service registration. |
+| `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
+| `FunctionsCliBuilder` | The DI seam handed to a workload — exposes `IServiceCollection` for service registration. Abstract base so we can grow the surface without breaking workloads. |
 | `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `SupportedLanguages`, contributes init options, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
 | `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
-| `InstalledWorkload` | Render-ready record consumed by `func workload list`. |
-| `WorkloadType` | `Stack` / `Tool` / `Extension` — categorization for `func workload list`. |
+
+`WorkloadInfo` (the render-ready manifest entry consumed by `func workload list`) is a CLI-internal type — workload authors don't see it.
 
 ### Lifecycle
 
 ```
 Configure (CLI startup):
   HostApplicationBuilder
+    ├── services.AddBuiltInCommands()       ← built-ins enter DI here
     └── WorkloadRegistration.RegisterWorkloads(builder)
         ├── Discover installed workloads               ← future PR (loader)
         ├── Activate each IWorkload type
@@ -225,12 +226,11 @@ Configure (CLI startup):
                 builder.Services.AddSingleton<Command>(new MyTopLevelCommand())  // optional
 
 Build commands (Parser.CreateCommand):
-  ├── Resolve InitCommand from DI
-  │   ├── Inject IEnumerable<IProjectInitializer>
-  │   └── Each initializer's GetInitOptions() are added to func init
-  ├── Resolve WorkloadListCommand from DI
-  │   └── Inject IReadOnlyList<InstalledWorkload>
-  └── Add every Command registered in DI as a root subcommand
+  ├── Pull every Command from DI (built-ins + workload-contributed)
+  ├── Validate names are unique (throws on collision)
+  ├── InitCommand sees IEnumerable<IProjectInitializer>, attaches their options
+  ├── WorkloadListCommand sees IReadOnlyList<WorkloadInfo>
+  └── HelpCommand built last with a back-reference to the constructed root
 
 Invoke (when the user runs a command):
   └── func init resolves the right IProjectInitializer (by --stack / single-installed / prompt)
@@ -239,10 +239,10 @@ Invoke (when the user runs a command):
 
 ### Empty State (Today)
 
-Until the loader lands, `WorkloadRegistration.RegisterWorkloads` registers an empty `IReadOnlyList<InstalledWorkload>`. With no workloads installed:
+Until the loader lands, `WorkloadRegistration.RegisterWorkloads` registers an empty `IReadOnlyList<WorkloadInfo>`. With no workloads installed:
 
 - `func workload list` prints `No workloads installed.`
-- `func init` prints "No language workloads installed." and a hint to install one (exit code 1).
+- `func init` prints "No stacks installed." and a hint to install one (exit code 1).
 - `func new` and `func pack` continue to work the same way they do on `vnext`.
 
 ## Error Handling

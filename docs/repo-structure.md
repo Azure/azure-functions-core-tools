@@ -43,7 +43,7 @@ The main tool users install and run. Assembly name is `func`.
 | `Commands/Workload/` | `func workload` parent command + `func workload list` |
 | `Console/`         | `IInteractionService` abstraction + Spectre.Console implementation, theme |
 | `Common/`          | Shared utilities — `Constants`, `Stacks` (stack registry), `VersionChecker` |
-| `Hosting/`         | `FunctionsCliBuilder` (internal `IFunctionsCliBuilder` impl) and `WorkloadRegistration` (workload bootstrap seam) |
+| `Hosting/`         | `DefaultFunctionsCliBuilder` (internal `FunctionsCliBuilder` impl), `BuiltInCommands` DI registrations, and `WorkloadRegistration` (workload bootstrap seam) |
 | `Telemetry/`       | `CliTelemetry` (ActivitySource + Meter), Azure Monitor exporter wiring, activity / metric extensions |
 | `Program.cs`       | Entry point — host, telemetry, command tree, error handling |
 | `Parser.cs`        | Command tree composition — resolves built-ins from DI, picks up workload-contributed `Command` services, wires Spectre help |
@@ -55,11 +55,10 @@ A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public
 | File / Type | Role |
 |-------------|------|
 | `Common/GracefulException` | User-friendly exception with optional verbose detail; drives non-zero exit codes |
-| `Workloads/IWorkload` | Workload entry point — identity properties + `Configure(IFunctionsCliBuilder)` |
-| `Workloads/IFunctionsCliBuilder` | DI seam — exposes `IServiceCollection` to workloads |
+| `Workloads/IWorkload` | Workload entry point — identity properties + `Configure(FunctionsCliBuilder)` |
+| `Workloads/FunctionsCliBuilder` | DI seam (abstract base) — exposes `IServiceCollection` to workloads |
 | `Workloads/IProjectInitializer` | `func init` extension point for a stack |
 | `Workloads/WorkloadContext`, `InitContext` | Records carrying inputs to providers |
-| `Workloads/InstalledWorkload`, `WorkloadType` | View model + categorization for `func workload list` |
 
 ## Build System
 
