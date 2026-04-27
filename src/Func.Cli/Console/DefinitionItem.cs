@@ -7,4 +7,4 @@ namespace Azure.Functions.Cli.Console;
 /// A label + description pair rendered as an aligned row in a definition list
 /// (used for command listings, option listings, etc.).
 /// </summary>
-public readonly record struct DefinitionItem(string Label, string Description);
+internal readonly record struct DefinitionItem(string Label, string Description);

@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Console;
 /// stderr; all other output goes to stdout.
 /// </para>
 /// </remarks>
-public interface IInteractionService
+internal interface IInteractionService
 {
     /// <summary>Active visual theme. Exposed so callers can use ad-hoc styles where needed.</summary>
     public ITheme Theme { get; }

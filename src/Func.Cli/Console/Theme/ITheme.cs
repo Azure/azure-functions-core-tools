@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Console.Theme;
 /// Swapping implementations (e.g. a no-color theme) requires no changes in
 /// command or help code.
 /// </summary>
-public interface ITheme
+internal interface ITheme
 {
     /// <summary>Product and section titles (e.g. "Azure Functions CLI").</summary>
     public Style Title { get; }

@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Commands;
 /// Root 'func' command definition. Separate from BaseCommand because RootCommand
 /// has distinct behavior (no-args → help, global options, version display).
 /// </summary>
-public class FuncRootCommand : RootCommand
+internal class FuncRootCommand : RootCommand
 {
     public static readonly Option<bool> VerboseOption = new("--verbose", "-v")
     {

@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Console;
 /// Rich console implementation backed by Spectre.Console. All styled output
 /// flows through <see cref="ITheme"/>.
 /// </summary>
-public class SpectreInteractionService : IInteractionService
+internal class SpectreInteractionService : IInteractionService
 {
     private readonly IAnsiConsole _stdout;
     private readonly IAnsiConsole _stderr;

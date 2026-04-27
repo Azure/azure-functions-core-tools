@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands;
 /// The full implementation requires a language workload — this defines
 /// the command skeleton and options.
 /// </summary>
-public class PackCommand : BaseCommand
+internal class PackCommand : BaseCommand
 {
     public static readonly Option<string?> OutputOption = new("--output", "-o")
     {

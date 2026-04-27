@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Console;
 /// Typical use via <c>IInteractionService.WriteLine(l =&gt; l.Muted("Run ").Command("func new"))</c>.
 /// The builder itself is just a segment accumulator; rendering is performed by the interaction service.
 /// </remarks>
-public sealed class InlineLine
+internal sealed class InlineLine
 {
     private readonly ITheme _theme;
     private readonly List<Segment> _segments = new();

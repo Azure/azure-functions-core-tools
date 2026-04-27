@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Common;
 /// <summary>
 /// Central registry of stacks (language / runtime targets) and their supported languages.
 /// </summary>
-public static class Stacks
+internal static class Stacks
 {
     public static readonly FrozenDictionary<string, string[]> LanguageMap =
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)

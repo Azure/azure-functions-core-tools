@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Commands;
 /// <summary>
 /// Launches the Azure Functions host runtime via 'func start'.
 /// </summary>
-public class StartCommand : BaseCommand
+internal class StartCommand : BaseCommand
 {
     public static readonly Option<int?> PortOption = new("--port", "-p")
     {

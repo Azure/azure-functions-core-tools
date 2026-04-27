@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Commands;
 /// constructor and ApplyPath(parseResult) in their execute method to support
 /// 'func start [path]', 'func init [path]', etc.
 /// </summary>
-public abstract class BaseCommand : Command
+internal abstract class BaseCommand : Command
 {
     /// <summary>
     /// Shared path argument definition for commands that need project directory support.

@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Console.Theme;
 /// <summary>
 /// Default color theme. Preserves the palette used prior to the theming refactor.
 /// </summary>
-public sealed class DefaultTheme : ITheme
+internal sealed class DefaultTheme : ITheme
 {
     public Style Title { get; } = new(Color.Blue, decoration: Decoration.Bold);
 

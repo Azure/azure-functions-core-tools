@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace Azure.Functions.Cli.Common;
 
-public static class Constants
+internal static class Constants
 {
     public const string ProductName = "Azure Functions CLI";
     public const string CliName = "func";

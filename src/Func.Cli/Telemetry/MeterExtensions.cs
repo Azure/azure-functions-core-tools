@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Telemetry;
 /// <see cref="MeterListener"/> is subscribed, the underlying instruments are
 /// effectively no-ops, so callers do not need to branch on opt-out state.
 /// </remarks>
-public static class MeterExtensions
+internal static class MeterExtensions
 {
     private static readonly Counter<long> _commandCount =
         CliTelemetry.Metric.CreateCounter<long>(
