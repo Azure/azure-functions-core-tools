@@ -52,6 +52,7 @@ public class StartCommand : BaseCommand
     public StartCommand(IInteractionService interaction)
         : base("start", "Launch the Azure Functions host runtime.")
     {
+        ArgumentNullException.ThrowIfNull(interaction);
         _interaction = interaction;
 
         AddPathArgument();

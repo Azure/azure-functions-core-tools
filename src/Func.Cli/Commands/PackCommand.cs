@@ -28,6 +28,7 @@ public class PackCommand : BaseCommand
     public PackCommand(IInteractionService interaction)
         : base("pack", "Package the function app into a zip ready for deployment.")
     {
+        ArgumentNullException.ThrowIfNull(interaction);
         _interaction = interaction;
 
         AddPathArgument();

@@ -38,6 +38,7 @@ public class InitCommand : BaseCommand
     public InitCommand(IInteractionService interaction)
         : base("init", "Initialize a new Azure Functions project.")
     {
+        ArgumentNullException.ThrowIfNull(interaction);
         _interaction = interaction;
 
         AddPathArgument();

@@ -11,14 +11,9 @@ namespace Azure.Functions.Cli.Commands;
 /// so that --help, -h, and -? all render uniform Spectre-based output.
 /// Uses the HelpCommand's renderer to generate help from real Command metadata.
 /// </summary>
-internal sealed class SpectreHelpAction : SynchronousCommandLineAction
+internal sealed class SpectreHelpAction(HelpCommand helpCommand) : SynchronousCommandLineAction
 {
-    private readonly HelpCommand _helpCommand;
-
-    public SpectreHelpAction(HelpCommand helpCommand)
-    {
-        _helpCommand = helpCommand;
-    }
+    private readonly HelpCommand _helpCommand = helpCommand ?? throw new ArgumentNullException(nameof(helpCommand));
 
     public override int Invoke(ParseResult parseResult)
     {
