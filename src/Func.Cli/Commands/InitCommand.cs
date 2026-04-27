@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands;
 /// Initializes a new Azure Functions project. The full implementation requires
 /// a language workload to be installed — this defines the command skeleton and options.
 /// </summary>
-public class InitCommand : BaseCommand
+internal class InitCommand : BaseCommand
 {
     public static readonly Option<string?> StackOption = new("--stack", "-s")
     {

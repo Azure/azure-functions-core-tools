@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli;
 /// (commands are constructed here, not auto-discovered) so the command
 /// tree is deterministic and easy to reason about.
 /// </summary>
-public static class Parser
+internal static class Parser
 {
     /// <summary>
     /// Creates and configures the root CLI command with all subcommands registered.

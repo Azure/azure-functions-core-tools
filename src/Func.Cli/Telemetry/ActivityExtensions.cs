@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Telemetry;
 /// <see cref="OpenTelemetry.Resources.ResourceBuilder"/> and inherited by
 /// every span — they should not be set per span here.
 /// </remarks>
-public static class ActivityExtensions
+internal static class ActivityExtensions
 {
     extension(ActivitySource source)
     {

@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Telemetry;
 /// listener is subscribed and the .NET diagnostic APIs are effectively
 /// no-ops — so call sites stay free of opt-out branches.
 /// </remarks>
-public static class CliTelemetry
+internal static class CliTelemetry
 {
     /// <summary>
     /// OTel source / service name. Lowercase, dotted form to match the

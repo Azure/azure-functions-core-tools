@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Tests;
 /// so tests can assert on both content and role.
 /// Interactive methods return defaults (non-interactive mode).
 /// </summary>
-public class TestInteractionService : IInteractionService
+internal class TestInteractionService : IInteractionService
 {
     private readonly List<string> _lines = new();
 
