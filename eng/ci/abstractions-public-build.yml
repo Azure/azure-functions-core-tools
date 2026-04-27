@@ -45,6 +45,7 @@ extends:
          runSourceLanguagesInSourceAnalysis: true
     settings:
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
+      networkIsolationPolicy: Preferred, GitHub, NuGet
 
     stages:
       - stage: Build
