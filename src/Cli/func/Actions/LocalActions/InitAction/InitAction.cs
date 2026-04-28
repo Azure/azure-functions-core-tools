@@ -71,6 +71,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool SkipNpmInstall { get; set; } = false;
 
+        public bool SkipGoModTidy { get; set; } = false;
+
         public WorkerRuntime ResolvedWorkerRuntime { get; set; }
 
         public string ResolvedLanguage { get; set; }
@@ -139,13 +141,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(tf => TargetFramework = tf);
 
             Parser
-                .Setup<string>("language")
+                .Setup<string>('l', "language")
                 .SetDefault(null)
                 .Callback(l => Language = l);
 
             Parser
                 .Setup<bool>("skip-npm-install")
                 .Callback(skip => SkipNpmInstall = skip);
+
+            Parser
+                .Setup<bool>("skip-go-mod-tidy")
+                .Callback(skip => SkipGoModTidy = skip);
 
             Parser
                 .Setup<string>('m', "model")
@@ -209,6 +215,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
 
+                Utilities.WarnIfGoWorkerRuntime(ResolvedWorkerRuntime);
+
                 // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
                 // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
                 // before attempting to resolve the programming model.
@@ -229,6 +237,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
+            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Go && InitDocker)
+            {
+                throw new CliException("Docker support for the Go worker runtime is not yet available.");
+            }
+
             ValidateTargetFramework();
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
@@ -238,7 +251,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation);
+
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Go)
+                {
+                    await GoHelpers.SetupProject(
+                        Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-_"),
+                        SkipGoModTidy);
+                }
+                else
+                {
+                    await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation);
+                }
+
                 await WriteFiles();
 
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
@@ -274,9 +298,27 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (!string.IsNullOrEmpty(workerRuntimeString))
             {
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeString);
-                language = !string.IsNullOrEmpty(languageString)
-                    ? WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString)
-                    : WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntimeString);
+                if (workerRuntime == Helpers.WorkerRuntime.Go)
+                {
+                    return (workerRuntime, string.Empty);
+                }
+
+                if (!string.IsNullOrEmpty(languageString))
+                {
+                    language = WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString);
+                }
+                else if (WorkerRuntimeLanguageHelper.TryNormalizeLanguage(workerRuntimeString, out var inferredLanguage))
+                {
+                    language = inferredLanguage;
+                }
+                else
+                {
+                    language = LanguageSelectionIfRelevant(workerRuntime);
+                    if (string.IsNullOrEmpty(language))
+                    {
+                        language = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
+                    }
+                }
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
@@ -292,6 +334,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+                if (workerRuntime == Helpers.WorkerRuntime.Go)
+                {
+                    return (workerRuntime, string.Empty);
+                }
+
                 language = GlobalCoreToolsSettings.CurrentLanguageOrNull
                     ?? (!string.IsNullOrEmpty(languageString) ? WorkerRuntimeLanguageHelper.NormalizeLanguage(languageString) : null)
                     ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
@@ -407,7 +454,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
         {
             string localSettingsJsonContent = await StaticResources.LocalSettingsJson;
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
+
+            // The Go worker is registered with the host under the "native" runtime identifier,
+            // so FUNCTIONS_WORKER_RUNTIME in local.settings.json must be "native" even though
+            // the CLI exposes the runtime as "go" everywhere else.
+            string workerRuntimeSetting = workerRuntime == Helpers.WorkerRuntime.Go
+                ? "native"
+                : WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntimeSetting);
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", Constants.StorageEmulatorConnectionString);
 
             if (workerRuntime == Helpers.WorkerRuntime.Powershell)
@@ -489,6 +543,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (workerRuntime == Helpers.WorkerRuntime.Custom)
             {
                 await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCustom);
+            }
+            else if (workerRuntime == Helpers.WorkerRuntime.Go)
+            {
+                // Docker support for Go is validated up-front in RunAsync; this branch is unreachable in practice.
+                throw new CliException("Docker support for the Go worker runtime is not yet available.");
             }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
             {

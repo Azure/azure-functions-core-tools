@@ -25,7 +25,9 @@ namespace Azure.Functions.Cli.Helpers
         [DisplayString("powershell")]
         Powershell,
         [DisplayString("custom")]
-        Custom
+        Custom,
+        [DisplayString("go")]
+        Go
     }
 
     public static class WorkerRuntimeLanguageHelper
@@ -38,7 +40,8 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Python, new[] { "py" } },
             { WorkerRuntime.Java, new string[] { } },
             { WorkerRuntime.Powershell, new[] { "pwsh" } },
-            { WorkerRuntime.Custom, new string[] { } }
+            { WorkerRuntime.Custom, new string[] { } },
+            { WorkerRuntime.Go, new[] { "golang" } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
@@ -67,7 +70,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.CSharp, new[] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.FSharp, new[] { "fsharp" } },
             { Constants.Languages.Java, new string[] { } },
-            { Constants.Languages.Custom, new string[] { } }
+            { Constants.Languages.Custom, new string[] { } },
         };
 
         public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = _languageToAlias
@@ -79,7 +82,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             { WorkerRuntime.Node, new[] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
             { WorkerRuntime.Dotnet, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
-            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } }
+            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
         };
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => _availableWorkersRuntime.Keys
@@ -110,6 +113,8 @@ namespace Azure.Functions.Cli.Helpers
                     return "powershell";
                 case WorkerRuntime.Custom:
                     return "custom";
+                case WorkerRuntime.Go:
+                    return "go";
                 default:
                     return "None";
             }
@@ -159,7 +164,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentNullException(nameof(languageString), "language can't be empty");
             }
-            else if (_normalizeMap.ContainsKey(languageString))
+            else if (WorkerRuntimeStringToLanguage.ContainsKey(languageString))
             {
                 return WorkerRuntimeStringToLanguage[languageString];
             }
@@ -167,6 +172,18 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentException($"Language '{languageString}' is not available. Available language strings are {WorkerRuntimeStringToLanguage.Keys}");
             }
+        }
+
+        public static bool TryNormalizeLanguage(string languageString, out string normalized)
+        {
+            if (!string.IsNullOrWhiteSpace(languageString) && WorkerRuntimeStringToLanguage.ContainsKey(languageString))
+            {
+                normalized = WorkerRuntimeStringToLanguage[languageString];
+                return true;
+            }
+
+            normalized = null;
+            return false;
         }
 
         public static IEnumerable<string> LanguagesForWorker(WorkerRuntime worker)
