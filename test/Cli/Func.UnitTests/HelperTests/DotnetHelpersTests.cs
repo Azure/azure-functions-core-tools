@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
         [Theory]
         [InlineData(WorkerRuntime.Dotnet, 20)]
-        [InlineData(WorkerRuntime.DotnetIsolated, 18)]
+        [InlineData(WorkerRuntime.DotnetIsolated, 19)]
         public void GetTemplates_ReturnsExpectedTemplates(WorkerRuntime runtime, int expectedCount)
         {
             var templates = DotnetHelpers.GetTemplates(runtime);

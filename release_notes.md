@@ -1,4 +1,4 @@
-# Azure Functions CLI 4.10.0
+# Azure Functions CLI 4.11.0
 
 #### Host Version
 
@@ -13,3 +13,4 @@
 - Mark Node.js 24 as GA in stacks.json (add Flex Consumption SKU) (#4867)
 - Surface SSL/TLS certificate errors clearly when SSL inspection proxies intercept connections (#4857)
 - Fix `func kubernetes deploy` race condition where `kubectl rollout status` ran before the Deployment was registered, and fix `func kubernetes delete` to honor `--no-docker` instead of failing on registry auth (#4919)
+- Add `McpPromptTrigger` template for dotnet-isolated `func new`
