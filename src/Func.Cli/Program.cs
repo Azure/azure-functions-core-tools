@@ -9,34 +9,41 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
-using OpenTelemetry;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
 ITheme theme = new DefaultTheme();
 IInteractionService interaction = new SpectreInteractionService(theme);
 
-// Wire up the OpenTelemetry SDK only when telemetry is configured (build has
-// a real instrumentation key and the user has not opted out). When it isn't,
-// no listener is subscribed and ActivitySource/Meter calls become no-ops.
-TracerProvider? tracerProvider = null;
-MeterProvider? meterProvider = null;
+// Build the host: a CLI process gets the empty variant so we skip the default
+// configuration and logging providers (they're not needed). The host owns
+// shared lifetimes — currently just the OpenTelemetry pipeline, which is
+// registered as hosted services so flush + shutdown happen via host disposal.
+var hostBuilder = Host.CreateEmptyApplicationBuilder(null);
+hostBuilder.Services.AddSingleton(interaction);
+
+// Wire OpenTelemetry only when a real instrumentation key is baked in and
+// the user hasn't opted out. When it isn't, no listener is subscribed and
+// ActivitySource / Meter calls become no-ops.
 if (CliTelemetry.TryGetConnectionString(out var connectionString))
 {
-    var resourceBuilder = CliTelemetry.CreateResourceBuilder();
-
-    tracerProvider = Sdk.CreateTracerProviderBuilder()
-        .SetResourceBuilder(resourceBuilder)
-        .AddSource(CliTelemetry.SourceName)
-        .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString)
-        .Build();
-
-    meterProvider = Sdk.CreateMeterProviderBuilder()
-        .SetResourceBuilder(resourceBuilder)
-        .AddMeter(CliTelemetry.SourceName)
-        .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString)
-        .Build();
+    hostBuilder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => CliTelemetry.ConfigureResource(r))
+        .WithTracing(t => t
+            .AddSource(CliTelemetry.SourceName)
+            .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString))
+        .WithMetrics(m => m
+            .AddMeter(CliTelemetry.SourceName)
+            .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
 }
+
+using var host = hostBuilder.Build();
+
+// Start the host so hosted services (OTel providers) are running and
+// listeners are subscribed before any command code emits telemetry.
+await host.StartAsync();
 
 // Create the command tree
 var rootCommand = Parser.CreateCommand(interaction);
@@ -103,23 +110,14 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
         stopwatch.Stop();
         CliTelemetry.Metric.RecordCommand(commandName, exitCode, stopwatch.ElapsedMilliseconds);
     }
-} // activity disposed (and stopped) here, before flush
+} // activity disposed (and stopped) here, before host shutdown flushes
 
-try
-{
-    // Print version update notice if available (bounded wait)
-    await PrintVersionNotice(interaction, versionCheckTask);
-}
-finally
-{
-    // Flush + dispose the OTel providers explicitly. The bare ServiceProvider
-    // doesn't own them (they were built outside DI), so we manage them here.
-    tracerProvider?.ForceFlush(3000);
-    meterProvider?.ForceFlush(3000);
-    tracerProvider?.Dispose();
-    meterProvider?.Dispose();
-}
+// Print version update notice if available (bounded wait)
+await PrintVersionNotice(interaction, versionCheckTask);
 
+// Container disposal (triggered by `using var host` going out of scope)
+// disposes the OTel providers, which flushes pending telemetry. No explicit
+// flush needed here.
 return exitCode;
 
 /// <summary>
