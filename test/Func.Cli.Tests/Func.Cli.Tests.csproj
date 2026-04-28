@@ -21,6 +21,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Func.Cli\Func.Cli.csproj" />
+    <ProjectReference Include="..\Func.Cli.Tests.Fixtures.Workload\Func.Cli.Tests.Fixtures.Workload.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <OutputItemType>Content</OutputItemType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

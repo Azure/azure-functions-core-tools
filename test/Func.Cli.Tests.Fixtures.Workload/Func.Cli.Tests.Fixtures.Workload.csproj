@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Azure.Functions.Cli.Tests.Fixtures.Workload</RootNamespace>
+    <AssemblyName>Azure.Functions.Cli.Tests.Fixtures.Workload</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
