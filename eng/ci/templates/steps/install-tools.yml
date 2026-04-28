@@ -38,3 +38,8 @@ steps:
   inputs:
     packageType: sdk
     useGlobalJson: true
+
+- task: GoTool@0
+  inputs:
+    version: '1.24.2'
+  displayName: 'Install Go 1.24.2'

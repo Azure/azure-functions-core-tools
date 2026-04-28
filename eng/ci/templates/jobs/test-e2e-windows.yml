@@ -25,6 +25,9 @@ jobs:
       custom_win_x64:
         languageWorker: 'Custom'
         runtime: 'win-x64'
+      go_win_x64:
+        languageWorker: 'Go'
+        runtime: 'win-x64'
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
