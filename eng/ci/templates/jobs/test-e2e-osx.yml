@@ -33,25 +33,6 @@ jobs:
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
 
-  - bash: |
-      set -e
-      brew install go
-      # Microsoft-hosted macOS-latest agents are Intel; brew puts the go symlink at
-      # /usr/local/bin/go (Apple Silicon would be /opt/homebrew/bin). Prepend both
-      # so this works regardless of which agent we land on.
-      echo "##vso[task.prependpath]/usr/local/bin"
-      echo "##vso[task.prependpath]/opt/homebrew/bin"
-      echo "PATH after install: $PATH"
-      which go
-      go version
-    displayName: 'Install Go'
-
-  - bash: |
-      echo "PATH at test start: $PATH"
-      which go || echo "ERROR: go not on PATH"
-      go version || echo "ERROR: go version failed"
-    displayName: 'Diagnose Go availability'
-
   - script: |
       sudo chown -R $(id -u):$(id -g) ~/.npm
       npm install -g @azure/functions
@@ -74,19 +55,6 @@ jobs:
       chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
       chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
     displayName: 'Make CLI binaries executable'
-
-  - pwsh: |
-      Write-Host "PATH right before test run (pwsh): $env:PATH"
-      $goCmd = Get-Command go -ErrorAction SilentlyContinue
-      if ($goCmd) {
-        Write-Host "go resolved to: $($goCmd.Source)"
-        & go version
-      } else {
-        Write-Host "ERROR: go not found by pwsh Get-Command"
-      }
-      Write-Host "ls /usr/local/bin/go*:"
-      Get-ChildItem /usr/local/bin/go* -ErrorAction SilentlyContinue | Format-List
-    displayName: 'Diagnose Go availability (pre-test, pwsh)'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
     parameters:

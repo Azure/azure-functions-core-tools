@@ -32,13 +32,6 @@ jobs:
   steps:
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - bash: |
-      sudo apt-get update
-      sudo apt-get install -y golang-1.24
-      echo "##vso[task.prependpath]/usr/lib/go-1.24/bin"
-      /usr/lib/go-1.24/bin/go version
-    displayName: 'Install Go 1.24'
-
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
 
