@@ -750,6 +750,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
             }
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
+            {
+                var goVersion = await GoHelpers.GetEnvironmentGoVersion();
+                GoHelpers.AssertGoVersion(goVersion);
+
+                if (NoBuild)
+                {
+                    GoHelpers.AssertBinaryExists();
+                }
+                else
+                {
+                    await GoHelpers.BuildProject();
+                }
+            }
 
             if (!NetworkHelpers.IsPortAvailable(Port))
             {
