@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections.Frozen;
-using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Common;
 
@@ -20,14 +19,4 @@ internal static class Stacks
             ["java"] = ["Java"],
             ["powershell"] = ["PowerShell"],
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// Writes the workload install hints for all known stacks as an aligned list.
-    /// </summary>
-    public static void WriteWorkloadInstallHints(IInteractionService interaction)
-    {
-        var items = LanguageMap.Select(static kvp => new DefinitionItem($"func workload install {kvp.Key}", string.Join(", ", kvp.Value)));
-
-        interaction.WriteDefinitionList(items);
-    }
 }

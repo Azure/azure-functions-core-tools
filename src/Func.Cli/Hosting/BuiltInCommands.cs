@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Workload;
+using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Hosting;
@@ -19,6 +20,8 @@ internal static class BuiltInCommands
     public static IServiceCollection AddBuiltInCommands(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<IWorkloadHintRenderer, WorkloadHintRenderer>();
 
         // VersionCommand is also resolved by Parser to wire `func` (no args)
         // to detailed-version output, so register the concrete type and

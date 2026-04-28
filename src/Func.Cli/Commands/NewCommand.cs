@@ -2,9 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -29,13 +28,13 @@ internal class NewCommand : BaseCommand, IBuiltInCommand
         Description = "Overwrite existing files"
     };
 
-    private readonly IInteractionService _interaction;
+    private readonly IWorkloadHintRenderer _hintRenderer;
 
-    public NewCommand(IInteractionService interaction)
+    public NewCommand(IWorkloadHintRenderer hintRenderer)
         : base("new", "Create a new function from a template.")
     {
-        ArgumentNullException.ThrowIfNull(interaction);
-        _interaction = interaction;
+        ArgumentNullException.ThrowIfNull(hintRenderer);
+        _hintRenderer = hintRenderer;
 
         AddPathArgument();
         Options.Add(NameOption);
@@ -47,16 +46,13 @@ internal class NewCommand : BaseCommand, IBuiltInCommand
     {
         ApplyPath(parseResult, createIfNotExists: true);
 
-        _interaction.WriteError("No language workloads installed.");
-        _interaction.WriteBlankLine();
-        _interaction.WriteHint("Install a workload to create functions from templates:");
-        _interaction.WriteBlankLine();
-        Stacks.WriteWorkloadInstallHints(_interaction);
-        _interaction.WriteBlankLine();
-        _interaction.WriteLine(l => l
-            .Muted("Run ")
-            .Command("func workload search")
-            .Muted(" to discover available workloads."));
+        // Until a workload contributes templates, the only useful thing this
+        // command can do is point the user at `func workload install`.
+        _hintRenderer.Render(new WorkloadHint(
+            WorkloadHintKind.NoWorkloadsInstalled,
+            ActionDescription: "create functions from templates",
+            RequestedStack: null,
+            InstalledStacks: Array.Empty<string>()));
 
         return Task.FromResult(1);
     }
