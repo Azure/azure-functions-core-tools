@@ -47,7 +47,7 @@ internal static class Parser
         // collision among them is a CLI bug, not a workload problem, so we
         // throw rather than skip.
         var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
-        foreach (var command in allCommands.OfType<IBuiltInCommand>().Cast<Command>())
+        foreach (var command in allCommands.Where(c => c is IBuiltInCommand))
         {
             if (!reservedNames.Add(command.Name))
             {

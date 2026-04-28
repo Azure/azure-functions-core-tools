@@ -26,16 +26,16 @@ internal static class BuiltInCommands
         services.AddSingleton<VersionCommand>();
         services.AddSingleton<Command>(sp => sp.GetRequiredService<VersionCommand>());
 
-        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<InitCommand>(sp));
-        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<NewCommand>(sp));
-        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<PackCommand>(sp));
-        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<StartCommand>(sp));
+        services.AddSingleton<Command, InitCommand>();
+        services.AddSingleton<Command, NewCommand>();
+        services.AddSingleton<Command, PackCommand>();
+        services.AddSingleton<Command, StartCommand>();
 
         // WorkloadCommand has WorkloadListCommand as a subcommand. Register
         // the list command as its own concrete type (not as Command) so it
         // doesn't get added at the top level by GetServices<Command>().
         services.AddSingleton<WorkloadListCommand>();
-        services.AddSingleton<Command>(sp => ActivatorUtilities.CreateInstance<WorkloadCommand>(sp));
+        services.AddSingleton<Command, WorkloadCommand>();
 
         return services;
     }

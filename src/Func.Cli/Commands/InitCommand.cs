@@ -62,6 +62,8 @@ internal class InitCommand : BaseCommand, IBuiltInCommand
         {
             foreach (var option in initializer.GetInitOptions())
             {
+                // TODO: detect option-name collisions across workloads and surface
+                // a workload-named error.
                 Options.Add(option);
             }
         }
@@ -82,8 +84,8 @@ internal class InitCommand : BaseCommand, IBuiltInCommand
         if (dupes.Count > 0)
         {
             throw new InvalidOperationException(
-                $"Multiple workloads register an IProjectInitializer for the same stack: {string.Join(", ", dupes)}. " +
-                "Each stack must be owned by exactly one workload.");
+                $"Two installed workloads both claim the '{string.Join("', '", dupes)}' stack. " +
+                "Run `func workload list` to see them, then `func workload uninstall <name>` to remove one.");
         }
 
         ApplyPath(parseResult, createIfNotExists: true);
