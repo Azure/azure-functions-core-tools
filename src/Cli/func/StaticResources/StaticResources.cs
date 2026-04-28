@@ -84,6 +84,10 @@ namespace Azure.Functions.Cli
 
         public static Task<string> FuncIgnore => GetValue("funcignore");
 
+        public static Task<string> MainGo => GetValue("main.go");
+
+        public static Task<string> GoMod => GetValue("go.mod");
+
         public static Task<string> PackageJsonJsV4 => GetValue("package-js-v4.json");
 
         public static Task<string> PackageJsonJs => GetValue("package-js.json");
