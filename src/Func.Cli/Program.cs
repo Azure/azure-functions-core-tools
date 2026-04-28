@@ -7,6 +7,7 @@ using Azure.Functions.Cli;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
+using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,14 +40,24 @@ if (CliTelemetry.TryGetConnectionString(out var connectionString))
             .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
 }
 
+// Register built-in commands so they flow through DI alongside any
+// workload-contributed commands.
+hostBuilder.Services.AddBuiltInCommands();
+
+// Let installed workloads contribute services. The builder exposes the same
+// IServiceCollection the host uses, so anything a workload registers is
+// resolvable when commands are built below.
+WorkloadRegistration.RegisterWorkloads(new DefaultFunctionsCliBuilder(hostBuilder.Services));
+
 using var host = hostBuilder.Build();
 
 // Start the host so hosted services (OTel providers) are running and
 // listeners are subscribed before any command code emits telemetry.
 await host.StartAsync();
 
-// Create the command tree
-var rootCommand = Parser.CreateCommand(interaction);
+// Create the command tree, resolving built-ins (and any workload-contributed
+// services they depend on) from the host's service provider.
+var rootCommand = Parser.CreateCommand(host.Services);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.

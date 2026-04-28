@@ -2,7 +2,7 @@
 
 This document explains the runtime architecture of the Azure Functions Core Tools v5 CLI — how commands are composed, how telemetry is wired, and how the console layer works.
 
-> **Status**: v5 is in active development. The workload extensibility model described in [building-a-workload.md](building-a-workload.md) is being staged in follow-up PRs and is not yet wired into the CLI on `vnext`.
+> **Status**: v5 is in active development. As of this PR, the workload abstractions and the DI host that loads workloads are wired into the CLI; the runtime workload loader and `func workload install` / `uninstall` commands land in a follow-up PR. Until then, the CLI runs with zero installed workloads — built-in commands that depend on workload contributions (e.g. `func init`) report "no workloads installed" and exit cleanly.
 
 ## Startup Flow
 
@@ -10,12 +10,22 @@ This document explains the runtime architecture of the Azure Functions Core Tool
 Program.cs
   ├── Build IInteractionService (Spectre + DefaultTheme)
   │
-  ├── Wire up OpenTelemetry SDK (when a connection string is baked in)
-  │   ├── TracerProvider — exports to Azure Monitor
-  │   └── MeterProvider — exports to Azure Monitor
+  ├── HostApplicationBuilder
+  │   ├── Register IInteractionService
+  │   ├── Register OpenTelemetry (when a connection string is baked in)
+  │   │   ├── ConfigureResource(CliTelemetry.ConfigureResource)
+  │   │   ├── WithTracing → AzureMonitorTraceExporter
+  │   │   └── WithMetrics → AzureMonitorMetricExporter
+  │   └── WorkloadRegistration.RegisterWorkloads(FunctionsCliBuilder)
+  │       └── For each installed workload: workload.Configure(builder)
+  │           (registers IProjectInitializer, top-level Command instances, etc.)
   │
-  ├── Parser.CreateCommand(interaction)
-  │   ├── Build the root command and its subcommands
+  ├── host.StartAsync()    ← OTel listeners subscribed before any tracing
+  │
+  ├── Parser.CreateCommand(host.Services)
+  │   ├── Build root command
+  │   ├── Resolve built-in commands from DI (init, new, pack, start, version, help, workload)
+  │   ├── Add every Command registered in DI (workload-contributed top-level subcommands)
   │   └── Replace help rendering with Spectre on all commands
   │
   ├── Wire cancellation (Ctrl+C / SIGTERM via CancellationTokenSource)
@@ -28,7 +38,8 @@ Program.cs
   ├── Print CLI version upgrade notice (if newer v5 release available)
   │
   ├── Record command metrics (name, exit code, duration)
-  ├── Flush + dispose the OpenTelemetry providers
+  │
+  ├── host.StopAsync(3s)  ← flushes OTel exporters with a bounded wait
   │
   └── Error handling
       ├── OperationCanceledException → exit 130
@@ -44,9 +55,13 @@ func
 ├── new [path]            Create a new function from a template
 ├── pack [path]           Package the function app for deployment
 ├── start [path]          Start the Functions host (placeholder)
+├── workload
+│   └── list              List installed workloads
 ├── version (hidden)      Print version info
 └── help (hidden)         Print help
 ```
+
+Workloads can add their own subcommands by registering `Command` instances in DI (see [building-a-workload.md](building-a-workload.md)).
 
 ## Command Architecture
 
@@ -164,6 +179,72 @@ interaction.WriteLine(l => l
 
 Returns `true` when the console supports prompts (not redirected, not CI). Commands should check this before offering interactive flows.
 
+## Workload System
+
+The CLI is designed around a workload model: the base CLI provides core commands and infrastructure, while stack- and feature-specific behavior is delivered by independently installable workloads. Workloads contribute behavior through plain .NET DI.
+
+### Architecture
+
+```
+CLI (Func.Cli)
+  │
+  │ references
+  ▼
+Abstractions (Func.Cli.Abstractions)    ← NuGet package
+  │
+  │ referenced by
+  ▼
+Workload (e.g. Func.Cli.Workload.Dotnet) ← NuGet package, loaded at runtime
+```
+
+The CLI never has a compile-time reference to any workload. Workloads will be loaded dynamically via `AssemblyLoadContext`.
+
+### Extension Points
+
+The abstractions library exposes the surface workload authors program against:
+
+| Type | Role |
+|------|------|
+| `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
+| `FunctionsCliBuilder` | The DI seam handed to a workload — exposes `IServiceCollection` for service registration. Abstract base so we can grow the surface without breaking workloads. |
+| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `SupportedLanguages`, contributes init options, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
+
+`WorkloadInfo` (the render-ready manifest entry consumed by `func workload list`) is a CLI-internal type — workload authors don't see it.
+
+### Lifecycle
+
+```
+Configure (CLI startup):
+  HostApplicationBuilder
+    ├── services.AddBuiltInCommands()       ← built-ins enter DI here
+    └── WorkloadRegistration.RegisterWorkloads(builder)
+        ├── Discover installed workloads               ← future PR (loader)
+        ├── Activate each IWorkload type
+        └── workload.Configure(builder)
+            └── builder.Services.AddSingleton<IProjectInitializer, …>()
+                builder.Services.AddSingleton<Command>(new MyTopLevelCommand())  // optional
+
+Build commands (Parser.CreateCommand):
+  ├── Pull every Command from DI (built-ins + workload-contributed)
+  ├── Validate names are unique (throws on collision)
+  ├── InitCommand sees IEnumerable<IProjectInitializer>, attaches their options
+  ├── WorkloadListCommand sees IReadOnlyList<WorkloadInfo>
+  └── HelpCommand built last with a back-reference to the constructed root
+
+Invoke (when the user runs a command):
+  └── func init resolves the right IProjectInitializer (by --stack / single-installed / prompt)
+      and calls InitializeAsync.
+```
+
+### Empty State (Today)
+
+Until the loader lands, `WorkloadRegistration.RegisterWorkloads` registers an empty `IReadOnlyList<WorkloadInfo>`. With no workloads installed:
+
+- `func workload list` prints `No workloads installed.`
+- `func init` prints "No stacks installed." and a hint to install one (exit code 1).
+- `func new` and `func pack` continue to work the same way they do on `vnext`.
+
 ## Error Handling
 
 The CLI uses `GracefulException` (defined in `Func.Cli.Abstractions`) for all user-facing errors:
@@ -181,18 +262,19 @@ throw new GracefulException(
 
 ## Telemetry
 
-The CLI uses [OpenTelemetry](https://opentelemetry.io/) with the Azure Monitor exporter to send usage data to Application Insights.
+The CLI uses [OpenTelemetry](https://opentelemetry.io/) with the Azure Monitor exporter to send usage data to Application Insights, wired through `Microsoft.Extensions.Hosting` so the providers are owned by the host.
 
 ### How It Works
 
 - `CliTelemetry` owns a single `ActivitySource` and `Meter`, both named `Azure.Functions.Cli`.
+- The OTel SDK is registered on the host via `AddOpenTelemetry().WithTracing/.WithMetrics` only when an instrumentation key is baked in. The hosted services subscribe listeners on `host.StartAsync` and flush + dispose on `host.StopAsync`.
 - The root activity wraps the entire command invocation; command name, exit code, OS, and runtime version land as activity tags / resource attributes.
 - A `Counter<long>` records command-execution counts with the same dimensions, plus a `Histogram<double>` for command duration in milliseconds.
-- `TracerProvider` and `MeterProvider` flush via `ForceFlush(3000)` and dispose on exit.
+- `host.StopAsync(TimeSpan.FromSeconds(3))` bounds the export flush so a slow exporter can't hang the CLI on exit.
 
 ### Opt-Out
 
-The CLI is opt-out: when no instrumentation key is baked in (the default for local builds) or `CliTelemetry.TryGetConnectionString` returns `false`, no providers are created and the `ActivitySource` / `Meter` calls become no-ops.
+The CLI is opt-out: when no instrumentation key is baked in (the default for local builds) or `CliTelemetry.TryGetConnectionString` returns `false`, no OTel services are added to the host and the `ActivitySource` / `Meter` calls become no-ops.
 
 ### Instrumentation Key
 
@@ -212,15 +294,18 @@ If a newer version is found, a notice is printed after the command completes.
 
 ## Init, New, and Pack Command Flow
 
-Today these commands operate on the stack inferred from the user (`--stack`) or from project files on disk. The full template / project-initializer / pack-provider extensibility model — where each stack's behavior is contributed by an installable workload — is documented in [building-a-workload.md](building-a-workload.md) and is being added in follow-up PRs.
-
 ### `func init`
 
 ```
-1. Determine stack (--stack or prompt)
-2. Determine language (--language or prompt from the stack's supported languages)
-3. Scaffold the project for that stack
+1. Determine stack (--stack or, when multiple initializers are installed, prompt)
+2. Resolve the matching IProjectInitializer via CanHandle(stack)
+   ├── No initializers installed  → "No language workloads installed." (exit 1)
+   └── No matching initializer    → "No installed workload supports stack '<x>'." (exit 1)
+3. Build InitContext (ProjectPath, ProjectName, Language, Force)
+4. Delegate to IProjectInitializer.InitializeAsync(context, parseResult)
 ```
+
+Each registered initializer also contributes options to `func init` via `GetInitOptions()`; values are read back inside `InitializeAsync` via the `ParseResult`.
 
 ### `func new`
 

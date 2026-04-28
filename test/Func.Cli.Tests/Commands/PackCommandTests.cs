@@ -99,7 +99,7 @@ public class PackCommandTests
     [Fact]
     public void PackCommand_RegisteredInParser()
     {
-        var root = Parser.CreateCommand(_interaction);
+        var root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
         Assert.Contains("pack", names);
     }

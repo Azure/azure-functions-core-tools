@@ -3,13 +3,14 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
 /// Launches the Azure Functions host runtime via 'func start'.
 /// </summary>
-internal class StartCommand : BaseCommand
+internal class StartCommand : BaseCommand, IBuiltInCommand
 {
     public static readonly Option<int?> PortOption = new("--port", "-p")
     {

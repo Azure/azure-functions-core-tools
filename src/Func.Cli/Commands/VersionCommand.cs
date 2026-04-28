@@ -4,13 +4,14 @@
 using System.CommandLine;
 using System.Reflection;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
 /// Displays Azure Functions CLI version information.
 /// </summary>
-internal class VersionCommand : BaseCommand
+internal class VersionCommand : BaseCommand, IBuiltInCommand
 {
     private readonly IInteractionService _interaction;
 

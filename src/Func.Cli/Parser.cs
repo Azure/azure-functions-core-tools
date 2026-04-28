@@ -5,52 +5,96 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli;
 
 /// <summary>
-/// Assembles the root command tree. Keeps an explicit composition root
-/// (commands are constructed here, not auto-discovered) so the command
-/// tree is deterministic and easy to reason about.
+/// Assembles the root command tree from DI. Every top-level command —
+/// built-in or workload-contributed — is resolved as a <see cref="Command"/>
+/// from the container so the composition path is uniform. HelpCommand is
+/// constructed inline because it needs a back-reference to the constructed
+/// root.
+///
+/// Built-in commands are tagged with <see cref="IBuiltInCommand"/>; their
+/// names form the reserved set. Workload-contributed commands whose name
+/// collides with a built-in (or with another workload command) are skipped
+/// at startup with a warning to stderr, leaving the rest of the CLI usable.
 /// </summary>
 internal static class Parser
 {
     /// <summary>
-    /// Creates and configures the root CLI command with all subcommands registered.
+    /// Creates and configures the root CLI command, resolving all
+    /// <see cref="Command"/> services from <paramref name="services"/>.
     /// </summary>
-    public static FuncRootCommand CreateCommand(IInteractionService interaction)
+    public static FuncRootCommand CreateCommand(IServiceProvider services)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var interaction = services.GetRequiredService<IInteractionService>();
         var rootCommand = new FuncRootCommand();
 
-        // Create built-in commands
+        // HelpCommand needs the constructed root, so it can't be DI-resolved
+        // ahead of the root. Built inline and added first.
         var helpCommand = new HelpCommand(interaction, rootCommand);
-        var versionCommand = new VersionCommand(interaction);
-        var initCommand = new InitCommand(interaction);
-        var newCommand = new NewCommand(interaction);
-        var packCommand = new PackCommand(interaction);
-        var startCommand = new StartCommand(interaction);
-
-        // Register built-in commands
-        rootCommand.Subcommands.Add(versionCommand);
         rootCommand.Subcommands.Add(helpCommand);
-        rootCommand.Subcommands.Add(initCommand);
-        rootCommand.Subcommands.Add(newCommand);
-        rootCommand.Subcommands.Add(packCommand);
-        rootCommand.Subcommands.Add(startCommand);
 
-        // Replace built-in help rendering with Spectre on all commands
+        var allCommands = services.GetServices<Command>().ToList();
+
+        // First pass: built-ins. Their names form the reserved set, plus
+        // help (added above). Built-ins are trusted by construction — any
+        // collision among them is a CLI bug, not a workload problem, so we
+        // throw rather than skip.
+        var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
+        foreach (var command in allCommands.Where(c => c is IBuiltInCommand))
+        {
+            if (!reservedNames.Add(command.Name))
+            {
+                throw new InvalidOperationException(
+                    $"Two built-in commands share the name '{command.Name}'. This is a CLI bug.");
+            }
+
+            rootCommand.Subcommands.Add(command);
+        }
+
+        // Second pass: workload-contributed commands. A command that
+        // collides with a built-in is skipped (built-in wins). Two workload
+        // commands colliding with each other are both skipped — picking one
+        // would be non-deterministic from the user's perspective.
+        var workloadCommands = allCommands.Where(c => c is not IBuiltInCommand).ToList();
+        var workloadNameCounts = workloadCommands
+            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var command in workloadCommands)
+        {
+            if (reservedNames.Contains(command.Name))
+            {
+                interaction.WriteWarning(
+                    $"A workload tried to register top-level command '{command.Name}', which is reserved by the CLI. This command was not loaded.");
+                continue;
+            }
+
+            if (workloadNameCounts[command.Name] > 1)
+            {
+                interaction.WriteWarning(
+                    $"Multiple workloads registered top-level command '{command.Name}'. All conflicting registrations were skipped. " +
+                    "Run `func workload uninstall <name>` to keep one.");
+                continue;
+            }
+
+            rootCommand.Subcommands.Add(command);
+        }
+
+        var versionCommand = services.GetRequiredService<VersionCommand>();
+
         ReplaceHelpAction(rootCommand, helpCommand);
-
-        // Wire the root action (no-args → help, --verbose → detailed version)
         ConfigureRootAction(rootCommand, helpCommand, versionCommand);
 
         return rootCommand;
     }
 
-    /// <summary>
-    /// Replaces the built-in System.CommandLine help action on every command
-    /// so that --help, -h, and -? all render uniform Spectre-based output.
-    /// </summary>
     private static void ReplaceHelpAction(FuncRootCommand rootCommand, HelpCommand helpCommand)
     {
         var spectreHelp = new SpectreHelpAction(helpCommand);
