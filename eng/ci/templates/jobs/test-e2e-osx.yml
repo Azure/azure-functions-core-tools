@@ -33,12 +33,24 @@ jobs:
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
 
-  - script: |
+  - bash: |
+      set -e
       brew install go
-      GO_BIN="$(brew --prefix go)/bin"
-      echo "##vso[task.prependpath]${GO_BIN}"
-      "${GO_BIN}/go" version
+      # Microsoft-hosted macOS-latest agents are Intel; brew puts the go symlink at
+      # /usr/local/bin/go (Apple Silicon would be /opt/homebrew/bin). Prepend both
+      # so this works regardless of which agent we land on.
+      echo "##vso[task.prependpath]/usr/local/bin"
+      echo "##vso[task.prependpath]/opt/homebrew/bin"
+      echo "PATH after install: $PATH"
+      which go
+      go version
     displayName: 'Install Go'
+
+  - bash: |
+      echo "PATH at test start: $PATH"
+      which go || echo "ERROR: go not on PATH"
+      go version || echo "ERROR: go version failed"
+    displayName: 'Diagnose Go availability'
 
   - script: |
       sudo chown -R $(id -u):$(id -g) ~/.npm
@@ -62,6 +74,16 @@ jobs:
       chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
       chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
     displayName: 'Make CLI binaries executable'
+
+  - bash: |
+      echo "PATH right before test run: $PATH"
+      which go || echo "ERROR: go not on PATH"
+      go version || echo "ERROR: go version failed"
+      echo "ls /usr/local/bin/go*:"
+      ls -la /usr/local/bin/go* 2>&1 || true
+      echo "ls /opt/homebrew/bin/go*:"
+      ls -la /opt/homebrew/bin/go* 2>&1 || true
+    displayName: 'Diagnose Go availability (pre-test)'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
     parameters:
