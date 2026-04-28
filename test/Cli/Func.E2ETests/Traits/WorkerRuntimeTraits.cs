@@ -49,5 +49,10 @@ namespace Azure.Functions.Cli.E2ETests.Traits
         /// Indicates tests that target the Custom runtime.
         /// </summary>
         public const string Custom = "Custom";
+
+        /// <summary>
+        /// Indicates tests that target the Go runtime.
+        /// </summary>
+        public const string Go = "Go";
     }
 }

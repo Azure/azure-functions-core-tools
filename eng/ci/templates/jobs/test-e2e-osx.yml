@@ -25,15 +25,13 @@ jobs:
       custom_osx_x64:
         languageWorker: 'Custom'
         runtime: 'osx-x64'
+      go_osx_x64:
+        languageWorker: 'Go'
+        runtime: 'osx-x64'
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
-
-  - script: |
-      brew install go
-      go version
-    displayName: 'Install Go'
 
   - script: |
       sudo chown -R $(id -u):$(id -g) ~/.npm

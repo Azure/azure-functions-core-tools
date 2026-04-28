@@ -25,16 +25,12 @@ jobs:
       custom_linux_x64:
         languageWorker: 'Custom'
         runtime: 'linux-x64'
+      go_linux_x64:
+        languageWorker: 'Go'
+        runtime: 'linux-x64'
 
   steps:
   - template: /eng/ci/templates/steps/install-tools.yml@self
-
-  - bash: |
-      sudo apt-get update
-      sudo apt-get install -y npm golang
-      npm --version
-      go version
-    displayName: 'Install npm and Go'
 
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
