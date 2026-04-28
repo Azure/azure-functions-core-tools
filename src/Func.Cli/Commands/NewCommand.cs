@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -11,7 +12,7 @@ namespace Azure.Functions.Cli.Commands;
 /// Creates a new function from a template. The full implementation requires
 /// a language workload to be installed — this defines the command skeleton and options.
 /// </summary>
-internal class NewCommand : BaseCommand
+internal class NewCommand : BaseCommand, IBuiltInCommand
 {
     public static readonly Option<string?> NameOption = new("--name", "-n")
     {

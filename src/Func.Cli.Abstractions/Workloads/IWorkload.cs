@@ -24,7 +24,9 @@ public interface IWorkload
     /// <summary>
     /// Workload version. Authored on the workload itself rather than read
     /// from the NuGet package metadata so the running code is the source of
-    /// truth for what version of the workload is installed.
+    /// truth for what version of the workload is installed. Must be a valid
+    /// SemVer 2.0 string (e.g. <c>"1.2.3"</c>, <c>"1.2.3-preview.1"</c>);
+    /// the CLI does not currently enforce or normalize the format.
     /// </summary>
     public string PackageVersion { get; }
 

@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands;
@@ -13,7 +14,7 @@ namespace Azure.Functions.Cli.Commands;
 /// Each registered initializer may also contribute additional options to this
 /// command (e.g. dotnet's <c>--target-framework</c>).
 /// </summary>
-internal class InitCommand : BaseCommand
+internal class InitCommand : BaseCommand, IBuiltInCommand
 {
     public static readonly Option<string?> StackOption = new("--stack", "-s")
     {
@@ -49,21 +50,6 @@ internal class InitCommand : BaseCommand
         _interaction = interaction;
         _initializers = initializers.ToList();
 
-        // Two workloads claiming the same stack is unrecoverable — `--stack`
-        // would be ambiguous and auto-select would silently pick whichever DI
-        // returned first. Fail fast at startup with a clear message instead.
-        var dupes = _initializers
-            .GroupBy(i => i.Stack, StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
-        if (dupes.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"Multiple workloads register an IProjectInitializer for the same stack: {string.Join(", ", dupes)}. " +
-                "Each stack must be owned by exactly one workload.");
-        }
-
         AddPathArgument();
         Options.Add(StackOption);
         Options.Add(NameOption);
@@ -83,6 +69,23 @@ internal class InitCommand : BaseCommand
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
+        // Two workloads claiming the same stack is unrecoverable — `--stack`
+        // would be ambiguous and auto-select would silently pick whichever
+        // DI returned first. Validated lazily here (rather than in the ctor)
+        // so an init-side conflict doesn't break unrelated commands like
+        // `func start`.
+        var dupes = _initializers
+            .GroupBy(i => i.Stack, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+        if (dupes.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Multiple workloads register an IProjectInitializer for the same stack: {string.Join(", ", dupes)}. " +
+                "Each stack must be owned by exactly one workload.");
+        }
+
         ApplyPath(parseResult, createIfNotExists: true);
 
         var stack = parseResult.GetValue(StackOption);
@@ -125,7 +128,8 @@ internal class InitCommand : BaseCommand
 
         if (!string.IsNullOrEmpty(stack))
         {
-            return _initializers.FirstOrDefault(i => i.CanHandle(stack));
+            return _initializers.FirstOrDefault(i =>
+                string.Equals(i.Stack, stack, StringComparison.OrdinalIgnoreCase));
         }
 
         // No stack specified — auto-select if there's only one initializer

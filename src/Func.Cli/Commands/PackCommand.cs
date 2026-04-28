@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -11,7 +12,7 @@ namespace Azure.Functions.Cli.Commands;
 /// The full implementation requires a language workload — this defines
 /// the command skeleton and options.
 /// </summary>
-internal class PackCommand : BaseCommand
+internal class PackCommand : BaseCommand, IBuiltInCommand
 {
     public static readonly Option<string?> OutputOption = new("--output", "-o")
     {

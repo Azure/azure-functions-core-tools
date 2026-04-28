@@ -5,6 +5,7 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli;
@@ -15,13 +16,17 @@ namespace Azure.Functions.Cli;
 /// from the container so the composition path is uniform. HelpCommand is
 /// constructed inline because it needs a back-reference to the constructed
 /// root.
+///
+/// Built-in commands are tagged with <see cref="IBuiltInCommand"/>; their
+/// names form the reserved set. Workload-contributed commands whose name
+/// collides with a built-in (or with another workload command) are skipped
+/// at startup with a warning to stderr, leaving the rest of the CLI usable.
 /// </summary>
 internal static class Parser
 {
     /// <summary>
     /// Creates and configures the root CLI command, resolving all
     /// <see cref="Command"/> services from <paramref name="services"/>.
-    /// Throws if two registered commands share a name.
     /// </summary>
     public static FuncRootCommand CreateCommand(IServiceProvider services)
     {
@@ -35,14 +40,48 @@ internal static class Parser
         var helpCommand = new HelpCommand(interaction, rootCommand);
         rootCommand.Subcommands.Add(helpCommand);
 
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
-        foreach (var command in services.GetServices<Command>())
+        var allCommands = services.GetServices<Command>().ToList();
+
+        // First pass: built-ins. Their names form the reserved set, plus
+        // help (added above). Built-ins are trusted by construction — any
+        // collision among them is a CLI bug, not a workload problem, so we
+        // throw rather than skip.
+        var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
+        foreach (var command in allCommands.OfType<IBuiltInCommand>().Cast<Command>())
         {
-            if (!seenNames.Add(command.Name))
+            if (!reservedNames.Add(command.Name))
             {
                 throw new InvalidOperationException(
-                    $"Duplicate top-level command name '{command.Name}'. " +
-                    "A workload registered a Command that collides with a built-in or another workload.");
+                    $"Two built-in commands share the name '{command.Name}'. This is a CLI bug.");
+            }
+
+            rootCommand.Subcommands.Add(command);
+        }
+
+        // Second pass: workload-contributed commands. A command that
+        // collides with a built-in is skipped (built-in wins). Two workload
+        // commands colliding with each other are both skipped — picking one
+        // would be non-deterministic from the user's perspective.
+        var workloadCommands = allCommands.Where(c => c is not IBuiltInCommand).ToList();
+        var workloadNameCounts = workloadCommands
+            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var command in workloadCommands)
+        {
+            if (reservedNames.Contains(command.Name))
+            {
+                interaction.WriteWarning(
+                    $"A workload tried to register top-level command '{command.Name}', which is reserved by the CLI. This command was not loaded.");
+                continue;
+            }
+
+            if (workloadNameCounts[command.Name] > 1)
+            {
+                interaction.WriteWarning(
+                    $"Multiple workloads registered top-level command '{command.Name}'. All conflicting registrations were skipped. " +
+                    "Run `func workload uninstall <name>` to keep one.");
+                continue;
             }
 
             rootCommand.Subcommands.Add(command);

@@ -23,12 +23,6 @@ public interface IProjectInitializer
     public IReadOnlyList<string> SupportedLanguages { get; }
 
     /// <summary>
-    /// Returns true if this initializer should handle the given <paramref name="stack"/>.
-    /// Allows aliases (e.g. "csharp" → dotnet initializer).
-    /// </summary>
-    public bool CanHandle(string stack);
-
-    /// <summary>
     /// Options this initializer contributes to the <c>func init</c> command.
     /// Attached during command construction and visible in <c>--help</c>.
     /// </summary>
