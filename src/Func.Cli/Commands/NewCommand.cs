@@ -13,17 +13,17 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal class NewCommand : BaseCommand, IBuiltInCommand
 {
-    public static readonly Option<string?> NameOption = new("--name", "-n")
+    public Option<string?> NameOption { get; } = new("--name", "-n")
     {
         Description = "The name of the function"
     };
 
-    public static readonly Option<string?> TemplateOption = new("--template", "-t")
+    public Option<string?> TemplateOption { get; } = new("--template", "-t")
     {
         Description = "The function template name"
     };
 
-    public static readonly Option<bool> ForceOption = new("--force")
+    public Option<bool> ForceOption { get; } = new("--force")
     {
         Description = "Overwrite existing files"
     };

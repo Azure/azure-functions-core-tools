@@ -16,22 +16,22 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal class InitCommand : BaseCommand, IBuiltInCommand
 {
-    public static readonly Option<string?> StackOption = new("--stack", "-s")
+    public Option<string?> StackOption { get; } = new("--stack", "-s")
     {
         Description = "The stack to use. Run `func workload list` to see what's installed."
     };
 
-    public static readonly Option<string?> NameOption = new("--name", "-n")
+    public Option<string?> NameOption { get; } = new("--name", "-n")
     {
         Description = "The name of the function app project"
     };
 
-    public static readonly Option<string?> LanguageOption = new("--language", "-l")
+    public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
         Description = "The programming language (e.g., C#, F#, JavaScript, TypeScript, Python)"
     };
 
-    public static readonly Option<bool> ForceOption = new("--force")
+    public Option<bool> ForceOption { get; } = new("--force")
     {
         Description = "Force initialization even if the folder is not empty"
     };

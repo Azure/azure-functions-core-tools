@@ -34,10 +34,11 @@ internal static class Parser
 
         var interaction = services.GetRequiredService<IInteractionService>();
         var rootCommand = new FuncRootCommand();
+        var versionCommand = services.GetRequiredService<VersionCommand>();
 
         // HelpCommand needs the constructed root, so it can't be DI-resolved
         // ahead of the root. Built inline and added first.
-        var helpCommand = new HelpCommand(interaction, rootCommand);
+        var helpCommand = new HelpCommand(interaction, rootCommand, versionCommand);
         rootCommand.Subcommands.Add(helpCommand);
 
         var allCommands = services.GetServices<Command>().ToList();
@@ -87,8 +88,6 @@ internal static class Parser
             rootCommand.Subcommands.Add(command);
         }
 
-        var versionCommand = services.GetRequiredService<VersionCommand>();
-
         ReplaceHelpAction(rootCommand, helpCommand);
         ConfigureRootAction(rootCommand, helpCommand, versionCommand);
 
@@ -128,7 +127,7 @@ internal static class Parser
     {
         rootCommand.SetAction(parseResult =>
         {
-            if (parseResult.GetValue(FuncRootCommand.VerboseOption))
+            if (parseResult.GetValue(rootCommand.VerboseOption))
             {
                 return versionCommand.ExecuteDetailed();
             }

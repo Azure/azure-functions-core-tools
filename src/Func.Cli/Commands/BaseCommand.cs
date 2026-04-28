@@ -18,23 +18,10 @@ namespace Azure.Functions.Cli.Commands;
 internal abstract class BaseCommand : Command
 {
     /// <summary>
-    /// Shared path argument definition for commands that need project directory support.
+    /// Path argument for commands that operate on a project directory. Created
+    /// per command instance so each command owns its own argument graph.
     /// </summary>
-    protected static readonly Argument<string?> PathArgument = new("path")
-    {
-        Description = "The project directory to use (defaults to current directory)",
-        Arity = ArgumentArity.ZeroOrOne,
-        CustomParser = result =>
-        {
-            var token = result.Tokens.Count > 0 ? result.Tokens[0].Value : null;
-            if (token is not null && token.StartsWith('-'))
-            {
-                result.AddError($"Unrecognized option '{token}'.");
-                return null;
-            }
-            return token;
-        }
-    };
+    protected Argument<string?>? PathArgument { get; private set; }
 
     protected BaseCommand(string name, string description) : base(name, description)
     {
@@ -55,6 +42,21 @@ internal abstract class BaseCommand : Command
     /// </summary>
     protected void AddPathArgument()
     {
+        PathArgument = new("path")
+        {
+            Description = "The project directory to use (defaults to current directory)",
+            Arity = ArgumentArity.ZeroOrOne,
+            CustomParser = result =>
+            {
+                var token = result.Tokens.Count > 0 ? result.Tokens[0].Value : null;
+                if (token is not null && token.StartsWith('-'))
+                {
+                    result.AddError($"Unrecognized option '{token}'.");
+                    return null;
+                }
+                return token;
+            }
+        };
         Arguments.Add(PathArgument);
     }
 
@@ -64,8 +66,13 @@ internal abstract class BaseCommand : Command
     /// When <paramref name="createIfNotExists"/> is true, the directory is created
     /// if it does not exist (useful for init/new).
     /// </summary>
-    protected static void ApplyPath(ParseResult parseResult, bool createIfNotExists = false)
+    protected void ApplyPath(ParseResult parseResult, bool createIfNotExists = false)
     {
+        if (PathArgument is null)
+        {
+            return;
+        }
+
         var path = parseResult.GetValue(PathArgument);
         if (string.IsNullOrEmpty(path))
         {
