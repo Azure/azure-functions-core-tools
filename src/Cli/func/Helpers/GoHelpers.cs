@@ -13,7 +13,8 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const int MinimumGoMajorVersion = 1;
         private const int MinimumGoMinorVersion = 24;
-        private const string GoBinaryName = "app";
+        internal const string GoBinaryName = "app";
+        internal const string GoModFileName = "go.mod";
 
         public static async Task<WorkerLanguageVersionInfo> GetEnvironmentGoVersion()
         {
@@ -121,6 +122,172 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException(
                     $"Could not find a built Go binary '{binaryName}' in '{workingDirectory}'. " +
                     $"Run 'func start' without '--no-build' to compile, or run 'go build -o {binaryName} .' manually.");
+            }
+        }
+
+        /// <summary>
+        /// Cross-compiles the user's Go project into a linux/amd64 binary named
+        /// <see cref="GoBinaryName"/> in <paramref name="workingDirectory"/>. Used
+        /// by <c>func pack</c> and <c>func publish</c> — the produced binary is the
+        /// one that runs on the Linux Functions host, regardless of the dev OS.
+        /// </summary>
+        public static async Task BuildForLinux(string workingDirectory = null)
+        {
+            workingDirectory ??= Environment.CurrentDirectory;
+
+            var goVersion = await GetEnvironmentGoVersion();
+            AssertGoVersion(goVersion);
+
+            ColoredConsole.WriteLine($"Building Go worker binary '{GoBinaryName}' for linux/amd64...");
+
+            var env = new Dictionary<string, string>
+            {
+                ["CGO_ENABLED"] = "0",
+                ["GOOS"] = "linux",
+                ["GOARCH"] = "amd64",
+            };
+
+            var exe = new Executable("go", $"build -o \"{GoBinaryName}\" .", workingDirectory: workingDirectory, environmentVariables: env);
+            var stderr = new StringBuilder();
+            var exitCode = await exe.RunAsync(
+                l => ColoredConsole.WriteLine(l),
+                e =>
+                {
+                    stderr.AppendLine(e);
+                    ColoredConsole.Error.WriteLine(ErrorColor(e));
+                });
+
+            if (exitCode != 0)
+            {
+                var detail = stderr.Length == 0 ? string.Empty : $" {stderr.ToString().Trim()}";
+                throw new CliException($"Go build for linux/amd64 failed with exit code {exitCode}.{detail}");
+            }
+        }
+
+        /// <summary>
+        /// Ensures the Go binary in <paramref name="workingDirectory"/> is a valid
+        /// Linux x86_64 executable suitable for the Azure Functions Linux host.
+        /// Validates the binary's structure by checking its ELF header format.
+        /// Called by <c>func pack --no-build</c> to confirm the binary was properly
+        /// cross-compiled before packaging for deployment.
+        /// </summary>
+        public static void AssertLinuxAmd64Binary(string workingDirectory = null)
+        {
+            workingDirectory ??= Environment.CurrentDirectory;
+            var binaryPath = Path.Combine(workingDirectory, GoBinaryName);
+
+            void ValidateBinaryExists()
+            {
+                if (!FileSystemHelpers.FileExists(binaryPath))
+                {
+                    throw new CliException(
+                        $"Could not find a built Go binary '{GoBinaryName}' in '{workingDirectory}'. " +
+                        $"Run 'func pack' without '--no-build' to cross-compile, or run " +
+                        $"'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .' manually.");
+                }
+            }
+
+            byte[] ReadElfHeader()
+            {
+                // Read the first 20 bytes of the ELF header so we can validate magic, class, data, and machine.
+                // Layout reference: https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.eheader.html
+                var header = new byte[20];
+                using (var fs = new FileStream(binaryPath, FileMode.Open, FileAccess.Read))
+                {
+                    int read = fs.Read(header, 0, header.Length);
+                    if (read < header.Length)
+                    {
+                        throw new CliException(
+                            $"'{binaryPath}' is too small to be an ELF binary. " +
+                            "Re-run 'func pack' without '--no-build' to produce a linux/amd64 binary.");
+                    }
+                }
+                return header;
+            }
+
+            // ELF magic is the file signature that identifies an ELF (Executable and Linkable Format) binary
+            void ValidateElfMagic(byte[] header)
+            {
+                // ELF magic: 0x7F 'E' 'L' 'F'
+                bool isElf = header[0] == 0x7F && header[1] == (byte)'E' && header[2] == (byte)'L' && header[3] == (byte)'F';
+                if (!isElf)
+                {
+                    throw new CliException(
+                        $"'{binaryPath}' is not an ELF binary. The Functions Linux host requires a linux/amd64 ELF binary. " +
+                        "Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app .'");
+                }
+            }
+
+            void ValidateElfFormat(byte[] header)
+            {
+                // EI_CLASS == 2 (64-bit), EI_DATA == 1 (little endian)
+                if (header[4] != 2 || header[5] != 1)
+                {
+                    throw new CliException(
+                        $"'{binaryPath}' is not a 64-bit little-endian ELF binary. The Functions Linux host requires a linux/amd64 binary. " +
+                        "Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app .'");
+                }
+            }
+
+            void ValidateElfMachine(byte[] header)
+            {
+                // e_machine is at offset 18, 2 bytes little-endian. 0x3E == EM_X86_64.
+                ushort eMachine = (ushort)(header[18] | (header[19] << 8));
+                if (eMachine != 0x3E)
+                {
+                    throw new CliException(
+                        $"'{binaryPath}' targets machine 0x{eMachine:X4}, not x86_64. The Functions Linux host requires a linux/amd64 binary. " +
+                        "Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app .'");
+                }
+            }
+
+            // Execute validations in order
+            ValidateBinaryExists();
+            var header = ReadElfHeader();
+            ValidateElfMagic(header);
+            ValidateElfFormat(header);
+            ValidateElfMachine(header);
+        }
+
+        /// <summary>
+        /// Returns the explicit allowlist of files that should be included in the
+        /// Go deployment zip. Centralizes the list so that <see cref="ZipHelper"/>
+        /// (zip composition) and <c>func publish --list-included-files</c> stay in sync.
+        /// </summary>
+        public static IEnumerable<string> GetPackFiles(string functionAppRoot)
+        {
+            functionAppRoot ??= Environment.CurrentDirectory;
+            return new[]
+            {
+                Path.Combine(functionAppRoot, Constants.HostJsonFileName),
+                Path.Combine(functionAppRoot, GoBinaryName),
+            };
+        }
+
+        /// <summary>
+        /// Verifies the function app root has the files required to build/publish a Go app:
+        /// <c>host.json</c> and <c>go.mod</c>. Throws <see cref="CliException"/> with an
+        /// actionable message on failure. Used by <c>func publish</c>; <c>func pack</c>
+        /// performs the equivalent checks via <see cref="PackValidationHelper"/>.
+        /// </summary>
+        public static void AssertGoFunctionAppLayout(string functionAppRoot)
+        {
+            functionAppRoot ??= Environment.CurrentDirectory;
+
+            var hostJsonPath = Path.Combine(functionAppRoot, Constants.HostJsonFileName);
+            if (!FileSystemHelpers.FileExists(hostJsonPath))
+            {
+                throw new CliException(
+                    $"Could not find '{Constants.HostJsonFileName}' in '{functionAppRoot}'. " +
+                    "Run 'func publish' from the root of a Go function app.");
+            }
+
+            var goModPath = Path.Combine(functionAppRoot, GoModFileName);
+            if (!FileSystemHelpers.FileExists(goModPath))
+            {
+                throw new CliException(
+                    $"Could not find '{GoModFileName}' in '{functionAppRoot}'. " +
+                    "Run 'func publish' from the root of a Go function app.");
             }
         }
 

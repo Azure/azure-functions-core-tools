@@ -212,5 +212,39 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             _output.WriteLine(output);
         }
+
+        [Fact]
+        public async Task GetAppZipFile_GoRuntime_ContainsOnlyHostJsonAndApp()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+
+            var previousRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "host.json"), "{}");
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinaryName), new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F', 2, 1 });
+
+                // Files that must NOT be picked up — Go uses an explicit allowlist, not funcignore.
+                File.WriteAllText(Path.Combine(dir, "main.go"), "package main\nfunc main() {}\n");
+                File.WriteAllText(Path.Combine(dir, "go.mod"), "module example.com/test\n");
+                File.WriteAllText(Path.Combine(dir, "local.settings.json"), "{}");
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
+
+                var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: false);
+
+                Assert.NotNull(stream);
+                using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+                var entries = archive.Entries.Select(e => e.FullName).OrderBy(n => n).ToArray();
+
+                Assert.Equal(new[] { "app", "host.json" }, entries);
+            }
+            finally
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previousRuntime;
+                Directory.Delete(dir, recursive: true);
+            }
+        }
     }
 }

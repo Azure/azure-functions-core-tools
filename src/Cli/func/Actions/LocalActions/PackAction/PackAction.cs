@@ -114,6 +114,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 WorkerRuntime.Node => new NodePackSubcommandAction(_secretsManager).RunAsync(packOptions, Args),
                 WorkerRuntime.Powershell => new PowershellPackSubcommandAction().RunAsync(packOptions),
                 WorkerRuntime.Custom => new CustomPackSubcommandAction().RunAsync(packOptions),
+                WorkerRuntime.Go => new GoPackSubcommandAction().RunAsync(packOptions),
                 _ => throw new CliException($"Unsupported runtime: {runtime}")
             });
     }
