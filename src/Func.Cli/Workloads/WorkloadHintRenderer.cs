@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Workloads;
@@ -43,7 +42,7 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
         _interaction.WriteHint($"Install a stack to {hint.ActionDescription}:");
         _interaction.WriteBlankLine();
 
-        var items = Stacks.LanguageMap.Select(static kvp =>
+        var items = KnownInstallableWorkloads.LanguageMap.Select(static kvp =>
             new DefinitionItem($"func workload install {kvp.Key}", string.Join(", ", kvp.Value)));
         _interaction.WriteDefinitionList(items);
 
