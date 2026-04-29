@@ -28,7 +28,6 @@ internal static class BuiltInCommands
 
         services.AddSingleton<Command, InitCommand>();
         services.AddSingleton<Command, NewCommand>();
-        services.AddSingleton<Command, PackCommand>();
         services.AddSingleton<Command, StartCommand>();
 
         // WorkloadCommand has WorkloadListCommand as a subcommand. Register

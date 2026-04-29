@@ -1,6 +1,6 @@
 # Building a New Workload
 
-This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior — most commonly to provide `func init` / `func new` / `func pack` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
+This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior — most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
 
 > **Status**: the abstractions and DI host described below are in the tree as of this PR. The runtime loader and `func workload install` / `uninstall` commands land in a follow-up PR; until then, this document describes the contract workload authors can build against.
 
@@ -110,7 +110,7 @@ public sealed class NodeWorkload : IWorkload
     public string PackageId      => "Azure.Functions.Cli.Workload.Node";
     public string PackageVersion => "1.0.0";   // typically read from assembly metadata
     public string DisplayName    => "Node.js";
-    public string Description    => "func init / func new / func pack support for Node.js and TypeScript.";
+    public string Description    => "func init / func new support for Node.js and TypeScript.";
 
     public void Configure(FunctionsCliBuilder builder)
     {
