@@ -202,6 +202,7 @@ namespace Azure.Functions.Cli.Helpers
                             "Re-run 'func pack' without '--no-build' to produce a linux/amd64 binary.");
                     }
                 }
+
                 return header;
             }
 
