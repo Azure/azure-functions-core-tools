@@ -40,25 +40,16 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  # GoTool@0 (in install-tools.yml) only ships an amd64 Go binary, which fails
-  # to execute on Apple Silicon (macOS-latest is arm64) without Rosetta 2 and
-  # surfaces as "Could not find a Go installation" inside func. Install an
-  # arm64-native Go via Homebrew and prepend it so it wins over the cached
-  # GoTool@0 path on macOS only. Linux/Windows pipelines continue to use
-  # GoTool@0 from install-tools.yml unchanged.
-  #
-  # We pin to go@1.24 (keg-only) to match the major.minor GoTool@0 installs
-  # on Linux/Windows. We also override GOROOT to brew's matching toolchain;
-  # GoTool@0 exports GOROOT pointing at its own 1.24.2 cache, and brew's go
-  # driver (1.24.x latest patch, e.g. 1.24.13) reads that env var and aborts:
-  #   compile: version "go1.24.2" does not match go tool version "go1.24.13"
+  # On macOS, GoTool@0 (in install-tools.yml) is skipped because it only
+  # ships an amd64 Go binary, which can't run on Apple Silicon agents.
+  # Install an arm64-native Go via Homebrew, pinned to the same major.minor
+  # (1.24) used by GoTool@0 on Linux/Windows, so all three OSes test against
+  # a consistent Go version.
   - bash: |
       set -euo pipefail
       brew install go@1.24
       GO_BIN="$(brew --prefix go@1.24)/bin"
-      BREW_GOROOT="$("$GO_BIN/go" env GOROOT)"
       echo "##vso[task.prependpath]$GO_BIN"
-      echo "##vso[task.setvariable variable=GOROOT]$BREW_GOROOT"
       "$GO_BIN/go" version
     displayName: 'Install Go 1.24 (Homebrew, arm64-native)'
 
