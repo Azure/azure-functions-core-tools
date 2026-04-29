@@ -31,21 +31,21 @@ using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Commands;
 
-public class DeployCommand : BaseCommand
+internal class DeployCommand : BaseCommand
 {
-    private readonly IInteractionService _interaction;
-
-    // Define options as static readonly fields
-    public static readonly Option<string> AppNameOption = new("--app-name", "-a")
+    // Define options as instance properties
+    public Option<string> AppNameOption { get; } = new("--app-name", "-a")
     {
         Description = "The Azure Functions app name to deploy to",
         Required = true
     };
 
-    public static readonly Option<bool> DryRunOption = new("--dry-run")
+    public Option<bool> DryRunOption { get; } = new("--dry-run")
     {
         Description = "Preview the deployment without making changes"
     };
+
+    private readonly IInteractionService _interaction;
 
     public DeployCommand(IInteractionService interaction)
         : base("deploy", "Deploy the function app to Azure")
@@ -92,7 +92,7 @@ public class DeployCommand : BaseCommand
 ### Key Conventions
 
 - **Constructor injection**: Take `IInteractionService` (and `IWorkloadManager` if needed)
-- **Static option fields**: Options are `static readonly` so tests and other code can reference them
+- **Instance option properties**: Options are `public Option<T> XOption { get; } = new(...)` — instance, not static. Tests and other code reach them through the resolved command instance (DI). Avoid `static readonly` so each command instance owns its own options and parallel test runs cannot share mutable parser state.
 - **`SetAction`**: Wire handler in the constructor, not via override
 - **`ApplyPath`**: Call this first if you added `AddPathArgument()`
 - **Never use `Console.Write*`**: Always go through `IInteractionService`
@@ -102,14 +102,14 @@ public class DeployCommand : BaseCommand
 
 ```csharp
 // Options: named, optional by default
-public static readonly Option<string> NameOption = new("--name", "-n")
+public Option<string> NameOption { get; } = new("--name", "-n")
 {
     Description = "The resource name",
     Required = true  // make it required
 };
 
 // Options with defaults
-public static readonly Option<int> TimeoutOption = new("--timeout")
+public Option<int> TimeoutOption { get; } = new("--timeout")
 {
     Description = "Timeout in seconds",
     DefaultValueFactory = _ => 30
