@@ -9,16 +9,18 @@ namespace Azure.Functions.Cli.Tests.Commands;
 public class InitCommandTests
 {
     private readonly TestInteractionService _interaction;
+    private readonly RecordingWorkloadHintRenderer _hintRenderer;
 
     public InitCommandTests()
     {
         _interaction = new TestInteractionService();
+        _hintRenderer = new RecordingWorkloadHintRenderer();
     }
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
     {
-        var cmd = new InitCommand(_interaction, []);
+        var cmd = new InitCommand(_interaction, _hintRenderer, []);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--stack", optionNames);
@@ -39,7 +41,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_HasPathArgument()
     {
-        var cmd = new InitCommand(_interaction, []);
+        var cmd = new InitCommand(_interaction, _hintRenderer, []);
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
     }

@@ -37,17 +37,21 @@ internal class InitCommand : BaseCommand, IBuiltInCommand
     };
 
     private readonly IInteractionService _interaction;
+    private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
     public InitCommand(
         IInteractionService interaction,
+        IWorkloadHintRenderer hintRenderer,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
+        ArgumentNullException.ThrowIfNull(hintRenderer);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
+        _hintRenderer = hintRenderer;
         _initializers = initializers.ToList();
 
         AddPathArgument();
@@ -96,11 +100,12 @@ internal class InitCommand : BaseCommand, IBuiltInCommand
         if (initializer is null)
         {
             var installed = _initializers.Select(i => i.Stack).ToArray();
-            WorkloadHints.WriteNoMatchingWorkload(
-                _interaction,
-                installed,
-                actionDescription: "initialize a project",
-                requestedStack: stack);
+            var hint = installed.Length == 0
+                ? new WorkloadHint(WorkloadHintKind.NoWorkloadsInstalled, "initialize a project", null, installed)
+                : stack is not null
+                    ? new WorkloadHint(WorkloadHintKind.NoMatchingStack, "initialize a project", stack, installed)
+                    : new WorkloadHint(WorkloadHintKind.AmbiguousStackChoice, "initialize a project", null, installed);
+            _hintRenderer.Render(hint);
             return 1;
         }
 
