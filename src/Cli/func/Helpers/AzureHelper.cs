@@ -18,8 +18,6 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static readonly string _storageApiVersion = "2018-02-01";
 
-        internal static Func<Func<Task<object>>, Task<object>> ArmCallOverrideAsync { get; set; }
-
         internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null, Func<Site, string, string, Task<Site>> loadFunction = null)
         {
             IEnumerable<string> allSubscriptionIds;
@@ -288,33 +286,46 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken, string managementURL)
         {
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
+            Exception lastException = null;
+
             foreach (var subscription in subscriptions)
             {
                 try
                 {
-                    // List all storage accounts in the subscription
-                    var listUrl = new Uri(
-                        $"{managementURL}/subscriptions/{subscription.SubscriptionId}" +
-                        $"/providers/Microsoft.Storage/storageAccounts" +
-                        $"?api-version={_storageApiVersion}");
-
-                    var accounts =
-                        await ExecuteArmCallAsync(() => ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
-                            HttpMethod.Get,
-                            listUrl,
-                            accessToken));
-
-                    if (accounts?.Value == null || !accounts.Value.Any())
+                    // Build URL using ArmUriTemplates
+                    var listUrl = ArmUriTemplates.StorageAccountsList.Bind(managementURL, new
                     {
-                        continue;
+                        subscriptionId = subscription.SubscriptionId
+                    });
+
+                    // Fetch all pages
+                    var allAccounts = new List<ArmWrapper<ArmGenericResource>>();
+
+                    var response = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
+                        HttpMethod.Get,
+                        listUrl,
+                        accessToken);
+
+                    while (response != null)
+                    {
+                        if (response.Value != null)
+                        {
+                            allAccounts.AddRange(response.Value);
+                        }
+
+                        if (string.IsNullOrEmpty(response.NextLink))
+                        {
+                            break;
+                        }
+
+                        response = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
+                        HttpMethod.Get,
+                        new Uri(response.NextLink),
+                        accessToken);
                     }
 
-                    // Filter in-memory by storage account name
-                    var match = accounts?.Value?
-                        .FirstOrDefault(a => string.Equals(
-                            a.Name,
-                            storageAccountName,
-                            StringComparison.OrdinalIgnoreCase));
+                    var match = allAccounts.FirstOrDefault(a =>
+                        string.Equals(a.Name, storageAccountName, StringComparison.OrdinalIgnoreCase));
 
                     if (match == null)
                     {
@@ -323,12 +334,12 @@ namespace Azure.Functions.Cli.Helpers
 
                     var resourceGroup = ExtractResourceGroupFromId(match.Id);
 
-                    // Fetch storage account using RG-specific endpoint
-                    var getUrl = new Uri(
-                        $"{managementURL}/subscriptions/{subscription.SubscriptionId}" +
-                        $"/resourceGroups/{resourceGroup}" +
-                        $"/providers/Microsoft.Storage/storageAccounts/{storageAccountName}" +
-                        $"?api-version={_storageApiVersion}");
+                    var getUrl = ArmUriTemplates.StorageAccountByResourceGroup.Bind(managementURL, new
+                    {
+                        subscriptionId = subscription.SubscriptionId,
+                        resourceGroup = resourceGroup,
+                        storageAccountName = storageAccountName
+                    });
 
                     var storageAccount =
                         await ArmHttpAsync<ArmWrapper<ArmGenericResource>>(
@@ -343,11 +354,18 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 catch (Exception ex)
                 {
+                    lastException = ex;
+
                     if (StaticSettings.IsDebug)
                     {
                         ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
                     }
                 }
+            }
+
+            if (lastException != null)
+            {
+                throw lastException;
             }
 
             throw new ArmResourceNotFoundException($"Cannot find storage account with name {storageAccountName}");
@@ -811,24 +829,13 @@ namespace Azure.Functions.Cli.Helpers
 
             for (int i = 0; i < parts.Length; i++)
             {
-                if (parts[i].Equals("resourceGroups", StringComparison.OrdinalIgnoreCase))
+                if (parts[i].Equals("resourceGroups", StringComparison.OrdinalIgnoreCase) && i + 1 < parts.Length)
                 {
                     return parts[i + 1];
                 }
             }
 
             throw new InvalidOperationException("Resource group not found in resource ID");
-        }
-
-        private static async Task<T> ExecuteArmCallAsync<T>(Func<Task<T>> actualCall)
-        {
-            if (ArmCallOverrideAsync != null)
-            {
-                var result = await ArmCallOverrideAsync(() => actualCall().ContinueWith(t => (object)t.Result));
-                return (T)result;
-            }
-
-            return await actualCall();
         }
     }
 }
