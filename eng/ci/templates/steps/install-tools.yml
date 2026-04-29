@@ -43,3 +43,9 @@ steps:
   inputs:
     version: '1.24.2'
   displayName: 'Install Go 1.24.2'
+  # Skip on macOS: GoTool@0 only ships an amd64 Go binary, which fails to
+  # execute on Apple Silicon agents (macOS-latest is arm64). It also exports
+  # GOROOT pointing at its own toolchain, which conflicts with the brew
+  # Go we install in the macOS E2E job (test-e2e-osx.yml). Mac jobs that
+  # need Go install it via Homebrew themselves.
+  condition: ne(variables['Agent.OS'], 'Darwin')
