@@ -97,8 +97,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             try
             {
                 var binaryName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? GoHelpers.GoBinaryName + ".exe"
-                    : GoHelpers.GoBinaryName;
+                    ? "app.exe"
+                    : "app";
                 File.WriteAllText(Path.Combine(dir, binaryName), "stub");
 
                 var action = () => GoHelpers.AssertBinaryExists(dir);
@@ -143,8 +143,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 await GoHelpers.BuildProject(dir);
 
                 var binaryName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? GoHelpers.GoBinaryName + ".exe"
-                    : GoHelpers.GoBinaryName;
+                    ? "app.exe"
+                    : "app";
                 File.Exists(Path.Combine(dir, binaryName)).Should().BeTrue("BuildProject should produce the worker binary");
             }
             finally
@@ -154,7 +154,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [SkipIfGoNonExistFact]
-        public async Task BuildProject_InvalidProject_ThrowsCliException()
+        public Task BuildProject_InvalidProject_ThrowsCliException()
         {
             var dir = Path.Combine(Path.GetTempPath(), "func-go-build-fail-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
@@ -163,18 +163,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 File.WriteAllText(Path.Combine(dir, "go.mod"), "module example.com/test\n\ngo 1.24\n");
                 File.WriteAllText(Path.Combine(dir, "main.go"), "package main\n\nthis is not valid go\n");
 
-                CliException caught = null;
-                try
-                {
-                    await GoHelpers.BuildProject(dir);
-                }
-                catch (CliException ex)
-                {
-                    caught = ex;
-                }
-
-                caught.Should().NotBeNull("BuildProject should throw when go build fails");
-                caught.Message.Should().Contain("Go build failed");
+                Func<Task> act = () => GoHelpers.BuildProject(dir);
+                act.Should().Throw<CliException>("BuildProject should throw when go build fails")
+                    .Which.Message.Should().Contain("Go build failed");
+                return Task.CompletedTask;
             }
             finally
             {

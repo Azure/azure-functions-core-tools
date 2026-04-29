@@ -9,11 +9,11 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    public static class GoHelpers
+    internal static class GoHelpers
     {
         private const int MinimumGoMajorVersion = 1;
         private const int MinimumGoMinorVersion = 24;
-        public const string GoBinaryName = "app";
+        private const string GoBinaryName = "app";
 
         public static async Task<WorkerLanguageVersionInfo> GetEnvironmentGoVersion()
         {
@@ -95,19 +95,13 @@ namespace Azure.Functions.Cli.Helpers
             ColoredConsole.WriteLine($"Building Go worker binary '{outputName}'...");
 
             var exe = new Executable("go", $"build -o \"{outputName}\" .", workingDirectory: workingDirectory);
-            var stderr = new StringBuilder();
             var exitCode = await exe.RunAsync(
                 l => ColoredConsole.WriteLine(l),
-                e =>
-                {
-                    stderr.AppendLine(e);
-                    ColoredConsole.Error.WriteLine(ErrorColor(e));
-                });
+                e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
 
             if (exitCode != 0)
             {
-                var detail = stderr.Length == 0 ? string.Empty : $" {stderr.ToString().Trim()}";
-                throw new CliException($"Go build failed with exit code {exitCode}.{detail}");
+                throw new CliException($"Go build failed with exit code {exitCode}. See output above for details.");
             }
         }
 
