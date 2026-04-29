@@ -40,6 +40,20 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  # GoTool@0 (in install-tools.yml) only ships an amd64 Go binary, which fails
+  # to execute on Apple Silicon (macOS-latest is arm64) without Rosetta 2 and
+  # surfaces as "Could not find a Go installation" inside func. Install an
+  # arm64-native Go via Homebrew and prepend it so it wins over the cached
+  # GoTool@0 path on macOS only. Linux/Windows pipelines continue to use
+  # GoTool@0 from install-tools.yml unchanged.
+  - bash: |
+      set -euo pipefail
+      brew install go
+      GO_BIN="$(brew --prefix go)/bin"
+      echo "##vso[task.prependpath]$GO_BIN"
+      "$GO_BIN/go" version
+    displayName: 'Install Go (Homebrew, arm64-native)'
+
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
   - pwsh: |
