@@ -24,7 +24,7 @@ Program.cs
   │
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
-  │   ├── Resolve built-in commands from DI (init, new, pack, start, version, help, workload)
+  │   ├── Resolve built-in commands from DI (init, new, start, version, help, workload)
   │   ├── Add every Command registered in DI (workload-contributed top-level subcommands)
   │   └── Replace help rendering with Spectre on all commands
   │
@@ -53,7 +53,6 @@ Program.cs
 func
 ├── init [path]           Initialize a new Functions project
 ├── new [path]            Create a new function from a template
-├── pack [path]           Package the function app for deployment
 ├── start [path]          Start the Functions host (placeholder)
 ├── workload
 │   └── list              List installed workloads
@@ -243,7 +242,7 @@ Until the loader lands, `WorkloadRegistration.RegisterWorkloads` registers an em
 
 - `func workload list` prints `No workloads installed.`
 - `func init` prints "No stacks installed." and a hint to install one (exit code 1).
-- `func new` and `func pack` continue to work the same way they do on `vnext`.
+- `func new` continues to work the same way it does on `vnext`.
 
 ## Error Handling
 
@@ -292,7 +291,7 @@ At startup, the CLI runs a non-blocking background check for newer v5 releases v
 
 If a newer version is found, a notice is printed after the command completes.
 
-## Init, New, and Pack Command Flow
+## Init and New Command Flow
 
 ### `func init`
 
@@ -315,15 +314,4 @@ Each registered initializer also contributes options to `func init` via `GetInit
 3. Select template (--template or prompt)
 4. Get function name (--name or prompt with editable default)
 5. Scaffold the function
-```
-
-### `func pack`
-
-```
-1. Detect stack from project files (ProjectDetector)
-2. Validate the project (stack-specific checks)
-3. If --no-build: skip build step, use project dir as-is
-4. Otherwise: prepare the project (e.g., dotnet publish for the dotnet stack)
-5. Zip the output directory using System.IO.Compression.ZipFile
-6. Output: <project-name>.zip in the --output directory (or current dir)
 ```
