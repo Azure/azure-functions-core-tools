@@ -42,6 +42,13 @@ namespace Azure.Functions.Cli.Helpers
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
                 return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Array.Empty<string>());
             }
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
+            {
+                // Go publishes an explicit allowlist (host.json + the cross-compiled 'app' binary),
+                // The 'app' binary needs the executable bit set
+                // when extracted on Linux. Shared by both `func pack` and `func publish`.
+                return await CreateZip(GoHelpers.GetPackFiles(functionAppRoot), functionAppRoot, new[] { GoHelpers.GoBinaryName });
+            }
             else
             {
                 var customHandler = await HostHelpers.GetCustomHandlerExecutable(functionAppRoot);
