@@ -1,11 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Net;
 using Azure.Functions.Cli.Arm;
-using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Helpers;
 using FluentAssertions;
-using Moq;
 using RichardSzalay.MockHttp;
 using Xunit;
 
@@ -125,12 +124,42 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
                 ArmClient.SetTestHandler(mockHttp);
 
-                // Act
-                Func<Task> act = async () =>
-                    await AzureHelper.GetStorageAccount(storageName, accessToken, managementUrl);
-
-                // Assert
+                // Act & Assert
                 await Assert.ThrowsAsync<ArmResourceNotFoundException>(() => AzureHelper.GetStorageAccount(storageName, accessToken, managementUrl));
+            }
+            finally
+            {
+                ArmClient.SetTestHandler(null);
+            }
+        }
+
+        [Fact]
+        public async Task GetStorageAccount_ShouldThrow_LastException_WhenAllSubscriptionsFail()
+        {
+            try
+            {
+                const string managementUrl = "https://management.azure.com";
+                const string accessToken = "token";
+
+                var subscriptionsUrl =
+                    $"{managementUrl}/subscriptions?api-version=2018-09-01";
+
+                var listUrl =
+                    $"{managementUrl}/subscriptions/sub/providers/Microsoft.Storage/storageAccounts?api-version=2018-02-01";
+
+                var mockHttp = new MockHttpMessageHandler();
+
+                // Subscriptions
+                mockHttp.When(HttpMethod.Get, subscriptionsUrl).Respond("application/json", @"{ 'value': [ { 'subscriptionId': 'sub' } ] }");
+
+                // Simulate failure (403)
+                mockHttp.When(HttpMethod.Get, listUrl)
+                    .Respond(HttpStatusCode.Forbidden);
+                ArmClient.SetTestHandler(mockHttp);
+
+                // Act & Assert
+                await Assert.ThrowsAsync<HttpRequestException>(() =>
+                    AzureHelper.GetStorageAccount("mystorage", accessToken, managementUrl));
             }
             finally
             {
