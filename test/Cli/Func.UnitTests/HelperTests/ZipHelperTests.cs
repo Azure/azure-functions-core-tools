@@ -82,8 +82,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 files.Add(file);
             }
 
-            // Find the repo root by walking up until we find the solution file
-            var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+            // Find the repo root by walking up from the test assembly location until we find
+            // the solution file. Avoid Directory.GetCurrentDirectory() because some CI runners
+            // (e.g. CloudTest) launch tests from a working directory outside the source tree.
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Azure.Functions.Cli.sln")))
             {
                 dir = dir.Parent;

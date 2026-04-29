@@ -68,14 +68,23 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData(false)]
         public void Test_IsMinifiedVersion(bool expected)
         {
-            var filePath = Path.Combine("artifactsconfig.json");
+            // IsMinifiedVersion uses ConfigurationBuilder.AddJsonFile with a relative path,
+            // which resolves against AppContext.BaseDirectory — not the test's current working directory.
+            // CI runners may launch tests from a working dir different from the test assembly location,
+            // so write the artifactsconfig.json next to the test binary to keep this test deterministic.
+            var filePath = Path.Combine(AppContext.BaseDirectory, "artifactsconfig.json");
             string artifactsJsonContent = "{\"minifiedVersion\": " + expected.ToString().ToLower() + "}";
             File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
 
-            bool output = Utilities.IsMinifiedVersion();
-
-            File.Delete(filePath);
-            Assert.Equal(expected, output);
+            try
+            {
+                bool output = Utilities.IsMinifiedVersion();
+                Assert.Equal(expected, output);
+            }
+            finally
+            {
+                File.Delete(filePath);
+            }
         }
     }
 }
