@@ -46,13 +46,19 @@ jobs:
   # arm64-native Go via Homebrew and prepend it so it wins over the cached
   # GoTool@0 path on macOS only. Linux/Windows pipelines continue to use
   # GoTool@0 from install-tools.yml unchanged.
+  #
+  # We pin to go@1.24 (keg-only) to match the version GoTool@0 installs on
+  # Linux/Windows; otherwise the unversioned 'go' formula floats to the
+  # latest brew release, drifting macOS away from the other OSes and (when
+  # GoTool@0's GOROOT is still set) producing toolchain mismatches like:
+  #   compile: version "go1.24.2" does not match go tool version "go1.26.2"
   - bash: |
       set -euo pipefail
-      brew install go
-      GO_BIN="$(brew --prefix go)/bin"
+      brew install go@1.24
+      GO_BIN="$(brew --prefix go@1.24)/bin"
       echo "##vso[task.prependpath]$GO_BIN"
       "$GO_BIN/go" version
-    displayName: 'Install Go (Homebrew, arm64-native)'
+    displayName: 'Install Go 1.24 (Homebrew, arm64-native)'
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
