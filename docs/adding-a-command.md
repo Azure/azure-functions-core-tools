@@ -9,18 +9,18 @@ The repo includes agent instructions (`AGENTS.md`) with
 conventions and patterns. Try a prompt like:
 
 > Scaffold a new "func deploy" command with options for app name and resource group.
-> Follow the command guide in docs/adding-a-command.md, register it in Parser.cs,
+> Follow the command guide in docs/adding-a-command.md, register it in BuiltInCommands.cs,
 > and add a test file.
 
 ## Quick Start
 
 1. Create a new command class in `src/Func.Cli/Commands/`
-2. Register it in `Parser.cs`
+2. Register it in `src/Func.Cli/Hosting/BuiltInCommands.cs`
 3. Add tests in `test/Func.Cli.Tests/`
 
 ## Step 1: Create the Command Class
 
-Create a new file in `src/Func.Cli/Commands/`. All commands extend `BaseCommand`.
+Create a new file in `src/Func.Cli/Commands/`. All commands extend `FuncCliCommand`.
 
 ```csharp
 // src/Func.Cli/Commands/DeployCommand.cs
@@ -31,7 +31,7 @@ using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Commands;
 
-internal class DeployCommand : BaseCommand
+internal class DeployCommand : FuncCliCommand
 {
     // Define options as instance properties
     public Option<string> AppNameOption { get; } = new("--app-name", "-a")
@@ -115,33 +115,32 @@ public Option<int> TimeoutOption { get; } = new("--timeout")
     DefaultValueFactory = _ => 30
 };
 
-// Arguments: positional (use BaseCommand.AddPathArgument for [path])
+// Arguments: positional (use FuncCliCommand.AddPathArgument for [path])
 var arg = new Argument<string>("resource") { Description = "The resource to deploy" };
 Arguments.Add(arg);
 ```
 
-## Step 2: Register in Parser.cs
+## Step 2: Register in BuiltInCommands.cs
 
-Open `src/Func.Cli/Parser.cs` and add the command to the tree:
+Open `src/Func.Cli/Hosting/BuiltInCommands.cs` and register the command as a `FuncCliCommand` so the parser picks it up. Built-in commands also implement the `IBuiltInCommand` marker interface so the parser distinguishes them from workload-contributed commands:
 
 ```csharp
-public static FuncRootCommand CreateCommand(
-    IInteractionService interaction,
-    IWorkloadManager? workloadManager = null)
+// src/Func.Cli/Commands/DeployCommand.cs
+internal class DeployCommand : FuncCliCommand, IBuiltInCommand
 {
-    var rootCommand = new FuncRootCommand();
+    // …
+}
 
-    // ... existing commands ...
-    var deployCommand = new DeployCommand(interaction);  // ← add this
-
+// src/Func.Cli/Hosting/BuiltInCommands.cs
+public static IServiceCollection AddBuiltInCommands(this IServiceCollection services)
+{
     // ... existing registrations ...
-    rootCommand.Subcommands.Add(deployCommand);          // ← add this
-
-    // ... rest of method ...
+    services.AddSingleton<FuncCliCommand, DeployCommand>();   // ← add this
+    return services;
 }
 ```
 
-The help system will automatically include the new command — no additional registration needed.
+`Parser.CreateCommand` resolves every `FuncCliCommand` from DI, partitions them into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), and adds them to the root tree. The help system picks up the new command automatically.
 
 ## Step 3: Add Tests
 
@@ -215,7 +214,7 @@ dotnet run --project src/Func.Cli/ -- deploy --app-name myapp --dry-run
 For grouped commands (like `func workload install`), create a parent command:
 
 ```csharp
-public class AzureCommand : BaseCommand
+public class AzureCommand : FuncCliCommand
 {
     public AzureCommand(IInteractionService interaction)
         : base("azure", "Azure resource management commands")
@@ -226,7 +225,7 @@ public class AzureCommand : BaseCommand
     }
 }
 
-public class AzureLoginCommand : BaseCommand
+public class AzureLoginCommand : FuncCliCommand
 {
     public AzureLoginCommand(IInteractionService interaction)
         : base("login", "Log in to Azure")
@@ -244,7 +243,7 @@ This produces: `func azure login`, `func azure list`.
 ## Checklist
 
 - [ ] Command class in `src/Func.Cli/Commands/`
-- [ ] Registered in `Parser.CreateCommand()`
+- [ ] Implements `IBuiltInCommand` and registered as a `FuncCliCommand` in `BuiltInCommands.cs`
 - [ ] Uses `IInteractionService` for all I/O
 - [ ] Uses `GracefulException` for user-facing errors
 - [ ] Tests cover registration, options, and happy path

@@ -6,27 +6,31 @@ using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli;
 
 /// <summary>
 /// Assembles the root command tree from DI. Every top-level command —
-/// built-in or workload-contributed — is resolved as a <see cref="Command"/>
+/// built-in or workload-contributed — is resolved as a <see cref="FuncCliCommand"/>
 /// from the container so the composition path is uniform. HelpCommand is
 /// constructed inline because it needs a back-reference to the constructed
 /// root.
 ///
 /// Built-in commands are tagged with <see cref="IBuiltInCommand"/>; their
-/// names form the reserved set. Workload-contributed commands whose name
-/// collides with a built-in (or with another workload command) are skipped
-/// at startup with a warning to stderr, leaving the rest of the CLI usable.
+/// names form the reserved set. Workload-contributed commands flow through
+/// <see cref="ExternalCommand"/>, which carries the owning
+/// <see cref="WorkloadInfo"/>. Workload commands whose name collides with a
+/// built-in (or with another workload command) are skipped at startup with
+/// a warning to stderr that names the workload, leaving the rest of the CLI
+/// usable.
 /// </summary>
 internal static class Parser
 {
     /// <summary>
     /// Creates and configures the root CLI command, resolving all
-    /// <see cref="Command"/> services from <paramref name="services"/>.
+    /// <see cref="FuncCliCommand"/> services from <paramref name="services"/>.
     /// </summary>
     public static FuncRootCommand CreateCommand(IServiceProvider services)
     {
@@ -41,14 +45,30 @@ internal static class Parser
         var helpCommand = new HelpCommand(interaction, rootCommand, versionCommand);
         rootCommand.Subcommands.Add(helpCommand);
 
-        var allCommands = services.GetServices<Command>().ToList();
+        var allCommands = services.GetServices<FuncCliCommand>().ToList();
+
+        // Defensive: every FuncCliCommand resolved from DI must be either a
+        // built-in or an ExternalCommand (workload-contributed). Anything
+        // else is a CLI bug — fail fast at startup so it's caught in tests
+        // rather than producing untraceable workload commands.
+        foreach (var command in allCommands)
+        {
+            if (command is not IBuiltInCommand && command is not ExternalCommand)
+            {
+                throw new InvalidOperationException(
+                    $"Top-level command '{command.GetType().FullName}' (name: '{command.Name}') is registered " +
+                    "as a FuncCliCommand but is neither IBuiltInCommand nor ExternalCommand. " +
+                    "Built-in commands must implement IBuiltInCommand; workload commands must be registered " +
+                    "through FunctionsCliBuilder.RegisterCommand. This is a CLI bug.");
+            }
+        }
 
         // First pass: built-ins. Their names form the reserved set, plus
         // help (added above). Built-ins are trusted by construction — any
         // collision among them is a CLI bug, not a workload problem, so we
         // throw rather than skip.
         var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
-        foreach (var command in allCommands.Where(c => c is IBuiltInCommand))
+        foreach (var command in allCommands.OfType<IBuiltInCommand>().Cast<FuncCliCommand>())
         {
             if (!reservedNames.Add(command.Name))
             {
@@ -63,24 +83,30 @@ internal static class Parser
         // collides with a built-in is skipped (built-in wins). Two workload
         // commands colliding with each other are both skipped — picking one
         // would be non-deterministic from the user's perspective.
-        var workloadCommands = allCommands.Where(c => c is not IBuiltInCommand).ToList();
-        var workloadNameCounts = workloadCommands
+        var workloadCommands = allCommands.OfType<ExternalCommand>().ToList();
+        var workloadNameGroups = workloadCommands
             .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         foreach (var command in workloadCommands)
         {
             if (reservedNames.Contains(command.Name))
             {
                 interaction.WriteWarning(
-                    $"A workload tried to register top-level command '{command.Name}', which is reserved by the CLI. This command was not loaded.");
+                    $"Workload '{command.Workload.PackageId}' tried to register top-level command " +
+                    $"'{command.Name}', which is reserved by the CLI. This command was not loaded.");
                 continue;
             }
 
-            if (workloadNameCounts[command.Name] > 1)
+            var siblings = workloadNameGroups[command.Name];
+            if (siblings.Count > 1)
             {
+                var workloadList = string.Join(", ", siblings
+                    .Select(c => $"'{c.Workload.PackageId}'")
+                    .Distinct(StringComparer.Ordinal));
                 interaction.WriteWarning(
-                    $"Multiple workloads registered top-level command '{command.Name}'. All conflicting registrations were skipped. " +
+                    $"Workloads {workloadList} all registered top-level command '{command.Name}'. " +
+                    "All conflicting registrations were skipped. " +
                     "Run `func workload uninstall <name>` to keep one.");
                 continue;
             }
@@ -136,3 +162,4 @@ internal static class Parser
         });
     }
 }
+

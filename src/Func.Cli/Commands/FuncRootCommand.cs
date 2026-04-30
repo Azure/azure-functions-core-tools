@@ -6,7 +6,7 @@ using System.CommandLine;
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Root 'func' command definition. Separate from BaseCommand because RootCommand
+/// Root 'func' command definition. Separate from FuncCliCommand because RootCommand
 /// has distinct behavior (no-args → help, global options, version display).
 /// </summary>
 internal class FuncRootCommand : RootCommand

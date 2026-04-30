@@ -25,20 +25,21 @@ internal static class BuiltInCommands
 
         // VersionCommand is also resolved by Parser to wire `func` (no args)
         // to detailed-version output, so register the concrete type and
-        // surface it as a top-level Command.
+        // surface it as a top-level FuncCliCommand.
         services.AddSingleton<VersionCommand>();
-        services.AddSingleton<Command>(sp => sp.GetRequiredService<VersionCommand>());
+        services.AddSingleton<FuncCliCommand>(sp => sp.GetRequiredService<VersionCommand>());
 
-        services.AddSingleton<Command, InitCommand>();
-        services.AddSingleton<Command, NewCommand>();
-        services.AddSingleton<Command, StartCommand>();
+        services.AddSingleton<FuncCliCommand, InitCommand>();
+        services.AddSingleton<FuncCliCommand, NewCommand>();
+        services.AddSingleton<FuncCliCommand, StartCommand>();
 
         // WorkloadCommand has WorkloadListCommand as a subcommand. Register
-        // the list command as its own concrete type (not as Command) so it
-        // doesn't get added at the top level by GetServices<Command>().
+        // the list command as its own concrete type (not as FuncCliCommand) so
+        // it doesn't get added at the top level by GetServices<FuncCliCommand>().
         services.AddSingleton<WorkloadListCommand>();
-        services.AddSingleton<Command, WorkloadCommand>();
+        services.AddSingleton<FuncCliCommand, WorkloadCommand>();
 
         return services;
     }
 }
+

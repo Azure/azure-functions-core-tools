@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands;
 /// <summary>
 /// Renders rich help generated from real <see cref="Command"/> metadata.
 /// </summary>
-internal class HelpCommand : BaseCommand
+internal class HelpCommand : FuncCliCommand
 {
     public Argument<string?> CommandArgument { get; } = new("command")
     {

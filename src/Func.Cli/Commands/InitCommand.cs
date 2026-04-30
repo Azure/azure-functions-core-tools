@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Commands;
 /// Each registered initializer may also contribute additional options to this
 /// command (e.g. dotnet's <c>--target-framework</c>).
 /// </summary>
-internal class InitCommand : BaseCommand, IBuiltInCommand
+internal class InitCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<string?> StackOption { get; } = new("--stack", "-s")
     {

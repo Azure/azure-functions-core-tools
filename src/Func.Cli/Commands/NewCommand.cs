@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands;
 /// Creates a new function from a template. The full implementation requires
 /// a language workload to be installed — this defines the command skeleton and options.
 /// </summary>
-internal class NewCommand : BaseCommand, IBuiltInCommand
+internal class NewCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<string?> NameOption { get; } = new("--name", "-n")
     {

@@ -9,7 +9,7 @@ and .NET 10 using a workload-based extensibility model (similar to `dotnet` CLI 
 
 See `docs/adding-a-command.md` for the full guide. Summary:
 
-1. Create a class in `src/Func.Cli/Commands/` extending `BaseCommand`
+1. Create a class in `src/Func.Cli/Commands/` extending `FuncCliCommand`
 2. Register it in `Parser.cs`
 3. Add tests in `test/Func.Cli.Tests/Commands/`
 4. Update `docs/cli-architecture.md` command tree

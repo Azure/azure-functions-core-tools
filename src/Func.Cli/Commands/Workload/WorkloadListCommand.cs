@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// from each package's <c>workload.json</c>.
 /// </summary>
 internal sealed class WorkloadListCommand(IInteractionService interaction, IReadOnlyList<WorkloadInfo> workloads)
-    : BaseCommand("list", "List installed workloads.")
+    : FuncCliCommand("list", "List installed workloads.")
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IReadOnlyList<WorkloadInfo> _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
