@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli;
 
 /// <summary>
 /// Assembles the root command tree from DI. Every top-level command —
-/// built-in or workload-contributed — is resolved as a <see cref="BaseCommand"/>
+/// built-in or workload-contributed — is resolved as a <see cref="FuncCliCommand"/>
 /// from the container so the composition path is uniform. HelpCommand is
 /// constructed inline because it needs a back-reference to the constructed
 /// root.
@@ -30,7 +30,7 @@ internal static class Parser
 {
     /// <summary>
     /// Creates and configures the root CLI command, resolving all
-    /// <see cref="BaseCommand"/> services from <paramref name="services"/>.
+    /// <see cref="FuncCliCommand"/> services from <paramref name="services"/>.
     /// </summary>
     public static FuncRootCommand CreateCommand(IServiceProvider services)
     {
@@ -45,9 +45,9 @@ internal static class Parser
         var helpCommand = new HelpCommand(interaction, rootCommand, versionCommand);
         rootCommand.Subcommands.Add(helpCommand);
 
-        var allCommands = services.GetServices<BaseCommand>().ToList();
+        var allCommands = services.GetServices<FuncCliCommand>().ToList();
 
-        // Defensive: every BaseCommand resolved from DI must be either a
+        // Defensive: every FuncCliCommand resolved from DI must be either a
         // built-in or an ExternalCommand (workload-contributed). Anything
         // else is a CLI bug — fail fast at startup so it's caught in tests
         // rather than producing untraceable workload commands.
@@ -57,7 +57,7 @@ internal static class Parser
             {
                 throw new InvalidOperationException(
                     $"Top-level command '{command.GetType().FullName}' (name: '{command.Name}') is registered " +
-                    "as a BaseCommand but is neither IBuiltInCommand nor ExternalCommand. " +
+                    "as a FuncCliCommand but is neither IBuiltInCommand nor ExternalCommand. " +
                     "Built-in commands must implement IBuiltInCommand; workload commands must be registered " +
                     "through FunctionsCliBuilder.RegisterCommand. This is a CLI bug.");
             }
@@ -68,7 +68,7 @@ internal static class Parser
         // collision among them is a CLI bug, not a workload problem, so we
         // throw rather than skip.
         var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
-        foreach (var command in allCommands.OfType<IBuiltInCommand>().Cast<BaseCommand>())
+        foreach (var command in allCommands.OfType<IBuiltInCommand>().Cast<FuncCliCommand>())
         {
             if (!reservedNames.Add(command.Name))
             {

@@ -36,7 +36,7 @@ public class DefaultFunctionsCliBuilderTests
 
         builder.RegisterCommand(stub);
 
-        var resolved = services.BuildServiceProvider().GetServices<BaseCommand>().ToList();
+        var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
         var external = Assert.Single(resolved.OfType<ExternalCommand>());
         Assert.Same(workload, external.Workload);
         Assert.Same(stub, external.Source);
@@ -53,7 +53,7 @@ public class DefaultFunctionsCliBuilderTests
 
         builder.RegisterCommand<GenericTestCommand>();
 
-        var resolved = services.BuildServiceProvider().GetServices<BaseCommand>().ToList();
+        var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
         var external = Assert.Single(resolved.OfType<ExternalCommand>());
         var source = Assert.IsType<GenericTestCommand>(external.Source);
         Assert.Equal("from-di", source.Payload.Value);
@@ -79,7 +79,7 @@ public class DefaultFunctionsCliBuilderTests
 
         builder.RegisterCommand(_ => new TestWorkloads.StubFuncCommand("from-factory"));
 
-        var resolved = services.BuildServiceProvider().GetServices<BaseCommand>().ToList();
+        var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
         var external = Assert.Single(resolved.OfType<ExternalCommand>());
         Assert.Equal("from-factory", external.Name);
     }
@@ -103,7 +103,7 @@ public class DefaultFunctionsCliBuilderTests
         builder.RegisterCommand(_ => null!);
 
         var sp = services.BuildServiceProvider();
-        var ex = Assert.Throws<InvalidOperationException>(() => sp.GetServices<BaseCommand>().ToList());
+        var ex = Assert.Throws<InvalidOperationException>(() => sp.GetServices<FuncCliCommand>().ToList());
         Assert.Contains("Workload.With.NullFactory", ex.Message);
     }
 

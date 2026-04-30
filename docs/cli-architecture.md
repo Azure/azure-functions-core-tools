@@ -26,7 +26,7 @@ Program.cs
   │
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
-  │   ├── Resolve every BaseCommand from DI:
+  │   ├── Resolve every FuncCliCommand from DI:
   │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, version, help, workload
   │   │     └── ExternalCommand wrappers (each carries the WorkloadInfo for the
   │   │         workload that called RegisterCommand)
@@ -70,9 +70,9 @@ Workloads can add their own subcommands by calling `builder.RegisterCommand(...)
 
 ## Command Architecture
 
-All commands extend `BaseCommand` → `System.CommandLine.Command`.
+All commands extend `FuncCliCommand` → `System.CommandLine.Command`.
 
-### BaseCommand
+### FuncCliCommand
 
 Provides shared infrastructure:
 - **`SetAction`** wiring — connects `ExecuteAsync` to the command
@@ -115,7 +115,7 @@ public Option<string> FrameworkOption { get; } = new("--target-framework")
     DefaultValueFactory = _ => "net10.0"
 };
 
-// Positional argument (via BaseCommand)
+// Positional argument (via FuncCliCommand)
 AddPathArgument(); // adds optional [path] argument
 ```
 
@@ -237,7 +237,7 @@ Configure (CLI startup):
                 builder.RegisterCommand(sp => new MyFactoryCommand(...)) // optional
 
 Build commands (Parser.CreateCommand):
-  ├── Resolve every BaseCommand from DI:
+  ├── Resolve every FuncCliCommand from DI:
   │     ├── Built-ins (IBuiltInCommand) — names form the reserved set
   │     └── ExternalCommand wrappers — each carries the source WorkloadInfo
   ├── Built-in collisions throw (CLI bug); workload commands that collide with

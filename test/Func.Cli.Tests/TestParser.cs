@@ -42,7 +42,7 @@ internal static class TestParser
     /// <summary>
     /// Builds an <see cref="IServiceProvider"/> wired with all built-in commands
     /// plus any extra registrations applied by <paramref name="configure"/>.
-    /// Exposed for tests that need to resolve <see cref="BaseCommand"/> services
+    /// Exposed for tests that need to resolve <see cref="FuncCliCommand"/> services
     /// directly without going through <see cref="Parser.CreateCommand"/>.
     /// </summary>
     public static IServiceProvider BuildServiceProviderWith(

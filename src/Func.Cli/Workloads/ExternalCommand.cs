@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
 /// Internal adapter that wraps a workload-contributed <see cref="FuncCommand"/>
-/// in a <see cref="BaseCommand"/> the parser can execute, while carrying the
+/// in a <see cref="FuncCliCommand"/> the parser can execute, while carrying the
 /// owning <see cref="WorkloadInfo"/> for diagnostics and tracing.
 ///
 /// Translates the parser-independent descriptors on <see cref="FuncCommand"/>
@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// The descriptors on the source command are read once at construction;
 /// subsequent changes are not reflected.
 /// </summary>
-internal sealed class ExternalCommand : BaseCommand
+internal sealed class ExternalCommand : FuncCliCommand
 {
     private static readonly MethodInfo _createOptionMethod =
         typeof(ExternalCommand).GetMethod(nameof(CreateTypedOption), BindingFlags.NonPublic | BindingFlags.Static)!;

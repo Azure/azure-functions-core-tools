@@ -115,22 +115,22 @@ public class ParserTests
     }
 
     [Fact]
-    public void CreateCommand_BaseCommandNotBuiltInOrExternal_Throws()
+    public void CreateCommand_FuncCliCommandNotBuiltInOrExternal_Throws()
     {
         var services = TestParser.BuildServiceProviderWith(_interaction, s =>
         {
-            s.AddSingleton<BaseCommand, RogueBaseCommand>();
+            s.AddSingleton<FuncCliCommand, RogueFuncCliCommand>();
         });
 
         var ex = Assert.Throws<InvalidOperationException>(() => Parser.CreateCommand(services));
-        Assert.Contains(nameof(RogueBaseCommand), ex.Message);
+        Assert.Contains(nameof(RogueFuncCliCommand), ex.Message);
         Assert.Contains("rogue", ex.Message);
     }
 
     [Fact]
     public async Task Parse_BuiltInWorkloadParentCommand_NoSubcommand_RendersHelp()
     {
-        // After switching to BaseCommand with the virtual default ExecuteAsync,
+        // After switching to FuncCliCommand with the virtual default ExecuteAsync,
         // `func workload` (no subcommand) should print help and exit 0. The
         // default impl walks parent commands to find the root's HelpOption and
         // invokes its (Spectre-wired) action.
@@ -143,10 +143,10 @@ public class ParserTests
         Assert.NotEmpty(_interaction.Lines);
     }
 
-    private sealed class RogueBaseCommand : BaseCommand
+    private sealed class RogueFuncCliCommand : FuncCliCommand
     {
-        public RogueBaseCommand()
-            : base("rogue", "A BaseCommand that is neither built-in nor external.")
+        public RogueFuncCliCommand()
+            : base("rogue", "A FuncCliCommand that is neither built-in nor external.")
         {
         }
     }

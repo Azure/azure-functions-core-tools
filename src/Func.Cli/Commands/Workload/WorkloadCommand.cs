@@ -10,10 +10,10 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// inspection, and updates. Today the only subcommand wired in is
 /// <see cref="WorkloadListCommand"/>; install / uninstall land in a follow-up PR.
 ///
-/// Parent-only — relies on <see cref="BaseCommand.ExecuteAsync"/>'s default
+/// Parent-only — relies on <see cref="FuncCliCommand.ExecuteAsync"/>'s default
 /// implementation to render help when invoked without a subcommand.
 /// </summary>
-internal sealed class WorkloadCommand : BaseCommand, IBuiltInCommand
+internal sealed class WorkloadCommand : FuncCliCommand, IBuiltInCommand
 {
     public WorkloadCommand(WorkloadListCommand listCommand)
         : base("workload", "Manage Func CLI workloads.")

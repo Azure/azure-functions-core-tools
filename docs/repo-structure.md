@@ -39,15 +39,15 @@ The main tool users install and run. Assembly name is `func`.
 
 | Directory          | Purpose |
 |--------------------|---------|
-| `Commands/`        | Built-in commands (init, new, pack, start, version, help) + `BaseCommand`, `FuncRootCommand`, `ProjectDetector`, `SpectreHelpAction`, `WorkloadHints` |
+| `Commands/`        | Built-in commands (init, new, pack, start, version, help) + `FuncCliCommand`, `FuncRootCommand`, `ProjectDetector`, `SpectreHelpAction`, `WorkloadHints` |
 | `Commands/Workload/` | `func workload` parent command + `func workload list` |
 | `Console/`         | `IInteractionService` abstraction + Spectre.Console implementation, theme |
 | `Common/`          | Shared utilities — `Constants`, `Stacks` (stack registry), `VersionChecker` |
 | `Hosting/`         | `DefaultFunctionsCliBuilder` (internal `FunctionsCliBuilder` impl), `BuiltInCommands` DI registrations, and `WorkloadRegistration` (workload bootstrap seam) |
-| `Workloads/`       | `ExternalCommand` — internal `BaseCommand` adapter that wraps a workload-supplied `FuncCommand` and carries the owning `WorkloadInfo` |
+| `Workloads/`       | `ExternalCommand` — internal `FuncCliCommand` adapter that wraps a workload-supplied `FuncCommand` and carries the owning `WorkloadInfo` |
 | `Telemetry/`       | `CliTelemetry` (ActivitySource + Meter), Azure Monitor exporter wiring, activity / metric extensions |
 | `Program.cs`       | Entry point — host, telemetry, command tree, error handling |
-| `Parser.cs`        | Command tree composition — resolves every `BaseCommand` from DI, partitions into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), wires Spectre help |
+| `Parser.cs`        | Command tree composition — resolves every `FuncCliCommand` from DI, partitions into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), wires Spectre help |
 
 ### `src/Func.Cli.Abstractions` — Workload Contracts
 

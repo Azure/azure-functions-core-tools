@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands;
 /// <summary>
 /// Displays Azure Functions CLI version information.
 /// </summary>
-internal class VersionCommand : BaseCommand, IBuiltInCommand
+internal class VersionCommand : FuncCliCommand, IBuiltInCommand
 {
     private readonly IInteractionService _interaction;
 

@@ -20,7 +20,7 @@ conventions and patterns. Try a prompt like:
 
 ## Step 1: Create the Command Class
 
-Create a new file in `src/Func.Cli/Commands/`. All commands extend `BaseCommand`.
+Create a new file in `src/Func.Cli/Commands/`. All commands extend `FuncCliCommand`.
 
 ```csharp
 // src/Func.Cli/Commands/DeployCommand.cs
@@ -31,7 +31,7 @@ using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Commands;
 
-internal class DeployCommand : BaseCommand
+internal class DeployCommand : FuncCliCommand
 {
     // Define options as instance properties
     public Option<string> AppNameOption { get; } = new("--app-name", "-a")
@@ -115,18 +115,18 @@ public Option<int> TimeoutOption { get; } = new("--timeout")
     DefaultValueFactory = _ => 30
 };
 
-// Arguments: positional (use BaseCommand.AddPathArgument for [path])
+// Arguments: positional (use FuncCliCommand.AddPathArgument for [path])
 var arg = new Argument<string>("resource") { Description = "The resource to deploy" };
 Arguments.Add(arg);
 ```
 
 ## Step 2: Register in BuiltInCommands.cs
 
-Open `src/Func.Cli/Hosting/BuiltInCommands.cs` and register the command as a `BaseCommand` so the parser picks it up. Built-in commands also implement the `IBuiltInCommand` marker interface so the parser distinguishes them from workload-contributed commands:
+Open `src/Func.Cli/Hosting/BuiltInCommands.cs` and register the command as a `FuncCliCommand` so the parser picks it up. Built-in commands also implement the `IBuiltInCommand` marker interface so the parser distinguishes them from workload-contributed commands:
 
 ```csharp
 // src/Func.Cli/Commands/DeployCommand.cs
-internal class DeployCommand : BaseCommand, IBuiltInCommand
+internal class DeployCommand : FuncCliCommand, IBuiltInCommand
 {
     // …
 }
@@ -135,12 +135,12 @@ internal class DeployCommand : BaseCommand, IBuiltInCommand
 public static IServiceCollection AddBuiltInCommands(this IServiceCollection services)
 {
     // ... existing registrations ...
-    services.AddSingleton<BaseCommand, DeployCommand>();   // ← add this
+    services.AddSingleton<FuncCliCommand, DeployCommand>();   // ← add this
     return services;
 }
 ```
 
-`Parser.CreateCommand` resolves every `BaseCommand` from DI, partitions them into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), and adds them to the root tree. The help system picks up the new command automatically.
+`Parser.CreateCommand` resolves every `FuncCliCommand` from DI, partitions them into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), and adds them to the root tree. The help system picks up the new command automatically.
 
 ## Step 3: Add Tests
 
@@ -214,7 +214,7 @@ dotnet run --project src/Func.Cli/ -- deploy --app-name myapp --dry-run
 For grouped commands (like `func workload install`), create a parent command:
 
 ```csharp
-public class AzureCommand : BaseCommand
+public class AzureCommand : FuncCliCommand
 {
     public AzureCommand(IInteractionService interaction)
         : base("azure", "Azure resource management commands")
@@ -225,7 +225,7 @@ public class AzureCommand : BaseCommand
     }
 }
 
-public class AzureLoginCommand : BaseCommand
+public class AzureLoginCommand : FuncCliCommand
 {
     public AzureLoginCommand(IInteractionService interaction)
         : base("login", "Log in to Azure")
@@ -243,7 +243,7 @@ This produces: `func azure login`, `func azure list`.
 ## Checklist
 
 - [ ] Command class in `src/Func.Cli/Commands/`
-- [ ] Implements `IBuiltInCommand` and registered as a `BaseCommand` in `BuiltInCommands.cs`
+- [ ] Implements `IBuiltInCommand` and registered as a `FuncCliCommand` in `BuiltInCommands.cs`
 - [ ] Uses `IInteractionService` for all I/O
 - [ ] Uses `GracefulException` for user-facing errors
 - [ ] Tests cover registration, options, and happy path

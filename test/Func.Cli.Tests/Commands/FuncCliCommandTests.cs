@@ -9,7 +9,7 @@ using Xunit;
 namespace Azure.Functions.Cli.Tests.Commands;
 
 [Collection(nameof(WorkingDirectoryTests))]
-public class BaseCommandTests : IDisposable
+public class FuncCliCommandTests : IDisposable
 {
     // Use a well-known stable path so constructors don't fail when a previous
     // test left cwd in a since-deleted temp directory.
@@ -17,7 +17,7 @@ public class BaseCommandTests : IDisposable
     private readonly string _tempDir;
     private readonly TestInteractionService _interaction = new();
 
-    public BaseCommandTests()
+    public FuncCliCommandTests()
     {
         Directory.SetCurrentDirectory(_safeDir);
         _tempDir = Path.Combine(Path.GetTempPath(), $"func-base-{Guid.NewGuid():N}");

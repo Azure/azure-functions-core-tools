@@ -46,21 +46,21 @@ internal sealed class DefaultFunctionsCliBuilder : FunctionsCliBuilder
     protected override void OnRegisterCommand(FuncCommand command)
     {
         var workload = RequireWorkload();
-        Services.AddSingleton<BaseCommand>(_ => new ExternalCommand(workload, command));
+        Services.AddSingleton<FuncCliCommand>(_ => new ExternalCommand(workload, command));
     }
 
     protected override void OnRegisterCommand<TCommand>()
     {
         var workload = RequireWorkload();
         Services.AddSingleton<TCommand>();
-        Services.AddSingleton<BaseCommand>(sp =>
+        Services.AddSingleton<FuncCliCommand>(sp =>
             new ExternalCommand(workload, sp.GetRequiredService<TCommand>()));
     }
 
     protected override void OnRegisterCommand(Func<IServiceProvider, FuncCommand> factory)
     {
         var workload = RequireWorkload();
-        Services.AddSingleton<BaseCommand>(sp =>
+        Services.AddSingleton<FuncCliCommand>(sp =>
         {
             var command = factory(sp)
                 ?? throw new InvalidOperationException(
