@@ -698,5 +698,47 @@
       "enabledInTryMode": false,
       "userPrompt": []
     }
+  },
+  {
+    "id": "McpPromptTrigger-Typescript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext, PromptInvocationContext, promptArg } from \"@azure/functions\";\n\nexport async function %functionName%(promptContext: PromptInvocationContext, context: InvocationContext): Promise<string> {\n    const code = promptContext.arguments.code ?? '';\n    const language = promptContext.arguments.language ?? 'typescript';\n\n    context.log(`MCP Prompt trigger function processed a request for ${language}.`);\n\n    return `Review this ${language} code and suggest improvements:\\n\\n${code}`;\n}\n\napp.mcpPrompt('%functionName%', {\n    promptName: '%functionName%',\n    description: 'Prompt that asks an MCP client to review code and suggest improvements.',\n    promptArguments: {\n        code: promptArg.describe('The code to review').isRequired(),\n        language: promptArg.describe('Programming language for the submitted code'),\n    },\n    handler: %functionName%\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpPromptTrigger",
+      "description": "Template for an MCP prompt function.",
+      "name": "MCP Prompt Trigger",
+      "language": "TypeScript",
+      "triggerType": "mcpPromptTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "McpPromptTrigger-Javascript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, promptArg } = require('@azure/functions');\n\nasync function %functionName%(promptContext, context) {\n    const code = promptContext.arguments.code ?? '';\n    const language = promptContext.arguments.language ?? 'javascript';\n\n    context.log(`MCP Prompt trigger function processed a request for ${language}.`);\n\n    return `Review this ${language} code and suggest improvements:\\n\\n${code}`;\n}\n\napp.mcpPrompt('%functionName%', {\n    promptName: '%functionName%',\n    description: 'Prompt that asks an MCP client to review code and suggest improvements.',\n    promptArguments: {\n        code: promptArg.describe('The code to review').isRequired(),\n        language: promptArg.describe('Programming language for the submitted code'),\n    },\n    handler: %functionName%\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "mcpPromptTrigger",
+      "description": "Template for an MCP prompt function.",
+      "name": "MCP Prompt Trigger",
+      "language": "JavaScript",
+      "triggerType": "mcpPromptTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
   }
 ]
