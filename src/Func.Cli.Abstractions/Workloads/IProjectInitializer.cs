@@ -28,7 +28,9 @@ public interface IProjectInitializer
     /// </summary>
     public IReadOnlyList<Option> GetInitOptions();
 
-    /// <summary>Scaffolds a new project at <see cref="WorkloadContext.ProjectPath"/>.</summary>
+    /// <summary>
+    /// Scaffolds a new project at <see cref="WorkloadContext.WorkingDirectory"/>.
+    /// </summary>
     public Task InitializeAsync(
         InitContext context,
         ParseResult parseResult,

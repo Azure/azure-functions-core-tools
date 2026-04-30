@@ -13,17 +13,21 @@ namespace Azure.Functions.Cli.Commands;
 /// and implement ExecuteAsync for their business logic. Follows the Aspire CLI pattern
 /// where the command IS the System.CommandLine Command (no separate definition + handler).
 ///
-/// Commands that operate on a project directory should call AddPathArgument() in their
-/// constructor and ApplyPath(parseResult) in their execute method to support
-/// 'func start [path]', 'func init [path]', etc.
+/// Commands that operate on a project directory should call <see cref="AddPathArgument"/>
+/// in their constructor and read the resolved <c>WorkingDirectory</c> via
+/// <c>parseResult.GetValue(PathArgument)</c>. The location must be threaded explicitly
+/// to the rest of the command — the process cwd is not mutated.
 /// </summary>
 internal abstract class FuncCliCommand : Command
 {
     /// <summary>
-    /// Path argument for commands that operate on a project directory. Created
-    /// per command instance so each command owns its own argument graph.
+    /// Strongly-typed path argument for commands that operate on a project
+    /// directory. Created per command instance via <see cref="AddPathArgument"/>
+    /// so each command owns its own argument graph (matching the broader
+    /// instance-options pattern), and binds directly to
+    /// <see cref="Common.WorkingDirectory"/>; see <see cref="PathArgument"/>.
     /// </summary>
-    protected Argument<string?>? PathArgument { get; private set; }
+    public PathArgument? PathArgument { get; private set; }
 
     protected FuncCliCommand(string name, string description) : base(name, description)
     {
@@ -78,58 +82,7 @@ internal abstract class FuncCliCommand : Command
     /// </summary>
     protected void AddPathArgument()
     {
-        PathArgument = new("path")
-        {
-            Description = "The project directory to use (defaults to current directory)",
-            Arity = ArgumentArity.ZeroOrOne,
-            CustomParser = result =>
-            {
-                var token = result.Tokens.Count > 0 ? result.Tokens[0].Value : null;
-                if (token is not null && token.StartsWith('-'))
-                {
-                    result.AddError($"Unrecognized option '{token}'.");
-                    return null;
-                }
-                return token;
-            }
-        };
+        PathArgument = new PathArgument();
         Arguments.Add(PathArgument);
-    }
-
-    /// <summary>
-    /// If [path] was specified, validates it and changes the working directory.
-    /// Call at the start of ExecuteAsync in commands that use AddPathArgument().
-    /// When <paramref name="createIfNotExists"/> is true, the directory is created
-    /// if it does not exist (useful for init/new).
-    /// </summary>
-    protected void ApplyPath(ParseResult parseResult, bool createIfNotExists = false)
-    {
-        if (PathArgument is null)
-        {
-            return;
-        }
-
-        var path = parseResult.GetValue(PathArgument);
-        if (string.IsNullOrEmpty(path))
-        {
-            return;
-        }
-
-        var fullPath = Path.GetFullPath(path);
-        if (!Directory.Exists(fullPath))
-        {
-            if (createIfNotExists)
-            {
-                Directory.CreateDirectory(fullPath);
-            }
-            else
-            {
-                throw new GracefulException(
-                    $"The specified path does not exist: '{path}'",
-                    isUserError: true);
-            }
-        }
-
-        Directory.SetCurrentDirectory(fullPath);
     }
 }

@@ -164,9 +164,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
     {
         var packageManager = parseResult.GetValue(PackageManagerOption) ?? "npm";
         var language       = context.Language ?? "JavaScript";
-        var projectPath    = context.ProjectPath;
-
-        Directory.CreateDirectory(projectPath);
+        var projectPath    = context.WorkingDirectory.Info.FullName;
 
         await File.WriteAllTextAsync(
             Path.Combine(projectPath, "package.json"),
@@ -186,7 +184,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
 | Type | Provides |
 |------|----------|
-| `WorkloadContext` (base) | `ProjectPath` — the directory the command is operating on |
+| `WorkloadContext` (base) | `WorkingDirectory` — the directory (`DirectoryInfo` + `WasExplicit` flag) the command is operating from. The CLI guarantees `WorkingDirectory.Info` exists before invoking your initializer, so you don't need to call `Directory.CreateDirectory`. Stack-specific concepts like dotnet's `.csproj` are not modelled here; workloads add their own options for those. |
 | `InitContext` | `ProjectName`, `Language`, `Force` |
 
 Workload-specific option values flow through the `ParseResult`, so the CLI never has to know about your options.

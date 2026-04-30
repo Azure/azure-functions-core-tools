@@ -1,28 +1,26 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
-[Collection(nameof(WorkingDirectoryTests))]
 public class StartCommandTests : IDisposable
 {
-    private static readonly string _safeDir = Path.GetTempPath();
     private readonly string _tempDir;
     private readonly TestInteractionService _interaction = new();
 
     public StartCommandTests()
     {
-        Directory.SetCurrentDirectory(_safeDir);
         _tempDir = Path.Combine(Path.GetTempPath(), $"func-start-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
     }
 
     public void Dispose()
     {
-        try { Directory.SetCurrentDirectory(_safeDir); } catch { }
         if (Directory.Exists(_tempDir))
         {
             Directory.Delete(_tempDir, recursive: true);
@@ -63,5 +61,20 @@ public class StartCommandTests : IDisposable
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
         Assert.Contains("start", names);
+    }
+
+    [Fact]
+    public async Task StartCommand_NonExistentPath_ThrowsGracefulException()
+    {
+        var nonExistent = Path.Combine(_tempDir, "does-not-exist");
+        var root = TestParser.CreateRoot(_interaction);
+        var result = root.Parse($"start \"{nonExistent}\"");
+
+        // Disable the default exception handler so GracefulException propagates,
+        // matching production wiring.
+        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+        var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
+        Assert.Contains("does not exist", ex.Message);
+        Assert.Contains(nonExistent, ex.Message);
     }
 }
