@@ -9,13 +9,13 @@ The repo includes agent instructions (`AGENTS.md`) with
 conventions and patterns. Try a prompt like:
 
 > Scaffold a new "func deploy" command with options for app name and resource group.
-> Follow the command guide in docs/adding-a-command.md, register it in Parser.cs,
+> Follow the command guide in docs/adding-a-command.md, register it in BuiltInCommands.cs,
 > and add a test file.
 
 ## Quick Start
 
 1. Create a new command class in `src/Func.Cli/Commands/`
-2. Register it in `Parser.cs`
+2. Register it in `src/Func.Cli/Hosting/BuiltInCommands.cs`
 3. Add tests in `test/Func.Cli.Tests/`
 
 ## Step 1: Create the Command Class
@@ -120,28 +120,27 @@ var arg = new Argument<string>("resource") { Description = "The resource to depl
 Arguments.Add(arg);
 ```
 
-## Step 2: Register in Parser.cs
+## Step 2: Register in BuiltInCommands.cs
 
-Open `src/Func.Cli/Parser.cs` and add the command to the tree:
+Open `src/Func.Cli/Hosting/BuiltInCommands.cs` and register the command as a `BaseCommand` so the parser picks it up. Built-in commands also implement the `IBuiltInCommand` marker interface so the parser distinguishes them from workload-contributed commands:
 
 ```csharp
-public static FuncRootCommand CreateCommand(
-    IInteractionService interaction,
-    IWorkloadManager? workloadManager = null)
+// src/Func.Cli/Commands/DeployCommand.cs
+internal class DeployCommand : BaseCommand, IBuiltInCommand
 {
-    var rootCommand = new FuncRootCommand();
+    // …
+}
 
-    // ... existing commands ...
-    var deployCommand = new DeployCommand(interaction);  // ← add this
-
+// src/Func.Cli/Hosting/BuiltInCommands.cs
+public static IServiceCollection AddBuiltInCommands(this IServiceCollection services)
+{
     // ... existing registrations ...
-    rootCommand.Subcommands.Add(deployCommand);          // ← add this
-
-    // ... rest of method ...
+    services.AddSingleton<BaseCommand, DeployCommand>();   // ← add this
+    return services;
 }
 ```
 
-The help system will automatically include the new command — no additional registration needed.
+`Parser.CreateCommand` resolves every `BaseCommand` from DI, partitions them into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), and adds them to the root tree. The help system picks up the new command automatically.
 
 ## Step 3: Add Tests
 
@@ -244,7 +243,7 @@ This produces: `func azure login`, `func azure list`.
 ## Checklist
 
 - [ ] Command class in `src/Func.Cli/Commands/`
-- [ ] Registered in `Parser.CreateCommand()`
+- [ ] Implements `IBuiltInCommand` and registered as a `BaseCommand` in `BuiltInCommands.cs`
 - [ ] Uses `IInteractionService` for all I/O
 - [ ] Uses `GracefulException` for user-facing errors
 - [ ] Tests cover registration, options, and happy path

@@ -45,7 +45,8 @@ The CLI builds a `HostApplicationBuilder` at startup. Each installed workload is
 3. CLI builds the root command tree from DI
      ├── Built-in commands resolve workload-contributed services they consume
      │   (e.g. InitCommand consumes IEnumerable<IProjectInitializer>)
-     └── Every Command registered in DI is added as a root subcommand
+     └── Every command registered through builder.RegisterCommand(...) is
+         added as a root subcommand, tagged with the workload that registered it
 4. Command dispatch
 ```
 
@@ -56,7 +57,7 @@ The shape mirrors WebJobs' `IWebJobsStartup` — `Configure(FunctionsCliBuilder)
 1. Create a class library project that targets `net10.0`
 2. Reference `Azure.Functions.Cli.Abstractions`
 3. Implement `IWorkload`
-4. Inside `Configure`, register an `IProjectInitializer` (and/or top-level `Command` services, and any supporting services)
+4. Inside `Configure`, register an `IProjectInitializer` (and/or contribute top-level commands via `builder.RegisterCommand(...)`, and any supporting services)
 5. Build, package, and (once the loader ships) install with `func workload install`
 
 ## Step 1: Create the Project
@@ -115,7 +116,7 @@ public sealed class NodeWorkload : IWorkload
     public void Configure(FunctionsCliBuilder builder)
     {
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
-        // builder.Services.AddSingleton<Command>(new NodeTopLevelCommand());
+        // builder.RegisterCommand(new NodeTopLevelCommand());
         // …any other services your providers depend on
     }
 }
@@ -192,15 +193,57 @@ Workload-specific option values flow through the `ParseResult`, so the CLI never
 
 ## Step 4 (optional): Contribute New Commands
 
-For "feature" workloads that aren't tied to a stack — say a Durable Functions workload — register `Command` instances directly in DI alongside (or instead of) an `IProjectInitializer`. The CLI picks up every `Command` registered in the container and attaches it to the root.
+For "feature" workloads that aren't tied to a stack — say a Durable Functions workload — register top-level commands through `builder.RegisterCommand(...)`. Workload commands derive from `FuncCommand` (in `Azure.Functions.Cli.Workloads`), which is parser-independent: you describe the command's name, description, options, arguments, and subcommands using lightweight descriptors, and read parsed values through a `FuncCommandInvocationContext` at execution time. The CLI tracks which workload each command came from for diagnostics and collision reporting.
 
 ```csharp
-internal sealed class DurableCommand : Command
+using Azure.Functions.Cli.Workloads;
+
+internal sealed class DurableCommand : FuncCommand
 {
-    public DurableCommand() : base("durable", "Manage Durable Functions")
+    private static readonly FuncCommandOption<string> InstanceOption =
+        new("--instance-id", "-i", "Orchestration instance id");
+
+    public override string Name => "durable";
+
+    public override string Description => "Manage Durable Functions";
+
+    public override IReadOnlyList<FuncCommand> Subcommands =>
+    [
+        new ListInstancesCommand(),
+        new StartNewCommand(),
+    ];
+
+    public override Task<int> ExecuteAsync(
+        FuncCommandInvocationContext context,
+        CancellationToken cancellationToken) => Task.FromResult(0);
+
+    private sealed class ListInstancesCommand : FuncCommand
     {
-        Subcommands.Add(new Command("get-instances", "List orchestration instances"));
-        Subcommands.Add(new Command("start-new",     "Start a new orchestration"));
+        public override string Name => "get-instances";
+
+        public override string Description => "List orchestration instances.";
+
+        public override IReadOnlyList<FuncCommandOption> Options => [InstanceOption];
+
+        public override Task<int> ExecuteAsync(
+            FuncCommandInvocationContext context,
+            CancellationToken cancellationToken)
+        {
+            var instanceId = context.GetValue(InstanceOption);
+            // …list instances…
+            return Task.FromResult(0);
+        }
+    }
+
+    private sealed class StartNewCommand : FuncCommand
+    {
+        public override string Name => "start-new";
+
+        public override string Description => "Start a new orchestration.";
+
+        public override Task<int> ExecuteAsync(
+            FuncCommandInvocationContext context,
+            CancellationToken cancellationToken) => Task.FromResult(0);
     }
 }
 
@@ -213,12 +256,18 @@ public sealed class DurableWorkload : IWorkload
 
     public void Configure(FunctionsCliBuilder builder)
     {
-        builder.Services.AddSingleton<Command>(new DurableCommand());
+        // Pick the overload that fits how your command is constructed:
+        //   builder.RegisterCommand(new DurableCommand());        // simple instance
+        //   builder.RegisterCommand<DurableCommand>();            // DI-constructed
+        //   builder.RegisterCommand(sp => new DurableCommand(...)); // custom factory
+        builder.RegisterCommand<DurableCommand>();
     }
 }
 ```
 
-This produces `func durable get-instances`, `func durable start-new`, and so on.
+This produces `func durable get-instances`, `func durable start-new`, and so on. Reading parsed values goes through the supplied `FuncCommandInvocationContext` using the **same descriptor instance** the command exposes through `Options` / `Arguments` — descriptors are looked up by reference identity, so don't construct a new descriptor every time you read a value.
+
+> The host wraps your `FuncCommand` in an internal adapter that carries the owning `WorkloadInfo`, so `func` can identify the source workload in collision warnings and diagnostics. Don't register raw `System.CommandLine.Command` services through `builder.Services` — the parser only consumes commands registered through `RegisterCommand`.
 
 ## Reading Workload-Specific Options
 
@@ -272,7 +321,7 @@ Add path-scoped public + official CI pipelines in `eng/ci/` (mirror the abstract
 
 - [ ] New project in `src/Func.Cli.Workload.<Name>/`, references `Func.Cli.Abstractions` only
 - [ ] `IWorkload` with parameterless constructor and the five identity properties (`PackageId`, `PackageVersion`, `Type`, `DisplayName`, `Description`)
-- [ ] `Configure(FunctionsCliBuilder)` registers an `IProjectInitializer` and/or top-level `Command` services
+- [ ] `Configure(FunctionsCliBuilder)` registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
 - [ ] `IProjectInitializer.GetInitOptions()` returns any extra options the initializer needs
 - [ ] Test project in `test/Func.Cli.Workload.<Name>.Tests/`
 - [ ] `Directory.Build.props`, `Directory.Build.targets`, `Directory.Version.props` created

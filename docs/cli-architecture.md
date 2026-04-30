@@ -17,15 +17,21 @@ Program.cs
   │   │   ├── WithTracing → AzureMonitorTraceExporter
   │   │   └── WithMetrics → AzureMonitorMetricExporter
   │   └── WorkloadRegistration.RegisterWorkloads(FunctionsCliBuilder)
-  │       └── For each installed workload: workload.Configure(builder)
-  │           (registers IProjectInitializer, top-level Command instances, etc.)
+  │       └── For each installed workload: workload.Configure(workloadBuilder)
+  │           (workloadBuilder is scoped to the WorkloadInfo so RegisterCommand
+  │            calls tag commands with the owning workload; the builder also
+  │            registers IProjectInitializer and any supporting services)
   │
   ├── host.StartAsync()    ← OTel listeners subscribed before any tracing
   │
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
-  │   ├── Resolve built-in commands from DI (init, new, start, version, help, workload)
-  │   ├── Add every Command registered in DI (workload-contributed top-level subcommands)
+  │   ├── Resolve every BaseCommand from DI:
+  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, version, help, workload
+  │   │     └── ExternalCommand wrappers (each carries the WorkloadInfo for the
+  │   │         workload that called RegisterCommand)
+  │   ├── Skip workload commands that collide with built-ins or with each
+  │   │   other; emit a warning to stderr that names the offending workload(s)
   │   └── Replace help rendering with Spectre on all commands
   │
   ├── Wire cancellation (Ctrl+C / SIGTERM via CancellationTokenSource)
@@ -60,7 +66,7 @@ func
 └── help (hidden)         Print help
 ```
 
-Workloads can add their own subcommands by registering `Command` instances in DI (see [building-a-workload.md](building-a-workload.md)).
+Workloads can add their own subcommands by calling `builder.RegisterCommand(...)` from inside `IWorkload.Configure` (see [building-a-workload.md](building-a-workload.md)). Workload commands are described in parser-independent terms via `FuncCommand` / `FuncCommandOption` / `FuncCommandArgument`; the host wraps each one in an internal `ExternalCommand` adapter that translates the descriptors to `System.CommandLine` and tracks the registering workload for diagnostics.
 
 ## Command Architecture
 
@@ -205,9 +211,12 @@ The abstractions library exposes the surface workload authors program against:
 | Type | Role |
 |------|------|
 | `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
-| `FunctionsCliBuilder` | The DI seam handed to a workload — exposes `IServiceCollection` for service registration. Abstract base so we can grow the surface without breaking workloads. |
+| `FunctionsCliBuilder` | The DI seam handed to a workload. Exposes `Services` for plain DI registrations and `RegisterCommand(...)` overloads (instance / type / factory) for contributing top-level commands. Abstract base so we can grow the surface without breaking workloads. |
 | `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `SupportedLanguages`, contributes init options, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
 | `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
+| `FuncCommand` | Parser-independent base for workload-contributed top-level commands. Describes `Name`, `Description`, `Options`, `Arguments`, `Subcommands`, and an `ExecuteAsync(FuncCommandInvocationContext, CancellationToken)`. |
+| `FuncCommandOption` / `FuncCommandArgument` | Typed descriptors used by `FuncCommand`. Identity matters — pass the same descriptor instance to `context.GetValue(...)` to read parsed values. |
+| `FuncCommandInvocationContext` | Read parsed option / argument values without depending on `System.CommandLine`. |
 
 `WorkloadInfo` (the render-ready manifest entry consumed by `func workload list`) is a CLI-internal type — workload authors don't see it.
 
@@ -220,13 +229,20 @@ Configure (CLI startup):
     └── WorkloadRegistration.RegisterWorkloads(builder)
         ├── Discover installed workloads               ← future PR (loader)
         ├── Activate each IWorkload type
-        └── workload.Configure(builder)
+        └── workload.Configure(workloadBuilder)        ← per-workload, scoped
+                                                        to a WorkloadInfo
             └── builder.Services.AddSingleton<IProjectInitializer, …>()
-                builder.Services.AddSingleton<Command>(new MyTopLevelCommand())  // optional
+                builder.RegisterCommand(new MyTopLevelCommand())     // optional
+                builder.RegisterCommand<MyDiCommand>()               // optional
+                builder.RegisterCommand(sp => new MyFactoryCommand(...)) // optional
 
 Build commands (Parser.CreateCommand):
-  ├── Pull every Command from DI (built-ins + workload-contributed)
-  ├── Validate names are unique (throws on collision)
+  ├── Resolve every BaseCommand from DI:
+  │     ├── Built-ins (IBuiltInCommand) — names form the reserved set
+  │     └── ExternalCommand wrappers — each carries the source WorkloadInfo
+  ├── Built-in collisions throw (CLI bug); workload commands that collide with
+  │   built-ins or with each other are skipped with a warning that names the
+  │   workload(s)
   ├── InitCommand sees IEnumerable<IProjectInitializer>, attaches their options
   ├── WorkloadListCommand sees IReadOnlyList<WorkloadInfo>
   └── HelpCommand built last with a back-reference to the constructed root

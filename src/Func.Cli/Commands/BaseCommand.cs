@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.CommandLine.Help;
+using System.CommandLine.Invocation;
 using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Commands;
@@ -32,9 +34,43 @@ internal abstract class BaseCommand : Command
     }
 
     /// <summary>
-    /// Executes the command asynchronously with cancellation support.
+    /// Executes the command asynchronously with cancellation support. Parent-only
+    /// commands that have subcommands but no execution logic of their own can
+    /// inherit the default implementation, which invokes the help action wired
+    /// to the root command's <see cref="HelpOption"/> (e.g. Spectre help). The
+    /// help action itself decides which command to render help for based on
+    /// <see cref="ParseResult.CommandResult"/>, so the user sees help for this
+    /// command, not the root.
     /// </summary>
-    protected abstract Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken);
+    protected virtual Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    {
+        // SCL 2.0.6 adds HelpOption to RootCommand, not to subcommands. Walk
+        // from this command up through parents to find the nearest HelpOption.
+        Command? current = this;
+        while (current is not null)
+        {
+            var helpOption = current.Options.OfType<HelpOption>().FirstOrDefault();
+            if (helpOption?.Action is SynchronousCommandLineAction sync)
+            {
+                return Task.FromResult(sync.Invoke(parseResult));
+            }
+
+            current = current.Parents.OfType<Command>().FirstOrDefault();
+        }
+
+        // Fallback: if we still can't find a help action, look at the root
+        // result. In practice this is the same lookup, but it's defensive
+        // against constructed-but-unparented commands.
+        var rootHelp = parseResult.RootCommandResult.Command.Options.OfType<HelpOption>().FirstOrDefault();
+        if (rootHelp?.Action is SynchronousCommandLineAction rootSync)
+        {
+            return Task.FromResult(rootSync.Invoke(parseResult));
+        }
+
+        // Help action not wired (command was constructed outside Parser.CreateCommand,
+        // or there is no HelpOption). Nothing meaningful to render — return success.
+        return Task.FromResult(0);
+    }
 
     /// <summary>
     /// Adds the optional [path] argument to this command. Call from the constructor
