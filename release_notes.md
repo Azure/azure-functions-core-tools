@@ -9,6 +9,6 @@
 
 #### Changes
 
-- Fixed `func pack --python` stripping `.dist-info` directories from packaged dependencies (#4853)
-- Add support for PowerShell 7.6 (#4866)
 - Fix `func pack` throwing cryptic `Unsupported runtime: None` when `local.settings.json` is absent and `FUNCTIONS_WORKER_RUNTIME` is not set (#4829)
+- Mark Node.js 24 as GA in stacks.json (add Flex Consumption SKU) (#4867)
+- Surface SSL/TLS certificate errors clearly when SSL inspection proxies intercept connections (#4857)
