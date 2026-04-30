@@ -34,7 +34,7 @@ public abstract class FuncCommandOption
     public string Description { get; }
 
     /// <summary>Type-erased view of the value type carried by this option (used by the parser adapter to construct a typed parser option).</summary>
-    internal abstract Type ValueType { get; }
+    public abstract Type ValueType { get; }
 }
 
 /// <summary>
@@ -76,5 +76,5 @@ public sealed class FuncCommandOption<T> : FuncCommandOption
     /// </summary>
     public T DefaultValue { get; }
 
-    internal override Type ValueType => typeof(T);
+    public override Type ValueType => typeof(T);
 }

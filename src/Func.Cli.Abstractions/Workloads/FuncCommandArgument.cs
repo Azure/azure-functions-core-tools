@@ -38,7 +38,7 @@ public abstract class FuncCommandArgument
     public bool IsRequired { get; }
 
     /// <summary>The runtime value type carried by this argument (used by the parser adapter).</summary>
-    internal abstract Type ValueType { get; }
+    public abstract Type ValueType { get; }
 }
 
 /// <summary>
@@ -54,5 +54,5 @@ public sealed class FuncCommandArgument<T> : FuncCommandArgument
     {
     }
 
-    internal override Type ValueType => typeof(T);
+    public override Type ValueType => typeof(T);
 }

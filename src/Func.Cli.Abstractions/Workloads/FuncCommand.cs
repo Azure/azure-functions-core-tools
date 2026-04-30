@@ -9,14 +9,6 @@ namespace Azure.Functions.Cli.Workloads;
 /// type/factory overloads); the host wraps it in an internal adapter that maps the
 /// declared <see cref="Options"/>, <see cref="Arguments"/>, and <see cref="Subcommands"/>
 /// onto the underlying parser and tracks which workload owns the registration.
-///
-/// The contract is intentionally parser-independent — workload authors describe their
-/// command shape with <see cref="FuncCommandOption"/> / <see cref="FuncCommandArgument"/>
-/// descriptors and read parsed values through <see cref="FuncCommandInvocationContext"/>,
-/// so the CLI can change parser implementations without breaking workloads.
-///
-/// Implementations are typically singletons; do not assume a fresh instance per
-/// invocation.
 /// </summary>
 public abstract class FuncCommand
 {
@@ -57,7 +49,5 @@ public abstract class FuncCommand
     /// this command (reference identity is required).
     /// </summary>
     /// <returns>Process exit code. <c>0</c> for success.</returns>
-    public abstract Task<int> ExecuteAsync(
-        FuncCommandInvocationContext context,
-        CancellationToken cancellationToken);
+    public abstract Task<int> ExecuteAsync(FuncCommandInvocationContext context, CancellationToken cancellationToken);
 }
