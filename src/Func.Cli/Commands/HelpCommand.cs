@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal class HelpCommand : BaseCommand
 {
-    public static readonly Argument<string?> CommandArgument = new("command")
+    public Argument<string?> CommandArgument { get; } = new("command")
     {
         Description = "The command to get help for.",
         Arity = ArgumentArity.ZeroOrOne
@@ -21,15 +21,18 @@ internal class HelpCommand : BaseCommand
 
     private readonly IInteractionService _interaction;
     private readonly FuncRootCommand _rootCommand;
+    private readonly VersionCommand _versionCommand;
 
-    public HelpCommand(IInteractionService interaction, FuncRootCommand rootCommand)
+    public HelpCommand(IInteractionService interaction, FuncRootCommand rootCommand, VersionCommand versionCommand)
         : base("help", "Show help information for Azure Functions CLI.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(rootCommand);
+        ArgumentNullException.ThrowIfNull(versionCommand);
         Hidden = true;
         _interaction = interaction;
         _rootCommand = rootCommand;
+        _versionCommand = versionCommand;
         Arguments.Add(CommandArgument);
     }
 
@@ -45,7 +48,7 @@ internal class HelpCommand : BaseCommand
     /// <summary>Shows top-level help: product banner, command list, global options.</summary>
     internal int ShowGeneralHelp()
     {
-        var version = VersionCommand.GetVersion();
+        var version = _versionCommand.GetVersion();
 
         _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
@@ -200,7 +203,7 @@ internal class HelpCommand : BaseCommand
         });
     }
 
-    private static string FormatOptionName(Option option)
+    private string FormatOptionName(Option option)
     {
         var names = new List<string> { option.Name };
         names.AddRange(option.Aliases.Where(a => a != option.Name));

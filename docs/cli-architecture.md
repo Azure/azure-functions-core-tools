@@ -93,17 +93,17 @@ Provides shared infrastructure:
 
 ### Option/Argument Conventions
 
-Options and arguments are defined as `static readonly` fields on the command class:
+Options and arguments are defined as instance properties on the command class so each resolved command owns its own option instances (no shared mutable parser state across tests):
 
 ```csharp
 // Option with short alias and default value
-public static readonly Option<string> NameOption = new("--name", "-n")
+public Option<string> NameOption { get; } = new("--name", "-n")
 {
     Description = "The name of the function app project"
 };
 
 // Option with default value factory
-public static readonly Option<string> FrameworkOption = new("--target-framework")
+public Option<string> FrameworkOption { get; } = new("--target-framework")
 {
     Description = "The target framework (default: net10.0)",
     DefaultValueFactory = _ => "net10.0"

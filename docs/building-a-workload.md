@@ -148,7 +148,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
     // Workload-specific options. Attached to `func init` during command construction
     // and visible in --help. Read back inside InitializeAsync via the ParseResult.
-    public static readonly Option<string> PackageManagerOption = new("--package-manager")
+    public Option<string> PackageManagerOption { get; } = new("--package-manager")
     {
         Description = "The package manager to use (npm, yarn, pnpm)",
         DefaultValueFactory = _ => "npm"

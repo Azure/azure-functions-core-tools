@@ -12,38 +12,38 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal class StartCommand : BaseCommand, IBuiltInCommand
 {
-    public static readonly Option<int?> PortOption = new("--port", "-p")
+    public Option<int?> PortOption { get; } = new("--port", "-p")
     {
         Description = "The port to listen on (default: 7071)"
     };
 
-    public static readonly Option<string?> CorsOption = new("--cors")
+    public Option<string?> CorsOption { get; } = new("--cors")
     {
         Description = "A comma-separated list of CORS origins"
     };
 
-    public static readonly Option<bool> CorsCredentialsOption = new("--cors-credentials")
+    public Option<bool> CorsCredentialsOption { get; } = new("--cors-credentials")
     {
         Description = "Allow cross-origin authenticated requests"
     };
 
-    public static readonly Option<string[]?> FunctionsOption = new("--functions")
+    public Option<string[]?> FunctionsOption { get; } = new("--functions")
     {
         Description = "A space-separated list of functions to load",
         Arity = ArgumentArity.ZeroOrMore
     };
 
-    public static readonly Option<bool> NoBuildOption = new("--no-build")
+    public Option<bool> NoBuildOption { get; } = new("--no-build")
     {
         Description = "Do not build the project before running"
     };
 
-    public static readonly Option<bool> EnableAuthOption = new("--enable-auth")
+    public Option<bool> EnableAuthOption { get; } = new("--enable-auth")
     {
         Description = "Enable full authentication handling"
     };
 
-    public static readonly Option<string?> HostVersionOption = new("--host-version")
+    public Option<string?> HostVersionOption { get; } = new("--host-version")
     {
         Description = "The host runtime version to use (e.g., 4.1049.0)"
     };

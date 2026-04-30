@@ -50,7 +50,7 @@ internal class VersionCommand : BaseCommand, IBuiltInCommand
         return 0;
     }
 
-    public static string GetVersion()
+    public string GetVersion()
     {
         return Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -60,7 +60,7 @@ internal class VersionCommand : BaseCommand, IBuiltInCommand
             ?? "unknown";
     }
 
-    private static string GetInformationalVersion()
+    private string GetInformationalVersion()
     {
         return Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()

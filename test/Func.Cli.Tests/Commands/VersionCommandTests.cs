@@ -33,7 +33,7 @@ public class VersionCommandTests
     [Fact]
     public void GetVersion_ReturnsNonEmptyString()
     {
-        var version = VersionCommand.GetVersion();
+        var version = new VersionCommand(_interaction).GetVersion();
 
         Assert.False(string.IsNullOrWhiteSpace(version));
         Assert.Contains("5.0.0", version);
