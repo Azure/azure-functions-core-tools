@@ -45,9 +45,9 @@ if (CliTelemetry.TryGetConnectionString(out var connectionString))
 // workload-contributed commands.
 hostBuilder.Services.AddBuiltInCommands();
 
-// Storage subsystem: bind WorkloadPathsOptions from configuration so the
-// FUNC_CLI_HOME env var flows through. Strip the FUNC_CLI_ prefix so the
-// env var maps directly to the option property name.
+// Storage subsystem: bind WorkloadPathsOptions from the "Workloads" config
+// section so the FUNC_CLI_Workloads__Home env var flows through (the
+// FUNC_CLI_ prefix is stripped, "__" maps to section nesting).
 hostBuilder.Configuration.AddEnvironmentVariables(prefix: "FUNC_CLI_");
 hostBuilder.Services.AddWorkloadStorage(hostBuilder.Configuration);
 

@@ -11,13 +11,14 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 public class GlobalManifestStoreTests : IDisposable
 {
     private readonly string _tempHome;
+    private readonly WorkloadPaths _paths;
     private readonly GlobalManifestStore _store;
 
     public GlobalManifestStoreTests()
     {
         _tempHome = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        _store = new GlobalManifestStore(
-            Options.Create(new WorkloadPathsOptions { Home = _tempHome }));
+        _paths = new WorkloadPaths(Options.Create(new WorkloadPathsOptions { Home = _tempHome }));
+        _store = new GlobalManifestStore(_paths);
     }
 
     public void Dispose()
@@ -29,121 +30,153 @@ public class GlobalManifestStoreTests : IDisposable
     }
 
     [Fact]
-    public void Read_ReturnsEmptyManifest_WhenFileMissing()
+    public async Task GetWorkloadsAsync_ReturnsEmpty_WhenManifestMissing()
     {
-        var manifest = _store.Read();
+        var workloads = await _store.GetWorkloadsAsync();
 
-        Assert.NotNull(manifest);
-        Assert.Empty(manifest.Workloads);
+        Assert.Empty(workloads);
     }
 
     [Fact]
-    public void WriteThenRead_RoundTripsAllFields()
+    public async Task SaveWorkloadAsync_InsertsNewEntry()
     {
-        var original = new GlobalManifest
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "1.0.0"));
+
+        var workloads = await _store.GetWorkloadsAsync();
+        var entry = Assert.Single(workloads);
+        Assert.Equal("Azure.Functions.Cli.Workload.Dotnet", entry.PackageId);
+        Assert.Equal("1.0.0", entry.Version);
+    }
+
+    [Fact]
+    public async Task SaveWorkloadAsync_ReplacesExistingEntry_BySamePackageId()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "2.0.0"));
+
+        var workloads = await _store.GetWorkloadsAsync();
+        var entry = Assert.Single(workloads);
+        Assert.Equal("2.0.0", entry.Version);
+    }
+
+    [Fact]
+    public async Task SaveWorkloadAsync_MatchesPackageId_CaseInsensitively()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("azure.functions.cli.workload.dotnet", "2.0.0"));
+
+        var workloads = await _store.GetWorkloadsAsync();
+        Assert.Single(workloads);
+    }
+
+    [Fact]
+    public async Task RemoveWorkloadAsync_ReturnsFalse_WhenEntryAbsent()
+    {
+        var removed = await _store.RemoveWorkloadAsync("does.not.exist");
+
+        Assert.False(removed);
+    }
+
+    [Fact]
+    public async Task RemoveWorkloadAsync_RemovesEntry_AndReturnsTrue()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("a", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("b", "1.0.0"));
+
+        var removed = await _store.RemoveWorkloadAsync("A");
+
+        Assert.True(removed);
+        var workloads = await _store.GetWorkloadsAsync();
+        Assert.Equal(new[] { "b" }, workloads.Select(w => w.PackageId));
+    }
+
+    [Fact]
+    public async Task GetWorkloadsAsync_RoundTripsAllFields()
+    {
+        var entry = new GlobalManifestEntry
         {
-            Workloads =
+            PackageId = "Azure.Functions.Cli.Workload.Dotnet",
+            DisplayName = "Dotnet",
+            Description = "DotNet workload",
+            Version = "1.0.0",
+            Aliases = new[] { "dotnet", "dotnet-isolated" },
+            InstallPath = Path.Combine(_tempHome, "workloads", "dotnet", "1.0.0"),
+            EntryPoint = new EntryPointSpec
             {
-                new GlobalManifestEntry
-                {
-                    PackageId = "Azure.Functions.Cli.Workload.Dotnet",
-                    DisplayName = "Dotnet",
-                    Description = "DotNet workload",
-                    Version = "1.0.0",
-                    Aliases = new[] { "dotnet", "dotnet-isolated" },
-                    InstallPath = Path.Combine(_tempHome, "workloads", "Azure.Functions.Cli.Workload.Dotnet", "1.0.0"),
-                    EntryPoint = new EntryPointSpec
-                    {
-                        Assembly = "lib/net10.0/Azure.Functions.Cli.Workload.Dotnet.dll",
-                        Type = "Azure.Functions.Cli.Workload.Dotnet.DotnetWorkload",
-                    },
-                },
+                Assembly = "lib/net10.0/Foo.dll",
+                Type = "Foo.DotnetWorkload",
             },
         };
 
-        _store.Write(original);
-        var roundTripped = _store.Read();
+        await _store.SaveWorkloadAsync(entry);
+        var actual = (await _store.GetWorkloadsAsync()).Single();
 
-        var entry = Assert.Single(roundTripped.Workloads);
-        var expected = original.Workloads[0];
-        Assert.Equal(expected.PackageId, entry.PackageId);
-        Assert.Equal(expected.DisplayName, entry.DisplayName);
-        Assert.Equal(expected.Description, entry.Description);
-        Assert.Equal(expected.Version, entry.Version);
-        Assert.Equal(expected.Aliases, entry.Aliases);
-        Assert.Equal(expected.InstallPath, entry.InstallPath);
-        Assert.Equal(expected.EntryPoint.Assembly, entry.EntryPoint.Assembly);
-        Assert.Equal(expected.EntryPoint.Type, entry.EntryPoint.Type);
+        Assert.Equal(entry.PackageId, actual.PackageId);
+        Assert.Equal(entry.DisplayName, actual.DisplayName);
+        Assert.Equal(entry.Description, actual.Description);
+        Assert.Equal(entry.Version, actual.Version);
+        Assert.Equal(entry.Aliases, actual.Aliases);
+        Assert.Equal(entry.InstallPath, actual.InstallPath);
+        Assert.Equal(entry.EntryPoint.Assembly, actual.EntryPoint.Assembly);
+        Assert.Equal(entry.EntryPoint.Type, actual.EntryPoint.Type);
     }
 
     [Fact]
-    public void Write_CreatesHomeDirectory_WhenMissing()
-    {
-        Assert.False(Directory.Exists(_tempHome));
-
-        _store.Write(new GlobalManifest());
-
-        Assert.True(File.Exists(Path.Combine(_tempHome, WorkloadPathsOptions.GlobalManifestFileName)));
-    }
-
-    [Fact]
-    public void Read_ThrowsGracefulException_OnMalformedJson()
+    public async Task SaveWorkloadAsync_ThrowsGracefulException_OnMalformedManifest()
     {
         Directory.CreateDirectory(_tempHome);
-        var manifestPath = Path.Combine(_tempHome, WorkloadPathsOptions.GlobalManifestFileName);
-        File.WriteAllText(manifestPath, "{ not valid json");
+        File.WriteAllText(_paths.GlobalManifestPath, "{ not valid json");
 
-        var ex = Assert.Throws<GracefulException>(() => _store.Read());
+        var ex = await Assert.ThrowsAsync<GracefulException>(
+            () => _store.SaveWorkloadAsync(NewEntry("a", "1.0.0")));
         Assert.True(ex.IsUserError);
-        Assert.Contains(manifestPath, ex.Message);
+        Assert.Contains(_paths.GlobalManifestPath, ex.Message);
     }
 
     [Fact]
-    public void Write_LeavesNoTempFile_OnSuccess()
+    public async Task SaveWorkloadAsync_LeavesNoTempFile_OnSuccess()
     {
-        _store.Write(new GlobalManifest());
+        await _store.SaveWorkloadAsync(NewEntry("a", "1.0.0"));
 
         var stragglers = Directory.GetFiles(_tempHome, "*.json.tmp");
         Assert.Empty(stragglers);
     }
 
     [Fact]
-    public void Write_PreservesPreviousManifest_OnRepeatedWrites()
+    public async Task SaveWorkloadAsync_PreservesPreviousManifest_WhenSerializationFails()
     {
-        // Atomic-rename guarantees the final path always points at a fully
-        // written file — never a partial one. Roundtripping after multiple
-        // writes proves the rename actually happened and the file is intact.
-        _store.Write(new GlobalManifest
-        {
-            Workloads =
-            {
-                new GlobalManifestEntry
-                {
-                    PackageId = "first",
-                    DisplayName = "first",
-                    Version = "1.0.0",
-                    InstallPath = "/tmp/first",
-                    EntryPoint = new EntryPointSpec { Assembly = "a.dll", Type = "T" },
-                },
-            },
-        });
+        // Establish a baseline good manifest.
+        await _store.SaveWorkloadAsync(NewEntry("baseline", "1.0.0"));
+        var baselineBytes = File.ReadAllBytes(_paths.GlobalManifestPath);
 
-        _store.Write(new GlobalManifest
-        {
-            Workloads =
-            {
-                new GlobalManifestEntry
-                {
-                    PackageId = "second",
-                    DisplayName = "second",
-                    Version = "2.0.0",
-                    InstallPath = "/tmp/second",
-                    EntryPoint = new EntryPointSpec { Assembly = "b.dll", Type = "T" },
-                },
-            },
-        });
+        // Now use a store that throws mid-serialize and assert the original
+        // manifest is byte-identical and no temp file leaks. This is the only
+        // test that actually proves the atomic-rename guarantee.
+        var failingStore = new ThrowingSerializeStore(_paths);
 
-        var entry = Assert.Single(_store.Read().Workloads);
-        Assert.Equal("second", entry.PackageId);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => failingStore.SaveWorkloadAsync(NewEntry("would-be-second", "2.0.0")));
+
+        Assert.Equal(baselineBytes, File.ReadAllBytes(_paths.GlobalManifestPath));
+        Assert.Empty(Directory.GetFiles(_tempHome, "*.json.tmp"));
+    }
+
+    private static GlobalManifestEntry NewEntry(string packageId, string version)
+        => new()
+        {
+            PackageId = packageId,
+            DisplayName = packageId,
+            Version = version,
+            InstallPath = $"/tmp/{packageId}/{version}",
+            EntryPoint = new EntryPointSpec { Assembly = "x.dll", Type = "X" },
+        };
+
+    private sealed class ThrowingSerializeStore(IWorkloadPaths paths) : GlobalManifestStore(paths)
+    {
+        internal override Task SerializeAsync(
+            Stream stream,
+            GlobalManifest manifest,
+            CancellationToken cancellationToken)
+            => throw new InvalidOperationException("boom");
     }
 }

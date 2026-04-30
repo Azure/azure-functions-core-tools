@@ -1,43 +1,29 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.ComponentModel.DataAnnotations;
+
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
-/// Filesystem layout for installed workloads. Bound from <see cref="Microsoft.Extensions.Configuration.IConfiguration"/>
-/// at startup so tests can inject a temp directory without mutating process-global env state.
-/// Default <see cref="Home"/> is <c>~/.azure-functions</c>; override via the
-/// <c>FUNC_CLI_HOME</c> environment variable.
+/// Pure configuration data for workload storage. Bound from the
+/// <c>Workloads</c> configuration section at startup; the corresponding
+/// environment variable is <c>FUNC_CLI_Workloads__Home</c>.
 /// </summary>
+/// <remarks>
+/// This type intentionally carries no behavior — path composition lives on
+/// <see cref="IWorkloadPaths"/>. Tests inject this via <c>Options.Create(...)</c>
+/// without touching process-global state.
+/// </remarks>
 internal sealed class WorkloadPathsOptions
 {
     /// <summary>
-    /// Filename of the global workload manifest within <see cref="Home"/>.
+    /// Root directory the func CLI persists workloads under. Defaults to
+    /// <c>~/.azure-functions</c>.
     /// </summary>
-    public const string GlobalManifestFileName = "workloads.json";
-
-    /// <summary>
-    /// Root for everything the func CLI persists for the user. Settable so
-    /// the Options binder can populate it from configuration; in tests, set
-    /// directly to a temp path.
-    /// </summary>
+    [Required]
+    [MinLength(1)]
     public string Home { get; set; } = DefaultHome();
-
-    /// <summary>
-    /// Directory containing all installed workload packages.
-    /// </summary>
-    public string WorkloadsRoot => Path.Combine(Home, "workloads");
-
-    /// <summary>
-    /// Absolute path to the global workload manifest file.
-    /// </summary>
-    public string GlobalManifestPath => Path.Combine(Home, GlobalManifestFileName);
-
-    /// <summary>
-    /// Per-package install directory inside <see cref="WorkloadsRoot"/>, namespaced by version.
-    /// </summary>
-    public string GetInstallDirectory(string packageId, string version)
-        => Path.Combine(WorkloadsRoot, packageId, version);
 
     private static string DefaultHome()
         => Path.Combine(
