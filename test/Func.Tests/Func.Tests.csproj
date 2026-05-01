@@ -10,4 +10,13 @@
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
   </ItemGroup>
 
+  <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Func.Tests.Fixtures.Workload\Func.Tests.Fixtures.Workload.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <OutputItemType>Content</OutputItemType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+
 </Project>
