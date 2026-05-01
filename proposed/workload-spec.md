@@ -177,6 +177,12 @@ metadata the CLI needs is split between two sources:
     - `description` → one-line summary shown in `func workload list`.
     - `tags` → space-separated short aliases (e.g. `dotnet csharp`)
       the user can pass to `install` / `uninstall` instead of the full id.
+    - `packageTypes` → **must** include a `FuncCliWorkload` entry. This
+      is how the CLI (and the catalog) distinguish workload packages
+      from arbitrary NuGets. Packages without this package type are
+      rejected at install time and excluded from `func workload search`
+      results. Modeled on the .NET CLI's `DotnetTool` package type
+      (e.g. `?packageType=dotnettool` on the NuGet search API).
 2. **Assembly attribute** — `[assembly: ExportCliWorkload<T>]` declares
    the entry-point type. The install pipeline scans for it once and
    records `(assembly path, type FQN)` in the global manifest.
@@ -207,11 +213,14 @@ install` / `uninstall`.
 
 ### 6.1 Install
 
-1. Resolve `<id>` to a package via the catalog (NuGet by default).
+1. Resolve `<id>` to a package via the catalog (NuGet by default),
+   filtered to packages declaring the `FuncCliWorkload` package type.
 2. Download to a staging directory.
-3. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`).
+3. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`,
+   `packageTypes`). Reject the package if `FuncCliWorkload` is not
+   among its declared package types.
 4. Scan the package's top-level assemblies for `[assembly:
-   ExportCliWorkload<T>]`. Exactly one assembly must declare it — zero
+   ExportCliWorkload<T>]`. Exactly one assembly must declare it; zero
    or multiple is a fatal install error.
 5. Atomically move into `~/.azure-functions/workloads/<id>/<version>/`.
 6. Update the global manifest `~/.azure-functions/workloads.json`,
