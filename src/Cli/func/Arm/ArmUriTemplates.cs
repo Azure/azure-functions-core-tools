@@ -17,12 +17,9 @@ namespace Azure.Functions.Cli.Arm
         public const string BasicAuthCheckApiVersion = "2022-03-01";
         public const string FunctionsStacksApiVersion = "2020-10-01";
         public const string FlexFunctionsStacksApiVersion = "2020-10-01";
-        public const string StorageApiVersion = "2018-02-01";
         public const string ArgUri = "providers/Microsoft.ResourceGraph/resources";
 
         public static readonly ArmUriTemplate SubscriptionResourceByNameAndType = new ArmUriTemplate($"resources?$filter=(SubscriptionId eq '{{subscriptionId}}' and name eq '{{resourceName}}' and resourceType eq '{{resourceType}}')", ArmApiVersion);
-        public static readonly ArmUriTemplate StorageAccountsList = new ArmUriTemplate("subscriptions/{subscriptionId}/providers/Microsoft.Storage/storageAccounts", StorageApiVersion);
-        public static readonly ArmUriTemplate StorageAccountByResourceGroup = new ArmUriTemplate("subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}", StorageApiVersion);
     }
 
     public class ArmUriTemplate
