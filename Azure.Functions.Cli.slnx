@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Abstractions/Abstractions.csproj" />
+    <Project Path="src/Func/Func.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Func.Tests/Func.Tests.csproj" />
+  </Folder>
+</Solution>

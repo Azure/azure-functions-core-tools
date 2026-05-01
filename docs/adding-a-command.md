@@ -14,16 +14,16 @@ conventions and patterns. Try a prompt like:
 
 ## Quick Start
 
-1. Create a new command class in `src/Func.Cli/Commands/`
-2. Register it in `src/Func.Cli/Hosting/BuiltInCommands.cs`
-3. Add tests in `test/Func.Cli.Tests/`
+1. Create a new command class in `src/Func/Commands/`
+2. Register it in `src/Func/Hosting/BuiltInCommands.cs`
+3. Add tests in `test/Func.Tests/`
 
 ## Step 1: Create the Command Class
 
-Create a new file in `src/Func.Cli/Commands/`. All commands extend `FuncCliCommand`.
+Create a new file in `src/Func/Commands/`. All commands extend `FuncCliCommand`.
 
 ```csharp
-// src/Func.Cli/Commands/DeployCommand.cs
+// src/Func/Commands/DeployCommand.cs
 
 using System.CommandLine;
 using Azure.Functions.Cli.Common;
@@ -124,16 +124,16 @@ Arguments.Add(arg);
 
 ## Step 2: Register in BuiltInCommands.cs
 
-Open `src/Func.Cli/Hosting/BuiltInCommands.cs` and register the command as a `FuncCliCommand` so the parser picks it up. Built-in commands also implement the `IBuiltInCommand` marker interface so the parser distinguishes them from workload-contributed commands:
+Open `src/Func/Hosting/BuiltInCommands.cs` and register the command as a `FuncCliCommand` so the parser picks it up. Built-in commands also implement the `IBuiltInCommand` marker interface so the parser distinguishes them from workload-contributed commands:
 
 ```csharp
-// src/Func.Cli/Commands/DeployCommand.cs
+// src/Func/Commands/DeployCommand.cs
 internal class DeployCommand : FuncCliCommand, IBuiltInCommand
 {
     // …
 }
 
-// src/Func.Cli/Hosting/BuiltInCommands.cs
+// src/Func/Hosting/BuiltInCommands.cs
 public static IServiceCollection AddBuiltInCommands(this IServiceCollection services)
 {
     // ... existing registrations ...
@@ -146,10 +146,10 @@ public static IServiceCollection AddBuiltInCommands(this IServiceCollection serv
 
 ## Step 3: Add Tests
 
-Create a test file in `test/Func.Cli.Tests/Commands/`:
+Create a test file in `test/Func.Tests/Commands/`:
 
 ```csharp
-// test/Func.Cli.Tests/Commands/DeployCommandTests.cs
+// test/Func.Tests/Commands/DeployCommandTests.cs
 
 using Azure.Functions.Cli.Commands;
 using Xunit;
@@ -205,10 +205,10 @@ public class DeployCommandTests
 dotnet build
 
 # Run tests
-dotnet test test/Func.Cli.Tests/
+dotnet test test/Func.Tests/
 
 # Try it locally
-dotnet run --project src/Func.Cli/ -- deploy --app-name myapp --dry-run
+dotnet run --project src/Func/ -- deploy --app-name myapp --dry-run
 ```
 
 ## Adding Nested Subcommands
@@ -244,7 +244,7 @@ This produces: `func azure login`, `func azure list`.
 
 ## Checklist
 
-- [ ] Command class in `src/Func.Cli/Commands/`
+- [ ] Command class in `src/Func/Commands/`
 - [ ] Implements `IBuiltInCommand` and registered as a `FuncCliCommand` in `BuiltInCommands.cs`
 - [ ] Uses `IInteractionService` for all I/O
 - [ ] Uses `GracefulException` for user-facing errors

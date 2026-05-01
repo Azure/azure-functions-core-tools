@@ -3,7 +3,7 @@ $rootDir = Resolve-Path $rootDir
 
 $logFilePath = "$rootDir/build.log"
 $skipCveFilePath = "$rootDir/skipPackagesCve.json"
-$projectPath = "$rootDir/src/Func.Cli"
+$projectPath = "$rootDir/src/Func"
 
 if (-not (Test-Path $projectPath))
 {

@@ -5,19 +5,18 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>Azure.Functions.Cli</RootNamespace>
     <AssemblyName>func</AssemblyName>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>$(TopLevelNamespace)</RootNamespace>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <PackageId>Azure.Functions.Cli</PackageId>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Func.Cli.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj" />
+    <ProjectReference Include="../Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

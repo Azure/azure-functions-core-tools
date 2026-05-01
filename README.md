@@ -39,14 +39,19 @@ The v5 CLI is a ground-up rebuild using:
 
 ```
 src/
-  Func.Cli/               # CLI application
+  Func/                    # CLI application
     Commands/              # Command definitions (one file per command)
     Console/               # Console output abstractions (Spectre wrappers)
     Workloads/             # Workload engine (contracts, manager, manifest)
     Program.cs             # Entry point with DI wiring
     Parser.cs              # Command tree composition
+  Abstractions/            # Public abstractions
+  Workload/
+    <Name>/                # An individual workload
 test/
-  Func.Cli.Tests/          # Unit tests (xUnit + NSubstitute)
+  Func.Tests/              # Unit tests core cli (xUnit + NSubstitute)
+  Workload/
+    <Name>.Tests/          # Unit tests for a workload
 eng/
   build/                   # MSBuild props and targets
   ci/                      # CI pipeline definitions (Azure DevOps)
@@ -55,6 +60,7 @@ eng/
 docs/
   vnext.md                 # v5 design document
   modernization.md         # Modernization design document
+Azure.Functions.Cli.slnx   # Solution file
 ```
 
 ## Development
@@ -78,18 +84,18 @@ dotnet test
 
 ```bash
 # Option 1 — dotnet run
-dotnet run --project src/Func.Cli -- <command> [args]
+dotnet run --project src/Func -- <command> [args]
 
 # Option 2 — add to PATH
-export PATH="$PATH:$(pwd)/out/bin/Func.Cli/debug"
+export PATH="$PATH:$(pwd)/out/bin/Func/debug"
 func <command>
 ```
 
 ### Publish a Self-Contained Build
 
 ```bash
-dotnet publish src/Func.Cli/Func.Cli.csproj -c Release -r osx-arm64
-./out/pub/Func.Cli/release_osx-arm64/func --version
+dotnet publish src/Func/Func.csproj -c Release -r osx-arm64
+./out/pub/Func/release_osx-arm64/func --version
 ```
 
 Common runtime identifiers: `osx-arm64`, `osx-x64`, `linux-x64`, `win-x64`

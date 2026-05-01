@@ -2,7 +2,7 @@
 """
 extract_commands.py — Extract CLI command metadata from azure-functions-core-tools source.
 
-Parses command definitions from C# files in src/Func.Cli/Commands/.
+Parses command definitions from C# files in src/Func/Commands/.
 Outputs a JSON manifest of all commands and their arguments.
 
 TODO: This script still uses v4's [Action(...)] attribute parsing logic.
@@ -102,7 +102,7 @@ def parse_arguments(content: str) -> list[dict]:
 
 def extract_commands(repo_root: str) -> dict:
     """Walk the Commands directory and extract all command metadata."""
-    commands_dir = Path(repo_root) / "src" / "Func.Cli" / "Commands"
+    commands_dir = Path(repo_root) / "src" / "Func" / "Commands"
     if not commands_dir.exists():
         print(f"Error: Commands directory not found at {commands_dir}", file=sys.stderr)
         sys.exit(1)

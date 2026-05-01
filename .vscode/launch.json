@@ -6,7 +6,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/out/bin/Func.Cli/debug/func.dll",
+            "program": "${workspaceFolder}/out/bin/Func/debug/func.dll",
             "env": {
                 "CLI_DEBUG": "1"
             },

@@ -9,7 +9,7 @@ trigger:
     - release/*
   paths:
     include:
-    - src/Func.Cli.Abstractions/**
+    - src/Abstractions/**
     - eng/ci/abstractions-official-build.yml
     - eng/ci/templates/jobs/test-abstractions.yml
     - eng/ci/templates/steps/build-abstractions.yml

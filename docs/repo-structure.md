@@ -11,10 +11,14 @@ The v5 CLI is built with [System.CommandLine](https://github.com/dotnet/command-
 ```
 azure-functions-core-tools/
 ├── src/
-│   ├── Func.Cli/                      # Main CLI executable (assembly: func)
-│   └── Func.Cli.Abstractions/         # Shared types for workload authors (NuGet)
+│   ├── Func/                          # Main CLI executable (assembly: func)
+│   └── Abstractions/                  # Shared types for workload authors (NuGet)
+|   └── Workload/
+|       └── <Name>/                    # Individual workload projects
 ├── test/
-│   └── Func.Cli.Tests/                # CLI unit tests
+│   └── Func.Tests/                    # CLI unit tests
+|   └── Workload/
+|       └── <Name>.Tests/              # Individual workload tests
 ├── eng/
 │   ├── build/                         # MSBuild props/targets
 │   │   ├── Packages.props             # Central package version pins
@@ -33,7 +37,7 @@ azure-functions-core-tools/
 
 ## Projects
 
-### `src/Func.Cli` — The CLI Executable
+### `src/Func` — The CLI Executable
 
 The main tool users install and run. Assembly name is `func`.
 
@@ -49,9 +53,9 @@ The main tool users install and run. Assembly name is `func`.
 | `Program.cs`       | Entry point — host, telemetry, command tree, error handling |
 | `Parser.cs`        | Command tree composition — resolves every `FuncCliCommand` from DI, partitions into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), wires Spectre help |
 
-### `src/Func.Cli.Abstractions` — Workload Contracts
+### `src/Abstractions` — Workload Contracts
 
-A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public types workload authors program against. Workload authors reference this package — they never reference `Func.Cli` directly.
+A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public types workload authors program against. Workload authors reference this package — they never reference `Func` cli directly.
 
 | File / Type | Role |
 |-------------|------|
@@ -83,7 +87,7 @@ Each project also has its own `Directory.Version.props` for independent versioni
 dotnet restore                          # Restore packages
 dotnet build                            # Build all projects in the solution
 dotnet test                             # Run all tests
-dotnet publish src/Func.Cli/            # Publish CLI for distribution
+dotnet publish src/Func/                # Publish CLI for distribution
 ```
 
 ### Output Structure
@@ -103,7 +107,7 @@ Each component has its own CI pipeline with **path-scoped triggers**, enabling i
 |----------|------|-------------|
 | CLI public build | `eng/ci/cli-public-build.yml` | PRs touching the CLI, nightly schedule |
 | CLI official build | `eng/ci/cli-official-build.yml` | Release branches |
-| Abstractions public | `eng/ci/abstractions-public-build.yml` | PRs touching `src/Func.Cli.Abstractions/` |
+| Abstractions public | `eng/ci/abstractions-public-build.yml` | PRs touching `src/Abstractions/` |
 | Abstractions official | `eng/ci/abstractions-official-build.yml` | Release builds, NuGet pack |
 | Code mirror | `eng/ci/code-mirror.yml` | Mirror to engineering repo |
 
@@ -115,7 +119,7 @@ Each component has its own CI pipeline with **path-scoped triggers**, enabling i
 
 ```bash
 dotnet test                             # All projects
-dotnet test test/Func.Cli.Tests/        # CLI tests only
+dotnet test test/Func.Tests/        # CLI tests only
 ```
 
 ## Branching Strategy

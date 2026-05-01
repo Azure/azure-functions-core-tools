@@ -26,6 +26,13 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- Assembly name and namespace -->
+  <PropertyGroup>
+    <TopLevelNamespace Condition="'$(TopLevelNamespace)' == ''">Azure.Functions.Cli</TopLevelNamespace>
+    <AssemblyName>$(TopLevelNamespace).$(MSBuildProjectName)</AssemblyName>
+    <RootNamespace Condition="'$(RootNamespace)' == ''">$(AssemblyName)</RootNamespace>
+  </PropertyGroup>
+
   <PropertyGroup>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
