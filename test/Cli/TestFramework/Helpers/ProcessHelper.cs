@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
@@ -10,6 +10,8 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
     public class ProcessHelper
     {
         private static readonly string _functionsHostUrl = "http://localhost";
+        private static readonly TimeSpan _functionInvocationPollInterval = TimeSpan.FromMilliseconds(500);
+        private static readonly TimeSpan _functionInvocationPollTimeout = TimeSpan.FromSeconds(10);
 
         public static async Task WaitForFunctionHostToStart(
             Process funcProcess,
@@ -41,7 +43,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                     if (funcProcess.HasExited)
                     {
                         LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
-                        return true;
+                        throw new HostExitedBeforeReadyException(funcProcess.ExitCode);
                     }
 
                     // Try ping endpoint
@@ -55,6 +57,10 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                     }
 
                     return false;
+                }
+                catch (HostExitedBeforeReadyException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -86,8 +92,6 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
             try
             {
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
-                fileWriter.Flush();
-
                 fileWriter.WriteLine($"[HANDLER] Process working directory: {process.StartInfo.WorkingDirectory}");
                 fileWriter.Flush();
 
@@ -98,21 +102,14 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
 
                 if (!string.IsNullOrEmpty(functionCall))
                 {
-                    using var client = new HttpClient();
-                    HttpResponseMessage response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
-                    capturedContent = await response.Content.ReadAsStringAsync();
+                    capturedContent = await InvokeFunctionWithRetryAsync(port, functionCall, fileWriter);
                     fileWriter.WriteLine($"[HANDLER] Captured content: {capturedContent}");
                     fileWriter.Flush();
                 }
             }
-            catch (Exception ex)
-            {
-                fileWriter.WriteLine($"[HANDLER] Caught the following exception: {ex.Message}");
-                fileWriter.Flush();
-            }
             finally
             {
-                fileWriter.WriteLine($"[HANDLER] Going to kill process");
+                fileWriter.WriteLine("[HANDLER] Going to kill process");
                 fileWriter.Flush();
 
                 // Wait 5 seconds for all the logs to show up first if we need them
@@ -121,12 +118,68 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                     await Task.Delay(5000);
                 }
 
-                process.Kill(true);
+                if (!process.HasExited)
+                {
+                    process.Kill(true);
+                }
             }
 
-            fileWriter.WriteLine($"[HANDLER] Returning captured content");
+            fileWriter.WriteLine("[HANDLER] Returning captured content");
             fileWriter.Flush();
             return capturedContent;
         }
+
+        /// <summary>
+        /// Polls the function endpoint until it returns a 2xx response, the host process exits,
+        /// or the timeout elapses. The host's /admin/host/ping endpoint can return success before
+        /// functions are fully indexed; this absorbs the indexing race so callers see content,
+        /// not an opaque empty body.
+        /// </summary>
+        private static async Task<string> InvokeFunctionWithRetryAsync(int port, string functionCall, StreamWriter fileWriter)
+        {
+            using var client = new HttpClient();
+            var deadline = DateTime.UtcNow + _functionInvocationPollTimeout;
+            HttpResponseMessage? lastResponse = null;
+            string lastBody = string.Empty;
+
+            while (true)
+            {
+                lastResponse = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
+                lastBody = await lastResponse.Content.ReadAsStringAsync();
+
+                if (lastResponse.IsSuccessStatusCode)
+                {
+                    return lastBody;
+                }
+
+                fileWriter.WriteLine($"[HANDLER] Function returned {(int)lastResponse.StatusCode}; retrying...");
+                fileWriter.Flush();
+
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new HttpRequestException(
+                        $"Function call '{functionCall}' did not return success within {_functionInvocationPollTimeout.TotalSeconds:F0}s. " +
+                        $"Last status: {(int)lastResponse.StatusCode} {lastResponse.ReasonPhrase}. Body: {lastBody}");
+                }
+
+                await Task.Delay(_functionInvocationPollInterval);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Thrown by <see cref="ProcessHelper.WaitForFunctionHostToStart"/> when the host process
+    /// exits before it becomes ready to serve requests. Carries the host's exit code so test
+    /// failures point at the real cause instead of a downstream empty-body assertion.
+    /// </summary>
+    public class HostExitedBeforeReadyException : Exception
+    {
+        public HostExitedBeforeReadyException(int exitCode)
+            : base($"Function host process exited with code {exitCode} before becoming ready.")
+        {
+            ExitCode = exitCode;
+        }
+
+        public int ExitCode { get; }
     }
 }

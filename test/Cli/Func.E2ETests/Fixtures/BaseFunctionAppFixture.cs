@@ -71,6 +71,10 @@ namespace Azure.Functions.Cli.E2ETests.Fixtures
 
         public async Task InitializeAsync()
         {
+            // Skip the live network connectivity probe in spawned `func` processes. Mirrors
+            // BaseE2ETests; fixture-backed tests don't go through that path.
+            Environment.SetEnvironmentVariable(Azure.Functions.Cli.Common.Constants.FunctionsCoreToolsOffline, "false");
+
             var workerRuntime = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(WorkerRuntime);
             var initArgs = new List<string> { ".", "--worker-runtime", workerRuntime }
                 .Concat(TargetFramework != null

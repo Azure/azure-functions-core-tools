@@ -71,14 +71,32 @@ namespace Azure.Functions.Cli.Helpers
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
             _isVerbose = args.Contains("--verbose");
-            _explicitOffline = args.Contains("--offline") || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCoreToolsOffline);
 
-            // Lazy network probe — only runs on first access of IsOfflineMode when no explicit offline flag was set.
-            // No SynchronizationContext in this CLI app, so .GetAwaiter().GetResult() is safe without Task.Run.
+            // FUNCTIONS_CORE_TOOLS_OFFLINE is tri-state:
+            //   true/1  => force offline (skip probe)
+            //   false/0 => force online  (skip probe)
+            //   unset   => probe normally
+            bool? envOfflineOverride = EnvironmentHelper.GetEnvironmentVariableAsNullableBool(Constants.FunctionsCoreToolsOffline);
+            _explicitOffline = args.Contains("--offline") || envOfflineOverride == true;
+            bool forceOnline = envOfflineOverride == false;
+
+            // Lazy network probe — only runs on first access of IsOfflineMode when no explicit
+            // offline/online override was set. No SynchronizationContext in this CLI app, so
+            // .GetAwaiter().GetResult() is safe without Task.Run.
             _networkOffline = new Lazy<bool>(() =>
-                _explicitOffline
-                    ? true
-                    : OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult());
+            {
+                if (_explicitOffline)
+                {
+                    return true;
+                }
+
+                if (forceOnline)
+                {
+                    return false;
+                }
+
+                return OfflineHelper.IsOfflineAsync().GetAwaiter().GetResult();
+            });
 
             try
             {
