@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 
@@ -68,7 +69,17 @@ internal class StartCommand : FuncCliCommand, IBuiltInCommand
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        ApplyPath(parseResult);
+        var workingDirectory = parseResult.GetValue(PathArgument!)!;
+        if (!workingDirectory.Exists)
+        {
+            // Echo the path as the user typed it (when explicit) so the error
+            // matches their input rather than a fully-resolved absolute path.
+            var displayPath = workingDirectory.OriginalPath ?? workingDirectory.Info.FullName;
+            throw new GracefulException(
+                $"The specified path does not exist: '{displayPath}'",
+                isUserError: true);
+        }
+
         _interaction.WriteWarning("The 'start' command is not yet implemented in this version.");
         _interaction.WriteHint("This is a preview build of Azure Functions CLI vNext.");
         return Task.FromResult(1);

@@ -76,7 +76,7 @@ All commands extend `FuncCliCommand` → `System.CommandLine.Command`.
 
 Provides shared infrastructure:
 - **`SetAction`** wiring — connects `ExecuteAsync` to the command
-- **`[path]` argument** — optional via `AddPathArgument()` + `ApplyPath(parseResult)` which calls `Directory.SetCurrentDirectory`
+- **`[path]` argument** — optional via `AddPathArgument()`. Read the resolved value with `parseResult.GetValue(PathArgument!)`, which returns a `WorkingDirectory` the command must thread through its work explicitly. The CLI never mutates `Directory.SetCurrentDirectory`.
 - **Parse result access** — commands read option values via `parseResult.GetValue(MyOption)`
 
 ### Command Lifecycle
@@ -316,7 +316,7 @@ If a newer version is found, a notice is printed after the command completes.
 2. Resolve the matching IProjectInitializer via CanHandle(stack)
    ├── No initializers installed  → "No language workloads installed." (exit 1)
    └── No matching initializer    → "No installed workload supports stack '<x>'." (exit 1)
-3. Build InitContext (ProjectPath, ProjectName, Language, Force)
+3. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
 4. Delegate to IProjectInitializer.InitializeAsync(context, parseResult)
 ```
 

@@ -92,7 +92,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 "Run `func workload list` to see them, then `func workload uninstall <name>` to remove one.");
         }
 
-        ApplyPath(parseResult, createIfNotExists: true);
+        var workingDirectory = parseResult.GetValue(PathArgument!)!;
+        workingDirectory.CreateIfNotExists();
 
         var stack = parseResult.GetValue(StackOption);
 
@@ -110,7 +111,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         var context = new InitContext(
-            ProjectPath: Directory.GetCurrentDirectory(),
+            WorkingDirectory: workingDirectory,
             ProjectName: parseResult.GetValue(NameOption),
             Language: parseResult.GetValue(LanguageOption),
             Force: parseResult.GetValue(ForceOption));

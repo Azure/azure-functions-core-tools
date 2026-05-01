@@ -44,10 +44,10 @@ internal class NewCommand : FuncCliCommand, IBuiltInCommand
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        ApplyPath(parseResult, createIfNotExists: true);
-
         // Until a workload contributes templates, the only useful thing this
-        // command can do is point the user at `func workload install`.
+        // command can do is point the user at `func workload install`. Once
+        // templates exist we'll resolve `parseResult.GetValue(PathArgument!)`
+        // and call `CreateIfNotExists()` before scaffolding.
         _hintRenderer.Render(new WorkloadHint(
             WorkloadHintKind.NoWorkloadsInstalled,
             ActionDescription: "create functions from templates",

@@ -183,3 +183,14 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 - **Tests**: xUnit with NSubstitute for mocking, `FakeDotnetCliRunner` pattern for CLI wrappers
 - **Error handling**: throw `GracefulException` for user-facing errors (caught in Program.cs)
 - **Cancellation**: all async methods accept `CancellationToken`, pass through to child operations
+- **XML doc summaries**: always put `<summary>` and `</summary>` on their own lines, even for one-line summaries:
+
+  ```csharp
+  // Good
+  /// <summary>
+  /// Reads the global manifest, returning an empty one if it doesn't exist.
+  /// </summary>
+
+  // Bad
+  /// <summary>Reads the global manifest, returning an empty one if it doesn't exist.</summary>
+  ```

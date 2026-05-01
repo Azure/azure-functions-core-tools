@@ -62,7 +62,9 @@ internal class DeployCommand : FuncCliCommand
         // Wire up the handler
         SetAction(async (parseResult, cancellationToken) =>
         {
-            ApplyPath(parseResult); // handles [path] → Directory.SetCurrentDirectory
+            // Resolve [path] once, then thread it explicitly to the rest of
+            // the command. The CLI never mutates the process cwd.
+            var workingDirectory = parseResult.GetValue(PathArgument!)!;
 
             var appName = parseResult.GetValue(AppNameOption)!;
             var dryRun = parseResult.GetValue(DryRunOption);
@@ -94,7 +96,7 @@ internal class DeployCommand : FuncCliCommand
 - **Constructor injection**: Take `IInteractionService` (and `IWorkloadManager` if needed)
 - **Instance option properties**: Options are `public Option<T> XOption { get; } = new(...)` — instance, not static. Tests and other code reach them through the resolved command instance (DI). Avoid `static readonly` so each command instance owns its own options and parallel test runs cannot share mutable parser state.
 - **`SetAction`**: Wire handler in the constructor, not via override
-- **`ApplyPath`**: Call this first if you added `AddPathArgument()`
+- **`PathArgument`**: After calling `AddPathArgument()`, read the resolved value with `parseResult.GetValue(PathArgument!)`. Returns a `WorkingDirectory` (a `DirectoryInfo` plus a `WasExplicit` flag) and never mutates the process cwd. Call `workingDirectory.CreateIfNotExists()` if your command should auto-create the directory (e.g. `init`, `new`); otherwise check `workingDirectory.Exists` and throw `GracefulException` yourself.
 - **Never use `Console.Write*`**: Always go through `IInteractionService`
 - **Throw `GracefulException`** for user-facing errors (not `Exception`)
 
