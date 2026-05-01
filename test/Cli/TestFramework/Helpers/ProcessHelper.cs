@@ -139,7 +139,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
         {
             using var client = new HttpClient();
             var deadline = DateTime.UtcNow + _functionInvocationPollTimeout;
-            HttpResponseMessage lastResponse = null;
+            HttpResponseMessage? lastResponse = null;
             string lastBody = string.Empty;
 
             while (true)
