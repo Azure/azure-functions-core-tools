@@ -5,138 +5,75 @@
 Azure Functions Core Tools v5 CLI — rebuilt with System.CommandLine, Spectre.Console,
 and .NET 10 using a workload-based extensibility model (similar to `dotnet` CLI workloads).
 
-## Adding a New Command
+## Design Principles
 
-See `docs/adding-a-command.md` for the full guide. Summary:
+Guidance for any code added in this repo. v5 is a deliberate restructure away from
+the legacy patterns in `main`; keep the bar high.
 
-1. Create a class in `src/Func/Commands/` extending `FuncCliCommand`
-2. Register it in `Parser.cs`
-3. Add tests in `test/Func.Tests/Commands/`
-4. Update `docs/cli-architecture.md` command tree
+### DI-first
 
-## Creating a New Workload
+- All composition goes through `Microsoft.Extensions.DependencyInjection`. Build the
+  service collection at startup; do not introduce service locators or ambient
+  containers (the legacy Autofac container in `main` is being phased out — do not
+  bring it forward).
+- Inject dependencies via **constructor injection**. No property injection, no
+  service-locator lookups in business logic, no `IServiceProvider.GetService` calls
+  outside the composition root.
+- Prefer `IOptions<T>` / `IOptionsMonitor<T>` for configuration, bound from
+  `IConfiguration` at the composition root.
+- Pick the narrowest sensible lifetime: `Singleton` for stateless/shared,
+  `Scoped` for per-command/per-request work, `Transient` only when justified.
 
-See `docs/building-a-workload.md` for the interface contracts. Below is the full
-checklist for scaffolding a new workload project. Use the dotnet workload as the
-reference implementation.
+### Avoid static classes
 
-### Workload Project Checklist
+- Do **not** introduce new `static` classes for behavior. Static state and static
+  helpers are the main reason `main` is hard to test.
+- Static is acceptable only for:
+  - Pure, side-effect-free utility functions with no dependencies that would
+    otherwise be injected.
+  - Constants and `extension` method holders.
+  - `Program.Main`.
+- Anything that touches I/O, the filesystem, the environment, the network, the
+  clock, or process state must be a regular class behind an interface (or abstract
+  base) so it can be substituted in tests.
 
-Replace `<Name>` with the workload name (e.g., `Node`, `Python`, `Java`).
-Replace `<name>` with the lowercase form (e.g., `node`, `python`, `java`).
+### Testability is non-negotiable
 
-#### 1. Source project — `src/Workload/<Name>/`
+- Every new class must be reachable from a test — through an interface, a concrete
+  type with injectable dependencies, an `IOptions<T>`, or similar. If you can't see
+  how to test it, the design is wrong; restructure before adding more code.
+- Wrap non-deterministic dependencies (clock, environment variables, filesystem,
+  process launching, HTTP) behind interfaces. Do not call `Environment.*`,
+  `File.*`, `DateTime.Now`, `Process.Start`, etc. directly from business logic.
+- Keep methods focused and side-effect-light so they can be unit-tested without
+  spinning up the full CLI.
 
-Create the following files:
+### Visibility
 
-- [ ] `Workload.<Name>.csproj`
-  ```xml
-  <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-      <TargetFramework>net10.0</TargetFramework>
-      <Description>Azure Functions CLI <name> workload — ...</Description>
-    </PropertyGroup>
+- New types are **`internal`** by default. Only make a type `public` when there is
+  a clear, documented reason (e.g. it is part of a published API surface). Prefer
+  `InternalsVisibleTo` for test access over widening visibility.
+- Same rule for members: prefer `private` / `internal`, widen only when needed.
 
-    <ItemGroup>
-      <InternalsVisibleTo Include="Azure.Functions.Workload.<Name>.Tests" />
-    </ItemGroup>
+### Style
 
-    <ItemGroup>
-      <ProjectReference Include="../../Abstractions/Abstractions.csproj" />
-    </ItemGroup>
+- Match the style of the file you're editing.
+- Prefer **file-scoped namespaces** in new files.
+- Don't leave unused `using` directives.
+- Don't run `dotnet format` across unrelated files or make drive-by formatting
+  changes.
+- Follow the existing `stylecop.json` / analyzer rules. Don't disable analyzers to
+  silence warnings — fix the underlying issue.
+- Keep changes minimal and surgical. User-visible behavior changes must be flagged
+  explicitly in the PR description.
 
-  </Project>
-  ```
-- [ ] `Directory.Version.props` — workload version:
-  ```xml
-  <Project>
-    <PropertyGroup>
-      <VersionPrefix>1.0.0</VersionPrefix>
-      <VersionSuffix>preview.1</VersionSuffix>
-      <UpdateBuildVersion>true</UpdateBuildVersion>
-    </PropertyGroup>
-  </Project>
-  ```
-- [ ] `release_notes.md` — initial release notes
-- [ ] `<Name>Workload.cs` — class implementing `IWorkload`
-- [ ] At least one of: `IProjectInitializer`, `ITemplateProvider`, `IPackProvider` implementations
+## Procedures
 
-#### 2. Test project — `test/Workload/<Name>.Tests/`
+Multi-step playbooks live as skills under `.github/skills/`. Use them when the
+task matches:
 
-- [ ] `Workload.<Name>.Tests.csproj`
-  ```xml
-  <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-      <TargetFramework>net10.0</TargetFramework>
-    </PropertyGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="$(SrcRoot)Workload/<Name>/$Workload.<Name>.csproj" />
-    </ItemGroup>
-
-  </Project>
-  ```
-- [ ] Contract tests for the `IWorkload` implementation
-- [ ] Unit tests for each provider (initializer, template, pack)
-
-#### 3. Solution file — `Azure.Functions.Cli.slnx`
-
-- [ ] Add both projects to the solution:
-  ```
-  dotnet sln add src/Workload/<Name>/Workload.<Name>.csproj
-  dotnet sln add test/Workload/<Name>.Tests/Workload.<Name>.Tests.csproj
-  ```
-
-#### 4. CI pipelines
-
-Create two pipeline files in `eng/ci/`:
-
-- [ ] `workload-<name>-public-build.yml` — 1ES Unofficial template
-  - Path filters: `src/Abstractions/**`, `src/Workload/<Name>/**`,
-    `test/Workload/<Name>.Tests/**`, plus CI template paths
-  - Build & test stage on Windows + Linux
-
-- [ ] `workload-<name>-official-build.yml` — 1ES Official template
-  - Same path filters plus `release/*` branch and pack template path
-  - Build & test stage + NuGet pack stage
-  - `pr: none` (official builds only trigger on push)
-
-Create CI templates:
-
-- [ ] `eng/ci/templates/jobs/test-workload-<name>.yml` — job template
-- [ ] `eng/ci/templates/steps/run-workload-<name>-tests.yml` — test step
-- [ ] `eng/ci/templates/official/jobs/pack-workload-<name>.yml` — NuGet pack job
-
-Use the dotnet workload CI files as templates.
-
-#### 5. Base CLI updates — `src/Func/`
-
-In `src/Func/Workloads/WorkloadManager.cs`:
-
-- [ ] Add short alias to `_wellKnownAliases` dictionary:
-  ```csharp
-  ["<name>"] = "Azure.Functions.Cli.Workload.<Name>",
-  ```
-- [ ] Add entry to `_workloadCatalog` array:
-  ```csharp
-  new("<name>", "Azure.Functions.Cli.Workload.<Name>", "<Display Name>", "<Languages>"),
-  ```
-
-If the workload has unique project files (e.g., `go.mod`, `Cargo.toml`):
-- [ ] Add detection in `src/Func/Commands/ProjectDetector.cs`
-
-#### 6. Documentation
-
-- [ ] `docs/repo-structure.md` — add new project directories, CI pipeline entries
-- [ ] `docs/building-a-workload.md` — update if new patterns are introduced
-
-#### 7. Verify
-
-```bash
-dotnet restore
-dotnet build
-dotnet test
-```
+- **Adding a new CLI command** → `add-command` skill.
+- **Creating a new workload** (Node, Python, Java, ...) → `create-workload` skill.
 
 ## Build & Test Commands
 
@@ -170,3 +107,16 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
   // Bad
   /// <summary>Reads the global manifest, returning an empty one if it doesn't exist.</summary>
   ```
+
+## Reference
+
+All reusable playbooks live in `.github/skills/<skill-name>/SKILL.md` (per the
+[Agent Skills](https://agentskills.io) spec). Claude Code picks them up via
+symlinks under `.claude/skills/`. Available skills:
+
+- `add-command` — adding a new CLI command.
+- `create-workload` — scaffolding a new workload (Node, Python, Java, ...).
+- `dotnet-best-practices` — coding patterns to apply.
+- `dotnet-design-pattern-review` — review checklist.
+
+Where any skill and this file disagree, **AGENTS.md wins** for this repository.
