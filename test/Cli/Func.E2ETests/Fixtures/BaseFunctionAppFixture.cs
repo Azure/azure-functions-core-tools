@@ -75,6 +75,20 @@ namespace Azure.Functions.Cli.E2ETests.Fixtures
             // BaseE2ETests; fixture-backed tests don't go through that path.
             Environment.SetEnvironmentVariable(Azure.Functions.Cli.Common.Constants.FunctionsCoreToolsOffline, "false");
 
+            // Provide a sentinel Application Insights connection string. The dotnet-isolated
+            // worker template writes `host.json` with `telemetryMode: "OpenTelemetry"`, which
+            // causes the Azure Monitor exporter inside the worker to validate
+            // APPLICATIONINSIGHTS_CONNECTION_STRING at DI build time. With no value set, the
+            // worker process exits with 0xDEAD before responding to the host, the host
+            // exhausts its restart retries, and `func start` exits -1. The all-zeros key is
+            // the documented sentinel; it satisfies the parser without enabling telemetry.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING")))
+            {
+                Environment.SetEnvironmentVariable(
+                    "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                    "InstrumentationKey=00000000-0000-0000-0000-000000000000");
+            }
+
             var workerRuntime = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(WorkerRuntime);
             var initArgs = new List<string> { ".", "--worker-runtime", workerRuntime }
                 .Concat(TargetFramework != null
