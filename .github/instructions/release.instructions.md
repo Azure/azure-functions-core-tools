@@ -32,7 +32,7 @@ Version updates are done in the `main` branch.
 
 1. **Update version**:
     - Checkout the `main` branch
-    - Update `VersionPrefix` in `src/Func.Cli/Directory.Version.props`.
+    - Update `VersionPrefix` in `src/Func/Directory.Version.props`.
 
 ### Host Version Update Procedure
 
@@ -63,7 +63,7 @@ If the worker versions need to be updated due to host version changes, provide c
 - Replace `<NewHostVersion>` with the requested host version number
 
 ## Project Layout
-- **src/Func.Cli/Directory.Version.props** – controls Core Tools version
+- **src/Func/Directory.Version.props** – controls Core Tools version
 - **release_notes.md** – records Core Tools and Host version updates.
 - **src/** – main CLI implementation.
 - **eng/** – engineering assets and build props.
@@ -71,7 +71,7 @@ If the worker versions need to be updated due to host version changes, provide c
 
 ## Steps to Follow
 
-- Always update version numbers in `src/Func.Cli/Directory.Version.props`.
+- Always update version numbers in `src/Func/Directory.Version.props`.
 - Always update `release_notes.md` in the repo root with the new Core Tools version.
 - If applicable, update Host versions in `eng/build/Packages.props`.
 - If Host versions are updated, ensure to reflect those changes in `release_notes.md`.

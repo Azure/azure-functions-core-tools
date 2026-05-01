@@ -13,7 +13,7 @@
         "ms-dotnettools.csdevkit"
       ],
       "settings": {
-        "dotnet.defaultSolution": "Azure.Functions.Cli.sln"
+        "dotnet.defaultSolution": "Azure.Functions.Cli.slnx"
       }
     }
   },

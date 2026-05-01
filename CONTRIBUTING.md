@@ -46,7 +46,7 @@ Build the project from the repository root:
 dotnet build
 ```
 
-The output will be in `out/bin/Func.Cli/debug/`.
+The output will be in `out/bin/Func/debug/`.
 
 ### Running the CLI
 
@@ -60,7 +60,7 @@ The output will be in `out/bin/Func.Cli/debug/`.
 Run the CLI from source:
 
 ```bash
-dotnet run --project src/Func.Cli -- <command>
+dotnet run --project src/Func -- <command>
 ```
 
 **Running against a specific function app:**
@@ -69,19 +69,19 @@ Option 1 - Run from the function app directory:
 
 ```bash
 cd myTestFunctionApp
-dotnet run --project PATH_TO_CORE_TOOLS_REPO/src/Func.Cli -- <command>
+dotnet run --project PATH_TO_CORE_TOOLS_REPO/src/Func -- <command>
 ```
 
 Option 2 - Use the path argument:
 
 ```bash
-dotnet run --project src/Func.Cli -- start PATH_TO_TEST_APP
+dotnet run --project src/Func -- start PATH_TO_TEST_APP
 ```
 
 Option 3 - Add the built executable to your PATH:
 
 ```bash
-export PATH=$PATH:/path/to/azure-functions-core-tools/out/bin/Func.Cli/debug
+export PATH=$PATH:/path/to/azure-functions-core-tools/out/bin/Func/debug
 func <command>
 ```
 
@@ -90,13 +90,13 @@ func <command>
 To produce a self-contained executable for local testing:
 
 ```bash
-dotnet publish src/Func.Cli/Func.Cli.csproj -c Release -r osx-arm64
+dotnet publish src/Func/Func.csproj -c Release -r osx-arm64
 ```
 
-The output is in `out/pub/Func.Cli/release_osx-arm64/`. Common RIDs: `osx-arm64`, `osx-x64`, `linux-x64`, `win-x64`.
+The output is in `out/pub/Func/release_osx-arm64/`. Common RIDs: `osx-arm64`, `osx-x64`, `linux-x64`, `win-x64`.
 
 ```bash
-./out/pub/Func.Cli/release_osx-arm64/func --version
+./out/pub/Func/release_osx-arm64/func --version
 ```
 
 ### Running Tests
@@ -110,5 +110,5 @@ Tests can be run using:
 #### Unit Tests
 
 ```bash
-dotnet test test/Func.Cli.Tests/Func.Cli.Tests.csproj
+dotnet test test/Func.Tests/Func.Tests.csproj
 ```

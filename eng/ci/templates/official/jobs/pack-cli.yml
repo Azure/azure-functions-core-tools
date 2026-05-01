@@ -16,26 +16,26 @@ jobs:
   - template: /eng/ci/templates/official/steps/prebuild-common.yml@self
 
   - pwsh: |
-      dotnet build src/Func.Cli/Func.Cli.csproj `
-        -c Release `
+      dotnet build src/Func/Func.csproj `
+        -c release `
         --no-restore `
         /p:RuntimeIdentifiers=
     displayName: 'Build CLI'
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)/out/bin/Func.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Func'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)/out/bin/Func.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Func'
       signPatterns: $(thirdPartyBinariesToSign)
 
   - pwsh: |
-      dotnet pack src/Func.Cli/Func.Cli.csproj `
+      dotnet pack src/Func/Func.csproj `
         -o $(Build.Repository.LocalPath)/artifacts `
-        -c Release `
+        -c release `
         --no-build `
         /p:RuntimeIdentifiers=
     displayName: 'Pack CLI for NuGet'

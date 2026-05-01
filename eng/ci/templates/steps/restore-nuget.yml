@@ -3,6 +3,6 @@ steps:
   displayName: 'Restore NuGet packages'
   inputs:
     command: 'restore'
-    projects: 'Azure.Functions.Cli.sln'
+    projects: 'Azure.Functions.Cli.slnx'
     feedsToUse: 'config'
     nugetConfigPath: '$(Build.SourcesDirectory)/NuGet.Config'

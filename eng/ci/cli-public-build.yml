@@ -18,8 +18,8 @@ pr:
     - release/*
   paths:
     include:
-    - src/Func.Cli/**
-    - test/Func.Cli.Tests/**
+    - src/Func/**
+    - test/Func.Tests/**
     - eng/**
     - Directory.Build.props
     - Directory.Build.targets

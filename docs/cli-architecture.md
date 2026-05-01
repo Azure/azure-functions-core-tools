@@ -191,15 +191,15 @@ The CLI is designed around a workload model: the base CLI provides core commands
 ### Architecture
 
 ```
-CLI (Func.Cli)
+CLI (Func)
   │
   │ references
   ▼
-Abstractions (Func.Cli.Abstractions)    ← NuGet package
+Abstractions (Azure.Functions.Cli.Abstractions)    ← NuGet package
   │
   │ referenced by
   ▼
-Workload (e.g. Func.Cli.Workload.Dotnet) ← NuGet package, loaded at runtime
+Workload (e.g. Azure.Functions.Cli.Workload.Dotnet) ← NuGet package, loaded at runtime
 ```
 
 The CLI never has a compile-time reference to any workload. Workloads will be loaded dynamically via `AssemblyLoadContext`.
@@ -262,7 +262,7 @@ Until the loader lands, `WorkloadRegistration.RegisterWorkloads` registers an em
 
 ## Error Handling
 
-The CLI uses `GracefulException` (defined in `Func.Cli.Abstractions`) for all user-facing errors:
+The CLI uses `GracefulException` (defined in `Abstractions`) for all user-facing errors:
 
 ```csharp
 throw new GracefulException(

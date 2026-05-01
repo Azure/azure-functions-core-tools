@@ -8,29 +8,29 @@ This guide walks through building a workload for the Azure Functions Core Tools 
 
 ```
 ┌─────────────────────────────────┐
-│  Func.Cli (the CLI executable)  │
+│  Func (the CLI executable)      │
 │  Builds a host, loads workloads │
 │  via AssemblyLoadContext        │
 └──────────┬──────────────────────┘
            │ references (compile-time)
            ▼
 ┌─────────────────────────────────┐
-│  Func.Cli.Abstractions          │
+│  Abstractions                   │
 │  NuGet package with interfaces  │
-│  IWorkload, FunctionsCliBuilder│
+│  IWorkload, FunctionsCliBuilder │
 │  IProjectInitializer, …         │
 └──────────┬──────────────────────┘
            │ referenced by (compile-time)
            ▼
 ┌─────────────────────────────────┐
 │  Your Workload                  │
-│  e.g. Func.Cli.Workload.Node    │
+│  e.g. Workload.Node             │
 │  NuGet package, loaded at       │
 │  runtime via reflection         │
 └─────────────────────────────────┘
 ```
 
-**Key principle**: workloads reference only `Func.Cli.Abstractions`, never `Func.Cli`. The CLI loads workloads dynamically — there is no compile-time dependency from the CLI to any workload.
+**Key principle**: workloads reference only `Abstractions`, never `Func`. The CLI loads workloads dynamically — there is no compile-time dependency from the CLI to any workload.
 
 ## How a Workload Plugs In
 
@@ -63,37 +63,31 @@ The shape mirrors WebJobs' `IWebJobsStartup` — `Configure(FunctionsCliBuilder)
 ## Step 1: Create the Project
 
 ```bash
-mkdir src/Func.Cli.Workload.Node
-cd src/Func.Cli.Workload.Node
+mkdir src/Workload/Node
+cd src/Workload/Node
 ```
 
-Create the `.csproj`:
+Create the `Workload.Node.csproj`:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <AssemblyName>Azure.Functions.Cli.Workload.Node</AssemblyName>
-    <RootNamespace>Azure.Functions.Cli.Workload.Node</RootNamespace>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <IsPackable>true</IsPackable>
-    <PackageId>Azure.Functions.Cli.Workload.Node</PackageId>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj" />
+    <ProjectReference Include="../../Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Func.Cli.Workload.Node.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Workload.Node.Tests" />
   </ItemGroup>
 
 </Project>
 ```
 
-Add the standard build files (copy from an existing project): `Directory.Build.props`, `Directory.Build.targets`, `Directory.Version.props`.
+Add the standard build files (copy from an existing project): `Directory.Version.props`.
 
 ## Step 2: Implement IWorkload
 
@@ -309,20 +303,20 @@ Initializers are themselves easy to unit-test: drive them with a temp directory 
 Add the project (and its test project) to the solution:
 
 ```bash
-dotnet sln add src/Func.Cli.Workload.Node/Func.Cli.Workload.Node.csproj
-dotnet sln add test/Func.Cli.Workload.Node.Tests/Func.Cli.Workload.Node.Tests.csproj
+dotnet sln add src/Workload/Node/Workload.Node.csproj
+dotnet sln add test/Workload/Node.Tests/Workload.Node.Tests.csproj
 ```
 
 Add path-scoped public + official CI pipelines in `eng/ci/` (mirror the abstractions pipelines as a starting point — workload-specific templates will land alongside the loader in a follow-up PR).
 
 ## Checklist
 
-- [ ] New project in `src/Func.Cli.Workload.<Name>/`, references `Func.Cli.Abstractions` only
+- [ ] New project `src/Workload/<Name>/Workload.<Name>.csproj`, references `Abstractions` only
 - [ ] `IWorkload` with parameterless constructor and the five identity properties (`PackageId`, `PackageVersion`, `Type`, `DisplayName`, `Description`)
 - [ ] `Configure(FunctionsCliBuilder)` registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
 - [ ] `IProjectInitializer.GetInitOptions()` returns any extra options the initializer needs
-- [ ] Test project in `test/Func.Cli.Workload.<Name>.Tests/`
-- [ ] `Directory.Build.props`, `Directory.Build.targets`, `Directory.Version.props` created
+- [ ] Test project `test/Workload/<Name>.Tests/Workload.<Name>.Tests.csproj`
+- [ ] `Directory.Version.props` created
 - [ ] Added to the solution
 - [ ] Public + official CI pipelines in `eng/ci/`
 - [ ] `dotnet build` and `dotnet test` pass

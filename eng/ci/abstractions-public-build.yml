@@ -6,7 +6,7 @@ trigger:
     - feature/*
   paths:
     include:
-    - src/Func.Cli.Abstractions/**
+    - src/Abstractions/**
     - eng/ci/abstractions-public-build.yml
     - eng/ci/templates/jobs/test-abstractions.yml
     - eng/ci/templates/steps/build-abstractions.yml
@@ -19,7 +19,7 @@ pr:
     - feature/*
   paths:
     include:
-    - src/Func.Cli.Abstractions/**
+    - src/Abstractions/**
     - eng/ci/abstractions-public-build.yml
     - eng/ci/templates/jobs/test-abstractions.yml
     - eng/ci/templates/steps/build-abstractions.yml

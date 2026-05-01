@@ -22,7 +22,7 @@ jobs:
   - template: /eng/ci/templates/official/steps/prebuild-common.yml@self
 
   - pwsh: |
-      dotnet publish src/Func.Cli/Func.Cli.csproj `
+      dotnet publish src/Func/Func.csproj `
         -o "$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}" `
         -c Release `
         -r ${{ parameters.runtime }} `

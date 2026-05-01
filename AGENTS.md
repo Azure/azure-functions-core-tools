@@ -9,9 +9,9 @@ and .NET 10 using a workload-based extensibility model (similar to `dotnet` CLI 
 
 See `docs/adding-a-command.md` for the full guide. Summary:
 
-1. Create a class in `src/Func.Cli/Commands/` extending `FuncCliCommand`
+1. Create a class in `src/Func/Commands/` extending `FuncCliCommand`
 2. Register it in `Parser.cs`
-3. Add tests in `test/Func.Cli.Tests/Commands/`
+3. Add tests in `test/Func.Tests/Commands/`
 4. Update `docs/cli-architecture.md` command tree
 
 ## Creating a New Workload
@@ -25,41 +25,26 @@ reference implementation.
 Replace `<Name>` with the workload name (e.g., `Node`, `Python`, `Java`).
 Replace `<name>` with the lowercase form (e.g., `node`, `python`, `java`).
 
-#### 1. Source project — `src/Func.Cli.Workload.<Name>/`
+#### 1. Source project — `src/Workload/<Name>/`
 
 Create the following files:
 
-- [ ] `Func.Cli.Workload.<Name>.csproj`
+- [ ] `Workload.<Name>.csproj`
   ```xml
   <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
       <TargetFramework>net10.0</TargetFramework>
-      <RootNamespace>Azure.Functions.Cli.Workload.<Name></RootNamespace>
-      <AssemblyName>Azure.Functions.Cli.Workload.<Name></AssemblyName>
-      <Nullable>enable</Nullable>
-      <ImplicitUsings>enable</ImplicitUsings>
-      <IsPackable>true</IsPackable>
-      <PackageId>Azure.Functions.Cli.Workload.<Name></PackageId>
       <Description>Azure Functions CLI <name> workload — ...</Description>
     </PropertyGroup>
+
     <ItemGroup>
-      <InternalsVisibleTo Include="Func.Cli.Workload.<Name>.Tests" />
+      <InternalsVisibleTo Include="Azure.Functions.Workload.<Name>.Tests" />
     </ItemGroup>
+
     <ItemGroup>
-      <ProjectReference Include="..\Func.Cli.Abstractions\Func.Cli.Abstractions.csproj" />
+      <ProjectReference Include="../../Abstractions/Abstractions.csproj" />
     </ItemGroup>
-  </Project>
-  ```
-- [ ] `Directory.Build.props` — imports parent props:
-  ```xml
-  <Project>
-    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
-  </Project>
-  ```
-- [ ] `Directory.Build.targets` — imports parent targets:
-  ```xml
-  <Project>
-    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
+
   </Project>
   ```
 - [ ] `Directory.Version.props` — workload version:
@@ -68,7 +53,7 @@ Create the following files:
     <PropertyGroup>
       <VersionPrefix>1.0.0</VersionPrefix>
       <VersionSuffix>preview.1</VersionSuffix>
-      <UpdateBuildNumber>true</UpdateBuildNumber>
+      <UpdateBuildVersion>true</UpdateBuildVersion>
     </PropertyGroup>
   </Project>
   ```
@@ -76,42 +61,30 @@ Create the following files:
 - [ ] `<Name>Workload.cs` — class implementing `IWorkload`
 - [ ] At least one of: `IProjectInitializer`, `ITemplateProvider`, `IPackProvider` implementations
 
-#### 2. Test project — `test/Func.Cli.Workload.<Name>.Tests/`
+#### 2. Test project — `test/Workload/<Name>.Tests/`
 
-- [ ] `Func.Cli.Workload.<Name>.Tests.csproj`
+- [ ] `Workload.<Name>.Tests.csproj`
   ```xml
   <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
       <TargetFramework>net10.0</TargetFramework>
-      <RootNamespace>Azure.Functions.Cli.Workload.<Name>.Tests</RootNamespace>
-      <Nullable>enable</Nullable>
-      <ImplicitUsings>enable</ImplicitUsings>
-      <IsPackable>false</IsPackable>
-      <IsTestProject>true</IsTestProject>
     </PropertyGroup>
+
     <ItemGroup>
-      <PackageReference Include="Microsoft.NET.Test.Sdk" />
-      <PackageReference Include="xunit" />
-      <PackageReference Include="xunit.runner.visualstudio">
-        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        <PrivateAssets>all</PrivateAssets>
-      </PackageReference>
+      <ProjectReference Include="$(SrcRoot)Workload/<Name>/$Workload.<Name>.csproj" />
     </ItemGroup>
-    <ItemGroup>
-      <ProjectReference Include="..\..\src\Func.Cli.Workload.<Name>\Func.Cli.Workload.<Name>.csproj" />
-    </ItemGroup>
+
   </Project>
   ```
-- [ ] `Directory.Build.props` and `Directory.Build.targets` (same parent-import pattern)
 - [ ] Contract tests for the `IWorkload` implementation
 - [ ] Unit tests for each provider (initializer, template, pack)
 
-#### 3. Solution file — `Azure.Functions.Cli.sln`
+#### 3. Solution file — `Azure.Functions.Cli.slnx`
 
 - [ ] Add both projects to the solution:
   ```
-  dotnet sln add src/Func.Cli.Workload.<Name>/Func.Cli.Workload.<Name>.csproj
-  dotnet sln add test/Func.Cli.Workload.<Name>.Tests/Func.Cli.Workload.<Name>.Tests.csproj
+  dotnet sln add src/Workload/<Name>/Workload.<Name>.csproj
+  dotnet sln add test/Workload/<Name>.Tests/Workload.<Name>.Tests.csproj
   ```
 
 #### 4. CI pipelines
@@ -119,8 +92,8 @@ Create the following files:
 Create two pipeline files in `eng/ci/`:
 
 - [ ] `workload-<name>-public-build.yml` — 1ES Unofficial template
-  - Path filters: `src/Func.Cli.Abstractions/**`, `src/Func.Cli.Workload.<Name>/**`,
-    `test/Func.Cli.Workload.<Name>.Tests/**`, plus CI template paths
+  - Path filters: `src/Abstractions/**`, `src/Workload/<Name>/**`,
+    `test/Workload/<Name>.Tests/**`, plus CI template paths
   - Build & test stage on Windows + Linux
 
 - [ ] `workload-<name>-official-build.yml` — 1ES Official template
@@ -136,9 +109,9 @@ Create CI templates:
 
 Use the dotnet workload CI files as templates.
 
-#### 5. Base CLI updates — `src/Func.Cli/`
+#### 5. Base CLI updates — `src/Func/`
 
-In `src/Func.Cli/Workloads/WorkloadManager.cs`:
+In `src/Func/Workloads/WorkloadManager.cs`:
 
 - [ ] Add short alias to `_wellKnownAliases` dictionary:
   ```csharp
@@ -150,7 +123,7 @@ In `src/Func.Cli/Workloads/WorkloadManager.cs`:
   ```
 
 If the workload has unique project files (e.g., `go.mod`, `Cargo.toml`):
-- [ ] Add detection in `src/Func.Cli/Commands/ProjectDetector.cs`
+- [ ] Add detection in `src/Func/Commands/ProjectDetector.cs`
 
 #### 6. Documentation
 
@@ -176,9 +149,12 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 
 ## Project Conventions
 
-- **Folder names**: short form — `Func.Cli`, `Func.Cli.Abstractions`, `Func.Cli.Workload.<Name>`
-- **Assembly/namespace names**: full form — `Azure.Functions.Cli`, `Azure.Functions.Cli.Workloads`
-- **Package IDs**: full form — `Azure.Functions.Cli.Workload.<Name>`
+- **Folder names**: short name structured from source root, with project name matching the folder segments.
+  - e.g.: `Func/Func.csproj`, `Abstractions/Abstractions.csproj`, `Workload/<Name>/Workload.<Name>.csproj`.
+- **Assembly/namespace names**: omit by default, will be built from project name with a top-level namespace `Azure.Functions.Cli` prefixed by msbuild props.
+  - e.g.: `Workload.<Name>.csproj` will automatically become `Azure.Functions.Cli.Workload.<Name>.dll` and namespace of `Azure.Functions.Cli.Workload.<Name>`.
+  - Manually setting is only done when that convention is not desired. e.g.: `Func.csproj` manually sets `<AssemblyName>func</AssemblyName>` and `<RootNamespace>$(TopLevelNamespace)</RootNamespace>`.
+- **Package IDs**: omit by default, will be based on assembly name.
 - **CI pipelines**: `workload-<name>-public-build.yml` and `workload-<name>-official-build.yml`
 - **Tests**: xUnit with NSubstitute for mocking, `FakeDotnetCliRunner` pattern for CLI wrappers
 - **Error handling**: throw `GracefulException` for user-facing errors (caught in Program.cs)

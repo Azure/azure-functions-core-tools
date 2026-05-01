@@ -8,7 +8,6 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-
   <!-- paths -->
   <PropertyGroup>
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>

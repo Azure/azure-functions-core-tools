@@ -12,4 +12,4 @@
 * @azure/azure-functions-core
 
 # Adding codeowner for Language specific files such that GitHub automatically adds language owners as a reviewers.
-src/Func.Cli/Func.Cli.csproj @azure/azure-functions-worker-owners @azure/azure-functions-core
+src/Func/Func.csproj @azure/azure-functions-worker-owners @azure/azure-functions-core
