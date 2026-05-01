@@ -74,7 +74,7 @@
   print an actionable hint with the exact command to install one (e.g.
   `func workload install python`) and exit with a clear error.
 - If a workload is installed, the Func CLI delegates project scaffolding to it.
-- If `--worker-runtime` is omitted, the Func CLI **may** prompt or auto-select
+- If `--stack` is omitted, the Func CLI **may** prompt or auto-select
   based on installed workloads. Behavior must be consistent across
   workloads.
 
@@ -82,20 +82,29 @@
 
 - Templates come **only** from installed workloads. The Func CLI has no
   built-in templates.
-- `func new` (no args) lists templates from every installed workload.
+- `func new` (no args) lists templates from every installed workload that
+  matches the **current project's stack**, resolved in this order:
+  1. Explicit `--stack <name>` flag.
+  2. `FUNCTIONS_WORKER_RUNTIME` in `local.settings.json`.
+  3. A future `.func/config.json` (see §12 open questions).
+  4. Inferred from project markers via `IProjectDetector`.
+
+  If no stack can be resolved, `func new` lists templates from every
+  installed workload and prompts the user (or errors in non-interactive
+  mode) to disambiguate via `--stack`.
 - `func new --template <name> --name <fn>` materializes the template
   identified by name. If multiple workloads expose the same template name,
-  the Func CLI disambiguates by `--worker-runtime` or via an error listing the
+  the Func CLI disambiguates by `--stack` or via an error listing the
   conflicts.
 
 ### 4.4 `func pack` — build & package for deployment
 
 - The Func CLI inspects the current directory and asks each candidate workload
-  (filtered by project markers, then by `project.detect`) whether it owns
+  (filtered by project markers, then by `IProjectDetector`) whether it owns
   the directory.
-- Exactly one workload must claim the directory. Zero → error with install
-  hint. More than one → error listing the contenders, suggest
-  `--worker-runtime` to disambiguate.
+- Exactly one workload must claim the directory. Zero is an error with an
+  install hint. More than one is an error listing the contenders, suggest
+  `--stack` to disambiguate.
 - Pack output paths and naming are workload-defined; the Func CLI surfaces the
   resulting artifact path back to the user.
 
@@ -200,7 +209,7 @@ install` / `uninstall`.
 - Detection: the workload's `IProjectDetector` returns a confidence
   (`yes` / `no` / `maybe`) plus an optional reason string.
 - Tie-breaking: if multiple workloads return `yes`, the Func CLI errors
-  with the list and asks the user to disambiguate via `--worker-runtime`.
+  with the list and asks the user to disambiguate via `--stack`.
 
 ### 5.4 Versioning
 
@@ -249,7 +258,7 @@ install` / `uninstall`.
 - The Func CLI dispatches each request (init/new/pack/etc.) to whichever
   workload(s) registered the corresponding contribution-point service
   (see §5.1). When more than one workload registers the same service,
-  the dispatch rules of the consuming command apply (e.g. `--worker-runtime`
+  the dispatch rules of the consuming command apply (e.g. `--stack`
   disambiguation, project detection routing).
 - Errors from a workload **must** surface to the user with the workload id
   prefixed (e.g. `[python] error: ...`).
@@ -285,7 +294,7 @@ install` / `uninstall`.
 | Global manifest unreadable / unknown schema | Throw a `GracefulException` with the manifest path and the action to take (update CLI). Do not crash silently. |
 | Workload entry-point missing or unloadable  | Print the underlying error and the install path; suggest `func workload uninstall && install`.   |
 | Workload fails during request               | Surface the error with `[<workload-id>]` prefix; exit non-zero with the workload's exit code (or 1). |
-| Two workloads claim same project / template | Error listing all candidates, suggest `--worker-runtime` to disambiguate.                         |
+| Two workloads claim same project / template | Error listing all candidates, suggest `--stack` to disambiguate.                                  |
 | Catalog unreachable                         | `install`/`update` must error clearly; `list` and offline operations must still work.             |
 
 ## 8. Performance requirements
