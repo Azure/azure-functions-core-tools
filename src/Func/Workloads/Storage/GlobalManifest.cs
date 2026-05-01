@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json.Serialization;
+
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
@@ -20,6 +22,15 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// </remarks>
 internal sealed class GlobalManifest
 {
+    /// <summary>
+    /// Schema URI for this manifest. Doubles as a version marker so a
+    /// future CLI with a higher schema can reject manifests written by
+    /// an older CLI it doesn't know how to read (and vice versa).
+    /// </summary>
+    [JsonPropertyName("$schema")]
+    [JsonPropertyOrder(-1)]
+    public string Schema { get; init; } = WorkloadManifestSchemas.V1;
+
     /// <summary>
     /// Installed workloads indexed by package id, then by version. Empty
     /// when no workload has been installed yet.

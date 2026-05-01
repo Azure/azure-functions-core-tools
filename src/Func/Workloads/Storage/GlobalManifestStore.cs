@@ -106,6 +106,15 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
                 cancellationToken).ConfigureAwait(false)
                 ?? new GlobalManifest();
 
+            if (!WorkloadManifestSchemas.IsSupported(deserialized.Schema))
+            {
+                throw new GracefulException(
+                    $"The workload manifest at '{path}' uses schema '{deserialized.Schema}', "
+                    + "which this version of the Functions CLI does not understand. "
+                    + "Please update the CLI to the latest version.",
+                    isUserError: true);
+            }
+
             // System.Text.Json rebuilds the outer dictionary with the default
             // (case-sensitive) comparer regardless of the in-memory comparer
             // on the type's default. Reapply ordinal-ignore-case so package-id
@@ -134,7 +143,7 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
             rebuilt[packageId] = versions;
         }
 
-        return new GlobalManifest { Workloads = rebuilt };
+        return new GlobalManifest { Workloads = rebuilt, Schema = manifest.Schema };
     }
 
     private async Task WriteManifestAsync(GlobalManifest manifest, CancellationToken cancellationToken)
