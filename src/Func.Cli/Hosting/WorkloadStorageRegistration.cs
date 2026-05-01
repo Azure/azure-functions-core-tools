@@ -2,8 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Storage;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -11,8 +11,8 @@ namespace Azure.Functions.Cli.Hosting;
 /// Wires the workload-storage subsystem (paths + manifest store) into DI.
 /// Binds <see cref="WorkloadPathsOptions"/> from the <c>Workloads</c>
 /// configuration section so the <c>FUNC_CLI_Workloads__Home</c> env var
-/// (added at host build) flows through, while tests can register their own
-/// options without touching process-global state.
+/// (registered at host build) flows through, while tests can register their
+/// own options without touching process-global state.
 /// </summary>
 internal static class WorkloadStorageRegistration
 {
@@ -21,19 +21,20 @@ internal static class WorkloadStorageRegistration
     /// </summary>
     public const string ConfigurationSection = "Workloads";
 
-    public static IServiceCollection AddWorkloadStorage(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public static IServiceCollection AddWorkloadStorage(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddOptions<WorkloadPathsOptions>()
-            .Bind(configuration.GetSection(ConfigurationSection))
+            .BindConfiguration(ConfigurationSection)
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddSingleton<IWorkloadPaths, WorkloadPaths>();
+        // WorkloadPathsOptions implements IWorkloadPaths directly. Resolve the
+        // single bound options instance so consumers don't have to unwrap
+        // IOptions<> themselves.
+        services.AddSingleton<IWorkloadPaths>(
+            sp => sp.GetRequiredService<IOptions<WorkloadPathsOptions>>().Value);
         services.AddSingleton<IGlobalManifestStore, GlobalManifestStore>();
 
         return services;

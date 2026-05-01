@@ -130,7 +130,7 @@ internal static class VersionChecker
     {
         var cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".azure-functions");
+            Constants.FuncHomeDirectoryName);
         return Path.Combine(cacheDir, Constants.VersionCacheFileName);
     }
 

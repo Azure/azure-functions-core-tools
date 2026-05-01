@@ -2,21 +2,26 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.ComponentModel.DataAnnotations;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
-/// Pure configuration data for workload storage. Bound from the
-/// <c>Workloads</c> configuration section at startup; the corresponding
-/// environment variable is <c>FUNC_CLI_Workloads__Home</c>.
+/// Configuration + computed filesystem layout for installed workloads.
+/// Bound from the <c>Workloads</c> configuration section at startup; the
+/// corresponding environment variable is <c>FUNC_CLI_Workloads__Home</c>.
 /// </summary>
 /// <remarks>
-/// This type intentionally carries no behavior — path composition lives on
-/// <see cref="IWorkloadPaths"/>. Tests inject this via <c>Options.Create(...)</c>
-/// without touching process-global state.
+/// Only <see cref="Home"/> is settable. Everything else is computed from it
+/// and exposed through <see cref="IWorkloadPaths"/>.
 /// </remarks>
-internal sealed class WorkloadPathsOptions
+internal sealed class WorkloadPathsOptions : IWorkloadPaths
 {
+    /// <summary>
+    /// Filename of the global workload manifest within <see cref="Home"/>.
+    /// </summary>
+    public const string GlobalManifestFileName = "workloads.json";
+
     /// <summary>
     /// Root directory the func CLI persists workloads under. Defaults to
     /// <c>~/.azure-functions</c>.
@@ -25,8 +30,18 @@ internal sealed class WorkloadPathsOptions
     [MinLength(1)]
     public string Home { get; set; } = DefaultHome();
 
+    /// <inheritdoc />
+    public string WorkloadsRoot => Path.Combine(Home, "workloads");
+
+    /// <inheritdoc />
+    public string GlobalManifestPath => Path.Combine(Home, GlobalManifestFileName);
+
+    /// <inheritdoc />
+    public string GetInstallDirectory(string packageId, string version)
+        => Path.Combine(WorkloadsRoot, packageId, version);
+
     private static string DefaultHome()
         => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".azure-functions");
+            Constants.FuncHomeDirectoryName);
 }

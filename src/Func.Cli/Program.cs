@@ -48,8 +48,8 @@ hostBuilder.Services.AddBuiltInCommands();
 // Storage subsystem: bind WorkloadPathsOptions from the "Workloads" config
 // section so the FUNC_CLI_Workloads__Home env var flows through (the
 // FUNC_CLI_ prefix is stripped, "__" maps to section nesting).
-hostBuilder.Configuration.AddEnvironmentVariables(prefix: "FUNC_CLI_");
-hostBuilder.Services.AddWorkloadStorage(hostBuilder.Configuration);
+hostBuilder.Configuration.AddEnvironmentVariables(prefix: Constants.EnvironmentVariablePrefix);
+hostBuilder.Services.AddWorkloadStorage();
 
 // Let installed workloads contribute services. The builder exposes the same
 // IServiceCollection the host uses, so anything a workload registers is

@@ -4,29 +4,37 @@
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
-/// Aggregated manifest at <c>~/.azure-functions/workloads.json</c>. Lists
-/// every workload <c>func workload install</c> has installed. Source of
-/// truth for the loader and <c>func workload list</c>.
+/// On-disk shape of <c>~/.azure-functions/workloads.json</c>. Two-level
+/// nested dictionary: outer keyed by package id (case-insensitive), inner
+/// keyed by package version. The structural shape is what gives us
+/// uniqueness — there is no way to record two entries for the same
+/// (package id, version) pair, by construction.
 /// </summary>
+/// <remarks>
+/// The outer dictionary is constructed with
+/// <see cref="StringComparer.OrdinalIgnoreCase"/> so package-id lookups
+/// work regardless of how the caller cases the id (NuGet ids are
+/// case-insensitive). On read, the comparer is reapplied because
+/// <see cref="System.Text.Json.JsonSerializer"/> deserializes dictionaries
+/// with the default ordinal comparer.
+/// </remarks>
 internal sealed class GlobalManifest
 {
     /// <summary>
-    /// Every workload currently installed for the user. Order is the order they were installed.
+    /// Installed workloads indexed by package id, then by version. Empty
+    /// when no workload has been installed yet.
     /// </summary>
-    public List<GlobalManifestEntry> Workloads { get; init; } = new();
+    public Dictionary<string, Dictionary<string, GlobalManifestEntry>> Workloads { get; init; }
+        = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>
-/// One entry in <see cref="GlobalManifest"/>. Snapshot of the package
-/// metadata plus the resolved install location and entry point.
+/// One installed workload version. The owning package id and version live
+/// in the surrounding <see cref="GlobalManifest.Workloads"/> dictionary
+/// keys, so they're not duplicated on the entry itself.
 /// </summary>
 internal sealed class GlobalManifestEntry
 {
-    /// <summary>
-    /// NuGet package id this workload was installed from (e.g. <c>Azure.Functions.Cli.Workload.Dotnet</c>).
-    /// </summary>
-    public required string PackageId { get; init; }
-
     /// <summary>
     /// Human-readable name shown by <c>func workload list</c> (e.g. <c>".NET"</c>).
     /// </summary>
@@ -38,12 +46,8 @@ internal sealed class GlobalManifestEntry
     public string Description { get; init; } = string.Empty;
 
     /// <summary>
-    /// Installed package version (NuGet version string).
-    /// </summary>
-    public required string Version { get; init; }
-
-    /// <summary>
-    /// Short aliases the user can pass to <c>func workload install/uninstall</c> instead of the full package id (e.g. <c>"dotnet"</c>).
+    /// Short aliases the user can pass to <c>func workload install/uninstall</c>
+    /// instead of the full package id (e.g. <c>"dotnet"</c>).
     /// </summary>
     public IReadOnlyList<string> Aliases { get; init; } = Array.Empty<string>();
 
@@ -60,7 +64,7 @@ internal sealed class GlobalManifestEntry
 
 /// <summary>
 /// Identifies the type that implements <see cref="IWorkload"/>. Auto-discovered
-/// at install time by scanning the package's <c>lib/&lt;tfm&gt;/</c> assemblies.
+/// at install time via <c>[assembly: ExportCliWorkload&lt;T&gt;]</c>.
 /// </summary>
 internal sealed class EntryPointSpec
 {
@@ -76,3 +80,10 @@ internal sealed class EntryPointSpec
     /// </summary>
     public required string Type { get; init; }
 }
+
+/// <summary>
+/// Projection of a single (package id, version, entry) triple from the
+/// nested manifest. Lets callers iterate the manifest as a flat list
+/// without exposing the on-disk dictionary shape.
+/// </summary>
+internal sealed record InstalledWorkload(string PackageId, string Version, GlobalManifestEntry Entry);

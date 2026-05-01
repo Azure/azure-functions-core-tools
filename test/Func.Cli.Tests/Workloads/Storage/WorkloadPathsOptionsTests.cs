@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.ComponentModel.DataAnnotations;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Storage;
 using Xunit;
 
@@ -16,7 +17,7 @@ public class WorkloadPathsOptionsTests
 
         var expected = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".azure-functions");
+            Constants.FuncHomeDirectoryName);
         Assert.Equal(expected, options.Home);
     }
 
@@ -36,5 +37,33 @@ public class WorkloadPathsOptionsTests
 
         Assert.False(valid);
         Assert.Contains(results, r => r.MemberNames.Contains(nameof(WorkloadPathsOptions.Home)));
+    }
+
+    [Fact]
+    public void WorkloadsRoot_IsHomeJoinedWithWorkloads()
+    {
+        var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
+
+        Assert.Equal(Path.Combine("/tmp/funcs", "workloads"), options.WorkloadsRoot);
+    }
+
+    [Fact]
+    public void GlobalManifestPath_IsHomeJoinedWithManifestFileName()
+    {
+        var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
+
+        Assert.Equal(
+            Path.Combine("/tmp/funcs", WorkloadPathsOptions.GlobalManifestFileName),
+            options.GlobalManifestPath);
+    }
+
+    [Fact]
+    public void GetInstallDirectory_LayoutIsPackageIdThenVersion()
+    {
+        var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
+
+        Assert.Equal(
+            Path.Combine("/tmp/funcs", "workloads", "Azure.Functions.Cli.Workload.Dotnet", "1.2.3"),
+            options.GetInstallDirectory("Azure.Functions.Cli.Workload.Dotnet", "1.2.3"));
     }
 }

@@ -9,25 +9,41 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// shape and the read-modify-write dance so callers can't accidentally race
 /// on a shared mutable aggregate.
 /// </summary>
+/// <remarks>
+/// The manifest models side-by-side installs (multiple versions of the
+/// same package coexist), so reads, writes, and removes are scoped to a
+/// (<c>packageId</c>, <c>version</c>) pair. Package-id matching is
+/// case-insensitive (NuGet convention); version matching is ordinal.
+/// </remarks>
 internal interface IGlobalManifestStore
 {
     /// <summary>
-    /// Returns every workload currently recorded in the manifest. Returns an
-    /// empty list when the manifest doesn't exist yet.
+    /// Returns every installed (<c>packageId</c>, <c>version</c>) pair as a
+    /// flat list. Returns an empty list when the manifest doesn't exist yet.
+    /// Order is unspecified.
     /// </summary>
-    public Task<IReadOnlyList<GlobalManifestEntry>> GetWorkloadsAsync(CancellationToken cancellationToken = default);
+    public Task<IReadOnlyList<InstalledWorkload>> GetWorkloadsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Inserts <paramref name="entry"/>, or replaces an existing entry with
-    /// the same <see cref="GlobalManifestEntry.PackageId"/> (case-insensitive).
-    /// Used by both <c>workload install</c> (insert) and upgrade (replace).
+    /// Inserts <paramref name="entry"/> under
+    /// (<paramref name="packageId"/>, <paramref name="version"/>), or
+    /// replaces an existing entry with the same pair. Other versions of the
+    /// same package are left untouched (side-by-side).
     /// </summary>
-    public Task SaveWorkloadAsync(GlobalManifestEntry entry, CancellationToken cancellationToken = default);
+    public Task SaveWorkloadAsync(
+        string packageId,
+        string version,
+        GlobalManifestEntry entry,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Removes the entry whose <see cref="GlobalManifestEntry.PackageId"/>
-    /// matches (case-insensitive). Returns <c>true</c> when an entry was
-    /// removed, <c>false</c> when no matching entry existed.
+    /// Removes the entry for (<paramref name="packageId"/>,
+    /// <paramref name="version"/>). Returns <c>true</c> when an entry was
+    /// removed, <c>false</c> when no such entry existed. Other versions of
+    /// the same package are left untouched.
     /// </summary>
-    public Task<bool> RemoveWorkloadAsync(string packageId, CancellationToken cancellationToken = default);
+    public Task<bool> RemoveWorkloadAsync(
+        string packageId,
+        string version,
+        CancellationToken cancellationToken = default);
 }

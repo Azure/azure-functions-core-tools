@@ -15,48 +15,67 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
     private readonly IWorkloadPaths _paths = paths
         ?? throw new ArgumentNullException(nameof(paths));
 
-    public async Task<IReadOnlyList<GlobalManifestEntry>> GetWorkloadsAsync(
+    public async Task<IReadOnlyList<InstalledWorkload>> GetWorkloadsAsync(
         CancellationToken cancellationToken = default)
     {
         var manifest = await ReadManifestAsync(cancellationToken).ConfigureAwait(false);
-        return manifest.Workloads;
+        var results = new List<InstalledWorkload>();
+        foreach (var (packageId, versions) in manifest.Workloads)
+        {
+            foreach (var (version, entry) in versions)
+            {
+                results.Add(new InstalledWorkload(packageId, version, entry));
+            }
+        }
+
+        return results;
     }
 
     public async Task SaveWorkloadAsync(
+        string packageId,
+        string version,
         GlobalManifestEntry entry,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
         ArgumentNullException.ThrowIfNull(entry);
 
         var manifest = await ReadManifestAsync(cancellationToken).ConfigureAwait(false);
-        var existing = manifest.Workloads.FindIndex(
-            w => string.Equals(w.PackageId, entry.PackageId, StringComparison.OrdinalIgnoreCase));
 
-        if (existing >= 0)
+        if (!manifest.Workloads.TryGetValue(packageId, out var versions))
         {
-            manifest.Workloads[existing] = entry;
+            versions = new Dictionary<string, GlobalManifestEntry>(StringComparer.Ordinal);
+            manifest.Workloads[packageId] = versions;
         }
-        else
-        {
-            manifest.Workloads.Add(entry);
-        }
+
+        versions[version] = entry;
 
         await WriteManifestAsync(manifest, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> RemoveWorkloadAsync(
         string packageId,
+        string version,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
         var manifest = await ReadManifestAsync(cancellationToken).ConfigureAwait(false);
-        var removed = manifest.Workloads.RemoveAll(
-            w => string.Equals(w.PackageId, packageId, StringComparison.OrdinalIgnoreCase));
 
-        if (removed == 0)
+        if (!manifest.Workloads.TryGetValue(packageId, out var versions)
+            || !versions.Remove(version))
         {
             return false;
+        }
+
+        // Drop the package-id bucket once its last version is gone so the
+        // manifest doesn't accumulate empty parents over an install/uninstall
+        // cycle.
+        if (versions.Count == 0)
+        {
+            manifest.Workloads.Remove(packageId);
         }
 
         await WriteManifestAsync(manifest, cancellationToken).ConfigureAwait(false);
@@ -81,11 +100,17 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
                 bufferSize: 4096,
                 useAsync: true);
 
-            return await JsonSerializer.DeserializeAsync(
+            var deserialized = await JsonSerializer.DeserializeAsync(
                 stream,
                 WorkloadJsonContext.Default.GlobalManifest,
                 cancellationToken).ConfigureAwait(false)
                 ?? new GlobalManifest();
+
+            // System.Text.Json rebuilds the outer dictionary with the default
+            // (case-sensitive) comparer regardless of the in-memory comparer
+            // on the type's default. Reapply ordinal-ignore-case so package-id
+            // lookups match NuGet semantics across read/write boundaries.
+            return RehydrateComparers(deserialized);
         }
         catch (JsonException ex)
         {
@@ -93,6 +118,23 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
                 $"Failed to parse '{path}': {ex.Message}",
                 isUserError: true);
         }
+    }
+
+    private static GlobalManifest RehydrateComparers(GlobalManifest manifest)
+    {
+        if (ReferenceEquals(manifest.Workloads.Comparer, StringComparer.OrdinalIgnoreCase))
+        {
+            return manifest;
+        }
+
+        var rebuilt = new Dictionary<string, Dictionary<string, GlobalManifestEntry>>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var (packageId, versions) in manifest.Workloads)
+        {
+            rebuilt[packageId] = versions;
+        }
+
+        return new GlobalManifest { Workloads = rebuilt };
     }
 
     private async Task WriteManifestAsync(GlobalManifest manifest, CancellationToken cancellationToken)
