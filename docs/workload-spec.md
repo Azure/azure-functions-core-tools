@@ -1,9 +1,9 @@
 # Workload Spec
 
-> **Status:** Draft. This spec is the **contract** that any workload model
-> implementation must satisfy. It deliberately avoids prescribing
-> in-process vs out-of-process — see [`workload-design.md`](./workload-design.md)
-> for the comparison of those options.
+> **Status:** Draft. This spec defines the contract between the Func CLI
+> and workload packages. v1 uses an **in-process** model: workloads are
+> .NET assemblies loaded into the `func` process inside isolated
+> collectible `AssemblyLoadContext`s.
 
 ## 1. Goals
 
@@ -40,9 +40,9 @@
 | **Host runtime**      | `Microsoft.Azure.WebJobs.Script.WebHost` — the process that actually executes Functions. Acquired and versioned as a workload, launched by `func start`. |
 | **Workload**          | An installable extension contributing init/new/pack support and/or commands. |
 | **Workload package**  | The distributable unit. NuGet in v1; format may evolve.                 |
-| **Workload manifest** | Per-workload metadata describing id, version, capabilities, etc.         |
+| **Global manifest**   | The single CLI-owned JSON file at `~/.azure-functions/workloads.json` recording which workload versions are installed and how to load them. |
 | **Worker runtime**    | The Functions runtime language identifier (`dotnet`, `node`, `python`, `java`, `powershell`, `custom`). |
-| **Capability**        | A named feature a workload supports (e.g. `project.init`, `templates`, `pack`). |
+| **Contribution point** | An interface in `Func.Cli.Abstractions` (e.g. `IProjectInitializer`) that a workload registers to participate in a built-in command. |
 | **Project marker**    | A glob/file pattern (`*.csproj`, `package.json`, …) that hints which workload owns a given directory. |
 
 ## 4. User-facing requirements
@@ -131,56 +131,77 @@
 
 ## 5. Workload contract — what a workload provides
 
-A workload **may** implement any subset of the following capabilities. It
-**must** declare which it supports in its manifest.
+A workload is a NuGet package containing a .NET assembly that implements
+`IWorkload`. The assembly declares its entry point with a single
+assembly-level attribute:
 
-| Capability        | Method / interface                                  | Required for                     |
-|-------------------|-----------------------------------------------------|----------------------------------|
-| `project.detect`  | "Does this directory look like my project?"         | `func pack` directory routing    |
-| `project.init`    | Scaffold a new project                              | `func init`                      |
-| `templates.list`  | Enumerate available templates                       | `func new` (listing)             |
-| `templates.create`| Materialize a template into the project             | `func new --template`            |
-| `pack.run`        | Build & package the project                         | `func pack`                      |
-| `commands`        | Register additional CLI commands                    | Feature workloads (e.g. durable) |
+```csharp
+[assembly: ExportCliWorkload<MyWorkload>]
+```
 
-### 5.1 Manifest requirements
+The `IWorkload` implementation receives a `FunctionsCliBuilder` during
+host startup and registers concrete services into DI. The CLI consumes
+those services via `IEnumerable<T>` collections and dispatches based on
+which workload contributed which service. There is **no static
+capability list** — what a workload can do is whatever it has registered.
 
-Every workload package **must** ship a manifest declaring at least:
+### 5.1 Contribution points (DI)
 
-| Field              | Type     | Required | Notes                                            |
-|--------------------|----------|----------|--------------------------------------------------|
-| `schemaVersion`    | int      | yes      | Manifest schema version. v1 = `1`.               |
-| `id`               | string   | yes      | Unique, kebab-case (e.g. `python`, `dotnet`).     |
-| `version`          | semver   | yes      | Workload version (independent of Func CLI version). |
-| `displayName`      | string   | yes      | Shown in `func workload list`.                   |
-| `description`      | string   | yes      | One-line summary.                                |
-| `workerRuntimes`   | string[] | yes      | Worker runtime ids this workload owns.           |
-| `languages`        | string[] | no       | Display labels (e.g. `["C#", "F#"]`).             |
-| `capabilities`     | string[] | yes      | Subset of capabilities listed above.             |
-| `projectMarkers`   | string[] | no       | Glob patterns for fast pre-filtering in `pack`.  |
-| `protocolVersion`  | string   | impl-dependent | Required for out-of-process model (Option B). |
-| `executable`       | string   | impl-dependent | Required for out-of-process model.            |
+A workload **may** register any subset of these services. Each service
+the workload registers means it participates in the corresponding command:
 
-Implementation-specific fields (e.g. `executable`, assembly name) are
-documented in the chosen design.
+| Service registered                | The workload can…                                          | Used by                          |
+|-----------------------------------|-----------------------------------------------------------|----------------------------------|
+| `IProjectInitializer`             | Scaffold a new project for a given worker runtime.        | `func init`                      |
+| `IProjectDetector`                | Decide whether a directory is "its" project.              | `func pack` directory routing    |
+| `ITemplateProvider`               | Enumerate and materialize templates.                      | `func new`                       |
+| `IPackProvider`                   | Build & package the project.                              | `func pack`                      |
+| `IExternalCommand`                | Register additional CLI commands (e.g. `func durable …`). | Feature workloads                |
+| `IHostRuntimeLauncher`            | Launch the Functions host runtime process.                | `func start` (host workload)     |
 
-### 5.2 Project detection
+The exact interface names and shapes are documented in
+[`building-a-workload.md`](./building-a-workload.md). Adding a new
+contribution point is an additive change to `Func.Cli.Abstractions`
+(no manifest field to coordinate, no schema bump).
 
-- Pre-filter: the Func CLI applies `projectMarkers` (if present) to the target
-  directory before invoking the workload. Workloads with no markers are
-  always candidates.
-- Detection: the workload returns a confidence (`yes` / `no` / `maybe`)
-  plus an optional reason string.
-- Tie-breaking: if multiple workloads return `yes`, the Func CLI errors with
-  the list and asks the user to disambiguate via `--worker-runtime`.
+### 5.2 Package metadata
 
-### 5.3 Versioning
+Workload packages do **not** ship a per-package manifest file. The
+metadata the CLI needs is split between two sources:
+
+1. **NuGet metadata (`.nuspec`)** — owned by the package author, captured
+   at install time:
+    - `id` → package id (NuGet rules apply, case-insensitive).
+    - `version` → semver, the workload version.
+    - `title` → display name shown in `func workload list`.
+    - `description` → one-line summary shown in `func workload list`.
+    - `tags` → space-separated short aliases (e.g. `dotnet csharp`)
+      the user can pass to `install` / `uninstall` instead of the full id.
+2. **Assembly attribute** — `[assembly: ExportCliWorkload<T>]` declares
+   the entry-point type. The install pipeline scans for it once and
+   records `(assembly path, type FQN)` in the global manifest.
+
+The CLI persists everything it needs for startup in a single
+**global manifest** at `~/.azure-functions/workloads.json` (see §6.1).
+Workload authors never touch this file; it is owned by `func workload
+install` / `uninstall`.
+
+### 5.3 Project detection
+
+- Pre-filter: the Func CLI applies project-marker globs (declared by
+  the workload's `IProjectDetector` registration) before invoking the
+  detector. Workloads with no markers are always candidates.
+- Detection: the workload's `IProjectDetector` returns a confidence
+  (`yes` / `no` / `maybe`) plus an optional reason string.
+- Tie-breaking: if multiple workloads return `yes`, the Func CLI errors
+  with the list and asks the user to disambiguate via `--worker-runtime`.
+
+### 5.4 Versioning
 
 - Workloads use **semver**. `func workload update` uses the same major
   version by default; major bumps require an explicit opt-in.
-- The Func CLI declares a **minimum supported manifest schema version** and
-  rejects workloads below it with a clear error pointing at
-  `func workload update`.
+- The CLI declares a **minimum supported global-manifest schema version**
+  (see §10) and rejects manifests it cannot parse.
 
 ## 6. Lifecycle
 
@@ -188,23 +209,39 @@ documented in the chosen design.
 
 1. Resolve `<id>` to a package via the catalog (NuGet by default).
 2. Download to a staging directory.
-3. Validate the manifest (required fields, schema version).
-4. Atomically move into `~/.azure-functions/workloads/<id>/<version>/` (or
-   the equivalent path for the chosen design).
-5. Emit a "installed" message including version and capabilities.
+3. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`).
+4. Scan the package's top-level assemblies for `[assembly:
+   ExportCliWorkload<T>]`. Exactly one assembly must declare it — zero
+   or multiple is a fatal install error.
+5. Atomically move into `~/.azure-functions/workloads/<id>/<version>/`.
+6. Update the global manifest `~/.azure-functions/workloads.json`,
+   adding an entry under `workloads[<id>][<version>]` with
+   `displayName`, `description`, `aliases`, `installPath`, and
+   `entryPoint: { assembly, type }`. The write is atomic (temp file +
+   rename) so a crash mid-install cannot corrupt the manifest.
+7. Emit an "installed" message including version and entry-point type.
 
 ### 6.2 Discovery
 
-- On every Func CLI startup, scan the install root for manifests.
-- Discovery **must** complete in O(workload count) and **must not** spawn
-  any workload process or load any workload assembly during scan (Option B
-  may defer process spawn until first invocation; Option A may defer
-  assembly load until first request).
+- On every Func CLI startup, the loader reads the global manifest at
+  `~/.azure-functions/workloads.json`. Discovery is a **single JSON
+  read + N assembly loads**, where N is the number of installed
+  workloads — no filesystem walking of install directories.
+- Discovery **must** complete in O(workload count) and **must not**
+  invoke any workload code beyond instantiating the entry-point type
+  (no scanning of all types, no running of static initializers beyond
+  what the runtime triggers on first method dispatch).
+- Each workload is loaded into its **own collectible
+  `AssemblyLoadContext`** so two workloads can ship conflicting
+  dependency versions without clashing.
 
 ### 6.3 Invocation
 
-- The Func CLI binds the relevant request (init/new/pack/etc.) to the
-  capability declared in the manifest.
+- The Func CLI dispatches each request (init/new/pack/etc.) to whichever
+  workload(s) registered the corresponding contribution-point service
+  (see §5.1). When more than one workload registers the same service,
+  the dispatch rules of the consuming command apply (e.g. `--worker-runtime`
+  disambiguation, project detection routing).
 - Errors from a workload **must** surface to the user with the workload id
   prefixed (e.g. `[python] error: ...`).
 - The Func CLI **must** distinguish between workload-protocol errors (bug, ask
@@ -236,10 +273,9 @@ documented in the chosen design.
 | Scenario                                    | Required behavior                                                                                  |
 |---------------------------------------------|----------------------------------------------------------------------------------------------------|
 | No workload installed for runtime           | Print exact install command, exit non-zero.                                                       |
-| Workload manifest invalid                   | Skip the workload during discovery, log a warning to stderr, do not crash.                        |
+| Global manifest unreadable / unknown schema | Throw a `GracefulException` with the manifest path and the action to take (update CLI). Do not crash silently. |
+| Workload entry-point missing or unloadable  | Print the underlying error and the install path; suggest `func workload uninstall && install`.   |
 | Workload fails during request               | Surface the error with `[<workload-id>]` prefix; exit non-zero with the workload's exit code (or 1). |
-| Workload protocol violation (Option B)      | Treat as a workload bug; print actionable error, exit non-zero.                                   |
-| Workload spawn / load failure               | Print the underlying error and the install path; suggest `func workload uninstall && install`.   |
 | Two workloads claim same project / template | Error listing all candidates, suggest `--worker-runtime` to disambiguate.                         |
 | Catalog unreachable                         | `install`/`update` must error clearly; `list` and offline operations must still work.             |
 
@@ -266,13 +302,31 @@ documented in the chosen design.
 
 ## 10. Compatibility & versioning
 
-- The Func CLI advertises a **manifest schema version** and **(if applicable)
-  protocol version** during workload invocation.
-- Workloads built against a newer schema or protocol than the Func CLI
-  supports must be rejected with a "Func CLI too old, please update" message.
-- Workloads built against an older schema/protocol must continue to work
-  if the Func CLI can satisfy the older contract; otherwise the Func CLI rejects
-  with a "workload too old, please run `func workload update`" message.
+### 10.1 Global manifest schema
+
+The global manifest at `~/.azure-functions/workloads.json` carries a
+top-level `schemaVersion: <int>` field. The current schema is **v1**.
+
+- The Func CLI **must** check `schemaVersion` on every read.
+- A manifest with a `schemaVersion` higher than the CLI supports
+  **must** be rejected with a `GracefulException` instructing the user
+  to update the CLI. The CLI **must not** attempt a partial parse.
+- A manifest with no `schemaVersion` field (legacy, written before the
+  field existed) is treated as v1 and re-emitted with `schemaVersion: 1`
+  on the next write.
+
+### 10.2 Workload compatibility
+
+- Workloads use **semver**; `func workload install` and `update` honour
+  the standard NuGet resolution rules.
+- A workload built against a newer Func CLI abstractions package than
+  the running CLI supports must fail to load with a "Func CLI too old,
+  please update" message — surfaced as an `[<workload-id>]`-prefixed
+  error from the loader.
+- A workload built against an older abstractions package must continue
+  to work as long as the CLI can still satisfy the contract types it
+  resolves; otherwise the CLI rejects with "workload too old, please
+  run `func workload update`".
 
 ## 11. Telemetry expectations
 
@@ -292,8 +346,11 @@ documented in the chosen design.
    warn?
 3. **Cross-RID workloads** — does `func workload install python` resolve
    per-RID artifacts, or does the workload bundle all RIDs?
-4. **Process reuse** (Option B specific) — within a single `func` invocation
-   that fires multiple workload calls, do we reuse the spawn?
+4. **Self-contained / single-file `func`** — `WorkloadPaths` already
+   supports a configurable root, but a portable single-file `func`
+   loses portability the moment a workload is installed unless we
+   probe `<func-dir>/workloads` first. Decide before the install
+   command lands.
 5. **Bidirectional UX** (logs, progress, prompts) — CLI-rendered only in
    v1, or do we lock in a callback contract now to avoid breaking changes
    later?
