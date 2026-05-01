@@ -50,6 +50,7 @@ hostBuilder.Services.AddBuiltInCommands();
 // FUNC_CLI_ prefix is stripped, "__" maps to section nesting).
 hostBuilder.Configuration.AddEnvironmentVariables(prefix: Constants.EnvironmentVariablePrefix);
 hostBuilder.Services.AddWorkloadStorage();
+hostBuilder.Services.AddWorkloadInstaller();
 
 // Let installed workloads contribute services. The builder exposes the same
 // IServiceCollection the host uses, so anything a workload registers is

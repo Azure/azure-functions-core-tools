@@ -60,6 +60,11 @@ internal static class TestParser
         services.AddSingleton(interaction);
         services.AddBuiltInCommands();
         services.AddSingleton<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>());
+
+        // Built-in workload commands need the install pipeline + manifest store.
+        // Use NSubstitute stubs here so tests don't have to touch real storage.
+        services.AddSingleton(NSubstitute.Substitute.For<global::Azure.Functions.Cli.Workloads.Storage.IGlobalManifestStore>());
+        services.AddSingleton(NSubstitute.Substitute.For<global::Azure.Functions.Cli.Workloads.Install.IWorkloadInstaller>());
         return services;
     }
 }
