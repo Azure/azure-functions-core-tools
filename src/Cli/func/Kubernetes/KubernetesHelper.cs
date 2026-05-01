@@ -274,6 +274,20 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static async Task WaitForDeploymentRollout(DeploymentV1Apps deployment)
         {
+            // Poll until the deployment is visible in the API server before checking rollout status.
+            // kubectl apply can return before the resource is registered, causing a race condition.
+            var deadline = DateTime.UtcNow.Add(TimeSpan.FromMinutes(2));
+            while (DateTime.UtcNow < deadline)
+            {
+                (_, bool exists) = await ResourceExists("deployment", deployment.Metadata.Name, deployment.Metadata.Namespace);
+                if (exists)
+                {
+                    break;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
+
             var statement = $"rollout status deployment {deployment.Metadata.Name}";
 
             // If a namespace is specified, we filter on it
