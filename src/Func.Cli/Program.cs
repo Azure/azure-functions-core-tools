@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
@@ -43,6 +44,12 @@ if (CliTelemetry.TryGetConnectionString(out var connectionString))
 // Register built-in commands so they flow through DI alongside any
 // workload-contributed commands.
 hostBuilder.Services.AddBuiltInCommands();
+
+// Storage subsystem: bind WorkloadPathsOptions from the "Workloads" config
+// section so the FUNC_CLI_Workloads__Home env var flows through (the
+// FUNC_CLI_ prefix is stripped, "__" maps to section nesting).
+hostBuilder.Configuration.AddEnvironmentVariables(prefix: Constants.EnvironmentVariablePrefix);
+hostBuilder.Services.AddWorkloadStorage();
 
 // Let installed workloads contribute services. The builder exposes the same
 // IServiceCollection the host uses, so anything a workload registers is
