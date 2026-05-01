@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
             // Create HTTP Trigger function with anonymous authlevel
             var result = new FuncNewCommand(FuncPath, testName, Log)
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute([".", "--template", "HttpTrigger", "--name", "MyHttpTriggerFunction", "--authlevel", "Anonymous", "-a"]);
+                .Execute([".", "--template", "HttpTrigger", "--name", "MyHttpTriggerFunction", "--authlevel", "Anonymous"]);
 
             // Verify output contains success message
             result.Should().HaveStdOutContaining("The function \"MyHttpTriggerFunction\" was created successfully from the \"HttpTrigger\" template.");

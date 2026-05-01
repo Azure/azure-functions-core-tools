@@ -106,6 +106,37 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 "FUNCTIONS_CORE_TOOLS_OFFLINE env var should set offline mode");
         }
 
+        [Theory]
+        [InlineData("false")]
+        [InlineData("0")]
+        [InlineData("FALSE")]
+        public void Init_WithEnvVarFalse_ForcesOnlineWithoutNetworkCheck(string envValue)
+        {
+            // Arrange
+            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, envValue);
+
+            // Act
+            GlobalCoreToolsSettings.Init(null, Array.Empty<string>());
+
+            // Assert – probe is skipped; offline mode is false regardless of real connectivity
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeFalse(
+                "FUNCTIONS_CORE_TOOLS_OFFLINE=false should force online and skip the probe");
+        }
+
+        [Fact]
+        public void Init_WithOfflineFlagAndEnvVarFalse_FlagWins()
+        {
+            // Arrange
+            Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsOffline, "false");
+
+            // Act – explicit --offline flag should still take precedence over env var override
+            GlobalCoreToolsSettings.Init(null, new[] { "--offline" });
+
+            // Assert
+            GlobalCoreToolsSettings.IsOfflineMode.Should().BeTrue(
+                "--offline flag should take precedence over FUNCTIONS_CORE_TOOLS_OFFLINE=false");
+        }
+
         // ─── SetOffline ─────────────────────────────────────────────────
         [Fact]
         public void SetOffline_True_SetsIsOfflineMode()

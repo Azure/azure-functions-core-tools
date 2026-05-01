@@ -42,6 +42,12 @@ namespace Azure.Functions.Cli.E2ETests
             Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, hiveRoot);
             Directory.CreateDirectory(hiveRoot);
 
+            // Skip the live network connectivity probe in spawned `func` processes. E2E tests
+            // are not testing connectivity; relying on a real probe makes them flake when the
+            // CI runner is slow on the first DNS/TLS handshake. Tests that explicitly want
+            // offline behavior pass the `--offline` flag, which still takes precedence.
+            Environment.SetEnvironmentVariable(Azure.Functions.Cli.Common.Constants.FunctionsCoreToolsOffline, "false");
+
             Directory.CreateDirectory(WorkingDirectory);
             return Task.CompletedTask;
         }
