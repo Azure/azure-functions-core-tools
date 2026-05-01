@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
+    <!-- Required for NSubstitute (Castle DynamicProxy) to mock internal interfaces. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
   <ItemGroup>
