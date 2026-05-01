@@ -286,89 +286,34 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken, string managementURL)
         {
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
-            Exception lastException = null;
+            var subIds = subscriptions?.Select(s => s.SubscriptionId).ToList();
 
-            foreach (var subscription in subscriptions)
+            if (subIds == null || subIds.Count == 0)
             {
-                try
-                {
-                    // Build URL using ArmUriTemplates
-                    var listUrl = ArmUriTemplates.StorageAccountsList.Bind(managementURL, new
-                    {
-                        subscriptionId = subscription.SubscriptionId
-                    });
-
-                    // Fetch all pages
-                    var allAccounts = new List<ArmWrapper<ArmGenericResource>>();
-
-                    var response = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
-                        HttpMethod.Get,
-                        listUrl,
-                        accessToken);
-
-                    while (response != null)
-                    {
-                        if (response.Value != null)
-                        {
-                            allAccounts.AddRange(response.Value);
-                        }
-
-                        if (string.IsNullOrEmpty(response.NextLink))
-                        {
-                            break;
-                        }
-
-                        response = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
-                        HttpMethod.Get,
-                        new Uri(response.NextLink),
-                        accessToken);
-                    }
-
-                    var match = allAccounts.FirstOrDefault(a =>
-                        string.Equals(a.Name, storageAccountName, StringComparison.OrdinalIgnoreCase));
-
-                    if (match == null)
-                    {
-                        continue;
-                    }
-
-                    var resourceGroup = ExtractResourceGroupFromId(match.Id);
-
-                    var getUrl = ArmUriTemplates.StorageAccountByResourceGroup.Bind(managementURL, new
-                    {
-                        subscriptionId = subscription.SubscriptionId,
-                        resourceGroup = resourceGroup,
-                        storageAccountName = storageAccountName
-                    });
-
-                    var storageAccount =
-                        await ArmHttpAsync<ArmWrapper<ArmGenericResource>>(
-                            HttpMethod.Get,
-                            getUrl,
-                            accessToken);
-
-                    if (storageAccount != null)
-                    {
-                        return await GetStorageAccount(storageAccount, accessToken, managementURL);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    lastException = ex;
-
-                    if (StaticSettings.IsDebug)
-                    {
-                        ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
-                    }
-                }
+                throw new InvalidOperationException("No subscriptions found for the current account.");
             }
 
-            if (lastException != null)
+            // Resolve storage account via Azure Resource Graph (ARG)
+            var query =
+                $"Resources | where type =~ 'microsoft.storage/storageaccounts' " +
+                $"and name =~ '{storageAccountName}' | project id | limit 1";
+
+            var resourceId = await GetResourceIDFromArg(subIds, query, accessToken, managementURL);
+
+            if (string.IsNullOrWhiteSpace(resourceId))
             {
-                throw lastException;
+                throw new ArmResourceNotFoundException(
+                    $"Cannot find storage account with name {storageAccountName}");
             }
 
-            throw new ArmResourceNotFoundException($"Cannot find storage account with name {storageAccountName}");
+            return await GetStorageAccount(
+                new ArmWrapper<ArmGenericResource>
+                {
+                    Id = resourceId,
+                    Name = storageAccountName
+                },
+                accessToken,
+                managementURL);
         }
 
         private static async Task<StorageAccount> GetStorageAccount(ArmWrapper<ArmGenericResource> armWrapper, string accessToken, string managementURL)
@@ -821,21 +766,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return null;
             }
-        }
-
-        private static string ExtractResourceGroupFromId(string resourceId)
-        {
-            var parts = resourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-            for (int i = 0; i < parts.Length; i++)
-            {
-                if (parts[i].Equals("resourceGroups", StringComparison.OrdinalIgnoreCase) && i + 1 < parts.Length)
-                {
-                    return parts[i + 1];
-                }
-            }
-
-            throw new InvalidOperationException("Resource group not found in resource ID");
         }
     }
 }
