@@ -270,9 +270,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         ConfigureAuthorizationLevel(template);
                     }
 
-                    ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
+                    var defaultFunctionName = GetUniqueDefaultFunctionName(
+                        template.Metadata.DefaultFunctionName,
+                        functionName => FunctionArtifactExists(functionName, FileName, template));
+                    ColoredConsole.Write($"Function name: [{defaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
-                    FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
+                    FunctionName = string.IsNullOrEmpty(FunctionName) ? defaultFunctionName : FunctionName;
                     await _templatesManager.Deploy(FunctionName, FileName, template);
                     PerformPostDeployTasks(FunctionName, Language);
                 }
@@ -468,6 +471,45 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var binding = bindings.Where(b => b["type"].ToString().Equals(HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
                 binding["authLevel"] = AuthorizationLevel.ToString().ToLowerInvariant();
             }
+        }
+
+        internal static string GetUniqueDefaultFunctionName(string defaultFunctionName, Func<string, bool> functionExists)
+        {
+            if (!functionExists(defaultFunctionName))
+            {
+                return defaultFunctionName;
+            }
+
+            var index = 1;
+            string candidate;
+            do
+            {
+                candidate = $"{defaultFunctionName}{index}";
+                index++;
+            }
+            while (functionExists(candidate));
+
+            return candidate;
+        }
+
+        private static bool FunctionArtifactExists(string functionName, string fileName, Template template)
+        {
+            if (IsNodeV4Template(template))
+            {
+                return template.Files
+                    .Where(file => !file.Key.EndsWith(".dat"))
+                    .Select(file => fileName ?? file.Key.Replace("%functionName%", functionName))
+                    .Any(name => FileSystemHelpers.FileExists(
+                        Path.Combine(Environment.CurrentDirectory, "src", "functions", name)));
+            }
+
+            return FileSystemHelpers.DirectoryExists(Path.Combine(Environment.CurrentDirectory, functionName));
+        }
+
+        private static bool IsNodeV4Template(Template template)
+        {
+            return template.Id.EndsWith("JavaScript-4.x", StringComparison.OrdinalIgnoreCase) ||
+                template.Id.EndsWith("TypeScript-4.x", StringComparison.OrdinalIgnoreCase);
         }
 
         private bool InferAndUpdateLanguage(WorkerRuntime workerRuntime)
