@@ -43,20 +43,6 @@ internal sealed class DefaultFunctionsCliBuilder : FunctionsCliBuilder
 
     public override IServiceCollection Services { get; }
 
-    protected override void OnRegisterCommand(FuncCommand command)
-    {
-        var workload = RequireWorkload();
-        Services.AddSingleton<FuncCliCommand>(_ => new ExternalCommand(workload, command));
-    }
-
-    protected override void OnRegisterCommand<TCommand>()
-    {
-        var workload = RequireWorkload();
-        Services.AddSingleton<TCommand>();
-        Services.AddSingleton<FuncCliCommand>(sp =>
-            new ExternalCommand(workload, sp.GetRequiredService<TCommand>()));
-    }
-
     protected override void OnRegisterCommand(Func<IServiceProvider, FuncCommand> factory)
     {
         var workload = RequireWorkload();

@@ -85,7 +85,7 @@ public class ExternalCommandTests
         var b = new FuncCommandOption<string>("--name", null, "second");
         var source = new TestWorkloads.StubFuncCommand("deploy", options: [a, b]);
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        var ex = Assert.Throws<WorkloadOperationException>(
             () => new ExternalCommand(TestWorkloads.CreateInfo("Workload.A"), source));
         Assert.Contains("Workload.A", ex.Message);
         Assert.Contains("--name", ex.Message);
@@ -98,7 +98,7 @@ public class ExternalCommandTests
         var b = new FuncCommandOption<string>("--second", "-x", "second");
         var source = new TestWorkloads.StubFuncCommand("deploy", options: [a, b]);
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        var ex = Assert.Throws<WorkloadOperationException>(
             () => new ExternalCommand(TestWorkloads.CreateInfo(), source));
         Assert.Contains("-x", ex.Message);
     }
@@ -110,7 +110,7 @@ public class ExternalCommandTests
         var b = new FuncCommandArgument<string>("path", "second");
         var source = new TestWorkloads.StubFuncCommand("deploy", arguments: [a, b]);
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        var ex = Assert.Throws<WorkloadOperationException>(
             () => new ExternalCommand(TestWorkloads.CreateInfo(), source));
         Assert.Contains("path", ex.Message);
     }
@@ -122,9 +122,22 @@ public class ExternalCommandTests
         var b = new TestWorkloads.StubFuncCommand("dup");
         var source = new TestWorkloads.StubFuncCommand("parent", subcommands: [a, b]);
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        var ex = Assert.Throws<WorkloadOperationException>(
             () => new ExternalCommand(TestWorkloads.CreateInfo(), source));
         Assert.Contains("dup", ex.Message);
+    }
+
+    [Fact]
+    public void Ctor_WorkloadOperationException_CarriesWorkloadInfo()
+    {
+        var a = new FuncCommandOption<string>("--name", null, "first");
+        var b = new FuncCommandOption<string>("--name", null, "second");
+        var source = new TestWorkloads.StubFuncCommand("deploy", options: [a, b]);
+        var workload = TestWorkloads.CreateInfo("Workload.B");
+
+        var ex = Assert.Throws<WorkloadOperationException>(
+            () => new ExternalCommand(workload, source));
+        Assert.Same(workload, ex.Workload);
     }
 
     [Fact]

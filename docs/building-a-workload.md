@@ -250,8 +250,8 @@ public sealed class DurableWorkload : IWorkload
     {
         // Pick the overload that fits how your command is constructed:
         //   builder.RegisterCommand(new DurableCommand());        // simple instance
-        //   builder.RegisterCommand<DurableCommand>();            // DI-constructed
-        //   builder.RegisterCommand(sp => new DurableCommand(...)); // custom factory
+        //   builder.RegisterCommand<DurableCommand>();            // DI-constructed (recommended)
+        //   builder.RegisterCommand(typeof(DurableCommand));      // by runtime Type
         builder.RegisterCommand<DurableCommand>();
     }
 }
