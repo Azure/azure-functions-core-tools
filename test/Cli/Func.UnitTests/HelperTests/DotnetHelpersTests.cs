@@ -94,5 +94,32 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 DotnetHelpers.RunDotnetNewFunc = original;
             }
         }
+
+        /// <summary>
+        /// Verifies that TryGetBuildOutputPathAsync returns null when no project file exists
+        /// in the given working directory (or any of its parent directories outside the project tree).
+        /// </summary>
+        [Fact]
+        public async Task TryGetBuildOutputPathAsync_ReturnsNull_WhenNoProjectFileExists()
+        {
+            // Arrange - use an isolated temp directory under /tmp so that FindProjectFile
+            // cannot walk up and find a .csproj from a real project.
+            var testRootDirectory = Path.Combine(Path.GetTempPath(), "func-test-noproj-" + Guid.NewGuid().ToString("N"));
+            var workingDir = Path.Combine(testRootDirectory, "subdir");
+            Directory.CreateDirectory(workingDir);
+
+            try
+            {
+                // Act
+                var result = await DotnetHelpers.TryGetBuildOutputPathAsync(workingDir);
+
+                // Assert
+                Assert.Null(result);
+            }
+            finally
+            {
+                Directory.Delete(testRootDirectory, recursive: true);
+            }
+        }
     }
 }
