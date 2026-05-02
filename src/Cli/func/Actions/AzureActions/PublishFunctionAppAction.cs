@@ -650,11 +650,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else if (functionApp.IsLinux && functionApp.IsDynamic)
             {
                 // Consumption Linux
+                WarnIfNoZipIsUnsupported(functionApp);
                 shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionApp, zipStreamFactory);
             }
             else if (functionApp.IsFlex)
             {
                 // Flex
+                WarnIfNoZipIsUnsupported(functionApp);
                 shouldSyncTriggers = await HandleFlexConsumptionPublish(functionApp, zipStreamFactory);
             }
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
@@ -684,6 +686,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 shouldSyncTriggers = false;
 
                 // "--no-zip"
+                await EnsureNoRunFromPackageSetting(functionApp);
                 await PublishZipDeploy(functionApp, zipStreamFactory);
             }
 
@@ -716,6 +719,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: ShowKeys);
             }
+        }
+
+        private void WarnIfNoZipIsUnsupported(Site functionApp)
+        {
+            if (RunFromPackageDeploy)
+            {
+                return;
+            }
+
+            var plan = functionApp.IsFlex ? "Flex Consumption" : "Linux Consumption";
+            ColoredConsole.WriteLine(WarningColor(
+                $"The --nozip flag is not supported for {plan} Function Apps. This deployment will use Run-From-Package."));
         }
 
         private async Task SyncTriggers(Site functionApp)
@@ -1011,6 +1026,42 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
+        private async Task EnsureNoRunFromPackageSetting(Site functionApp)
+        {
+            if (!RemoveRunFromPackageSetting(functionApp, out _))
+            {
+                return;
+            }
+
+            ColoredConsole.WriteLine(WarningColor(
+                $"Removing {Constants.WebsiteRunFromPackage} app setting before --nozip deployment."));
+            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+            if (!result.IsSuccessful)
+            {
+                throw new CliException($"Error when removing app settings: {result.ErrorResult}.");
+            }
+
+            await WaitForAppSettingUpdateSCM(
+                functionApp,
+                shouldHaveSettings: functionApp.AzureAppSettings,
+                shouldNotHaveSettings: new Dictionary<string, string> { { Constants.WebsiteRunFromPackage, null } },
+                timeOutSeconds: 300);
+        }
+
+        internal static bool RemoveRunFromPackageSetting(Site functionApp, out IDictionary<string, string> removedSettings)
+        {
+            removedSettings = new Dictionary<string, string>();
+
+            if (functionApp.AzureAppSettings.TryGetValue(Constants.WebsiteRunFromPackage, out string value))
+            {
+                removedSettings[Constants.WebsiteRunFromPackage] = value;
+                functionApp.AzureAppSettings.Remove(Constants.WebsiteRunFromPackage);
+                return true;
+            }
+
+            return false;
+        }
+
         private async Task WaitForAppSettingUpdateSCM(
             Site functionApp,
             IDictionary<string, string> shouldHaveSettings = null,
@@ -1063,7 +1114,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         {
                             foreach (KeyValuePair<string, string> keyValuePair in shouldNotHaveSettings)
                             {
-                                if (scmSettingsDict.ContainsKey(keyValuePair.Key) && scmSettingsDict[keyValuePair.Key] == keyValuePair.Value)
+                                if (scmSettingsDict.ContainsKey(keyValuePair.Key) &&
+                                    (keyValuePair.Value == null || scmSettingsDict[keyValuePair.Key] == keyValuePair.Value))
                                 {
                                     scmUpdated = false;
                                     break;
