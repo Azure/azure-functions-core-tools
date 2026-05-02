@@ -55,7 +55,7 @@ public class WorkloadUninstallCommandTests
             () => InvokeAsync(cmd, "Test.Workload"));
 
         Assert.Contains("Multiple versions", ex.Message);
-        Assert.Contains("--all", ex.Message);
+        Assert.Contains("--all-versions", ex.Message);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class WorkloadUninstallCommandTests
             .Returns(true);
 
         var cmd = NewCommand();
-        await InvokeAsync(cmd, "Test.Workload", "--all");
+        await InvokeAsync(cmd, "Test.Workload", "--all-versions");
 
         await _installer.Received(1).UninstallAsync("Test.Workload", "1.0.0", Arg.Any<CancellationToken>());
         await _installer.Received(1).UninstallAsync("Test.Workload", "2.0.0", Arg.Any<CancellationToken>());
@@ -106,9 +106,9 @@ public class WorkloadUninstallCommandTests
 
         var cmd = NewCommand();
         var ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload", "--all", "--version", "1.0.0"));
+            () => InvokeAsync(cmd, "Test.Workload", "--all-versions", "--version", "1.0.0"));
 
-        Assert.Contains("--all and --version", ex.Message);
+        Assert.Contains("--all-versions and --version", ex.Message);
     }
 
     [Fact]

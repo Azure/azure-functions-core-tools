@@ -24,9 +24,20 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
     private readonly IWorkloadInstaller _installer;
     private readonly IGlobalManifestStore _store;
 
-    private readonly Argument<string> _packageIdArgument;
-    private readonly Option<string?> _versionOption;
-    private readonly Option<bool> _allOption;
+    public Argument<string> PackageIdArgument { get; } = new("packageId")
+    {
+        Description = "Package id of the workload to uninstall.",
+    };
+
+    public Option<string?> VersionOption { get; } = new("--version", "-v")
+    {
+        Description = "Specific version to uninstall. Omit when only one version is installed.",
+    };
+
+    public Option<bool> AllVersionsOption { get; } = new("--all-versions")
+    {
+        Description = "Uninstall every installed version of the package.",
+    };
 
     public WorkloadUninstallCommand(
         IInteractionService interaction,
@@ -38,35 +49,22 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
 
-        _packageIdArgument = new Argument<string>("packageId")
-        {
-            Description = "Package id of the workload to uninstall.",
-        };
-        _versionOption = new Option<string?>("--version")
-        {
-            Description = "Specific version to uninstall. Omit when only one version is installed.",
-        };
-        _allOption = new Option<bool>("--all")
-        {
-            Description = "Uninstall every installed version of the package.",
-        };
-
-        Arguments.Add(_packageIdArgument);
-        Options.Add(_versionOption);
-        Options.Add(_allOption);
+        Arguments.Add(PackageIdArgument);
+        Options.Add(VersionOption);
+        Options.Add(AllVersionsOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var packageId = parseResult.GetValue(_packageIdArgument)
+        var packageId = parseResult.GetValue(PackageIdArgument)
             ?? throw new GracefulException("packageId is required.", isUserError: true);
-        var version = parseResult.GetValue(_versionOption);
-        var all = parseResult.GetValue(_allOption);
+        var version = parseResult.GetValue(VersionOption);
+        var all = parseResult.GetValue(AllVersionsOption);
 
         if (all && !string.IsNullOrEmpty(version))
         {
             throw new GracefulException(
-                "--all and --version cannot be combined.",
+                "--all-versions and --version cannot be combined.",
                 isUserError: true);
         }
 
@@ -130,7 +128,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
             var available = string.Join(", ", matches.Select(m => m.Version));
             throw new GracefulException(
                 $"Multiple versions of '{packageId}' are installed ({available}). " +
-                "Pass --version <v> or --all.",
+                "Pass --version <v> or --all-versions.",
                 isUserError: true);
         }
 

@@ -119,8 +119,7 @@ internal class HelpCommand : FuncCliCommand
     /// </summary>
     internal void RenderCommandHelp(Command command)
     {
-        var isRoot = command is RootCommand;
-        var commandPath = isRoot ? "func" : $"func {command.Name}";
+        var commandPath = BuildCommandPath(command);
 
         _interaction.WriteBlankLine();
         _interaction.WriteTitle(commandPath);
@@ -166,6 +165,32 @@ internal class HelpCommand : FuncCliCommand
                 options.Select(o => new DefinitionItem(FormatOptionName(o), o.Description ?? string.Empty)));
             _interaction.WriteBlankLine();
         }
+    }
+
+    /// <summary>
+    /// Builds the displayed command path by walking parents, e.g.
+    /// <c>func workload install</c> for a deeply nested subcommand. Any
+    /// command whose parent chain does not lead to a <see cref="RootCommand"/>
+    /// (constructed-but-unparented in tests) renders as just its name prefixed
+    /// with <c>func</c>.
+    /// </summary>
+    private static string BuildCommandPath(Command command)
+    {
+        if (command is RootCommand)
+        {
+            return "func";
+        }
+
+        var segments = new List<string>();
+        Command? current = command;
+        while (current is not null && current is not RootCommand)
+        {
+            segments.Add(current.Name);
+            current = current.Parents.OfType<Command>().FirstOrDefault();
+        }
+
+        segments.Reverse();
+        return "func " + string.Join(' ', segments);
     }
 
     /// <summary>

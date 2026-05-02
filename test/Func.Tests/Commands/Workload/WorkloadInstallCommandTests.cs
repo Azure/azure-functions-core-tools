@@ -18,11 +18,24 @@ public class WorkloadInstallCommandTests
     private readonly IWorkloadInstaller _installer = Substitute.For<IWorkloadInstaller>();
 
     [Fact]
-    public void Install_HasFromOption_Required()
+    public void Install_HasIdArgumentAndOptions()
     {
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
-        var fromOption = Assert.Single(cmd.Options, o => o.Name == "--from");
-        Assert.True(fromOption.Required);
+        Assert.Single(cmd.Arguments, a => a.Name == "id");
+        Assert.Single(cmd.Options, o => o.Name == "--version");
+        Assert.Single(cmd.Options, o => o.Name == "--from");
+    }
+
+    [Fact]
+    public async Task Install_NoFromFlag_FeedAcquisitionNotYetSupported()
+    {
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var ex = await Assert.ThrowsAsync<GracefulException>(
+            () => InvokeAsync(cmd, "Test.Workload"));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("not yet supported", ex.Message);
+        Assert.Contains("--from", ex.Message);
     }
 
     [Fact]
@@ -43,7 +56,7 @@ public class WorkloadInstallCommandTests
                     }));
 
             var cmd = new WorkloadInstallCommand(_interaction, _installer);
-            var exit = await InvokeAsync(cmd, "--from", temp);
+            var exit = await InvokeAsync(cmd, "Test.Workload", "--from", temp);
 
             Assert.Equal(0, exit);
             await _installer.Received(1).InstallFromDirectoryAsync(temp, Arg.Any<CancellationToken>());
@@ -69,7 +82,39 @@ public class WorkloadInstallCommandTests
 
             var cmd = new WorkloadInstallCommand(_interaction, _installer);
             await Assert.ThrowsAsync<GracefulException>(
-                () => InvokeAsync(cmd, "--from", temp));
+                () => InvokeAsync(cmd, "Test.Workload", "--from", temp));
+        }
+        finally
+        {
+            if (Directory.Exists(temp))
+            {
+                Directory.Delete(temp, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Install_FromIdMismatch_WritesHint()
+    {
+        var temp = Directory.CreateTempSubdirectory("install-cmd-").FullName;
+        try
+        {
+            _installer.InstallFromDirectoryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(new InstalledWorkload(
+                    "Other.Workload",
+                    "2.0.0",
+                    new GlobalManifestEntry
+                    {
+                        DisplayName = "Other",
+                        InstallPath = "/install",
+                        EntryPoint = new EntryPointSpec { Assembly = "x.dll", Type = "T" },
+                    }));
+
+            var cmd = new WorkloadInstallCommand(_interaction, _installer);
+            await InvokeAsync(cmd, "Test.Workload", "--version", "1.0.0", "--from", temp);
+
+            Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:") && l.Contains("Other.Workload"));
+            Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:") && l.Contains("2.0.0"));
         }
         finally
         {

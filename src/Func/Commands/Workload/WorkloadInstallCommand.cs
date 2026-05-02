@@ -19,29 +19,66 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 {
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
-    private readonly Option<DirectoryInfo> _fromOption;
+
+    public Argument<string> PackageIdArgument { get; } = new("id")
+    {
+        Description = "Package id (or alias) of the workload to install.",
+    };
+
+    public Option<string?> VersionOption { get; } = new("--version", "-v")
+    {
+        Description = "Specific version to install. Defaults to the latest available.",
+    };
+
+    public Option<DirectoryInfo?> FromOption { get; } = new("--from")
+    {
+        Description = "Path to a directory containing an extracted workload .nupkg (the .nuspec must be at the top level). Use for local development before publishing to a feed.",
+    };
 
     public WorkloadInstallCommand(IInteractionService interaction, IWorkloadInstaller installer)
-        : base("install", "Install a workload from an already-extracted package directory.")
+        : base("install", "Install a workload.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
 
-        _fromOption = new Option<DirectoryInfo>("--from")
-        {
-            Description = "Path to a directory containing an extracted workload .nupkg (the .nuspec must be at the top level).",
-            Required = true,
-        };
-        Options.Add(_fromOption);
+        Arguments.Add(PackageIdArgument);
+        Options.Add(VersionOption);
+        Options.Add(FromOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var from = parseResult.GetValue(_fromOption)
-            ?? throw new GracefulException("--from is required.", isUserError: true);
+        var packageId = parseResult.GetValue(PackageIdArgument)
+            ?? throw new GracefulException("packageId is required.", isUserError: true);
+        var version = parseResult.GetValue(VersionOption);
+        var from = parseResult.GetValue(FromOption);
+
+        if (from is null)
+        {
+            // Feed-based acquisition (resolve packageId + optional version
+            // against a NuGet feed, download, extract, then install) lands in
+            // a follow-up. For now, --from is the only supported path.
+            throw new GracefulException(
+                $"Acquiring '{packageId}' from a NuGet feed is not yet supported. " +
+                "Pass --from <path> with an extracted .nupkg directory.",
+                isUserError: true);
+        }
 
         var installed = await _installer.InstallFromDirectoryAsync(from.FullName, cancellationToken)
             .ConfigureAwait(false);
+
+        if (!string.Equals(installed.PackageId, packageId, StringComparison.OrdinalIgnoreCase))
+        {
+            _interaction.WriteHint(
+                $"Note: --from package id '{installed.PackageId}' differs from requested id '{packageId}'.");
+        }
+
+        if (!string.IsNullOrEmpty(version)
+            && !string.Equals(installed.Version, version, StringComparison.Ordinal))
+        {
+            _interaction.WriteHint(
+                $"Note: --from version '{installed.Version}' differs from requested version '{version}'.");
+        }
 
         _interaction.WriteSuccess(
             $"Installed workload '{installed.PackageId}' version '{installed.Version}'.");
