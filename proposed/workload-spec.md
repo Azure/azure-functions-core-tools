@@ -323,15 +323,23 @@ install` / `uninstall`.
 ### 10.1 Global manifest schema
 
 The global manifest at `~/.azure-functions/workloads.json` carries a
-top-level `schemaVersion: <int>` field. The current schema is **v1**.
+top-level `$schema` field whose value is a versioned JSON Schema URL
+(e.g. `https://aka.ms/func-workloads/v1/schema.json`). The current
+schema is **v1**.
 
-- The Func CLI **must** check `schemaVersion` on every read.
-- A manifest with a `schemaVersion` higher than the CLI supports
-  **must** be rejected with a `GracefulException` instructing the user
-  to update the CLI. The CLI **must not** attempt a partial parse.
-- A manifest with no `schemaVersion` field (legacy, written before the
-  field existed) is treated as v1 and re-emitted with `schemaVersion: 1`
-  on the next write.
+This follows the same convention used by `tsconfig.json`,
+`azure-pipelines.yml`, and `dotnet/global.json`: editors and external
+validators can fetch the schema document directly, breaking changes
+ship under a new versioned URL (`/v2/`, `/v3/`, ...), and older + newer
+CLIs can coexist on disk without one silently corrupting the other.
+
+- The Func CLI **must** check `$schema` on every read.
+- A manifest whose `$schema` URL the CLI does not recognize **must** be
+  rejected with a `GracefulException` instructing the user to update
+  the CLI. The CLI **must not** attempt a partial parse.
+- A manifest with no `$schema` field (legacy, written before the field
+  existed) is treated as v1 and re-emitted with the current `$schema`
+  URL on the next write.
 
 ### 10.2 Workload compatibility
 
