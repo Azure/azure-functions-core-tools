@@ -20,12 +20,12 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
 
-    public Argument<string> PackageIdArgument { get; } = new("id")
+    public Argument<string> PackageIdArgument { get; } = new("packageId")
     {
-        Description = "Package id (or alias) of the workload to install.",
+        Description = "Package ID (or alias) of the workload to install.",
     };
 
-    public Option<string?> VersionOption { get; } = new("--version", "-v")
+    public Option<string?> VersionOption { get; } = new("--version")
     {
         Description = "Specific version to install. Defaults to the latest available.",
     };

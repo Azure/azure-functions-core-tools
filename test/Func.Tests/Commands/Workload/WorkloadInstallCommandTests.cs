@@ -21,7 +21,7 @@ public class WorkloadInstallCommandTests
     public void Install_HasIdArgumentAndOptions()
     {
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
-        Assert.Single(cmd.Arguments, a => a.Name == "id");
+        Assert.Single(cmd.Arguments, a => a.Name == "packageId");
         Assert.Single(cmd.Options, o => o.Name == "--version");
         Assert.Single(cmd.Options, o => o.Name == "--from");
     }

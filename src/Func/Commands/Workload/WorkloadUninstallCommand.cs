@@ -26,10 +26,10 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
     public Argument<string> PackageIdArgument { get; } = new("packageId")
     {
-        Description = "Package id of the workload to uninstall.",
+        Description = "Package ID of the workload to uninstall.",
     };
 
-    public Option<string?> VersionOption { get; } = new("--version", "-v")
+    public Option<string?> VersionOption { get; } = new("--version")
     {
         Description = "Specific version to uninstall. Omit when only one version is installed.",
     };
