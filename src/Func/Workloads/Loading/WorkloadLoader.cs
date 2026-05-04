@@ -38,7 +38,8 @@ internal sealed class WorkloadLoader : IWorkloadLoader
                 isUserError: true);
         }
 
-        var assembly = new WorkloadLoadContext(assemblyPath).LoadFromAssemblyPath(assemblyPath);
+        var assembly = new WorkloadLoadContext(installed.PackageId, assemblyPath)
+            .LoadFromAssemblyPath(assemblyPath);
 
         var type = assembly.GetType(entry.EntryPoint.Type, throwOnError: false);
         if (type is null)

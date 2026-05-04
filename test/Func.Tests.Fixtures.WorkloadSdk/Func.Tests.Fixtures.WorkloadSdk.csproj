@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>$(TopLevelNamespace).Tests.Fixtures.WorkloadSdk</AssemblyName>
+    <RootNamespace>$(AssemblyName)</RootNamespace>
+
+    <!--
+      EnableDynamicLoading is the SDK switch a real workload csproj would set:
+      it copies the workload's package dependencies to the output and produces
+      a deps.json the loader can probe via AssemblyDependencyResolver.
+    -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Private + ExcludeAssets="runtime" is the convention a future workload SDK
+      will enforce on the contract reference (mirrors dotnet/samples
+      AppWithPlugin/HelloPlugin). It excludes Abstractions from this fixture's
+      runtime closure (deps.json), so AssemblyDependencyResolver returns null
+      for Azure.Functions.Cli.Abstractions and the default context resolves to
+      the host's copy — the "natural-resolution path".
+
+      The sibling Func.Tests.Fixtures.Workload project is intentionally shaped
+      the *opposite* way (no Private/ExcludeAssets) so its deps.json *does*
+      list Abstractions, exercising the loader's defensive intercept path. The
+      two fixtures together pin both halves of the type-unification contract.
+    -->
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj"
+                      Private="false"
+                      ExcludeAssets="runtime" />
+  </ItemGroup>
+
+</Project>

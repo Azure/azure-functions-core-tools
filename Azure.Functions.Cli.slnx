@@ -11,5 +11,6 @@
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
     <Project Path="test/Func.Tests.Fixtures.Workload/Func.Tests.Fixtures.Workload.csproj" />
+    <Project Path="test/Func.Tests.Fixtures.WorkloadSdk/Func.Tests.Fixtures.WorkloadSdk.csproj" />
   </Folder>
 </Solution>
