@@ -511,5 +511,98 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 Environment.SetEnvironmentVariable(pythonEnvVar, originalValue);
             }
         }
+
+        [Fact]
+        public void ResolveNativeWorkerRuntime_NativeWithGoMod_ResolvesToGo()
+        {
+            string envVar = Constants.FunctionsWorkerRuntime;
+            string original = Environment.GetEnvironmentVariable(envVar);
+            Environment.SetEnvironmentVariable(envVar, "native");
+
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Is<string>(p => p.EndsWith("go.mod"))).Returns(true);
+
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
+
+            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+
+            try
+            {
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.None;
+                    var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+
+                    action.ResolveNativeWorkerRuntime();
+
+                    GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Go);
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
+            }
+        }
+
+        [Fact]
+        public void ResolveNativeWorkerRuntime_NativeWithoutGoMod_Throws()
+        {
+            string envVar = Constants.FunctionsWorkerRuntime;
+            string original = Environment.GetEnvironmentVariable(envVar);
+            Environment.SetEnvironmentVariable(envVar, "native");
+
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(false);
+
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
+
+            try
+            {
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+
+                    Action act = () => action.ResolveNativeWorkerRuntime();
+
+                    act.Should().Throw<CliException>()
+                        .Which.Message.Should().Contain("Run 'func init'");
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void ResolveNativeWorkerRuntime_NonNativeRuntime_NoOp()
+        {
+            string envVar = Constants.FunctionsWorkerRuntime;
+            string original = Environment.GetEnvironmentVariable(envVar);
+            Environment.SetEnvironmentVariable(envVar, "python");
+
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
+
+            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+
+            try
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Python;
+                var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+
+                action.ResolveNativeWorkerRuntime();
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Python);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@
   <Import Project="$(EngBuildRoot)Templates.targets" Condition="'$(SkipTemplates)' != 'true'" />
 
   <Import Project="$(EngBuildRoot)Workers.Powershell.targets" />
+  <Import Project="$(EngBuildRoot)Workers.Golang.targets" />
   <Import Project="$(EngBuildRoot)Workers.Python.Workaround.targets" Condition="'$(RuntimeIdentifier)' == 'win-arm64'" />
 
 </Project>

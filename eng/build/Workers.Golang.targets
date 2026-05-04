@@ -1,0 +1,15 @@
+<Project>
+
+  <!--
+    Ships the Go (native) worker config alongside the published CLI so the host
+    can discover the Go worker at workers/native/worker.config.json.
+  -->
+  <ItemGroup>
+    <Content Include="$(RepoRoot)src\Cli\func\StaticResources\nativeWorkerConfig.json">
+      <Link>workers\native\worker.config.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
