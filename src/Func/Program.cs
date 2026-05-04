@@ -95,10 +95,13 @@ int exitCode = 0;
 
 using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName))
 {
+    var verbose = false;
     try
     {
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-        exitCode = await rootCommand.Parse(args).InvokeAsync(config, cts.Token);
+        var parseResult = rootCommand.Parse(args);
+        verbose = parseResult.GetValue(rootCommand.VerboseOption);
+        exitCode = await parseResult.InvokeAsync(config, cts.Token);
     }
     catch (OperationCanceledException)
     {
@@ -112,7 +115,14 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
 
         if (ex.VerboseMessage is not null)
         {
-            interaction.WriteHint(ex.VerboseMessage);
+            if (verbose)
+            {
+                interaction.WriteHint(ex.VerboseMessage);
+            }
+            else
+            {
+                interaction.WriteHint("Run with --verbose for more details.");
+            }
         }
 
         exitCode = 1;

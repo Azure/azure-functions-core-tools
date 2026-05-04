@@ -7,16 +7,16 @@ using Xunit;
 namespace Azure.Functions.Cli.Tests.Workloads.Discovery;
 
 /// <summary>
-/// Locks the on-the-wire shape of <see cref="ExportCliWorkloadAttribute{T}"/>.
+/// Locks the on-the-wire shape of <see cref="CliWorkloadAttribute{T}"/>.
 /// The attribute is a public contract used by every workload package author,
 /// so changes here are breaking.
 /// </summary>
-public class ExportCliWorkloadAttributeTests
+public class CliWorkloadAttributeTests
 {
     [Fact]
     public void Attribute_TargetsAssembly_DisallowsMultiple_AndIsNotInherited()
     {
-        var usage = Assert.Single(typeof(ExportCliWorkloadAttribute<>)
+        var usage = Assert.Single(typeof(CliWorkloadAttribute<>)
             .GetCustomAttributes(typeof(AttributeUsageAttribute), inherit: false))
             as AttributeUsageAttribute;
 
@@ -29,7 +29,7 @@ public class ExportCliWorkloadAttributeTests
     [Fact]
     public void Attribute_GenericParameter_IsConstrainedToIWorkload()
     {
-        var typeParam = typeof(ExportCliWorkloadAttribute<>).GetGenericArguments().Single();
+        var typeParam = typeof(CliWorkloadAttribute<>).GetGenericArguments().Single();
         var constraints = typeParam.GetGenericParameterConstraints();
 
         Assert.Contains(typeof(IWorkload), constraints);

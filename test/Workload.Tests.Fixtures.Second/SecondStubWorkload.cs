@@ -1,16 +1,16 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Tests.Fixtures.Workload.Second;
+using Azure.Functions.Cli.Workload.Tests.Fixtures.Second;
 using Azure.Functions.Cli.Workloads;
 
-[assembly: ExportCliWorkload<SecondStubWorkload>]
+[assembly: CliWorkload<SecondStubWorkload>]
 
-namespace Azure.Functions.Cli.Tests.Fixtures.Workload.Second;
+namespace Azure.Functions.Cli.Workload.Tests.Fixtures.Second;
 
 public sealed class SecondStubWorkload : IWorkload
 {
-    public string PackageId => "Azure.Functions.Cli.Tests.Fixtures.Workload.Second";
+    public string PackageId => "Azure.Functions.Cli.Workload.Tests.Fixtures.Second";
 
     public string PackageVersion => "1.0.0";
 

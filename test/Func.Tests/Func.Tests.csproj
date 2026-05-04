@@ -17,7 +17,12 @@
       <OutputItemType>Content</OutputItemType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </ProjectReference>
-    <ProjectReference Include="..\Func.Tests.Fixtures.Workload.Second\Func.Tests.Fixtures.Workload.Second.csproj">
+    <ProjectReference Include="..\Workload.Tests.Fixtures.CrossAssembly\Workload.Tests.Fixtures.CrossAssembly.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <OutputItemType>Content</OutputItemType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="..\Workload.Tests.Fixtures.Second\Workload.Tests.Fixtures.Second.csproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <OutputItemType>Content</OutputItemType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
