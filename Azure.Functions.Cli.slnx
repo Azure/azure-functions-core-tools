@@ -10,5 +10,6 @@
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
+    <Project Path="test/Func.Tests.Fixtures.Workload/Func.Tests.Fixtures.Workload.csproj" />
   </Folder>
 </Solution>
