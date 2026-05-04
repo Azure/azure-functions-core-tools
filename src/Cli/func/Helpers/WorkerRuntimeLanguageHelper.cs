@@ -196,29 +196,6 @@ namespace Azure.Functions.Cli.Helpers
             var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
                           ?? secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
 
-            // 'native' is the host's runtime identifier for any worker registered with
-            // language="native" (today: Go via workers/native/worker.config.json). It is not a
-            // language moniker and is intentionally not in _normalizeMap. Resolve it to a concrete
-            // worker runtime by inspecting project markers; add new arms here as additional native
-            // workers (e.g. Rust) are onboarded.
-            if (!string.IsNullOrWhiteSpace(setting)
-                && string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
-            {
-                if (FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "go.mod")))
-                {
-                    if (GlobalCoreToolsSettings.IsVerbose)
-                    {
-                        ColoredConsole.WriteLine(VerboseColor("Resolving native worker runtime to 'go' (go.mod found)."));
-                    }
-
-                    return WorkerRuntime.Go;
-                }
-
-                throw new CliException(
-                    $"Could not determine the worker language for the project at '{Environment.CurrentDirectory}'. " +
-                    "Run 'func init' to initialize a supported function app in this directory.");
-            }
-
             try
             {
                 WorkerRuntime workerRuntime = NormalizeWorkerRuntime(setting);

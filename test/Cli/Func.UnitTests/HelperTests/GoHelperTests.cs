@@ -154,7 +154,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [SkipIfGoNonExistFact]
-        public Task BuildProject_InvalidProject_ThrowsCliException()
+        public async Task BuildProject_InvalidProject_ThrowsCliException()
         {
             var dir = Path.Combine(Path.GetTempPath(), "func-go-build-fail-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
@@ -164,9 +164,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 File.WriteAllText(Path.Combine(dir, "main.go"), "package main\n\nthis is not valid go\n");
 
                 Func<Task> act = () => GoHelpers.BuildProject(dir);
-                act.Should().Throw<CliException>("BuildProject should throw when go build fails")
-                    .Which.Message.Should().Contain("Go build failed");
-                return Task.CompletedTask;
+                var ex = await Assert.ThrowsAsync<CliException>(act);
+                ex.Message.Should().Contain("Go build failed");
             }
             finally
             {

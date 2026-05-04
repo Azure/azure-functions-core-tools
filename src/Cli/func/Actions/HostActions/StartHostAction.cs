@@ -733,6 +733,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task PreRunConditions()
         {
+            ResolveNativeWorkerRuntime();
             EnsureWorkerRuntimeIsSet();
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python)
@@ -893,6 +894,37 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 ? await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
+        }
+
+        internal void ResolveNativeWorkerRuntime()
+        {
+            // 'native' is the host's runtime identifier for any worker registered with
+            // language="native" (today: Go via workers/native/worker.config.json).
+            // Resolve it here by inspecting project markers; add new arms as additional native
+            // workers (e.g. Rust) are onboarded.
+            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
+                          ?? _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+
+            if (string.IsNullOrWhiteSpace(setting)
+                || !string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "go.mod")))
+            {
+                if (VerboseLogging == true)
+                {
+                    ColoredConsole.WriteLine(VerboseColor("Resolving native worker runtime to 'go' (go.mod found)."));
+                }
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
+                return;
+            }
+
+            throw new CliException(
+                $"Could not determine the worker language for the project at '{Environment.CurrentDirectory}'. " +
+                "Run 'func init' to initialize a supported function app in this directory.");
         }
 
         private void EnsureWorkerRuntimeIsSet()
