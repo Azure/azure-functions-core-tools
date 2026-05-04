@@ -744,7 +744,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (WorkerRuntimeLanguageHelper.IsDotnet(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !NoBuild)
             {
-                await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
+                await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty, honorProjectOutputPath: true);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Powershell && !CommandChecker.CommandExists("dotnet"))
             {

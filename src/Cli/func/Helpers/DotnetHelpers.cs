@@ -289,10 +289,37 @@ namespace Azure.Functions.Cli.Helpers
             return csProjFiles.Count + fsProjFiles.Count == 1;
         }
 
-        public static async Task BuildAndChangeDirectory(string outputPath, string cliParams)
+        /// <summary>
+        /// Builds the dotnet project and changes the current directory to the build output directory.
+        /// When <paramref name="honorProjectOutputPath"/> is true, the project's OutputPath (including any
+        /// custom value) is evaluated via MSBuild and used as the destination, so that dotnet-isolated apps
+        /// with a customized OutputPath have their .azurefunctions folder in the expected location.
+        /// </summary>
+        /// <param name="outputPath">The fallback output path when the project's OutputPath cannot be evaluated.</param>
+        /// <param name="cliParams">Additional CLI parameters to pass to the build command.</param>
+        /// <param name="honorProjectOutputPath">
+        /// When true, attempts to evaluate the project's OutputPath via MSBuild and builds without an
+        /// explicit --output override. Falls back to <paramref name="outputPath"/> if evaluation fails.
+        /// </param>
+        public static async Task BuildAndChangeDirectory(string outputPath, string cliParams, bool honorProjectOutputPath = false)
         {
             if (CanDotnetBuild())
             {
+                if (honorProjectOutputPath)
+                {
+                    string workingDirectory = Environment.CurrentDirectory;
+                    string projectOutputPath = await TryGetBuildOutputPathAsync(workingDirectory);
+                    if (projectOutputPath != null)
+                    {
+                        // Build without --output so the project's own OutputPath is respected.
+                        // This ensures that dotnet-isolated apps place their .azurefunctions folder
+                        // in the correct location even when a custom OutputPath is configured.
+                        await BuildDotnetProject(outputPath: null, dotnetCliParams: cliParams);
+                        Environment.CurrentDirectory = projectOutputPath;
+                        return;
+                    }
+                }
+
                 await BuildDotnetProject(outputPath, cliParams);
                 Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
             }
@@ -302,14 +329,85 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        /// <summary>
+        /// Evaluates the project's build output directory using MSBuild properties,
+        /// honoring any custom OutputPath defined in the project or build props files.
+        /// Returns null if the project file cannot be found or if MSBuild evaluation fails.
+        /// </summary>
+        /// <param name="workingDirectory">The working directory containing the project file.</param>
+        /// <returns>
+        /// The absolute path to the build output directory, or null if it cannot be determined.
+        /// </returns>
+        internal static async Task<string> TryGetBuildOutputPathAsync(string workingDirectory)
+        {
+            EnsureDotnet();
+
+            string projectFilePath = ProjectHelpers.FindProjectFile(workingDirectory);
+            if (projectFilePath == null)
+            {
+                return null;
+            }
+
+            // Use -restore:false to avoid the overhead of a NuGet restore just to read a property.
+            // If the project has not been restored yet this call will fail (non-zero exit) and we
+            // fall back to the default bin/output behavior, which is safe.
+            string args =
+                $"msbuild \"{projectFilePath}\" " +
+                "-nologo -v:q -restore:false " +
+                "-getProperty:OutputPath";
+
+            var exe = new Executable(
+                "dotnet",
+                args,
+                workingDirectory: workingDirectory,
+                environmentVariables: new Dictionary<string, string> { ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1" });
+
+            var stdOut = new StringBuilder();
+            int exitCode = await exe.RunAsync(s => stdOut.Append(s), s => { });
+            if (exitCode != 0)
+            {
+                return null;
+            }
+
+            string outputPath = stdOut.ToString().Trim();
+            if (string.IsNullOrEmpty(outputPath))
+            {
+                return null;
+            }
+
+            // OutputPath may already be absolute (e.g. when set via Directory.Build.props with a
+            // full path).  Path.Combine ignores the first argument when the second is rooted, so
+            // check explicitly and skip the combine when the path is already absolute.
+            if (Path.IsPathRooted(outputPath))
+            {
+                return Path.GetFullPath(outputPath);
+            }
+
+            // Otherwise it is relative to the project directory (workingDirectory); convert to absolute.
+            return Path.GetFullPath(Path.Combine(workingDirectory, outputPath));
+        }
+
+        /// <summary>
+        /// Builds the dotnet project, optionally writing output to a specific directory.
+        /// When <paramref name="outputPath"/> is null the project's own OutputPath is used (no --output flag).
+        /// </summary>
+        /// <param name="outputPath">
+        /// The output directory for the build, or null to use the project's configured OutputPath.
+        /// </param>
+        /// <param name="dotnetCliParams">Additional CLI parameters to pass to the build command.</param>
+        /// <param name="showOutput">Whether to display build output to the console.</param>
         public static async Task<bool> BuildDotnetProject(string outputPath, string dotnetCliParams, bool showOutput = true)
         {
-            if (FileSystemHelpers.DirectoryExists(outputPath))
+            if (outputPath != null && FileSystemHelpers.DirectoryExists(outputPath))
             {
                 FileSystemHelpers.DeleteDirectorySafe(outputPath);
             }
 
-            var exe = new Executable("dotnet", $"build --output {outputPath} {dotnetCliParams}");
+            var buildArgs = outputPath != null
+                ? $"build --output {outputPath} {dotnetCliParams}".TrimEnd()
+                : $"build {dotnetCliParams}".TrimEnd();
+
+            var exe = new Executable("dotnet", buildArgs);
             var exitCode = showOutput
                 ? await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e))
                 : await exe.RunAsync();
