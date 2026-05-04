@@ -179,7 +179,9 @@ we don't read app-style settings files.
 
 ### Testing stack
 
-- **xUnit** + **NSubstitute** for unit tests. (No MSTest, no Moq.)
+- **xUnit** + **NSubstitute** for unit tests. Use **AwesomeAssertions** for
+  fluent assertions (the maintained fork of FluentAssertions, which moved to a
+  paid licence). No MSTest, no Moq, no FluentAssertions.
 - Common test packages are enforced by `test/Directory.Build.props`, don't
   re-declare them in individual test csprojs.
 - Follow AAA (Arrange / Act / Assert).
