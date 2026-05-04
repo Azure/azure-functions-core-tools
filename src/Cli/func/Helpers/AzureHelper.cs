@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Arm;
@@ -286,26 +286,34 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken, string managementURL)
         {
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
-            foreach (var subscription in subscriptions)
-            {
-                var storageAccount =
-                    await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
-                        HttpMethod.Get,
-                        ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(managementURL, new
-                        {
-                            subscriptionId = subscription.SubscriptionId,
-                            resourceName = storageAccountName,
-                            resourceType = "Microsoft.Storage/storageAccounts"
-                        }),
-                        accessToken);
+            var subIds = subscriptions?.Select(s => s.SubscriptionId).ToList();
 
-                if (storageAccount.Value.Any())
-                {
-                    return await GetStorageAccount(storageAccount.Value.First(), accessToken, managementURL);
-                }
+            if (subIds == null || subIds.Count == 0)
+            {
+                throw new InvalidOperationException("No subscriptions found for the current account.");
             }
 
-            throw new ArmResourceNotFoundException($"Cannot find storage account with name {storageAccountName}");
+            // Resolve storage account via Azure Resource Graph (ARG)
+            var query =
+                $"Resources | where type =~ 'microsoft.storage/storageaccounts' " +
+                $"and name =~ '{storageAccountName}' | project id | limit 1";
+
+            var resourceId = await GetResourceIDFromArg(subIds, query, accessToken, managementURL);
+
+            if (string.IsNullOrWhiteSpace(resourceId))
+            {
+                throw new ArmResourceNotFoundException(
+                    $"Cannot find storage account with name {storageAccountName}");
+            }
+
+            return await GetStorageAccount(
+                new ArmWrapper<ArmGenericResource>
+                {
+                    Id = resourceId,
+                    Name = storageAccountName
+                },
+                accessToken,
+                managementURL);
         }
 
         private static async Task<StorageAccount> GetStorageAccount(ArmWrapper<ArmGenericResource> armWrapper, string accessToken, string managementURL)

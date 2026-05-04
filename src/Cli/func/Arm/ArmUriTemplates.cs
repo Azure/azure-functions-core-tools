@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.RegularExpressions;
@@ -17,7 +17,6 @@ namespace Azure.Functions.Cli.Arm
         public const string BasicAuthCheckApiVersion = "2022-03-01";
         public const string FunctionsStacksApiVersion = "2020-10-01";
         public const string FlexFunctionsStacksApiVersion = "2020-10-01";
-
         public const string ArgUri = "providers/Microsoft.ResourceGraph/resources";
 
         public static readonly ArmUriTemplate SubscriptionResourceByNameAndType = new ArmUriTemplate($"resources?$filter=(SubscriptionId eq '{{subscriptionId}}' and name eq '{{resourceName}}' and resourceType eq '{{resourceType}}')", ArmApiVersion);
