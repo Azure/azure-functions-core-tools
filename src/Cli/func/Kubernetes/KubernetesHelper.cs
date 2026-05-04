@@ -14,6 +14,7 @@ using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.EventEmitters;
@@ -274,6 +275,27 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static async Task WaitForDeploymentRollout(DeploymentV1Apps deployment)
         {
+            // Poll until the deployment is visible in the API server before checking rollout status.
+            // kubectl apply can return before the resource is registered, causing a race condition.
+            var deadline = DateTime.UtcNow.Add(TimeSpan.FromMinutes(2));
+            bool found = false;
+            while (DateTime.UtcNow < deadline)
+            {
+                (_, bool exists) = await ResourceExists("deployment", deployment.Metadata.Name, deployment.Metadata.Namespace);
+                if (exists)
+                {
+                    found = true;
+                    break;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
+
+            if (!found)
+            {
+                ColoredConsole.WriteLine(WarningColor($"Warning: Deployment '{deployment.Metadata.Name}' was not registered within 2 minutes. Proceeding with rollout status check."));
+            }
+
             var statement = $"rollout status deployment {deployment.Metadata.Name}";
 
             // If a namespace is specified, we filter on it
@@ -283,6 +305,60 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             await KubectlHelper.RunKubectl(statement, showOutput: true, timeout: TimeSpan.FromMinutes(4));
+        }
+
+        internal static async Task<TriggersPayload> GetTriggersFromLocalFiles()
+        {
+            var functionsPath = Environment.CurrentDirectory;
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
+                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
+            {
+                if (DotnetHelpers.CanDotnetBuild())
+                {
+                    var outputPath = Path.Combine("bin", "output");
+                    await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty, showOutput: false);
+                    functionsPath = Path.Combine(Environment.CurrentDirectory, outputPath);
+                }
+            }
+
+            Dictionary<string, JObject> functionsJsons;
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
+            {
+                var functionsMetadataPath = Path.Combine(functionsPath, "functions.metadata");
+                if (!FileSystemHelpers.FileExists(functionsMetadataPath))
+                {
+                    functionsJsons = new Dictionary<string, JObject>();
+                }
+                else
+                {
+                    var functionsMetadataContents = FileSystemHelpers.ReadAllTextFromFile(functionsMetadataPath);
+                    var functionsMetadata = JsonConvert.DeserializeObject<JArray>(functionsMetadataContents);
+                    functionsJsons = functionsMetadata
+                        .Where(x => x["bindings"] != null)
+                        .ToDictionary(k => k["name"].ToString(), v => v.ToObject<JObject>());
+                }
+            }
+            else
+            {
+                var functionJsonFiles = FileSystemHelpers
+                    .GetDirectories(functionsPath)
+                    .Select(d => Path.Combine(d, "function.json"))
+                    .Where(FileSystemHelpers.FileExists)
+                    .Select(f => (filePath: f, content: FileSystemHelpers.ReadAllTextFromFile(f)));
+
+                functionsJsons = functionJsonFiles
+                    .Select(t => (t.filePath, jObject: JsonConvert.DeserializeObject<JObject>(t.content)))
+                    .Where(b => b.jObject["bindings"] != null)
+                    .ToDictionary(k => Path.GetFileName(Path.GetDirectoryName(k.filePath)), v => v.jObject);
+            }
+
+            var hostJson = JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile("host.json"));
+
+            return new TriggersPayload
+            {
+                HostJson = hostJson,
+                FunctionsJson = functionsJsons
+            };
         }
 
         private static async Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)

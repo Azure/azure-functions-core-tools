@@ -11,8 +11,6 @@ using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Fclp;
 using Microsoft.Extensions.FileSystemGlobbing;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
@@ -248,60 +246,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         private async Task<TriggersPayload> GetTriggersLocalFiles()
         {
-            var functionsPath = Environment.CurrentDirectory;
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
-                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
-            {
-                if (DotnetHelpers.CanDotnetBuild())
-                {
-                    var outputPath = Path.Combine("bin", "output");
-                    await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty, showOutput: false);
-                    functionsPath = Path.Combine(Environment.CurrentDirectory, outputPath);
-                }
-            }
-
-            var functionsJsons = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated
-                ? ReadFunctionsMetadata(functionsPath)
-                : ReadFunctionJsons(functionsPath);
-
-            var hostJson = JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile("host.json"));
-
-            return new TriggersPayload
-            {
-                HostJson = hostJson,
-                FunctionsJson = functionsJsons
-            };
-        }
-
-        private static Dictionary<string, JObject> ReadFunctionsMetadata(string functionsPath)
-        {
-            var functionsMetadataPath = Path.Combine(functionsPath, "functions.metadata");
-
-            if (!FileSystemHelpers.FileExists(functionsMetadataPath))
-            {
-                return new();
-            }
-
-            var functionsMetadataContents = FileSystemHelpers.ReadAllTextFromFile(functionsMetadataPath);
-            var functionsMetadata = JsonConvert.DeserializeObject<JArray>(functionsMetadataContents);
-
-            return functionsMetadata
-                .Where(x => x["bindings"] != null)
-                .ToDictionary(k => k["name"].ToString(), v => v.ToObject<JObject>());
-        }
-
-        private static Dictionary<string, JObject> ReadFunctionJsons(string functionsPath)
-        {
-            var functionJsonFiles = FileSystemHelpers
-                .GetDirectories(functionsPath)
-                .Select(d => Path.Combine(d, "function.json"))
-                .Where(FileSystemHelpers.FileExists)
-                .Select(f => (filePath: f, content: FileSystemHelpers.ReadAllTextFromFile(f)));
-
-            return functionJsonFiles
-                .Select(t => (t.filePath, jObject: JsonConvert.DeserializeObject<JObject>(t.content)))
-                .Where(b => b.jObject["bindings"] != null)
-                .ToDictionary(k => Path.GetFileName(Path.GetDirectoryName(k.filePath)), v => v.jObject);
+            return await KubernetesHelper.GetTriggersFromLocalFiles();
         }
 
         private async Task<(string Name, bool ShouldBuild)> ResolveImageName()

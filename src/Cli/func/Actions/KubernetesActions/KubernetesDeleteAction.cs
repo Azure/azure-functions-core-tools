@@ -98,6 +98,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 ServiceType = s;
             });
             SetFlag<bool>("use-config-map", "Use a ConfigMap/V1 instead of a Secret/V1 object for function app settings configurations", c => UseConfigMap = c);
+            SetFlag<bool>("no-docker", "With --image-name, the core-tools will use the current directory for functions instead of inspecting the image. Use this when the registry requires authentication.", nd => NoDocker = nd);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
@@ -107,7 +108,16 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public override async Task RunAsync()
         {
             (var resolvedImageName, var shouldBuild) = ResolveImageName();
-            var triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+            TriggersPayload triggers;
+            if (NoDocker)
+            {
+                triggers = await GetTriggersLocalFiles();
+            }
+            else
+            {
+                triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+            }
+
             (var resources, var funcKeys) = await KubernetesHelper.GetFunctionsDeploymentResources(
                 Name,
                 resolvedImageName,
@@ -139,8 +149,13 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     tasks.Add(KubectlHelper.KubectlDelete(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace));
                 }
 
-                Task.WaitAll(tasks.ToArray());
+                await Task.WhenAll(tasks.ToArray());
             }
+        }
+
+        private async Task<TriggersPayload> GetTriggersLocalFiles()
+        {
+            return await KubernetesHelper.GetTriggersFromLocalFiles();
         }
 
         private (string ImageName, bool ShouldBuild) ResolveImageName()
