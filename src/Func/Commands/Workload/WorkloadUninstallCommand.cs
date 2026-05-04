@@ -68,7 +68,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
                 isUserError: true);
         }
 
-        var installed = await _store.GetWorkloadsAsync(cancellationToken).ConfigureAwait(false);
+        var installed = await _store.GetWorkloadsAsync(cancellationToken);
         var matches = installed
             .Where(w => string.Equals(w.PackageId, packageId, StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -84,8 +84,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
         foreach (var candidate in toRemove)
         {
-            var removed = await _installer.UninstallAsync(candidate.PackageId, candidate.Version, cancellationToken)
-                .ConfigureAwait(false);
+            var removed = await _installer.UninstallAsync(candidate.PackageId, candidate.Version, cancellationToken);
             if (removed)
             {
                 _interaction.WriteSuccess(

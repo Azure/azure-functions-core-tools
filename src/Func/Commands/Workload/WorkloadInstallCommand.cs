@@ -64,8 +64,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                 isUserError: true);
         }
 
-        var installed = await _installer.InstallFromDirectoryAsync(from.FullName, cancellationToken)
-            .ConfigureAwait(false);
+        var installed = await _installer.InstallFromDirectoryAsync(from.FullName, cancellationToken);
 
         if (!string.Equals(installed.PackageId, packageId, StringComparison.OrdinalIgnoreCase))
         {

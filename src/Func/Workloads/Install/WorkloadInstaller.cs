@@ -96,8 +96,7 @@ internal sealed class WorkloadInstaller(
 
         try
         {
-            await _store.SaveWorkloadAsync(meta.PackageId, meta.Version, entry, cancellationToken)
-                .ConfigureAwait(false);
+            await _store.SaveWorkloadAsync(meta.PackageId, meta.Version, entry, cancellationToken);
         }
         catch
         {
@@ -119,8 +118,7 @@ internal sealed class WorkloadInstaller(
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
-        var removed = await _store.RemoveWorkloadAsync(packageId, version, cancellationToken)
-            .ConfigureAwait(false);
+        var removed = await _store.RemoveWorkloadAsync(packageId, version, cancellationToken);
         if (!removed)
         {
             return false;
