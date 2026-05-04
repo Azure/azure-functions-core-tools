@@ -64,7 +64,7 @@ internal sealed class GlobalManifestEntry
 
 /// <summary>
 /// Identifies the type that implements <see cref="IWorkload"/>. Auto-discovered
-/// at install time via <c>[assembly: ExportCliWorkload&lt;T&gt;]</c>.
+/// at install time via <c>[assembly: CliWorkload&lt;T&gt;]</c>.
 /// </summary>
 internal sealed class EntryPointSpec
 {
