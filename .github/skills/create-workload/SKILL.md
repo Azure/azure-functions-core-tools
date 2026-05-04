@@ -42,7 +42,6 @@ Create the following files:
     <PropertyGroup>
       <VersionPrefix>1.0.0</VersionPrefix>
       <VersionSuffix>preview.1</VersionSuffix>
-      <UpdateBuildVersion>true</UpdateBuildVersion>
     </PropertyGroup>
   </Project>
   ```
