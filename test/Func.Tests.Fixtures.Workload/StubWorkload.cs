@@ -4,7 +4,7 @@
 using Azure.Functions.Cli.Tests.Fixtures.Workload;
 using Azure.Functions.Cli.Workloads;
 
-[assembly: ExportCliWorkload<StubWorkload>]
+[assembly: CliWorkload<StubWorkload>]
 
 namespace Azure.Functions.Cli.Tests.Fixtures.Workload;
 

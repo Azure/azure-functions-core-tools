@@ -4,7 +4,7 @@
 using Azure.Functions.Cli.Tests.Fixtures.Workload.Second;
 using Azure.Functions.Cli.Workloads;
 
-[assembly: ExportCliWorkload<SecondStubWorkload>]
+[assembly: CliWorkload<SecondStubWorkload>]
 
 namespace Azure.Functions.Cli.Tests.Fixtures.Workload.Second;
 

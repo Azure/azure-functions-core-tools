@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Runtime.Loader;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -14,6 +13,7 @@ public class WorkloadEntryPointScannerTests : IDisposable
     private const string FixtureAssemblyFile = "Azure.Functions.Cli.Tests.Fixtures.Workload.dll";
     private const string FixtureTypeName = "Azure.Functions.Cli.Tests.Fixtures.Workload.StubWorkload";
     private const string SecondFixtureAssemblyFile = "Azure.Functions.Cli.Tests.Fixtures.Workload.Second.dll";
+    private const string CrossAssemblyFixtureFile = "Azure.Functions.Cli.Tests.Fixtures.Workload.CrossAssembly.dll";
 
     private readonly string _tempDir;
 
@@ -75,23 +75,16 @@ public class WorkloadEntryPointScannerTests : IDisposable
     }
 
     [Fact]
-    public void Scan_DoesNotPinAssembly_WhenScanCompletes()
+    public void Scan_Throws_WhenWorkloadTypeLivesInDifferentAssembly()
     {
-        CopyFixtureToTemp(FixtureAssemblyFile);
+        CopyFixtureToTemp(CrossAssemblyFixtureFile);
         var scanner = new WorkloadEntryPointScanner();
-        var contextsBefore = AssemblyLoadContext.All.Count();
 
-        scanner.Scan(_tempDir);
-        for (var i = 0; i < 3; i++)
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-        }
+        var ex = Assert.Throws<GracefulException>(() => scanner.Scan(_tempDir));
 
-        var contextsAfter = AssemblyLoadContext.All.Count();
-        Assert.True(
-            contextsAfter <= contextsBefore + 1,
-            $"Scan should release its load context. Before: {contextsBefore}, after: {contextsAfter}.");
+        Assert.True(ex.IsUserError);
+        Assert.Contains(CrossAssemblyFixtureFile, ex.Message);
+        Assert.Contains("different assembly", ex.Message);
     }
 
     [Fact]
