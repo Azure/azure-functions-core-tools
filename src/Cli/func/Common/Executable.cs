@@ -122,11 +122,32 @@ namespace Azure.Functions.Cli.Common
 
                 if (timeout is null)
                 {
-                    return await exitCodeTask.ConfigureAwait(false);
+                    var exitCode = await exitCodeTask.ConfigureAwait(false);
+
+                    if (_streamOutput)
+                    {
+                        // Process exit and async output delivery are independent: the Exited event
+                        // can fire before OutputDataReceived/ErrorDataReceived have drained the OS
+                        // pipe buffers. For short-lived commands (e.g. `go version`) this leaves
+                        // callers reading an empty StringBuilder. The parameterless WaitForExit()
+                        // is the documented way to flush the async event pump after the process
+                        // has already exited.
+                        Process.WaitForExit();
+                    }
+
+                    return exitCode;
                 }
                 else
                 {
-                    return await exitCodeTask.WaitAsync(timeout.Value).ConfigureAwait(false);
+                    var exitCode = await exitCodeTask.WaitAsync(timeout.Value).ConfigureAwait(false);
+
+                    if (_streamOutput)
+                    {
+                        // See comment above: drain async output handlers before returning.
+                        Process.WaitForExit();
+                    }
+
+                    return exitCode;
                 }
             }
             catch (TimeoutException)
