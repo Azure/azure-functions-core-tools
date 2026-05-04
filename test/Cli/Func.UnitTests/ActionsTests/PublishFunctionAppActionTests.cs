@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.StacksApi;
 using Moq;
@@ -200,6 +201,53 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             helperServiceMock.Verify(
                 x => x.UpdateWebSettings(It.IsAny<Site>(), It.IsAny<Dictionary<string, string>>()),
                 Times.Never);
+        }
+
+        [Theory]
+        [InlineData("1")]
+        [InlineData("0")]
+        [InlineData("")]
+        public void RemoveRunFromPackageSetting_RemovesExistingSettingRegardlessOfValue(string value)
+        {
+            // Arrange
+            var site = new Site("test-site")
+            {
+                AzureAppSettings = new Dictionary<string, string>
+                {
+                    { Constants.WebsiteRunFromPackage, value },
+                    { "OTHER_SETTING", "present" }
+                }
+            };
+
+            // Act
+            var removed = PublishFunctionAppAction.RemoveRunFromPackageSetting(site, out var removedSettings);
+
+            // Assert
+            Assert.True(removed);
+            Assert.False(site.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage));
+            Assert.Equal("present", site.AzureAppSettings["OTHER_SETTING"]);
+            Assert.Equal(value, removedSettings[Constants.WebsiteRunFromPackage]);
+        }
+
+        [Fact]
+        public void RemoveRunFromPackageSetting_WhenAbsent_DoesNotMutateSettings()
+        {
+            // Arrange
+            var site = new Site("test-site")
+            {
+                AzureAppSettings = new Dictionary<string, string>
+                {
+                    { "OTHER_SETTING", "present" }
+                }
+            };
+
+            // Act
+            var removed = PublishFunctionAppAction.RemoveRunFromPackageSetting(site, out var removedSettings);
+
+            // Assert
+            Assert.False(removed);
+            Assert.Equal("present", site.AzureAppSettings["OTHER_SETTING"]);
+            Assert.Empty(removedSettings);
         }
 
         private static FlexFunctionsStacks CreateMockFlexStacks()
