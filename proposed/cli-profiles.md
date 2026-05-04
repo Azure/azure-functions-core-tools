@@ -497,11 +497,14 @@ Functions:
 ### 12.1 Commands
 
 ```bash
-func profile list                    # List all available profiles (built-in + user + project)
-func profile list --built-in         # Built-in profiles only
-func profile list --json             # Machine-readable output
-func profile show flex               # Detailed view of a specific profile (resolved)
-func profile show staging --raw      # Show without inheritance resolution
+func profile list                                # List all available profiles (built-in + user + project)
+func profile list --source built-in              # Filter to built-in profiles only
+func profile list --source user                  # Filter to user-level profiles only
+func profile list --source project               # Filter to project-level profiles only
+func profile list --source built-in,project      # Combine sources (comma-separated)
+func profile list --json                         # Machine-readable output
+func profile show flex                           # Detailed view of a specific profile (resolved)
+func profile show staging --raw                  # Show without inheritance resolution
 ```
 
 ### 12.2 Output
