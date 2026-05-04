@@ -38,10 +38,10 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Dotnet, new[] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.Node, new[] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.Python, new[] { "py" } },
+            { WorkerRuntime.Go, new[] { "golang" } },
             { WorkerRuntime.Java, new string[] { } },
             { WorkerRuntime.Powershell, new[] { "pwsh" } },
             { WorkerRuntime.Custom, new string[] { } },
-            { WorkerRuntime.Go, new[] { "golang" } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
