@@ -234,7 +234,7 @@ Configure (CLI startup):
             └── builder.Services.AddSingleton<IProjectInitializer, …>()
                 builder.RegisterCommand(new MyTopLevelCommand())     // optional
                 builder.RegisterCommand<MyDiCommand>()               // optional
-                builder.RegisterCommand(sp => new MyFactoryCommand(...)) // optional
+                builder.RegisterCommand(typeof(MyByTypeCommand))     // optional
 
 Build commands (Parser.CreateCommand):
   ├── Resolve every FuncCliCommand from DI:

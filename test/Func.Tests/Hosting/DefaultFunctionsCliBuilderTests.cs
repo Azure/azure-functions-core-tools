@@ -60,6 +60,19 @@ public class DefaultFunctionsCliBuilderTests
     }
 
     [Fact]
+    public void RegisterCommand_Generic_DoesNotRegisterCommandTypeInDi()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new GenericTestPayload("from-di"));
+        var builder = new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo());
+
+        builder.RegisterCommand<GenericTestCommand>();
+
+        var sp = services.BuildServiceProvider();
+        Assert.Null(sp.GetService<GenericTestCommand>());
+    }
+
+    [Fact]
     public void RegisterCommand_Generic_AbstractType_Throws()
     {
         var services = new ServiceCollection();
@@ -71,40 +84,60 @@ public class DefaultFunctionsCliBuilderTests
     }
 
     [Fact]
-    public void RegisterCommand_Factory_InvokedPerResolution()
+    public void RegisterCommand_Type_ResolvesThroughDi()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new GenericTestPayload("from-di"));
         var workload = TestWorkloads.CreateInfo();
         var builder = new DefaultFunctionsCliBuilder(services, workload);
 
-        builder.RegisterCommand(_ => new TestWorkloads.StubFuncCommand("from-factory"));
+        builder.RegisterCommand(typeof(GenericTestCommand));
 
         var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
         var external = Assert.Single(resolved.OfType<ExternalCommand>());
-        Assert.Equal("from-factory", external.Name);
+        var source = Assert.IsType<GenericTestCommand>(external.Source);
+        Assert.Equal("from-di", source.Payload.Value);
     }
 
     [Fact]
-    public void RegisterCommand_Factory_Null_Throws()
+    public void RegisterCommand_Type_DoesNotRegisterCommandTypeInDi()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new GenericTestPayload("from-di"));
+        var builder = new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo());
+
+        builder.RegisterCommand(typeof(GenericTestCommand));
+
+        var sp = services.BuildServiceProvider();
+        Assert.Null(sp.GetService<GenericTestCommand>());
+    }
+
+    [Fact]
+    public void RegisterCommand_Type_NullType_Throws()
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        Assert.Throws<ArgumentNullException>(
-            () => builder.RegisterCommand((Func<IServiceProvider, FuncCommand>)null!));
+        Assert.Throws<ArgumentNullException>(() => builder.RegisterCommand((Type)null!));
     }
 
     [Fact]
-    public void RegisterCommand_Factory_ReturnsNull_FailsAtResolutionTime()
+    public void RegisterCommand_Type_NotFuncCommand_Throws()
     {
-        var services = new ServiceCollection();
-        var workload = TestWorkloads.CreateInfo("Workload.With.NullFactory");
-        var builder = new DefaultFunctionsCliBuilder(services, workload);
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        builder.RegisterCommand(_ => null!);
+        var ex = Assert.Throws<ArgumentException>(() => builder.RegisterCommand(typeof(string)));
+        Assert.Contains("not assignable", ex.Message);
+        Assert.Contains(nameof(FuncCommand), ex.Message);
+    }
 
-        var sp = services.BuildServiceProvider();
-        var ex = Assert.Throws<InvalidOperationException>(() => sp.GetServices<FuncCliCommand>().ToList());
-        Assert.Contains("Workload.With.NullFactory", ex.Message);
+    [Fact]
+    public void RegisterCommand_Type_AbstractType_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
+
+        var ex = Assert.Throws<ArgumentException>(() => builder.RegisterCommand(typeof(AbstractFuncCommand)));
+        Assert.Contains("abstract command type", ex.Message);
+        Assert.Contains(nameof(AbstractFuncCommand), ex.Message);
     }
 
     [Fact]
@@ -134,12 +167,11 @@ public class DefaultFunctionsCliBuilderTests
     }
 
     [Fact]
-    public void RegisterCommand_Factory_WithoutWorkloadContext_Throws()
+    public void RegisterCommand_Type_WithoutWorkloadContext_Throws()
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
 
-        Assert.Throws<InvalidOperationException>(
-            () => builder.RegisterCommand(_ => new TestWorkloads.StubFuncCommand("oops")));
+        Assert.Throws<InvalidOperationException>(() => builder.RegisterCommand(typeof(GenericTestCommand)));
     }
 
     private sealed class GenericTestPayload(string value)

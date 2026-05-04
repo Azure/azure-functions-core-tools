@@ -177,8 +177,8 @@ internal sealed class ExternalCommand : FuncCliCommand
         }
     }
 
-    private InvalidOperationException BuildSourceError(string message)
-        => new($"Workload '{Workload.PackageId}' {message}");
+    private WorkloadOperationException BuildSourceError(string message)
+        => new(Workload, message);
 
     private static Option<T> CreateTypedOption<T>(FuncCommandOption descriptor)
     {

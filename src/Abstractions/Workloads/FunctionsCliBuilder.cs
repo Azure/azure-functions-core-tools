@@ -33,12 +33,15 @@ public abstract class FunctionsCliBuilder
     public void RegisterCommand(FuncCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        OnRegisterCommand(command);
+        OnRegisterCommand(_ => command);
     }
 
     /// <summary>
-    /// Registers a top-level command by type. The command is constructed by
-    /// the DI container, so it can request services through its constructor.
+    /// Registers a top-level command by type. The command is constructed
+    /// through <see cref="ActivatorUtilities.GetServiceOrCreateInstance(IServiceProvider, Type)"/>,
+    /// so it can request services through its constructor without the
+    /// workload needing to register the command type itself with
+    /// <see cref="Services"/>.
     /// </summary>
     /// <typeparam name="TCommand">A concrete <see cref="FuncCommand"/>.</typeparam>
     /// <exception cref="ArgumentException"><typeparamref name="TCommand"/> is abstract.</exception>
@@ -52,30 +55,49 @@ public abstract class FunctionsCliBuilder
                 nameof(TCommand));
         }
 
-        OnRegisterCommand<TCommand>();
+        OnRegisterCommand(sp => ActivatorUtilities.GetServiceOrCreateInstance<TCommand>(sp));
     }
 
     /// <summary>
-    /// Registers a top-level command produced by <paramref name="factory"/>.
-    /// Useful when the command needs services not registered through
-    /// <see cref="Services"/>, or when constructing the command requires
-    /// custom logic.
+    /// Registers a top-level command by runtime <see cref="Type"/>. Useful
+    /// when the command type is only known at runtime (e.g. discovered from
+    /// configuration). The type must be a concrete <see cref="FuncCommand"/>;
+    /// it is constructed through
+    /// <see cref="ActivatorUtilities.GetServiceOrCreateInstance(IServiceProvider, Type)"/>.
     /// </summary>
-    /// <exception cref="ArgumentNullException"><paramref name="factory"/> is <c>null</c>.</exception>
-    public void RegisterCommand(Func<IServiceProvider, FuncCommand> factory)
+    /// <param name="commandType">A concrete type assignable to <see cref="FuncCommand"/>.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="commandType"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="commandType"/> is not assignable to <see cref="FuncCommand"/>, or it is abstract.
+    /// </exception>
+    public void RegisterCommand(Type commandType)
     {
-        ArgumentNullException.ThrowIfNull(factory);
-        OnRegisterCommand(factory);
+        ArgumentNullException.ThrowIfNull(commandType);
+
+        if (!typeof(FuncCommand).IsAssignableFrom(commandType))
+        {
+            throw new ArgumentException(
+                $"Type '{commandType}' is not assignable to {nameof(FuncCommand)}.",
+                nameof(commandType));
+        }
+
+        if (commandType.IsAbstract)
+        {
+            throw new ArgumentException(
+                $"Cannot register abstract command type '{commandType}'. Pass a concrete FuncCommand subclass.",
+                nameof(commandType));
+        }
+
+        OnRegisterCommand(sp => (FuncCommand)ActivatorUtilities.GetServiceOrCreateInstance(sp, commandType));
     }
 
-    /// <summary>Hook implemented by the host to wire a <see cref="FuncCommand"/> instance.</summary>
-    protected abstract void OnRegisterCommand(FuncCommand command);
-
-    /// <summary>Hook implemented by the host to wire a <see cref="FuncCommand"/> by type.</summary>
-    protected abstract void OnRegisterCommand<TCommand>()
-        where TCommand : FuncCommand;
-
-    /// <summary>Hook implemented by the host to wire a <see cref="FuncCommand"/> via a factory.</summary>
+    /// <summary>
+    /// Hook implemented by the host to wire a <see cref="FuncCommand"/>
+    /// produced by <paramref name="factory"/> into the parser. The factory
+    /// is invoked when the host resolves commands; it is given the host's
+    /// <see cref="IServiceProvider"/> so the command can request services.
+    /// </summary>
     protected abstract void OnRegisterCommand(Func<IServiceProvider, FuncCommand> factory);
 }
+
 
