@@ -1,0 +1,55 @@
+schedules:
+- cron: "0 7 * * *"   # 11pm PST
+  displayName: Nightly Build
+  branches:
+    include:
+      - main
+      - vnext
+  always: true
+
+trigger: none
+
+pr:
+  branches:
+    include:
+    - main
+    - vnext
+    - feature/*
+    - release/*
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-ubuntu-24.04-min
+      os: linux
+      ${{ if eq( variables['Build.Reason'], 'Schedule' ) }}:
+        demands:
+        - Priority -equals Low
+
+    sdl:
+      sourceAnalysisPool:
+        name: 1es-pool-azfunc-public
+        image: 1es-windows-2022
+        os: windows
+      codeql:
+         runSourceLanguagesInSourceAnalysis: true
+
+    settings:
+      skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
+      networkIsolationPolicy: Preferred, NuGet
+
+    stages:
+      - stage: Build
+        jobs:
+        - template: /eng/ci/templates/jobs/build.yml@self
+          parameters:
+            sign: false

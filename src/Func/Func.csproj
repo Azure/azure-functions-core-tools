@@ -8,7 +8,11 @@
     <AssemblyName>func</AssemblyName>
     <RootNamespace>$(TopLevelNamespace)</RootNamespace>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <PackageId>Azure.Functions.Cli</PackageId>
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>true</IsPublishable>
   </PropertyGroup>
 
   <ItemGroup>

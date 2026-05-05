@@ -30,6 +30,7 @@ artifacts/
 launchSettings.json
 publish-env
 *.binlog
+pp.xml
 _*
 
 # v4 publish tool binaries (should not be checked in)

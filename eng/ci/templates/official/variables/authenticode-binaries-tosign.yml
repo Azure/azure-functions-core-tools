@@ -1,3 +1,0 @@
-variables:
-  authenticodeBinariesToSign: >
-    func.dll,func.exe

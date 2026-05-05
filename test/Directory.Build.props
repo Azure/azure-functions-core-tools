@@ -4,6 +4,7 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
   </PropertyGroup>
 
   <!-- Enforce common packages for all test projects -->

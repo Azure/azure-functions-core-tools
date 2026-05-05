@@ -1,0 +1,108 @@
+parameters:
+- name: sign
+  type: boolean
+  default: false
+
+jobs:
+- job: build
+
+  variables:
+  - template: /eng/ci/templates/variables/build.yml@self
+  - name: pack_dir
+    readonly: true
+    value: $(Build.ArtifactStagingDirectory)/pkg
+  - name: publish_dir
+    readonly: true
+    value: $(Build.ArtifactStagingDirectory)/pub
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      displayName: Publish Packages
+      path: $(pack_dir)
+      artifact: drop_packages
+    - output: pipelineArtifact
+      displayName: Publish CLI
+      path: $(publish_dir)
+      artifact: drop_cli
+
+  steps:
+    - template: /eng/ci/templates/steps/install-dotnet.yml@self
+
+    - task: DotNetCoreCLI@2
+      displayName: Restore
+      inputs:
+        command: custom
+        custom: restore
+        projects: $(solution)
+        arguments: -v m
+
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: build
+        projects: $(solution)
+        arguments: -c $(configuration) -v m --no-restore
+
+    - task: DotNetCoreCLI@2
+      displayName: Unit tests
+      inputs:
+        command: test
+        arguments: -c $(configuration) --no-build
+        projects: $(solution)
+
+    - ${{ if eq(parameters.sign, true) }}:
+      # We are publishing as single file, don't bother signing func cli yet
+      - template: ci/sign-files.yml@eng
+        parameters:
+          displayName: Sign assemblies
+          minimatch: true
+          signType: dll-strong-name
+          folderPath: out/bin
+          pattern: |
+            **/Azure.Functions.Cli*.dll
+            !**/Azure.Functions.Cli*Test.dll
+            !**/Azure.Functions.Cli*Tests.dll
+
+    - task: DotNetCoreCLI@2
+      displayName: Pack
+      inputs:
+        command: custom
+        custom: pack
+        arguments: -c $(configuration) -v m -o $(pack_dir) --no-build
+        projects: $(solution)
+
+    - task: DotNetCoreCLI@2
+      displayName: Publish All Runtimes
+      inputs:
+        command: custom
+        custom: build
+        projects: $(solution)
+        arguments: -c $(configuration) -v m --no-restore -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir)
+
+    - ${{ if eq(parameters.sign, true) }}:
+      - template: ci/sign-files.yml@eng
+        parameters:
+          displayName: Sign nuget packages
+          signType: nuget
+          folderPath: $(pack_dir)
+          pattern: '*.nupkg'
+
+      - template: /eng/ci/templates/steps/sign-app.yml@eng
+        parameters:
+          platform: windows
+          folderPath: $(publish_dir)
+          signPatterns: '**/win-*/func'
+
+      - template: /eng/ci/templates/steps/sign-app.yml@eng
+        parameters:
+          platform: linux
+          folderPath: $(publish_dir)
+          signPatterns: '**/linux-*/func'
+
+      - template: /eng/ci/templates/steps/sign-app.yml@eng
+        parameters:
+          platform: macos
+          folderPath: $(publish_dir)
+          signPatterns: '**/osx-*/func'

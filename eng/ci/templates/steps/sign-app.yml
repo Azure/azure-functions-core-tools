@@ -1,0 +1,66 @@
+parameters:
+- name: folderPath
+  type: string
+- name: signPatterns
+  type: string
+- name: platform
+  type: string
+  values:
+  - linux
+  - macos
+  - windows
+
+steps:
+- template: ci/sign-files.yml@eng
+  parameters:
+    displayName: 'Signing app (${{ parameters.platform }})'
+    minimatch: true
+    folderPath: '${{ parameters.folderPath }}'
+    pattern: '${{ parameters.signPatterns }}'
+    signType: inline
+    ${{ if eq(parameters.platform, 'linux') }}:
+      inlineOperation: |
+        [
+          {
+            "keyCode": "${{ parameters.keyCode }}",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "sign",
+            "toolVersion": "1.0"
+          }
+        ]
+    ${{ if eq(parameters.platform, 'macos') }}:
+      inlineOperation: |
+        [
+          {
+              "KeyCode" : "CP-401337-Apple",
+              "OperationCode" : "MacAppDeveloperSign",
+              "Parameters" : {},
+              "ToolName" : "sign",
+              "ToolVersion" : "1.0"
+          }
+        ]
+    ${{ if eq(parameters.platform, 'windows') }}:
+      inlineOperation: |
+        [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+        ]
