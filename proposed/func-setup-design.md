@@ -118,13 +118,44 @@ This avoids the failure mode where a user runs `func init` first, never sees `se
 - Errors clearly state what completed and what did not, with the exact command to retry the failed step.
 - Non-zero exit on any failure in `--non-interactive` or `--check` mode.
 
-## 9. Open Questions
+## 9. Resolved Questions
 
-These are concrete, lower-level questions. The foundational architecture (identity, scope, re-run model, boundaries) is settled above.
+These are concrete, lower-level decisions. The foundational architecture (identity, scope, re-run model, boundaries) is in §1 through §8.
 
-- **Progress reporting.** How is long-running workload install progress surfaced in CI logs (where TTY tricks fail)? Plain-text periodic lines, structured JSON via a flag, or both?
-- **Offline / air-gapped.** Should `setup` accept a `--offline` flag that skips network attempts and only validates that already-cached artifacts satisfy the request? (Likely yes, mirroring `func start --offline` from the profiles proposal.)
-- **Picker UX.** Categorized prompt vs flat list. Do we ship a recommended-defaults set per detected language?
-- **Discoverability after install.** Where does the "next step is `func setup`" hint surface? Post-install message from the package, output of `func` with no args, both?
-- **`--check` exit codes.** Single non-zero on any drift, or distinct codes for "missing workload" vs "missing profile cache" vs "stale registry"?
-- **Inferring workloads from a project.** What signals do we read (e.g. `host.json`, presence of `requirements.txt` / `package.json` / `*.csproj`)? How is the inference surfaced (pre-selected in picker vs informational only)?
+### 9.1 Progress reporting
+
+How is long-running workload install progress surfaced in CI logs (where TTY tricks fail)?
+
+**Decision:** Spinner / progress bar when a TTY is detected. Plain-text periodic lines otherwise (the default for CI). Opt-in structured output via `--output json` for tooling that wants to parse progress events.
+
+### 9.2 Offline / air-gapped
+
+Should `setup` accept a `--offline` flag that skips network attempts and only validates that already-cached artifacts satisfy the request?
+
+**Decision:** Deferred. Offline / air-gapped support will be addressed in a separate proposal that covers the CLI as a whole, not bolted onto `setup` in isolation. `setup` does not ship an `--offline` flag in v1.
+
+### 9.3 Picker UX
+
+Categorized prompt vs flat list. Do we ship a recommended-defaults set per detected language?
+
+**Decision:** Categorized picker (Languages / Features / Tools). When project inference suggests a language, that language's recommended defaults are pre-selected. The user can deselect or add to the recommendation before confirming.
+
+### 9.4 Discoverability after install
+
+Where does the "next step is `func setup`" hint surface?
+
+**Decision:** Both. The package installer prints a post-install message pointing at `func setup`, and `func` with no arguments shows a getting-started hint that includes `func setup`.
+
+### 9.5 `--check` exit codes
+
+Single non-zero on any drift, or distinct codes per drift type?
+
+**Decision:** Single non-zero exit (`exit 1`) on any drift. Drift details (which workloads are missing, which profile caches are stale, etc.) are written to stdout/stderr in human-readable form. No distinct exit codes per drift type. Tooling that needs structured drift information can use `--output json` (see §9.1).
+
+### 9.6 Inferring workloads from a project
+
+What signals does `setup` read, and how is the inference surfaced?
+
+**Decision:** `setup` reads everything it reasonably can (e.g. `host.json` `workerRuntime`, language manifests like `package.json` / `requirements.txt` / `*.csproj` / `pom.xml`, `.func/config.json` for declared profiles). The inference is **informational only**: the picker shows what was detected, but the user still picks explicitly. Nothing is pre-selected from inference alone.
+
+> Note: this is in tension with §9.3, which pre-selects recommended defaults *per detected language*. The reconciled rule is: detection surfaces information; *recommendations* (curated workload sets shipped with the CLI) are what get pre-selected. If detection finds Python, the picker shows "detected: Python" and pre-selects the **Python recommendation** (a CLI-curated set), not raw inference output. The user remains the decider.
