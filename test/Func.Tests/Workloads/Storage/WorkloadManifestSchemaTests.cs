@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
 public class WorkloadManifestSchemaTests : IDisposable
 {
-    private const string V1Schema = "https://aka.ms/func-workloads/v1/schema.json";
+    private const string V1Schema = WorkloadManifestSchema.V1Schema;
 
     private readonly string _tempHome;
     private readonly GlobalManifestStore _store;
@@ -100,7 +100,10 @@ public class WorkloadManifestSchemaTests : IDisposable
 
         Assert.True(ex.IsUserError);
         Assert.Contains("v999", ex.Message);
-        Assert.Contains("update", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not supported", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Supported schemas", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(WorkloadManifestSchema.V1Schema, ex.Message);
+        Assert.Contains("updating the CLI", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

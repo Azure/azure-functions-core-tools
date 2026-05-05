@@ -108,10 +108,19 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
 
             if (!WorkloadManifestSchema.IsSupported(deserialized.Schema))
             {
+                var supported = string.Join(
+                    Environment.NewLine,
+                    WorkloadManifestSchema.SupportedSchemas.Select(s => $"  - {s}"));
+
                 throw new GracefulException(
-                    $"The workload manifest at '{path}' declares schema '{deserialized.Schema}', "
-                    + $"but this version of the Functions CLI only understands '{WorkloadManifestSchema.CurrentSchema}'. "
-                    + "Please update the CLI to the latest version.",
+                    $"The schema '{deserialized.Schema}' declared by manifest '{path}' is not supported."
+                    + Environment.NewLine
+                    + "Supported schemas are:"
+                    + Environment.NewLine
+                    + supported
+                    + Environment.NewLine
+                    + Environment.NewLine
+                    + "Check for spelling or try updating the CLI to the latest version.",
                     isUserError: true);
             }
 

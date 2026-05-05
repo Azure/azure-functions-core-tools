@@ -21,10 +21,23 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 internal static class WorkloadManifestSchema
 {
     /// <summary>
-    /// Current schema URL. Bump the version segment (<c>v1</c> → <c>v2</c>)
-    /// when the manifest shape changes in a way older CLIs cannot safely read.
+    /// v1 manifest schema URL. Pinned so tests and external tooling can
+    /// reference a stable identifier that does not move when
+    /// <see cref="CurrentSchema"/> is bumped.
     /// </summary>
-    public const string CurrentSchema = "https://aka.ms/func-workloads/v1/schema.json";
+    public const string V1Schema = "https://aka.ms/func-workloads/v1/schema.json";
+
+    /// <summary>
+    /// Current schema URL written into newly-saved manifests. Bump the
+    /// version segment (<c>v1</c> → <c>v2</c>) when the manifest shape
+    /// changes in a way older CLIs cannot safely read.
+    /// </summary>
+    public const string CurrentSchema = V1Schema;
+
+    /// <summary>
+    /// Schemas this CLI knows how to read.
+    /// </summary>
+    public static IReadOnlyList<string> SupportedSchemas { get; } = [V1Schema];
 
     /// <summary>
     /// Returns <c>true</c> if this CLI understands the supplied schema URL.
@@ -32,7 +45,6 @@ internal static class WorkloadManifestSchema
     /// before this field was introduced still load.
     /// </summary>
     public static bool IsSupported(string? schema)
-        => string.IsNullOrEmpty(schema)
-            || string.Equals(schema, CurrentSchema, StringComparison.Ordinal);
+        => string.IsNullOrEmpty(schema) || SupportedSchemas.Contains(schema, StringComparer.Ordinal);
 }
 
