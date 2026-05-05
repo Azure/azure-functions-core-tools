@@ -43,6 +43,5 @@
   </ItemGroup>
 
   <Import Project="$(MSBuildThisFileDirectory)Release.props" />
-  <Import Project="$(MSBuildThisFileDirectory)Publish.AllRuntimes.props" />
 
 </Project>

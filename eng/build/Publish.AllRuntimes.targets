@@ -1,10 +1,13 @@
 <Project>
 
-  <Target Name="PublishAllRids" Condition="'$(IsPublishable)' == 'true'">
-    <PropertyGroup>
-      <_PublishRootTrailingSlash Condition="'$(PublishRoot)' != ''">$([MSBuild]::EnsureTrailingSlash('$(PublishRoot)'))</_PublishRootTrailingSlash>
-    </PropertyGroup>
+  <PropertyGroup Condition="'$(IsPublishable)' == 'true'">
+    <!-- Enable roll-forward to latest patch.  This allows one restore operation
+         to apply to all of the self-contained publish operations. -->
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+    <PublishDir Condition="'$(AllRuntimesPublishRoot)' != '' AND '$(RuntimeIdentifier)' != ''">$([MSBuild]::EnsureTrailingSlash('$(AllRuntimesPublishRoot)'))$(RuntimeIdentifier)/</PublishDir>
+  </PropertyGroup>
 
+  <Target Name="PublishAllRids" Condition="'$(IsPublishable)' == 'true'">
     <ItemGroup>
       <!-- Transform RuntimeIdentifiers property to item -->
       <RuntimeIdentifierForPublish Include="$(RuntimeIdentifiers)" />
