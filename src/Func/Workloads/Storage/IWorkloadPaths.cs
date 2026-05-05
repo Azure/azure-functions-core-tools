@@ -20,9 +20,9 @@ internal interface IWorkloadPaths
     public string WorkloadsRoot { get; }
 
     /// <summary>
-    /// Absolute path to the global workload manifest file.
+    /// Absolute path to the global workload registry file.
     /// </summary>
-    public string GlobalManifestPath { get; }
+    public string WorkloadRegistryPath { get; }
 
     /// <summary>
     /// Per-package install directory inside <see cref="WorkloadsRoot"/>, namespaced by version.

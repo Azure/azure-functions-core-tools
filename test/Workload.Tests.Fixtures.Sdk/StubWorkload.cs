@@ -7,25 +7,25 @@ namespace Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk;
 
 /// <summary>
 /// SDK-shaped test fixture: behaves identically to the sibling
-/// <c>Workload.Tests.Fixtures.Default</c> stub, but its csproj follows the future
-/// workload SDK convention (<c>Private="false"</c>,
+/// <c>Workload.Tests.Fixtures.Default</c> stub, but its csproj follows the
+/// future workload SDK convention (<c>Private="false"</c>,
 /// <c>ExcludeAssets="runtime"</c>) so the contract assembly is excluded from
 /// the fixture's runtime closure. This exercises the loader's natural-
 /// resolution path: <see cref="System.Runtime.Loader.AssemblyDependencyResolver"/>
 /// returns null for <c>Azure.Functions.Cli.Abstractions</c> and the default
 /// context resolves it from the host's bin folder.
 /// </summary>
-public sealed class StubWorkload : IWorkload
+public sealed class StubWorkload : Workloads.Workload
 {
-    public string PackageId => "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk";
+    public override string Name => "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk";
 
-    public string PackageVersion => "1.0.0";
+    public override string Version => "1.0.0";
 
-    public string DisplayName => "Stub (SDK-shaped)";
+    public override string DisplayName => "Stub (SDK-shaped)";
 
-    public string Description => "SDK-convention test fixture workload.";
+    public override string Description => "SDK-convention test fixture workload.";
 
-    public void Configure(FunctionsCliBuilder builder)
+    public override void Configure(FunctionsCliBuilder builder)
     {
     }
 }

@@ -48,13 +48,13 @@ public class WorkloadPathsOptionsTests
     }
 
     [Fact]
-    public void GlobalManifestPath_IsHomeJoinedWithManifestFileName()
+    public void WorkloadRegistryPath_IsHomeJoinedWithRegistryFileName()
     {
         var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
 
         Assert.Equal(
-            Path.Combine("/tmp/funcs", WorkloadPathsOptions.GlobalManifestFileName),
-            options.GlobalManifestPath);
+            Path.Combine("/tmp/funcs", WorkloadPathsOptions.WorkloadRegistryFileName),
+            options.WorkloadRegistryPath);
     }
 
     [Fact]

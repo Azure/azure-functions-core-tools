@@ -4,22 +4,25 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Implemented by a workload's entry-point class. The CLI loader instantiates
-/// the type named by the workload's manifest (<c>workload.json</c>
-/// <c>entryPoint</c>), then invokes <see cref="Configure"/> so the workload
-/// can register its services with <see cref="FunctionsCliBuilder"/>.
+/// Base class for a workload's entry-point. The CLI loader instantiates the
+/// type identified by the workload's <see cref="WorkloadMetadata"/>
+/// (<c>workload.json</c> in the package root), then invokes
+/// <see cref="Configure"/> so the workload can register its services with
+/// <see cref="FunctionsCliBuilder"/>.
 ///
 /// Mirrors the shape of WebJobs' <c>IWebJobsStartup</c>. Implementations must
 /// have a parameterless constructor.
+///
+/// Abstract class (rather than an interface) so we can grow the surface with
+/// new properties or virtual members without breaking existing workloads.
 /// </summary>
-public interface IWorkload
+public abstract class Workload
 {
     /// <summary>
-    /// Globally unique package identifier — typically the assembly / NuGet
+    /// Globally unique workload identifier, typically the assembly / NuGet
     /// package name (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>).
-    /// Used to identify the workload in the manifest and CLI output.
     /// </summary>
-    public string PackageId { get; }
+    public abstract string Name { get; }
 
     /// <summary>
     /// Workload version. Authored on the workload itself rather than read
@@ -28,17 +31,21 @@ public interface IWorkload
     /// SemVer 2.0 string (e.g. <c>"1.2.3"</c>, <c>"1.2.3-preview.1"</c>);
     /// the CLI does not currently enforce or normalize the format.
     /// </summary>
-    public string PackageVersion { get; }
+    public abstract string Version { get; }
 
-    /// <summary>Human-readable name shown in <c>func workload list</c>.</summary>
-    public string DisplayName { get; }
+    /// <summary>
+    /// Human-readable name shown in <c>func workload list</c>.
+    /// </summary>
+    public abstract string DisplayName { get; }
 
-    /// <summary>One-line description of what the workload provides.</summary>
-    public string Description { get; }
+    /// <summary>
+    /// One-line description of what the workload provides.
+    /// </summary>
+    public abstract string Description { get; }
 
     /// <summary>
     /// Registers the workload's services with the host. Called once during
     /// CLI bootstrap, before the root command tree is built.
     /// </summary>
-    public void Configure(FunctionsCliBuilder builder);
+    public abstract void Configure(FunctionsCliBuilder builder);
 }

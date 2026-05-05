@@ -5,17 +5,17 @@ using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Workload.Tests.Fixtures.Default;
 
-public sealed class StubWorkload : IWorkload
+public sealed class StubWorkload : Workloads.Workload
 {
-    public string PackageId => "Azure.Functions.Cli.Workload.Tests.Fixtures.Default";
+    public override string Name => "Azure.Functions.Cli.Workload.Tests.Fixtures.Default";
 
-    public string PackageVersion => "1.0.0";
+    public override string Version => "1.0.0";
 
-    public string DisplayName => "Stub";
+    public override string DisplayName => "Stub";
 
-    public string Description => "Test fixture workload.";
+    public override string Description => "Test fixture workload.";
 
-    public void Configure(FunctionsCliBuilder builder)
+    public override void Configure(FunctionsCliBuilder builder)
     {
     }
 }

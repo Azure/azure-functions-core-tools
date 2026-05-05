@@ -12,5 +12,5 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// don't carry <c>[JsonPropertyName]</c> attributes.
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[JsonSerializable(typeof(GlobalManifest))]
+[JsonSerializable(typeof(WorkloadRegistry))]
 internal sealed partial class WorkloadJsonContext : JsonSerializerContext;

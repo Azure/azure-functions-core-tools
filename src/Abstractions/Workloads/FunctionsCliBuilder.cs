@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Bootstrap surface passed to <see cref="IWorkload.Configure"/>.
+/// Bootstrap surface passed to <see cref="Workload.Configure"/>.
 /// Workloads register their services — project initializers, commands, and
 /// any other supporting types — through <see cref="Services"/> and the
 /// <see cref="RegisterCommand(FuncCommand)"/> overloads.
