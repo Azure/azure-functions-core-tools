@@ -3,7 +3,6 @@
 
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Workloads.Discovery;
@@ -34,9 +33,8 @@ internal sealed class WorkloadEntryPointScanner : IWorkloadEntryPointScanner
 
         if (!Directory.Exists(installDirectory))
         {
-            throw new GracefulException(
-                $"Could not scan workload entry point: directory '{installDirectory}' does not exist.",
-                isUserError: true);
+            throw new DirectoryNotFoundException(
+                $"Workload install directory '{installDirectory}' does not exist.");
         }
 
         var installAssemblies = Directory.GetFiles(installDirectory, "*.dll", SearchOption.TopDirectoryOnly);
@@ -70,16 +68,12 @@ internal sealed class WorkloadEntryPointScanner : IWorkloadEntryPointScanner
 
         return matches.Count switch
         {
-            0 => throw new GracefulException(
-                message: $"Workload at '{installDirectory}' is invalid: no entry point found.",
-                verboseMessage: "A workload package must declare exactly one [assembly: CliWorkload<T>]."),
+            0 => throw new InvalidWorkloadException(
+                $"No [assembly: CliWorkload] found in '{installDirectory}'."),
             1 => matches[0],
-            _ => throw new GracefulException(
-                message: $"Workload at '{installDirectory}' is invalid: multiple entry points found.",
-                verboseMessage:
-                    "Multiple assemblies declare [assembly: CliWorkload<T>]: " +
-                    $"{string.Join(", ", matches.Select(m => m.Assembly))}. " +
-                    "A workload package must declare exactly one."),
+            _ => throw new InvalidWorkloadException(
+                $"Multiple [assembly: CliWorkload] declarations found in '{installDirectory}': " +
+                $"{string.Join(", ", matches.Select(m => m.Assembly))}."),
         };
     }
 
@@ -136,12 +130,10 @@ internal sealed class WorkloadEntryPointScanner : IWorkloadEntryPointScanner
             // additional probing to find the implementation type.
             if (workloadType.Assembly != assembly)
             {
-                throw new GracefulException(
-                    message: $"Workload at '{installDirectory}' is invalid: entry point in '{Path.GetFileName(assemblyPath)}' is malformed.",
-                    verboseMessage:
-                        $"[assembly: CliWorkload<{workloadType.FullName}>] points at a type defined in a different assembly " +
-                        $"('{workloadType.Assembly.GetName().Name}'). The IWorkload implementation must live in the same " +
-                        "assembly that declares the attribute.");
+                throw new InvalidWorkloadException(
+                    $"[assembly: CliWorkload<{workloadType.FullName}>] in '{Path.GetFileName(assemblyPath)}' " +
+                    $"references a type defined in a different assembly ('{workloadType.Assembly.GetName().Name}'). " +
+                    "The implementation type must live in the same assembly that declares the attribute.");
             }
 
             return new EntryPointSpec

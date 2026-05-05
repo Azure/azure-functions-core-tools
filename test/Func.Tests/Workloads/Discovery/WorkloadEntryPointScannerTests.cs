@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 using Xunit;
@@ -51,13 +50,10 @@ public class WorkloadEntryPointScannerTests : IDisposable
             Path.Combine(_tempDir, "xunit.assert.dll"));
         var scanner = new WorkloadEntryPointScanner();
 
-        var ex = Assert.Throws<GracefulException>(() => scanner.Scan(_tempDir));
+        var ex = Assert.Throws<InvalidWorkloadException>(() => scanner.Scan(_tempDir));
 
-        Assert.True(ex.IsUserError);
         Assert.Contains(_tempDir, ex.Message);
-        Assert.Contains("no entry point found", ex.Message);
-        Assert.NotNull(ex.VerboseMessage);
-        Assert.Contains("[assembly: CliWorkload<T>]", ex.VerboseMessage);
+        Assert.Contains("No [assembly: CliWorkload]", ex.Message);
     }
 
     [Fact]
@@ -67,14 +63,12 @@ public class WorkloadEntryPointScannerTests : IDisposable
         CopyFixtureToTemp(SecondFixtureAssemblyFile);
         var scanner = new WorkloadEntryPointScanner();
 
-        var ex = Assert.Throws<GracefulException>(() => scanner.Scan(_tempDir));
+        var ex = Assert.Throws<InvalidWorkloadException>(() => scanner.Scan(_tempDir));
 
-        Assert.True(ex.IsUserError);
         Assert.Contains(_tempDir, ex.Message);
-        Assert.Contains("multiple entry points", ex.Message);
-        Assert.NotNull(ex.VerboseMessage);
-        Assert.Contains(FixtureAssemblyFile, ex.VerboseMessage);
-        Assert.Contains(SecondFixtureAssemblyFile, ex.VerboseMessage);
+        Assert.Contains("Multiple [assembly: CliWorkload]", ex.Message);
+        Assert.Contains(FixtureAssemblyFile, ex.Message);
+        Assert.Contains(SecondFixtureAssemblyFile, ex.Message);
     }
 
     [Fact]
@@ -83,13 +77,10 @@ public class WorkloadEntryPointScannerTests : IDisposable
         CopyFixtureToTemp(CrossAssemblyFixtureFile);
         var scanner = new WorkloadEntryPointScanner();
 
-        var ex = Assert.Throws<GracefulException>(() => scanner.Scan(_tempDir));
+        var ex = Assert.Throws<InvalidWorkloadException>(() => scanner.Scan(_tempDir));
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains(_tempDir, ex.Message);
         Assert.Contains(CrossAssemblyFixtureFile, ex.Message);
-        Assert.NotNull(ex.VerboseMessage);
-        Assert.Contains("different assembly", ex.VerboseMessage);
+        Assert.Contains("different assembly", ex.Message);
     }
 
     [Fact]
@@ -110,9 +101,8 @@ public class WorkloadEntryPointScannerTests : IDisposable
         var scanner = new WorkloadEntryPointScanner();
         var missing = Path.Combine(_tempDir, "does-not-exist");
 
-        var ex = Assert.Throws<GracefulException>(() => scanner.Scan(missing));
+        var ex = Assert.Throws<DirectoryNotFoundException>(() => scanner.Scan(missing));
 
-        Assert.True(ex.IsUserError);
         Assert.Contains(missing, ex.Message);
     }
 
