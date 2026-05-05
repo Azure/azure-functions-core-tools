@@ -1,3 +1,0 @@
-variables:
-  thirdPartyBinariesToSign: >
-    Spectre.Console.dll,NuGet.*.dll

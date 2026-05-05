@@ -1,7 +1,0 @@
-steps:
-- task: DotNetCoreCLI@2
-  displayName: 'Build Abstractions'
-  inputs:
-    command: 'build'
-    projects: 'src/Abstractions/Abstractions.csproj'
-    arguments: '--no-restore'
