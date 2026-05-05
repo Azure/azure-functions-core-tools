@@ -10,7 +10,7 @@
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
-    <Project Path="test/Func.Tests.Fixtures.Workload/Func.Tests.Fixtures.Workload.csproj" />
-    <Project Path="test/Func.Tests.Fixtures.WorkloadSdk/Func.Tests.Fixtures.WorkloadSdk.csproj" />
+    <Project Path="test/Workload.Tests.Fixtures.Default/Workload.Tests.Fixtures.Default.csproj" />
+    <Project Path="test/Workload.Tests.Fixtures.Sdk/Workload.Tests.Fixtures.Sdk.csproj" />
   </Folder>
 </Solution>
