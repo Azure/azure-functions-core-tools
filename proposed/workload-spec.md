@@ -145,7 +145,7 @@ A workload is a NuGet package containing a .NET assembly that implements
 assembly-level attribute:
 
 ```csharp
-[assembly: ExportCliWorkload<MyWorkload>]
+[assembly: CliWorkload<MyWorkload>]
 ```
 
 The `IWorkload` implementation receives a `FunctionsCliBuilder` during
