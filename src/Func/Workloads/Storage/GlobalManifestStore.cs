@@ -106,6 +106,24 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
                 cancellationToken).ConfigureAwait(false)
                 ?? new GlobalManifest();
 
+            if (!WorkloadManifestSchema.IsSupported(deserialized.Schema))
+            {
+                var supported = string.Join(
+                    Environment.NewLine,
+                    WorkloadManifestSchema.SupportedSchemas.Select(s => $"  - {s}"));
+
+                throw new GracefulException(
+                    $"The schema '{deserialized.Schema}' declared by manifest '{path}' is not supported."
+                    + Environment.NewLine
+                    + "Supported schemas are:"
+                    + Environment.NewLine
+                    + supported
+                    + Environment.NewLine
+                    + Environment.NewLine
+                    + "Check for spelling or try updating the CLI to the latest version.",
+                    isUserError: true);
+            }
+
             // System.Text.Json rebuilds the outer dictionary with the default
             // (case-sensitive) comparer regardless of the in-memory comparer
             // on the type's default. Reapply ordinal-ignore-case so package-id
@@ -134,7 +152,7 @@ internal class GlobalManifestStore(IWorkloadPaths paths) : IGlobalManifestStore
             rebuilt[packageId] = versions;
         }
 
-        return new GlobalManifest { Workloads = rebuilt };
+        return new GlobalManifest { Workloads = rebuilt, Schema = manifest.Schema };
     }
 
     private async Task WriteManifestAsync(GlobalManifest manifest, CancellationToken cancellationToken)
