@@ -1,0 +1,21 @@
+<Project>
+
+  <Target Name="PublishAllRids" Condition="'$(IsPublishable)' == 'true'">
+    <PropertyGroup>
+      <_PublishRootTrailingSlash Condition="'$(PublishRoot)' != ''">$([MSBuild]::EnsureTrailingSlash('$(PublishRoot)'))</_PublishRootTrailingSlash>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <!-- Transform RuntimeIdentifiers property to item -->
+      <RuntimeIdentifierForPublish Include="$(RuntimeIdentifiers)" />
+
+      <!-- Transform RuntimeIdentifierForPublish items to project items to pass to MSBuild task -->
+      <ProjectToPublish Include="@(RuntimeIdentifierForPublish->'$(MSBuildProjectFullPath)')">
+        <AdditionalProperties>RuntimeIdentifier=%(RuntimeIdentifierForPublish.Identity)</AdditionalProperties>
+      </ProjectToPublish>
+    </ItemGroup>
+
+    <MSBuild Projects="@(ProjectToPublish)" Targets="Publish" BuildInParallel="true"/>
+  </Target>
+
+</Project>

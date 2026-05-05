@@ -1,0 +1,13 @@
+variables:
+- name: DOTNET_NOLOGO
+  value: 1
+- name: DOTNET_SKIP_FIRST_TIME_EXPERIENCE
+  value: 1
+- name: DOTNET_CLI_TELEMETRY_OPTOUT
+  value: 1
+- name: configuration
+  value: release
+- name: solution
+  value: Azure.Functions.Cli.slnx
+- name: Build.Counter
+  value: $[counter(format('{0:yyyyMMdd}', pipeline.startTime), 0)]

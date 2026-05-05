@@ -1,0 +1,10 @@
+<Project>
+
+  <PropertyGroup Condition="'$(IsPublishable)' == 'true'">
+    <!-- Enable roll-forward to latest patch.  This allows one restore operation
+         to apply to all of the self-contained publish operations. -->
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+    <PublishDir Condition="'$(AllRuntimesPublishRoot)' != '' AND '$(RuntimeIdentifier)' != ''">$([MSBuild]::EnsureTrailingSlash('$(AllRuntimesPublishRoot)'))$(RuntimeIdentifier)/</PublishDir>
+  </PropertyGroup>
+
+</Project>
