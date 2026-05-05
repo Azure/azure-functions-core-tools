@@ -12,12 +12,7 @@
 
   <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->
   <ItemGroup>
-    <ProjectReference Include="..\Workload.Tests.Fixtures.Default\Workload.Tests.Fixtures.Default.csproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <OutputItemType>Content</OutputItemType>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </ProjectReference>
-    <ProjectReference Include="..\Workload.Tests.Fixtures.Sdk\Workload.Tests.Fixtures.Sdk.csproj">
+    <ProjectReference Include="../Workload.Tests.Fixtures.*/Workload.Tests.Fixtures.*.csproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <OutputItemType>Content</OutputItemType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
