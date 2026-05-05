@@ -9,8 +9,8 @@ namespace Azure.Functions.Cli.Tests.Workloads.Discovery;
 
 public class WorkloadEntryPointScannerTests : IDisposable
 {
-    private const string FixtureAssemblyFile = "Azure.Functions.Cli.Tests.Fixtures.Workload.dll";
-    private const string FixtureTypeName = "Azure.Functions.Cli.Tests.Fixtures.Workload.StubWorkload";
+    private const string FixtureAssemblyFile = "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.dll";
+    private const string FixtureTypeName = "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.StubWorkload";
     private const string SecondFixtureAssemblyFile = "Azure.Functions.Cli.Workload.Tests.Fixtures.Second.dll";
     private const string CrossAssemblyFixtureFile = "Azure.Functions.Cli.Workload.Tests.Fixtures.CrossAssembly.dll";
 
