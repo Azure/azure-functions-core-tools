@@ -3,11 +3,11 @@
 
 using Azure.Functions.Cli.Workloads;
 
-namespace Azure.Functions.Cli.Tests.Fixtures.Workload;
+namespace Azure.Functions.Cli.Workload.Tests.Fixtures.Default;
 
 public sealed class StubWorkload : IWorkload
 {
-    public string PackageId => "Azure.Functions.Cli.Tests.Fixtures.Workload";
+    public string PackageId => "Azure.Functions.Cli.Workload.Tests.Fixtures.Default";
 
     public string PackageVersion => "1.0.0";
 

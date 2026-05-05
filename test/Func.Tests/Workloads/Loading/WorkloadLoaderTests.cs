@@ -12,13 +12,13 @@ namespace Azure.Functions.Cli.Tests.Workloads.Loading;
 
 public class WorkloadLoaderTests
 {
-    private const string FixturePackageId = "Azure.Functions.Cli.Tests.Fixtures.Workload";
-    private const string FixtureAssemblyFile = "Azure.Functions.Cli.Tests.Fixtures.Workload.dll";
-    private const string FixtureTypeName = "Azure.Functions.Cli.Tests.Fixtures.Workload.StubWorkload";
+    private const string FixturePackageId = "Azure.Functions.Cli.Workload.Tests.Fixtures.Default";
+    private const string FixtureAssemblyFile = "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.dll";
+    private const string FixtureTypeName = "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.StubWorkload";
 
-    private const string SdkFixturePackageId = "Azure.Functions.Cli.Tests.Fixtures.WorkloadSdk";
-    private const string SdkFixtureAssemblyFile = "Azure.Functions.Cli.Tests.Fixtures.WorkloadSdk.dll";
-    private const string SdkFixtureTypeName = "Azure.Functions.Cli.Tests.Fixtures.WorkloadSdk.StubWorkload";
+    private const string SdkFixturePackageId = "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk";
+    private const string SdkFixtureAssemblyFile = "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk.dll";
+    private const string SdkFixtureTypeName = "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk.StubWorkload";
 
     [Fact]
     public void LoadInstalled_ReturnsEmpty_WhenNoEntries()
@@ -76,7 +76,7 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader();
         var entry = FixtureEntry(
             FixturePackageId,
-            typeNameOverride: "Azure.Functions.Cli.Tests.Fixtures.Workload.NotAWorkload");
+            typeNameOverride: "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.NotAWorkload");
 
         var ex = Assert.Throws<GracefulException>(() => loader.LoadInstalled(new[] { entry }));
 
@@ -145,14 +145,14 @@ public class WorkloadLoaderTests
     public void LoadInstalled_HydratesEntry_WithSdkShapedFixture()
     {
         // Sibling of LoadInstalled_HydratesEntry_FromAssemblyOnDisk, but using
-        // the Func.Tests.Fixtures.WorkloadSdk project, whose csproj follows the
+        // the Workload.Tests.Fixtures.Sdk project, whose csproj follows the
         // future workload SDK convention (Private="false",
         // ExcludeAssets="runtime") so its deps.json does not list the contract
         // assemblies as runtime assets. This exercises the natural-resolution
         // path: AssemblyDependencyResolver returns null for the contract
-        // assemblies and the default context resolves them — distinct from the
+        // assemblies and the default context resolves them, distinct from the
         // defensive intercept path exercised by the sibling test using the
-        // mis-packaged Func.Tests.Fixtures.Workload fixture.
+        // mis-packaged Workload.Tests.Fixtures.Default fixture.
         var loader = new WorkloadLoader();
 
         var loaded = loader.LoadInstalled(new[] { SdkFixtureEntry(SdkFixturePackageId) });
@@ -174,9 +174,9 @@ public class WorkloadLoaderTests
         // Pins the SDK convention end-to-end: the WorkloadSdk fixture project
         // must NOT ship Azure.Functions.Cli.Abstractions in its runtime closure
         // (deps.json). If this fails, someone removed Private="false" /
-        // ExcludeAssets="runtime" from Func.Tests.Fixtures.WorkloadSdk.csproj
+        // ExcludeAssets="runtime" from Workload.Tests.Fixtures.Sdk.csproj
         // and the fixture is silently no longer exercising the natural-
-        // resolution path — the LoadInstalled_HydratesEntry_WithSdkShapedFixture
+        // resolution path: the LoadInstalled_HydratesEntry_WithSdkShapedFixture
         // test would still pass via the loader's defensive intercept, hiding
         // the regression. Asserting the resolver invariant directly is what
         // separates the two test cases.

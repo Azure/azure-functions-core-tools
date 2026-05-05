@@ -3,11 +3,11 @@
 
 using Azure.Functions.Cli.Workloads;
 
-namespace Azure.Functions.Cli.Tests.Fixtures.WorkloadSdk;
+namespace Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk;
 
 /// <summary>
 /// SDK-shaped test fixture: behaves identically to the sibling
-/// <c>Func.Tests.Fixtures.Workload</c> stub, but its csproj follows the future
+/// <c>Workload.Tests.Fixtures.Default</c> stub, but its csproj follows the future
 /// workload SDK convention (<c>Private="false"</c>,
 /// <c>ExcludeAssets="runtime"</c>) so the contract assembly is excluded from
 /// the fixture's runtime closure. This exercises the loader's natural-
@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Tests.Fixtures.WorkloadSdk;
 /// </summary>
 public sealed class StubWorkload : IWorkload
 {
-    public string PackageId => "Azure.Functions.Cli.Tests.Fixtures.WorkloadSdk";
+    public string PackageId => "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk";
 
     public string PackageVersion => "1.0.0";
 
