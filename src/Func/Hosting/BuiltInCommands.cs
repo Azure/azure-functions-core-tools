@@ -33,10 +33,13 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, NewCommand>();
         services.AddSingleton<FuncCliCommand, StartCommand>();
 
-        // WorkloadCommand has WorkloadListCommand as a subcommand. Register
-        // the list command as its own concrete type (not as FuncCliCommand) so
-        // it doesn't get added at the top level by GetServices<FuncCliCommand>().
+        // WorkloadCommand has WorkloadListCommand, WorkloadInstallCommand, and
+        // WorkloadUninstallCommand as subcommands. Register each subcommand as
+        // its own concrete type (not as FuncCliCommand) so they don't get added
+        // at the top level by GetServices<FuncCliCommand>().
         services.AddSingleton<WorkloadListCommand>();
+        services.AddSingleton<WorkloadInstallCommand>();
+        services.AddSingleton<WorkloadUninstallCommand>();
         services.AddSingleton<FuncCliCommand, WorkloadCommand>();
 
         return services;
