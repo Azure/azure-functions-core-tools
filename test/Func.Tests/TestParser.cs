@@ -5,7 +5,9 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests;
 
@@ -59,7 +61,15 @@ internal static class TestParser
         var services = new ServiceCollection();
         services.AddSingleton(interaction);
         services.AddBuiltInCommands();
-        services.AddSingleton<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>());
+
+        // Stub manifest store so commands that depend on it (e.g.
+        // WorkloadListCommand) resolve without booting the storage subsystem.
+        // Tests that exercise listing register their own substitute.
+        var emptyStore = Substitute.For<IGlobalManifestStore>();
+        emptyStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<InstalledWorkload>());
+        services.AddSingleton(emptyStore);
+
         return services;
     }
 }

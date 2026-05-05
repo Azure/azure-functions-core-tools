@@ -3,39 +3,43 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
-using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
-/// Lists workloads recorded in the global manifest. Source of truth is
-/// <see cref="WorkloadInfo"/>, populated by the install / discovery layer
-/// from each package's <c>workload.json</c>.
+/// Lists workloads recorded in the global manifest. Reads directly from
+/// <see cref="IGlobalManifestStore"/> so listing works without invoking the
+/// workload loader (no assembly loads, no ALC creation).
 /// </summary>
-internal sealed class WorkloadListCommand(IInteractionService interaction, IReadOnlyList<WorkloadInfo> workloads)
+internal sealed class WorkloadListCommand(IInteractionService interaction, IGlobalManifestStore store)
     : FuncCliCommand("list", "List installed workloads.")
 {
-    private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
-    private readonly IReadOnlyList<WorkloadInfo> _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
+    private const string AliasesPlaceholder = "-";
 
-    protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+    private readonly IGlobalManifestStore _store = store ?? throw new ArgumentNullException(nameof(store));
+
+    protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        if (_workloads.Count == 0)
+        var workloads = await _store.GetWorkloadsAsync(cancellationToken).ConfigureAwait(false);
+
+        if (workloads.Count == 0)
         {
             _interaction.WriteHint("No workloads installed.");
-            return Task.FromResult(0);
+            return 0;
         }
 
-        var rows = _workloads.Select(w => new[]
+        var rows = workloads.Select(w => new[]
         {
             w.PackageId,
-            w.Aliases.Count == 0 ? "—" : string.Join(", ", w.Aliases),
-            w.DisplayName,
-            w.Description,
-            w.PackageVersion,
+            w.Entry.Aliases.Count == 0 ? AliasesPlaceholder : string.Join(", ", w.Entry.Aliases),
+            w.Entry.DisplayName,
+            w.Entry.Description,
+            w.Version,
         });
 
         _interaction.WriteTable(["Package", "Aliases", "Name", "Description", "Version"], rows);
-        return Task.FromResult(0);
+        return 0;
     }
 }

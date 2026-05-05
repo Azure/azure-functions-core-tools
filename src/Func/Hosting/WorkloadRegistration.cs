@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -11,20 +10,19 @@ namespace Azure.Functions.Cli.Hosting;
 /// the global manifest at <c>~/.azure-functions/workloads.json</c>, loads
 /// each workload's entry-point assembly into its own
 /// <see cref="System.Runtime.Loader.AssemblyLoadContext"/>, instantiates the
-/// type named in the per-package <c>workload.json</c>, and invokes
+/// type identified by <c>[assembly: ExportCliWorkload&lt;T&gt;]</c>, and invokes
 /// <see cref="IWorkload.Configure"/>.
 ///
-/// At this stage the loader/installer haven't landed yet.
-/// <see cref="RegisterWorkloads"/> registers an empty
-/// <see cref="WorkloadInfo"/> list so DI consumers (e.g.
-/// <c>func workload list</c>) get a deterministic empty result; the real
-/// loader will replace this in a follow-up PR.
+/// At this stage the loader hasn't landed yet, so <see cref="RegisterWorkloads"/>
+/// is a no-op. Commands that only need to enumerate installed workloads
+/// (e.g. <c>func workload list</c>) read the global manifest directly via
+/// <see cref="Workloads.Storage.IGlobalManifestStore"/>; they don't need the
+/// loader at all.
 /// </summary>
 internal static class WorkloadRegistration
 {
     public static void RegisterWorkloads(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>());
     }
 }
