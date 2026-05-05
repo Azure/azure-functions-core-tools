@@ -98,6 +98,34 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart
                 }
             }
 
+            // The default dotnet-isolated template enables OpenTelemetry + Azure Monitor,
+            // which (a) requires APPLICATIONINSIGHTS_CONNECTION_STRING and (b) routes user
+            // ILogger output to OTel exporters instead of host stdout. Strip both so user
+            // logs flow to the console where this test asserts on them.
+            string programPath = Path.Combine(WorkingDirectory, "Program.cs");
+            string programContent = """
+                using Microsoft.Azure.Functions.Worker.Builder;
+                using Microsoft.Extensions.Hosting;
+
+                var builder = FunctionsApplication.CreateBuilder(args);
+                builder.ConfigureFunctionsWebApplication();
+                builder.Build().Run();
+                """;
+            File.WriteAllText(programPath, programContent);
+
+            string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
+            string hostJsonContent = """
+                {
+                    "version": "2.0",
+                    "logging": {
+                        "logLevel": {
+                            "default": "Information"
+                        }
+                    }
+                }
+                """;
+            File.WriteAllText(hostJsonPath, hostJsonContent);
+
             // Execute the function
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
