@@ -49,30 +49,166 @@
 
 ### 4.1 `func workload` — package management
 
-| Command                                | Behavior                                                          |
-|----------------------------------------|-------------------------------------------------------------------|
-| `func workload list`                   | List installed workloads with id, version, capabilities, install path. |
-| `func workload search [<query>]`       | Search the configured workload catalog (NuGet feed). Returns id, latest version, description. |
-| `func workload install <id> [--version <v>] [--from <path>]` | Acquire and install a workload. `--from` installs from a local path/feed for development. |
-| `func workload uninstall <id> [--all-versions]` | Remove an installed workload. By default removes only the active version. |
-| `func workload update [<id>] [--all]` | Update one or all workloads to the latest compatible version.     |
+#### `func workload list`
 
-**Required behaviors:**
+```
+func workload list [--all-versions] [--json]
+```
 
-- All commands must be **non-interactive** when given complete arguments and
-  must exit with a non-zero code on failure.
-- `install`, `uninstall`, `update` must be **idempotent**: re-running with
-  the same effective state must succeed without error.
-- A failed install must leave no partial state on disk (atomic move into
-  the install root, or rollback).
-- Concurrent invocations must not corrupt the workload store. (Cross-
-  process locking on the install root.)
+Lists installed workloads with id, version, capabilities, and install path.
+
+##### Options
+
+- `--all-versions`
+  - Lists every installed version of every workload. Default: only the
+    active version per workload is shown.
+- `--json`
+  - Emits machine-readable JSON output instead of the default
+    human-readable table. Required for scripting.
+
+#### `func workload search`
+
+```
+func workload search [<query>] [--source <path>] [--include-prereleases] [--json]
+```
+
+Searches the configured workload catalog (NuGet feed by default) and
+returns id, latest version, and description for matching packages.
+
+##### Arguments
+
+- `<query>`
+  - Optional free-form search string. When omitted, returns all packages
+    in the catalog declaring the `FuncCliWorkload` package type.
+
+##### Options
+
+- `--source <path>`
+  - Queries an alternate feed (URL or local path) instead of the
+    configured default catalog.
+- `--include-prereleases`
+  - Includes pre-release versions in the results. Default: stable only.
+- `--json`
+  - Emits machine-readable JSON output.
+
+#### `func workload install`
+
+```
+func workload install <id> [--version <v>] [--source <path>] [--exact|-e] [--include-prereleases]
+```
+
+Acquires and installs a workload. See §6.1 for the full install pipeline.
+
+##### Arguments
+
+- `<id>`
+  - Required. Matched as an `alias:<name>` tag by default (see §5.3 and
+    §6.1 for the resolution flow). With `--exact`, must be the literal
+    package id.
+
+##### Options
+
+- `--version <v>`
+  - Installs the specified semver version. Default: the latest stable
+    version available in the catalog. Combine with
+    `--include-prereleases` to allow pre-release versions when resolving
+    "latest".
+- `--source <path>`
+  - Installs from a local path or alternate feed (e.g. for development
+    or internal mirrors) instead of the configured default catalog.
+- `--exact` / `-e`
+  - Disables alias matching. `<id>` must be the literal package id
+    (case-insensitive). Use when an alias collides across multiple
+    packages or when scripting against a known id.
+- `--include-prereleases`
+  - Allows pre-release versions to be selected when resolving "latest".
+    Default: stable only.
+
+#### `func workload uninstall`
+
+```
+func workload uninstall <id> [--version <v>] [--all-versions]
+```
+
+Removes an installed workload. By default removes only the active version.
+
+##### Arguments
+
+- `<id>`
+  - Required. The workload to remove. Resolved using the same alias
+    rules as `install`.
+
+##### Options
+
+- `--version <v>`
+  - Removes a specific installed version. Useful for cleaning up old
+    side-by-side installs without affecting the active version.
+- `--all-versions`
+  - Removes every installed version of the workload. Mutually exclusive
+    with `--version`.
+
+#### `func workload update`
+
+```
+func workload update [<id>] [--all] [--major] [--prune] [--source <path>] [--include-prereleases]
+```
+
+Updates one or all workloads to the latest compatible version. Default
+is "same major version only". The new version is installed side-by-side
+and the active pointer is swapped atomically (see §6.4).
+
+##### Arguments
+
+- `<id>`
+  - Optional. Updates a single workload. Mutually exclusive with
+    `--all`. Omitting both `<id>` and `--all` is an error.
+
+##### Options
+
+- `--all`
+  - Updates every installed workload. Mutually exclusive with `<id>`.
+- `--major`
+  - Allows crossing a major-version boundary. Default: same major
+    version only, to protect against breaking changes.
+- `--prune`
+  - Deletes superseded versions from disk after a successful swap.
+    Default: keep prior versions to allow rollback (see §6.4).
+- `--source <path>`
+  - Resolves updates from an alternate feed instead of the configured
+    default catalog.
+- `--include-prereleases`
+  - Allows pre-release versions to be selected when resolving "latest".
+    Default: stable only.
+
+#### Required behaviors (all `func workload` commands)
+
+- All commands must be **non-interactive** when given complete arguments
+  and must exit with a non-zero code on failure.
+- `install`, `uninstall`, `update` must be **idempotent**: re-running
+  with the same effective state must succeed without error.
+- A failed install must leave no partial state on disk (atomic move
+  into the install root, or rollback).
+- Concurrent invocations must not corrupt the workload store
+  (cross-process locking on the install root).
 
 ### 4.2 `func init` — scaffold a project
 
 - If no workload is installed for the requested runtime, the Func CLI **must**
   print an actionable hint with the exact command to install one (e.g.
   `func workload install python`) and exit with a clear error.
+- The CLI determines the suggested workload using, in order:
+  1. An explicit `--stack <name>` flag, if provided.
+  2. `FUNCTIONS_WORKER_RUNTIME` from `local.settings.json`, if present.
+  3. Lightweight project-marker detection (e.g. presence of `*.csproj`,
+     `requirements.txt`, `package.json`) to make a best-effort guess.
+- If detection is ambiguous or yields no signal, the hint **must** list the
+  canonical install command for each known stack rather than guessing.
+- The CLI **must** maintain a curated map of v4 subcommands that have moved
+  into workloads (e.g. `func azure …`, `func kubernetes …`, `func durable …`).
+  When a user invokes one of these on v5 without the corresponding workload
+  installed, the CLI prints: "`<cmd>` is now provided by a workload. Install
+  it with `func workload install <id>`." This guarantees a clean upgrade
+  path from v4 muscle memory.
 - If a workload is installed, the Func CLI delegates project scaffolding to it.
 - If `--stack` is omitted, the Func CLI **may** prompt or auto-select
   based on installed workloads. Behavior must be consistent across
@@ -162,18 +298,49 @@ the workload registers means it participates in the corresponding command:
 | Service registered                | The workload can…                                          | Used by                          |
 |-----------------------------------|-----------------------------------------------------------|----------------------------------|
 | `IProjectInitializer`             | Scaffold a new project for a given worker runtime.        | `func init`                      |
-| `IProjectDetector`                | Decide whether a directory is "its" project.              | `func pack` directory routing    |
+| `IProjectDetector`                | Decide whether a directory is "its" project.              | `func init`, `func new`, `func pack`, `func start` (workload resolution) |
 | `ITemplateProvider`               | Enumerate and materialize templates.                      | `func new`                       |
 | `IPackProvider`                   | Build & package the project.                              | `func pack`                      |
 | `IExternalCommand`                | Register additional CLI commands (e.g. `func durable …`). | Feature workloads                |
 | `IHostRuntimeLauncher`            | Launch the Functions host runtime process.                | `func start` (host workload)     |
 
 The exact interface names and shapes are documented in
-[`building-a-workload.md`](./building-a-workload.md). Adding a new
-contribution point is an additive change to `Func.Cli.Abstractions`
-(no manifest field to coordinate, no schema bump).
+[`building-a-workload.md`](./building-a-workload.md). That document is
+currently stale and will be refreshed alongside the first contract
+revision; detailed interface signatures are deliberately out of scope
+for this spec. Adding a new contribution point is an additive change
+to `Func.Cli.Abstractions` (no manifest field to coordinate, no schema
+bump).
 
-### 5.2 Package metadata
+### 5.2 Workload resolution
+
+For commands that act on a project (`init`, `new`, `pack`, `start`), the
+CLI must determine which installed workload owns the current directory.
+Resolution proceeds in this order:
+
+1. **Explicit selector.** A `--stack <name>` flag (or equivalent
+   command-specific flag) wins.
+2. **`FUNCTIONS_WORKER_RUNTIME`** in `local.settings.json`, mapped to
+   the workload that registered itself for that runtime.
+3. **`IProjectDetector`.** The CLI invokes every registered detector
+   against the working directory:
+   - **Pre-filter:** the CLI applies project-marker globs (declared by
+     the workload's `IProjectDetector` registration) before invoking
+     the detector. Workloads with no markers are always candidates.
+   - **Detection:** the workload's `IProjectDetector` returns a
+     confidence (`yes` / `no` / `maybe`) plus an optional reason string.
+   - **Tie-breaking:**
+     - Exactly one `yes` → that workload owns the command.
+     - Zero matches → the CLI prints an actionable error (and, for
+       `init`, falls back to prompting or listing available workloads).
+     - Multiple `yes` results → the CLI errors with the list and asks
+       the user to disambiguate via `--stack`.
+
+`IProjectDetector` is therefore **not** specific to `pack`; it is the
+shared mechanism for any command that needs to bind to a workload from
+a directory. The §5.1 table reflects this.
+
+### 5.3 Package metadata
 
 Workload packages do **not** ship a per-package manifest file. The
 metadata the CLI needs is split between two sources:
@@ -184,15 +351,28 @@ metadata the CLI needs is split between two sources:
     - `version` → semver, the workload version.
     - `title` → display name shown in `func workload list`.
     - `description` → one-line summary shown in `func workload list`.
-    - `tags` → space-separated short aliases (e.g. `dotnet csharp`)
-      the user can pass to `install` / `uninstall` instead of the full id.
+    - `tags` → NuGet tags. The CLI gives meaning to two reserved tag
+      conventions; all other tags are treated as free-form metadata
+      for search ranking only:
+        - `func-workload` → **required** for discoverability. The
+          catalog query filters by this tag to enumerate Functions
+          workloads (complementing the `FuncCliWorkload` package type,
+          which is authoritative but not always exposed by every feed
+          UI).
+        - `alias:<name>` → declares a short alias (e.g. `alias:python`)
+          that the user can pass to `install` / `uninstall` / `update`
+          instead of the full package id. A workload may declare
+          multiple aliases. Aliases must be lowercase, NuGet-tag-safe,
+          and globally unique within the catalog; install fails if
+          multiple matched packages declare the same alias and the
+          user did not pass an exact id (see §6 install flow).
     - `packageTypes` → **must** include a `FuncCliWorkload` entry. This
       is how the CLI (and the catalog) distinguish workload packages
       from arbitrary NuGets. Packages without this package type are
       rejected at install time and excluded from `func workload search`
       results. Modeled on the .NET CLI's `DotnetTool` package type
       (e.g. `?packageType=dotnettool` on the NuGet search API).
-2. **Assembly attribute** — `[assembly: ExportCliWorkload<T>]` declares
+2. **Assembly attribute** — `[assembly: CliWorkload<T>]` declares
    the entry-point type. The install pipeline scans for it once and
    records `(assembly path, type FQN)` in the global manifest.
 
@@ -200,16 +380,6 @@ The CLI persists everything it needs for startup in a single
 **global manifest** at `~/.azure-functions/workloads.json` (see §6.1).
 Workload authors never touch this file; it is owned by `func workload
 install` / `uninstall`.
-
-### 5.3 Project detection
-
-- Pre-filter: the Func CLI applies project-marker globs (declared by
-  the workload's `IProjectDetector` registration) before invoking the
-  detector. Workloads with no markers are always candidates.
-- Detection: the workload's `IProjectDetector` returns a confidence
-  (`yes` / `no` / `maybe`) plus an optional reason string.
-- Tie-breaking: if multiple workloads return `yes`, the Func CLI errors
-  with the list and asks the user to disambiguate via `--stack`.
 
 ### 5.4 Versioning
 
@@ -223,13 +393,25 @@ install` / `uninstall`.
 ### 6.1 Install
 
 1. Resolve `<id>` to a package via the catalog (NuGet by default),
-   filtered to packages declaring the `FuncCliWorkload` package type.
+   filtered to packages declaring the `FuncCliWorkload` package type:
+   - **Alias path** (default): the resolver queries the catalog for
+     packages whose tags include `alias:<id>`.
+       - Exactly one match → install it.
+       - Zero matches → fall back to exact-match-by-id. If that also
+         finds nothing, fail with an actionable error listing close
+         matches.
+       - Multiple matches → fail and list the matched package ids;
+         the user must re-run with `--exact <packageId>`.
+   - **Exact path** (`--exact` / `-e`): the resolver targets exactly
+     `<id>` as a literal package id (case-insensitive). No alias
+     matching is performed. Fails if no such package exists in the
+     catalog.
 2. Download to a staging directory.
 3. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`,
    `packageTypes`). Reject the package if `FuncCliWorkload` is not
    among its declared package types.
 4. Scan the package's top-level assemblies for `[assembly:
-   ExportCliWorkload<T>]`. Exactly one assembly must declare it; zero
+   CliWorkload<T>]`. Exactly one assembly must declare it; zero
    or multiple is a fatal install error.
 5. Atomically move into `~/.azure-functions/workloads/<id>/<version>/`.
 6. Update the global manifest `~/.azure-functions/workloads.json`,
@@ -284,7 +466,7 @@ install` / `uninstall`.
   python (1.2.3) is available. Run 'func workload update python' to
   upgrade.`).
 - Frequency: at most once per 24h. Network failures must be silent.
-- Disabled by `FUNCTIONS_DISABLE_WORKLOAD_UPDATE_CHECK=1`.
+- Disabled by `FUNC_CLI_DISABLE_WORKLOAD_UPDATE_CHECK=1`.
 
 ## 7. Error handling requirements
 
@@ -361,8 +543,10 @@ CLIs can coexist on disk without one silently corrupting the other.
   (success / user-error / workload-error / cli-error), `duration`.
 - Workloads **may** emit their own telemetry but **must not** propagate
   user-identifying data through the Func CLI.
-- Telemetry is opt-out via the existing `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT`
-  environment variable.
+- Telemetry is opt-out via `FUNC_CLI_TELEMETRY_OPTOUT=1`. For
+  back-compat with v4, the legacy `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT`
+  environment variable is also honored; if both are set, either being
+  truthy disables telemetry.
 
 ## 12. Open questions
 
