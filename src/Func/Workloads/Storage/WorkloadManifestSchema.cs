@@ -25,7 +25,7 @@ internal static class WorkloadManifestSchema
     /// reference a stable identifier that does not move when
     /// <see cref="CurrentSchema"/> is bumped.
     /// </summary>
-    public const string V1Schema = "https://aka.ms/func-workloads/v1/schema.json";
+    public const string V1Schema = "https://aka.ms/func/workloads/v1/schema.json";
 
     /// <summary>
     /// Current schema URL written into newly-saved manifests. Bump the

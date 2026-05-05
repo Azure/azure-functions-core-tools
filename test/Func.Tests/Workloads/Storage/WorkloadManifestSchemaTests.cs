@@ -91,7 +91,7 @@ public class WorkloadManifestSchemaTests : IDisposable
     {
         await WriteRawManifestAsync("""
             {
-              "$schema": "https://aka.ms/func-workloads/v999/schema.json",
+              "$schema": "https://aka.ms/func/workloads/v999/schema.json",
               "workloads": {}
             }
             """);
