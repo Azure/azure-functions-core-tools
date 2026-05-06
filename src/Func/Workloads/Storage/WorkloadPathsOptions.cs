@@ -18,9 +18,9 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 internal sealed class WorkloadPathsOptions : IWorkloadPaths
 {
     /// <summary>
-    /// Filename of the global workload manifest within <see cref="Home"/>.
+    /// Filename of the global workload registry within <see cref="Home"/>.
     /// </summary>
-    public const string GlobalManifestFileName = "workloads.json";
+    public const string WorkloadRegistryFileName = "workloads.json";
 
     /// <summary>
     /// Root directory the func CLI persists workloads under. Defaults to
@@ -34,7 +34,7 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     public string WorkloadsRoot => Path.Combine(Home, "workloads");
 
     /// <inheritdoc />
-    public string GlobalManifestPath => Path.Combine(Home, GlobalManifestFileName);
+    public string WorkloadRegistryPath => Path.Combine(Home, WorkloadRegistryFileName);
 
     /// <inheritdoc />
     public string GetInstallDirectory(string packageId, string version)

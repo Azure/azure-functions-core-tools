@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// generic <see cref="InvalidOperationException"/>.
 ///
 /// Internal because the throw sites all run inside <see cref="ExternalCommand"/>
-/// after the workload's <see cref="IWorkload.Configure"/> has already returned;
+/// after the workload's <see cref="Workload.Configure"/> has already returned;
 /// workload code is never on the call stack and does not need to catch this.
 /// </summary>
 internal sealed class WorkloadOperationException : Exception

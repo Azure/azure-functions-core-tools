@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -12,8 +13,8 @@ using NSubstitute;
 namespace Azure.Functions.Cli.Tests;
 
 /// <summary>
-/// Test helper that builds the same DI shape Program.cs builds at runtime —
-/// built-in commands + an empty workload list — so tests can call
+/// Test helper that builds the same DI shape Program.cs builds at runtime,
+/// built-in commands plus an empty workload list, so tests can call
 /// <see cref="Parser.CreateCommand"/> without standing up a host.
 /// </summary>
 internal static class TestParser
@@ -62,15 +63,20 @@ internal static class TestParser
         services.AddSingleton(interaction);
         services.AddBuiltInCommands();
 
-        // Stub manifest store so commands that depend on it (e.g.
-        // WorkloadListCommand) resolve without booting the storage subsystem.
-        // Tests that exercise listing register their own substitute.
-        var emptyStore = Substitute.For<IGlobalManifestStore>();
+        // Stub the workload subsystem so commands that depend on it (e.g.
+        // WorkloadListCommand) resolve without booting real storage / loading.
+        // Tests that exercise listing register their own substitutes.
+        IWorkloadStore emptyStore = Substitute.For<IWorkloadStore>();
         emptyStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<InstalledWorkload>());
+            .Returns(Array.Empty<WorkloadEntry>());
         services.AddSingleton(emptyStore);
+        services.AddSingleton(Substitute.For<IWorkloadLoader>());
+
+        IWorkloadProvider emptyProvider = Substitute.For<IWorkloadProvider>();
+        emptyProvider.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>()));
+        services.AddSingleton(emptyProvider);
 
         return services;
     }
 }
-

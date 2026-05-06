@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Xunit;
 
@@ -12,15 +13,15 @@ public class WorkloadManifestSchemaTests : IDisposable
     private const string V1Schema = WorkloadManifestSchema.V1Schema;
 
     private readonly string _tempHome;
-    private readonly GlobalManifestStore _store;
-    private readonly string _manifestPath;
+    private readonly WorkloadStore _store;
+    private readonly string _registryPath;
 
     public WorkloadManifestSchemaTests()
     {
         _tempHome = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         var paths = new WorkloadPathsOptions { Home = _tempHome };
-        _store = new GlobalManifestStore(paths);
-        _manifestPath = paths.GlobalManifestPath;
+        _store = new WorkloadStore(paths);
+        _registryPath = paths.WorkloadRegistryPath;
     }
 
     public void Dispose()
@@ -40,63 +41,64 @@ public class WorkloadManifestSchemaTests : IDisposable
     [Fact]
     public async Task SaveWorkload_WritesSchemaUrlAtTopOfDocument()
     {
-        await _store.SaveWorkloadAsync("Azure.Functions.Cli.Workload.Stub", "1.0.0", NewEntry());
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Stub", "1.0.0"));
 
-        var json = await File.ReadAllTextAsync(_manifestPath);
+        string json = await File.ReadAllTextAsync(_registryPath);
 
         Assert.Contains($"\"$schema\":\"{V1Schema}\"", json);
-        var schemaIdx = json.IndexOf("\"$schema\"", StringComparison.Ordinal);
-        var workloadsIdx = json.IndexOf("\"workloads\"", StringComparison.Ordinal);
+        int schemaIdx = json.IndexOf("\"$schema\"", StringComparison.Ordinal);
+        int workloadsIdx = json.IndexOf("\"workloads\"", StringComparison.Ordinal);
         Assert.True(schemaIdx >= 0 && workloadsIdx >= 0);
         Assert.True(schemaIdx < workloadsIdx, "$schema must appear before workloads.");
     }
 
     [Fact]
-    public async Task GetWorkloads_AcceptsManifest_WithKnownSchemaUrl()
+    public async Task GetWorkloads_AcceptsRegistry_WithKnownSchemaUrl()
     {
-        await WriteRawManifestAsync($$"""
+        await WriteRawRegistryAsync($$"""
             {
               "$schema":"{{V1Schema}}",
-              "workloads": {
-                "Pkg": { "1.0.0": { "displayName": "Pkg", "installPath": "/x", "entryPoint": { "assembly": "X.dll", "type": "X" } } }
-              }
+              "workloads": [
+                { "packageId": "Pkg", "packageVersion": "1.0.0", "entryPoint": { "assemblyPath": "X.dll", "type": "X" } }
+              ]
             }
             """);
 
-        var workloads = await _store.GetWorkloadsAsync();
+        IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync();
 
         Assert.Single(workloads);
     }
 
     [Fact]
-    public async Task GetWorkloads_AcceptsManifest_WithMissingSchema_AsLegacyV1()
+    public async Task GetWorkloads_AcceptsRegistry_WithMissingSchema_AsLegacyV1()
     {
-        // Manifests written before $schema landed must still load. They are
+        // Registries written before $schema landed must still load. They are
         // implicitly v1 and re-emitted with the field on next write.
-        await WriteRawManifestAsync("""
+        await WriteRawRegistryAsync("""
             {
-              "workloads": {
-                "Pkg": { "1.0.0": { "displayName": "Pkg", "installPath": "/x", "entryPoint": { "assembly": "X.dll", "type": "X" } } }
-              }
+              "workloads": [
+                { "packageId": "Pkg", "packageVersion": "1.0.0", "entryPoint": { "assemblyPath": "X.dll", "type": "X" } }
+              ]
             }
             """);
 
-        var workloads = await _store.GetWorkloadsAsync();
+        IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync();
 
         Assert.Single(workloads);
     }
 
     [Fact]
-    public async Task GetWorkloads_RejectsManifest_WithUnknownSchemaUrl()
+    public async Task GetWorkloads_RejectsRegistry_WithUnknownSchemaUrl()
     {
-        await WriteRawManifestAsync("""
+        await WriteRawRegistryAsync("""
             {
               "$schema": "https://aka.ms/func/workloads/v999/schema.json",
-              "workloads": {}
+              "workloads": []
             }
             """);
 
-        var ex = await Assert.ThrowsAsync<GracefulException>(() => _store.GetWorkloadsAsync());
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => _store.GetWorkloadsAsync());
 
         Assert.True(ex.IsUserError);
         Assert.Contains("v999", ex.Message);
@@ -109,25 +111,25 @@ public class WorkloadManifestSchemaTests : IDisposable
     [Fact]
     public async Task RoundTrip_PreservesSchemaUrl()
     {
-        await _store.SaveWorkloadAsync("Pkg", "1.0.0", NewEntry());
+        await _store.SaveWorkloadAsync(NewEntry("Pkg", "1.0.0"));
         await _store.GetWorkloadsAsync();
-        await _store.SaveWorkloadAsync("Pkg2", "2.0.0", NewEntry());
+        await _store.SaveWorkloadAsync(NewEntry("Pkg2", "2.0.0"));
 
-        var json = await File.ReadAllTextAsync(_manifestPath);
+        string json = await File.ReadAllTextAsync(_registryPath);
 
         Assert.Contains($"\"$schema\":\"{V1Schema}\"", json);
     }
 
-    private static GlobalManifestEntry NewEntry() => new()
+    private static WorkloadEntry NewEntry(string packageId, string version) => new()
     {
-        DisplayName = "Stub",
-        InstallPath = "/installs/stub",
-        EntryPoint = new EntryPointSpec { Assembly = "Stub.dll", Type = "Stub" },
+        PackageId = packageId,
+        PackageVersion = version,
+        EntryPoint = new EntryPointSpec { AssemblyPath = "Stub.dll", Type = "Stub" },
     };
 
-    private async Task WriteRawManifestAsync(string json)
+    private async Task WriteRawRegistryAsync(string json)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_manifestPath)!);
-        await File.WriteAllTextAsync(_manifestPath, json);
+        Directory.CreateDirectory(Path.GetDirectoryName(_registryPath)!);
+        await File.WriteAllTextAsync(_registryPath, json);
     }
 }

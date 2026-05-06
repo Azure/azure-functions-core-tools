@@ -1,0 +1,6 @@
+{
+  "entryPoint": {
+    "assemblyPath": "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk.dll",
+    "type": "Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk.StubWorkload"
+  }
+}

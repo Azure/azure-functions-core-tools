@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Hosting;
 /// Default <see cref="FunctionsCliBuilder"/> implementation. Internal so
 /// workloads only see the abstract base type.
 ///
-/// Each invocation of <see cref="IWorkload.Configure"/> gets its own instance
+/// Each invocation of <see cref="Workload.Configure"/> gets its own instance
 /// constructed with the corresponding <see cref="WorkloadInfo"/>; the
 /// underlying <see cref="IServiceCollection"/> is the same global container
 /// the host uses, so workloads contributing the same service interface all
@@ -58,7 +58,7 @@ internal sealed class DefaultFunctionsCliBuilder : FunctionsCliBuilder
     private WorkloadInfo RequireWorkload()
         => _workload ?? throw new InvalidOperationException(
             "Commands can only be registered through a workload-scoped builder. " +
-            "RegisterCommand is invoked by the workload loader during IWorkload.Configure; " +
+            "RegisterCommand is invoked by the workload loader during Workload.Configure; " +
             "calling it on the host's global builder is a CLI bug.");
 }
 

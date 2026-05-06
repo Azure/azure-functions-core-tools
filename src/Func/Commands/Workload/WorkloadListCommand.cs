@@ -3,26 +3,30 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
-using Azure.Functions.Cli.Workloads.Storage;
+using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
-/// Lists workloads recorded in the global manifest. Reads directly from
-/// <see cref="IGlobalManifestStore"/> so listing works without invoking the
-/// workload loader (no assembly loads, no ALC creation).
+/// Lists workloads recorded in the global registry. Reads from the cached
+/// <see cref="WorkloadInfo"/> list materialized by
+/// <see cref="IWorkloadProvider"/> so display name and description come from
+/// each loaded <see cref="Workloads.Workload"/> instance and the file-backed
+/// registry isn't re-read on every invocation.
 /// </summary>
-internal sealed class WorkloadListCommand(IInteractionService interaction, IGlobalManifestStore store)
+internal sealed class WorkloadListCommand(
+    IInteractionService interaction,
+    IWorkloadProvider workloads)
     : FuncCliCommand("list", "List installed workloads.")
 {
     private const string AliasesPlaceholder = "-";
 
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
-    private readonly IGlobalManifestStore _store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var workloads = await _store.GetWorkloadsAsync(cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<WorkloadInfo> workloads = await _workloads.GetWorkloadsAsync(cancellationToken);
 
         if (workloads.Count == 0)
         {
@@ -30,13 +34,13 @@ internal sealed class WorkloadListCommand(IInteractionService interaction, IGlob
             return 0;
         }
 
-        var rows = workloads.Select(w => new[]
+        IEnumerable<string[]> rows = workloads.Select(w => new[]
         {
             w.PackageId,
-            w.Entry.Aliases.Count == 0 ? AliasesPlaceholder : string.Join(", ", w.Entry.Aliases),
-            w.Entry.DisplayName,
-            w.Entry.Description,
-            w.Version,
+            w.Aliases.Count == 0 ? AliasesPlaceholder : string.Join(", ", w.Aliases),
+            w.Instance.DisplayName,
+            w.Instance.Description,
+            w.PackageVersion,
         });
 
         _interaction.WriteTable(["Package", "Aliases", "Name", "Description", "Version"], rows);

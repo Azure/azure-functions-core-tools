@@ -91,6 +91,10 @@ the full CLI.
   changes.
 - Follow the existing `stylecop.json` / analyzer rules. Don't disable analyzers
   to silence warnings, fix the underlying issue.
+- Use `var` only when the type is obvious from the right-hand side (e.g.
+  `new T(...)`, a cast, or a literal). When the type is hidden behind a method
+  or property call, write the type explicitly so readers don't have to chase
+  the API to know what they're holding.
 - Keep changes minimal and surgical. User-visible behavior changes must be
   flagged explicitly in the PR description.
 

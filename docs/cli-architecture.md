@@ -244,7 +244,7 @@ Build commands (Parser.CreateCommand):
   │   built-ins or with each other are skipped with a warning that names the
   │   workload(s)
   ├── InitCommand sees IEnumerable<IProjectInitializer>, attaches their options
-  ├── WorkloadListCommand sees IReadOnlyList<WorkloadInfo>
+  ├── WorkloadListCommand depends on IWorkloadProvider
   └── HelpCommand built last with a back-reference to the constructed root
 
 Invoke (when the user runs a command):
@@ -254,7 +254,7 @@ Invoke (when the user runs a command):
 
 ### Empty State (Today)
 
-Until the loader lands, `WorkloadRegistration.RegisterWorkloads` registers an empty `IReadOnlyList<WorkloadInfo>`. With no workloads installed:
+Until any workload SDK lands, no `workloads.json` exists in `~/.azure-functions/`, so `IWorkloadProvider.GetWorkloadsAsync` resolves to an empty list. With no workloads installed:
 
 - `func workload list` prints `No workloads installed.`
 - `func init` prints "No stacks installed." and a hint to install one (exit code 1).
