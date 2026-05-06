@@ -88,6 +88,90 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             GoHelpers.AssertGoVersion(worker);
         }
+
+        [Fact]
+        public void AssertBinaryExists_BinaryPresent_DoesNotThrow()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-test-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var binaryName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? "app.exe"
+                    : "app";
+                File.WriteAllText(Path.Combine(dir, binaryName), "stub");
+
+                var action = () => GoHelpers.AssertBinaryExists(dir);
+                action.Should().NotThrow();
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void AssertBinaryExists_BinaryMissing_ThrowsActionableCliException()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-test-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var action = () => GoHelpers.AssertBinaryExists(dir);
+
+                action.Should().Throw<CliException>()
+                    .Which.Message.Should().Contain("Could not find a built Go binary")
+                                  .And.Contain("--no-build")
+                                  .And.Contain("go build");
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [SkipIfGoNonExistFact]
+        public async Task BuildProject_ValidProject_ProducesBinary()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-build-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "go.mod"), "module example.com/test\n\ngo 1.24\n");
+                File.WriteAllText(Path.Combine(dir, "main.go"), "package main\n\nfunc main() {}\n");
+
+                await GoHelpers.BuildProject(dir);
+
+                var binaryName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? "app.exe"
+                    : "app";
+                File.Exists(Path.Combine(dir, binaryName)).Should().BeTrue("BuildProject should produce the worker binary");
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [SkipIfGoNonExistFact]
+        public async Task BuildProject_InvalidProject_ThrowsCliException()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-build-fail-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "go.mod"), "module example.com/test\n\ngo 1.24\n");
+                File.WriteAllText(Path.Combine(dir, "main.go"), "package main\n\nthis is not valid go\n");
+
+                Func<Task> act = () => GoHelpers.BuildProject(dir);
+                var ex = await Assert.ThrowsAsync<CliException>(act);
+                ex.Message.Should().Contain("Go build failed");
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
     }
 
     public sealed class SkipIfGoNonExistFact : FactAttribute
