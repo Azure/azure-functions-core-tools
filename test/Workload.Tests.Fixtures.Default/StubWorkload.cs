@@ -7,10 +7,6 @@ namespace Azure.Functions.Cli.Workload.Tests.Fixtures.Default;
 
 public sealed class StubWorkload : Workloads.Workload
 {
-    public override string Name => "Azure.Functions.Cli.Workload.Tests.Fixtures.Default";
-
-    public override string Version => "1.0.0";
-
     public override string DisplayName => "Stub";
 
     public override string Description => "Test fixture workload.";

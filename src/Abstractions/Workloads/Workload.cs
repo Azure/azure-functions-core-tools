@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Reflection;
-
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
@@ -18,53 +16,14 @@ namespace Azure.Functions.Cli.Workloads;
 /// Abstract class (rather than an interface) so we can grow the surface with
 /// new properties or virtual members without breaking existing workloads.
 /// </summary>
+/// <remarks>
+/// The workload's identity (package id, version, aliases) is supplied by the
+/// NuGet package's nuspec at install time and persisted in the global
+/// registry, so the type itself only needs to describe its CLI presentation
+/// and wire up its services.
+/// </remarks>
 public abstract class Workload
 {
-    /// <summary>
-    /// Globally unique workload identifier, typically the assembly / NuGet
-    /// package name (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>).
-    /// </summary>
-    public abstract string Name { get; }
-
-    /// <summary>
-    /// Workload version. Defaults to the workload assembly's
-    /// <see cref="System.Reflection.AssemblyInformationalVersionAttribute"/>
-    /// (falling back to <see cref="System.Reflection.AssemblyFileVersionAttribute"/>
-    /// and then <see cref="System.Reflection.AssemblyName.Version"/>), so
-    /// most workloads can leave this alone and let the build supply the
-    /// version. Override to author the version on the workload itself when
-    /// the running code should be the source of truth. Should be a valid
-    /// SemVer 2.0 string (e.g. <c>"1.2.3"</c>, <c>"1.2.3-preview.1"</c>);
-    /// the CLI does not currently enforce or normalize the format.
-    /// </summary>
-    public virtual string Version
-    {
-        get
-        {
-            Assembly assembly = GetType().Assembly;
-
-            string? informational = assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion;
-            if (!string.IsNullOrWhiteSpace(informational))
-            {
-                // Strip any +sha build metadata so callers see a clean SemVer string.
-                int plus = informational.IndexOf('+');
-                return plus >= 0 ? informational[..plus] : informational;
-            }
-
-            string? file = assembly
-                .GetCustomAttribute<AssemblyFileVersionAttribute>()
-                ?.Version;
-            if (!string.IsNullOrWhiteSpace(file))
-            {
-                return file;
-            }
-
-            return assembly.GetName().Version?.ToString() ?? "0.0.0";
-        }
-    }
-
     /// <summary>
     /// Human-readable name shown in <c>func workload list</c>.
     /// </summary>

@@ -14,25 +14,26 @@ internal static class TestWorkloads
     public static WorkloadInfo CreateInfo(
         string packageId = "Test.Workload.A",
         string version = "1.0.0")
-        => new(
-            Instance: new TestWorkload(packageId, version),
+    {
+        var instance = new TestWorkload(packageId);
+        return new WorkloadInfo(
+            Instance: instance,
             PackageId: packageId,
             PackageVersion: version,
-            Aliases: Array.Empty<string>());
+            Aliases: Array.Empty<string>(),
+            DisplayName: instance.DisplayName,
+            Description: instance.Description);
+    }
 
     /// <summary>
     /// Minimal <see cref="Workloads.Workload"/> used by tests that need a
     /// runtime instance to back a <see cref="WorkloadInfo"/>.
     /// </summary>
-    private sealed class TestWorkload(string name, string version) : global::Azure.Functions.Cli.Workloads.Workload
+    private sealed class TestWorkload(string name) : global::Azure.Functions.Cli.Workloads.Workload
     {
-        public override string Name { get; } = name;
+        public override string DisplayName { get; } = name;
 
-        public override string Version { get; } = version;
-
-        public override string DisplayName => Name;
-
-        public override string Description => $"{Name} for tests";
+        public override string Description => $"{DisplayName} for tests";
 
         public override void Configure(FunctionsCliBuilder builder)
         {

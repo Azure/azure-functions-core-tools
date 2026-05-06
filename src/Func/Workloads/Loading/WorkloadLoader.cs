@@ -79,6 +79,8 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
             Instance: instance,
             PackageId: entry.PackageId,
             PackageVersion: entry.PackageVersion,
-            Aliases: entry.Aliases);
+            Aliases: entry.Aliases,
+            DisplayName: instance.DisplayName,
+            Description: instance.Description);
     }
 }

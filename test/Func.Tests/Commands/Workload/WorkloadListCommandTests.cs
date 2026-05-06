@@ -30,18 +30,18 @@ public class WorkloadListCommandTests
     {
         var workloads = new[]
         {
-            new WorkloadInfo(
-                Instance: new FakeWorkload(displayName: ".NET", description: "C# / F# workload."),
-                PackageId: "Azure.Functions.Cli.Workload.Dotnet",
-                PackageVersion: "1.0.0",
-                Aliases: new[] { "dotnet", "dotnet-isolated" }),
+            NewInfo(
+                instance: new FakeWorkload(displayName: ".NET", description: "C# / F# workload."),
+                packageId: "Azure.Functions.Cli.Workload.Dotnet",
+                packageVersion: "1.0.0",
+                aliases: new[] { "dotnet", "dotnet-isolated" }),
         };
 
         var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
-        Assert.Contains("TABLE: [Package, Aliases, Name, Description, Version]", _interaction.Lines);
+        Assert.Contains("TABLE: [ID, Aliases, Display Name, Description, Version]", _interaction.Lines);
         Assert.Contains(
             "  ROW: [Azure.Functions.Cli.Workload.Dotnet, dotnet, dotnet-isolated, .NET, C# / F# workload., 1.0.0]",
             _interaction.Lines);
@@ -52,11 +52,11 @@ public class WorkloadListCommandTests
     {
         var workloads = new[]
         {
-            new WorkloadInfo(
-                Instance: new FakeWorkload(),
-                PackageId: "Azure.Functions.Cli.Workload.Custom",
-                PackageVersion: "0.1.0",
-                Aliases: Array.Empty<string>()),
+            NewInfo(
+                instance: new FakeWorkload(),
+                packageId: "Azure.Functions.Cli.Workload.Custom",
+                packageVersion: "0.1.0",
+                aliases: Array.Empty<string>()),
         };
 
         var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
@@ -72,9 +72,9 @@ public class WorkloadListCommandTests
     {
         var workloads = new[]
         {
-            new WorkloadInfo(new FakeWorkload(), "Pkg.A", "1.0.0", Array.Empty<string>()),
-            new WorkloadInfo(new FakeWorkload(), "Pkg.B", "2.0.0", Array.Empty<string>()),
-            new WorkloadInfo(new FakeWorkload(), "Pkg.A", "1.1.0", Array.Empty<string>()),
+            NewInfo(new FakeWorkload(), "Pkg.A", "1.0.0", Array.Empty<string>()),
+            NewInfo(new FakeWorkload(), "Pkg.B", "2.0.0", Array.Empty<string>()),
+            NewInfo(new FakeWorkload(), "Pkg.A", "1.1.0", Array.Empty<string>()),
         };
 
         var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
@@ -92,6 +92,13 @@ public class WorkloadListCommandTests
         return provider;
     }
 
+    private static WorkloadInfo NewInfo(
+        FakeWorkload instance,
+        string packageId,
+        string packageVersion,
+        IReadOnlyList<string> aliases)
+        => new(instance, packageId, packageVersion, aliases, instance.DisplayName, instance.Description);
+
     private static Task<int> InvokeAsync(WorkloadListCommand cmd, params string[] args)
     {
         var root = new RootCommand();
@@ -103,10 +110,6 @@ public class WorkloadListCommandTests
         string displayName = "Test Workload",
         string description = "A workload for tests.") : global::Azure.Functions.Cli.Workloads.Workload
     {
-        public override string Name => "Fake";
-
-        public override string Version => "0.0.0";
-
         public override string DisplayName { get; } = displayName;
 
         public override string Description { get; } = description;
