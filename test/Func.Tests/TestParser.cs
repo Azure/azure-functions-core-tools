@@ -71,7 +71,11 @@ internal static class TestParser
             .Returns(Array.Empty<WorkloadEntry>());
         services.AddSingleton(emptyStore);
         services.AddSingleton(Substitute.For<IWorkloadLoader>());
-        services.AddSingleton<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>());
+
+        IWorkloadProvider emptyProvider = Substitute.For<IWorkloadProvider>();
+        emptyProvider.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>()));
+        services.AddSingleton(emptyProvider);
 
         return services;
     }

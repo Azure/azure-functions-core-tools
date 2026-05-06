@@ -35,8 +35,22 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
     private WorkloadInfo LoadEntry(WorkloadEntry entry)
     {
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-        string contentRoot = Path.Combine(installPath, WorkloadMetadataReader.ContentDirectoryName);
-        string assemblyPath = Path.Combine(contentRoot, entry.EntryPoint.AssemblyPath);
+        string contentRoot = Path.GetFullPath(Path.Combine(installPath, "tools", "any"));
+        string assemblyPath = Path.GetFullPath(Path.Combine(contentRoot, entry.EntryPoint.AssemblyPath));
+
+        // Defense-in-depth: the metadata reader rejects rooted paths and `..`
+        // segments at parse time, but the registry stores the same value and
+        // could be tampered with on disk. Refuse to load anything resolved
+        // outside the content root.
+        string contentRootWithSeparator = contentRoot.EndsWith(Path.DirectorySeparatorChar)
+            ? contentRoot
+            : contentRoot + Path.DirectorySeparatorChar;
+        if (!assemblyPath.StartsWith(contentRootWithSeparator, StringComparison.Ordinal))
+        {
+            throw new GracefulException(
+                $"[{entry.PackageId}] Could not load workload: assembly path '{entry.EntryPoint.AssemblyPath}' resolves outside the package content root '{contentRoot}'.",
+                isUserError: true);
+        }
 
         if (!File.Exists(assemblyPath))
         {

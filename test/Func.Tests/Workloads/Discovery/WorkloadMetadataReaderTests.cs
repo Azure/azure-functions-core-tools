@@ -127,6 +127,51 @@ public class WorkloadMetadataReaderTests : IDisposable
         Assert.Contains(missing, ex.Message);
     }
 
+    [Theory]
+    [InlineData("/etc/passwd.dll")]
+    [InlineData("/abs/path/foo.dll")]
+    public void Read_Throws_WhenAssemblyPathIsAbsolute(string assemblyPath)
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "entryPoint": {
+                "assemblyPath": "{{assemblyPath}}",
+                "type": "Foo.MyWorkload"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
+            () => _reader.Read(_tempDir));
+
+        Assert.Contains("absolute", ex.Message);
+        Assert.Contains("assemblyPath", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("../escape.dll")]
+    [InlineData("../../etc/passwd.dll")]
+    [InlineData("nested/../../escape.dll")]
+    public void Read_Throws_WhenAssemblyPathContainsParentSegment(string assemblyPath)
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "entryPoint": {
+                "assemblyPath": "{{assemblyPath}}",
+                "type": "Foo.MyWorkload"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
+            () => _reader.Read(_tempDir));
+
+        Assert.Contains("..", ex.Message);
+        Assert.Contains("assemblyPath", ex.Message);
+    }
+
     [Fact]
     public void Read_HydratesShippedFixtureMetadata()
     {

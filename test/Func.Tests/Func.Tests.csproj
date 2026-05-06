@@ -21,9 +21,10 @@
 
   <!--
     Workload package layout convention: each installed workload is a directory
-    containing a workload.json manifest at the root and a `tools/` sub-folder
-    with the workload's assemblies + deps. Tests need that shape on disk so the
-    loader can resolve fixture assemblies via WorkloadMetadataReader.ContentDirectoryName.
+    containing a workload.json manifest at the root and a `tools/any/`
+    sub-folder with the workload's assemblies + deps. Tests need that shape on
+    disk so the loader can resolve fixture assemblies via the same path
+    combination it uses in production (see WorkloadMetadataReader.ContentDirectoryName).
 
     The fixtures themselves build into a flat bin output (the standard SDK
     layout); this target reshapes them in the test project's bin so the
@@ -31,7 +32,7 @@
 
       $(OutDir)/
         workload.json                     <- Default fixture's manifest
-        tools/
+        tools/any/
           Azure.Functions.Cli.Workload.Tests.Fixtures.Default.dll (+ .deps.json, .runtimeconfig.json, .pdb)
           Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk.dll     (+ .deps.json, .runtimeconfig.json, .pdb)
   -->
@@ -43,10 +44,10 @@
       <_FixtureBinary Include="$(OutDir)Azure.Functions.Cli.Workload.Tests.Fixtures.*.pdb" />
     </ItemGroup>
 
-    <MakeDir Directories="$(OutDir)tools" Condition="'@(_FixtureBinary)' != ''" />
+    <MakeDir Directories="$(OutDir)tools/any" Condition="'@(_FixtureBinary)' != ''" />
 
     <Move SourceFiles="@(_FixtureBinary)"
-          DestinationFolder="$(OutDir)tools"
+          DestinationFolder="$(OutDir)tools/any"
           OverwriteReadOnlyFiles="true"
           Condition="'@(_FixtureBinary)' != ''" />
 

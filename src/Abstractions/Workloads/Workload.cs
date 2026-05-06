@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Reflection;
+
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
@@ -25,13 +27,43 @@ public abstract class Workload
     public abstract string Name { get; }
 
     /// <summary>
-    /// Workload version. Authored on the workload itself rather than read
-    /// from the NuGet package metadata so the running code is the source of
-    /// truth for what version of the workload is installed. Must be a valid
+    /// Workload version. Defaults to the workload assembly's
+    /// <see cref="System.Reflection.AssemblyInformationalVersionAttribute"/>
+    /// (falling back to <see cref="System.Reflection.AssemblyFileVersionAttribute"/>
+    /// and then <see cref="System.Reflection.AssemblyName.Version"/>), so
+    /// most workloads can leave this alone and let the build supply the
+    /// version. Override to author the version on the workload itself when
+    /// the running code should be the source of truth. Should be a valid
     /// SemVer 2.0 string (e.g. <c>"1.2.3"</c>, <c>"1.2.3-preview.1"</c>);
     /// the CLI does not currently enforce or normalize the format.
     /// </summary>
-    public abstract string Version { get; }
+    public virtual string Version
+    {
+        get
+        {
+            Assembly assembly = GetType().Assembly;
+
+            string? informational = assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion;
+            if (!string.IsNullOrWhiteSpace(informational))
+            {
+                // Strip any +sha build metadata so callers see a clean SemVer string.
+                int plus = informational.IndexOf('+');
+                return plus >= 0 ? informational[..plus] : informational;
+            }
+
+            string? file = assembly
+                .GetCustomAttribute<AssemblyFileVersionAttribute>()
+                ?.Version;
+            if (!string.IsNullOrWhiteSpace(file))
+            {
+                return file;
+            }
+
+            return assembly.GetName().Version?.ToString() ?? "0.0.0";
+        }
+    }
 
     /// <summary>
     /// Human-readable name shown in <c>func workload list</c>.

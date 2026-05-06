@@ -179,13 +179,29 @@ public class WorkloadLoaderTests
         // test would still pass via the loader's defensive intercept, hiding
         // the regression. Asserting the resolver invariant directly is what
         // separates the two test cases.
-        var fixturePath = Path.Combine(AppContext.BaseDirectory, "tools", SdkFixtureAssemblyFile);
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "tools", "any", SdkFixtureAssemblyFile);
         var resolver = new AssemblyDependencyResolver(fixturePath);
 
         var resolved = resolver.ResolveAssemblyToPath(
             new System.Reflection.AssemblyName("Azure.Functions.Cli.Abstractions"));
 
         Assert.Null(resolved);
+    }
+
+    [Fact]
+    public void Load_Throws_WhenAssemblyPathEscapesContentRoot()
+    {
+        // The metadata reader rejects rooted paths and `..` segments at parse
+        // time, but the registry persists the same value and could be tampered
+        // with on disk. Pin the loader's defense-in-depth check.
+        var loader = new WorkloadLoader(StubPaths());
+        var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "../../../escape.dll");
+
+        var ex = Assert.Throws<GracefulException>(() => loader.Load(new[] { entry }));
+
+        Assert.True(ex.IsUserError);
+        Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
+        Assert.Contains("outside the package content root", ex.Message);
     }
 
     [Fact]

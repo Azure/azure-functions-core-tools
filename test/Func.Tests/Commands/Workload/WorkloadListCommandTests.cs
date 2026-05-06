@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Workloads;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
@@ -15,7 +16,7 @@ public class WorkloadListCommandTests
     [Fact]
     public async Task EmptyList_WritesNoWorkloadsHint_ReturnsZero()
     {
-        var cmd = new WorkloadListCommand(_interaction, Array.Empty<WorkloadInfo>());
+        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(Array.Empty<WorkloadInfo>()));
 
         int exit = await InvokeAsync(cmd);
 
@@ -36,7 +37,7 @@ public class WorkloadListCommandTests
                 Aliases: new[] { "dotnet", "dotnet-isolated" }),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, workloads);
+        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -58,7 +59,7 @@ public class WorkloadListCommandTests
                 Aliases: Array.Empty<string>()),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, workloads);
+        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
         await InvokeAsync(cmd);
 
         string rowLine = _interaction.Lines.Single(l => l.StartsWith("  ROW:"));
@@ -76,11 +77,19 @@ public class WorkloadListCommandTests
             new WorkloadInfo(new FakeWorkload(), "Pkg.A", "1.1.0", Array.Empty<string>()),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, workloads);
+        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
         await InvokeAsync(cmd);
 
         var rows = _interaction.Lines.Where(l => l.StartsWith("  ROW:")).ToList();
         Assert.Equal(3, rows.Count);
+    }
+
+    private static IWorkloadProvider ProviderReturning(IReadOnlyList<WorkloadInfo> workloads)
+    {
+        IWorkloadProvider provider = Substitute.For<IWorkloadProvider>();
+        provider.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<IReadOnlyList<WorkloadInfo>>(workloads));
+        return provider;
     }
 
     private static Task<int> InvokeAsync(WorkloadListCommand cmd, params string[] args)

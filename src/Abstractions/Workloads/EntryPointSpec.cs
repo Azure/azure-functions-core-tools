@@ -12,8 +12,8 @@ namespace Azure.Functions.Cli.Workloads;
 public sealed class EntryPointSpec
 {
     /// <summary>
-    /// Path to the assembly relative to the package root
-    /// (e.g. <c>lib/net10.0/Foo.dll</c>).
+    /// Path to the assembly relative to the package's content root
+    /// (<c>tools/any/</c> by convention), e.g. <c>Foo.dll</c>.
     /// </summary>
     public required string AssemblyPath { get; init; }
 
