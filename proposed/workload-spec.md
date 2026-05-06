@@ -52,14 +52,14 @@
 #### `func workload list`
 
 ```
-func workload list [--all-versions] [--json]
+func workload list [--all-versions|-a] [--json]
 ```
 
 Lists installed workloads with id, version, capabilities, and install path.
 
 ##### Options
 
-- `--all-versions`
+- `--all-versions` / `-a`
   - Lists every installed version of every workload. Default: only the
     active version per workload is shown.
 - `--json`
@@ -94,21 +94,21 @@ returns id, latest version, and description for matching packages.
 #### `func workload install`
 
 ```
-func workload install <id> [--version <v>] [--source <path>] [--exact|-e] [--include-prereleases]
+func workload install <package> [--version <v>] [--source <path>] [--exact|-e] [--include-prereleases]
 ```
 
 Acquires and installs a workload. See §6.1 for the full install pipeline.
 
 ##### Arguments
 
-- `<id>`
+- `<package>`
   - Required. Matched as an `alias:<name>` tag by default (see §5.3 and
     §6.1 for the resolution flow). With `--exact`, must be the literal
     package id.
 
 ##### Options
 
-- `--version <v>`
+- `--version` / `-v`
   - Installs the specified semver version. Default: the latest stable
     version available in the catalog. Combine with
     `--include-prereleases` to allow pre-release versions when resolving
@@ -117,7 +117,7 @@ Acquires and installs a workload. See §6.1 for the full install pipeline.
   - Installs from a local path or alternate feed (e.g. for development
     or internal mirrors) instead of the configured default catalog.
 - `--exact` / `-e`
-  - Disables alias matching. `<id>` must be the literal package id
+  - Disables alias matching. `<package>` must be the literal package id
     (case-insensitive). Use when an alias collides across multiple
     packages or when scripting against a known id.
 - `--include-prereleases`
@@ -127,30 +127,34 @@ Acquires and installs a workload. See §6.1 for the full install pipeline.
 #### `func workload uninstall`
 
 ```
-func workload uninstall <id> [--version <v>] [--all-versions]
+func workload uninstall <package> [--version|<v>] [--all-versions|-a] [--exact|-e]
 ```
 
 Removes an installed workload. By default removes only the active version.
 
 ##### Arguments
 
-- `<id>`
+- `<package>`
   - Required. The workload to remove. Resolved using the same alias
-    rules as `install`.
+    rules as `install` (see §6.1).
 
 ##### Options
 
-- `--version <v>`
+- `--version` / `-v`
   - Removes a specific installed version. Useful for cleaning up old
     side-by-side installs without affecting the active version.
-- `--all-versions`
+- `--all-versions` / `-a`
   - Removes every installed version of the workload. Mutually exclusive
     with `--version`.
+- `--exact` / `-e`
+  - Disables alias matching. `<package>` must be the literal package id
+    (case-insensitive). Use when an alias collides across multiple
+    installed packages or when scripting against a known id.
 
 #### `func workload update`
 
 ```
-func workload update [<id>] [--all] [--major] [--prune] [--source <path>] [--include-prereleases]
+func workload update [<package>] [--all] [--major] [--prune] [--source <path>] [--include-prereleases]
 ```
 
 Updates one or all workloads to the latest compatible version. Default
@@ -159,14 +163,14 @@ and the active pointer is swapped atomically (see §6.4).
 
 ##### Arguments
 
-- `<id>`
+- `<package>`
   - Optional. Updates a single workload. Mutually exclusive with
-    `--all`. Omitting both `<id>` and `--all` is an error.
+    `--all`. Omitting both `<package>` and `--all` is an error.
 
 ##### Options
 
 - `--all`
-  - Updates every installed workload. Mutually exclusive with `<id>`.
+  - Updates every installed workload. Mutually exclusive with `<package>`.
 - `--major`
   - Allows crossing a major-version boundary. Default: same major
     version only, to protect against breaking changes.
@@ -207,7 +211,7 @@ and the active pointer is swapped atomically (see §6.4).
   into workloads (e.g. `func azure …`, `func kubernetes …`, `func durable …`).
   When a user invokes one of these on v5 without the corresponding workload
   installed, the CLI prints: "`<cmd>` is now provided by a workload. Install
-  it with `func workload install <id>`." This guarantees a clean upgrade
+  it with `func workload install <package>`." This guarantees a clean upgrade
   path from v4 muscle memory.
 - If a workload is installed, the Func CLI delegates project scaffolding to it.
 - If `--stack` is omitted, the Func CLI **may** prompt or auto-select
@@ -276,19 +280,55 @@ and the active pointer is swapped atomically (see §6.4).
 
 ## 5. Workload contract — what a workload provides
 
-A workload is a NuGet package containing a .NET assembly that implements
-`IWorkload`. The assembly declares its entry point with a single
-assembly-level attribute:
+A workload is a NuGet package containing a .NET assembly with a class
+that extends the abstract `Workload` base from `Func.Cli.Abstractions`:
 
 ```csharp
-[assembly: CliWorkload<MyWorkload>]
+public sealed class MyWorkload : Workload
+{
+    public override string Name => "Azure.Functions.Cli.Workload.MyStack";
+    public override string DisplayName => "My Stack";
+    public override string Description => "Functions support for My Stack.";
+
+    public override void Configure(FunctionsCliBuilder builder)
+    {
+        // register IProjectInitializer, ITemplateProvider, etc.
+    }
+}
 ```
 
-The `IWorkload` implementation receives a `FunctionsCliBuilder` during
-host startup and registers concrete services into DI. The CLI consumes
-those services via `IEnumerable<T>` collections and dispatches based on
-which workload contributed which service. There is **no static
-capability list** — what a workload can do is whatever it has registered.
+`Version` defaults to the workload assembly's
+`AssemblyInformationalVersion` (falling back to `AssemblyFileVersion` /
+`AssemblyName.Version`), so most workloads can leave the build supply
+the version. Override only when the running code should be the source
+of truth.
+
+`Name` is the identity the workload **claims for itself** in code. The
+CLI uses it as the prefix on diagnostic messages (`[<Name>] …`) and as
+the `workload-id` field in telemetry (see §11). It is conventionally
+the assembly / package name (e.g.
+`"Azure.Functions.Cli.Workload.Dotnet"`) and normally matches the
+package id, but the two are distinct concepts:
+
+- **`Workload.Name`** — declared by the workload code. Stable across
+  republishes; what the workload calls itself in logs and telemetry.
+- **`packageId`** — the NuGet identity used by `func workload install` /
+  `uninstall` / `list` and recorded in the global manifest. What the
+  user types.
+
+They normally agree, but a workload republished under a new package id
+(e.g. an ownership transfer) can keep its `Name` stable so log filters,
+telemetry dashboards, and error-prefix grep patterns continue to work.
+
+The package also ships a `workload.json` at the package root pointing
+at the entry-point type; see §5.3 for the file shape and §6.1 for how
+the install pipeline consumes it.
+
+The `Workload` instance receives a `FunctionsCliBuilder` during host
+startup (`Configure`) and registers concrete services into DI. The CLI
+consumes those services via `IEnumerable<T>` collections and dispatches
+based on which workload contributed which service. There is **no static
+capability list**: what a workload can do is whatever it has registered.
 
 ### 5.1 Contribution points (DI)
 
@@ -342,8 +382,7 @@ a directory. The §5.1 table reflects this.
 
 ### 5.3 Package metadata
 
-Workload packages do **not** ship a per-package manifest file. The
-metadata the CLI needs is split between two sources:
+The metadata the CLI needs is split between two sources:
 
 1. **NuGet metadata (`.nuspec`)** — owned by the package author, captured
    at install time:
@@ -351,14 +390,9 @@ metadata the CLI needs is split between two sources:
     - `version` → semver, the workload version.
     - `title` → display name shown in `func workload list`.
     - `description` → one-line summary shown in `func workload list`.
-    - `tags` → NuGet tags. The CLI gives meaning to two reserved tag
-      conventions; all other tags are treated as free-form metadata
-      for search ranking only:
-        - `func-workload` → **required** for discoverability. The
-          catalog query filters by this tag to enumerate Functions
-          workloads (complementing the `FuncCliWorkload` package type,
-          which is authoritative but not always exposed by every feed
-          UI).
+    - `tags` → NuGet tags. The CLI gives meaning to one reserved tag
+      convention; all other tags are treated as free-form metadata for
+      search ranking only:
         - `alias:<name>` → declares a short alias (e.g. `alias:python`)
           that the user can pass to `install` / `uninstall` / `update`
           instead of the full package id. A workload may declare
@@ -372,9 +406,48 @@ metadata the CLI needs is split between two sources:
       rejected at install time and excluded from `func workload search`
       results. Modeled on the .NET CLI's `DotnetTool` package type
       (e.g. `?packageType=dotnettool` on the NuGet search API).
-2. **Assembly attribute** — `[assembly: CliWorkload<T>]` declares
-   the entry-point type. The install pipeline scans for it once and
-   records `(assembly path, type FQN)` in the global manifest.
+2. **Per-workload manifest (`workload.json`)** — owned by the package
+   author, shipped at the root of the workload's NuGet package. Required:
+   a package without this file is not a valid workload. Identifies the
+   entry-point type the CLI activates after install:
+
+   ```json
+   {
+     "entryPoint": {
+       "assemblyPath": "Foo.dll",
+       "type": "Foo.MyWorkload"
+     }
+   }
+   ```
+
+   - `entryPoint.assemblyPath` → path to the assembly relative to the
+     package's content root (see "Package layout" below). Must not be
+     absolute or contain `..` segments; the install pipeline rejects
+     either.
+   - `entryPoint.type` → fully-qualified type name extending the
+     abstract `Workload` base class.
+
+   The install pipeline reads `workload.json` once and records the
+   entry-point spec in the global manifest, so subsequent CLI
+   invocations don't have to crack the package open again.
+
+   **Package layout.** A workload `.nupkg` follows this convention:
+
+   ```
+   <package-root>/
+     workload.json              ← required, at the package root
+     tools/any/
+       <Workload>.dll           ← entryPoint.assemblyPath is resolved
+       <dependencies>.dll          relative to tools/any/
+       ...
+   ```
+
+   `tools/any/` is the content directory the install pipeline extracts
+   and from which `entryPoint.assemblyPath` is resolved. The `tools/`
+   prefix mirrors the .NET CLI's `dotnet tool` package convention
+   (which uses `tools/<TFM>/any/`); workloads use a single `any`
+   subdirectory because the CLI loads them in-process via
+   `AssemblyLoadContext` rather than launching a separate runtime.
 
 The CLI persists everything it needs for startup in a single
 **global manifest** at `~/.azure-functions/workloads.json` (see §6.1).
@@ -392,10 +465,10 @@ install` / `uninstall`.
 
 ### 6.1 Install
 
-1. Resolve `<id>` to a package via the catalog (NuGet by default),
+1. Resolve `<package>` to a package via the catalog (NuGet by default),
    filtered to packages declaring the `FuncCliWorkload` package type:
    - **Alias path** (default): the resolver queries the catalog for
-     packages whose tags include `alias:<id>`.
+     packages whose tags include `alias:<package>`.
        - Exactly one match → install it.
        - Zero matches → fall back to exact-match-by-id. If that also
          finds nothing, fail with an actionable error listing close
@@ -403,22 +476,38 @@ install` / `uninstall`.
        - Multiple matches → fail and list the matched package ids;
          the user must re-run with `--exact <packageId>`.
    - **Exact path** (`--exact` / `-e`): the resolver targets exactly
-     `<id>` as a literal package id (case-insensitive). No alias
+     `<package>` as a literal package id (case-insensitive). No alias
      matching is performed. Fails if no such package exists in the
      catalog.
 2. Download to a staging directory.
 3. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`,
    `packageTypes`). Reject the package if `FuncCliWorkload` is not
    among its declared package types.
-4. Scan the package's top-level assemblies for `[assembly:
-   CliWorkload<T>]`. Exactly one assembly must declare it; zero
-   or multiple is a fatal install error.
-5. Atomically move into `~/.azure-functions/workloads/<id>/<version>/`.
-6. Update the global manifest `~/.azure-functions/workloads.json`,
-   adding an entry under `workloads[<id>][<version>]` with
-   `displayName`, `description`, `aliases`, `installPath`, and
-   `entryPoint: { assembly, type }`. The write is atomic (temp file +
-   rename) so a crash mid-install cannot corrupt the manifest.
+4. Read `workload.json` from the package root. Reject if the file is
+   missing, malformed, or `entryPoint.assemblyPath` is rooted or
+   contains `..` segments.
+5. Atomically move into `~/.azure-functions/workloads/<packageId>/<version>/`.
+6. Append an entry to the global manifest
+   `~/.azure-functions/workloads.json` under the top-level `workloads`
+   array. Each entry contains:
+   - `packageId` — NuGet package id (case-insensitive match).
+   - `packageVersion` — installed version (ordinal match).
+   - `aliases` — short aliases extracted from the package's
+     `alias:<name>` tags.
+   - `entryPoint: { assemblyPath, type }` — copied from the package's
+     `workload.json` so the loader doesn't re-read the package on every
+     CLI invocation.
+
+   Side-by-side installs of the same package id at different versions
+   are separate entries. `displayName` and `description` are **not**
+   persisted in the manifest; they are read from the loaded `Workload`
+   instance at runtime so an updated workload's metadata always reflects
+   what's running. Install paths are computed from the configured
+   workload home plus `(packageId, packageVersion)` and likewise not
+   persisted.
+
+   The write is atomic (temp file + rename) so a crash mid-install
+   cannot corrupt the manifest.
 7. Emit an "installed" message including version and entry-point type.
 
 ### 6.2 Discovery
@@ -449,13 +538,13 @@ install` / `uninstall`.
 
 ### 6.4 Update
 
-- `func workload update <id>` resolves a newer version, installs it
+- `func workload update <package>` resolves a newer version, installs it
   side-by-side, then atomically swaps the "active" version pointer.
 - Old versions remain on disk until `--prune` is passed, allowing rollback.
 
 ### 6.5 Removal
 
-- `func workload uninstall <id>` removes the active version's directory.
+- `func workload uninstall <package>` removes the active version's directory.
 - `--all-versions` removes every installed version.
 - Other installed workloads must be unaffected.
 
@@ -506,7 +595,7 @@ install` / `uninstall`.
 
 The global manifest at `~/.azure-functions/workloads.json` carries a
 top-level `$schema` field whose value is a versioned JSON Schema URL
-(e.g. `https://aka.ms/func-workloads/v1/schema.json`). The current
+(e.g. `https://aka.ms/func/workloads/v1/schema.json`). The current
 schema is **v1**.
 
 This follows the same convention used by `tsconfig.json`,
