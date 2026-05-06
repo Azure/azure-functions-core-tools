@@ -99,11 +99,31 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
                 bufferSize: 4096,
                 useAsync: true);
 
-            return await JsonSerializer.DeserializeAsync(
+            WorkloadRegistry registry = await JsonSerializer.DeserializeAsync(
                 stream,
                 WorkloadJsonContext.Default.WorkloadRegistry,
                 cancellationToken)
                 ?? new WorkloadRegistry();
+
+            if (!WorkloadManifestSchema.IsSupported(registry.Schema))
+            {
+                string supported = string.Join(
+                    Environment.NewLine,
+                    WorkloadManifestSchema.SupportedSchemas.Select(s => $"  - {s}"));
+
+                throw new GracefulException(
+                    $"The schema '{registry.Schema}' declared by registry '{path}' is not supported."
+                    + Environment.NewLine
+                    + "Supported schemas are:"
+                    + Environment.NewLine
+                    + supported
+                    + Environment.NewLine
+                    + Environment.NewLine
+                    + "Check for spelling or try updating the CLI to the latest version.",
+                    isUserError: true);
+            }
+
+            return registry;
         }
         catch (JsonException ex)
         {

@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json.Serialization;
+
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
@@ -11,6 +13,17 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// </summary>
 internal sealed class WorkloadRegistry
 {
+    /// <summary>
+    /// JSON Schema URL identifying the registry format. Doubles as a
+    /// version marker: a future CLI emitting a different URL signals a
+    /// schema this CLI may not understand, and is rejected at load.
+    /// Serialized as <c>$schema</c> to follow the JSON Schema convention
+    /// (matches tsconfig.json, azure-pipelines.yml, dotnet/global.json).
+    /// </summary>
+    [JsonPropertyName("$schema")]
+    [JsonPropertyOrder(-1)]
+    public string Schema { get; init; } = WorkloadManifestSchema.CurrentSchema;
+
     /// <summary>
     /// Installed workloads. Empty when no workload has been installed yet.
     /// </summary>
