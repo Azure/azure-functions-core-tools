@@ -23,9 +23,10 @@ public class WorkloadProviderTests
                 EntryPoint = new EntryPointSpec { AssemblyPath = "A.dll", Type = "A.T" },
             },
         };
+        var instance = new TestWorkload();
         var loaded = new[]
         {
-            new WorkloadInfo(new TestWorkload(), "Pkg.A", "1.0.0", Array.Empty<string>()),
+            new WorkloadInfo(instance, "Pkg.A", "1.0.0", Array.Empty<string>(), instance.DisplayName, instance.Description),
         };
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(entries);
@@ -121,8 +122,6 @@ public class WorkloadProviderTests
 
     private sealed class TestWorkload : global::Azure.Functions.Cli.Workloads.Workload
     {
-        public override string Name => "test";
-
         public override string DisplayName => "Test";
 
         public override string Description => "Test workload.";

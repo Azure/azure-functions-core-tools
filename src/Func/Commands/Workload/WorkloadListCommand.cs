@@ -38,12 +38,12 @@ internal sealed class WorkloadListCommand(
         {
             w.PackageId,
             w.Aliases.Count == 0 ? AliasesPlaceholder : string.Join(", ", w.Aliases),
-            w.Instance.DisplayName,
-            w.Instance.Description,
+            w.DisplayName,
+            w.Description,
             w.PackageVersion,
         });
 
-        _interaction.WriteTable(["Package", "Aliases", "Name", "Description", "Version"], rows);
+        _interaction.WriteTable(["ID", "Aliases", "Display Name", "Description", "Version"], rows);
         return 0;
     }
 }
