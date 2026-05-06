@@ -66,11 +66,12 @@ internal static class TestParser
         // Stub the workload subsystem so commands that depend on it (e.g.
         // WorkloadListCommand) resolve without booting real storage / loading.
         // Tests that exercise listing register their own substitutes.
-        var emptyStore = Substitute.For<IWorkloadStore>();
+        IWorkloadStore emptyStore = Substitute.For<IWorkloadStore>();
         emptyStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
             .Returns(Array.Empty<WorkloadEntry>());
         services.AddSingleton(emptyStore);
         services.AddSingleton(Substitute.For<IWorkloadLoader>());
+        services.AddSingleton<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>());
 
         return services;
     }

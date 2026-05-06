@@ -13,11 +13,13 @@ namespace Azure.Functions.Cli.Hosting;
 /// type identified by <c>[assembly: ExportCliWorkload&lt;T&gt;]</c>, and invokes
 /// <see cref="Workload.Configure"/>.
 ///
-/// At this stage the loader hasn't landed yet, so <see cref="RegisterWorkloads"/>
-/// is a no-op. Commands that only need to enumerate installed workloads
-/// (e.g. <c>func workload list</c>) read the global registry directly via
-/// <see cref="Workloads.Storage.IWorkloadStore"/>; they don't need the
-/// loader at all.
+/// At this stage <see cref="RegisterWorkloads"/> is a no-op: the loaded-
+/// workloads list itself is published as a singleton by
+/// <see cref="WorkloadStorageRegistration.AddWorkloadStorage"/>, so commands
+/// that only need to enumerate installed workloads (e.g. <c>func workload
+/// list</c>) inject <c>IReadOnlyList&lt;WorkloadInfo&gt;</c> directly. This
+/// hook will grow to invoke <see cref="Workload.Configure"/> per loaded
+/// workload once the contribution surface lands.
 /// </summary>
 internal static class WorkloadRegistration
 {
