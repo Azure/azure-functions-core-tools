@@ -121,7 +121,7 @@ internal static class CliTelemetry
         // Explicit "off" sentinels mean the user has not opted out;
         // anything else (including unrecognized values) is treated as
         // opt-out, so we fail safe toward not collecting telemetry.
-        return !_optOutFalseSentinels.Contains(value);
+        return !_optOutFalseSentinels.Contains(value.Trim());
     }
 
     private static string ResolveCliVersion()

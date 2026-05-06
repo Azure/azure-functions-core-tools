@@ -40,6 +40,8 @@ public class TelemetryTests
     [InlineData("n")]
     [InlineData("off")]
     [InlineData("OFF")]
+    [InlineData("  off  ")]
+    [InlineData("\tfalse\n")]
     public void TryGetConnectionString_OptOutFalseSentinels_DoNotOptOut(string value)
     {
         // The documented "off" sentinels must NOT be treated as opt-out.
