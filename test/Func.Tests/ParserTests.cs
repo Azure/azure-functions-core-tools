@@ -48,6 +48,15 @@ public class ParserTests
         Assert.Contains("--verbose", optionNames);
     }
 
+    [Fact]
+    public void VerboseOption_HasNoShortAlias()
+    {
+        // -v is intentionally left free so subcommands can claim it.
+        var root = (FuncRootCommand)TestParser.CreateRoot(_interaction);
+
+        Assert.DoesNotContain("-v", root.VerboseOption.Aliases);
+    }
+
     [Theory]
     [InlineData("version")]
     [InlineData("help")]

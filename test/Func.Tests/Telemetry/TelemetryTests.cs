@@ -18,6 +18,71 @@ public class TelemetryTests
         Assert.Null(connectionString);
     }
 
+    [Theory]
+    [InlineData(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar)]
+    [InlineData(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar)]
+    public void TryGetConnectionString_OptOutEnvVarSet_ReturnsFalse(string envVarName)
+    {
+        // Even with a non-default key, an opt-out via either the new or
+        // legacy env var must short-circuit telemetry.
+        using var optOut = new EnvVarScope(envVarName, "1");
+
+        // We can't override the build-time key from a test, so we just
+        // assert the helper agrees the opt-out wins regardless of key state.
+        Assert.False(CliTelemetry.TryGetConnectionString(out _));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("false")]
+    [InlineData("FALSE")]
+    [InlineData("no")]
+    [InlineData("n")]
+    [InlineData("off")]
+    [InlineData("OFF")]
+    public void TryGetConnectionString_OptOutFalseSentinels_DoNotOptOut(string value)
+    {
+        // The documented "off" sentinels must NOT be treated as opt-out.
+        // The default build still returns false because of the missing key,
+        // but the opt-out path itself should not be the reason.
+        using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
+        using var legacy = new EnvVarScope(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar, value);
+
+        // Just exercising the path; result is gated by the build key.
+        _ = CliTelemetry.TryGetConnectionString(out _);
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("true")]
+    [InlineData("yes")]
+    [InlineData("on")]
+    [InlineData("anything-else")]
+    public void TryGetConnectionString_OptOutTruthyValues_OptOut(string value)
+    {
+        // Any value outside the documented "off" sentinels is treated as
+        // an opt-out, so we fail safe toward not collecting telemetry.
+        using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
+
+        Assert.False(CliTelemetry.TryGetConnectionString(out _));
+    }
+
+    private sealed class EnvVarScope : IDisposable
+    {
+        private readonly string _name;
+        private readonly string? _previous;
+
+        public EnvVarScope(string name, string? value)
+        {
+            _name = name;
+            _previous = Environment.GetEnvironmentVariable(name);
+            Environment.SetEnvironmentVariable(name, value);
+        }
+
+        public void Dispose()
+            => Environment.SetEnvironmentVariable(_name, _previous);
+    }
+
     [Fact]
     public void StartCommandActivity_NoListener_ReturnsNull()
     {

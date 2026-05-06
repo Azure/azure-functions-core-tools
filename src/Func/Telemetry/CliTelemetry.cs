@@ -82,6 +82,9 @@ internal static class CliTelemetry
             .AddAttributes(GetResourceAttributes());
     }
 
+    private static readonly HashSet<string> _optOutFalseSentinels =
+        new(StringComparer.OrdinalIgnoreCase) { "no", "n", "0", "false", "off" };
+
     /// <summary>
     /// Returns the Azure Monitor connection string when telemetry is
     /// configured (build has a real instrumentation key) and the user has
@@ -97,16 +100,28 @@ internal static class CliTelemetry
             return false;
         }
 
-        var optOut = Environment.GetEnvironmentVariable(Constants.TelemetryOptOutEnvVar);
-        if (!string.IsNullOrEmpty(optOut) &&
-            !(optOut.Equals("0", StringComparison.OrdinalIgnoreCase) ||
-              optOut.Equals("false", StringComparison.OrdinalIgnoreCase)))
+        if (IsOptedOut(Constants.TelemetryOptOutEnvVar) ||
+            IsOptedOut(Constants.LegacyTelemetryOptOutEnvVar))
         {
             return false;
         }
 
         connectionString = $"InstrumentationKey={key}";
         return true;
+    }
+
+    private static bool IsOptedOut(string envVarName)
+    {
+        var value = Environment.GetEnvironmentVariable(envVarName);
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        // Explicit "off" sentinels mean the user has not opted out;
+        // anything else (including unrecognized values) is treated as
+        // opt-out, so we fail safe toward not collecting telemetry.
+        return !_optOutFalseSentinels.Contains(value);
     }
 
     private static string ResolveCliVersion()

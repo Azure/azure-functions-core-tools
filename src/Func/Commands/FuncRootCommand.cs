@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal class FuncRootCommand : RootCommand
 {
-    public Option<bool> VerboseOption { get; } = new("--verbose", "-v")
+    public Option<bool> VerboseOption { get; } = new("--verbose")
     {
         Description = "Enable verbose output",
         Recursive = true

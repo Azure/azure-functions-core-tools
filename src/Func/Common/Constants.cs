@@ -13,7 +13,18 @@ internal static class Constants
     public const string DocsUrl = "https://aka.ms/func-cli";
     public const string GitHubUrl = "https://github.com/Azure/azure-functions-core-tools";
     public const string GitHubReleasesApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases";
-    public const string TelemetryOptOutEnvVar = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
+    /// <summary>
+    /// Env var users set to opt out of CLI telemetry. Matches the
+    /// <c>FUNC_CLI_*</c> convention used elsewhere in v5.
+    /// </summary>
+    public const string TelemetryOptOutEnvVar = "FUNC_CLI_TELEMETRY_OPTOUT";
+
+    /// <summary>
+    /// Legacy opt-out env var inherited from Core Tools v4. Honored for
+    /// back-compat so users who already set it on their machines are not
+    /// silently re-opted in after upgrading.
+    /// </summary>
+    public const string LegacyTelemetryOptOutEnvVar = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
     public const string VersionCacheFileName = ".version-check";
 
     /// <summary>
