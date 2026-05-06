@@ -8,4 +8,11 @@
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Per-workload manifest shipped at the package root; copied next to the
+         fixture assembly so loader tests can resolve it the same way the
+         install pipeline will. -->
+    <Content Include="workload.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
