@@ -44,7 +44,7 @@ internal class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Enable full authentication handling"
     };
 
-    public Option<string?> HostVersionOption { get; } = new("--host-version")
+    public Option<string?> HostVersionOption { get; } = new("--host-version", "-v")
     {
         Description = "The host runtime version to use (e.g., 4.1049.0)"
     };

@@ -117,7 +117,7 @@ Common runtime identifiers: `osx-arm64`, `osx-x64`, `linux-x64`, `win-x64`
 The Azure Functions Core Tools collect usage data in order to help us improve your experience.
 The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft.
 
-You can opt-out of telemetry by setting the `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` environment variable to `1` or `true` using your favorite shell.
+You can opt-out of telemetry by setting the `FUNC_CLI_TELEMETRY_OPTOUT` environment variable to any value other than `no`, `n`, `0`, `false`, or `off`. The legacy `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` variable from Core Tools v4 is still honored.
 
 [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement)
 
