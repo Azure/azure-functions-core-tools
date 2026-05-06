@@ -35,6 +35,7 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
     {
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
         string assemblyPath = Path.Combine(installPath, entry.EntryPoint.AssemblyPath);
+
         if (!File.Exists(assemblyPath))
         {
             throw new GracefulException(

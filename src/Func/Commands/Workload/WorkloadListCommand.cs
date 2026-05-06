@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 
@@ -29,7 +30,7 @@ internal sealed class WorkloadListCommand(
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var entries = await _store.GetWorkloadsAsync(cancellationToken);
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync(cancellationToken);
 
         if (entries.Count == 0)
         {
@@ -37,9 +38,9 @@ internal sealed class WorkloadListCommand(
             return 0;
         }
 
-        var workloads = _loader.Load(entries);
+        IReadOnlyList<WorkloadInfo> workloads = _loader.Load(entries);
 
-        var rows = workloads.Select(w => new[]
+        IEnumerable<string[]> rows = workloads.Select(w => new[]
         {
             w.PackageId,
             w.Aliases.Count == 0 ? AliasesPlaceholder : string.Join(", ", w.Aliases),

@@ -89,6 +89,10 @@ the lightest option:
 - **File-scoped namespaces** in new files.
 - Match the style of the file you're editing.
 - No unused `using` directives.
+- Use `var` only when the type is obvious from the right-hand side (e.g.
+  `new T(...)`, a cast, or a literal). When the type is hidden behind a method
+  or property call, write the type explicitly so readers don't have to chase
+  the API to know what they're holding.
 - Don't run `dotnet format` across unrelated files; no drive-by reformatting.
 - Don't disable analyzers to silence warnings, fix the underlying issue.
 
