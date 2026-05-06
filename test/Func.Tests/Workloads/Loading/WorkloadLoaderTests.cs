@@ -179,7 +179,7 @@ public class WorkloadLoaderTests
         // test would still pass via the loader's defensive intercept, hiding
         // the regression. Asserting the resolver invariant directly is what
         // separates the two test cases.
-        var fixturePath = Path.Combine(AppContext.BaseDirectory, SdkFixtureAssemblyFile);
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "tools", SdkFixtureAssemblyFile);
         var resolver = new AssemblyDependencyResolver(fixturePath);
 
         var resolved = resolver.ResolveAssemblyToPath(

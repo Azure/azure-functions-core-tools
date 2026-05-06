@@ -3,6 +3,7 @@
 
 using System.Reflection;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Workloads.Loading;
@@ -34,12 +35,13 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
     private WorkloadInfo LoadEntry(WorkloadEntry entry)
     {
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-        string assemblyPath = Path.Combine(installPath, entry.EntryPoint.AssemblyPath);
+        string contentRoot = Path.Combine(installPath, WorkloadMetadataReader.ContentDirectoryName);
+        string assemblyPath = Path.Combine(contentRoot, entry.EntryPoint.AssemblyPath);
 
         if (!File.Exists(assemblyPath))
         {
             throw new GracefulException(
-                $"[{entry.PackageId}] Could not load workload: assembly '{entry.EntryPoint.AssemblyPath}' was not found at '{installPath}'.",
+                $"[{entry.PackageId}] Could not load workload: assembly '{entry.EntryPoint.AssemblyPath}' was not found at '{contentRoot}'.",
                 isUserError: true);
         }
 

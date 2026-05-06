@@ -19,6 +19,14 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
     /// </summary>
     public const string MetadataFileName = "workload.json";
 
+    /// <summary>
+    /// Conventional sub-directory inside a workload's package that holds
+    /// the workload's assemblies, dependencies, and runtime config. The
+    /// per-workload manifest (<see cref="MetadataFileName"/>) sits at the
+    /// package root and points into this directory.
+    /// </summary>
+    public const string ContentDirectoryName = "tools";
+
     /// <inheritdoc />
     public WorkloadMetadata Read(string packageDirectory)
     {

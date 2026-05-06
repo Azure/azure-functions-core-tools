@@ -19,4 +19,44 @@
     </ProjectReference>
   </ItemGroup>
 
+  <!--
+    Workload package layout convention: each installed workload is a directory
+    containing a workload.json manifest at the root and a `tools/` sub-folder
+    with the workload's assemblies + deps. Tests need that shape on disk so the
+    loader can resolve fixture assemblies via WorkloadMetadataReader.ContentDirectoryName.
+
+    The fixtures themselves build into a flat bin output (the standard SDK
+    layout); this target reshapes them in the test project's bin so the
+    on-disk tree mirrors a real installed package:
+
+      $(OutDir)/
+        workload.json                     <- Default fixture's manifest
+        tools/
+          Azure.Functions.Cli.Workload.Tests.Fixtures.Default.dll (+ .deps.json, .runtimeconfig.json, .pdb)
+          Azure.Functions.Cli.Workload.Tests.Fixtures.Sdk.dll     (+ .deps.json, .runtimeconfig.json, .pdb)
+  -->
+  <Target Name="LayoutFixtureWorkloadsForTests" AfterTargets="Build" DependsOnTargets="ResolveProjectReferences">
+    <ItemGroup>
+      <_FixtureBinary Include="$(OutDir)Azure.Functions.Cli.Workload.Tests.Fixtures.*.dll" />
+      <_FixtureBinary Include="$(OutDir)Azure.Functions.Cli.Workload.Tests.Fixtures.*.deps.json" />
+      <_FixtureBinary Include="$(OutDir)Azure.Functions.Cli.Workload.Tests.Fixtures.*.runtimeconfig.json" />
+      <_FixtureBinary Include="$(OutDir)Azure.Functions.Cli.Workload.Tests.Fixtures.*.pdb" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(OutDir)tools" Condition="'@(_FixtureBinary)' != ''" />
+
+    <Move SourceFiles="@(_FixtureBinary)"
+          DestinationFolder="$(OutDir)tools"
+          OverwriteReadOnlyFiles="true"
+          Condition="'@(_FixtureBinary)' != ''" />
+
+    <!-- Drop the Default fixture's workload.json at the (synthesized) package root.
+         The Sdk fixture's workload.json is intentionally not staged here: only one
+         can live at the root, and the WorkloadMetadataReader fixture test pins the
+         Default values. -->
+    <Copy SourceFiles="$(TestRoot)Workload.Tests.Fixtures.Default/workload.json"
+          DestinationFiles="$(OutDir)workload.json"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
