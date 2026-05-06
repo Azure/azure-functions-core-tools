@@ -17,14 +17,18 @@
 - Allow the Functions team and external authors to ship workloads on their
   own cadence, independent of the Func CLI's release schedule.
 - Make workload acquisition, update, and removal a first-class CLI
-  experience (`func workload …`).
+  experience (`func workload ...`).
 
 ## 2. Non-goals (v1)
 
 - **Sandboxing.** Workloads run with the same OS privileges as `func`. We
-  rely on package provenance (signed NuGets) for trust, not runtime
-  containment.
-- **Cross-workload coordination.** Workloads do not call each other.
+  rely on package provenance (NuGet feed trust, signing where available)
+  for trust, not runtime containment. Whether v1 *requires* signed
+  packages or only warns is an open question (see §12).
+- **Cross-workload coordination.** Workloads do not call each other
+  directly. The Func CLI brokers the only legitimate cross-workload
+  interaction: invoking the host-runtime workload (§4.6) on behalf of a
+  language workload during `func start`.
 - **Authoring telemetry framework.** Workloads may emit logs/diagnostics;
   shared telemetry primitives are out of scope for v1.
 - **GUI / IDE integration.** This spec covers the CLI only. IDE
@@ -37,13 +41,16 @@
 | Term                  | Meaning                                                                 |
 |-----------------------|-------------------------------------------------------------------------|
 | **Func CLI**          | The `func` binary itself. Owns command parsing, UX, workload lifecycle. Distinct from the Functions host runtime, which is itself delivered as a workload (see §4.6). |
-| **Host runtime**      | `Microsoft.Azure.WebJobs.Script.WebHost` — the process that actually executes Functions. Acquired and versioned as a workload, launched by `func start`. |
-| **Workload**          | An installable extension contributing init/new/pack support and/or commands. |
+| **Host runtime**      | `Microsoft.Azure.WebJobs.Script.WebHost`, the process that actually executes Functions. Acquired and versioned as a workload, launched by `func start`. |
+| **Workload**          | An installable extension that contributes init/new/pack support and/or commands. Concretely: a NuGet package whose entry-point assembly contains a class deriving from the abstract `Workload` base in `Func.Cli.Abstractions` (see §5). |
 | **Workload package**  | The distributable unit. NuGet in v1; format may evolve.                 |
-| **Global manifest**   | The single CLI-owned JSON file at `~/.azure-functions/workloads.json` recording which workload versions are installed and how to load them. |
+| **Catalog**           | The package source `func workload search` / `install` queries to resolve workload packages. The configured default is the public NuGet feed; alternates can be passed via `--source`. |
+| **Alias**             | A short, NuGet-tag-safe handle (e.g. `python`) declared by a workload package via an `alias:<name>` tag. Users can pass aliases to `install` / `uninstall` / `update` instead of the full package id (see §5.3, §6.1). |
+| **Workload home**     | The on-disk root the CLI uses to install workloads and read the workload registry. Defaults to `~/.azure-functions`; configurable via the `FUNC_CLI_Workloads__Home` environment variable (see §11 for the env var prefix convention). |
+| **Workload registry**   | The single CLI-owned JSON file at `<workload-home>/workloads.json` recording which workload versions are installed and how to load them. |
 | **Worker runtime**    | The Functions runtime language identifier (`dotnet`, `node`, `python`, `java`, `powershell`, `custom`). |
 | **Contribution point** | An interface in `Func.Cli.Abstractions` (e.g. `IProjectInitializer`) that a workload registers to participate in a built-in command. |
-| **Project marker**    | A glob/file pattern (`*.csproj`, `package.json`, …) that hints which workload owns a given directory. |
+| **Project marker**    | A glob or file pattern (`*.csproj`, `package.json`, ...) that hints which workload owns a given directory. |
 
 ## 4. User-facing requirements
 
@@ -59,7 +66,7 @@ Lists installed workloads with id, version, capabilities, and install path.
 
 ##### Options
 
-- `--all-versions` / `-a`
+- `--all-versions|-a`
   - Lists every installed version of every workload. Default: only the
     active version per workload is shown.
 - `--json`
@@ -94,7 +101,7 @@ returns id, latest version, and description for matching packages.
 #### `func workload install`
 
 ```
-func workload install <package> [--version <v>] [--source <path>] [--exact|-e] [--include-prereleases]
+func workload install <package> [--version|-v <v>] [--source <path>] [--exact|-e] [--include-prereleases]
 ```
 
 Acquires and installs a workload. See §6.1 for the full install pipeline.
@@ -108,7 +115,7 @@ Acquires and installs a workload. See §6.1 for the full install pipeline.
 
 ##### Options
 
-- `--version` / `-v`
+- `--version|-v`
   - Installs the specified semver version. Default: the latest stable
     version available in the catalog. Combine with
     `--include-prereleases` to allow pre-release versions when resolving
@@ -116,7 +123,7 @@ Acquires and installs a workload. See §6.1 for the full install pipeline.
 - `--source <path>`
   - Installs from a local path or alternate feed (e.g. for development
     or internal mirrors) instead of the configured default catalog.
-- `--exact` / `-e`
+- `--exact|-e`
   - Disables alias matching. `<package>` must be the literal package id
     (case-insensitive). Use when an alias collides across multiple
     packages or when scripting against a known id.
@@ -127,7 +134,7 @@ Acquires and installs a workload. See §6.1 for the full install pipeline.
 #### `func workload uninstall`
 
 ```
-func workload uninstall <package> [--version|<v>] [--all-versions|-a] [--exact|-e]
+func workload uninstall <package> [--version|-v <v>] [--all-versions|-a] [--exact|-e]
 ```
 
 Removes an installed workload. By default removes only the active version.
@@ -140,13 +147,13 @@ Removes an installed workload. By default removes only the active version.
 
 ##### Options
 
-- `--version` / `-v`
+- `--version|-v`
   - Removes a specific installed version. Useful for cleaning up old
     side-by-side installs without affecting the active version.
-- `--all-versions` / `-a`
+- `--all-versions|-a`
   - Removes every installed version of the workload. Mutually exclusive
     with `--version`.
-- `--exact` / `-e`
+- `--exact|-e`
   - Disables alias matching. `<package>` must be the literal package id
     (case-insensitive). Use when an alias collides across multiple
     installed packages or when scripting against a known id.
@@ -205,29 +212,20 @@ and the active pointer is swapped atomically (see §6.4).
   2. `FUNCTIONS_WORKER_RUNTIME` from `local.settings.json`, if present.
   3. Lightweight project-marker detection (e.g. presence of `*.csproj`,
      `requirements.txt`, `package.json`) to make a best-effort guess.
+- This fallback applies only when no workload is installed for the
+  requested runtime. When workloads *are* installed, §5.2 (Workload
+  resolution) describes the richer detector-based flow.
 - If detection is ambiguous or yields no signal, the hint **must** list the
   canonical install command for each known stack rather than guessing.
-- The CLI **must** maintain a curated map of v4 subcommands that have moved
-  into workloads (e.g. `func azure …`, `func kubernetes …`, `func durable …`).
-  When a user invokes one of these on v5 without the corresponding workload
-  installed, the CLI prints: "`<cmd>` is now provided by a workload. Install
-  it with `func workload install <package>`." This guarantees a clean upgrade
-  path from v4 muscle memory.
 - If a workload is installed, the Func CLI delegates project scaffolding to it.
-- If `--stack` is omitted, the Func CLI **may** prompt or auto-select
-  based on installed workloads. Behavior must be consistent across
-  workloads.
 
 ### 4.3 `func new` — create a function from a template
 
 - Templates come **only** from installed workloads. The Func CLI has no
   built-in templates.
 - `func new` (no args) lists templates from every installed workload that
-  matches the **current project's stack**, resolved in this order:
-  1. Explicit `--stack <name>` flag.
-  2. `FUNCTIONS_WORKER_RUNTIME` in `local.settings.json`.
-  3. A future `.func/config.json` (see §12 open questions).
-  4. Inferred from project markers via `IProjectDetector`.
+  matches the **current project's stack**. Stack resolution follows
+  §5.2 (Workload resolution).
 
   If no stack can be resolved, `func new` lists templates from every
   installed workload and prompts the user (or errors in non-interactive
@@ -239,14 +237,14 @@ and the active pointer is swapped atomically (see §6.4).
 
 ### 4.4 `func pack` — build & package for deployment
 
-- The Func CLI inspects the current directory and asks each candidate workload
-  (filtered by project markers, then by `IProjectDetector`) whether it owns
-  the directory.
-- Exactly one workload must claim the directory. Zero is an error with an
-  install hint. More than one is an error listing the contenders, suggest
-  `--stack` to disambiguate.
-- Pack output paths and naming are workload-defined; the Func CLI surfaces the
-  resulting artifact path back to the user.
+- The owning workload is selected via §5.2 (Workload resolution).
+  Exactly one workload must claim the directory. Zero is an error with an
+  install hint. More than one is an error listing the contenders,
+  suggesting `--stack` to disambiguate.
+- The owning workload performs the build and package via its
+  `IPackProvider` contribution (§5.1). Pack output paths and naming are
+  workload-defined; the Func CLI surfaces the resulting artifact path
+  back to the user.
 
 ### 4.5 `func start` and other built-in commands
 
@@ -254,13 +252,16 @@ and the active pointer is swapped atomically (see §6.4).
   not** embed the host runtime in its own binary; the runtime is acquired
   and updated as a workload (see §4.6) so it can ship and version
   independently of the CLI.
-- In v1, `func start` resolves the host-runtime workload, ensures it is
-  installed (offering to install if missing), and delegates process
-  startup to it. Argument forwarding, port selection, and log streaming
-  remain CLI responsibilities.
-- Workloads **may** register additional command trees (e.g., `func durable
-  …`). The Func CLI must surface these in `--help` output alongside built-in
-  commands and label the source workload in verbose help.
+- In v1, `func start` resolves the host-runtime workload and delegates
+  process startup to it. If the workload is not installed, the Func CLI
+  **must** print the install hint
+  (`Run 'func workload install <package>' to install the host runtime.`)
+  and exit non-zero; it **must not** auto-install or prompt. Argument
+  forwarding, port selection, and log streaming remain CLI responsibilities.
+- Workloads **may** register additional command trees via
+  `IExternalCommand` (§5.1), e.g. `func durable ...`. The Func CLI must
+  surface these in `--help` output alongside built-in commands and label
+  the source workload in verbose help.
 
 ### 4.6 Host runtime as a workload
 
@@ -277,6 +278,24 @@ and the active pointer is swapped atomically (see §6.4).
   runtime.
 - This separation lets host hotfixes ship without a CLI release and lets
   the CLI itself be smaller and AOT-friendly.
+
+### 4.7 v4 → v5 migration hints
+
+Many subcommands that lived in the v4 monolith (`func azure ...`,
+`func kubernetes ...`, `func durable ...`, etc.) move into workloads in
+v5. Users with v4 muscle memory will still type the old commands, and
+without help they will see a generic "unknown command" error.
+
+- The Func CLI **must** maintain a curated map of known v4 subcommands
+  to the workload package id that now provides them.
+- When a user invokes one of these on v5 without the corresponding
+  workload installed, the CLI prints (and exits non-zero):
+  `'<cmd>' is now provided by a workload. Install it with 'func workload install <package>'.`
+- The map covers any v4 surface that has moved, not only `func init` /
+  `func new`; it applies to all unknown-subcommand paths.
+- The map is **CLI-internal**: workloads do not contribute to it. New
+  v4-migration entries ship in a CLI release; this is acceptable
+  because the v4 surface is closed.
 
 ## 5. Workload contract — what a workload provides
 
@@ -299,12 +318,12 @@ public sealed class MyWorkload : Workload
 
 `Version` defaults to the workload assembly's
 `AssemblyInformationalVersion` (falling back to `AssemblyFileVersion` /
-`AssemblyName.Version`), so most workloads can leave the build supply
+`AssemblyName.Version`), so most workloads can let the build supply
 the version. Override only when the running code should be the source
 of truth.
 
 `Name` is the identity the workload **claims for itself** in code. The
-CLI uses it as the prefix on diagnostic messages (`[<Name>] …`) and as
+CLI uses it as the prefix on diagnostic messages (`[<Name>] ...`) and as
 the `workload-id` field in telemetry (see §11). It is conventionally
 the assembly / package name (e.g.
 `"Azure.Functions.Cli.Workload.Dotnet"`) and normally matches the
@@ -313,7 +332,7 @@ package id, but the two are distinct concepts:
 - **`Workload.Name`** — declared by the workload code. Stable across
   republishes; what the workload calls itself in logs and telemetry.
 - **`packageId`** — the NuGet identity used by `func workload install` /
-  `uninstall` / `list` and recorded in the global manifest. What the
+  `uninstall` / `list` and recorded in the workload registry. What the
   user types.
 
 They normally agree, but a workload republished under a new package id
@@ -335,14 +354,19 @@ capability list**: what a workload can do is whatever it has registered.
 A workload **may** register any subset of these services. Each service
 the workload registers means it participates in the corresponding command:
 
-| Service registered                | The workload can…                                          | Used by                          |
+| Service registered                | The workload can...                                          | Used by                          |
 |-----------------------------------|-----------------------------------------------------------|----------------------------------|
 | `IProjectInitializer`             | Scaffold a new project for a given worker runtime.        | `func init`                      |
 | `IProjectDetector`                | Decide whether a directory is "its" project.              | `func init`, `func new`, `func pack`, `func start` (workload resolution) |
 | `ITemplateProvider`               | Enumerate and materialize templates.                      | `func new`                       |
 | `IPackProvider`                   | Build & package the project.                              | `func pack`                      |
-| `IExternalCommand`                | Register additional CLI commands (e.g. `func durable …`). | Feature workloads                |
+| `IExternalCommand`                | Register additional CLI subcommands.                      | Any `func <subcommand>` contributed by a workload (e.g. `func durable ...`) |
 | `IHostRuntimeLauncher`            | Launch the Functions host runtime process.                | `func start` (host workload)     |
+
+Implementation status: as of this spec revision, only `IProjectInitializer`
+exists in `Func.Cli.Abstractions`. The other contribution points are
+designed but not yet implemented; they ship incrementally as the
+corresponding built-in commands move onto the workload model.
 
 The exact interface names and shapes are documented in
 [`building-a-workload.md`](./building-a-workload.md). That document is
@@ -354,14 +378,16 @@ bump).
 
 ### 5.2 Workload resolution
 
-For commands that act on a project (`init`, `new`, `pack`, `start`), the
-CLI must determine which installed workload owns the current directory.
-Resolution proceeds in this order:
+For commands that act on an existing project (`new`, `pack`, `start`),
+the CLI must determine which installed workload owns the current
+directory. Resolution proceeds in this order:
 
-1. **Explicit selector.** A `--stack <name>` flag (or equivalent
-   command-specific flag) wins.
+1. **Explicit selector.** A `--stack <name>` flag wins.
 2. **`FUNCTIONS_WORKER_RUNTIME`** in `local.settings.json`, mapped to
-   the workload that registered itself for that runtime.
+   the workload that registered itself for that runtime. A workload
+   declares the runtime ids it claims via metadata on its
+   `IProjectDetector` registration (or, for workloads that ship no
+   detector, via a property on the `Workload` subclass).
 3. **`IProjectDetector`.** The CLI invokes every registered detector
    against the working directory:
    - **Pre-filter:** the CLI applies project-marker globs (declared by
@@ -371,10 +397,13 @@ Resolution proceeds in this order:
      confidence (`yes` / `no` / `maybe`) plus an optional reason string.
    - **Tie-breaking:**
      - Exactly one `yes` → that workload owns the command.
-     - Zero matches → the CLI prints an actionable error (and, for
-       `init`, falls back to prompting or listing available workloads).
+     - Zero matches → the CLI prints an actionable error.
      - Multiple `yes` results → the CLI errors with the list and asks
        the user to disambiguate via `--stack`.
+
+`func init` is special: there is no project to detect against, so it
+uses only steps 1 and 2 (selector → runtime). Steps 3+ require an
+existing project.
 
 `IProjectDetector` is therefore **not** specific to `pack`; it is the
 shared mechanism for any command that needs to bind to a workload from
@@ -388,18 +417,22 @@ The metadata the CLI needs is split between two sources:
    at install time:
     - `id` → package id (NuGet rules apply, case-insensitive).
     - `version` → semver, the workload version.
-    - `title` → display name shown in `func workload list`.
-    - `description` → one-line summary shown in `func workload list`.
+    - `title` → display name shown in `func workload search` (catalog
+      browse). The runtime `Workload.DisplayName` is the source of
+      truth for `func workload list` once the package is installed.
+    - `description` → one-line summary shown in `func workload search`.
+      The runtime `Workload.Description` is the source of truth for
+      installed workloads.
     - `tags` → NuGet tags. The CLI gives meaning to one reserved tag
       convention; all other tags are treated as free-form metadata for
       search ranking only:
         - `alias:<name>` → declares a short alias (e.g. `alias:python`)
           that the user can pass to `install` / `uninstall` / `update`
           instead of the full package id. A workload may declare
-          multiple aliases. Aliases must be lowercase, NuGet-tag-safe,
-          and globally unique within the catalog; install fails if
-          multiple matched packages declare the same alias and the
-          user did not pass an exact id (see §6 install flow).
+          multiple aliases. Aliases must be lowercase and
+          NuGet-tag-safe; uniqueness is by convention only (NuGet has
+          no central authority). Alias collisions across packages force
+          users into `--exact` resolution (see §6.1 install flow).
     - `packageTypes` → **must** include a `FuncCliWorkload` entry. This
       is how the CLI (and the catalog) distinguish workload packages
       from arbitrary NuGets. Packages without this package type are
@@ -416,7 +449,8 @@ The metadata the CLI needs is split between two sources:
      "entryPoint": {
        "assemblyPath": "Foo.dll",
        "type": "Foo.MyWorkload"
-     }
+     },
+     "minCliVersion": "5.0.0"
    }
    ```
 
@@ -426,9 +460,12 @@ The metadata the CLI needs is split between two sources:
      either.
    - `entryPoint.type` → fully-qualified type name extending the
      abstract `Workload` base class.
+   - `minCliVersion` (optional) → minimum Func CLI semver this workload
+     requires. The loader rejects the workload with a "Func CLI too
+     old, please update" error if the running CLI is older (see §10.2).
 
    The install pipeline reads `workload.json` once and records the
-   entry-point spec in the global manifest, so subsequent CLI
+   entry-point spec in the workload registry, so subsequent CLI
    invocations don't have to crack the package open again.
 
    **Package layout.** A workload `.nupkg` follows this convention:
@@ -450,7 +487,7 @@ The metadata the CLI needs is split between two sources:
    `AssemblyLoadContext` rather than launching a separate runtime.
 
 The CLI persists everything it needs for startup in a single
-**global manifest** at `~/.azure-functions/workloads.json` (see §6.1).
+**workload registry** at `~/.azure-functions/workloads.json` (see §6.1).
 Workload authors never touch this file; it is owned by `func workload
 install` / `uninstall`.
 
@@ -458,13 +495,17 @@ install` / `uninstall`.
 
 - Workloads use **semver**. `func workload update` uses the same major
   version by default; major bumps require an explicit opt-in.
-- The CLI declares a **minimum supported global-manifest schema version**
-  (see §10) and rejects manifests it cannot parse.
+- The CLI declares a **minimum supported registry schema version**
+  (see §10) and rejects registries it cannot parse.
 
 ## 6. Lifecycle
 
 ### 6.1 Install
 
+0. **Idempotency.** If the same `(packageId, version)` is already
+   present in the workload registry and its install directory is
+   intact, exit success without re-fetching or re-extracting. This
+   makes `func workload install` safe to re-run.
 1. Resolve `<package>` to a package via the catalog (NuGet by default),
    filtered to packages declaring the `FuncCliWorkload` package type:
    - **Alias path** (default): the resolver queries the catalog for
@@ -483,43 +524,57 @@ install` / `uninstall`.
 3. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`,
    `packageTypes`). Reject the package if `FuncCliWorkload` is not
    among its declared package types.
+
+   Workloads ship **self-contained** under `tools/any/` (see §5.3
+   "Package layout"); the install pipeline does **not** restore
+   transitive NuGet dependencies. Anything the workload needs at
+   runtime must be in the package.
 4. Read `workload.json` from the package root. Reject if the file is
    missing, malformed, or `entryPoint.assemblyPath` is rooted or
    contains `..` segments.
-5. Atomically move into `~/.azure-functions/workloads/<packageId>/<version>/`.
-6. Append an entry to the global manifest
-   `~/.azure-functions/workloads.json` under the top-level `workloads`
+5. Atomically move into
+   `<workload-home>/workloads/<packageId>/<version>/`.
+   `<packageId>` is stored lowercased (matching NuGet's normalization)
+   so case differences in user input always resolve to the same
+   directory.
+6. Append an entry to the workload registry
+   `<workload-home>/workloads.json` under the top-level `workloads`
    array. Each entry contains:
-   - `packageId` — NuGet package id (case-insensitive match).
+   - `packageId` — NuGet package id (lowercased; case-insensitive match
+     on lookup).
    - `packageVersion` — installed version (ordinal match).
    - `aliases` — short aliases extracted from the package's
      `alias:<name>` tags.
+   - `source` — the catalog feed URL or local path the package was
+     installed from. Used to flag non-default-feed packages in
+     `func workload list` (see §9).
    - `entryPoint: { assemblyPath, type }` — copied from the package's
      `workload.json` so the loader doesn't re-read the package on every
      CLI invocation.
 
    Side-by-side installs of the same package id at different versions
    are separate entries. `displayName` and `description` are **not**
-   persisted in the manifest; they are read from the loaded `Workload`
+   persisted in the registry; they are read from the loaded `Workload`
    instance at runtime so an updated workload's metadata always reflects
    what's running. Install paths are computed from the configured
    workload home plus `(packageId, packageVersion)` and likewise not
    persisted.
 
    The write is atomic (temp file + rename) so a crash mid-install
-   cannot corrupt the manifest.
+   cannot corrupt the registry.
 7. Emit an "installed" message including version and entry-point type.
 
 ### 6.2 Discovery
 
-- On every Func CLI startup, the loader reads the global manifest at
+- On every Func CLI startup, the loader reads the workload registry at
   `~/.azure-functions/workloads.json`. Discovery is a **single JSON
   read + N assembly loads**, where N is the number of installed
   workloads — no filesystem walking of install directories.
 - Discovery **must** complete in O(workload count) and **must not**
-  invoke any workload code beyond instantiating the entry-point type
-  (no scanning of all types, no running of static initializers beyond
-  what the runtime triggers on first method dispatch).
+  invoke any workload methods. The CLI may instantiate the entry-point
+  type via `Activator.CreateInstance` (which unavoidably runs the
+  type's static constructor); workloads **must** keep static
+  initialization side-effect-free for this reason.
 - Each workload is loaded into its **own collectible
   `AssemblyLoadContext`** so two workloads can ship conflicting
   dependency versions without clashing.
@@ -533,13 +588,22 @@ install` / `uninstall`.
   disambiguation, project detection routing).
 - Errors from a workload **must** surface to the user with the workload id
   prefixed (e.g. `[python] error: ...`).
-- The Func CLI **must** distinguish between workload-protocol errors (bug, ask
-  user to file an issue) and user-facing errors (display verbatim).
+- The Func CLI **must** distinguish between workload-protocol errors
+  (bug, ask user to file an issue) and user-facing errors (display
+  verbatim) by **exception type**: a `GracefulException` thrown from a
+  workload is a user-facing error and surfaced verbatim; any other
+  exception type is treated as a protocol error, prefixed with the
+  workload id, and accompanied by a "please file an issue against the
+  workload" hint.
 
 ### 6.4 Update
 
 - `func workload update <package>` resolves a newer version, installs it
   side-by-side, then atomically swaps the "active" version pointer.
+- If the new version fails install validation (workload.json missing or
+  malformed, entry-point type not found, etc.) the active pointer is
+  not swapped and the prior version remains active. The partially
+  staged install is cleaned up.
 - Old versions remain on disk until `--prune` is passed, allowing rollback.
 
 ### 6.5 Removal
@@ -547,6 +611,10 @@ install` / `uninstall`.
 - `func workload uninstall <package>` removes the active version's directory.
 - `--all-versions` removes every installed version.
 - Other installed workloads must be unaffected.
+- `uninstall` acquires the same registry lock as `install` (see §4.1
+  "Required behaviors"). Concurrent `func <command>` invocations either
+  complete with the prior version (if they discovered before the lock
+  was acquired) or fail to launch the workload after removal.
 
 ### 6.6 Background staleness check
 
@@ -555,18 +623,20 @@ install` / `uninstall`.
   python (1.2.3) is available. Run 'func workload update python' to
   upgrade.`).
 - Frequency: at most once per 24h. Network failures must be silent.
-- Disabled by `FUNC_CLI_DISABLE_WORKLOAD_UPDATE_CHECK=1`.
+- Disabled by `FUNC_CLI_Workloads__DisableUpdateCheck=true` (follows
+  the configuration-binding env-var convention from §11).
 
 ## 7. Error handling requirements
 
 | Scenario                                    | Required behavior                                                                                  |
 |---------------------------------------------|----------------------------------------------------------------------------------------------------|
 | No workload installed for runtime           | Print exact install command, exit non-zero.                                                       |
-| Global manifest unreadable / unknown schema | Throw a `GracefulException` with the manifest path and the action to take (update CLI). Do not crash silently. |
+| Workload registry unreadable / unknown schema | Throw a `GracefulException` with the registry path and the action to take (update CLI). Do not crash silently. |
 | Workload entry-point missing or unloadable  | Print the underlying error and the install path; suggest `func workload uninstall && install`.   |
 | Workload fails during request               | Surface the error with `[<workload-id>]` prefix; exit non-zero with the workload's exit code (or 1). |
 | Two workloads claim same project / template | Error listing all candidates, suggest `--stack` to disambiguate.                                  |
 | Catalog unreachable                         | `install`/`update` must error clearly; `list` and offline operations must still work.             |
+| Install failed mid-flight (download / extract / validation) | No partial state on disk; staging directory cleaned up; registry not updated; non-zero exit. |
 
 ## 8. Performance requirements
 
@@ -574,7 +644,9 @@ install` / `uninstall`.
   remain under **100 ms** for up to 25 installed workloads on a warm cache.
 - **First invocation** of a workload (cold) should complete the
   workload-side boot in under **300 ms** for AOT'd workloads and
-  **800 ms** for JIT.
+  **800 ms** for JIT. The host-runtime workload (§4.6) is JIT in v1,
+  so plan for the higher figure on first `func start` after install or
+  update.
 - **Subsequent invocations** within the same `func` invocation should not
   re-pay boot cost when the Func CLI can reuse the workload connection (an
   optimization, not a v1 requirement).
@@ -591,9 +663,9 @@ install` / `uninstall`.
 
 ## 10. Compatibility & versioning
 
-### 10.1 Global manifest schema
+### 10.1 Workload registry schema
 
-The global manifest at `~/.azure-functions/workloads.json` carries a
+The workload registry at `~/.azure-functions/workloads.json` carries a
 top-level `$schema` field whose value is a versioned JSON Schema URL
 (e.g. `https://aka.ms/func/workloads/v1/schema.json`). The current
 schema is **v1**.
@@ -605,10 +677,10 @@ ship under a new versioned URL (`/v2/`, `/v3/`, ...), and older + newer
 CLIs can coexist on disk without one silently corrupting the other.
 
 - The Func CLI **must** check `$schema` on every read.
-- A manifest whose `$schema` URL the CLI does not recognize **must** be
+- A registry whose `$schema` URL the CLI does not recognize **must** be
   rejected with a `GracefulException` instructing the user to update
   the CLI. The CLI **must not** attempt a partial parse.
-- A manifest with no `$schema` field (legacy, written before the field
+- A registry with no `$schema` field (legacy, written before the field
   existed) is treated as v1 and re-emitted with the current `$schema`
   URL on the next write.
 
@@ -616,10 +688,10 @@ CLIs can coexist on disk without one silently corrupting the other.
 
 - Workloads use **semver**; `func workload install` and `update` honour
   the standard NuGet resolution rules.
-- A workload built against a newer Func CLI abstractions package than
-  the running CLI supports must fail to load with a "Func CLI too old,
-  please update" message — surfaced as an `[<workload-id>]`-prefixed
-  error from the loader.
+- A workload **may** declare a `minCliVersion` field in its
+  `workload.json` (semver). On load, the CLI compares this against its
+  own version and rejects the workload with an `[<workload-id>]`-prefixed
+  "Func CLI too old, please update" error if the running CLI is older.
 - A workload built against an older abstractions package must continue
   to work as long as the CLI can still satisfy the contract types it
   resolves; otherwise the CLI rejects with "workload too old, please
@@ -650,14 +722,16 @@ CLIs can coexist on disk without one silently corrupting the other.
    loses portability the moment a workload is installed unless we
    probe `<func-dir>/workloads` first. Decide before the install
    command lands.
-5. **Bidirectional UX** (logs, progress, prompts) — CLI-rendered only in
-   v1, or do we lock in a callback contract now to avoid breaking changes
-   later?
-6. **Built-in workload** — does the CLI ship with any workload pre-installed
+5. **Built-in workload** — does the CLI ship with any workload pre-installed
    (e.g. seed the host-runtime workload on first run), or is the post-install
    state always "no workloads" and `func start` triggers an install prompt?
-7. **Host-runtime version pinning** — where does the per-project pin live
+6. **Host-runtime version pinning** — where does the per-project pin live
    (`host.json`, `local.settings.json`, a new `func.json`, project file)?
-8. **Host-runtime workload boundary** — does one workload ship all RIDs +
-   all major host versions, or one workload per major (e.g. `…Workload.Host.v4`,
-   `…Workload.Host.v5`)?
+7. **Host-runtime workload boundary** — does one workload ship all RIDs +
+   all major host versions, or one workload per major (e.g. `...Workload.Host.v4`,
+   `...Workload.Host.v5`)?
+
+**Resolved:** *Bidirectional UX* (workload-driven logs, progress,
+prompts) is **CLI-rendered only in v1** (see §2 non-goals). A
+callback contract for richer UX may be introduced in a later
+abstractions release as a non-breaking additive change.
