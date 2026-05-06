@@ -9,10 +9,11 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    public static class GoHelpers
+    internal static class GoHelpers
     {
         private const int MinimumGoMajorVersion = 1;
         private const int MinimumGoMinorVersion = 24;
+        private const string GoBinaryName = "app";
 
         public static async Task<WorkerLanguageVersionInfo> GetEnvironmentGoVersion()
         {
@@ -78,6 +79,48 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 ColoredConsole.WriteLine(AdditionalInfoColor("Skipped \"go mod tidy\". You must run \"go mod tidy\" manually."));
+            }
+        }
+
+        /// <summary>
+        /// Compiles the user's Go project into a binary named <see cref="GoBinaryName"/>
+        /// in <paramref name="workingDirectory"/>. The host resolves this binary via
+        /// <c>defaultExecutablePath</c> in <c>workers/native/worker.config.json</c>
+        /// (the host appends <c>.exe</c> on Windows automatically).
+        /// </summary>
+        public static async Task BuildProject(string workingDirectory = null)
+        {
+            workingDirectory ??= Environment.CurrentDirectory;
+            var outputName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
+            ColoredConsole.WriteLine($"Building Go worker binary '{outputName}'...");
+
+            var exe = new Executable("go", $"build -o \"{outputName}\" .", workingDirectory: workingDirectory);
+            var exitCode = await exe.RunAsync(
+                l => ColoredConsole.WriteLine(l),
+                e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+
+            if (exitCode != 0)
+            {
+                throw new CliException($"Go build failed with exit code {exitCode}. See output above for details.");
+            }
+        }
+
+        /// <summary>
+        /// Verifies that the compiled Go worker binary exists in
+        /// <paramref name="workingDirectory"/>. Throws a <see cref="CliException"/>
+        /// with an actionable message when missing — used by <c>func start --no-build</c>.
+        /// </summary>
+        public static void AssertBinaryExists(string workingDirectory = null)
+        {
+            workingDirectory ??= Environment.CurrentDirectory;
+            var binaryName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
+            var binaryPath = Path.Combine(workingDirectory, binaryName);
+
+            if (!FileSystemHelpers.FileExists(binaryPath))
+            {
+                throw new CliException(
+                    $"Could not find a built Go binary '{binaryName}' in '{workingDirectory}'. " +
+                    $"Run 'func start' without '--no-build' to compile, or run 'go build -o {binaryName} .' manually.");
             }
         }
 
