@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json.Serialization;
+using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Workloads.Storage;
 
@@ -13,4 +14,5 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(WorkloadRegistry))]
+[JsonSerializable(typeof(WorkloadMetadata))]
 internal sealed partial class WorkloadJsonContext : JsonSerializerContext;

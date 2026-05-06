@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,7 @@ internal static class WorkloadStorageRegistration
             sp => sp.GetRequiredService<IOptions<WorkloadPathsOptions>>().Value);
         services.AddSingleton<IWorkloadStore, WorkloadStore>();
         services.AddSingleton<IWorkloadLoader, WorkloadLoader>();
+        services.AddSingleton<IWorkloadMetadataReader, WorkloadMetadataReader>();
 
         // Materialize the installed-workloads list once, on first resolve.
         // The store + loader are still registered above so install / uninstall
