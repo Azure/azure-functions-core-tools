@@ -52,13 +52,13 @@ internal sealed class WorkloadLoadContext : AssemblyLoadContext
             return null;
         }
 
-        var resolved = _resolver.ResolveAssemblyToPath(assemblyName);
+        string? resolved = _resolver.ResolveAssemblyToPath(assemblyName);
         return resolved is null ? null : LoadFromAssemblyPath(resolved);
     }
 
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
     {
-        var resolved = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
+        string? resolved = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
         return resolved is null ? IntPtr.Zero : LoadUnmanagedDllFromPath(resolved);
     }
 

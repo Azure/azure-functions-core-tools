@@ -29,7 +29,7 @@ internal sealed class WorkloadListCommand(
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var entries = await _store.GetWorkloadsAsync(cancellationToken).ConfigureAwait(false);
+        var entries = await _store.GetWorkloadsAsync(cancellationToken);
 
         if (entries.Count == 0)
         {

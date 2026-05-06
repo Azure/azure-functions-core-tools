@@ -14,7 +14,7 @@ internal sealed class WorkloadRegistry
     /// <summary>
     /// Installed workloads. Empty when no workload has been installed yet.
     /// </summary>
-    public IList<WorkloadEntry> Workloads { get; init; } = new List<WorkloadEntry>();
+    public IList<WorkloadEntry> Workloads { get; init; } = [];
 }
 
 /// <summary>
@@ -37,7 +37,7 @@ internal sealed class WorkloadEntry
     /// Short aliases the user can pass to <c>func workload install/uninstall</c>
     /// instead of the full package id (e.g. <c>"dotnet"</c>).
     /// </summary>
-    public IReadOnlyList<string> Aliases { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Aliases { get; init; } = [];
 
     /// <summary>
     /// Where to find the <see cref="Workload"/> implementation. Copied from

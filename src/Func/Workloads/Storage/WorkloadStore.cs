@@ -18,8 +18,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
     public async Task<IReadOnlyList<WorkloadEntry>> GetWorkloadsAsync(
         CancellationToken cancellationToken = default)
     {
-        var registry = await ReadRegistryAsync(cancellationToken).ConfigureAwait(false);
-        return registry.Workloads.ToArray();
+        WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
+        return [.. registry.Workloads];
     }
 
     public async Task SaveWorkloadAsync(
@@ -30,9 +30,9 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.PackageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.PackageVersion);
 
-        var registry = await ReadRegistryAsync(cancellationToken).ConfigureAwait(false);
+        WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
 
-        var existing = FindIndex(registry, entry.PackageId, entry.PackageVersion);
+        int existing = FindIndex(registry, entry.PackageId, entry.PackageVersion);
         if (existing >= 0)
         {
             registry.Workloads[existing] = entry;
@@ -42,7 +42,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             registry.Workloads.Add(entry);
         }
 
-        await WriteRegistryAsync(registry, cancellationToken).ConfigureAwait(false);
+        await WriteRegistryAsync(registry, cancellationToken);
     }
 
     public async Task<bool> RemoveWorkloadAsync(
@@ -53,24 +53,24 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
-        var registry = await ReadRegistryAsync(cancellationToken).ConfigureAwait(false);
+        WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
 
-        var index = FindIndex(registry, packageId, version);
+        int index = FindIndex(registry, packageId, version);
         if (index < 0)
         {
             return false;
         }
 
         registry.Workloads.RemoveAt(index);
-        await WriteRegistryAsync(registry, cancellationToken).ConfigureAwait(false);
+        await WriteRegistryAsync(registry, cancellationToken);
         return true;
     }
 
     private static int FindIndex(WorkloadRegistry registry, string packageId, string version)
     {
-        for (var i = 0; i < registry.Workloads.Count; i++)
+        for (int i = 0; i < registry.Workloads.Count; i++)
         {
-            var candidate = registry.Workloads[i];
+            WorkloadEntry candidate = registry.Workloads[i];
             if (string.Equals(candidate.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(candidate.PackageVersion, version, StringComparison.Ordinal))
             {
@@ -83,7 +83,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
     private async Task<WorkloadRegistry> ReadRegistryAsync(CancellationToken cancellationToken)
     {
-        var path = _paths.WorkloadRegistryPath;
+        string path = _paths.WorkloadRegistryPath;
         if (!File.Exists(path))
         {
             return new WorkloadRegistry();
@@ -102,7 +102,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             return await JsonSerializer.DeserializeAsync(
                 stream,
                 WorkloadJsonContext.Default.WorkloadRegistry,
-                cancellationToken).ConfigureAwait(false)
+                cancellationToken)
                 ?? new WorkloadRegistry();
         }
         catch (JsonException ex)
@@ -115,8 +115,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
     private async Task WriteRegistryAsync(WorkloadRegistry registry, CancellationToken cancellationToken)
     {
-        var path = _paths.WorkloadRegistryPath;
-        var directory = Path.GetDirectoryName(path)!;
+        string path = _paths.WorkloadRegistryPath;
+        string directory = Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(directory);
 
         // Serialize to a temp file first so a partial write (crash, power loss,
@@ -124,7 +124,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         // registry. The subsequent File.Move replaces the target atomically
         // because the temp file lives in the same directory (rename(2) /
         // MoveFileEx with REPLACE_EXISTING are atomic within a filesystem).
-        var tempPath = Path.Combine(directory, $"{Guid.NewGuid():N}.json.tmp");
+        string tempPath = Path.Combine(directory, $"{Guid.NewGuid():N}.json.tmp");
 
         try
         {
@@ -136,7 +136,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
                 bufferSize: 4096,
                 useAsync: true))
             {
-                await SerializeAsync(stream, registry, cancellationToken).ConfigureAwait(false);
+                await SerializeAsync(stream, registry, cancellationToken);
             }
 
             File.Move(tempPath, path, overwrite: true);

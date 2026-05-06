@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Reflection;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Storage;
 
@@ -22,7 +23,7 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
         ArgumentNullException.ThrowIfNull(entries);
 
         var results = new List<WorkloadInfo>(entries.Count);
-        foreach (var entry in entries)
+        foreach (WorkloadEntry entry in entries)
         {
             results.Add(LoadEntry(entry));
         }
@@ -32,8 +33,8 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
 
     private WorkloadInfo LoadEntry(WorkloadEntry entry)
     {
-        var installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-        var assemblyPath = Path.Combine(installPath, entry.EntryPoint.AssemblyPath);
+        string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        string assemblyPath = Path.Combine(installPath, entry.EntryPoint.AssemblyPath);
         if (!File.Exists(assemblyPath))
         {
             throw new GracefulException(
@@ -41,16 +42,12 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
                 isUserError: true);
         }
 
-        var assembly = new WorkloadLoadContext(entry.PackageId, assemblyPath)
+        Assembly assembly = new WorkloadLoadContext(entry.PackageId, assemblyPath)
             .LoadFromAssemblyPath(assemblyPath);
 
-        var type = assembly.GetType(entry.EntryPoint.Type, throwOnError: false);
-        if (type is null)
-        {
-            throw new GracefulException(
+        Type? type = assembly.GetType(entry.EntryPoint.Type, throwOnError: false) ?? throw new GracefulException(
                 $"[{entry.PackageId}] Could not load workload: type '{entry.EntryPoint.Type}' was not found in '{entry.EntryPoint.AssemblyPath}' (install path: '{installPath}').",
                 isUserError: true);
-        }
 
         if (!typeof(Workload).IsAssignableFrom(type))
         {
