@@ -45,7 +45,7 @@ func setup [--workloads <list>] [--profiles <list>]
 
 ### 3.1 Interactive flow (default)
 
-1. If running inside a project directory, infer suggested workloads from project files (read-only).
+1. If running inside a project directory, infer suggested workloads via the shared **project detection** module (see §9.6). This is a read-only signal source reused from the workloads spec's "find missing workloads" flow ([workload-spec.md](./workload-spec.md)).
 2. Present a grouped picker (language stacks, feature workloads).
 3. Confirm and install the selected workloads via the workload subsystem.
 4. If `.func/config.json` declares profiles (see [cli-profiles.md](./cli-profiles.md)), pre-install their dependencies.
@@ -156,6 +156,16 @@ Single non-zero on any drift, or distinct codes per drift type?
 
 What signals does `setup` read, and how is the inference surfaced?
 
-**Decision:** `setup` reads everything it reasonably can (e.g. `host.json` `workerRuntime`, language manifests like `package.json` / `requirements.txt` / `*.csproj` / `pom.xml`, `.func/config.json` for declared profiles). The inference is **informational only**: the picker shows what was detected, but the user still picks explicitly. Nothing is pre-selected from inference alone.
+**Decision:** `setup` does not implement its own detection. It calls the shared **project detection** module owned by the workloads spec (see [workload-spec.md](./workload-spec.md), and PR #4923 thread r3190018800 for the original signal list). Signals include:
 
-> Note: this is in tension with §9.3, which pre-selects recommended defaults *per detected language*. The reconciled rule is: detection surfaces information; *recommendations* (curated workload sets shipped with the CLI) are what get pre-selected. If detection finds Python, the picker shows "detected: Python" and pre-selects the **Python recommendation** (a CLI-curated set), not raw inference output. The user remains the decider.
+- `--stack <name>` (explicit override, when provided).
+- `local.settings.json` `FUNCTIONS_WORKER_RUNTIME`.
+- `host.json` (presence and `workerRuntime`).
+- Project marker files: `*.csproj`, `requirements.txt`, `package.json`, `pom.xml`, etc.
+- `.func/config.json` (for declared profiles, per [cli-profiles.md](./cli-profiles.md)).
+
+The inference is **informational**: the picker surfaces what was detected ("detected: Python"). What gets *pre-selected* in the picker comes from §9.3's curated recommendations, not raw detection output. The user remains the decider.
+
+Reusing the same detection module as the workloads "missing workloads" flow ensures the two callers cannot drift apart.
+
+
