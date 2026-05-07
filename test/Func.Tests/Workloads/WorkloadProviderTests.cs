@@ -75,9 +75,8 @@ public class WorkloadProviderTests
             .Returns([]);
         var provider = new WorkloadProvider(store, loader);
 
-        Task<IReadOnlyList<WorkloadInfo>>[] callers = Enumerable.Range(0, 10)
-            .Select(_ => Task.Run(async () => await provider.GetWorkloadsAsync()))
-            .ToArray();
+        Task<IReadOnlyList<WorkloadInfo>>[] callers = [.. Enumerable.Range(0, 10)
+            .Select(_ => Task.Run(async () => await provider.GetWorkloadsAsync()))];
 
         // Give the callers time to queue behind the gate before releasing.
         await Task.Delay(50);

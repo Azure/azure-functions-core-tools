@@ -55,7 +55,7 @@ public abstract class FunctionsCliBuilder
                 nameof(TCommand));
         }
 
-        OnRegisterCommand(sp => ActivatorUtilities.GetServiceOrCreateInstance<TCommand>(sp));
+        OnRegisterCommand(ActivatorUtilities.GetServiceOrCreateInstance<TCommand>);
     }
 
     /// <summary>

@@ -17,20 +17,20 @@ using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-var theme = new DefaultTheme();
-var interaction = new SpectreInteractionService(theme);
+DefaultTheme theme = new();
+SpectreInteractionService interaction = new(theme);
 
 // Build the host: a CLI process gets the empty variant so we skip the default
 // configuration and logging providers (they're not needed). The host owns
 // shared lifetimes — currently just the OpenTelemetry pipeline, which is
 // registered as hosted services so flush + shutdown happen via host disposal.
-var hostBuilder = Host.CreateEmptyApplicationBuilder(null);
+HostApplicationBuilder hostBuilder = Host.CreateEmptyApplicationBuilder(null);
 hostBuilder.Services.AddSingleton(interaction);
 
 // Wire OpenTelemetry only when a real instrumentation key is baked in and
 // the user hasn't opted out. When it isn't, no listener is subscribed and
 // ActivitySource / Meter calls become no-ops.
-if (CliTelemetry.TryGetConnectionString(out var connectionString))
+if (CliTelemetry.TryGetConnectionString(out string? connectionString))
 {
     hostBuilder.Services.AddOpenTelemetry()
         .ConfigureResource(r => CliTelemetry.ConfigureResource(r))
@@ -57,7 +57,7 @@ hostBuilder.Services.AddWorkloadStorage();
 // resolvable when commands are built below.
 WorkloadRegistration.RegisterWorkloads(new DefaultFunctionsCliBuilder(hostBuilder.Services));
 
-using var host = hostBuilder.Build();
+using IHost host = hostBuilder.Build();
 
 // Start the host so hosted services (OTel providers) are running and
 // listeners are subscribed before any command code emits telemetry.
