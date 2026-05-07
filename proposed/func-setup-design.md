@@ -61,7 +61,24 @@ func setup --workloads node,python --profiles flex --non-interactive --yes
 - Installs the listed workloads. Pre-installs dependencies for the listed profiles.
 - Exits non-zero on any failure or ambiguity.
 
-### 3.3 `--check` mode
+### 3.3 Catalog and recommendations
+
+The picker draws from two sources, owned by different layers:
+
+| Zone                  | Source                                                       | Owned by                               |
+| --------------------- | ------------------------------------------------------------ | -------------------------------------- |
+| Featured / recommended | CLI-curated stack list (`node`, `python`, `dotnet-isolated`, `java`, `powershell`, `custom`) plus a per-stack **recommendation bundle** | Func CLI (hard-coded, small)           |
+| Browse all            | `func workload search` against the configured NuGet feed     | Workload subsystem ([workload-spec.md](./workload-spec.md) §4.1) |
+
+**Featured** is what gets *surfaced first* and what counts as "the Python recommendation" for §9.3 pre-selection. Members are the well-known Functions worker runtimes; the same list already exists in the workloads spec for the install-hint flow (workload-spec §4.2). `setup` reuses that list, it does not introduce a new one.
+
+**Browse all** is the full dynamic catalog. Third-party workloads, less-common stacks, and anything the user reaches via search live here. `setup` does not maintain this list; it is whatever `func workload search` returns.
+
+A recommendation bundle is initially the single canonical workload for that stack (e.g. Python recommendation = `python`). Bundles can grow over time (e.g. `python` + `azure-tools` + `durable`) without changing the picker UX.
+
+This split avoids two failure modes: all hard-coded means stale catalogs and no third-party visibility; all catalog means no opinion and a slow path for new users.
+
+### 3.4 `--check` mode
 
 Same resolution logic as a real run, no mutations. Reports what is missing (workloads, profile dependencies, caches). Useful for verifying a pre-baked CI image.
 
