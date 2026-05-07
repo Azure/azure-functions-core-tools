@@ -18,8 +18,6 @@ namespace Azure.Functions.Cli.Arm
         public const string FunctionsStacksApiVersion = "2020-10-01";
         public const string FlexFunctionsStacksApiVersion = "2020-10-01";
         public const string ArgUri = "providers/Microsoft.ResourceGraph/resources";
-
-        public static readonly ArmUriTemplate SubscriptionResourceByNameAndType = new ArmUriTemplate($"resources?$filter=(SubscriptionId eq '{{subscriptionId}}' and name eq '{{resourceName}}' and resourceType eq '{{resourceType}}')", ArmApiVersion);
     }
 
     public class ArmUriTemplate

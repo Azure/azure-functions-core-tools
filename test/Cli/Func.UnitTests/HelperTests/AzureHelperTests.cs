@@ -119,8 +119,50 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 ArmClient.SetTestHandler(mockHttp);
 
                 // Act + Assert
-                await Assert.ThrowsAsync<CliException>(() =>
+                await Assert.ThrowsAsync<ArmResourceNotFoundException>(() =>
                     AzureHelper.GetStorageAccount(storageName, accessToken, managementUrl));
+            }
+            finally
+            {
+                ArmClient.SetTestHandler(null);
+            }
+        }
+
+        [Fact]
+        public async Task GetStorageAccount_ShouldResolveAcrossMultipleSubscriptions()
+        {
+            try
+            {
+                const string managementUrl = "https://management.azure.com";
+                const string storageName = "mystorage";
+                const string accessToken = "token";
+
+                var subscriptionsUrl = $"{managementUrl}/subscriptions?api-version=2018-09-01";
+                var argUrl = $"{managementUrl}/providers/Microsoft.ResourceGraph/resources?api-version=2019-04-01";
+                var resourceId = "/subscriptions/sub2/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/mystorage";
+                var keysUrl = $"{managementUrl}/subscriptions/sub2/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/{storageName}/listKeys?api-version=2018-02-01";
+                var mockHttp = new MockHttpMessageHandler();
+
+                // Mock multiple subscriptions
+                mockHttp.When(HttpMethod.Get, subscriptionsUrl).Respond("application/json", @"{'value': [{ 'subscriptionId': 'sub1', 'displayName': 'Sub One' }, { 'subscriptionId': 'sub2', 'displayName': 'Sub Two' },{ 'subscriptionId': 'sub2', 'displayName': 'Sub Three' }]}");
+
+                // ARG resolves storage account from sub2
+                mockHttp.When(HttpMethod.Post, argUrl).Respond("application/json", $@"{{'data': {{'rows': [[ '{resourceId}' ]]}}}}");
+
+                // listKeys call
+                mockHttp.When(HttpMethod.Post, keysUrl).Respond("application/json", @"{'keys': [{'keyName': 'key1','value': 'test-key','permissions': 'FULL'}]}");
+                ArmClient.SetTestHandler(mockHttp);
+
+                // Act
+                var result = await AzureHelper.GetStorageAccount(
+                    storageName,
+                    accessToken,
+                    managementUrl);
+
+                // Assert
+                result.Should().NotBeNull();
+                result.StorageAccountName.Should().Be(storageName);
+                result.StorageAccountKey.Should().Be("test-key");
             }
             finally
             {

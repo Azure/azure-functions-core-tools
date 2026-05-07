@@ -288,19 +288,28 @@ namespace Azure.Functions.Cli.Helpers
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
             var subIds = subscriptions?.Select(s => s.SubscriptionId).ToList();
 
-            if (subIds == null || subIds.Count == 0)
+            if (subIds.Count == 0)
             {
                 throw new InvalidOperationException("No subscriptions found for the current account.");
             }
 
             // Resolve storage account via Azure Resource Graph (ARG)
+            var escapedStorageAccountName = storageAccountName.Replace("'", "''");
             var query =
-                $"Resources | where type =~ 'microsoft.storage/storageaccounts' " +
-                $"and name =~ '{storageAccountName}' | project id | limit 1";
+               $"where type =~ 'microsoft.storage/storageaccounts' " +
+               $"and name =~ '{escapedStorageAccountName}' | project id | limit 1";
 
-            var resourceId = await GetResourceIDFromArg(subIds, query, accessToken, managementURL);
-
-            if (string.IsNullOrWhiteSpace(resourceId))
+            string resourceId;
+            try
+            {
+                resourceId = await GetResourceIDFromArg(
+                    subIds,
+                    query,
+                    accessToken,
+                    managementURL);
+            }
+            catch (CliException ex) when (
+               ex.Message == "Error finding the Azure Resource information.")
             {
                 throw new ArmResourceNotFoundException(
                     $"Cannot find storage account with name {storageAccountName}");
