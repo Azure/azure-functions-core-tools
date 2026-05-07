@@ -101,7 +101,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IProjectInitializer? initializer = await SelectInitializerAsync(stack, cancellationToken);
         if (initializer is null)
         {
-            string[] installed = _initializers.Select(i => i.Stack).ToArray();
+            string[] installed = [.. _initializers.Select(i => i.Stack)];
             WorkloadHint hint = installed.Length == 0
                 ? new WorkloadHint(WorkloadHintKind.NoWorkloadsInstalled, "initialize a project", null, installed)
                 : stack is not null

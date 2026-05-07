@@ -78,7 +78,7 @@ public class DefaultFunctionsCliBuilderTests
         var services = new ServiceCollection();
         var builder = new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo());
 
-        var ex = Assert.Throws<ArgumentException>(() => builder.RegisterCommand<AbstractFuncCommand>());
+        var ex = Assert.Throws<ArgumentException>(builder.RegisterCommand<AbstractFuncCommand>);
         Assert.Contains("abstract command type", ex.Message);
         Assert.Contains(nameof(AbstractFuncCommand), ex.Message);
     }
@@ -163,7 +163,7 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
 
-        Assert.Throws<InvalidOperationException>(() => builder.RegisterCommand<GenericTestCommand>());
+        Assert.Throws<InvalidOperationException>(builder.RegisterCommand<GenericTestCommand>);
     }
 
     [Fact]
