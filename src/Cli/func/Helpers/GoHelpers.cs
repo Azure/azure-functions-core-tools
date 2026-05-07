@@ -3,6 +3,7 @@
 
 using System.Text;
 using System.Text.RegularExpressions;
+using Azure.Functions.Cli.Actions.LocalActions.PackAction;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -131,7 +132,13 @@ namespace Azure.Functions.Cli.Helpers
         /// by <c>func pack</c> and <c>func publish</c> — the produced binary is the
         /// one that runs on the Linux Functions host, regardless of the dev OS.
         /// </summary>
-        public static async Task BuildForLinux(string workingDirectory = null)
+        /// <remarks>
+        /// TODO(arm64): Currently hardcoded to linux/amd64. Linux ARM64 Function Apps
+        /// are not yet supported by Core Tools' Go pipeline. When the ARM resource
+        /// model exposes the target instance architecture, this method should accept
+        /// a target arch and the publish path should reject mismatches up front.
+        /// </remarks>
+        internal static async Task BuildForLinux(string workingDirectory = null)
         {
             workingDirectory ??= Environment.CurrentDirectory;
 
@@ -148,19 +155,17 @@ namespace Azure.Functions.Cli.Helpers
             };
 
             var exe = new Executable("go", $"build -o \"{GoBinaryName}\" .", workingDirectory: workingDirectory, environmentVariables: env);
-            var stderr = new StringBuilder();
+
+            // Stream stderr inline (red) and let the thrown exception summarize on failure
+            // rather than re-printing the captured output, so users don't see compiler errors twice.
             var exitCode = await exe.RunAsync(
                 l => ColoredConsole.WriteLine(l),
-                e =>
-                {
-                    stderr.AppendLine(e);
-                    ColoredConsole.Error.WriteLine(ErrorColor(e));
-                });
+                e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
 
             if (exitCode != 0)
             {
-                var detail = stderr.Length == 0 ? string.Empty : $" {stderr.ToString().Trim()}";
-                throw new CliException($"Go build for linux/amd64 failed with exit code {exitCode}.{detail}");
+                throw new CliException(
+                    $"Go build for linux/amd64 failed with exit code {exitCode}. See output above for details.");
             }
         }
 
@@ -171,7 +176,7 @@ namespace Azure.Functions.Cli.Helpers
         /// Called by <c>func pack --no-build</c> to confirm the binary was properly
         /// cross-compiled before packaging for deployment.
         /// </summary>
-        public static void AssertLinuxAmd64Binary(string workingDirectory = null)
+        internal static void AssertLinuxAmd64Binary(string workingDirectory = null)
         {
             workingDirectory ??= Environment.CurrentDirectory;
             var binaryPath = Path.Combine(workingDirectory, GoBinaryName);
@@ -214,8 +219,8 @@ namespace Azure.Functions.Cli.Helpers
                 if (!isElf)
                 {
                     throw new CliException(
-                        $"'{binaryPath}' is not an ELF binary. The Functions Linux host requires a linux/amd64 ELF binary. " +
-                        "Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app .'");
+                        $"'{binaryPath}' is not an ELF binary. Core Tools currently only supports linux/amd64 Go targets. " +
+                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .'");
                 }
             }
 
@@ -225,8 +230,8 @@ namespace Azure.Functions.Cli.Helpers
                 if (header[4] != 2 || header[5] != 1)
                 {
                     throw new CliException(
-                        $"'{binaryPath}' is not a 64-bit little-endian ELF binary. The Functions Linux host requires a linux/amd64 binary. " +
-                        "Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app .'");
+                        $"'{binaryPath}' is not a 64-bit little-endian ELF binary. Core Tools currently only supports linux/amd64 Go targets. " +
+                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .'");
                 }
             }
 
@@ -237,8 +242,8 @@ namespace Azure.Functions.Cli.Helpers
                 if (eMachine != 0x3E)
                 {
                     throw new CliException(
-                        $"'{binaryPath}' targets machine 0x{eMachine:X4}, not x86_64. The Functions Linux host requires a linux/amd64 binary. " +
-                        "Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app .'");
+                        $"'{binaryPath}' targets machine 0x{eMachine:X4}, not x86_64. Core Tools currently only supports linux/amd64 Go targets. " +
+                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .'");
                 }
             }
 
@@ -255,7 +260,7 @@ namespace Azure.Functions.Cli.Helpers
         /// Go deployment zip. Centralizes the list so that <see cref="ZipHelper"/>
         /// (zip composition) and <c>func publish --list-included-files</c> stay in sync.
         /// </summary>
-        public static IEnumerable<string> GetPackFiles(string functionAppRoot)
+        internal static IEnumerable<string> GetPackFiles(string functionAppRoot)
         {
             functionAppRoot ??= Environment.CurrentDirectory;
             return new[]
@@ -266,30 +271,20 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         /// <summary>
-        /// Verifies the function app root has the files required to build/publish a Go app:
-        /// <c>host.json</c> and <c>go.mod</c>. Throws <see cref="CliException"/> with an
-        /// actionable message on failure. Used by <c>func publish</c>; <c>func pack</c>
-        /// performs the equivalent checks via <see cref="PackValidationHelper"/>.
+        /// Verifies the function app root has the files required to build/publish a Go app
+        /// (<c>host.json</c> and <c>go.mod</c>) by routing through <see cref="PackValidationHelper"/>
+        /// so <c>func pack</c> and <c>func publish</c> share the same validation flow and messages.
+        /// Throws <see cref="CliException"/> on failure.
         /// </summary>
-        public static void AssertGoFunctionAppLayout(string functionAppRoot)
+        internal static void AssertGoFunctionAppLayout(string functionAppRoot)
         {
             functionAppRoot ??= Environment.CurrentDirectory;
 
-            var hostJsonPath = Path.Combine(functionAppRoot, Constants.HostJsonFileName);
-            if (!FileSystemHelpers.FileExists(hostJsonPath))
+            var validations = new List<Action<string>>
             {
-                throw new CliException(
-                    $"Could not find '{Constants.HostJsonFileName}' in '{functionAppRoot}'. " +
-                    "Run 'func publish' from the root of a Go function app.");
-            }
-
-            var goModPath = Path.Combine(functionAppRoot, GoModFileName);
-            if (!FileSystemHelpers.FileExists(goModPath))
-            {
-                throw new CliException(
-                    $"Could not find '{GoModFileName}' in '{functionAppRoot}'. " +
-                    "Run 'func publish' from the root of a Go function app.");
-            }
+                dir => PackValidationHelper.RunRequiredFilesValidation(dir, new[] { GoModFileName }, "Validate go.mod"),
+            };
+            PackValidationHelper.RunValidations(functionAppRoot, validations);
         }
 
         private static async Task RunGoCommandAsync(string arguments, string errorMessage, bool throwOnFailure = true)

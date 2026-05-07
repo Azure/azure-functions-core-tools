@@ -164,18 +164,21 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"--build {PublishBuildOption} is not supported for Windows Elastic Premium Function Apps.");
             }
 
+            // Get the WorkerRuntime
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+
             // Go is cross-compiled to linux/amd64 and currently only supported on Flex Consumption.
             // Reject Windows targets, non-Flex SKUs, and unsupported build modes up front.
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
+            if (workerRuntime == WorkerRuntime.Go)
             {
                 if (!functionApp.IsLinux)
                 {
-                    throw new CliException("Golang is only supported for Linux Function Apps.");
+                    throw new CliException("Go is only supported for Linux Function Apps.");
                 }
 
                 if (!functionApp.IsFlex)
                 {
-                    throw new CliException("Golang is only supported on Flex Consumption Function Apps.");
+                    throw new CliException("Go is only supported on Flex Consumption Function Apps.");
                 }
 
                 if (PublishBuildOption == BuildOption.Remote || PublishBuildOption == BuildOption.Container)
@@ -183,14 +186,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException(
                         $"--build {PublishBuildOption} is not supported for Go. Run 'func publish' without '--build {PublishBuildOption}'.");
                 }
+
+                // BuildNativeDeps is checked separately because ResolveBuildOption (called later) flips
+                // PublishBuildOption to BuildOption.Container when --build-native-deps is set, which would
+                // bypass the Go build branch and ship a zip with a missing or stale 'app' binary.
+                if (BuildNativeDeps)
+                {
+                    throw new CliException("--build-native-deps is not supported for Go. Run 'func publish' without '--build-native-deps'.");
+                }
             }
 
             // Get the GitIgnoreParser from the functionApp root
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
             var ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
-
-            // Get the WorkerRuntime
-            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Get Stacks once for both .NET version determination and EOL checking
             var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
@@ -1361,7 +1369,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
             {
                 // Go uses an explicit allowlist (see GoHelpers.GetPackFiles); funcignore is not consulted.
-                ColoredConsole.WriteLine("Go publishes only host.json and app; all other files are excluded.");
+                ColoredConsole.WriteLine($"Go publishes only {Constants.HostJsonFileName} and {GoHelpers.GoBinaryName}; all other files are excluded.");
                 return;
             }
 

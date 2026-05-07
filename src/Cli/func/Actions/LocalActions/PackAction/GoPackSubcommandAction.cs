@@ -3,19 +3,12 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Interfaces;
-using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
     [Action(Name = "pack go", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to Go apps when running func pack")]
     internal class GoPackSubcommandAction : PackSubcommandAction
     {
-        public override ICommandLineParserResult ParseArgs(string[] args)
-        {
-            return base.ParseArgs(args);
-        }
-
         public async Task RunAsync(PackOptions packOptions)
         {
             await ExecuteAsync(packOptions);
@@ -23,12 +16,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected internal override void ValidateFunctionApp(string functionAppRoot, PackOptions options)
         {
-            // RunValidations runs the standard host.json check plus our Go-specific checks.
-            var validations = new List<Action<string>>
-            {
-                dir => PackValidationHelper.RunRequiredFilesValidation(dir, new[] { GoHelpers.GoModFileName }, "Validate go.mod"),
-            };
-            PackValidationHelper.RunValidations(functionAppRoot, validations);
+            GoHelpers.AssertGoFunctionAppLayout(functionAppRoot);
         }
 
         protected override Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options)
@@ -49,13 +37,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             await GoHelpers.BuildForLinux(functionAppRoot);
         }
 
-        // No PackFunctionAsync override — the default flow goes through
+        // PackFunctionAsync intentionally not overridden — the default flow goes through
         // PackHelpers.CreatePackage → ZipHelper.GetAppZipFile, which has a Go branch
         // that emits the explicit allowlist (host.json + app).
         public override Task RunAsync()
         {
-            // Subcommand is dispatched via PackAction.RunRuntimeSpecificPackAsync; not invoked directly.
+            // Keep this since this subcommand is not meant to be run directly; dispatch happens
+            // via PackAction.RunRuntimeSpecificPackAsync, which calls RunAsync(PackOptions) above.
             return Task.CompletedTask;
         }
     }
 }
+

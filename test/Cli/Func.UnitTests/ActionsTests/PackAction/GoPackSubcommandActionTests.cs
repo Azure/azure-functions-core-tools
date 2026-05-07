@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Actions.LocalActions.PackAction;
 using Azure.Functions.Cli.Common;
+using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
@@ -32,9 +33,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             File.WriteAllText(Path.Combine(_tempDirectory, "go.mod"), "module example.com/test\n\ngo 1.24\n");
 
             var action = new GoPackSubcommandAction();
-            var ex = Record.Exception(() => action.ValidateFunctionApp(_tempDirectory, new PackOptions()));
+            var validate = () => action.ValidateFunctionApp(_tempDirectory, new PackOptions());
 
-            Assert.Null(ex);
+            validate.Should().NotThrow();
         }
 
         [Fact]
@@ -43,11 +44,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             File.WriteAllText(Path.Combine(_tempDirectory, "go.mod"), "module example.com/test\n\ngo 1.24\n");
 
             var action = new GoPackSubcommandAction();
-            var ex = Record.Exception(() => action.ValidateFunctionApp(_tempDirectory, new PackOptions()));
+            var validate = () => action.ValidateFunctionApp(_tempDirectory, new PackOptions());
 
-            Assert.NotNull(ex);
-            Assert.IsType<CliException>(ex);
-            Assert.Contains("host.json", ex.Message);
+            validate.Should().Throw<CliException>()
+                .Which.Message.Should().Contain("host.json");
         }
 
         [Fact]
@@ -56,11 +56,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             File.WriteAllText(Path.Combine(_tempDirectory, "host.json"), "{}");
 
             var action = new GoPackSubcommandAction();
-            var ex = Record.Exception(() => action.ValidateFunctionApp(_tempDirectory, new PackOptions()));
+            var validate = () => action.ValidateFunctionApp(_tempDirectory, new PackOptions());
 
-            Assert.NotNull(ex);
-            Assert.IsType<CliException>(ex);
-            Assert.Contains("go.mod", ex.Message);
+            validate.Should().Throw<CliException>()
+                .Which.Message.Should().Contain("go.mod");
         }
     }
 }
