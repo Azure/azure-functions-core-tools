@@ -744,6 +744,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (WorkerRuntimeLanguageHelper.IsDotnet(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !NoBuild)
             {
+                if (WorkerRuntimeLanguageHelper.IsDotnetIsolated(GlobalCoreToolsSettings.CurrentWorkerRuntime)
+                    && DotnetHelpers.CanDotnetBuild())
+                {
+                    ColoredConsole.WriteLine(WarningColor(
+                        "Running 'func start' directly against a .NET Isolated project may not correctly load function extensions. " +
+                        "Use 'dotnet run' instead, which builds the project and starts the Functions host from the correct output directory."));
+                }
+
                 await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Powershell && !CommandChecker.CommandExists("dotnet"))
