@@ -41,11 +41,12 @@
 | Term                  | Meaning                                                                 |
 |-----------------------|-------------------------------------------------------------------------|
 | **Func CLI**          | The `func` binary itself. Owns command parsing, UX, workload lifecycle. Distinct from the Functions host runtime, which is itself delivered as a workload (see §4.6). |
-| **Host runtime**      | `Microsoft.Azure.WebJobs.Script.WebHost`, the process that actually executes Functions. Acquired and versioned as a workload, launched by `func start`. |
+| **Host runtime**      | `Microsoft.Azure.WebJobs.Script.WebHost`, the process that actually executes Functions. Acquired and versioned as a content-only workload (see below); `func start` knows how to launch it directly. |
 | **Workload**          | An installable extension that contributes init/new/pack support and/or commands. Concretely: a NuGet package whose entry-point assembly contains a class deriving from the abstract `Workload` base in `Func.Cli.Abstractions` (see §5). |
+| **Content-only workload** | A workload that ships only files (no entry-point class, no `Configure` call, no contribution points). The CLI installs and tracks it like any other workload, but the loader skips it: it is consumed by built-in commands that know its package id and disk layout. The host-runtime workload is the canonical example. |
 | **Workload package**  | The distributable unit. NuGet in v1; format may evolve.                 |
 | **Catalog**           | The package source `func workload search` / `install` queries to resolve workload packages. The configured default is the public NuGet feed; alternates can be passed via `--source`. |
-| **Alias**             | A short, NuGet-tag-safe handle (e.g. `python`) declared by a workload package via an `alias:<name>` tag. Users can pass aliases to `install` / `uninstall` / `update` instead of the full package id (see §5.3, §6.1). |
+| **Alias**             | A short, NuGet-tag-safe handle (e.g. `python`) declared by a workload package via an `alias:<name>` tag. Users can pass aliases to `install` / `uninstall` / `update` / `prune` instead of the full package id (see §5.3, §6.1). |
 | **Workload home**     | The on-disk root the CLI uses to install workloads and read the workload registry. Defaults to `~/.azure-functions`; configurable via the `FUNC_CLI_Workloads__Home` environment variable (see §11 for the env var prefix convention). |
 | **Workload registry**   | The single CLI-owned JSON file at `<workload-home>/workloads.json` recording which workload versions are installed and how to load them. |
 | **Worker runtime**    | The Functions runtime language identifier (`dotnet`, `node`, `python`, `java`, `powershell`, `custom`). |
@@ -62,13 +63,15 @@
 func workload list [--all-versions|-a] [--json]
 ```
 
-Lists installed workloads with id, version, capabilities, and install path.
+Lists installed workloads with id, version, type (normal or
+content-only), capabilities, and install path.
 
 ##### Options
 
 - `--all-versions|-a`
   - Lists every installed version of every workload. Default: only the
-    active version per workload is shown.
+    loaded version per workload is shown (the highest installed semver,
+    see §6.2).
 - `--json`
   - Emits machine-readable JSON output instead of the default
     human-readable table. Required for scripting.
@@ -101,10 +104,17 @@ returns id, latest version, and description for matching packages.
 #### `func workload install`
 
 ```
-func workload install <package> [--version|-v <v>] [--source <path>] [--exact|-e] [--include-prereleases]
+func workload install <package> [--version|-v <v>] [--source <path>] [--exact|-e] [--include-prereleases] [--force|-f]
 ```
 
 Acquires and installs a workload. See §6.1 for the full install pipeline.
+
+If any version of `<package>` is already installed, the CLI prompts:
+`<package> is already installed at <existing>. Run 'func workload
+update <package>' instead?` Pass `--force` to skip the prompt and add
+the new version side-by-side anyway. In non-interactive contexts (no
+TTY, `--json` upstream), the prompt is treated as decline and the CLI
+exits non-zero with the same hint.
 
 ##### Arguments
 
@@ -130,6 +140,13 @@ Acquires and installs a workload. See §6.1 for the full install pipeline.
 - `--include-prereleases`
   - Allows pre-release versions to be selected when resolving "latest".
     Default: stable only.
+- `--force|-f`
+  - Skips the "already installed" prompt and proceeds with a
+    side-by-side install. For normal workloads, the new version (if
+    higher than the existing one) becomes the loaded version on the
+    next `func` invocation (see §6.2). For content-only workloads,
+    consumers (e.g. `func start` for the host workload) likewise pick
+    the highest installed version.
 
 #### `func workload uninstall`
 
@@ -161,12 +178,12 @@ Removes an installed workload. By default removes only the active version.
 #### `func workload update`
 
 ```
-func workload update [<package>] [--all] [--major] [--prune] [--source <path>] [--include-prereleases]
+func workload update [<package>] [--version|-v <v>] [--all] [--major] [--source <path>] [--include-prereleases]
 ```
 
-Updates one or all workloads to the latest compatible version. Default
-is "same major version only". The new version is installed side-by-side
-and the active pointer is swapped atomically (see §6.4).
+Updates a workload **in place**: removes one existing installed version
+and replaces it with the latest compatible version from the catalog.
+Default is "same major version only". See §6.4 for the full pipeline.
 
 ##### Arguments
 
@@ -176,14 +193,17 @@ and the active pointer is swapped atomically (see §6.4).
 
 ##### Options
 
+- `--version|-v`
+  - Names the **existing installed version** to update. The CLI removes
+    `<v>` and installs the new version in its place. Errors if `<v>` is
+    not currently installed. Default: updates the latest installed
+    version of `<package>`.
 - `--all`
-  - Updates every installed workload. Mutually exclusive with `<package>`.
+  - Updates every installed workload (the latest installed version of
+    each). Mutually exclusive with `<package>`.
 - `--major`
   - Allows crossing a major-version boundary. Default: same major
     version only, to protect against breaking changes.
-- `--prune`
-  - Deletes superseded versions from disk after a successful swap.
-    Default: keep prior versions to allow rollback (see §6.4).
 - `--source <path>`
   - Resolves updates from an alternate feed instead of the configured
     default catalog.
@@ -191,62 +211,26 @@ and the active pointer is swapped atomically (see §6.4).
   - Allows pre-release versions to be selected when resolving "latest".
     Default: stable only.
 
-#### `func workload pin`
+#### `func workload prune`
 
 ```
-func workload pin <package> --version|-v <v> [--exact|-e]
+func workload prune [<package>] [--exact|-e]
 ```
 
-Pins an installed workload to a specific version. While pinned, the
-loader honors `<v>` regardless of newer installs (see §6.2
-"Multiple-version policy"). The pin is persisted to the workload
-registry (§10.1) under `activeVersions[<packageId>]`, so it survives
-across `func` invocations.
+Removes inactive side-by-side installs. For each in-scope `packageId`,
+keeps the **latest installed version** and uninstalls every older
+version (directory + registry row). The latest version is never pruned
+(use `func workload uninstall --all-versions` for that).
 
-Use this to roll forward, roll back, or hold a workload at a known-good
-version while you investigate a regression. The named version **must**
-already be installed; if it isn't, the CLI errors with the exact
-`func workload install` command to run.
-
-This is a registry-only operation: no catalog round-trip, no
-re-download. The change is durable on disk the moment the command
-returns; it takes effect on the **next** `func` invocation. The
-currently running CLI process keeps the workloads it discovered at
-startup (§6.2 step 8); it does not reload them mid-invocation.
+Pruning is local-only: no catalog round-trip. It is the cleanup
+counterpart to `install --force` and to repeated `update` runs that
+have left old versions on disk.
 
 ##### Arguments
 
 - `<package>`
-  - Required. The workload to pin. Resolved using the same alias rules
-    as `install` (see §6.1).
-
-##### Options
-
-- `--version|-v`
-  - **Required.** The semver to pin to. Must already be installed.
-- `--exact|-e`
-  - Disables alias matching. `<package>` must be the literal package id
-    (case-insensitive).
-
-#### `func workload unpin`
-
-```
-func workload unpin <package> [--exact|-e]
-```
-
-Removes any pin on the named workload, reverting it to the default
-behavior: the loader picks the highest installed semver. The new `func
-workload install` and `update` runs will be picked up automatically on
-the next invocation.
-
-Like `pin`, this is a registry-only write and takes effect on the next
-`func` invocation. Unpinning a workload that wasn't pinned is a no-op
-and exits success.
-
-##### Arguments
-
-- `<package>`
-  - Required. The workload to unpin.
+  - Optional. Prunes only the named workload. Default: prunes every
+    installed workload.
 
 ##### Options
 
@@ -331,14 +315,18 @@ and exits success.
 - The Functions host runtime is distributed as a first-class workload
   (e.g. `Azure.Functions.Cli.Workload.Host`). It is **not** bundled
   with the CLI binary.
-- The host-runtime workload contributes a `host.run` capability (analogous
-  to the language workload capabilities in §5) that `func start` invokes.
-- Multiple host-runtime versions **may** coexist; the CLI selects one per
+- The host-runtime workload is **content-only** (§3, §5.3): its
+  package ships the host binaries under `tools/any/` with no
+  `entryPoint`. The workload subsystem records its registry row but
+  does not load it (§6.2 step 3). `func start` resolves the install
+  directory by package id and launches the host binaries directly.
+- Multiple host-runtime versions **may** coexist on disk via
+  `func workload install --force` (§6.1). The CLI selects one per
   invocation based on (in order): `--host-version` flag, project pin
   (e.g. `host.json` / project file metadata), latest installed.
-- All other workload contracts (manifest, lifecycle, update, telemetry)
-  apply unchanged. There is no special-case install path for the host
-  runtime.
+- All other workload lifecycle steps (install, update, prune,
+  uninstall, telemetry) apply unchanged. There is no special-case
+  install path for the host runtime.
 - This separation lets host hotfixes ship without a CLI release and lets
   the CLI itself be smaller and AOT-friendly.
 
@@ -424,12 +412,21 @@ the workload registers means it participates in the corresponding command:
 | `ITemplateProvider`               | Enumerate and materialize templates.                      | `func new`                       |
 | `IPackProvider`                   | Build & package the project.                              | `func pack`                      |
 | `IExternalCommand`                | Register additional CLI subcommands.                      | Any `func <subcommand>` contributed by a workload (e.g. `func durable ...`) |
-| `IHostRuntimeLauncher`            | Launch the Functions host runtime process.                | `func start` (host workload)     |
 
 Implementation status: as of this spec revision, only `IProjectInitializer`
 exists in `Func.Cli.Abstractions`. The other contribution points are
 designed but not yet implemented; they ship incrementally as the
 corresponding built-in commands move onto the workload model.
+
+**Content-only workloads** (`workload.json` with `contentOnly: true`,
+see §5.3) register no services. They do not implement `Workload`, are
+not loaded into an `AssemblyLoadContext`, and contribute no
+contribution points. Built-in CLI commands consume them directly by
+package id: today, `func start` knows the host workload's package id
+(`Azure.Functions.Cli.Workload.Host`) and resolves its on-disk
+location via `<workload-home>/workloads/<packageId>/<version>/`. How
+the CLI generalizes this for non-host content-only workloads is an
+open question (§12).
 
 The exact interface names and shapes are documented in
 [`building-a-workload.md`](./building-a-workload.md). That document is
@@ -503,33 +500,46 @@ The metadata the CLI needs is split between two sources:
       results. Modeled on the .NET CLI's `DotnetTool` package type
       (e.g. `?packageType=dotnettool` on the NuGet search API).
 2. **Per-workload manifest (`workload.json`)** — owned by the package
-   author, shipped at the root of the workload's NuGet package. Required:
-   a package without this file is not a valid workload. Identifies the
-   entry-point type the CLI activates after install:
+   author, shipped at the root of the workload's NuGet package.
+   Required: a package without this file is not a valid workload.
+
+   Normal workload:
 
    ```json
    {
+     "contentOnly": false,
      "entryPoint": {
        "assemblyPath": "Foo.dll",
        "type": "Foo.MyWorkload"
-     },
-     "minCliVersion": "5.0.0"
+     }
    }
    ```
 
+   Content-only workload:
+
+   ```json
+   { "contentOnly": true }
+   ```
+
+   - `contentOnly` (optional, default `false`) → when `false`, this is
+     a normal workload: `entryPoint` is **required** and validated by
+     the install pipeline. When `true`, the package ships content only
+     (no entry-point class); `entryPoint` is **optional and ignored**
+     if present, and the loader (§6.2) skips this entry entirely.
+     Content-only workloads are consumed by built-in commands that know
+     the package id (see §5.1 and §12).
    - `entryPoint.assemblyPath` → path to the assembly relative to the
      package's content root (see "Package layout" below). Must not be
      absolute or contain `..` segments; the install pipeline rejects
-     either.
+     either. Required when `contentOnly` is `false`.
    - `entryPoint.type` → fully-qualified type name extending the
-     abstract `Workload` base class.
-   - `minCliVersion` (optional) → minimum Func CLI semver this workload
-     requires. The loader rejects the workload with a "Func CLI too
-     old, please update" error if the running CLI is older (see §10.2).
+     abstract `Workload` base class. Required when `contentOnly` is
+     `false`.
 
-   The install pipeline reads `workload.json` once and records the
-   entry-point spec in the workload registry, so subsequent CLI
-   invocations don't have to crack the package open again.
+   The install pipeline reads `workload.json` once and stamps
+   `contentOnly` and `entryPoint` into the registry entry (§10.1) so
+   the loader can decide whether to activate without re-reading
+   `workload.json` for every package on every CLI invocation.
 
    **Package layout.** A workload `.nupkg` follows this convention:
 
@@ -548,6 +558,13 @@ The metadata the CLI needs is split between two sources:
    (which uses `tools/<TFM>/any/`); workloads use a single `any`
    subdirectory because the CLI loads them in-process via
    `AssemblyLoadContext` rather than launching a separate runtime.
+
+   **Content-only workloads** follow the same package layout but have
+   no `entryPoint` constraint on `tools/any/`. The author lays out
+   whatever files the consuming command expects; the install pipeline
+   extracts them verbatim. The host workload, for example, ships its
+   runtime binaries under `tools/any/` and `func start` resolves them
+   by path convention.
 
 The CLI persists everything it needs for startup in a single
 **workload registry** at `~/.azure-functions/workloads.json` (see §6.1).
@@ -568,8 +585,21 @@ install` / `uninstall`.
 0. **Idempotency.** If the same `(packageId, version)` is already
    present in the workload registry and its install directory is
    intact, exit success without re-fetching or re-extracting. This
-   makes `func workload install` safe to re-run.
-1. Resolve `<package>` to a package via the catalog (NuGet by default),
+   makes `func workload install` safe to re-run with an explicit
+   `--version`.
+1. **Existence check.** If any other version of `packageId` is already
+   installed (registry contains at least one row for that `packageId`)
+   and `--force|-f` was not passed, prompt:
+   `'<packageId>' is already installed at <listed versions>. Install
+   <new version> side-by-side? [y/N]:` Default: no.
+   - **No** (or non-interactive context, e.g. no TTY) → exit non-zero
+     with the hint `Run 'func workload update <package>' to replace the
+     existing version, or pass --force to install side-by-side.`
+   - **Yes** or `--force` → continue.
+
+   This check runs **before** download to avoid wasted network round-
+   trips on a likely-cancelled install.
+2. Resolve `<package>` to a package via the catalog (NuGet by default),
    filtered to packages declaring the `FuncCliWorkload` package type:
    - **Alias path** (default): the resolver queries the catalog for
      packages whose tags include `alias:<package>`.
@@ -579,12 +609,12 @@ install` / `uninstall`.
          matches.
        - Multiple matches → fail and list the matched package ids;
          the user must re-run with `--exact <packageId>`.
-   - **Exact path** (`--exact` / `-e`): the resolver targets exactly
+   - **Exact path** (`--exact|-e`): the resolver targets exactly
      `<package>` as a literal package id (case-insensitive). No alias
      matching is performed. Fails if no such package exists in the
      catalog.
-2. Download to a staging directory.
-3. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`,
+3. Download to a staging directory.
+4. Read NuGet metadata (`id`, `version`, `title`, `description`, `tags`,
    `packageTypes`). Reject the package if `FuncCliWorkload` is not
    among its declared package types.
 
@@ -592,15 +622,20 @@ install` / `uninstall`.
    "Package layout"); the install pipeline does **not** restore
    transitive NuGet dependencies. Anything the workload needs at
    runtime must be in the package.
-4. Read `workload.json` from the package root. Reject if the file is
-   missing, malformed, or `entryPoint.assemblyPath` is rooted or
-   contains `..` segments.
-5. Atomically move into
+5. Read `workload.json` from the package root. The file is required;
+   reject if missing or malformed.
+   - If `contentOnly: true`, ignore any `entryPoint` field. No further
+     validation against `tools/any/` is performed.
+   - If `contentOnly` is `false` or absent, `entryPoint` is required.
+     Reject if `entryPoint.assemblyPath` is rooted, contains `..`
+     segments, or does not resolve to a file under the staged
+     `tools/any/` directory.
+6. Atomically move into
    `<workload-home>/workloads/<packageId>/<version>/`.
    `<packageId>` is stored lowercased (matching NuGet's normalization)
    so case differences in user input always resolve to the same
    directory.
-6. Append an entry to the workload registry
+7. Append an entry to the workload registry
    `<workload-home>/workloads.json` under the top-level `workloads`
    array. Each entry contains:
    - `packageId` — NuGet package id (lowercased; case-insensitive match
@@ -611,70 +646,56 @@ install` / `uninstall`.
    - `source` — the catalog feed URL or local path the package was
      installed from. Used to flag non-default-feed packages in
      `func workload list` (see §9).
-   - `entryPoint: { assemblyPath, type }` — copied from the package's
-     `workload.json` so the loader doesn't re-read the package on every
-     CLI invocation.
+   - `contentOnly`: boolean stamped from `workload.json` (default
+     `false`). The loader (§6.2) uses this to decide whether to
+     activate the entry without re-reading `workload.json`.
+   - `entryPoint: { assemblyPath, type }`: copied from `workload.json`
+     when `contentOnly` is `false`. Omitted when `contentOnly` is
+     `true`.
 
    Side-by-side installs of the same package id at different versions
    are separate entries. `displayName` and `description` are **not**
    persisted in the registry; they are read from the loaded `Workload`
-   instance at runtime so an updated workload's metadata always reflects
-   what's running. Install paths are computed from the configured
-   workload home plus `(packageId, packageVersion)` and likewise not
-   persisted.
+   instance at runtime (and not applicable to content-only entries) so
+   an updated workload's metadata always reflects what's running.
+   Install paths are computed from the configured workload home plus
+   `(packageId, packageVersion)` and likewise not persisted.
 
    The write is atomic (temp file + rename) so a crash mid-install
    cannot corrupt the registry.
-7. **Update the registry pointer if needed.** A workload is unpinned by
-   default: `install` does **not** set `activeVersions[<packageId>]`,
-   so the loader resolves to the highest installed semver
-   automatically. If the package id is currently *pinned* (because a
-   prior `func workload use --version` set
-   `activeVersions[<packageId>]`), `install` leaves the pin alone and
-   prints a hint: `Run 'func workload use <package> --version <v>' to
-   switch.` The user changes pins explicitly via `func workload use`
-   (§4.1), never as a side effect of an install.
-
-   To roll back to an older installed version, run
-   `func workload use <package> --version <older>`. Combined with the
-   step 0 idempotency, this means rollback is a pointer flip with no
-   catalog round-trip.
-8. Emit an "installed" message including version and entry-point type.
+8. Emit an "installed" message: for normal workloads, include the
+   resolved entry-point type; for content-only workloads, include the
+   install path so the consuming command (e.g. `func start` for the
+   host workload) can be discovered.
 
 ### 6.2 Discovery and activation
 
 On every Func CLI startup, the workload subsystem builds the in-process
 list of live workloads in a fixed sequence. The whole flow is one JSON
-read plus N assembly loads, where N is the number of **active** versions
-in the registry, not the total entry count.
+read plus N assembly loads, where **N is the number of distinct
+package ids with at least one non-content-only installed version**, not
+the total entry count.
 
 1. **Read the registry.** Open
    `<workload-home>/workloads.json` once. Validate `$schema` (§10.1);
    reject unrecognized values via `GracefulException`. The registry
-   carries:
-   - `workloads[]` — every installed `(packageId, packageVersion)` row.
-   - `activeVersions: { <packageId>: <packageVersion> }` — the pointer
-     map maintained by `install` / `update` / `uninstall` (see §6.1
-     step 7, §6.4, §6.5).
-2. **Select active entries.** For each distinct `packageId` in
-   `workloads[]`, pick the version to load:
-   - If `activeVersions[<packageId>]` is set, the workload is **pinned**:
-     load the named version. If the named version is missing from
-     `workloads[]`, surface a `[<packageId>]` warning and skip this
-     workload (the user can re-pin via `func workload use` or remove
-     the pin).
-   - Otherwise the workload is **unpinned**: load the highest semver
-     among the rows for that `packageId`.
-
-   Inactive side-by-side rows (older versions of an unpinned workload,
-   or non-pinned versions of a pinned workload) are left on disk for
-   rollback (§6.4) and surfaced only by
-   `func workload list --all-versions`.
-3. **Validate compatibility.** If the entry's `workload.json` declared
-   `minCliVersion`, compare against the running CLI's semver. If the
-   CLI is older, fail this workload's load with
-   `[<packageId>] Func CLI too old, please update.` (see §10.2). Other
-   workloads continue to load.
+   carries a single `workloads[]` array of every installed
+   `(packageId, packageVersion)` row, each with its `contentOnly` flag
+   stamped at install time (§6.1 step 7).
+2. **Pick the live version per package id.** Group `workloads[]` by
+   `packageId`. For each group, select the row with the highest
+   semver. That row is the **live** version; every other row for the
+   same package id is an inactive side-by-side install retained on
+   disk for `func workload list --all-versions` and for rollback (the
+   user removes the live one via `func workload uninstall` to revert).
+3. **Skip content-only entries.** If the live row has
+   `contentOnly: true`, the loader does **not** activate it: no
+   assembly load, no `Workload.Configure` call, no DI contribution.
+   The entry stays in the registry and is surfaced by
+   `func workload list` (with type `Content`); built-in commands that
+   know its `packageId` (e.g. `func start` for the host workload)
+   resolve its install directory directly. Steps 4-7 below run only
+   for entries with `contentOnly: false`.
 4. **Load the assembly.** Compute the assembly path under
    `<workload-home>/workloads/<packageId>/<packageVersion>/<entryPoint.assemblyPath>`
    and reject anything that resolves outside the workloads root
@@ -691,13 +712,12 @@ in the registry, not the total entry count.
    during discovery; the type's static constructor is the only workload
    code that runs, so workloads **must** keep static initialization
    side-effect-free.
-7. **Configure.** Once all active workloads are instantiated, the CLI
-   walks the resulting list and calls each `Workload.Configure(builder)`
-   exactly once, in registry order. This is where contribution-point
-   services (`IProjectInitializer`, `IProjectDetector`,
-   `ITemplateProvider`, `IPackProvider`, `IExternalCommand`,
-   `IHostRuntimeLauncher` — see §5.1) are added to the CLI's DI
-   container.
+7. **Configure.** Once all live normal workloads are instantiated, the
+   CLI walks the resulting list and calls each
+   `Workload.Configure(builder)` exactly once, in registry order. This
+   is where contribution-point services (`IProjectInitializer`,
+   `IProjectDetector`, `ITemplateProvider`, `IPackProvider`,
+   `IExternalCommand`, see §5.1) are added to the CLI's DI container.
 8. **Cache for the process lifetime.** The list is cached in
    `IWorkloadProvider` (singleton). Subsequent commands within the same
    `func` invocation reuse it; they never re-read the registry or
@@ -706,33 +726,22 @@ in the registry, not the total entry count.
 #### Failure isolation
 
 A load failure for one workload (missing assembly, type-not-found,
-`minCliVersion` mismatch, etc.) **must not** abort discovery for the
-others. The CLI continues with the remaining active workloads and
+malformed registry entry, etc.) **must not** abort discovery for the
+others. The CLI continues with the remaining live workloads and
 surfaces the failed one as a non-fatal `[<packageId>]`-prefixed warning
 on the next command that would have used it.
 
 #### Multiple-version policy
 
-Side-by-side installs are allowed (`func workload install` does not
-remove prior versions; `--prune` on `update` does). Each `packageId`
-is in one of two states:
+Side-by-side installs are allowed (`func workload install --force`,
+§6.1 step 1). Loading is **not** side-by-side: only one version of a
+given `packageId` is live in the running process at any time, and that
+version is always the highest installed semver. Older installed
+versions sit on disk so the user can revert (uninstall the newer) or
+clean up later (`func workload prune`, §6.7).
 
-- **Unpinned (default).** No entry in `activeVersions`. The loader
-  picks the highest installed semver. New installs and updates are
-  picked up automatically on the next `func` invocation.
-- **Pinned.** `activeVersions[<packageId>] = <version>`, set by
-  `func workload use <package> --version <v>`. The loader honors the
-  pin verbatim; new installs and updates do **not** silently move the
-  pointer.
-
-Switching versions (or moving between pinned and unpinned) is done via
-`func workload use` (§4.1). It is a registry-only operation: no
-catalog round-trip, no re-download. The change takes effect on the
-next `func` invocation; the running process keeps its cached
-workloads.
-
-Per-project version pinning (profiles) is out of scope for v1 and
-tracked in §12.
+There is no pinning, no per-project profile, and no `activeVersions`
+pointer. The "latest installed wins" rule is the entire policy.
 
 ### 6.3 Invocation
 
@@ -753,38 +762,53 @@ tracked in §12.
 
 ### 6.4 Update
 
-- `func workload update <package>` resolves a newer version and installs
-  it side-by-side under
-  `<workload-home>/workloads/<packageId>/<newVersion>/`.
-- If the package is **unpinned** (default), the new row alone is enough:
-  the loader's "highest installed semver wins" rule (§6.2 step 2) makes
-  the new version live on the next `func` invocation. No registry
-  pointer is touched.
-- If the package is **pinned**, `update` installs the new row but does
-  **not** silently move the pin. It prints a hint: `Run 'func workload
-  use <package> --version <new>' to switch.`
-- If the new version fails install validation (workload.json missing or
-  malformed, entry-point type not found, etc.) the partially staged
-  install directory is cleaned up and the registry is not modified.
-- Old versions remain on disk (and in `workloads[]`) until `--prune` is
-  passed, allowing rollback via `func workload use <package> --version
-  <prior>`.
+`func workload update <package>` is conceptually an in-place version
+swap: existing version out, new version in. It is **not** a side-by-
+side install (use `install --force` for that, §6.1).
+
+1. **Resolve the target installed version.** Without `--version|-v`,
+   target the highest installed semver for `<package>`. With
+   `--version|-v <existing>`, target that exact installed version;
+   error if `<existing>` is not present in the registry (no fallback,
+   no auto-install).
+2. **Resolve the new version** from the catalog, honoring
+   `--include-prereleases` and the same-major-by-default rule
+   (`--major` opts in to crossing a major boundary).
+3. **Fetch and validate** the new version through the same staging
+   pipeline as install (§6.1 steps 3-5). On any failure, the staging
+   directory is cleaned up and the registry is not modified; the
+   existing installed version remains live.
+4. **Atomic swap.** Once the new version is staged and validated:
+   - Move the new version into
+     `<workload-home>/workloads/<packageId>/<newVersion>/`.
+   - Remove the target installed version's row from `workloads[]` and
+     add the new row, in a single atomic registry write.
+   - Delete the target version's install directory.
+
+   The swap happens on disk; the running process keeps its cached
+   workloads (§6.2 step 8). The new version goes live on the next
+   `func` invocation.
+5. The error case where step 4 partially fails (registry rewritten but
+   directory delete fails) is recoverable: the orphaned directory is
+   harmless because no row references it and `func workload prune`
+   (§6.7) cleans it up.
+
+For content-only workloads, the swap is the same shape: stage, swap
+the registry row, delete the old directory. There is no in-process
+cache to invalidate.
 
 ### 6.5 Removal
 
-- `func workload uninstall <package>` removes the active version: it
+- `func workload uninstall <package>` removes the live version: it
   deletes the version's install directory and removes its row from
-  `workloads[]`. If the package was **pinned** to the removed version,
-  the pin is dropped. The package id reverts to unpinned and, if other
-  versions remain, the loader's "highest semver wins" rule picks the
-  next live version automatically. The user is informed
-  ("Active version is now `<package>@<promoted>`.").
-- `--version <v>` removes only the named version. If `<v>` is the
-  currently active version (whether pinned or unpinned-by-max-semver),
-  the same rules apply: drop the pin if pinned to `<v>`; the loader
-  promotes the next-highest installed semver on the next invocation.
-- `--all-versions` removes every installed version of the package, drops
-  any pin, and removes every row.
+  `workloads[]`. If other versions of the same package id remain
+  installed, the loader's "highest installed semver wins" rule (§6.2
+  step 2) promotes the next-highest on the next `func` invocation.
+  The user is informed (`Live version is now <package>@<promoted>.`).
+- `--version <v>` removes only the named version. The same promotion
+  rule applies if the removed version happened to be the live one.
+- `--all-versions` removes every installed version of the package and
+  removes every row.
 - Other installed workloads must be unaffected.
 - `uninstall` acquires the same registry lock as `install` (see §4.1
   "Required behaviors"). Concurrent `func <command>` invocations either
@@ -800,6 +824,30 @@ tracked in §12.
 - Frequency: at most once per 24h. Network failures must be silent.
 - Disabled by `FUNC_CLI_Workloads__DisableUpdateCheck=true` (follows
   the configuration-binding env-var convention from §11).
+
+### 6.7 Prune
+
+`func workload prune` removes inactive side-by-side installs.
+
+1. **Determine scope.** Without `<package>`, prune every installed
+   package id. With `<package>`, prune only that one (alias-resolved
+   by default, exact-match with `--exact|-e`; same rules as
+   `install`).
+2. **Per package id, identify pruneable rows.** Group rows by
+   `packageId`. Within each group, the row with the highest semver is
+   **never** pruned (it's the live version per §6.2). Every other row
+   is pruneable.
+3. **Atomic removal per package id.** For each pruneable row, delete
+   the install directory and remove the registry row. Batch all
+   removals for a single package id into one registry write so a
+   crash mid-prune leaves the registry consistent.
+4. **Report.** Print one line per pruned `(packageId, version)` pair
+   and a total count. If nothing was pruneable, exit success with a
+   "Nothing to prune." message.
+
+Prune never removes the live version of any package id. To revert to
+an older installed version, run `func workload uninstall <package>`
+(or `--version <newer>`) first; the older version then becomes live.
 
 ## 7. Error handling requirements
 
@@ -817,11 +865,14 @@ tracked in §12.
 
 - **CLI startup overhead** for workload discovery (no invocation) must
   remain under **100 ms** for up to 25 installed workloads on a warm cache.
+  Content-only workloads contribute zero activation cost (no assembly
+  load, no `Configure` call) and count against this budget only for
+  the registry row read.
 - **First invocation** of a workload (cold) should complete the
   workload-side boot in under **300 ms** for AOT'd workloads and
-  **800 ms** for JIT. The host-runtime workload (§4.6) is JIT in v1,
-  so plan for the higher figure on first `func start` after install or
-  update.
+  **800 ms** for JIT. The host-runtime workload (§4.6) is content-only
+  and is not loaded by the workload subsystem at all; `func start`
+  launches its bundled binaries directly.
 - **Subsequent invocations** within the same `func` invocation should not
   re-pay boot cost when the Func CLI can reuse the workload connection (an
   optimization, not a v1 requirement).
@@ -864,27 +915,37 @@ The v1 registry shape is, at the top level:
 ```json
 {
   "$schema": "https://aka.ms/func/workloads/v1/schema.json",
-  "activeVersions": { "<packageId>": "<packageVersion>" },
   "workloads": [ /* WorkloadEntry[] */ ]
 }
 ```
 
-`activeVersions` is **sparse**: it holds entries only for *pinned*
-package ids (set via `func workload use --version`, see §4.1).
-Unpinned package ids have no entry there; the loader resolves them by
-picking the highest installed semver from `workloads[]` (§6.2 step 2).
 `workloads[]` is the flat list of every installed
 `(packageId, packageVersion)` row, including inactive side-by-side
 versions.
+
+A `WorkloadEntry` carries:
+
+- `packageId` (string): NuGet package id (lowercased).
+- `packageVersion` (string): installed version (ordinal match).
+- `aliases` (string[]): short aliases extracted from the package's
+  `alias:<name>` tags.
+- `source` (string): the catalog feed URL or local path the package
+  was installed from.
+- `contentOnly` (bool, default `false`): stamped from the package's
+  `workload.json` at install time (§6.1 step 7). When `true`, the
+  loader skips activation (§6.2 step 3).
+- `entryPoint` (`{ assemblyPath, type }`): copied from `workload.json`.
+  Present when `contentOnly` is `false`; omitted when `contentOnly`
+  is `true`.
+
+The loader's "live version per package id" resolution (§6.2 step 2)
+is computed from `workloads[]` alone: highest semver wins. There is
+no separate active-version pointer in the registry.
 
 ### 10.2 Workload compatibility
 
 - Workloads use **semver**; `func workload install` and `update` honour
   the standard NuGet resolution rules.
-- A workload **may** declare a `minCliVersion` field in its
-  `workload.json` (semver). On load, the CLI compares this against its
-  own version and rejects the workload with an `[<workload-id>]`-prefixed
-  "Func CLI too old, please update" error if the running CLI is older.
 - A workload built against an older abstractions package must continue
   to work as long as the CLI can still satisfy the contract types it
   resolves; otherwise the CLI rejects with "workload too old, please
@@ -923,13 +984,19 @@ versions.
 7. **Host-runtime workload boundary** — does one workload ship all RIDs +
    all major host versions, or one workload per major (e.g. `...Workload.Host.v4`,
    `...Workload.Host.v5`)?
-8. **Profiles / per-project version pinning** — v1 ships a single
-   global active version per `packageId` (§6.2 multi-version policy).
-   A future profile mechanism (project file, env var, or `func.json`
-   sidecar) would let a repo override `activeVersions` for a specific
-   working directory. Defer to a later abstractions release; the
-   registry schema already isolates the global pointer in
-   `activeVersions`, so adding a project-level override is additive.
+8. **Non-host content-only consumption.** `func start` knows the host
+   workload's package id (`Azure.Functions.Cli.Workload.Host`) and
+   resolves its install directory directly. There is no general
+   contract today for other built-in commands to consume
+   content-only workloads. If a second content-only workload appears,
+   we'll need either a name-based registry lookup helper or a
+   content-only contribution mechanism (e.g. registering a content
+   directory under a stable key).
+9. **TTL-based prune.** `func workload prune` (§6.7) removes every
+   non-live install unconditionally. A future variant
+   (`--older-than 30d` or similar) would let a user keep recent
+   versions for quick rollback while reclaiming disk for older ones.
+   Defer until we have telemetry on real prune usage.
 
 **Resolved:** *Bidirectional UX* (workload-driven logs, progress,
 prompts) is **CLI-rendered only in v1** (see §2 non-goals). A
