@@ -72,4 +72,3 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
         }
     }
 }
-
