@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.Reflection;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 
@@ -14,18 +14,21 @@ namespace Azure.Functions.Cli.Commands;
 internal class VersionCommand : FuncCliCommand, IBuiltInCommand
 {
     private readonly IInteractionService _interaction;
+    private readonly ICliVersionProvider _versionProvider;
 
-    public VersionCommand(IInteractionService interaction)
+    public VersionCommand(IInteractionService interaction, ICliVersionProvider versionProvider)
         : base("version", "Display the current Azure Functions CLI version.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
+        ArgumentNullException.ThrowIfNull(versionProvider);
         Hidden = true;
         _interaction = interaction;
+        _versionProvider = versionProvider;
     }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        _interaction.WriteLine(GetVersion());
+        _interaction.WriteLine(_versionProvider.Version);
         return Task.FromResult(0);
     }
 
@@ -39,8 +42,8 @@ internal class VersionCommand : FuncCliCommand, IBuiltInCommand
         _interaction.WriteTable(
             ["Property", "Value"],
             [
-                ["Version", GetVersion()],
-                ["Build", GetInformationalVersion()],
+                ["Version", _versionProvider.Version],
+                ["Build", _versionProvider.InformationalVersion],
                 ["Runtime", System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription],
                 ["OS", System.Runtime.InteropServices.RuntimeInformation.OSDescription],
                 ["Architecture", System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString()],
@@ -48,23 +51,5 @@ internal class VersionCommand : FuncCliCommand, IBuiltInCommand
         );
 
         return 0;
-    }
-
-    public string GetVersion()
-    {
-        return Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion
-            .Split('+')[0]
-            ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
-            ?? "unknown";
-    }
-
-    private string GetInformationalVersion()
-    {
-        return Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion
-            ?? "unknown";
     }
 }

@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.CommandLine.Help;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
@@ -36,13 +37,14 @@ internal static class Parser
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        var interaction = services.GetRequiredService<IInteractionService>();
+        IInteractionService interaction = services.GetRequiredService<IInteractionService>();
         var rootCommand = new FuncRootCommand();
-        var versionCommand = services.GetRequiredService<VersionCommand>();
+        VersionCommand versionCommand = services.GetRequiredService<VersionCommand>();
+        ICliVersionProvider versionProvider = services.GetRequiredService<ICliVersionProvider>();
 
         // HelpCommand needs the constructed root, so it can't be DI-resolved
         // ahead of the root. Built inline and added first.
-        var helpCommand = new HelpCommand(interaction, rootCommand, versionCommand);
+        var helpCommand = new HelpCommand(interaction, rootCommand, versionProvider);
         rootCommand.Subcommands.Add(helpCommand);
 
         var allCommands = services.GetServices<FuncCliCommand>().ToList();
@@ -51,7 +53,7 @@ internal static class Parser
         // built-in or an ExternalCommand (workload-contributed). Anything
         // else is a CLI bug — fail fast at startup so it's caught in tests
         // rather than producing untraceable workload commands.
-        foreach (var command in allCommands)
+        foreach (FuncCliCommand? command in allCommands)
         {
             if (command is not IBuiltInCommand && command is not ExternalCommand)
             {
@@ -68,7 +70,7 @@ internal static class Parser
         // collision among them is a CLI bug, not a workload problem, so we
         // throw rather than skip.
         var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
-        foreach (var command in allCommands.OfType<IBuiltInCommand>().Cast<FuncCliCommand>())
+        foreach (FuncCliCommand command in allCommands.OfType<IBuiltInCommand>().Cast<FuncCliCommand>())
         {
             if (!reservedNames.Add(command.Name))
             {
@@ -88,7 +90,7 @@ internal static class Parser
             .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
-        foreach (var command in workloadCommands)
+        foreach (ExternalCommand? command in workloadCommands)
         {
             if (reservedNames.Contains(command.Name))
             {
@@ -98,10 +100,10 @@ internal static class Parser
                 continue;
             }
 
-            var siblings = workloadNameGroups[command.Name];
+            List<ExternalCommand> siblings = workloadNameGroups[command.Name];
             if (siblings.Count > 1)
             {
-                var workloadList = string.Join(", ", siblings
+                string workloadList = string.Join(", ", siblings
                     .Select(c => $"'{c.Workload.PackageId}'")
                     .Distinct(StringComparer.Ordinal));
                 interaction.WriteWarning(
@@ -126,11 +128,11 @@ internal static class Parser
 
         SetHelpAction(rootCommand, spectreHelp);
 
-        foreach (var sub in rootCommand.Subcommands)
+        foreach (Command sub in rootCommand.Subcommands)
         {
             SetHelpAction(sub, spectreHelp);
 
-            foreach (var nested in sub.Subcommands)
+            foreach (Command nested in sub.Subcommands)
             {
                 SetHelpAction(nested, spectreHelp);
             }
@@ -139,11 +141,8 @@ internal static class Parser
 
     private static void SetHelpAction(Command command, SpectreHelpAction action)
     {
-        var helpOption = command.Options.OfType<HelpOption>().FirstOrDefault();
-        if (helpOption is not null)
-        {
-            helpOption.Action = action;
-        }
+        HelpOption? helpOption = command.Options.OfType<HelpOption>().FirstOrDefault();
+        helpOption?.Action = action;
     }
 
     private static void ConfigureRootAction(

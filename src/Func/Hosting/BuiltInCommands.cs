@@ -1,9 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Workload;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,6 +21,7 @@ internal static class BuiltInCommands
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<ICliVersionProvider, AssemblyCliVersionProvider>();
         services.AddSingleton<IWorkloadHintRenderer, WorkloadHintRenderer>();
 
         // VersionCommand is also resolved by Parser to wire `func` (no args)

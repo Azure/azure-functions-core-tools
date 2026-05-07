@@ -21,24 +21,24 @@ internal class HelpCommand : FuncCliCommand
 
     private readonly IInteractionService _interaction;
     private readonly FuncRootCommand _rootCommand;
-    private readonly VersionCommand _versionCommand;
+    private readonly ICliVersionProvider _versionProvider;
 
-    public HelpCommand(IInteractionService interaction, FuncRootCommand rootCommand, VersionCommand versionCommand)
+    public HelpCommand(IInteractionService interaction, FuncRootCommand rootCommand, ICliVersionProvider versionProvider)
         : base("help", "Show help information for Azure Functions CLI.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(rootCommand);
-        ArgumentNullException.ThrowIfNull(versionCommand);
+        ArgumentNullException.ThrowIfNull(versionProvider);
         Hidden = true;
         _interaction = interaction;
         _rootCommand = rootCommand;
-        _versionCommand = versionCommand;
+        _versionProvider = versionProvider;
         Arguments.Add(CommandArgument);
     }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var commandName = parseResult.GetValue(CommandArgument);
+        string? commandName = parseResult.GetValue(CommandArgument);
 
         return Task.FromResult(string.IsNullOrEmpty(commandName)
             ? ShowGeneralHelp()
@@ -48,7 +48,7 @@ internal class HelpCommand : FuncCliCommand
     /// <summary>Shows top-level help: product banner, command list, global options.</summary>
     internal int ShowGeneralHelp()
     {
-        var version = _versionCommand.GetVersion();
+        string version = _versionProvider.Version;
 
         _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
@@ -83,7 +83,7 @@ internal class HelpCommand : FuncCliCommand
 
         _interaction.WriteSectionHeader("Global Options");
         _interaction.WriteBlankLine();
-        var options = _rootCommand.Options
+        IEnumerable<DefinitionItem> options = _rootCommand.Options
             .Where(o => o is not HelpOption && o.Name != "--version")
             .Select(o => new DefinitionItem(FormatOptionName(o), o.Description ?? string.Empty))
             .Append(new DefinitionItem("--help, -h, -?", "Show help information"))
@@ -100,7 +100,7 @@ internal class HelpCommand : FuncCliCommand
     /// <summary>Shows help for a named subcommand.</summary>
     internal int ShowCommandHelp(string commandName)
     {
-        var command = _rootCommand.Subcommands
+        Command? command = _rootCommand.Subcommands
             .FirstOrDefault(c => c.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase));
 
         if (command is null)
@@ -119,8 +119,8 @@ internal class HelpCommand : FuncCliCommand
     /// </summary>
     internal void RenderCommandHelp(Command command)
     {
-        var isRoot = command is RootCommand;
-        var commandPath = isRoot ? "func" : $"func {command.Name}";
+        bool isRoot = command is RootCommand;
+        string commandPath = isRoot ? "func" : $"func {command.Name}";
 
         _interaction.WriteBlankLine();
         _interaction.WriteTitle(commandPath);
@@ -178,7 +178,7 @@ internal class HelpCommand : FuncCliCommand
         {
             line.Plain("  ").Command(commandPath);
 
-            foreach (var arg in command.Arguments.Where(a => !a.Hidden))
+            foreach (Argument? arg in command.Arguments.Where(a => !a.Hidden))
             {
                 line.Plain(" ");
                 if (arg.Arity.MinimumNumberOfValues > 0)

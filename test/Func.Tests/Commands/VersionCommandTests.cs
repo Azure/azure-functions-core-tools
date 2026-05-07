@@ -1,9 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Common;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -11,16 +11,20 @@ namespace Azure.Functions.Cli.Tests.Commands;
 public class VersionCommandTests
 {
     private readonly TestInteractionService _interaction;
+    private readonly ICliVersionProvider _versionProvider;
 
     public VersionCommandTests()
     {
         _interaction = new TestInteractionService();
+        _versionProvider = Substitute.For<ICliVersionProvider>();
+        _versionProvider.Version.Returns("5.0.0");
+        _versionProvider.InformationalVersion.Returns("5.0.0+abc1234");
     }
 
     [Fact]
     public async Task ExecuteAsync_PrintsVersionString()
     {
-        var command = new VersionCommand(_interaction);
+        var command = new VersionCommand(_interaction, _versionProvider);
         var parseResult = command.Parse([]);
 
         var exitCode = await parseResult.InvokeAsync();
@@ -31,18 +35,18 @@ public class VersionCommandTests
     }
 
     [Fact]
-    public void GetVersion_ReturnsNonEmptyString()
+    public void AssemblyCliVersionProvider_ReturnsNonEmptyVersion()
     {
-        var version = new VersionCommand(_interaction).GetVersion();
+        var provider = new AssemblyCliVersionProvider();
 
-        Assert.False(string.IsNullOrWhiteSpace(version));
-        Assert.Contains("5.0.0", version);
+        Assert.False(string.IsNullOrWhiteSpace(provider.Version));
+        Assert.Contains("5.0.0", provider.Version);
     }
 
     [Fact]
     public void ExecuteDetailed_PrintsTable()
     {
-        var command = new VersionCommand(_interaction);
+        var command = new VersionCommand(_interaction, _versionProvider);
 
         var exitCode = command.ExecuteDetailed();
 
