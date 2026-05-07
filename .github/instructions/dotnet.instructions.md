@@ -13,7 +13,9 @@ here disagrees with `AGENTS.md`, **`AGENTS.md` wins**.
 ## DI and composition
 
 - Use **primary constructor syntax** for DI:
-  `internal sealed class Foo(IBar bar) : IFoo`.
+  `internal sealed class Foo(IBar bar) : IFoo`. The same applies to non-DI
+  classes (exceptions, builders) where a single ctor + field/property
+  initializers can be collapsed.
 - Validate non-nullable constructor dependencies with `ArgumentNullException`:
   `private readonly IBar _bar = bar ?? throw new ArgumentNullException(nameof(bar));`.
 - No service locators, no `IServiceProvider.GetService` outside the composition
@@ -84,15 +86,30 @@ the lightest option:
   interpolation.
 - For user-facing CLI output, use `IInteractionService`, not `ILogger`.
 
+## Modern C# constructs
+
+These are enforced by `.editorconfig` (see IDE0007/0008/0090/0161/0200/0290 and
+IDE0300-0305). Write them this way the first time so the linter never has to
+fire:
+
+- **Collection expressions**: `[]` not `Array.Empty<T>()`; `[a, b]` not
+  `new[] { a, b }`; `[]` not `new List<T>()`; `[.. source]` not
+  `source.ToArray()`.
+- **Target-typed `new()`** when the LHS type is written: `Grid grid = new();`
+  not `var grid = new Grid();` or `Grid grid = new Grid();`. Pairs with the
+  `var` rule below: write the type once on the left, infer it on the right.
+- **Method groups** over wrapper lambdas: `SetAction(ExecuteAsync)` not
+  `SetAction((p, ct) => ExecuteAsync(p, ct))`.
+- **File-scoped namespaces** in new files.
+- **`var`** only when the RHS makes the type obvious (`new T(...)`, a cast,
+  a literal). When the type is hidden behind a method or property call, write
+  the type explicitly. Tests opt out of this one in `.editorconfig` to reduce
+  rename churn.
+
 ## Style
 
-- **File-scoped namespaces** in new files.
 - Match the style of the file you're editing.
 - No unused `using` directives.
-- Use `var` only when the type is obvious from the right-hand side (e.g.
-  `new T(...)`, a cast, or a literal). When the type is hidden behind a method
-  or property call, write the type explicitly so readers don't have to chase
-  the API to know what they're holding.
 - Don't run `dotnet format` across unrelated files; no drive-by reformatting.
 - Don't disable analyzers to silence warnings, fix the underlying issue.
 

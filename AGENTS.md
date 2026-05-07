@@ -85,16 +85,16 @@ the full CLI.
 ### Style
 
 - Match the style of the file you're editing.
-- Prefer **file-scoped namespaces** in new files.
 - Don't leave unused `using` directives.
 - Don't run `dotnet format` across unrelated files or make drive-by formatting
   changes.
 - Follow the existing `stylecop.json` / analyzer rules. Don't disable analyzers
   to silence warnings, fix the underlying issue.
-- Use `var` only when the type is obvious from the right-hand side (e.g.
-  `new T(...)`, a cast, or a literal). When the type is hidden behind a method
-  or property call, write the type explicitly so readers don't have to chase
-  the API to know what they're holding.
+- Mechanical conventions (`var` discipline, target-typed `new()`, collection
+  expressions, method group conversions, file-scoped namespaces, primary
+  constructors) are enforced by `.editorconfig`. See the **Modern C#
+  constructs** section in `.github/instructions/dotnet.instructions.md` for
+  the short list of preferred forms.
 - Keep changes minimal and surgical. User-visible behavior changes must be
   flagged explicitly in the PR description.
 
@@ -102,6 +102,14 @@ the full CLI.
 
 This repo ships **one product**: the `func` CLI. Treat it as a CLI first and a
 .NET app second.
+
+### Branding
+
+The product name in user-facing strings, HTTP `User-Agent` headers, telemetry
+identifiers, and release notes is **"Azure Functions CLI"**. The legacy
+"Azure Functions Core Tools" branding (and the npm install hint that came with
+it) is being phased out of v5. Don't reintroduce either when adding new
+output, error messages, or version notices.
 
 ### Console I/O, never call it directly
 
