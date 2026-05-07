@@ -4,7 +4,6 @@
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Common;
 
@@ -26,21 +25,21 @@ internal static class VersionChecker
     {
         try
         {
-            var currentVersion = GetCurrentVersion();
+            Version? currentVersion = GetCurrentVersion();
             if (currentVersion is null)
             {
                 return null;
             }
 
             // Check cache first
-            var cached = ReadCache();
+            Version? cached = ReadCache();
             if (cached is not null)
             {
                 return IsNewer(cached, currentVersion) ? cached.ToString() : null;
             }
 
             // Query GitHub
-            var latestVersion = await FetchLatestV5VersionAsync(cancellationToken);
+            Version? latestVersion = await FetchLatestV5VersionAsync(cancellationToken);
             if (latestVersion is null)
             {
                 return null;
@@ -60,11 +59,11 @@ internal static class VersionChecker
     private static async Task<Version?> FetchLatestV5VersionAsync(CancellationToken cancellationToken)
     {
         using var httpClient = new HttpClient { Timeout = _httpTimeout };
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "AzureFunctionsCoreToolsClient");
+        httpClient.DefaultRequestHeaders.Add("User-Agent", "AzureFunctionsCliClient");
         httpClient.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
 
         // Fetch first page of releases (30 results — more than enough to find latest v5)
-        var releases = await httpClient.GetFromJsonAsync<GitHubRelease[]>(
+        GitHubRelease[]? releases = await httpClient.GetFromJsonAsync<GitHubRelease[]>(
             Constants.GitHubReleasesApiUrl + "?per_page=30",
             cancellationToken);
 
@@ -74,20 +73,20 @@ internal static class VersionChecker
         }
 
         Version? latest = null;
-        foreach (var release in releases)
+        foreach (GitHubRelease release in releases)
         {
             if (release.Draft || release.Prerelease || string.IsNullOrEmpty(release.TagName))
             {
                 continue;
             }
 
-            var tag = release.TagName.TrimStart('v');
+            string tag = release.TagName.TrimStart('v');
             if (!tag.StartsWith("5.", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            if (Version.TryParse(tag, out var version) && (latest is null || version > latest))
+            if (Version.TryParse(tag, out Version? version) && (latest is null || version > latest))
             {
                 latest = version;
             }
@@ -98,7 +97,7 @@ internal static class VersionChecker
 
     private static Version? GetCurrentVersion()
     {
-        var versionString = typeof(VersionChecker).Assembly
+        string? versionString = typeof(VersionChecker).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion;
 
@@ -108,19 +107,19 @@ internal static class VersionChecker
         }
 
         // Strip prerelease suffix (e.g., "5.0.0-preview.1+abc" → "5.0.0")
-        var dashIndex = versionString.IndexOf('-');
+        int dashIndex = versionString.IndexOf('-');
         if (dashIndex > 0)
         {
             versionString = versionString[..dashIndex];
         }
 
-        var plusIndex = versionString.IndexOf('+');
+        int plusIndex = versionString.IndexOf('+');
         if (plusIndex > 0)
         {
             versionString = versionString[..plusIndex];
         }
 
-        return Version.TryParse(versionString, out var version) ? version : null;
+        return Version.TryParse(versionString, out Version? version) ? version : null;
     }
 
     private static bool IsNewer(Version latest, Version current)
@@ -128,7 +127,7 @@ internal static class VersionChecker
 
     private static string GetCachePath()
     {
-        var cacheDir = Path.Combine(
+        string cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             Constants.FuncHomeDirectoryName);
         return Path.Combine(cacheDir, Constants.VersionCacheFileName);
@@ -138,7 +137,7 @@ internal static class VersionChecker
     {
         try
         {
-            var cachePath = GetCachePath();
+            string cachePath = GetCachePath();
             if (!File.Exists(cachePath))
             {
                 return null;
@@ -150,8 +149,8 @@ internal static class VersionChecker
                 return null; // Cache expired
             }
 
-            var content = File.ReadAllText(cachePath).Trim();
-            return Version.TryParse(content, out var version) ? version : null;
+            string content = File.ReadAllText(cachePath).Trim();
+            return Version.TryParse(content, out Version? version) ? version : null;
         }
         catch
         {
@@ -163,7 +162,7 @@ internal static class VersionChecker
     {
         try
         {
-            var cachePath = GetCachePath();
+            string cachePath = GetCachePath();
             Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
             File.WriteAllText(cachePath, version.ToString());
         }

@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Tests;
 /// </summary>
 internal class TestInteractionService : IInteractionService
 {
-    private readonly List<string> _lines = new();
+    private readonly List<string> _lines = [];
 
     public IReadOnlyList<string> Lines => _lines;
     public string AllOutput => string.Join(Environment.NewLine, _lines);
@@ -56,7 +56,7 @@ internal class TestInteractionService : IInteractionService
 
     public void WriteDefinitionList(IEnumerable<DefinitionItem> items)
     {
-        foreach (var item in items)
+        foreach (DefinitionItem item in items)
         {
             _lines.Add($"  {item.Label}    {item.Description}");
         }
@@ -65,7 +65,7 @@ internal class TestInteractionService : IInteractionService
     public void WriteTable(string[] columns, IEnumerable<string[]> rows)
     {
         _lines.Add($"TABLE: [{string.Join(", ", columns)}]");
-        foreach (var row in rows)
+        foreach (string[] row in rows)
         {
             _lines.Add($"  ROW: [{string.Join(", ", row)}]");
         }

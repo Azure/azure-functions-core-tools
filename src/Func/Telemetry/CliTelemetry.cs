@@ -49,12 +49,12 @@ internal static class CliTelemetry
     /// </summary>
     public static IEnumerable<KeyValuePair<string, object>> GetResourceAttributes()
     {
-        return new KeyValuePair<string, object>[]
-        {
+        return
+        [
             new(TelemetryConventions.OsType, RuntimeInformation.OSDescription),
             new(TelemetryConventions.OsArchitecture, RuntimeInformation.OSArchitecture.ToString()),
             new(TelemetryConventions.ProcessRuntimeDescription, RuntimeInformation.FrameworkDescription),
-        };
+        ];
     }
 
     /// <summary>
@@ -94,7 +94,7 @@ internal static class CliTelemetry
     {
         connectionString = null;
 
-        var key = Constants.TelemetryInstrumentationKey;
+        string key = Constants.TelemetryInstrumentationKey;
         if (string.IsNullOrEmpty(key) || key == EmptyInstrumentationKey)
         {
             return false;
@@ -112,7 +112,7 @@ internal static class CliTelemetry
 
     private static bool IsOptedOut(string envVarName)
     {
-        var value = Environment.GetEnvironmentVariable(envVarName);
+        string? value = Environment.GetEnvironmentVariable(envVarName);
         if (string.IsNullOrEmpty(value))
         {
             return false;

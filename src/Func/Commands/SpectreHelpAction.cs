@@ -17,7 +17,7 @@ internal sealed class SpectreHelpAction(HelpCommand helpCommand) : SynchronousCo
 
     public override int Invoke(ParseResult parseResult)
     {
-        var command = parseResult.CommandResult.Command;
+        Command command = parseResult.CommandResult.Command;
 
         if (command is RootCommand)
         {

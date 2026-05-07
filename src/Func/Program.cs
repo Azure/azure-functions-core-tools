@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.Diagnostics;
 using Azure.Functions.Cli;
+using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
@@ -16,8 +17,8 @@ using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-ITheme theme = new DefaultTheme();
-IInteractionService interaction = new SpectreInteractionService(theme);
+var theme = new DefaultTheme();
+var interaction = new SpectreInteractionService(theme);
 
 // Build the host: a CLI process gets the empty variant so we skip the default
 // configuration and logging providers (they're not needed). The host owns
@@ -64,12 +65,12 @@ await host.StartAsync();
 
 // Create the command tree, resolving built-ins (and any workload-contributed
 // services they depend on) from the host's service provider.
-var rootCommand = Parser.CreateCommand(host.Services);
+FuncRootCommand rootCommand = Parser.CreateCommand(host.Services);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.
 using var cts = new CancellationTokenSource();
-var ctrlCCount = 0;
+int ctrlCCount = 0;
 Console.CancelKeyPress += (_, e) =>
 {
     ctrlCCount++;
@@ -86,10 +87,10 @@ Console.CancelKeyPress += (_, e) =>
 };
 
 // Fire background version check (non-blocking, best-effort)
-var versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
+Task<string?> versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
 
 // Parse and invoke asynchronously.
-var commandName = ResolveCommandName(args);
+string commandName = ResolveCommandName(args);
 var stopwatch = Stopwatch.StartNew();
 int exitCode = 0;
 
@@ -150,7 +151,7 @@ static string ResolveCommandName(string[] args)
 
     // Take command args (skip options starting with -)
     var parts = new List<string>();
-    foreach (var arg in args)
+    foreach (string arg in args)
     {
         if (arg.StartsWith('-'))
         {
@@ -178,21 +179,18 @@ static async Task PrintVersionNotice(IInteractionService interaction, Task<strin
     try
     {
         // Wait at most 1 second for the background check
-        var completed = await Task.WhenAny(versionCheckTask, Task.Delay(1000));
+        Task completed = await Task.WhenAny(versionCheckTask, Task.Delay(1000));
         if (completed != versionCheckTask)
         {
             return;
         }
 
-        var latestVersion = await versionCheckTask;
+        string? latestVersion = await versionCheckTask;
         if (latestVersion is not null)
         {
             interaction.WriteBlankLine();
             interaction.WriteLine(l => l
-                .Warning($"A newer version of Azure Functions Core Tools is available ({latestVersion})."));
-            interaction.WriteLine(l => l
-                .Muted("Update with: ")
-                .Code("npm i -g azure-functions-core-tools@5 --unsafe-perm true"));
+                .Warning($"A newer version of Azure Functions CLI is available ({latestVersion})."));
         }
     }
     catch

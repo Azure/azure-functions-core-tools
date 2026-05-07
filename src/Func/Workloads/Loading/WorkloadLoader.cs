@@ -3,7 +3,6 @@
 
 using System.Reflection;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Workloads.Loading;

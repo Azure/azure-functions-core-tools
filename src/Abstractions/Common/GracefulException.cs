@@ -29,24 +29,14 @@ public class GracefulException : Exception
 /// <summary>
 /// Thrown when a command or file is not found.
 /// </summary>
-public class CommandUnknownException : GracefulException
+public class CommandUnknownException(string commandName) : GracefulException($"Unknown command: '{commandName}'", isUserError: true)
 {
-    public string CommandName { get; }
-
-    public CommandUnknownException(string commandName)
-        : base($"Unknown command: '{commandName}'", isUserError: true)
-    {
-        CommandName = commandName;
-    }
+    public string CommandName { get; } = commandName;
 }
 
 /// <summary>
 /// Thrown when command arguments fail to parse.
 /// </summary>
-public class CommandParsingException : GracefulException
-{
-    public CommandParsingException(string message)
-        : base(message, isUserError: true)
+public class CommandParsingException(string message) : GracefulException(message, isUserError: true)
     {
-    }
 }

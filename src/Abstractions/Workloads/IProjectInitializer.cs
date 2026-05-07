@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.CommandLine.Parsing;
 
 namespace Azure.Functions.Cli.Workloads;
 

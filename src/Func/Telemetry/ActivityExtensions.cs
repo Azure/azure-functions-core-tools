@@ -28,7 +28,7 @@ internal static class ActivityExtensions
         /// </summary>
         public Activity? StartCommandActivity(string commandName)
         {
-            var activity = source.StartActivity(commandName, ActivityKind.Internal);
+            Activity? activity = source.StartActivity(commandName, ActivityKind.Internal);
             activity?.SetTag(TelemetryConventions.CliCommandName, commandName);
             return activity;
         }

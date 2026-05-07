@@ -69,12 +69,12 @@ internal class StartCommand : FuncCliCommand, IBuiltInCommand
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var workingDirectory = parseResult.GetValue(PathArgument!)!;
+        WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         if (!workingDirectory.Exists)
         {
             // Echo the path as the user typed it (when explicit) so the error
             // matches their input rather than a fully-resolved absolute path.
-            var displayPath = workingDirectory.OriginalPath ?? workingDirectory.Info.FullName;
+            string displayPath = workingDirectory.OriginalPath ?? workingDirectory.Info.FullName;
             throw new GracefulException(
                 $"The specified path does not exist: '{displayPath}'",
                 isUserError: true);

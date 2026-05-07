@@ -20,7 +20,7 @@ internal static class TestWorkloads
             Instance: instance,
             PackageId: packageId,
             PackageVersion: version,
-            Aliases: Array.Empty<string>(),
+            Aliases: [],
             DisplayName: instance.DisplayName,
             Description: instance.Description);
     }
@@ -29,7 +29,7 @@ internal static class TestWorkloads
     /// Minimal <see cref="Workloads.Workload"/> used by tests that need a
     /// runtime instance to back a <see cref="WorkloadInfo"/>.
     /// </summary>
-    private sealed class TestWorkload(string name) : global::Azure.Functions.Cli.Workloads.Workload
+    private sealed class TestWorkload(string name) : Workload
     {
         public override string DisplayName { get; } = name;
 

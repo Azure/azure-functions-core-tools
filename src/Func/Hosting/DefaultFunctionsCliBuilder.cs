@@ -26,29 +26,23 @@ namespace Azure.Functions.Cli.Hosting;
 /// <c>RegisterCommand</c> on a non-workload builder fail fast with a clear
 /// error so an untracked command can never reach the parser.
 /// </summary>
-internal sealed class DefaultFunctionsCliBuilder : FunctionsCliBuilder
+internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, WorkloadInfo? workload) : FunctionsCliBuilder
 {
-    private readonly WorkloadInfo? _workload;
+    private readonly WorkloadInfo? _workload = workload;
 
     public DefaultFunctionsCliBuilder(IServiceCollection services)
         : this(services, workload: null)
     {
     }
 
-    public DefaultFunctionsCliBuilder(IServiceCollection services, WorkloadInfo? workload)
-    {
-        Services = services ?? throw new ArgumentNullException(nameof(services));
-        _workload = workload;
-    }
-
-    public override IServiceCollection Services { get; }
+    public override IServiceCollection Services { get; } = services ?? throw new ArgumentNullException(nameof(services));
 
     protected override void OnRegisterCommand(Func<IServiceProvider, FuncCommand> factory)
     {
-        var workload = RequireWorkload();
+        WorkloadInfo workload = RequireWorkload();
         Services.AddSingleton<FuncCliCommand>(sp =>
         {
-            var command = factory(sp)
+            FuncCommand command = factory(sp)
                 ?? throw new InvalidOperationException(
                     $"Factory registered by workload '{workload.PackageId}' returned null.");
             return new ExternalCommand(workload, command);

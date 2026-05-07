@@ -3,7 +3,6 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +22,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_ReturnsRootCommand()
     {
-        var root = TestParser.CreateRoot(_interaction);
+        FuncRootCommand root = TestParser.CreateRoot(_interaction);
 
         Assert.NotNull(root);
         Assert.IsType<FuncRootCommand>(root);
@@ -32,7 +31,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_HasExpectedSubcommands()
     {
-        var root = TestParser.CreateRoot(_interaction);
+        FuncRootCommand root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
         Assert.Contains("version", names);
@@ -42,7 +41,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_HasGlobalOptions()
     {
-        var root = TestParser.CreateRoot(_interaction);
+        FuncRootCommand root = TestParser.CreateRoot(_interaction);
         var optionNames = root.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--verbose", optionNames);
@@ -62,8 +61,8 @@ public class ParserTests
     [InlineData("help")]
     public void Parse_ValidCommand_DoesNotProduceErrors(string commandName)
     {
-        var root = TestParser.CreateRoot(_interaction);
-        var result = root.Parse(commandName);
+        FuncRootCommand root = TestParser.CreateRoot(_interaction);
+        ParseResult result = root.Parse(commandName);
 
         Assert.Empty(result.Errors);
     }
@@ -73,13 +72,13 @@ public class ParserTests
     [Fact]
     public void CreateCommand_WorkloadRegisteredCommand_AppearsAsRootSubcommand()
     {
-        var workload = TestWorkloads.CreateInfo("My.Workload");
-        var root = TestParser.CreateRootWithWorkload(
+        WorkloadInfo workload = TestWorkloads.CreateInfo("My.Workload");
+        FuncRootCommand root = TestParser.CreateRootWithWorkload(
             _interaction,
             workload,
             builder => builder.RegisterCommand(new TestWorkloads.StubFuncCommand("workload-cmd", "wd")));
 
-        var added = root.Subcommands.OfType<ExternalCommand>().SingleOrDefault();
+        ExternalCommand? added = root.Subcommands.OfType<ExternalCommand>().SingleOrDefault();
         Assert.NotNull(added);
         Assert.Equal("workload-cmd", added!.Name);
         Assert.Same(workload, added.Workload);
@@ -88,8 +87,8 @@ public class ParserTests
     [Fact]
     public void CreateCommand_WorkloadCommandCollidesWithBuiltIn_IsSkippedWithNamedWarning()
     {
-        var workload = TestWorkloads.CreateInfo("Wl.Bar");
-        var root = TestParser.CreateRootWithWorkload(
+        WorkloadInfo workload = TestWorkloads.CreateInfo("Wl.Bar");
+        FuncRootCommand root = TestParser.CreateRootWithWorkload(
             _interaction,
             workload,
             builder => builder.RegisterCommand(new TestWorkloads.StubFuncCommand("init")));
@@ -105,10 +104,10 @@ public class ParserTests
     [Fact]
     public void CreateCommand_TwoWorkloadCommandsSameName_BothSkippedWithNamedWarning()
     {
-        var workloadA = TestWorkloads.CreateInfo("Wl.A");
-        var workloadB = TestWorkloads.CreateInfo("Wl.B");
+        WorkloadInfo workloadA = TestWorkloads.CreateInfo("Wl.A");
+        WorkloadInfo workloadB = TestWorkloads.CreateInfo("Wl.B");
 
-        var services = TestParser.BuildServiceProviderWith(_interaction, s =>
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, s =>
         {
             new DefaultFunctionsCliBuilder(s, workloadA)
                 .RegisterCommand(new TestWorkloads.StubFuncCommand("dup"));
@@ -116,7 +115,7 @@ public class ParserTests
                 .RegisterCommand(new TestWorkloads.StubFuncCommand("dup"));
         });
 
-        var root = Parser.CreateCommand(services);
+        FuncRootCommand root = Parser.CreateCommand(services);
 
         Assert.DoesNotContain(root.Subcommands, c => c.Name == "dup");
         Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:")
@@ -126,12 +125,12 @@ public class ParserTests
     [Fact]
     public void CreateCommand_FuncCliCommandNotBuiltInOrExternal_Throws()
     {
-        var services = TestParser.BuildServiceProviderWith(_interaction, s =>
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, s =>
         {
             s.AddSingleton<FuncCliCommand, RogueFuncCliCommand>();
         });
 
-        var ex = Assert.Throws<InvalidOperationException>(() => Parser.CreateCommand(services));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Parser.CreateCommand(services));
         Assert.Contains(nameof(RogueFuncCliCommand), ex.Message);
         Assert.Contains("rogue", ex.Message);
     }
@@ -143,10 +142,10 @@ public class ParserTests
         // `func workload` (no subcommand) should print help and exit 0. The
         // default impl walks parent commands to find the root's HelpOption and
         // invokes its (Spectre-wired) action.
-        var root = TestParser.CreateRoot(_interaction);
-        var parseResult = root.Parse("workload");
+        FuncRootCommand root = TestParser.CreateRoot(_interaction);
+        ParseResult parseResult = root.Parse("workload");
 
-        var exit = await parseResult.InvokeAsync();
+        int exit = await parseResult.InvokeAsync();
 
         Assert.Equal(0, exit);
         Assert.NotEmpty(_interaction.Lines);

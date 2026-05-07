@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
@@ -62,9 +63,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         // Workload-contributed options are attached after built-ins so they
         // appear as a clearly-grouped block in --help output.
-        foreach (var initializer in _initializers)
+        foreach (IProjectInitializer initializer in _initializers)
         {
-            foreach (var option in initializer.GetInitOptions())
+            foreach (Option option in initializer.GetInitOptions())
             {
                 // TODO: detect option-name collisions across workloads and surface
                 // a workload-named error.
@@ -92,16 +93,16 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 "Run `func workload list` to see them, then `func workload uninstall <name>` to remove one.");
         }
 
-        var workingDirectory = parseResult.GetValue(PathArgument!)!;
+        WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         workingDirectory.CreateIfNotExists();
 
-        var stack = parseResult.GetValue(StackOption);
+        string? stack = parseResult.GetValue(StackOption);
 
-        var initializer = await SelectInitializerAsync(stack, cancellationToken);
+        IProjectInitializer? initializer = await SelectInitializerAsync(stack, cancellationToken);
         if (initializer is null)
         {
-            var installed = _initializers.Select(i => i.Stack).ToArray();
-            var hint = installed.Length == 0
+            string[] installed = _initializers.Select(i => i.Stack).ToArray();
+            WorkloadHint hint = installed.Length == 0
                 ? new WorkloadHint(WorkloadHintKind.NoWorkloadsInstalled, "initialize a project", null, installed)
                 : stack is not null
                     ? new WorkloadHint(WorkloadHintKind.NoMatchingStack, "initialize a project", stack, installed)
@@ -156,7 +157,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         var choices = _initializers.Select(i => i.Stack).ToList();
-        var picked = await _interaction.PromptForSelectionAsync(
+        string picked = await _interaction.PromptForSelectionAsync(
             "Select a stack:",
             choices,
             cancellationToken);

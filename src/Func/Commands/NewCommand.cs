@@ -52,7 +52,7 @@ internal class NewCommand : FuncCliCommand, IBuiltInCommand
             WorkloadHintKind.NoWorkloadsInstalled,
             ActionDescription: "create functions from templates",
             RequestedStack: null,
-            InstalledStacks: Array.Empty<string>()));
+            InstalledStacks: []));
 
         return Task.FromResult(1);
     }

@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Tests;
 /// </summary>
 internal sealed class RecordingWorkloadHintRenderer : IWorkloadHintRenderer
 {
-    private readonly List<WorkloadHint> _hints = new();
+    private readonly List<WorkloadHint> _hints = [];
 
     public IReadOnlyList<WorkloadHint> Hints => _hints;
 

@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.CommandLine.Parsing;
 using System.Reflection;
 using Azure.Functions.Cli.Commands;
 
@@ -88,7 +87,7 @@ internal sealed class ExternalCommand : FuncCliCommand
         }
 
         var seenTokens = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var descriptor in options)
+        foreach (FuncCommandOption? descriptor in options)
         {
             if (descriptor is null)
             {
@@ -124,7 +123,7 @@ internal sealed class ExternalCommand : FuncCliCommand
         }
 
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var descriptor in arguments)
+        foreach (FuncCommandArgument? descriptor in arguments)
         {
             if (descriptor is null)
             {
@@ -154,7 +153,7 @@ internal sealed class ExternalCommand : FuncCliCommand
         }
 
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var subcommand in subcommands)
+        foreach (FuncCommand? subcommand in subcommands)
         {
             if (subcommand is null)
             {
@@ -183,7 +182,7 @@ internal sealed class ExternalCommand : FuncCliCommand
     private static Option<T> CreateTypedOption<T>(FuncCommandOption descriptor)
     {
         var typed = (FuncCommandOption<T>)descriptor;
-        var aliases = typed.ShortName is null ? [] : new[] { typed.ShortName };
+        string[] aliases = typed.ShortName is null ? [] : [typed.ShortName];
         var option = new Option<T>(typed.Name, aliases)
         {
             Description = typed.Description,
@@ -191,7 +190,7 @@ internal sealed class ExternalCommand : FuncCliCommand
 
         if (typed.HasDefaultValue)
         {
-            var defaultValue = typed.DefaultValue;
+            T? defaultValue = typed.DefaultValue;
             option.DefaultValueFactory = _ => defaultValue;
         }
 
@@ -235,7 +234,7 @@ internal sealed class ExternalCommand : FuncCliCommand
             where T : default
         {
             ArgumentNullException.ThrowIfNull(option);
-            if (!_options.TryGetValue(option, out var sclOption))
+            if (!_options.TryGetValue(option, out Option? sclOption))
             {
                 throw new ArgumentException(
                     $"Option '{option.Name}' is not declared on the command being executed. " +
@@ -250,7 +249,7 @@ internal sealed class ExternalCommand : FuncCliCommand
             where T : default
         {
             ArgumentNullException.ThrowIfNull(argument);
-            if (!_arguments.TryGetValue(argument, out var sclArgument))
+            if (!_arguments.TryGetValue(argument, out Argument? sclArgument))
             {
                 throw new ArgumentException(
                     $"Argument '{argument.Name}' is not declared on the command being executed. " +

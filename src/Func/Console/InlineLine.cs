@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Console;
 internal sealed class InlineLine
 {
     private readonly ITheme _theme;
-    private readonly List<Segment> _segments = new();
+    private readonly List<Segment> _segments = [];
 
     internal InlineLine(ITheme theme)
     {
@@ -70,7 +70,7 @@ internal sealed class InlineLine
     public IRenderable ToRenderable()
     {
         var paragraph = new Paragraph();
-        foreach (var segment in _segments)
+        foreach (Segment segment in _segments)
         {
             paragraph.Append(segment.Text, segment.Style ?? Style.Plain);
         }

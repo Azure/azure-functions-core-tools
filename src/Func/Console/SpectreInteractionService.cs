@@ -84,11 +84,11 @@ internal class SpectreInteractionService : IInteractionService
 
     public void WriteDefinitionList(IEnumerable<DefinitionItem> items)
     {
-        var grid = new Grid()
+        Grid grid = new Grid()
             .AddColumn(new GridColumn().PadLeft(2).PadRight(4).NoWrap())
             .AddColumn(new GridColumn().PadRight(0));
 
-        foreach (var item in items)
+        foreach (DefinitionItem item in items)
         {
             grid.AddRow(
                 new Text(item.Label, _theme.Command),
@@ -100,16 +100,16 @@ internal class SpectreInteractionService : IInteractionService
 
     public void WriteTable(string[] columns, IEnumerable<string[]> rows)
     {
-        var table = new Table()
+        Table table = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Grey);
 
-        foreach (var column in columns)
+        foreach (string column in columns)
         {
             table.AddColumn(new TableColumn(new Text(column, _theme.Heading)).Centered());
         }
 
-        foreach (var row in rows)
+        foreach (string[] row in rows)
         {
             table.AddRow(row.Select(cell => (IRenderable)new Text(cell)).ToArray());
         }
@@ -177,13 +177,13 @@ internal class SpectreInteractionService : IInteractionService
             return defaultValue ?? string.Empty;
         }
 
-        var textPrompt = new TextPrompt<string>(prompt).AllowEmpty();
+        TextPrompt<string> textPrompt = new TextPrompt<string>(prompt).AllowEmpty();
         if (defaultValue is not null)
         {
             textPrompt.DefaultValue(defaultValue);
         }
 
-        var result = await textPrompt.ShowAsync(_stderr, cancellationToken);
+        string result = await textPrompt.ShowAsync(_stderr, cancellationToken);
         return string.IsNullOrEmpty(result) && defaultValue is not null ? defaultValue : result;
     }
 }

@@ -3,7 +3,6 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Common;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;

@@ -28,7 +28,7 @@ internal sealed class PathArgument : Argument<WorkingDirectory>
 
     private static WorkingDirectory ParseToken(ArgumentResult result)
     {
-        var token = result.Tokens.Count > 0 ? result.Tokens[0].Value : null;
+        string? token = result.Tokens.Count > 0 ? result.Tokens[0].Value : null;
         if (string.IsNullOrEmpty(token))
         {
             return WorkingDirectory.FromCwd();

@@ -26,7 +26,7 @@ public class WorkloadProviderTests
         var instance = new TestWorkload();
         var loaded = new[]
         {
-            new WorkloadInfo(instance, "Pkg.A", "1.0.0", Array.Empty<string>(), instance.DisplayName, instance.Description),
+            new WorkloadInfo(instance, "Pkg.A", "1.0.0", [], instance.DisplayName, instance.Description),
         };
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(entries);
@@ -45,10 +45,10 @@ public class WorkloadProviderTests
     {
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<WorkloadEntry>());
+            .Returns([]);
         IWorkloadLoader loader = Substitute.For<IWorkloadLoader>();
         loader.Load(Arg.Any<IReadOnlyList<WorkloadEntry>>())
-            .Returns(Array.Empty<WorkloadInfo>());
+            .Returns([]);
         var provider = new WorkloadProvider(store, loader);
 
         IReadOnlyList<WorkloadInfo> first = await provider.GetWorkloadsAsync();
@@ -72,7 +72,7 @@ public class WorkloadProviderTests
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(release.Task);
         IWorkloadLoader loader = Substitute.For<IWorkloadLoader>();
         loader.Load(Arg.Any<IReadOnlyList<WorkloadEntry>>())
-            .Returns(Array.Empty<WorkloadInfo>());
+            .Returns([]);
         var provider = new WorkloadProvider(store, loader);
 
         Task<IReadOnlyList<WorkloadInfo>>[] callers = Enumerable.Range(0, 10)
@@ -81,7 +81,7 @@ public class WorkloadProviderTests
 
         // Give the callers time to queue behind the gate before releasing.
         await Task.Delay(50);
-        release.SetResult(Array.Empty<WorkloadEntry>());
+        release.SetResult([]);
 
         IReadOnlyList<WorkloadInfo>[] results = await Task.WhenAll(callers);
 
@@ -94,10 +94,10 @@ public class WorkloadProviderTests
     {
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<WorkloadEntry>());
+            .Returns([]);
         IWorkloadLoader loader = Substitute.For<IWorkloadLoader>();
         loader.Load(Arg.Any<IReadOnlyList<WorkloadEntry>>())
-            .Returns(Array.Empty<WorkloadInfo>());
+            .Returns([]);
         var provider = new WorkloadProvider(store, loader);
         using var cts = new CancellationTokenSource();
 

@@ -1,9 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Console;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;

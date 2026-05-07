@@ -4,7 +4,6 @@
 using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Invocation;
-using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -31,10 +30,7 @@ internal abstract class FuncCliCommand : Command
 
     protected FuncCliCommand(string name, string description) : base(name, description)
     {
-        SetAction(async (parseResult, cancellationToken) =>
-        {
-            return await ExecuteAsync(parseResult, cancellationToken);
-        });
+        SetAction(ExecuteAsync);
     }
 
     /// <summary>
@@ -53,7 +49,7 @@ internal abstract class FuncCliCommand : Command
         Command? current = this;
         while (current is not null)
         {
-            var helpOption = current.Options.OfType<HelpOption>().FirstOrDefault();
+            HelpOption? helpOption = current.Options.OfType<HelpOption>().FirstOrDefault();
             if (helpOption?.Action is SynchronousCommandLineAction sync)
             {
                 return Task.FromResult(sync.Invoke(parseResult));
@@ -65,7 +61,7 @@ internal abstract class FuncCliCommand : Command
         // Fallback: if we still can't find a help action, look at the root
         // result. In practice this is the same lookup, but it's defensive
         // against constructed-but-unparented commands.
-        var rootHelp = parseResult.RootCommandResult.Command.Options.OfType<HelpOption>().FirstOrDefault();
+        HelpOption? rootHelp = parseResult.RootCommandResult.Command.Options.OfType<HelpOption>().FirstOrDefault();
         if (rootHelp?.Action is SynchronousCommandLineAction rootSync)
         {
             return Task.FromResult(rootSync.Invoke(parseResult));

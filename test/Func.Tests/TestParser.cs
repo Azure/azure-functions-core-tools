@@ -21,7 +21,7 @@ internal static class TestParser
 {
     public static FuncRootCommand CreateRoot(IInteractionService interaction)
     {
-        var services = BuildBaseServices(interaction);
+        ServiceCollection services = BuildBaseServices(interaction);
         return Parser.CreateCommand(services.BuildServiceProvider());
     }
 
@@ -36,7 +36,7 @@ internal static class TestParser
         WorkloadInfo workload,
         Action<FunctionsCliBuilder> configure)
     {
-        var services = BuildBaseServices(interaction);
+        ServiceCollection services = BuildBaseServices(interaction);
         var builder = new DefaultFunctionsCliBuilder(services, workload);
         configure(builder);
         return Parser.CreateCommand(services.BuildServiceProvider());
@@ -52,7 +52,7 @@ internal static class TestParser
         IInteractionService interaction,
         Action<IServiceCollection>? configure = null)
     {
-        var services = BuildBaseServices(interaction);
+        ServiceCollection services = BuildBaseServices(interaction);
         configure?.Invoke(services);
         return services.BuildServiceProvider();
     }
@@ -68,13 +68,13 @@ internal static class TestParser
         // Tests that exercise listing register their own substitutes.
         IWorkloadStore emptyStore = Substitute.For<IWorkloadStore>();
         emptyStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<WorkloadEntry>());
+            .Returns([]);
         services.AddSingleton(emptyStore);
         services.AddSingleton(Substitute.For<IWorkloadLoader>());
 
         IWorkloadProvider emptyProvider = Substitute.For<IWorkloadProvider>();
         emptyProvider.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(new ValueTask<IReadOnlyList<WorkloadInfo>>(Array.Empty<WorkloadInfo>()));
+            .Returns(new ValueTask<IReadOnlyList<WorkloadInfo>>([]));
         services.AddSingleton(emptyProvider);
 
         return services;

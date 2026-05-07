@@ -16,8 +16,7 @@ public class WorkloadListCommandTests
     [Fact]
     public async Task EmptyList_WritesNoWorkloadsHint_ReturnsZero()
     {
-        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(Array.Empty<WorkloadInfo>()));
-
+        var cmd = new WorkloadListCommand(_interaction, ProviderReturning([]));
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -34,7 +33,7 @@ public class WorkloadListCommandTests
                 instance: new FakeWorkload(displayName: ".NET", description: "C# / F# workload."),
                 packageId: "Azure.Functions.Cli.Workload.Dotnet",
                 packageVersion: "1.0.0",
-                aliases: new[] { "dotnet", "dotnet-isolated" }),
+                aliases: ["dotnet", "dotnet-isolated"]),
         };
 
         var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
@@ -56,7 +55,7 @@ public class WorkloadListCommandTests
                 instance: new FakeWorkload(),
                 packageId: "Azure.Functions.Cli.Workload.Custom",
                 packageVersion: "0.1.0",
-                aliases: Array.Empty<string>()),
+                aliases: []),
         };
 
         var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
@@ -72,9 +71,9 @@ public class WorkloadListCommandTests
     {
         var workloads = new[]
         {
-            NewInfo(new FakeWorkload(), "Pkg.A", "1.0.0", Array.Empty<string>()),
-            NewInfo(new FakeWorkload(), "Pkg.B", "2.0.0", Array.Empty<string>()),
-            NewInfo(new FakeWorkload(), "Pkg.A", "1.1.0", Array.Empty<string>()),
+            NewInfo(new FakeWorkload(), "Pkg.A", "1.0.0", []),
+            NewInfo(new FakeWorkload(), "Pkg.B", "2.0.0", []),
+            NewInfo(new FakeWorkload(), "Pkg.A", "1.1.0", []),
         };
 
         var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));

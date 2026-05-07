@@ -26,7 +26,7 @@ public class WorkloadLoaderTests
     {
         var loader = new WorkloadLoader(StubPaths());
 
-        var loaded = loader.Load(Array.Empty<WorkloadEntry>());
+        var loaded = loader.Load([]);
 
         Assert.Empty(loaded);
     }
@@ -36,7 +36,7 @@ public class WorkloadLoaderTests
     {
         var loader = new WorkloadLoader(StubPaths());
 
-        var loaded = loader.Load(new[] { FixtureEntry(FixturePackageId) });
+        var loaded = loader.Load([FixtureEntry(FixturePackageId)]);
 
         var item = Assert.Single(loaded);
         Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
@@ -49,7 +49,7 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "DoesNotExist.dll");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load(new[] { entry }));
+        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
 
         Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
@@ -63,7 +63,7 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, typeNameOverride: "Some.Missing.Type");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load(new[] { entry }));
+        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
 
         Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
@@ -79,7 +79,7 @@ public class WorkloadLoaderTests
             FixturePackageId,
             typeNameOverride: "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.NotAWorkload");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load(new[] { entry }));
+        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
 
         Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
@@ -114,7 +114,7 @@ public class WorkloadLoaderTests
     {
         var loader = new WorkloadLoader(StubPaths());
 
-        var loaded = loader.Load(new[] { FixtureEntry("collectible-fixture") });
+        var loaded = loader.Load([FixtureEntry("collectible-fixture")]);
 
         var ctx = AssemblyLoadContext.GetLoadContext(loaded[0].Instance.GetType().Assembly);
         Assert.NotNull(ctx);
@@ -128,7 +128,7 @@ public class WorkloadLoaderTests
     {
         var loader = new WorkloadLoader(StubPaths());
 
-        var loaded = loader.Load(new[] { FixtureEntry("identity-fixture") });
+        var loaded = loader.Load([FixtureEntry("identity-fixture")]);
 
         // The Workload type the workload was activated as must be the same Type
         // identity the host knows. If the load context loaded its own copy of
@@ -155,7 +155,7 @@ public class WorkloadLoaderTests
         // mis-packaged Workload.Tests.Fixtures.Default fixture.
         var loader = new WorkloadLoader(StubPaths());
 
-        var loaded = loader.Load(new[] { SdkFixtureEntry(SdkFixturePackageId) });
+        var loaded = loader.Load([SdkFixtureEntry(SdkFixturePackageId)]);
 
         var item = Assert.Single(loaded);
         Assert.Equal(SdkFixtureTypeName, item.Instance.GetType().FullName);
@@ -197,7 +197,7 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "../../../escape.dll");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load(new[] { entry }));
+        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
 
         Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);

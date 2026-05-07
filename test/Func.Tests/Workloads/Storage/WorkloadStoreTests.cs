@@ -57,7 +57,7 @@ public class WorkloadStoreTests : IDisposable
 
         var workloads = await _store.GetWorkloadsAsync();
         Assert.Equal(
-            new[] { "1.0.0", "2.0.0" },
+            ["1.0.0", "2.0.0"],
             workloads.Select(w => w.PackageVersion).OrderBy(v => v));
     }
 
@@ -112,7 +112,7 @@ public class WorkloadStoreTests : IDisposable
         {
             PackageId = "Azure.Functions.Cli.Workload.Dotnet",
             PackageVersion = "1.0.0",
-            Aliases = new[] { "dotnet", "dotnet-isolated" },
+            Aliases = ["dotnet", "dotnet-isolated"],
             EntryPoint = new EntryPointSpec
             {
                 AssemblyPath = "lib/net10.0/Foo.dll",

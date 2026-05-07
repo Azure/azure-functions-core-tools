@@ -42,7 +42,7 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
         _interaction.WriteHint($"Install a stack to {hint.ActionDescription}:");
         _interaction.WriteBlankLine();
 
-        var items = KnownInstallableWorkloads.LanguageMap.Select(static kvp =>
+        IEnumerable<DefinitionItem> items = KnownInstallableWorkloads.LanguageMap.Select(static kvp =>
             new DefinitionItem($"func workload install {kvp.Key}", string.Join(", ", kvp.Value)));
         _interaction.WriteDefinitionList(items);
 
@@ -69,7 +69,7 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
     {
         _interaction.WriteBlankLine();
         _interaction.WriteHint("Installed stacks:");
-        foreach (var stack in stacks)
+        foreach (string stack in stacks)
         {
             _interaction.WriteLine(l => l
                 .Muted("  ")
