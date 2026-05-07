@@ -48,4 +48,3 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         }
     }
 }
-
