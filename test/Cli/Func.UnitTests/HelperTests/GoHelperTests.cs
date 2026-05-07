@@ -312,6 +312,120 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             files.Should().Contain(Path.Combine(root, GoHelpers.GoBinaryName));
         }
 
+        [Fact]
+        public void IsBinaryUpToDate_BinaryMissing_ReturnsFalse()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-fresh-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "main.go"), "package main");
+
+                GoHelpers.IsBinaryUpToDate(dir, "app.exe").Should().BeFalse();
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void IsBinaryUpToDate_BinaryNewerThanSources_ReturnsTrue()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-fresh-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var sourcePath = Path.Combine(dir, "main.go");
+                File.WriteAllText(sourcePath, "package main");
+                File.SetLastWriteTimeUtc(sourcePath, DateTime.UtcNow.AddMinutes(-5));
+
+                var binaryPath = Path.Combine(dir, "app.exe");
+                File.WriteAllText(binaryPath, "stub");
+                File.SetLastWriteTimeUtc(binaryPath, DateTime.UtcNow);
+
+                GoHelpers.IsBinaryUpToDate(dir, "app.exe").Should().BeTrue();
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void IsBinaryUpToDate_SourceNewerThanBinary_ReturnsFalse()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-fresh-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var binaryPath = Path.Combine(dir, "app.exe");
+                File.WriteAllText(binaryPath, "stub");
+                File.SetLastWriteTimeUtc(binaryPath, DateTime.UtcNow.AddMinutes(-5));
+
+                var sourcePath = Path.Combine(dir, "main.go");
+                File.WriteAllText(sourcePath, "package main");
+                File.SetLastWriteTimeUtc(sourcePath, DateTime.UtcNow);
+
+                GoHelpers.IsBinaryUpToDate(dir, "app.exe").Should().BeFalse();
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void IsBinaryUpToDate_GoModNewerThanBinary_ReturnsFalse()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-fresh-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "main.go"), "package main");
+                File.SetLastWriteTimeUtc(Path.Combine(dir, "main.go"), DateTime.UtcNow.AddMinutes(-10));
+
+                var binaryPath = Path.Combine(dir, "app.exe");
+                File.WriteAllText(binaryPath, "stub");
+                File.SetLastWriteTimeUtc(binaryPath, DateTime.UtcNow.AddMinutes(-5));
+
+                var goModPath = Path.Combine(dir, "go.mod");
+                File.WriteAllText(goModPath, "module example.com/test");
+                File.SetLastWriteTimeUtc(goModPath, DateTime.UtcNow);
+
+                GoHelpers.IsBinaryUpToDate(dir, "app.exe").Should().BeFalse();
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void IsBinaryUpToDate_NestedSourceNewerThanBinary_ReturnsFalse()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "func-go-fresh-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var binaryPath = Path.Combine(dir, "app.exe");
+                File.WriteAllText(binaryPath, "stub");
+                File.SetLastWriteTimeUtc(binaryPath, DateTime.UtcNow.AddMinutes(-5));
+
+                var nestedDir = Path.Combine(dir, "internal", "handlers");
+                Directory.CreateDirectory(nestedDir);
+                var nestedSource = Path.Combine(nestedDir, "http.go");
+                File.WriteAllText(nestedSource, "package handlers");
+                File.SetLastWriteTimeUtc(nestedSource, DateTime.UtcNow);
+
+                GoHelpers.IsBinaryUpToDate(dir, "app.exe").Should().BeFalse();
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
         // Builds a minimal 20-byte ELF identification region with EI_CLASS=64-bit, EI_DATA=little-endian
         // and an arbitrary e_machine value. AssertLinuxAmd64Binary only inspects the first 20 bytes, so
         // this is enough to exercise its checks without producing a valid runnable binary.

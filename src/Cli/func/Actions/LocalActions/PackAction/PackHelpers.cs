@@ -21,21 +21,29 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public static string ResolveOutputPath(string functionAppRoot, string outputPath)
         {
-            string resolvedPath;
             if (string.IsNullOrEmpty(outputPath))
             {
-                resolvedPath = Path.Combine(Environment.CurrentDirectory, $"{Path.GetFileName(functionAppRoot)}");
+                return Path.Combine(Environment.CurrentDirectory, $"{Path.GetFileName(functionAppRoot)}.zip");
             }
-            else
+
+            string resolvedPath = Path.Combine(Environment.CurrentDirectory, outputPath);
+
+            // If the user supplied a path ending in .zip, treat it as the destination file
+            // (matching the --help text: "file path where the packed ZIP archive will be created").
+            // Otherwise treat it as a directory and place <functionAppRoot>.zip inside it.
+            if (outputPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             {
-                resolvedPath = Path.Combine(Environment.CurrentDirectory, outputPath);
+                string parentDir = Path.GetDirectoryName(resolvedPath);
+                if (!string.IsNullOrEmpty(parentDir))
+                {
+                    Directory.CreateDirectory(parentDir);
+                }
 
-                // Create directory if it doesn't exist
-                Directory.CreateDirectory(resolvedPath);
-                resolvedPath = Path.Combine(resolvedPath, $"{Path.GetFileName(functionAppRoot)}");
+                return resolvedPath;
             }
 
-            return resolvedPath + ".zip";
+            Directory.CreateDirectory(resolvedPath);
+            return Path.Combine(resolvedPath, $"{Path.GetFileName(functionAppRoot)}.zip");
         }
 
         public static void ValidateFunctionAppRoot(string functionAppRoot)

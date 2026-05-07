@@ -127,6 +127,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
+            // Go uses programmatic registration in main.go (app.HTTP, app.Timer, ...);
+            // there are no per-function templates to scaffold, so 'func new' is intentionally not wired up.
+            if (_workerRuntime == WorkerRuntime.Go)
+            {
+                ColoredConsole
+                    .Error
+                    .WriteLine(ErrorColor("The 'func new' command is not supported for the Go runtime."))
+                    .WriteLine(ErrorColor("Go uses programmatic registration — add functions by editing 'main.go' (app.HTTP(...), app.Timer(...), etc.)."))
+                    .WriteLine(ErrorColor("For more information, visit: https://github.com/Azure/azure-functions-golang-worker"));
+                return;
+            }
+
             // Load templates and resolve language
             if (NeedsToLoadExtensionTemplates(_workerRuntime, Csx))
             {

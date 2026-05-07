@@ -94,17 +94,98 @@ namespace Azure.Functions.Cli.Helpers
         {
             workingDirectory ??= Environment.CurrentDirectory;
             var outputName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
+
+            if (IsBinaryUpToDate(workingDirectory, outputName))
+            {
+                ColoredConsole.WriteLine($"Go worker binary '{outputName}' is up to date — skipping build.");
+                return;
+            }
+
             ColoredConsole.WriteLine($"Building Go worker binary '{outputName}'...");
 
+            var stderrBuffer = new StringBuilder();
             var exe = new Executable("go", $"build -o \"{outputName}\" .", workingDirectory: workingDirectory);
             var exitCode = await exe.RunAsync(
                 l => ColoredConsole.WriteLine(l),
-                e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+                e =>
+                {
+                    stderrBuffer.AppendLine(e);
+                    ColoredConsole.Error.WriteLine(ErrorColor(e));
+                });
 
             if (exitCode != 0)
             {
+                if (LooksLikeStaleModules(stderrBuffer.ToString()))
+                {
+                    ColoredConsole.WriteLine(AdditionalInfoColor("Hint: run \"go mod tidy\" to update module dependencies, then re-run \"func start\"."));
+                }
+
                 throw new CliException($"Go build failed with exit code {exitCode}. See output above for details.");
             }
+        }
+
+        private static bool LooksLikeStaleModules(string stderr)
+        {
+            if (string.IsNullOrEmpty(stderr))
+            {
+                return false;
+            }
+
+            return stderr.Contains("missing go.sum entry", StringComparison.OrdinalIgnoreCase)
+                || stderr.Contains("no required module provides package", StringComparison.OrdinalIgnoreCase)
+                || stderr.Contains("inconsistent vendoring", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="binaryName"/> exists in
+        /// <paramref name="workingDirectory"/> and is newer than every <c>.go</c>
+        /// source file plus <c>go.mod</c>/<c>go.sum</c> in the same directory tree.
+        /// Lets <c>func start</c> skip a redundant <c>go build</c> on warm reruns.
+        /// </summary>
+        internal static bool IsBinaryUpToDate(string workingDirectory, string binaryName)
+        {
+            var binaryPath = Path.Combine(workingDirectory, binaryName);
+            if (!FileSystemHelpers.FileExists(binaryPath))
+            {
+                return false;
+            }
+
+            DateTime binaryWriteTime;
+            try
+            {
+                binaryWriteTime = File.GetLastWriteTimeUtc(binaryPath);
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+
+            var sources = Directory.EnumerateFiles(workingDirectory, "*.go", SearchOption.AllDirectories);
+            foreach (var manifest in new[] { "go.mod", "go.sum" })
+            {
+                var manifestPath = Path.Combine(workingDirectory, manifest);
+                if (FileSystemHelpers.FileExists(manifestPath))
+                {
+                    sources = sources.Append(manifestPath);
+                }
+            }
+
+            foreach (var source in sources)
+            {
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(source) > binaryWriteTime)
+                    {
+                        return false;
+                    }
+                }
+                catch (IOException)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
