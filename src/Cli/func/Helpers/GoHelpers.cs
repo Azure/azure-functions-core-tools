@@ -98,12 +98,6 @@ namespace Azure.Functions.Cli.Helpers
             var outputName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
             var outputPath = Path.Combine(GoBinDir, outputName);
 
-            if (IsBinaryUpToDate(workingDirectory, outputPath))
-            {
-                ColoredConsole.WriteLine($"Go worker binary '{outputPath}' is up to date — skipping build.");
-                return;
-            }
-
             ColoredConsole.WriteLine($"Building Go worker binary '{outputPath}'...");
 
             // Ensure bin/ exists so `go build -o bin/app` doesn't fail.
@@ -140,121 +134,6 @@ namespace Azure.Functions.Cli.Helpers
             return stderr.Contains("missing go.sum entry", StringComparison.OrdinalIgnoreCase)
                 || stderr.Contains("no required module provides package", StringComparison.OrdinalIgnoreCase)
                 || stderr.Contains("inconsistent vendoring", StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// Returns <c>true</c> when <paramref name="binaryName"/> exists in
-        /// <paramref name="workingDirectory"/> and is newer than every project source file
-        /// (including assets referenced by <c>//go:embed</c>) plus <c>go.mod</c>/<c>go.sum</c>
-        /// in the same directory tree. Lets <c>func start</c> skip a redundant <c>go build</c>
-        /// on warm reruns.
-        /// </summary>
-        /// <remarks>
-        /// To stay correct for <c>//go:embed</c> directives without parsing source, this widens
-        /// the freshness check to every regular file under <paramref name="workingDirectory"/>,
-        /// then excludes things that don't affect the produced binary:
-        /// <list type="bullet">
-        ///   <item>The binary itself (and its <c>.exe</c> variant on Windows).</item>
-        ///   <item>Hidden files/directories (<c>.git</c>, <c>.vscode</c>, etc.).</item>
-        ///   <item><c>vendor/</c> — vendored deps' freshness is implied by <c>go.mod</c>/<c>go.sum</c>.</item>
-        ///   <item><c>*_test.go</c> — test files are not compiled into the production binary.</item>
-        /// </list>
-        /// Any I/O failure conservatively returns <c>false</c> so the build runs.
-        /// </remarks>
-        internal static bool IsBinaryUpToDate(string workingDirectory, string binaryName)
-        {
-            var binaryPath = Path.Combine(workingDirectory, binaryName);
-            if (!FileSystemHelpers.FileExists(binaryPath))
-            {
-                return false;
-            }
-
-            DateTime binaryWriteTime;
-            try
-            {
-                binaryWriteTime = File.GetLastWriteTimeUtc(binaryPath);
-            }
-            catch (IOException)
-            {
-                return false;
-            }
-
-            string fullWorkingDir = Path.GetFullPath(workingDirectory);
-            string binaryFullPath = Path.GetFullPath(binaryPath);
-            string binaryExeFullPath = Path.GetFullPath(Path.Combine(workingDirectory, $"{GoBinaryName}.exe"));
-
-            try
-            {
-                foreach (var source in Directory.EnumerateFiles(fullWorkingDir, "*", SearchOption.AllDirectories))
-                {
-                    if (ShouldIgnoreForFreshnessCheck(source, fullWorkingDir, binaryFullPath, binaryExeFullPath))
-                    {
-                        continue;
-                    }
-
-                    if (File.GetLastWriteTimeUtc(source) > binaryWriteTime)
-                    {
-                        return false;
-                    }
-                }
-            }
-            catch (IOException)
-            {
-                return false;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool ShouldIgnoreForFreshnessCheck(string source, string workingDir, string binaryFullPath, string binaryExeFullPath)
-        {
-            // Skip the binary itself — it always post-dates its own sources.
-            if (string.Equals(source, binaryFullPath, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(source, binaryExeFullPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            // Test files are not compiled into the production binary.
-            if (source.EndsWith("_test.go", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            // Walk the relative path segments and skip vendor/ + hidden directories/files.
-            string relative = Path.GetRelativePath(workingDir, source);
-            string[] segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-            // Skip files under the root-level bin/ directory (our build output).
-            // Only check the first segment so nested dirs like pkg/bin/ aren't excluded.
-            if (segments.Length > 0 && string.Equals(segments[0], GoBinDir, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            foreach (var segment in segments)
-            {
-                if (segment.Length == 0)
-                {
-                    continue;
-                }
-
-                if (segment[0] == '.')
-                {
-                    return true;
-                }
-
-                if (string.Equals(segment, "vendor", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         /// <summary>

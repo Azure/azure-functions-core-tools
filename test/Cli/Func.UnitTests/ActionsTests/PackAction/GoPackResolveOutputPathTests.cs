@@ -26,15 +26,6 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             }
         }
 
-        // Test subclass exposes the protected ResolveOutputPath override defined on
-        // GoPackSubcommandAction so the Go-specific existing-file guardrail can be
-        // exercised without invoking the full pack pipeline.
-        private sealed class TestGoPackSubcommandAction : GoPackSubcommandAction
-        {
-            public string InvokeResolveOutputPath(string functionAppRoot, string outputPath)
-                => ResolveOutputPath(functionAppRoot, outputPath);
-        }
-
         [Fact]
         public void ResolveOutputPath_NoOutputProvided_UsesFunctionAppRootName()
         {
@@ -72,6 +63,15 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             act.Should().Throw<CliException>()
                 .WithMessage("*existing file*")
                 .WithMessage("*directory*");
+        }
+
+        // Test subclass exposes the protected ResolveOutputPath override defined on
+        // GoPackSubcommandAction so the Go-specific existing-file guardrail can be
+        // exercised without invoking the full pack pipeline.
+        private sealed class TestGoPackSubcommandAction : GoPackSubcommandAction
+        {
+            public string InvokeResolveOutputPath(string functionAppRoot, string outputPath)
+                => ResolveOutputPath(functionAppRoot, outputPath);
         }
     }
 }
