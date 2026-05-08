@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Helpers
 
             // we need the first item of the first row
             return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
-                ?? throw new CliException("Error finding the Azure Resource information.");
+                ?? throw new ArmResourceNotFoundException("Error finding the Azure Resource information.");
         }
 
         internal static async Task<bool> IsBasicAuthAllowedForSCM(Site functionApp, string accessToken, string managementURL)
@@ -286,7 +286,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken, string managementURL)
         {
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
-            var subIds = subscriptions?.Select(s => s.SubscriptionId).ToList();
+            var subIds = subscriptions.Select(s => s.SubscriptionId).ToList();
 
             if (subIds.Count == 0)
             {
@@ -308,8 +308,7 @@ namespace Azure.Functions.Cli.Helpers
                     accessToken,
                     managementURL);
             }
-            catch (CliException ex) when (
-               ex.Message == "Error finding the Azure Resource information.")
+            catch (ArmResourceNotFoundException)
             {
                 throw new ArmResourceNotFoundException(
                     $"Cannot find storage account with name {storageAccountName}");

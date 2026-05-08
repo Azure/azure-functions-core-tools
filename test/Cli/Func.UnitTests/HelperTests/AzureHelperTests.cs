@@ -144,7 +144,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 var mockHttp = new MockHttpMessageHandler();
 
                 // Mock multiple subscriptions
-                mockHttp.When(HttpMethod.Get, subscriptionsUrl).Respond("application/json", @"{'value': [{ 'subscriptionId': 'sub1', 'displayName': 'Sub One' }, { 'subscriptionId': 'sub2', 'displayName': 'Sub Two' },{ 'subscriptionId': 'sub2', 'displayName': 'Sub Three' }]}");
+                mockHttp.When(HttpMethod.Get, subscriptionsUrl).Respond("application/json", @"{'value': [{ 'subscriptionId': 'sub1', 'displayName': 'Sub One' }, { 'subscriptionId': 'sub2', 'displayName': 'Sub Two' },{ 'subscriptionId': 'sub3', 'displayName': 'Sub Three' }]}");
 
                 // ARG resolves storage account from sub2
                 mockHttp.When(HttpMethod.Post, argUrl).Respond("application/json", $@"{{'data': {{'rows': [[ '{resourceId}' ]]}}}}");
