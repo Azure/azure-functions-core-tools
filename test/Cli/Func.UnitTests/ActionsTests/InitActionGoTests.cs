@@ -81,5 +81,91 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             var resolved = ProgrammingModelHelper.ResolveProgrammingModel(null, WorkerRuntime.Go, string.Empty);
             resolved.Should().Be(ProgrammingModel.V1);
         }
+
+        [Theory]
+        [InlineData("native")]
+        [InlineData("Native")]
+        [InlineData("NATIVE")]
+        public void ResolveNativeWorkerRuntime_WithGoMod_ResolvesToGo(string settingValue)
+        {
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsWorkerRuntime, settingValue },
+            });
+
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            var previousDir = Environment.CurrentDirectory;
+            var tempDir = Path.Combine(Path.GetTempPath(), "func-test-native-" + Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, "go.mod"), "module test");
+                Environment.CurrentDirectory = tempDir;
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+            }
+            finally
+            {
+                Environment.CurrentDirectory = previousDir;
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ResolveNativeWorkerRuntime_WithoutGoMod_Throws()
+        {
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsWorkerRuntime, "native" },
+            });
+
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            var previousDir = Environment.CurrentDirectory;
+            var tempDir = Path.Combine(Path.GetTempPath(), "func-test-native-" + Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                Environment.CurrentDirectory = tempDir;
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                Action act = () => WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+
+                act.Should().Throw<CliException>().WithMessage("*native*");
+            }
+            finally
+            {
+                Environment.CurrentDirectory = previousDir;
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ResolveNativeWorkerRuntime_NonNativeSetting_IsNoOp()
+        {
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsWorkerRuntime, "node" },
+            });
+
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+            try
+            {
+                // Should not throw, should not change the runtime
+                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+            }
+        }
     }
 }

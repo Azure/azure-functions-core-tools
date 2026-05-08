@@ -37,14 +37,36 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             await GoHelpers.BuildForLinux(functionAppRoot);
         }
 
+        protected override string ResolveOutputPath(string functionAppRoot, string outputPath)
+        {
+            if (string.IsNullOrEmpty(outputPath))
+            {
+                return base.ResolveOutputPath(functionAppRoot, outputPath);
+            }
+
+            string resolvedPath = Path.Combine(Environment.CurrentDirectory, outputPath);
+
+            // If the user pointed --output at something that already exists as a file (not a
+            // directory), surface a clear error rather than letting Directory.CreateDirectory
+            // fail with an opaque IOException ("Cannot create ... because a file ... exists").
+            if (File.Exists(resolvedPath))
+            {
+                throw new CliException(
+                    $"--output '{outputPath}' refers to an existing file. " +
+                    "Pass an existing or new directory path instead.");
+            }
+
+            return base.ResolveOutputPath(functionAppRoot, outputPath);
+        }
+
         // PackFunctionAsync intentionally not overridden — the default flow goes through
         // PackHelpers.CreatePackage → ZipHelper.GetAppZipFile, which has a Go branch
         // that emits the explicit allowlist (host.json + app).
         public override Task RunAsync()
         {
-            // Keep this since this subcommand is not meant to be run directly; dispatch happens
-            // via PackAction.RunRuntimeSpecificPackAsync, which calls RunAsync(PackOptions) above.
-            return Task.CompletedTask;
+            throw new NotSupportedException(
+                $"{nameof(GoPackSubcommandAction)} is not meant to be invoked directly. " +
+                $"Dispatch happens via {nameof(PackAction)}.RunRuntimeSpecificPackAsync, which calls {nameof(RunAsync)}({nameof(PackOptions)}).");
         }
     }
 }

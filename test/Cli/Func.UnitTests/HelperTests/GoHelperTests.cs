@@ -93,13 +93,13 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AssertBinaryExists_BinaryPresent_DoesNotThrow()
         {
             var dir = Path.Combine(Path.GetTempPath(), "func-go-test-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
             try
             {
                 var binaryName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? "app.exe"
                     : "app";
-                File.WriteAllText(Path.Combine(dir, binaryName), "stub");
+                File.WriteAllText(Path.Combine(dir, GoHelpers.GoBinDir, binaryName), "stub");
 
                 var action = () => GoHelpers.AssertBinaryExists(dir);
                 action.Should().NotThrow();
@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 var binaryName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? "app.exe"
                     : "app";
-                File.Exists(Path.Combine(dir, binaryName)).Should().BeTrue("BuildProject should produce the worker binary");
+                File.Exists(Path.Combine(dir, GoHelpers.GoBinDir, binaryName)).Should().BeTrue("BuildProject should produce the worker binary in bin/");
             }
             finally
             {
@@ -185,7 +185,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
                 await GoHelpers.BuildForLinux(dir);
 
-                var binary = Path.Combine(dir, GoHelpers.GoBinaryName);
+                var binary = Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName);
                 File.Exists(binary).Should().BeTrue("BuildForLinux should produce the linux/amd64 worker binary");
 
                 // The produced binary is itself a linux/amd64 ELF, so AssertLinuxAmd64Binary should accept it.
@@ -222,11 +222,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AssertLinuxAmd64Binary_NotElf_Throws()
         {
             var dir = Path.Combine(Path.GetTempPath(), "func-go-elf-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
             try
             {
                 // 32 bytes of non-ELF garbage so the size check passes but the magic check fails.
-                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinaryName), new byte[32]);
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName), new byte[32]);
 
                 var action = () => GoHelpers.AssertLinuxAmd64Binary(dir);
                 action.Should().Throw<CliException>()
@@ -242,12 +242,12 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AssertLinuxAmd64Binary_ElfButWrongArch_Throws()
         {
             var dir = Path.Combine(Path.GetTempPath(), "func-go-elf-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
             try
             {
                 // Synthesize an ELF64 LE header but with e_machine = EM_AARCH64 (0xB7) instead of EM_X86_64.
                 var header = BuildElfHeader(machine: 0xB7);
-                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinaryName), header);
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName), header);
 
                 var action = () => GoHelpers.AssertLinuxAmd64Binary(dir);
                 action.Should().Throw<CliException>()
@@ -264,10 +264,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AssertLinuxAmd64Binary_ValidHeader_DoesNotThrow()
         {
             var dir = Path.Combine(Path.GetTempPath(), "func-go-elf-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
             try
             {
-                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinaryName), BuildElfHeader(machine: 0x3E));
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName), BuildElfHeader(machine: 0x3E));
 
                 var action = () => GoHelpers.AssertLinuxAmd64Binary(dir);
                 action.Should().NotThrow();
@@ -282,13 +282,13 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         public void AssertLinuxAmd64Binary_Elf32_Throws()
         {
             var dir = Path.Combine(Path.GetTempPath(), "func-go-elf-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
             try
             {
                 // Override EI_CLASS (offset 4) to 1 (ELFCLASS32) — should be rejected even if e_machine is x86_64.
                 var header = BuildElfHeader(machine: 0x3E);
                 header[4] = 1;
-                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinaryName), header);
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName), header);
 
                 var action = () => GoHelpers.AssertLinuxAmd64Binary(dir);
                 action.Should().Throw<CliException>()
@@ -309,7 +309,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
             files.Should().HaveCount(2);
             files.Should().Contain(Path.Combine(root, "host.json"));
-            files.Should().Contain(Path.Combine(root, GoHelpers.GoBinaryName));
+            files.Should().Contain(Path.Combine(root, GoHelpers.GoBinDir, GoHelpers.GoBinaryName));
         }
 
         [Fact]

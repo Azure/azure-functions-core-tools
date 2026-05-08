@@ -220,12 +220,13 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
 
             var previousRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             try
             {
                 File.WriteAllText(Path.Combine(dir, "host.json"), "{}");
-                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinaryName), new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F', 2, 1 });
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName), new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F', 2, 1 });
 
                 // Files that must NOT be picked up — Go uses an explicit allowlist, not funcignore.
                 File.WriteAllText(Path.Combine(dir, "main.go"), "package main\nfunc main() {}\n");
@@ -240,7 +241,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
                 var entries = archive.Entries.Select(e => e.FullName).OrderBy(n => n).ToArray();
 
-                Assert.Equal(new[] { "app", "host.json" }, entries);
+                Assert.Equal(new[] { "bin/app", "host.json" }, entries);
             }
             finally
             {

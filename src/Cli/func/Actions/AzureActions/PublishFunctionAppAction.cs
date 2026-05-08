@@ -165,6 +165,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Get the WorkerRuntime
+            WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(_secretsManager);
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Go is cross-compiled to linux/amd64 and currently only supported on Flex Consumption.
@@ -1391,11 +1392,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 // Go zip is built from the explicit allowlist in GoHelpers.GetPackFiles; print those
                 // files rooted at the function app root so output matches what is actually packaged
-                // even when 'func publish' is run from a subdirectory.
+                // even when 'func publish' is run from a subdirectory. The Go binary ('app') may
+                // not exist yet when --list-included-files is run before a build, so annotate it
+                // rather than printing a misleading path that doesn't exist on disk.
                 var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
                 foreach (var file in GoHelpers.GetPackFiles(functionAppRoot))
                 {
-                    ColoredConsole.WriteLine(file);
+                    if (FileSystemHelpers.FileExists(file))
+                    {
+                        ColoredConsole.WriteLine(file);
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine($"{file} (will be built during publish)");
+                    }
                 }
 
                 return;

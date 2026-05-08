@@ -48,9 +48,15 @@ jobs:
   - bash: |
       set -euo pipefail
       brew install go@1.24
-      GO_BIN="$(brew --prefix go@1.24)/bin"
+      GO_PREFIX="$(brew --prefix go@1.24)"
+      GO_BIN="$GO_PREFIX/bin"
+      GO_ROOT="$GO_PREFIX/libexec"
+      # Pin GOROOT to the Homebrew install so the `go` binary doesn't pick up a
+      # stale GOROOT inherited from the hosted agent image (which can point at a
+      # different Go install and cause "package std not found" / version skew).
       echo "##vso[task.prependpath]$GO_BIN"
-      "$GO_BIN/go" version
+      echo "##vso[task.setvariable variable=GOROOT]$GO_ROOT"
+      GOROOT="$GO_ROOT" "$GO_BIN/go" version
     displayName: 'Install Go 1.24 (Homebrew, arm64-native)'
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self

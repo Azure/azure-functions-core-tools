@@ -86,6 +86,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
 
             // Detect the runtime from environment variable or local.settings.json
+            WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(_secretsManager);
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
 
             if (workerRuntime == WorkerRuntime.None && NoBuild)

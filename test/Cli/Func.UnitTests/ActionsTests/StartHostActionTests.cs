@@ -532,9 +532,8 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 using (FileSystemHelpers.Override(fileSystem))
                 {
                     GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.None;
-                    var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
 
-                    action.ResolveNativeWorkerRuntime();
+                    WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager.Object);
 
                     GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Go);
                 }
@@ -563,12 +562,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             {
                 using (FileSystemHelpers.Override(fileSystem))
                 {
-                    var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
-
-                    Action act = () => action.ResolveNativeWorkerRuntime();
+                    Action act = () => WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager.Object);
 
                     act.Should().Throw<CliException>()
-                        .Which.Message.Should().Contain("Run 'func init'");
+                        .Which.Message.Should().Contain("native");
                 }
             }
             finally
@@ -592,9 +589,8 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             try
             {
                 GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Python;
-                var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
 
-                action.ResolveNativeWorkerRuntime();
+                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager.Object);
 
                 GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Python);
             }

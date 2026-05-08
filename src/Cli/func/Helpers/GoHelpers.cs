@@ -15,6 +15,7 @@ namespace Azure.Functions.Cli.Helpers
         private const int MinimumGoMajorVersion = 1;
         private const int MinimumGoMinorVersion = 24;
         internal const string GoBinaryName = "app";
+        internal const string GoBinDir = "bin";
         internal const string GoModFileName = "go.mod";
 
         public static async Task<WorkerLanguageVersionInfo> GetEnvironmentGoVersion()
@@ -86,25 +87,30 @@ namespace Azure.Functions.Cli.Helpers
 
         /// <summary>
         /// Compiles the user's Go project into a binary named <see cref="GoBinaryName"/>
-        /// in <paramref name="workingDirectory"/>. The host resolves this binary via
-        /// <c>defaultExecutablePath</c> in <c>workers/native/worker.config.json</c>
-        /// (the host appends <c>.exe</c> on Windows automatically).
+        /// under <c><see cref="GoBinDir"/>/</c> in <paramref name="workingDirectory"/>.
+        /// The host resolves this binary via <c>defaultExecutablePath</c> in
+        /// <c>workers/native/worker.config.json</c> (the host appends <c>.exe</c> on
+        /// Windows automatically).
         /// </summary>
         public static async Task BuildProject(string workingDirectory = null)
         {
             workingDirectory ??= Environment.CurrentDirectory;
             var outputName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
+            var outputPath = Path.Combine(GoBinDir, outputName);
 
-            if (IsBinaryUpToDate(workingDirectory, outputName))
+            if (IsBinaryUpToDate(workingDirectory, outputPath))
             {
-                ColoredConsole.WriteLine($"Go worker binary '{outputName}' is up to date — skipping build.");
+                ColoredConsole.WriteLine($"Go worker binary '{outputPath}' is up to date — skipping build.");
                 return;
             }
 
-            ColoredConsole.WriteLine($"Building Go worker binary '{outputName}'...");
+            ColoredConsole.WriteLine($"Building Go worker binary '{outputPath}'...");
+
+            // Ensure bin/ exists so `go build -o bin/app` doesn't fail.
+            Directory.CreateDirectory(Path.Combine(workingDirectory, GoBinDir));
 
             var stderrBuffer = new StringBuilder();
-            var exe = new Executable("go", $"build -o \"{outputName}\" .", workingDirectory: workingDirectory);
+            var exe = new Executable("go", $"build -o \"{outputPath}\" .", workingDirectory: workingDirectory);
             var exitCode = await exe.RunAsync(
                 l => ColoredConsole.WriteLine(l),
                 e =>
@@ -138,10 +144,23 @@ namespace Azure.Functions.Cli.Helpers
 
         /// <summary>
         /// Returns <c>true</c> when <paramref name="binaryName"/> exists in
-        /// <paramref name="workingDirectory"/> and is newer than every <c>.go</c>
-        /// source file plus <c>go.mod</c>/<c>go.sum</c> in the same directory tree.
-        /// Lets <c>func start</c> skip a redundant <c>go build</c> on warm reruns.
+        /// <paramref name="workingDirectory"/> and is newer than every project source file
+        /// (including assets referenced by <c>//go:embed</c>) plus <c>go.mod</c>/<c>go.sum</c>
+        /// in the same directory tree. Lets <c>func start</c> skip a redundant <c>go build</c>
+        /// on warm reruns.
         /// </summary>
+        /// <remarks>
+        /// To stay correct for <c>//go:embed</c> directives without parsing source, this widens
+        /// the freshness check to every regular file under <paramref name="workingDirectory"/>,
+        /// then excludes things that don't affect the produced binary:
+        /// <list type="bullet">
+        ///   <item>The binary itself (and its <c>.exe</c> variant on Windows).</item>
+        ///   <item>Hidden files/directories (<c>.git</c>, <c>.vscode</c>, etc.).</item>
+        ///   <item><c>vendor/</c> — vendored deps' freshness is implied by <c>go.mod</c>/<c>go.sum</c>.</item>
+        ///   <item><c>*_test.go</c> — test files are not compiled into the production binary.</item>
+        /// </list>
+        /// Any I/O failure conservatively returns <c>false</c> so the build runs.
+        /// </remarks>
         internal static bool IsBinaryUpToDate(string workingDirectory, string binaryName)
         {
             var binaryPath = Path.Combine(workingDirectory, binaryName);
@@ -160,32 +179,82 @@ namespace Azure.Functions.Cli.Helpers
                 return false;
             }
 
-            var sources = Directory.EnumerateFiles(workingDirectory, "*.go", SearchOption.AllDirectories);
-            foreach (var manifest in new[] { "go.mod", "go.sum" })
-            {
-                var manifestPath = Path.Combine(workingDirectory, manifest);
-                if (FileSystemHelpers.FileExists(manifestPath))
-                {
-                    sources = sources.Append(manifestPath);
-                }
-            }
+            string fullWorkingDir = Path.GetFullPath(workingDirectory);
+            string binaryFullPath = Path.GetFullPath(binaryPath);
+            string binaryExeFullPath = Path.GetFullPath(Path.Combine(workingDirectory, $"{GoBinaryName}.exe"));
 
-            foreach (var source in sources)
+            try
             {
-                try
+                foreach (var source in Directory.EnumerateFiles(fullWorkingDir, "*", SearchOption.AllDirectories))
                 {
+                    if (ShouldIgnoreForFreshnessCheck(source, fullWorkingDir, binaryFullPath, binaryExeFullPath))
+                    {
+                        continue;
+                    }
+
                     if (File.GetLastWriteTimeUtc(source) > binaryWriteTime)
                     {
                         return false;
                     }
                 }
-                catch (IOException)
-                {
-                    return false;
-                }
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
             }
 
             return true;
+        }
+
+        private static bool ShouldIgnoreForFreshnessCheck(string source, string workingDir, string binaryFullPath, string binaryExeFullPath)
+        {
+            // Skip the binary itself — it always post-dates its own sources.
+            if (string.Equals(source, binaryFullPath, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(source, binaryExeFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Test files are not compiled into the production binary.
+            if (source.EndsWith("_test.go", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Walk the relative path segments and skip vendor/ + hidden directories/files.
+            string relative = Path.GetRelativePath(workingDir, source);
+            string[] segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            // Skip files under the root-level bin/ directory (our build output).
+            // Only check the first segment so nested dirs like pkg/bin/ aren't excluded.
+            if (segments.Length > 0 && string.Equals(segments[0], GoBinDir, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (var segment in segments)
+            {
+                if (segment.Length == 0)
+                {
+                    continue;
+                }
+
+                if (segment[0] == '.')
+                {
+                    return true;
+                }
+
+                if (string.Equals(segment, "vendor", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -197,13 +266,13 @@ namespace Azure.Functions.Cli.Helpers
         {
             workingDirectory ??= Environment.CurrentDirectory;
             var binaryName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
-            var binaryPath = Path.Combine(workingDirectory, binaryName);
+            var binaryPath = Path.Combine(workingDirectory, GoBinDir, binaryName);
 
             if (!FileSystemHelpers.FileExists(binaryPath))
             {
                 throw new CliException(
-                    $"Could not find a built Go binary '{binaryName}' in '{workingDirectory}'. " +
-                    $"Run 'func start' without '--no-build' to compile, or run 'go build -o {binaryName} .' manually.");
+                    $"Could not find a built Go binary '{Path.Combine(GoBinDir, binaryName)}' in '{workingDirectory}'. " +
+                    $"Run 'func start' without '--no-build' to compile, or run 'go build -o {Path.Combine(GoBinDir, binaryName)} .' manually.");
             }
         }
 
@@ -226,7 +295,11 @@ namespace Azure.Functions.Cli.Helpers
             var goVersion = await GetEnvironmentGoVersion();
             AssertGoVersion(goVersion);
 
-            ColoredConsole.WriteLine($"Building Go worker binary '{GoBinaryName}' for linux/amd64...");
+            var outputPath = Path.Combine(GoBinDir, GoBinaryName);
+            ColoredConsole.WriteLine($"Building Go worker binary '{outputPath}' for linux/amd64...");
+
+            // Ensure bin/ exists so `go build -o bin/app` doesn't fail.
+            Directory.CreateDirectory(Path.Combine(workingDirectory, GoBinDir));
 
             var env = new Dictionary<string, string>
             {
@@ -235,7 +308,7 @@ namespace Azure.Functions.Cli.Helpers
                 ["GOARCH"] = "amd64",
             };
 
-            var exe = new Executable("go", $"build -o \"{GoBinaryName}\" .", workingDirectory: workingDirectory, environmentVariables: env);
+            var exe = new Executable("go", $"build -o \"{outputPath}\" .", workingDirectory: workingDirectory, environmentVariables: env);
 
             // Stream stderr inline (red) and let the thrown exception summarize on failure
             // rather than re-printing the captured output, so users don't see compiler errors twice.
@@ -260,16 +333,17 @@ namespace Azure.Functions.Cli.Helpers
         internal static void AssertLinuxAmd64Binary(string workingDirectory = null)
         {
             workingDirectory ??= Environment.CurrentDirectory;
-            var binaryPath = Path.Combine(workingDirectory, GoBinaryName);
+            var binaryPath = Path.Combine(workingDirectory, GoBinDir, GoBinaryName);
+            var displayPath = Path.Combine(GoBinDir, GoBinaryName);
 
             void ValidateBinaryExists()
             {
                 if (!FileSystemHelpers.FileExists(binaryPath))
                 {
                     throw new CliException(
-                        $"Could not find a built Go binary '{GoBinaryName}' in '{workingDirectory}'. " +
+                        $"Could not find a built Go binary '{displayPath}' in '{workingDirectory}'. " +
                         $"Run 'func pack' without '--no-build' to cross-compile, or run " +
-                        $"'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .' manually.");
+                        $"'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {displayPath} .' manually.");
                 }
             }
 
@@ -301,7 +375,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException(
                         $"'{binaryPath}' is not an ELF binary. Core Tools currently only supports linux/amd64 Go targets. " +
-                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .'");
+                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {displayPath} .'");
                 }
             }
 
@@ -312,7 +386,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException(
                         $"'{binaryPath}' is not a 64-bit little-endian ELF binary. Core Tools currently only supports linux/amd64 Go targets. " +
-                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .'");
+                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {displayPath} .'");
                 }
             }
 
@@ -324,7 +398,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException(
                         $"'{binaryPath}' targets machine 0x{eMachine:X4}, not x86_64. Core Tools currently only supports linux/amd64 Go targets. " +
-                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {GoBinaryName} .'");
+                        $"Re-run 'func pack' without '--no-build', or build with 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {displayPath} .'");
                 }
             }
 
@@ -347,7 +421,7 @@ namespace Azure.Functions.Cli.Helpers
             return new[]
             {
                 Path.Combine(functionAppRoot, Constants.HostJsonFileName),
-                Path.Combine(functionAppRoot, GoBinaryName),
+                Path.Combine(functionAppRoot, GoBinDir, GoBinaryName),
             };
         }
 

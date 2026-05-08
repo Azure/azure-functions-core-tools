@@ -226,6 +226,50 @@ namespace Azure.Functions.Cli.Helpers
             return workerRuntime;
         }
 
+        /// <summary>
+        /// Resolves <c>FUNCTIONS_WORKER_RUNTIME=native</c> to a concrete <see cref="WorkerRuntime"/>
+        /// by inspecting project-marker files in the current directory. If the setting is not
+        /// <c>"native"</c>, this method is a no-op.
+        /// </summary>
+        /// <remarks>
+        /// The Functions host registers certain workers under the <c>"native"</c> language
+        /// identifier (see <c>worker.config.json</c>). The CLI writes that value to
+        /// <c>local.settings.json</c> during <c>func init</c>, but needs to map it back to
+        /// the correct <see cref="WorkerRuntime"/> at command time. Resolution is based on
+        /// well-known project files so it stays extensible as new native languages are added.
+        /// <list type="bullet">
+        ///   <item><c>go.mod</c> → <see cref="WorkerRuntime.Go"/></item>
+        /// </list>
+        /// Call this early in any command that reads <see cref="GlobalCoreToolsSettings.CurrentWorkerRuntime"/>
+        /// and needs native resolution (e.g. <c>func start</c>, <c>func pack</c>, <c>func publish</c>).
+        /// </remarks>
+        public static void ResolveNativeWorkerRuntime(ISecretsManager secretsManager)
+        {
+            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
+                          ?? secretsManager.GetSecrets()?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+
+            if (string.IsNullOrWhiteSpace(setting)
+                || !string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, GoHelpers.GoModFileName)))
+            {
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found)."));
+                }
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
+                return;
+            }
+
+            throw new CliException(
+                $"FUNCTIONS_WORKER_RUNTIME is set to 'native' but no supported project marker was found in '{Environment.CurrentDirectory}'. " +
+                "Run 'func init' to initialize a supported function app in this directory.");
+        }
+
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
         {
             if (!_workerToDefaultLanguageMap.ContainsKey(worker))
