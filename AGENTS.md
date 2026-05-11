@@ -98,6 +98,19 @@ the full CLI.
 - Keep changes minimal and surgical. User-visible behavior changes must be
   flagged explicitly in the PR description.
 
+### Code comments
+
+Comment to explain *why*, not *what*. XML doc summaries
+are one or two sentences; reach for `<remarks>` only when there's a single
+non-obvious clarification, and avoid stacking `<para>` blocks. Don't cite
+spec sections or document URLs from inside code (`§6.2`,
+`workload-package-layout §5.4`). Don't justify naming choices, list
+convention origins ("matches tsconfig.json…"), or narrate the alternative
+you didn't pick. Skip comments that restate the next line (DI registrations,
+obvious defaults, "Empty when no X" on a collection). Lead with the
+operative verb. Keep pointers to follow-up issues, cross-platform quirks,
+and rationale that isn't visible from the surrounding code.
+
 ## CLI Conventions
 
 This repo ships **one product**: the `func` CLI. Treat it as a CLI first and a
