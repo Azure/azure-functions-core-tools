@@ -37,8 +37,9 @@ Console.CancelKeyPress += (_, e) =>
 // Fire background version check (non-blocking, best-effort)
 Task<string?> versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
 
-// Parse and invoke asynchronously.
-string commandName = ResolveCommandName(args);
+ParseResult commandParseResult = rootCommand.Parse(args);
+string commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
+
 var stopwatch = Stopwatch.StartNew();
 int exitCode = 0;
 
@@ -50,7 +51,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
         FuncRootCommand rootCommand = Parser.CreateCommand(host.Services);
 
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-        exitCode = await rootCommand.Parse(args).InvokeAsync(config, cts.Token);
+        exitCode = await commandParseResult.InvokeAsync(config, cts.Token);
     }
     catch (OperationCanceledException)
     {
@@ -93,37 +94,6 @@ if (exitCode != 130)
 // disposes the OTel providers, which flushes pending telemetry. No explicit
 // flush needed here.
 return exitCode;
-
-/// <summary>
-/// Resolves the command name from args for telemetry.
-/// </summary>
-static string ResolveCommandName(string[] args)
-{
-    if (args.Length == 0)
-    {
-        return "help";
-    }
-
-    // Take command args (skip options starting with -)
-    var parts = new List<string>();
-    foreach (string arg in args)
-    {
-        if (arg.StartsWith('-'))
-        {
-            break;
-        }
-
-        parts.Add(arg);
-
-        // At most 2 levels (e.g., "workload install", "host start")
-        if (parts.Count >= 2)
-        {
-            break;
-        }
-    }
-
-    return parts.Count > 0 ? string.Join(" ", parts) : "unknown";
-}
 
 /// <summary>
 /// Prints a version update notice if a newer version is available.
