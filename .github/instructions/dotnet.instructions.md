@@ -112,6 +112,7 @@ fire:
 - No unused `using` directives.
 - Don't run `dotnet format` across unrelated files; no drive-by reformatting.
 - Don't disable analyzers to silence warnings, fix the underlying issue.
+
 ## Code comments
 
 Comment to explain *why*, not *what*. XML doc summaries
