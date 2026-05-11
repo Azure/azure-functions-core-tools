@@ -245,8 +245,23 @@ namespace Azure.Functions.Cli.Helpers
         /// </remarks>
         public static void ResolveNativeWorkerRuntime(ISecretsManager secretsManager)
         {
-            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
-                          ?? secretsManager.GetSecrets()?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+
+            if (string.IsNullOrWhiteSpace(setting))
+            {
+                // Only fall back to local.settings.json if the env var isn't set.
+                // Guard with try/catch because SecretsManager may throw if there is
+                // no project root (e.g., func pack invoked from a parent directory
+                // before cwd is changed, or during runtime detection for non-Go projects).
+                try
+                {
+                    setting = secretsManager.GetSecrets()?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+                }
+                catch (CliException)
+                {
+                    return;
+                }
+            }
 
             if (string.IsNullOrWhiteSpace(setting)
                 || !string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
