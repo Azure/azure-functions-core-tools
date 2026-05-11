@@ -20,11 +20,9 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
     public const string MetadataFileName = "workload.json";
 
     /// <summary>
-    /// Conventional sub-directory inside a workload's package that holds
-    /// the workload's assemblies, dependencies, and runtime config. The
-    /// per-workload manifest (<see cref="MetadataFileName"/>) sits at the
-    /// package root and points into this directory. Mirrors the NuGet
-    /// <c>tools/</c> convention; <c>any</c> denotes a TFM-agnostic payload.
+    /// Sub-directory inside a workload's package that holds its assemblies,
+    /// dependencies, and runtime config. Mirrors NuGet's <c>tools/</c>
+    /// convention; <c>any</c> denotes a TFM-agnostic payload.
     /// </summary>
     public const string ContentDirectoryName = "tools/any";
 
@@ -67,11 +65,51 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' deserialized to null.");
         }
 
-        // System.Text.Json honours `required` on init-only properties, so a
-        // missing entryPoint / assemblyPath / type already throws above. The
-        // remaining failure mode is a JSON object that parses but contains
-        // empty strings; surface that with the same exception type so callers
-        // only have to handle one.
+        // Reject unknown $schema values strictly rather than partially
+        // interpret a future schema.
+        if (!WorkloadManifestSchema.IsPackageManifestSupported(metadata.Schema))
+        {
+            string supported = string.Join(
+                ", ",
+                WorkloadManifestSchema.SupportedPackageManifestSchemas);
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' has unsupported or missing $schema '{metadata.Schema}'. " +
+                $"This CLI understands: {supported}. Update the CLI to read newer manifests.");
+        }
+
+        switch (metadata.Kind)
+        {
+            case WorkloadKind.Workload:
+                ValidateWorkloadEntryPoint(metadata, metadataPath);
+                return metadata;
+
+            case WorkloadKind.Content:
+            case WorkloadKind.Meta:
+                // entryPoint is meaningless for content/meta packages — reject
+                // it at author time instead of silently ignoring the field.
+                if (metadata.EntryPoint is not null)
+                {
+                    throw new InvalidWorkloadException(
+                        $"'{metadataPath}' declares kind '{metadata.Kind.ToString().ToLowerInvariant()}' " +
+                        "but also defines an entryPoint. Remove the entryPoint or change the kind to 'workload'.");
+                }
+
+                return metadata;
+
+            default:
+                throw new InvalidWorkloadException(
+                    $"'{metadataPath}' has unrecognized kind '{metadata.Kind}'.");
+        }
+    }
+
+    private static void ValidateWorkloadEntryPoint(WorkloadMetadata metadata, string metadataPath)
+    {
+        if (metadata.EntryPoint is null)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' is missing entryPoint (required for kind 'workload').");
+        }
+
         if (string.IsNullOrWhiteSpace(metadata.EntryPoint.AssemblyPath))
         {
             throw new InvalidWorkloadException(
@@ -84,17 +122,13 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' is missing entryPoint.type.");
         }
 
-        // entryPoint.assemblyPath is interpreted relative to the package's
-        // content root by the loader. Reject anything that would let a
-        // package escape that root: absolute paths, rooted UNC-style paths,
-        // or any segment of `..`. Defense-in-depth check also lives in the
-        // loader.
+        // Reject anything that would let a package escape its content root:
+        // absolute paths or `..` segments. Defense-in-depth — the loader
+        // also checks.
         ValidateRelativePathStaysWithinPackage(
             metadata.EntryPoint.AssemblyPath,
             metadataPath,
             "entryPoint.assemblyPath");
-
-        return metadata;
     }
 
     private static void ValidateRelativePathStaysWithinPackage(
@@ -108,9 +142,8 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' has invalid {fieldName} '{value}': absolute paths are not allowed.");
         }
 
-        // Path.GetFileName / DirectorySeparatorChar handle both '/' and '\\'
-        // on Windows, but workload.json is authored cross-platform and may
-        // contain forward slashes even when read on Windows. Split on both.
+        // workload.json is authored cross-platform, so a Windows host may
+        // see forward slashes. Split on both separators.
         string[] segments = value.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
         foreach (string segment in segments)
         {

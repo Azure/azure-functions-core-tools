@@ -20,8 +20,10 @@ internal static class TelemetryConventions
     // Span / metric tag keys.
     public const string CliCommandName = "cli.command.name";
     public const string ProcessExitCode = "process.exit_code";
+    public const string CliWorkloadCount = "cli.workload.count";
 
     // Metric instrument names.
     public const string CommandCountInstrument = "cli.command.count";
     public const string CommandDurationInstrument = "cli.command.duration";
+    public const string WorkloadBootDurationInstrument = "cli.workload.boot_duration";
 }

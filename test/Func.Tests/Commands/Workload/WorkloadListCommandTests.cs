@@ -16,7 +16,7 @@ public class WorkloadListCommandTests
     [Fact]
     public async Task EmptyList_WritesNoWorkloadsHint_ReturnsZero()
     {
-        var cmd = new WorkloadListCommand(_interaction, ProviderReturning([]));
+        var cmd = new WorkloadListCommand(_interaction, Provider());
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -36,7 +36,7 @@ public class WorkloadListCommandTests
                 aliases: ["dotnet", "dotnet-isolated"]),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads));
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -58,7 +58,7 @@ public class WorkloadListCommandTests
                 aliases: []),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads));
         await InvokeAsync(cmd);
 
         string rowLine = _interaction.Lines.Single(l => l.StartsWith("  ROW:"));
@@ -76,18 +76,17 @@ public class WorkloadListCommandTests
             NewInfo(new FakeWorkload(), "Pkg.A", "1.1.0", []),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, ProviderReturning(workloads));
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads));
         await InvokeAsync(cmd);
 
         var rows = _interaction.Lines.Where(l => l.StartsWith("  ROW:")).ToList();
         Assert.Equal(3, rows.Count);
     }
 
-    private static IWorkloadProvider ProviderReturning(IReadOnlyList<WorkloadInfo> workloads)
+    private static IWorkloadProvider Provider(params WorkloadInfo[] workloads)
     {
-        IWorkloadProvider provider = Substitute.For<IWorkloadProvider>();
-        provider.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(new ValueTask<IReadOnlyList<WorkloadInfo>>(workloads));
+        var provider = Substitute.For<IWorkloadProvider>();
+        provider.GetWorkloads().Returns(workloads);
         return provider;
     }
 

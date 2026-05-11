@@ -113,6 +113,19 @@ fire:
 - Don't run `dotnet format` across unrelated files; no drive-by reformatting.
 - Don't disable analyzers to silence warnings, fix the underlying issue.
 
+## Code comments
+
+Comment to explain *why*, not *what*. XML doc summaries
+are one or two sentences; reach for `<remarks>` only when there's a single
+non-obvious clarification, and avoid stacking `<para>` blocks. Don't cite
+spec sections or document URLs from inside code (`§6.2`,
+`workload-package-layout §5.4`). Don't justify naming choices, list
+convention origins ("matches tsconfig.json…"), or narrate the alternative
+you didn't pick. Skip comments that restate the next line (DI registrations,
+obvious defaults, "Empty when no X" on a collection). Lead with the
+operative verb. Keep pointers to follow-up issues, cross-platform quirks,
+and rationale that isn't visible from the surrounding code.
+
 ## XML doc summaries
 
 `<summary>` and `</summary>` go on their own lines, even for one-liners:

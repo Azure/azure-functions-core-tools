@@ -11,8 +11,8 @@ using Microsoft.Extensions.Options;
 namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
-/// Wires the workload-storage subsystem (paths + manifest store + loader +
-/// provider) into DI. Binds <see cref="WorkloadPathsOptions"/> from the
+/// Wires the workload-storage subsystem (paths + manifest store + loader)
+/// into DI. Binds <see cref="WorkloadPathsOptions"/> from the
 /// <c>Workloads</c> configuration section so the
 /// <c>FUNC_CLI_Workloads__Home</c> env var (registered at host build) flows
 /// through, while tests can register their own options without touching
@@ -42,14 +42,6 @@ internal static class WorkloadStorageRegistration
         services.AddSingleton<IWorkloadStore, WorkloadStore>();
         services.AddSingleton<IWorkloadLoader, WorkloadLoader>();
         services.AddSingleton<IWorkloadMetadataReader, WorkloadMetadataReader>();
-
-        // The provider composes store + loader, lazily materializes the
-        // installed-workloads list, and caches it for the life of the
-        // process. Commands that need to enumerate live workloads (list,
-        // alias routing, command contribution) inject this rather than the
-        // store + loader directly. Singleton because the cache must be shared
-        // across resolutions.
-        services.AddSingleton<IWorkloadProvider, WorkloadProvider>();
 
         return services;
     }

@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
 public class WorkloadManifestSchemaTests : IDisposable
 {
-    private const string V1Schema = WorkloadManifestSchema.V1Schema;
+    private const string V1Schema = WorkloadManifestSchema.RegistryV1Schema;
 
     private readonly string _tempHome;
     private readonly WorkloadStore _store;
@@ -35,7 +35,7 @@ public class WorkloadManifestSchemaTests : IDisposable
     [Fact]
     public void CurrentSchema_IsV1Url()
     {
-        Assert.Equal(V1Schema, WorkloadManifestSchema.CurrentSchema);
+        Assert.Equal(V1Schema, WorkloadManifestSchema.CurrentRegistrySchema);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class WorkloadManifestSchemaTests : IDisposable
         Assert.Contains("v999", ex.Message);
         Assert.Contains("not supported", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Supported schemas", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(WorkloadManifestSchema.V1Schema, ex.Message);
+        Assert.Contains(WorkloadManifestSchema.RegistryV1Schema, ex.Message);
         Assert.Contains("updating the CLI", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 

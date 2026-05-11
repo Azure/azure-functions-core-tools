@@ -105,11 +105,11 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
                 cancellationToken)
                 ?? new WorkloadRegistry();
 
-            if (!WorkloadManifestSchema.IsSupported(registry.Schema))
+            if (!WorkloadManifestSchema.IsRegistrySupported(registry.Schema))
             {
                 string supported = string.Join(
                     Environment.NewLine,
-                    WorkloadManifestSchema.SupportedSchemas.Select(s => $"  - {s}"));
+                    WorkloadManifestSchema.SupportedRegistrySchemas.Select(s => $"  - {s}"));
 
                 throw new GracefulException(
                     $"The schema '{registry.Schema}' declared by registry '{path}' is not supported."

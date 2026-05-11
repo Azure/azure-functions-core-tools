@@ -4,19 +4,17 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Hands out the currently-installed, hydrated workloads. Composes the
-/// registry (<see cref="Storage.IWorkloadStore"/>) with the assembly loader
-/// (<see cref="Loading.IWorkloadLoader"/>) and caches the result so repeated
-/// command invocations don't re-read <c>workloads.json</c> or re-activate
-/// already-loaded assemblies.
+/// Hands out the set of installed, hydrated workloads. The list is
+/// materialized once at host startup by
+/// <see cref="Hosting.WorkloadRegistration"/> and exposed through this
+/// abstraction so consumers depend on a named domain concept rather than a
+/// raw <see cref="IEnumerable{T}"/> of <see cref="WorkloadInfo"/>.
 /// </summary>
 internal interface IWorkloadProvider
 {
     /// <summary>
-    /// Returns the loaded workloads, materializing them on first access and
-    /// returning the cached list on subsequent calls. Safe to call
-    /// concurrently; loading happens at most once per provider instance.
+    /// Returns the workloads that were loaded at boot. The result is stable
+    /// for the lifetime of the host.
     /// </summary>
-    public ValueTask<IReadOnlyList<WorkloadInfo>> GetWorkloadsAsync(
-        CancellationToken cancellationToken = default);
+    public IReadOnlyList<WorkloadInfo> GetWorkloads();
 }

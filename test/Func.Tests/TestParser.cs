@@ -72,9 +72,12 @@ internal static class TestParser
         services.AddSingleton(emptyStore);
         services.AddSingleton(Substitute.For<IWorkloadLoader>());
 
+        // Loaded workloads are registered individually as singletons at host
+        // startup by WorkloadRegistration and surfaced via IWorkloadProvider.
+        // Tests don't go through that path, so register a stub provider that
+        // returns no workloads. Tests that need a populated set replace it.
         IWorkloadProvider emptyProvider = Substitute.For<IWorkloadProvider>();
-        emptyProvider.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(new ValueTask<IReadOnlyList<WorkloadInfo>>([]));
+        emptyProvider.GetWorkloads().Returns([]);
         services.AddSingleton(emptyProvider);
 
         return services;

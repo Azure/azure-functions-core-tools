@@ -3,12 +3,15 @@
 
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Discovery;
+using Azure.Functions.Cli.Workloads.Storage;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Discovery;
 
 public class WorkloadMetadataReaderTests : IDisposable
 {
+    private const string SchemaUrl = WorkloadManifestSchema.PackageManifestV1Schema;
+
     private readonly string _tempDir;
     private readonly WorkloadMetadataReader _reader = new();
 
@@ -30,8 +33,10 @@ public class WorkloadMetadataReaderTests : IDisposable
     public void Read_ReturnsMetadata_WhenManifestIsValid()
     {
         WriteMetadata(
-            """
+            $$"""
             {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "workload",
               "entryPoint": {
                 "assemblyPath": "Foo.dll",
                 "type": "Foo.MyWorkload"
@@ -41,8 +46,114 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         WorkloadMetadata metadata = _reader.Read(_tempDir);
 
-        Assert.Equal("Foo.dll", metadata.EntryPoint.AssemblyPath);
+        Assert.Equal(SchemaUrl, metadata.Schema);
+        Assert.Equal(WorkloadKind.Workload, metadata.Kind);
+        Assert.Equal("Foo.dll", metadata.EntryPoint!.AssemblyPath);
         Assert.Equal("Foo.MyWorkload", metadata.EntryPoint.Type);
+    }
+
+    [Fact]
+    public void Read_DefaultsKindToWorkload_WhenKindOmitted()
+    {
+        // workload-package-layout §5.4: kind defaults to "workload" when
+        // omitted, matching the authoring default for normal workloads.
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "entryPoint": {
+                "assemblyPath": "Foo.dll",
+                "type": "Foo.MyWorkload"
+              }
+            }
+            """);
+
+        WorkloadMetadata metadata = _reader.Read(_tempDir);
+
+        Assert.Equal(WorkloadKind.Workload, metadata.Kind);
+    }
+
+    [Fact]
+    public void Read_ReturnsContentMetadata_WhenKindIsContent()
+    {
+        // workload-package-layout §5.4: content packages declare "kind":
+        // "content" and omit entryPoint entirely.
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "content"
+            }
+            """);
+
+        WorkloadMetadata metadata = _reader.Read(_tempDir);
+
+        Assert.Equal(WorkloadKind.Content, metadata.Kind);
+        Assert.Null(metadata.EntryPoint);
+    }
+
+    [Fact]
+    public void Read_ReturnsMetaMetadata_WhenKindIsMeta()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "meta"
+            }
+            """);
+
+        WorkloadMetadata metadata = _reader.Read(_tempDir);
+
+        Assert.Equal(WorkloadKind.Meta, metadata.Kind);
+        Assert.Null(metadata.EntryPoint);
+    }
+
+    [Theory]
+    [InlineData("content")]
+    [InlineData("meta")]
+    public void Read_Throws_WhenNonWorkloadKindDeclaresEntryPoint(string kind)
+    {
+        // workload-package-layout §5.4: entryPoint is forbidden for content
+        // and meta. The author should remove it (or set kind to workload).
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "{{kind}}",
+              "entryPoint": {
+                "assemblyPath": "Foo.dll",
+                "type": "Foo.MyWorkload"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
+            () => _reader.Read(_tempDir));
+
+        Assert.Contains(kind, ex.Message);
+        Assert.Contains("entryPoint", ex.Message);
+    }
+
+    [Fact]
+    public void Read_Throws_WhenSchemaUnknown()
+    {
+        WriteMetadata(
+            """
+            {
+              "$schema": "https://aka.ms/func-workloads/package/v999/schema.json",
+              "kind": "workload",
+              "entryPoint": {
+                "assemblyPath": "Foo.dll",
+                "type": "Foo.MyWorkload"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
+            () => _reader.Read(_tempDir));
+
+        Assert.Contains("$schema", ex.Message);
     }
 
     [Fact]
@@ -68,22 +179,31 @@ public class WorkloadMetadataReaderTests : IDisposable
     }
 
     [Fact]
-    public void Read_Throws_WhenEntryPointMissing()
+    public void Read_Throws_WhenWorkloadKindMissingEntryPoint()
     {
-        WriteMetadata("{}");
+        // kind=workload requires entryPoint.
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "workload"
+            }
+            """);
 
-        // `required` on init-only properties surfaces as a JsonException;
-        // the reader wraps it as an InvalidWorkloadException so callers only
-        // handle one type.
-        Assert.Throws<InvalidWorkloadException>(() => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
+            () => _reader.Read(_tempDir));
+
+        Assert.Contains("entryPoint", ex.Message);
     }
 
     [Fact]
     public void Read_Throws_WhenAssemblyPathBlank()
     {
         WriteMetadata(
-            """
+            $$"""
             {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "workload",
               "entryPoint": {
                 "assemblyPath": "   ",
                 "type": "Foo.MyWorkload"
@@ -101,8 +221,10 @@ public class WorkloadMetadataReaderTests : IDisposable
     public void Read_Throws_WhenTypeBlank()
     {
         WriteMetadata(
-            """
+            $$"""
             {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "workload",
               "entryPoint": {
                 "assemblyPath": "Foo.dll",
                 "type": ""
@@ -135,6 +257,8 @@ public class WorkloadMetadataReaderTests : IDisposable
         WriteMetadata(
             $$"""
             {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "workload",
               "entryPoint": {
                 "assemblyPath": "{{assemblyPath}}",
                 "type": "Foo.MyWorkload"
@@ -158,6 +282,8 @@ public class WorkloadMetadataReaderTests : IDisposable
         WriteMetadata(
             $$"""
             {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "workload",
               "entryPoint": {
                 "assemblyPath": "{{assemblyPath}}",
                 "type": "Foo.MyWorkload"
@@ -182,9 +308,10 @@ public class WorkloadMetadataReaderTests : IDisposable
         // surfaces here.
         WorkloadMetadata metadata = _reader.Read(AppContext.BaseDirectory);
 
+        Assert.Equal(WorkloadKind.Workload, metadata.Kind);
         Assert.Equal(
             "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.dll",
-            metadata.EntryPoint.AssemblyPath);
+            metadata.EntryPoint!.AssemblyPath);
         Assert.Equal(
             "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.StubWorkload",
             metadata.EntryPoint.Type);

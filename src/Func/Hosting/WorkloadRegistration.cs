@@ -1,30 +1,150 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Loading;
+using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
-/// Bridges installed workloads into the host. In the final design this reads
-/// the global manifest at <c>~/.azure-functions/workloads.json</c>, loads
-/// each workload's entry-point assembly into its own
-/// <see cref="System.Runtime.Loader.AssemblyLoadContext"/>, instantiates the
-/// type identified by <c>[assembly: ExportCliWorkload&lt;T&gt;]</c>, and invokes
-/// <see cref="Workload.Configure"/>.
-///
-/// At this stage <see cref="RegisterWorkloads"/> is a no-op: the loaded-
-/// workloads list itself is published as a singleton by
-/// <see cref="WorkloadStorageRegistration.AddWorkloadStorage"/>, so commands
-/// that only need to enumerate installed workloads (e.g. <c>func workload
-/// list</c>) inject <c>IReadOnlyList&lt;WorkloadInfo&gt;</c> directly. This
-/// hook will grow to invoke <see cref="Workload.Configure"/> per loaded
-/// workload once the contribution surface lands.
+/// Bridges installed workloads into the host. Reads the global manifest at
+/// <c>~/.azure-functions/workloads.json</c>, loads each live workload's
+/// entry-point assembly into its own
+/// <see cref="System.Runtime.Loader.AssemblyLoadContext"/>, and invokes
+/// <see cref="Workload.Configure"/> so each workload can contribute
+/// services and commands.
 /// </summary>
+/// <remarks>
+/// Runs before <see cref="Microsoft.Extensions.Hosting.IHostBuilder.Build"/>
+/// so workloads can mutate the <see cref="IServiceCollection"/>. Per-workload
+/// failures (load or <see cref="Workload.Configure"/>) are isolated: a single
+/// throw becomes a stderr warning and the remaining workloads still load.
+/// Only the highest installed semver per <c>packageId</c> goes live; older
+/// versions stay in the on-disk registry for rollback but aren't loaded into
+/// the process. Content-only and meta entries are skipped.
+/// </remarks>
 internal static class WorkloadRegistration
 {
-    public static void RegisterWorkloads(FunctionsCliBuilder builder)
+    /// <summary>
+    /// Loads every live workload, publishes them via
+    /// <see cref="IWorkloadProvider"/>, and invokes
+    /// <see cref="Workload.Configure"/> on each. Returns boot duration and
+    /// loaded count so the caller can emit telemetry after the host is
+    /// started (emitting from here would fire before OTel listeners are
+    /// subscribed and the metric would be dropped).
+    /// </summary>
+    /// <param name="services">The host's service collection. Workload-contributed services are added here.</param>
+    /// <param name="configuration">The host's configuration. The <c>Workloads</c> section is read to locate the workload home directory.</param>
+    /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
+    /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
+    /// <returns>The number of workloads loaded and the elapsed boot time.</returns>
+    public static async Task<WorkloadRegistrationResult> RegisterWorkloadsAsync(
+        IServiceCollection services,
+        IConfiguration configuration,
+        IInteractionService interaction,
+        CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(interaction);
+
+        var stopwatch = Stopwatch.StartNew();
+
+        // Bind WorkloadPathsOptions the same way the host's DI binding does,
+        // so FUNC_CLI_Workloads__Home and test overrides flow through.
+        var paths = new WorkloadPathsOptions();
+        configuration.GetSection(WorkloadStorageRegistration.ConfigurationSection).Bind(paths);
+
+        var store = new WorkloadStore(paths);
+        var loader = new WorkloadLoader(paths);
+
+        IReadOnlyList<WorkloadEntry> allEntries = await store.GetWorkloadsAsync(cancellationToken);
+        IReadOnlyList<WorkloadEntry> liveEntries = SelectLiveEntries(allEntries);
+
+        var workloads = new List<WorkloadInfo>(liveEntries.Count);
+        foreach (WorkloadEntry entry in liveEntries)
+        {
+            try
+            {
+                // Load per-entry so one failure becomes a warning instead of
+                // aborting discovery for the rest.
+                IReadOnlyList<WorkloadInfo> loaded = loader.Load([entry]);
+                workloads.Add(loaded[0]);
+            }
+            catch (Exception ex)
+            {
+                interaction.WriteWarning(
+                    $"Workload '{entry.PackageId}@{entry.PackageVersion}' could not be loaded: {ex.Message}");
+            }
+        }
+
+        // Register each WorkloadInfo individually so anything can contribute
+        // another via AddSingleton. Consumers depend on IWorkloadProvider,
+        // not IEnumerable<WorkloadInfo>, to name the domain concept and leave
+        // room for lookup behavior later.
+        foreach (WorkloadInfo workload in workloads)
+        {
+            services.AddSingleton(workload);
+        }
+
+        services.AddSingleton<IWorkloadProvider, WorkloadProvider>();
+
+        foreach (WorkloadInfo workload in workloads)
+        {
+            // Per-workload builder so RegisterCommand can tag the resulting
+            // ExternalCommand with its owning workload.
+            var builder = new DefaultFunctionsCliBuilder(services, workload);
+            try
+            {
+                workload.Instance.Configure(builder);
+            }
+            catch (Exception ex)
+            {
+                // A misbehaving workload must not brick the CLI — the user
+                // still needs `func workload uninstall` to remove it.
+                // Not transactional: services registered before the throw
+                // remain in the collection. Tracked in #4948.
+                interaction.WriteWarning(
+                    $"Workload '{workload.PackageId}@{workload.PackageVersion}' failed to initialize: {ex.Message}");
+            }
+        }
+
+        stopwatch.Stop();
+        return new WorkloadRegistrationResult(workloads.Count, stopwatch.ElapsedMilliseconds);
     }
+
+    /// <summary>
+    /// Skips non-workload entries (content-only, meta) and keeps only the
+    /// highest installed semver per <c>packageId</c>. Older versions stay on
+    /// disk for rollback but don't go live in the process.
+    /// </summary>
+    private static IReadOnlyList<WorkloadEntry> SelectLiveEntries(IReadOnlyList<WorkloadEntry> entries)
+    {
+        if (entries.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. entries
+            .Where(e => e.Kind == WorkloadKind.Workload)
+            .GroupBy(e => e.PackageId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(e => ParseVersionOrZero(e.PackageVersion))
+                .First())];
+    }
+
+    /// <summary>
+    /// Parses a registry version string, falling back to 0.0.0 on failure so
+    /// the "highest semver wins" sort stays deterministic instead of throwing
+    /// at boot. The malformed entry surfaces its own loader warning later.
+    /// </summary>
+    private static NuGetVersion ParseVersionOrZero(string version)
+        => NuGetVersion.TryParse(version, out NuGetVersion? parsed) ? parsed : new NuGetVersion(0, 0, 0);
 }
