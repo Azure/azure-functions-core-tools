@@ -23,8 +23,9 @@
     Workload package layout convention: each installed workload is a directory
     containing a workload.json manifest at the root and a `tools/any/`
     sub-folder with the workload's assemblies + deps. Tests need that shape on
-    disk so the loader can resolve fixture assemblies via the same path
-    combination it uses in production (see WorkloadMetadataReader.ContentDirectoryName).
+    disk so the loader can resolve fixture assemblies the same way it does
+    in production (workload.json's `entryPoint.assemblyPath` is interpreted
+    relative to the package root and includes the `tools/any/...` prefix).
 
     The fixtures themselves build into a flat bin output (the standard SDK
     layout); this target reshapes them in the test project's bin so the

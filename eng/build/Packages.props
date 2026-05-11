@@ -7,6 +7,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+    <PackageVersion Include="NuGet.Packaging" Version="6.13.2" />
     <PackageVersion Include="System.CommandLine" Version="2.0.6" />
     <PackageVersion Include="Spectre.Console" Version="0.49.1" />
   </ItemGroup>
@@ -15,7 +16,7 @@
     <PackageVersion Include="OpenTelemetry" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
-    <PackageVersion Include="NuGet.Versioning" Version="6.12.1" />
+    <PackageVersion Include="NuGet.Versioning" Version="6.13.2" />
   </ItemGroup>
   <!-- analyzers -->
   <ItemGroup>

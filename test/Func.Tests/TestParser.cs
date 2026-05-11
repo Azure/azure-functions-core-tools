@@ -80,6 +80,10 @@ internal static class TestParser
         emptyProvider.GetWorkloads().Returns([]);
         services.AddSingleton(emptyProvider);
 
+        // Workload install pipeline: substitute the installer so commands
+        // resolve without standing up the real install/uninstall side effects.
+        services.AddSingleton(Substitute.For<Cli.Workloads.Install.IWorkloadInstaller>());
+
         return services;
     }
 }

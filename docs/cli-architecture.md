@@ -2,7 +2,7 @@
 
 This document explains the runtime architecture of the Azure Functions Core Tools v5 CLI — how commands are composed, how telemetry is wired, and how the console layer works.
 
-> **Status**: v5 is in active development. As of this PR, the workload abstractions and the DI host that loads workloads are wired into the CLI; the runtime workload loader and `func workload install` / `uninstall` commands land in a follow-up PR. Until then, the CLI runs with zero installed workloads — built-in commands that depend on workload contributions (e.g. `func init`) report "no workloads installed" and exit cleanly.
+> **Status**: v5 is in active development. As of this PR, the workload abstractions, the DI host that loads workloads, and the `func workload install` / `uninstall` commands are wired into the CLI. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up. Built-in commands that depend on workload contributions (e.g. `func init`) report "no workloads installed" and exit cleanly until at least one workload is installed.
 
 ## Startup Flow
 

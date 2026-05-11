@@ -2,7 +2,7 @@
 
 This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior — most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
 
-> **Status**: the abstractions and DI host described below are in the tree as of this PR. The runtime loader and `func workload install` / `uninstall` commands land in a follow-up PR; until then, this document describes the contract workload authors can build against.
+> **Status**: the abstractions, DI host, and `func workload install` / `uninstall` commands described below are in the tree as of this PR. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up.
 
 ## Architecture
 
@@ -58,7 +58,7 @@ The shape mirrors WebJobs' `IWebJobsStartup` — `Configure(FunctionsCliBuilder)
 2. Reference `Azure.Functions.Cli.Abstractions`
 3. Implement `IWorkload`
 4. Inside `Configure`, register an `IProjectInitializer` (and/or contribute top-level commands via `builder.RegisterCommand(...)`, and any supporting services)
-5. Build, package, and (once the loader ships) install with `func workload install`
+5. Build, package, and install with `func workload install <path-to-nupkg>`
 
 ## Step 1: Create the Project
 

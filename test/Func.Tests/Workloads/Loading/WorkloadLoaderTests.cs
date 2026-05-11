@@ -212,10 +212,13 @@ public class WorkloadLoaderTests
 
     private static IWorkloadPaths StubPaths()
     {
-        // Loader resolves the assembly via paths.GetInstallDirectory(...).
-        // Test fixtures sit next to the test bin directory, so return that
-        // for any (packageId, version) pair the tests pass.
+        // Loader resolves assemblies via paths.GetInstallDirectory + tools/any.
+        // Fixture dlls land at <BaseDirectory>/tools/any/<file> via test
+        // project copies, so returning BaseDirectory as the install directory
+        // lines up with a registry entry of AssemblyPath = "<file>" without
+        // having to materialise a <pkgid>/<version>/tools/any tree.
         var paths = Substitute.For<IWorkloadPaths>();
+        paths.WorkloadsRoot.Returns(AppContext.BaseDirectory);
         paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
             .Returns(AppContext.BaseDirectory);
         return paths;

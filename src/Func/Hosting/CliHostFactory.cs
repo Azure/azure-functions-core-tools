@@ -60,6 +60,7 @@ internal static class CliHostFactory
         hostBuilder.Configuration.AddEnvironmentVariables(prefix: Constants.EnvironmentVariablePrefix);
         configureConfiguration?.Invoke(hostBuilder.Configuration);
         hostBuilder.Services.AddWorkloadStorage();
+        hostBuilder.Services.AddWorkloadInstaller();
 
         // Runs before Build() so workloads can still mutate IServiceCollection.
         // The boot duration is recorded after StartAsync below — OTel listeners

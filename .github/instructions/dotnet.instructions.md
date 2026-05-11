@@ -71,13 +71,42 @@ the lightest option:
 
 ## Error handling
 
-- Throw `GracefulException` (`Abstractions/Common/`) for **expected,
-  user-facing** errors. `Program.Main` catches it, prints the message, and
-  returns a non-zero exit code without a stack trace.
+Throw the **most specific** exception type at the failure site. Services and
+helpers shouldn't shape exceptions around CLI presentation; commands are the
+boundary that decides what's user-facing.
+
+- Framework / domain exceptions in services / helpers for known failure modes:
+  - `FileNotFoundException` / `DirectoryNotFoundException` for missing paths.
+  - `InvalidOperationException` for "operation isn't valid in current state".
+  - Domain exceptions like `InvalidWorkloadException` for subsystem-specific
+    validation failures.
+  - `ArgumentNullException` / `ArgumentException` for programmer errors on
+    method contracts.
+- **Commands wrap.** A command knows which exceptions from its dependencies
+  are user errors. Catch those at the command and wrap in
+  `GracefulException(message, isUserError: true)` (preserve the inner
+  exception). Anything you don't catch is a runtime bug and surfaces with a
+  stack trace.
+  - Keep the `try` **narrow**, ideally one method call. A wide `try` makes
+    a generic catch (e.g. `FileNotFoundException`) ambiguous about which
+    call site produced it. A one-call `try` plus the `<exception>` tags
+    on that method's xmldoc fully define what each catch arm means.
+  - Catching framework types (`FileNotFoundException`,
+    `InvalidOperationException`, ...) is fine **only when** the `try` is
+    narrow and the called method's xmldoc documents that type as a
+    user-facing failure mode. Otherwise promote the failure to a domain
+    exception so the catch is unambiguous.
+- `GracefulException` (`Abstractions/Common/`) is the CLI-facing wrapper.
+  `Program.Main` only catches `GracefulException`. Do **not** add broad
+  framework types to the top-level catch list, that hides bugs as user
+  errors.
 - Don't call `Environment.Exit` from inside a command.
-- Use specific framework exceptions (`ArgumentNullException`,
-  `InvalidOperationException`, ...) for programmer errors. Don't swallow
-  exceptions silently.
+- Default to rethrowing with context or converting to a more specific
+  domain exception. Swallowing is allowed only for genuine best-effort
+  cleanup paths (e.g. removing a leftover temp directory after another
+  failure), and the `catch` must include a comment explaining why losing
+  the exception is acceptable. Never `catch (Exception)` in business
+  logic.
 
 ## Logging vs user output
 
@@ -112,6 +141,19 @@ fire:
 - No unused `using` directives.
 - Don't run `dotnet format` across unrelated files; no drive-by reformatting.
 - Don't disable analyzers to silence warnings, fix the underlying issue.
+
+## Code comments
+
+Comment to explain *why*, not *what*. XML doc summaries
+are one or two sentences; reach for `<remarks>` only when there's a single
+non-obvious clarification, and avoid stacking `<para>` blocks. Don't cite
+spec sections or document URLs from inside code (`§6.2`,
+`workload-package-layout §5.4`). Don't justify naming choices, list
+convention origins ("matches tsconfig.json…"), or narrate the alternative
+you didn't pick. Skip comments that restate the next line (DI registrations,
+obvious defaults, "Empty when no X" on a collection). Lead with the
+operative verb. Keep pointers to follow-up issues, cross-platform quirks,
+and rationale that isn't visible from the surrounding code.
 
 ## Code comments
 

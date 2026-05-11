@@ -158,8 +158,9 @@ real terminal. If you need a new output primitive, add it to
 ### Exit codes
 
 - `0` for success, non-zero for failure.
-- Prefer letting `GracefulException` flow up to `Program.Main`; it sets the
-  exit code and prints the friendly message without a stack trace.
+- Throw the most specific exception type for the failure (see "Error
+  handling" below). `Program.Main` translates known categories into a
+  non-zero exit code with a clean, user-facing message.
 - Don't call `Environment.Exit` from inside a command, it bypasses cleanup and
   makes commands untestable.
 
@@ -215,13 +216,48 @@ we don't read app-style settings files.
 
 ### Error handling
 
-- Throw `GracefulException` (from `Abstractions/Common/`) for **expected,
-  user-facing** errors. `Program.Main` catches it, prints the friendly message,
-  and returns a non-zero exit code without a stack trace.
-- Use specific framework exceptions (`ArgumentNullException`,
-  `InvalidOperationException`, ...) for programmer errors.
-- Don't swallow exceptions silently; if you catch, log and rethrow or convert
-  to a `GracefulException` with context.
+Throw the most **specific** exception type for the failure at the point it
+happens. Services and helpers shouldn't shape their exceptions around CLI
+presentation; commands are the boundary that decides which failures are
+user-facing.
+
+- **Framework / domain exceptions** in services / helpers for known failure
+  modes:
+  - `FileNotFoundException` / `DirectoryNotFoundException` for missing
+    user-supplied paths.
+  - `InvalidOperationException` for "operation isn't valid in the current
+    state" (e.g. workload already installed).
+  - Domain exceptions like `InvalidWorkloadException` for validation
+    failures specific to a subsystem.
+  - `ArgumentNullException` / `ArgumentException` for programmer errors on
+    method contracts.
+- **Commands are the boundary.** A command knows which exceptions from its
+  direct dependencies are user errors. Catch those at the command and wrap
+  in `GracefulException(message, isUserError: true)` (preserving the inner
+  exception). Anything you don't catch is a runtime bug and should surface
+  unwrapped with a stack trace.
+  - Keep the `try` **narrow**, ideally one method call. A wide `try` makes
+    a generic catch (e.g. `FileNotFoundException`) ambiguous: you can no
+    longer tell which call site produced it. A one-call `try` plus the
+    `<exception>` tags on that method's xmldoc fully define what each
+    catch arm means.
+  - Catching framework types like `FileNotFoundException` /
+    `InvalidOperationException` is fine when (a) the `try` is narrow and
+    (b) the called method's xmldoc documents that type as a user-facing
+    failure mode. If neither holds, promote the failure to a domain
+    exception (e.g. `InvalidWorkloadException`) so the catch is
+    unambiguous.
+- **`GracefulException`** (`Abstractions/Common/`) is the CLI-facing wrapper.
+  `Program.Main` only catches `GracefulException` and prints it cleanly
+  (message + optional `VerboseMessage`, exit code 1). Do **not** add broad
+  framework types (`FileNotFoundException`, `InvalidOperationException`, ...)
+  to the top-level catch list, that hides bugs as user errors.
+- Default to rethrowing with context (preserve the inner exception) or
+  converting to a more specific domain exception. Swallowing an exception
+  silently is allowed only for genuine best-effort cleanup paths (e.g.
+  removing a leftover temp directory after another failure), and the
+  `catch` block must include a comment explaining why losing the
+  exception is acceptable. Never `catch (Exception)` in business logic.
 
 ### Logging
 
@@ -263,7 +299,12 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 - **Package IDs**: omit by default, will be based on assembly name.
 - **CI pipelines**: `workload-<name>-public-build.yml` and `workload-<name>-official-build.yml`
 - **Tests**: xUnit with NSubstitute for mocking, `FakeDotnetCliRunner` pattern for CLI wrappers
-- **Error handling**: throw `GracefulException` for user-facing errors (caught in Program.cs)
+- **Error handling**: services throw the most specific exception type at the
+  failure site (`FileNotFoundException`, `InvalidOperationException`, domain
+  exceptions like `InvalidWorkloadException`). Commands are the boundary:
+  catch the exceptions they expect from their dependencies and wrap in
+  `GracefulException(..., isUserError: true)`. `Program.cs` only catches
+  `GracefulException`, so anything unexpected surfaces as a runtime bug.
 - **Cancellation**: all async methods accept `CancellationToken`, pass through to child operations
 - **XML doc summaries**: always put `<summary>` and `</summary>` on their own lines, even for one-line summaries:
 
