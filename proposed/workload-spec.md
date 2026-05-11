@@ -421,15 +421,17 @@ corresponding built-in commands move onto the workload model.
 **Non-`workload` kinds** (`workload.json` with `kind: content` or
 `kind: meta`, see §5.3) register no services. They do not implement
 `Workload`, are not loaded into an `AssemblyLoadContext`, and
-contribute no contribution points. Built-in CLI commands consume
-`content` packages directly by package id: today, `func start` knows
-the host workload's package id (`Azure.Functions.Cli.Workload.Host`)
-and resolves its on-disk location via
-`<workload-home>/workloads/<packageId>/<version>/`. `meta` packages
-have no payload at all; they only exist as registry rows in
-`metas[]` (§10.1) so cascade uninstall can find their members. How
-the CLI generalizes `content` consumption beyond the host workload
-is an open question (§12).
+contribute no contribution points. The CLI's responsibility for a
+`content` package ends at install / update / removal and
+guaranteeing a registry row (§6.1, §10.1); the **contract between
+the consumer and the content workload is owned by the consumer**,
+not by the CLI. `func start` knows the host workload's package id
+(`Azure.Functions.Cli.Workload.Host`) and resolves its on-disk
+location via `<workload-home>/workloads/<packageId>/<version>/`;
+any future consumer (built-in command or another workload)
+follows the same pattern. `meta` packages have no payload at all;
+they only exist as registry rows in `metas[]` (§10.1) so cascade
+uninstall can find their members.
 
 The exact interface names and shapes are documented in
 [`building-a-workload.md`](./building-a-workload.md). That document is
@@ -1048,15 +1050,7 @@ no separate active-version pointer in the registry.
 7. **Host-runtime workload boundary** — does one workload ship all RIDs +
    all major host versions, or one workload per major (e.g. `...Workload.Host.v4`,
    `...Workload.Host.v5`)?
-8. **Non-host `content` consumption.** `func start` knows the host
-   workload's package id (`Azure.Functions.Cli.Workload.Host`) and
-   resolves its install directory directly. There is no general
-   contract today for other built-in commands to consume `content`
-   workloads. If a second `content` workload appears, we'll need
-   either a name-based registry lookup helper or a `content`
-   contribution mechanism (e.g. registering a content directory
-   under a stable key).
-9. **TTL-based prune.** `func workload prune` (§6.7) removes every
+8. **TTL-based prune.** `func workload prune` (§6.7) removes every
    non-live install unconditionally. A future variant
    (`--older-than 30d` or similar) would let a user keep recent
    versions for quick rollback while reclaiming disk for older ones.
@@ -1066,3 +1060,13 @@ no separate active-version pointer in the registry.
 prompts) is **CLI-rendered only in v1** (see §2 non-goals). A
 callback contract for richer UX may be introduced in a later
 abstractions release as a non-breaking additive change.
+
+**Resolved:** *Non-host `content` consumption* is **out of scope
+for the CLI**. The CLI's responsibility for a `content` workload
+ends at install / update / removal and guaranteeing a registry row
+(§6.1, §10.1). The contract between a consumer (a built-in command
+or another workload that depends on the content) and the content
+workload — package id, on-disk layout, expected files — is owned
+by the consumer, not by the CLI. `func start` consuming the host
+workload (§4.6) is one such consumer; future consumers follow the
+same pattern.
