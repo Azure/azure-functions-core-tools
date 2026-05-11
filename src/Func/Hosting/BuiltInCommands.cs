@@ -38,6 +38,8 @@ internal static class BuiltInCommands
         // the list command as its own concrete type (not as FuncCliCommand) so
         // it doesn't get added at the top level by GetServices<FuncCliCommand>().
         services.AddSingleton<WorkloadListCommand>();
+        services.AddSingleton<WorkloadInstallCommand>();
+        services.AddSingleton<WorkloadUninstallCommand>();
         services.AddSingleton<FuncCliCommand, WorkloadCommand>();
 
         return services;

@@ -4,7 +4,7 @@ This document describes the Azure Functions Core Tools v5 codebase — projects,
 
 ## Overview
 
-The v5 CLI is built with [System.CommandLine](https://github.com/dotnet/command-line-api) and [Spectre.Console](https://spectreconsole.net/), targeting **.NET 10**. It follows a **workload model** (similar to the `dotnet` CLI) where the base CLI provides core commands and infrastructure while language-specific functionality (templates, init, pack) is delivered via independently installable workload packages. The base CLI, the host that loads workloads, and the public abstractions library are in the tree today; the runtime workload loader and `func workload install` / `uninstall` commands land in a follow-up PR.
+The v5 CLI is built with [System.CommandLine](https://github.com/dotnet/command-line-api) and [Spectre.Console](https://spectreconsole.net/), targeting **.NET 10**. It follows a **workload model** (similar to the `dotnet` CLI) where the base CLI provides core commands and infrastructure while language-specific functionality (templates, init, pack) is delivered via independently installable workload packages. The base CLI, the host that loads workloads, the public abstractions library, and the `func workload install` / `uninstall` commands are all in the tree today; NuGet feed-based acquisition lands in a follow-up PR.
 
 ## Project Layout
 

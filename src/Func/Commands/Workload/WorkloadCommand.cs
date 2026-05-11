@@ -7,18 +7,25 @@ namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
 /// Parent <c>func workload</c> command. Subcommands manage workload installation,
-/// inspection, and updates. Today the only subcommand wired in is
-/// <see cref="WorkloadListCommand"/>; install / uninstall land in a follow-up PR.
+/// inspection, and updates.
 ///
-/// Parent-only — relies on <see cref="FuncCliCommand.ExecuteAsync"/>'s default
+/// Parent-only: relies on <see cref="FuncCliCommand.ExecuteAsync"/>'s default
 /// implementation to render help when invoked without a subcommand.
 /// </summary>
 internal sealed class WorkloadCommand : FuncCliCommand, IBuiltInCommand
 {
-    public WorkloadCommand(WorkloadListCommand listCommand)
+    public WorkloadCommand(
+        WorkloadListCommand listCommand,
+        WorkloadInstallCommand installCommand,
+        WorkloadUninstallCommand uninstallCommand)
         : base("workload", "Manage Func CLI workloads.")
     {
         ArgumentNullException.ThrowIfNull(listCommand);
+        ArgumentNullException.ThrowIfNull(installCommand);
+        ArgumentNullException.ThrowIfNull(uninstallCommand);
+
         Subcommands.Add(listCommand);
+        Subcommands.Add(installCommand);
+        Subcommands.Add(uninstallCommand);
     }
 }
