@@ -69,7 +69,7 @@ public class WorkloadStoreTests : IDisposable
 
         var workloads = await _store.GetWorkloadsAsync();
         var installed = Assert.Single(workloads);
-        Assert.Equal("second.dll", installed.EntryPoint.AssemblyPath);
+        Assert.Equal("second.dll", installed.EntryPoint!.AssemblyPath);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class WorkloadStoreTests : IDisposable
 
         var workloads = await _store.GetWorkloadsAsync();
         var installed = Assert.Single(workloads);
-        Assert.Equal("lower.dll", installed.EntryPoint.AssemblyPath);
+        Assert.Equal("lower.dll", installed.EntryPoint!.AssemblyPath);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class WorkloadStoreTests : IDisposable
         Assert.Equal(entry.PackageId, actual.PackageId);
         Assert.Equal(entry.PackageVersion, actual.PackageVersion);
         Assert.Equal(entry.Aliases, actual.Aliases);
-        Assert.Equal(entry.EntryPoint.AssemblyPath, actual.EntryPoint.AssemblyPath);
+        Assert.Equal(entry.EntryPoint!.AssemblyPath, actual.EntryPoint!.AssemblyPath);
         Assert.Equal(entry.EntryPoint.Type, actual.EntryPoint.Type);
     }
 

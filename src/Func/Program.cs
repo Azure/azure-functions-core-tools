@@ -10,62 +10,10 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Telemetry;
-using Azure.Monitor.OpenTelemetry.Exporter;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
 
 DefaultTheme theme = new();
 SpectreInteractionService interaction = new(theme);
-
-// Build the host: a CLI process gets the empty variant so we skip the default
-// configuration and logging providers (they're not needed). The host owns
-// shared lifetimes — currently just the OpenTelemetry pipeline, which is
-// registered as hosted services so flush + shutdown happen via host disposal.
-HostApplicationBuilder hostBuilder = Host.CreateEmptyApplicationBuilder(null);
-hostBuilder.Services.AddSingleton(interaction);
-
-// Wire OpenTelemetry only when a real instrumentation key is baked in and
-// the user hasn't opted out. When it isn't, no listener is subscribed and
-// ActivitySource / Meter calls become no-ops.
-if (CliTelemetry.TryGetConnectionString(out string? connectionString))
-{
-    hostBuilder.Services.AddOpenTelemetry()
-        .ConfigureResource(r => CliTelemetry.ConfigureResource(r))
-        .WithTracing(t => t
-            .AddSource(CliTelemetry.SourceName)
-            .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString))
-        .WithMetrics(m => m
-            .AddMeter(CliTelemetry.SourceName)
-            .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
-}
-
-// Register built-in commands so they flow through DI alongside any
-// workload-contributed commands.
-hostBuilder.Services.AddBuiltInCommands();
-
-// Storage subsystem: bind WorkloadPathsOptions from the "Workloads" config
-// section so the FUNC_CLI_Workloads__Home env var flows through (the
-// FUNC_CLI_ prefix is stripped, "__" maps to section nesting).
-hostBuilder.Configuration.AddEnvironmentVariables(prefix: Constants.EnvironmentVariablePrefix);
-hostBuilder.Services.AddWorkloadStorage();
-
-// Let installed workloads contribute services. The builder exposes the same
-// IServiceCollection the host uses, so anything a workload registers is
-// resolvable when commands are built below.
-WorkloadRegistration.RegisterWorkloads(new DefaultFunctionsCliBuilder(hostBuilder.Services));
-
-using IHost host = hostBuilder.Build();
-
-// Start the host so hosted services (OTel providers) are running and
-// listeners are subscribed before any command code emits telemetry.
-await host.StartAsync();
-
-// Create the command tree, resolving built-ins (and any workload-contributed
-// services they depend on) from the host's service provider.
-FuncRootCommand rootCommand = Parser.CreateCommand(host.Services);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.
@@ -98,6 +46,9 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
 {
     try
     {
+        using IHost host = await CliHostFactory.CreateHostAsync(interaction);
+        FuncRootCommand rootCommand = Parser.CreateCommand(host.Services);
+
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         exitCode = await rootCommand.Parse(args).InvokeAsync(config, cts.Token);
     }

@@ -12,5 +12,6 @@
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.Default/Workload.Tests.Fixtures.Default.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.Sdk/Workload.Tests.Fixtures.Sdk.csproj" />
+    <Project Path="test/Workload.Tests.Fixtures.WithCommand/Workload.Tests.Fixtures.WithCommand.csproj" />
   </Folder>
 </Solution>

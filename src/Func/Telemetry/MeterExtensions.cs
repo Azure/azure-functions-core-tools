@@ -29,6 +29,12 @@ internal static class MeterExtensions
             unit: "ms",
             description: "Duration of CLI command execution.");
 
+    private static readonly Histogram<double> _workloadBootDuration =
+        CliTelemetry.Metric.CreateHistogram<double>(
+            TelemetryConventions.WorkloadBootDurationInstrument,
+            unit: "ms",
+            description: "Duration of workload load + Configure at CLI startup.");
+
     extension(Meter meter)
     {
         /// <summary>
@@ -51,6 +57,20 @@ internal static class MeterExtensions
 
             _commandCount.Add(1, tags);
             _commandDuration.Record(durationMs, tags);
+        }
+
+        /// <summary>
+        /// Records the duration of CLI startup workload loading + Configure
+        /// invocation, tagged with the number of workloads processed.
+        /// </summary>
+        public void RecordWorkloadBoot(int workloadCount, long durationMs)
+        {
+            var tags = new TagList
+            {
+                { TelemetryConventions.CliWorkloadCount, workloadCount },
+            };
+
+            _workloadBootDuration.Record(durationMs, tags);
         }
     }
 }

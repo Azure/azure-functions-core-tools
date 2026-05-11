@@ -8,11 +8,7 @@ using Azure.Functions.Cli.Workloads;
 namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
-/// Lists workloads recorded in the global registry. Reads from the cached
-/// <see cref="WorkloadInfo"/> list materialized by
-/// <see cref="IWorkloadProvider"/> so display name and description come from
-/// each loaded <see cref="Workloads.Workload"/> instance and the file-backed
-/// registry isn't re-read on every invocation.
+/// Lists workloads from <see cref="IWorkloadProvider"/>.
 /// </summary>
 internal sealed class WorkloadListCommand(
     IInteractionService interaction,
@@ -24,14 +20,14 @@ internal sealed class WorkloadListCommand(
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
 
-    protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        IReadOnlyList<WorkloadInfo> workloads = await _workloads.GetWorkloadsAsync(cancellationToken);
+        IReadOnlyList<WorkloadInfo> workloads = _workloads.GetWorkloads();
 
         if (workloads.Count == 0)
         {
             _interaction.WriteHint("No workloads installed.");
-            return 0;
+            return Task.FromResult(0);
         }
 
         IEnumerable<string[]> rows = workloads.Select(w => new[]
@@ -44,6 +40,6 @@ internal sealed class WorkloadListCommand(
         });
 
         _interaction.WriteTable(["ID", "Aliases", "Display Name", "Description", "Version"], rows);
-        return 0;
+        return Task.FromResult(0);
     }
 }

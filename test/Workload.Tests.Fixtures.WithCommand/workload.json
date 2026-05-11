@@ -1,0 +1,8 @@
+{
+  "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+  "kind": "workload",
+  "entryPoint": {
+    "assemblyPath": "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.dll",
+    "type": "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.StubWorkload"
+  }
+}
