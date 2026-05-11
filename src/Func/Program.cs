@@ -131,8 +131,12 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
     }
 } // activity disposed (and stopped) here, before host shutdown flushes
 
-// Print version update notice if available (bounded wait)
-await PrintVersionNotice(interaction, versionCheckTask);
+// Print version update notice if available (bounded wait). Skip on
+// user requested cancellation.
+if (exitCode != 130)
+{
+    await PrintVersionNotice(interaction, versionCheckTask, cts.Token);
+}
 
 // Container disposal (triggered by `using var host` going out of scope)
 // disposes the OTel providers, which flushes pending telemetry. No explicit
@@ -172,14 +176,16 @@ static string ResolveCommandName(string[] args)
 
 /// <summary>
 /// Prints a version update notice if a newer version is available.
-/// Waits at most 1 second for the background check to complete.
+/// Waits at most 1 second for the background check to complete, or
+/// returns immediately if <paramref name="cancellationToken"/> fires.
 /// </summary>
-static async Task PrintVersionNotice(IInteractionService interaction, Task<string?> versionCheckTask)
+static async Task PrintVersionNotice(IInteractionService interaction, Task<string?> versionCheckTask, CancellationToken cancellationToken)
 {
     try
     {
-        // Wait at most 1 second for the background check
-        Task completed = await Task.WhenAny(versionCheckTask, Task.Delay(1000));
+        // Wait at most 1 second for the background check, but bail
+        // immediately if cancellation has been requested.
+        Task completed = await Task.WhenAny(versionCheckTask, Task.Delay(1000, cancellationToken));
         if (completed != versionCheckTask)
         {
             return;
@@ -193,7 +199,7 @@ static async Task PrintVersionNotice(IInteractionService interaction, Task<strin
                 .Warning($"A newer version of Azure Functions CLI is available ({latestVersion})."));
         }
     }
-    catch
+    catch (Exception)
     {
         // Best-effort
     }
