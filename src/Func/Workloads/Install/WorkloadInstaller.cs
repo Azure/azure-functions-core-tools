@@ -92,7 +92,7 @@ internal sealed class WorkloadInstaller(
             {
                 throw new InvalidOperationException(
                     $"Workload '{packageId}' version '{version}' is already installed at '{installPath}' " +
-                    "but is missing from the registry. Pass --force to repair the install.");
+                    "but is missing from the registry.");
             }
 
             // Drop registry and on-disk directory before extracting fresh

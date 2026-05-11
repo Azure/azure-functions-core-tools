@@ -127,7 +127,6 @@ public class WorkloadInstallCommandTests
     [Theory]
     [InlineData(typeof(FileNotFoundException), "missing nupkg")]
     [InlineData(typeof(InvalidWorkloadException), "bad package")]
-    [InlineData(typeof(InvalidOperationException), "already installed")]
     public async Task Install_InstallerThrowsExpectedFailure_WrappedInGracefulException(Type exceptionType, string message)
     {
         var inner = (Exception)Activator.CreateInstance(exceptionType, message)!;
@@ -138,6 +137,20 @@ public class WorkloadInstallCommandTests
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg"));
         Assert.Equal(message, ex.Message);
+        Assert.True(ex.IsUserError);
+    }
+
+    [Fact]
+    public async Task Install_InstallerThrowsBrokenInstall_AppendsForceHint()
+    {
+        _installer.InstallFromPackageAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Throws(new InvalidOperationException("Workload 'x' version '1' is already installed at '/p' but is missing from the registry."));
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg"));
+        Assert.Contains("missing from the registry", ex.Message);
+        Assert.Contains("--force", ex.Message);
         Assert.True(ex.IsUserError);
     }
 

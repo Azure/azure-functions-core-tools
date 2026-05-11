@@ -151,8 +151,9 @@ public sealed class WorkloadInstallerTests : IDisposable
     public async Task InstallFromPackage_AlreadyInstalled_DirOnly_NoRegistryEntry_Throws()
     {
         // Half-installed leftover (directory exists but registry has no
-        // matching row) is treated as a broken install: tell the user to
-        // pass --force to repair.
+        // matching row) is treated as a broken install. The remedy
+        // ("pass --force") is the command's responsibility, not the
+        // service's, so we only assert on the state description here.
         string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
         Directory.CreateDirectory(installDir);
 
@@ -162,7 +163,7 @@ public sealed class WorkloadInstallerTests : IDisposable
         InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => installer.InstallFromPackageAsync(nupkg));
         Assert.Contains("missing from the registry", ex.Message);
-        Assert.Contains("--force", ex.Message);
+        Assert.DoesNotContain("--force", ex.Message);
     }
 
     [Fact]

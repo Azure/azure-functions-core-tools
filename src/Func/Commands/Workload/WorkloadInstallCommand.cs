@@ -64,18 +64,26 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string workload = parseResult.GetValue(WorkloadArgument)!;
         bool force = parseResult.GetValue(ForceOption);
 
-        WorkloadInstallResult result;
         try
         {
-            result = await _installer.InstallFromPackageAsync(workload, force, cancellationToken);
+            WorkloadInstallResult result = await _installer.InstallFromPackageAsync(workload, force, cancellationToken);
+            _interaction.WriteSuccess(BuildSuccessMessage(result));
+            return 0;
         }
-        catch (Exception ex) when (ex is FileNotFoundException or InvalidWorkloadException or InvalidOperationException)
+        catch (FileNotFoundException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
-
-        _interaction.WriteSuccess(BuildSuccessMessage(result));
-        return 0;
+        catch (InvalidWorkloadException ex)
+        {
+            throw new GracefulException(ex.Message, isUserError: true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new GracefulException(
+                $"{ex.Message} Pass --force to repair the install.",
+                isUserError: true);
+        }
     }
 
     private static string BuildSuccessMessage(WorkloadInstallResult result)
