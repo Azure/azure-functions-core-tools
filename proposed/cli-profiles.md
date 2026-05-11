@@ -74,7 +74,7 @@ The registry uses a `$schema` URI for self-description and versioning, following
   "profiles": {
     "flex": {
       "sku": "flex-consumption",
-      "status": "GA",
+      "status": "stable",
       "host": {
         "version": "[4.1048.0, 4.1049.0)"
       },
@@ -122,7 +122,7 @@ Custom profiles also use `$schema` for editor support and validation:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `sku` | string | no | Azure SKU identifier. Metadata only — not used for resolution. |
-| `status` | string | no | `GA`, `preview`, `deprecated`. CLI warns on deprecated profiles. |
+| `status` | string | no | `stable`, `preview`, `deprecated`. CLI warns on deprecated profiles. |
 | `deprecationUrl` | string | no | URL to deprecation documentation with migration guidance. Used when `status` is `deprecated`. |
 | `extends` | string | no | Name of a parent profile to inherit from. Single inheritance only. |
 | `host.version` | version range | yes (or inherited) | NuGet-style version range for the host runtime. |
@@ -514,10 +514,10 @@ Available profiles:
 
   Name                    Source     Host Version Range       Bundle Range          Status
   ─────────────────────── ───────── ──────────────────────── ───────────────────── ──────────
-  flex                    built-in  [4.1048.0, 4.1049.0)     [4.0.0, 4.99.1)       GA
-  linux-premium           built-in  [4.1046.0, 4.1047.0)     [4.0.0, 4.30.1)       GA
-  windows-consumption     built-in  [4.1045.0, 4.1046.0)     [4.0.0, 4.25.1)       GA
-  windows-dedicated       built-in  [4.1045.0, 4.1046.0)     [4.0.0, 4.25.1)       GA
+  flex                    built-in  [4.1048.0, 4.1049.0)     [4.0.0, 4.99.1)       stable
+  linux-premium           built-in  [4.1046.0, 4.1047.0)     [4.0.0, 4.30.1)       stable
+  windows-consumption     built-in  [4.1045.0, 4.1046.0)     [4.0.0, 4.25.1)       stable
+  windows-dedicated       built-in  [4.1045.0, 4.1046.0)     [4.0.0, 4.25.1)       stable
   linux-consumption       built-in  [4.1044.0, 4.1045.0)     [4.0.0, 4.22.1)       deprecated
   staging                 project   [4.1046.100]             (inherited: flex)      —
   my-preview              user      [4.1050.0-pre, 4.1051.0) (inherited: flex)      —
