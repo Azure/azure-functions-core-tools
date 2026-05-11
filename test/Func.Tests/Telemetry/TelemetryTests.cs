@@ -90,7 +90,7 @@ public class TelemetryTests
     {
         // Without an OTel listener subscribed, ActivitySource.StartActivity
         // returns null and the extension propagates that.
-        Assert.Null(CliTelemetry.Trace.StartCommandActivity("test"));
+        Assert.Null(CliTelemetry.Trace.StartCommandActivity());
     }
 
     [Fact]
@@ -102,15 +102,51 @@ public class TelemetryTests
     }
 
     [Fact]
-    public void StartCommandActivity_WithListener_AppliesCommandNameTag()
+    public void StartCommandActivity_WithListener_UsesFixedOperationName()
+    {
+        // The activity is started before the command path is known, so it
+        // gets a stable operation name and no cli.command.name tag yet.
+        using var listener = SubscribeListener();
+
+        using var activity = CliTelemetry.Trace.StartCommandActivity();
+        Assert.NotNull(activity);
+
+        Assert.Equal(ActivityExtensions.CommandActivityName, activity.OperationName);
+        Assert.Equal(ActivityKind.Internal, activity.Kind);
+        Assert.Null(activity.GetTagItem(TelemetryConventions.CliCommandName));
+    }
+
+    [Fact]
+    public void SetCommandName_AppliesDisplayNameAndTag()
     {
         using var listener = SubscribeListener();
 
-        using var activity = CliTelemetry.Trace.StartCommandActivity("workload install");
+        using var activity = CliTelemetry.Trace.StartCommandActivity();
         Assert.NotNull(activity);
 
-        Assert.Equal("workload install", activity.GetTagItem("cli.command.name"));
-        Assert.Equal(ActivityKind.Internal, activity.Kind);
+        activity.SetCommandName("workload install");
+
+        Assert.Equal("workload install", activity.DisplayName);
+        Assert.Equal("workload install", activity.GetTagItem(TelemetryConventions.CliCommandName));
+        // Operation name (fixed at creation) is left alone — only DisplayName moves.
+        Assert.Equal(ActivityExtensions.CommandActivityName, activity.OperationName);
+    }
+
+    [Fact]
+    public void SetCommandName_LastValueWins()
+    {
+        // Defensive: tag should reflect the most recent name in case a future
+        // caller resolves the command in stages.
+        using var listener = SubscribeListener();
+
+        using var activity = CliTelemetry.Trace.StartCommandActivity();
+        Assert.NotNull(activity);
+
+        activity.SetCommandName("workload");
+        activity.SetCommandName("workload install");
+
+        Assert.Equal("workload install", activity.DisplayName);
+        Assert.Equal("workload install", activity.GetTagItem(TelemetryConventions.CliCommandName));
     }
 
     [Fact]
@@ -118,7 +154,7 @@ public class TelemetryTests
     {
         using var listener = SubscribeListener();
 
-        using var activity = CliTelemetry.Trace.StartCommandActivity("test");
+        using var activity = CliTelemetry.Trace.StartCommandActivity();
         Assert.NotNull(activity);
 
         var ex = new InvalidOperationException("boom");
