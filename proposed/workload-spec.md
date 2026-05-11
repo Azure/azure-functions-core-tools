@@ -41,9 +41,9 @@
 | Term                  | Meaning                                                                 |
 |-----------------------|-------------------------------------------------------------------------|
 | **Func CLI**          | The `func` binary itself. Owns command parsing, UX, workload lifecycle. Distinct from the Functions host runtime, which is itself delivered as a workload (see §4.6). |
-| **Host runtime**      | `Microsoft.Azure.WebJobs.Script.WebHost`, the process that actually executes Functions. Acquired and versioned as a content-only workload (see below); `func start` knows how to launch it directly. |
+| **Host runtime**      | `Microsoft.Azure.WebJobs.Script.WebHost`, the process that actually executes Functions. Acquired and versioned as a `content` workload (see below); `func start` knows how to launch it directly. |
 | **Workload**          | An installable extension that contributes init/new/pack support and/or commands. Concretely: a NuGet package whose entry-point assembly contains a class deriving from the abstract `Workload` base in `Func.Cli.Abstractions` (see §5). |
-| **Content-only workload** | A workload that ships only files (no entry-point class, no `Configure` call, no contribution points). The CLI installs and tracks it like any other workload, but the loader skips it: it is consumed by built-in commands that know its package id and disk layout. The host-runtime workload is the canonical example. |
+| **Workload kind** | One of `workload`, `content`, or `meta`. **`workload`** packages carry an entry-point assembly and a `Workload`-derived class; the loader activates them and they contribute services. **`content`** packages ship files only (no entry point, no `Configure` call); the loader skips them and built-in commands consume them by package id (the host runtime is the canonical example). **`meta`** packages carry no payload; they bundle other workloads via the `.nuspec`'s `<dependencies>`, recorded in the registry's `metas[]` array. See `workload-package-layout.md` §5.4 for the full schema. |
 | **Workload package**  | The distributable unit. NuGet in v1; format may evolve.                 |
 | **Catalog**           | The package source `func workload search` / `install` queries to resolve workload packages. The configured default is the public NuGet feed; alternates can be passed via `--source`. |
 | **Alias**             | A short, NuGet-tag-safe handle (e.g. `python`) declared by a workload package via an `alias:<name>` tag. Users can pass aliases to `install` / `uninstall` / `update` / `prune` instead of the full package id (see §5.3, §6.1). |
@@ -63,8 +63,8 @@
 func workload list [--all-versions|-a] [--json]
 ```
 
-Lists installed workloads with id, version, type (normal or
-content-only), capabilities, and install path.
+Lists installed workloads with id, version, kind (`workload`,
+`content`, or `meta`), capabilities, and install path.
 
 ##### Options
 
@@ -144,7 +144,7 @@ exits non-zero with the same hint.
   - Skips the "already installed" prompt and proceeds with a
     side-by-side install. For normal workloads, the new version (if
     higher than the existing one) becomes the loaded version on the
-    next `func` invocation (see §6.2). For content-only workloads,
+    next `func` invocation (see §6.2). For `content` workloads,
     consumers (e.g. `func start` for the host workload) likewise pick
     the highest installed version.
 
@@ -315,7 +315,7 @@ have left old versions on disk.
 - The Functions host runtime is distributed as a first-class workload
   (e.g. `Azure.Functions.Cli.Workload.Host`). It is **not** bundled
   with the CLI binary.
-- The host-runtime workload is **content-only** (§3, §5.3): its
+- The host-runtime workload has **`kind: content`** (§3, §5.3): its
   package ships the host binaries under `tools/any/` with no
   `entryPoint`. The workload subsystem records its registry row but
   does not load it (§6.2 step 3). `func start` resolves the install
@@ -418,15 +418,20 @@ exists in `Func.Cli.Abstractions`. The other contribution points are
 designed but not yet implemented; they ship incrementally as the
 corresponding built-in commands move onto the workload model.
 
-**Content-only workloads** (`workload.json` with `contentOnly: true`,
-see §5.3) register no services. They do not implement `Workload`, are
-not loaded into an `AssemblyLoadContext`, and contribute no
-contribution points. Built-in CLI commands consume them directly by
-package id: today, `func start` knows the host workload's package id
+**Non-`workload` kinds** (`workload.json` with `kind: content` or
+`kind: meta`, see §5.3) register no services. They do not implement
+`Workload`, are not loaded into an `AssemblyLoadContext`, and
+contribute no contribution points. The CLI's responsibility for a
+`content` package ends at install / update / removal and
+guaranteeing a registry row (§6.1, §10.1); the **contract between
+the consumer and the content workload is owned by the consumer**,
+not by the CLI. `func start` knows the host workload's package id
 (`Azure.Functions.Cli.Workload.Host`) and resolves its on-disk
-location via `<workload-home>/workloads/<packageId>/<version>/`. How
-the CLI generalizes this for non-host content-only workloads is an
-open question (§12).
+location via `<workload-home>/workloads/<packageId>/<version>/`;
+any future consumer (built-in command or another workload)
+follows the same pattern. `meta` packages have no payload at all;
+they only exist as registry rows in `metas[]` (§10.1) so cascade
+uninstall can find their members.
 
 The exact interface names and shapes are documented in
 [`building-a-workload.md`](./building-a-workload.md). That document is
@@ -501,13 +506,22 @@ The metadata the CLI needs is split between two sources:
       (e.g. `?packageType=dotnettool` on the NuGet search API).
 2. **Per-workload manifest (`workload.json`)** — owned by the package
    author, shipped at the root of the workload's NuGet package.
-   Required: a package without this file is not a valid workload.
+   Required: a package without this file is not a valid workload. The
+   full schema lives in `workload-package-layout.md` §5.4; the
+   summary below covers what the install pipeline reads.
 
-   Normal workload:
+   Every `workload.json` carries a required `$schema` URL and a
+   `kind` discriminator (default `workload`). The CLI rejects any
+   `$schema` URL it doesn't recognise; the manifest is **never**
+   parsed partially.
+
+   `workload` package (default; runs in the loader, contributes
+   services):
 
    ```json
    {
-     "contentOnly": false,
+     "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+     "kind": "workload",
      "entryPoint": {
        "assemblyPath": "Foo.dll",
        "type": "Foo.MyWorkload"
@@ -515,31 +529,42 @@ The metadata the CLI needs is split between two sources:
    }
    ```
 
-   Content-only workload:
+   `content` package (ships files only; loader skips):
 
    ```json
-   { "contentOnly": true }
+   {
+     "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+     "kind": "content"
+   }
    ```
 
-   - `contentOnly` (optional, default `false`) → when `false`, this is
-     a normal workload: `entryPoint` is **required** and validated by
-     the install pipeline. When `true`, the package ships content only
-     (no entry-point class); `entryPoint` is **optional and ignored**
-     if present, and the loader (§6.2) skips this entry entirely.
-     Content-only workloads are consumed by built-in commands that know
-     the package id (see §5.1 and §12).
-   - `entryPoint.assemblyPath` → path to the assembly relative to the
-     package's content root (see "Package layout" below). Must not be
-     absolute or contain `..` segments; the install pipeline rejects
-     either. Required when `contentOnly` is `false`.
-   - `entryPoint.type` → fully-qualified type name extending the
-     abstract `Workload` base class. Required when `contentOnly` is
-     `false`.
+   `meta` package (no payload; bundles other packages via the
+   `.nuspec` `<dependencies>`):
 
-   The install pipeline reads `workload.json` once and stamps
-   `contentOnly` and `entryPoint` into the registry entry (§10.1) so
-   the loader can decide whether to activate without re-reading
-   `workload.json` for every package on every CLI invocation.
+   ```json
+   {
+     "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+     "kind": "meta"
+   }
+   ```
+
+   - `kind` (optional, default `"workload"`) → one of `"workload"`,
+     `"content"`, or `"meta"`. Determines whether the loader
+     activates the package.
+   - `entryPoint.assemblyPath` → path to the assembly relative to
+     `tools/any/`. Must not be absolute or contain `..` segments;
+     the install pipeline rejects either. **Required** for
+     `kind: workload`; **forbidden** for `kind: content` and
+     `kind: meta` (the install pipeline rejects packages that
+     declare an `entryPoint` for a non-workload kind).
+   - `entryPoint.type` → fully-qualified type name extending the
+     abstract `Workload` base class. Same required/forbidden rules
+     as `assemblyPath`.
+
+   The install pipeline reads `workload.json` once and stamps `kind`
+   and `entryPoint` into the registry entry (§10.1) so the loader
+   can decide whether to activate without re-reading `workload.json`
+   for every package on every CLI invocation.
 
    **Package layout.** A workload `.nupkg` follows this convention:
 
@@ -559,12 +584,13 @@ The metadata the CLI needs is split between two sources:
    subdirectory because the CLI loads them in-process via
    `AssemblyLoadContext` rather than launching a separate runtime.
 
-   **Content-only workloads** follow the same package layout but have
-   no `entryPoint` constraint on `tools/any/`. The author lays out
-   whatever files the consuming command expects; the install pipeline
-   extracts them verbatim. The host workload, for example, ships its
-   runtime binaries under `tools/any/` and `func start` resolves them
-   by path convention.
+   `content` packages follow the same package layout but have no
+   `entryPoint` constraint on `tools/any/`. The author lays out
+   whatever files the consuming command expects; the install
+   pipeline extracts them verbatim. The host workload, for example,
+   ships its runtime binaries under `tools/any/` and `func start`
+   resolves them by path convention. `meta` packages typically have
+   no `tools/any/` payload at all.
 
 The CLI persists everything it needs for startup in a single
 **workload registry** at `~/.azure-functions/workloads.json` (see §6.1).
@@ -623,13 +649,17 @@ install` / `uninstall`.
    transitive NuGet dependencies. Anything the workload needs at
    runtime must be in the package.
 5. Read `workload.json` from the package root. The file is required;
-   reject if missing or malformed.
-   - If `contentOnly: true`, ignore any `entryPoint` field. No further
-     validation against `tools/any/` is performed.
-   - If `contentOnly` is `false` or absent, `entryPoint` is required.
-     Reject if `entryPoint.assemblyPath` is rooted, contains `..`
-     segments, or does not resolve to a file under the staged
-     `tools/any/` directory.
+   reject if missing or malformed. Validate the `$schema` URL: a URL
+   the CLI doesn't recognise causes the install to fail before any
+   field is read.
+   - If `kind: workload` (or `kind` is absent, defaulting to
+     `workload`), `entryPoint` is required. Reject if
+     `entryPoint.assemblyPath` is rooted, contains `..` segments, or
+     does not resolve to a file under the staged `tools/any/`
+     directory.
+   - If `kind: content` or `kind: meta`, `entryPoint` is **forbidden**.
+     Reject the package if it declares one. No further validation
+     against `tools/any/` is performed.
 6. Atomically move into
    `<workload-home>/workloads/<packageId>/<version>/`.
    `<packageId>` is stored lowercased (matching NuGet's normalization)
@@ -646,56 +676,67 @@ install` / `uninstall`.
    - `source` — the catalog feed URL or local path the package was
      installed from. Used to flag non-default-feed packages in
      `func workload list` (see §9).
-   - `contentOnly`: boolean stamped from `workload.json` (default
-     `false`). The loader (§6.2) uses this to decide whether to
-     activate the entry without re-reading `workload.json`.
-   - `entryPoint: { assemblyPath, type }`: copied from `workload.json`
-     when `contentOnly` is `false`. Omitted when `contentOnly` is
-     `true`.
+   - `kind` — `"workload"`, `"content"`, or `"meta"` stamped from
+     `workload.json` (default `"workload"`). The loader (§6.2) uses
+     this to decide whether to activate the entry without re-reading
+     `workload.json`.
+   - `installedExplicitly` — `true` when the user invoked
+     `func workload install <id>` directly; `false` when the row was
+     written as a member of a `meta` install (see
+     `workload-package-layout.md` §5.5). Drives cascade-uninstall
+     behaviour.
+   - `entryPoint: { assemblyPath, type }` — copied from `workload.json`
+     when `kind` is `workload`. Omitted for `content` and `meta`.
 
-   Side-by-side installs of the same package id at different versions
-   are separate entries. `displayName` and `description` are **not**
-   persisted in the registry; they are read from the loaded `Workload`
-   instance at runtime (and not applicable to content-only entries) so
-   an updated workload's metadata always reflects what's running.
-   Install paths are computed from the configured workload home plus
-   `(packageId, packageVersion)` and likewise not persisted.
+   For `meta` installs, the install pipeline also writes a row to the
+   registry's top-level `metas[]` array (§10.1) carrying the meta's
+   `(packageId, packageVersion)` and a frozen `members[]` snapshot.
+   Side-by-side installs of the same `(packageId, packageVersion)` in
+   `workloads[]` are separate entries; metas are unique per id (no
+   SxS for metas; see `workload-package-layout.md` §5.4 "Metas are
+   unique per id"). `displayName` and `description` are **not**
+   persisted in the registry; they are read from the loaded
+   `Workload` instance at runtime (and not applicable to `content` or
+   `meta` entries) so an updated workload's metadata always reflects
+   what's running. Install paths are computed from the configured
+   workload home plus `(packageId, packageVersion)` and likewise not
+   persisted.
 
    The write is atomic (temp file + rename) so a crash mid-install
    cannot corrupt the registry.
-8. Emit an "installed" message: for normal workloads, include the
-   resolved entry-point type; for content-only workloads, include the
-   install path so the consuming command (e.g. `func start` for the
-   host workload) can be discovered.
+8. Emit an "installed" message: for `kind: workload`, include the
+   resolved entry-point type; for `content`, include the install path
+   so the consuming command (e.g. `func start` for the host workload)
+   can be discovered; for `meta`, list the resolved members.
 
 ### 6.2 Discovery and activation
 
 On every Func CLI startup, the workload subsystem builds the in-process
 list of live workloads in a fixed sequence. The whole flow is one JSON
 read plus N assembly loads, where **N is the number of distinct
-package ids with at least one non-content-only installed version**, not
+package ids with at least one installed `kind: workload` version**, not
 the total entry count.
 
 1. **Read the registry.** Open
    `<workload-home>/workloads.json` once. Validate `$schema` (§10.1);
    reject unrecognized values via `GracefulException`. The registry
    carries a single `workloads[]` array of every installed
-   `(packageId, packageVersion)` row, each with its `contentOnly` flag
-   stamped at install time (§6.1 step 7).
+   `(packageId, packageVersion)` row, each with its `kind` stamped
+   at install time (§6.1 step 7).
 2. **Pick the live version per package id.** Group `workloads[]` by
    `packageId`. For each group, select the row with the highest
    semver. That row is the **live** version; every other row for the
    same package id is an inactive side-by-side install retained on
    disk for `func workload list --all-versions` and for rollback (the
    user removes the live one via `func workload uninstall` to revert).
-3. **Skip content-only entries.** If the live row has
-   `contentOnly: true`, the loader does **not** activate it: no
-   assembly load, no `Workload.Configure` call, no DI contribution.
-   The entry stays in the registry and is surfaced by
-   `func workload list` (with type `Content`); built-in commands that
-   know its `packageId` (e.g. `func start` for the host workload)
-   resolve its install directory directly. Steps 4-7 below run only
-   for entries with `contentOnly: false`.
+3. **Skip non-`workload` kinds.** If the live row has
+   `kind: content` or `kind: meta`, the loader does **not** activate
+   it: no assembly load, no `Workload.Configure` call, no DI
+   contribution. The entry stays in the registry and is surfaced by
+   `func workload list` (with its kind shown); built-in commands
+   that know its `packageId` (e.g. `func start` for the host
+   workload) resolve its install directory directly. Steps 4-7
+   below run only for entries with `kind: workload`.
 4. **Load the assembly.** Compute the assembly path under
    `<workload-home>/workloads/<packageId>/<packageVersion>/<entryPoint.assemblyPath>`
    and reject anything that resolves outside the workloads root
@@ -712,16 +753,18 @@ the total entry count.
    during discovery; the type's static constructor is the only workload
    code that runs, so workloads **must** keep static initialization
    side-effect-free.
-7. **Configure.** Once all live normal workloads are instantiated, the
-   CLI walks the resulting list and calls each
-   `Workload.Configure(builder)` exactly once, in registry order. This
-   is where contribution-point services (`IProjectInitializer`,
-   `IProjectDetector`, `ITemplateProvider`, `IPackProvider`,
-   `IExternalCommand`, see §5.1) are added to the CLI's DI container.
-8. **Cache for the process lifetime.** The list is cached in
-   `IWorkloadProvider` (singleton). Subsequent commands within the same
-   `func` invocation reuse it; they never re-read the registry or
-   re-instantiate workloads.
+7. **Configure.** Once all live `kind: workload` entries are
+   instantiated, the CLI walks the resulting list and calls each
+   `Workload.Configure(builder)` exactly once, in registry order.
+   This is where contribution-point services
+   (`IProjectInitializer`, `IProjectDetector`, `ITemplateProvider`,
+   `IPackProvider`, `IExternalCommand`, see §5.1) are added to the
+   CLI's DI container.
+8. **Cache for the process lifetime.** The list is materialized once
+   at host startup and exposed through `IWorkloadProvider`
+   (singleton). Subsequent commands within the same `func`
+   invocation inject `IWorkloadProvider` and reuse the cached list;
+   they never re-read the registry or re-instantiate workloads.
 
 #### Failure isolation
 
@@ -793,7 +836,7 @@ side install (use `install --force` for that, §6.1).
    harmless because no row references it and `func workload prune`
    (§6.7) cleans it up.
 
-For content-only workloads, the swap is the same shape: stage, swap
+For `content` workloads, the swap is the same shape: stage, swap
 the registry row, delete the old directory. There is no in-process
 cache to invalidate.
 
@@ -865,14 +908,14 @@ an older installed version, run `func workload uninstall <package>`
 
 - **CLI startup overhead** for workload discovery (no invocation) must
   remain under **100 ms** for up to 25 installed workloads on a warm cache.
-  Content-only workloads contribute zero activation cost (no assembly
-  load, no `Configure` call) and count against this budget only for
-  the registry row read.
+  `content` and `meta` entries contribute zero activation cost (no
+  assembly load, no `Configure` call) and count against this budget
+  only for the registry row read.
 - **First invocation** of a workload (cold) should complete the
   workload-side boot in under **300 ms** for AOT'd workloads and
-  **800 ms** for JIT. The host-runtime workload (§4.6) is content-only
-  and is not loaded by the workload subsystem at all; `func start`
-  launches its bundled binaries directly.
+  **800 ms** for JIT. The host-runtime workload (§4.6) has
+  `kind: content` and is not loaded by the workload subsystem at
+  all; `func start` launches its bundled binaries directly.
 - **Subsequent invocations** within the same `func` invocation should not
   re-pay boot cost when the Func CLI can reuse the workload connection (an
   optimization, not a v1 requirement).
@@ -915,13 +958,17 @@ The v1 registry shape is, at the top level:
 ```json
 {
   "$schema": "https://aka.ms/func/workloads/v1/schema.json",
-  "workloads": [ /* WorkloadEntry[] */ ]
+  "workloads": [ /* WorkloadEntry[] */ ],
+  "metas":     [ /* MetaEntry[]    */ ]
 }
 ```
 
 `workloads[]` is the flat list of every installed
 `(packageId, packageVersion)` row, including inactive side-by-side
-versions.
+versions and entries of every kind. `metas[]` is the parallel list
+of installed meta packages; it is empty until the user installs
+their first meta. The two arrays are independent: a meta's members
+live in `workloads[]` like any other install.
 
 A `WorkloadEntry` carries:
 
@@ -931,12 +978,31 @@ A `WorkloadEntry` carries:
   `alias:<name>` tags.
 - `source` (string): the catalog feed URL or local path the package
   was installed from.
-- `contentOnly` (bool, default `false`): stamped from the package's
-  `workload.json` at install time (§6.1 step 7). When `true`, the
-  loader skips activation (§6.2 step 3).
-- `entryPoint` (`{ assemblyPath, type }`): copied from `workload.json`.
-  Present when `contentOnly` is `false`; omitted when `contentOnly`
-  is `true`.
+- `kind` (string, default `"workload"`): one of `"workload"`,
+  `"content"`, or `"meta"`. Stamped from the package's `workload.json`
+  at install time (§6.1 step 7). The loader skips activation for
+  `"content"` and `"meta"` entries (§6.2 step 3).
+- `installedExplicitly` (bool, default `true`): `true` when the user
+  installed this row directly via `func workload install <id>`;
+  `false` when the row was written as a member of a meta install.
+  Drives cascade-uninstall behaviour
+  (`workload-package-layout.md` §5.5).
+- `entryPoint` (`{ assemblyPath, type }`): copied from
+  `workload.json`. Present when `kind` is `"workload"`; omitted (and
+  forbidden) for `"content"` and `"meta"` entries.
+
+A `MetaEntry` carries:
+
+- `packageId` (string): NuGet package id of the meta (lowercased).
+- `packageVersion` (string): installed meta version.
+- `members` (object[]): frozen snapshot of the
+  `(packageId, packageVersion)` pairs the meta resolved to at
+  install time. Used by `func workload uninstall <metaId>` to drive
+  cascade removal. Members are recorded here for traceability; their
+  loadable state lives in `workloads[]`.
+
+Metas are unique per `packageId` (no SxS for metas; see
+`workload-package-layout.md` §5.4 "Metas are unique per id").
 
 The loader's "live version per package id" resolution (§6.2 step 2)
 is computed from `workloads[]` alone: highest semver wins. There is
@@ -984,15 +1050,7 @@ no separate active-version pointer in the registry.
 7. **Host-runtime workload boundary** — does one workload ship all RIDs +
    all major host versions, or one workload per major (e.g. `...Workload.Host.v4`,
    `...Workload.Host.v5`)?
-8. **Non-host content-only consumption.** `func start` knows the host
-   workload's package id (`Azure.Functions.Cli.Workload.Host`) and
-   resolves its install directory directly. There is no general
-   contract today for other built-in commands to consume
-   content-only workloads. If a second content-only workload appears,
-   we'll need either a name-based registry lookup helper or a
-   content-only contribution mechanism (e.g. registering a content
-   directory under a stable key).
-9. **TTL-based prune.** `func workload prune` (§6.7) removes every
+8. **TTL-based prune.** `func workload prune` (§6.7) removes every
    non-live install unconditionally. A future variant
    (`--older-than 30d` or similar) would let a user keep recent
    versions for quick rollback while reclaiming disk for older ones.
@@ -1002,3 +1060,13 @@ no separate active-version pointer in the registry.
 prompts) is **CLI-rendered only in v1** (see §2 non-goals). A
 callback contract for richer UX may be introduced in a later
 abstractions release as a non-breaking additive change.
+
+**Resolved:** *Non-host `content` consumption* is **out of scope
+for the CLI**. The CLI's responsibility for a `content` workload
+ends at install / update / removal and guaranteeing a registry row
+(§6.1, §10.1). The contract between a consumer (a built-in command
+or another workload that depends on the content) and the content
+workload — package id, on-disk layout, expected files — is owned
+by the consumer, not by the CLI. `func start` consuming the host
+workload (§4.6) is one such consumer; future consumers follow the
+same pattern.
