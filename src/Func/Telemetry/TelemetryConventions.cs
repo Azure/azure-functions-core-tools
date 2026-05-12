@@ -21,10 +21,16 @@ internal static class TelemetryConventions
     public const string CliCommandName = "cli.command.name";
     public const string ProcessExitCode = "process.exit_code";
     public const string CliWorkloadCount = "cli.workload.count";
-    public const string OutcomeStatus = "outcome";
 
-    public const string OutcomeSuccess = "success";
-    public const string OutcomeError = "error";
+    /// <summary>
+    /// OTel general semconv attribute used to classify failures. Absent /
+    /// empty means success; non-empty is the failure type. We populate it
+    /// with <c>Exception.GetType().FullName</c> via
+    /// <see cref="ActivityExtensions.Fail"/>. Cardinality is bounded by the
+    /// exception types thrown in CLI boot code (a handful), so the same
+    /// value works for both span dimensions and metric tags.
+    /// </summary>
+    public const string ErrorType = "error.type";
 
     // Activity (span) names.
     public const string WorkloadBootActivityName = "cli.workload.boot";

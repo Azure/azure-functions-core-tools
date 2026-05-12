@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Telemetry;
 /// the same outcome and workload-count tags as the trace.
 /// </summary>
 /// <remarks>
-/// Subscription is registered once in <see cref="Hosting.CliHost.CreateBuilder"/>
+/// Subscription is registered once in <see cref="Hosting.CliHostFactory.CreateBuilder"/>
 /// at process startup. The listener is process-global; for a short-lived CLI
 /// process this is fine. Recording happens after the host has started, so
 /// the OpenTelemetry meter pipeline is already subscribed and the sample
@@ -49,10 +49,8 @@ internal static class WorkloadBootMetricListener
         }
 
         int count = activity.GetTagItem(TelemetryConventions.CliWorkloadCount) is int value ? value : 0;
-        string outcome = activity.Status == ActivityStatusCode.Error
-            ? TelemetryConventions.OutcomeError
-            : TelemetryConventions.OutcomeSuccess;
+        string? errorType = activity.GetTagItem(TelemetryConventions.ErrorType) as string;
 
-        CliTelemetry.Metric.RecordWorkloadBoot(count, (long)activity.Duration.TotalMilliseconds, outcome);
+        CliTelemetry.Metric.RecordWorkloadBoot(count, (long)activity.Duration.TotalMilliseconds, errorType);
     }
 }

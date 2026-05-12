@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Hosting;
 /// Boot duration is captured by the <c>cli.workload.boot</c> activity opened
 /// here; the <see cref="WorkloadBootMetricListener"/> translates that
 /// activity's stop into the boot-duration histogram so the metric and the
-/// trace stay in sync (workload count, success/error outcome).
+/// trace stay in sync (workload count, error.type on failure).
 /// </para>
 /// </remarks>
 internal static class WorkloadRegistration
@@ -59,7 +59,7 @@ internal static class WorkloadRegistration
 
         // The activity name doubles as the metric scope: WorkloadBootMetricListener
         // translates the stop event into cli.workload.boot_duration with the
-        // same count + outcome tags.
+        // same count tag and, on failure, the same error.type tag.
         using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
         try
         {

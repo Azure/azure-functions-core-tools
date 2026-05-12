@@ -48,13 +48,17 @@ internal static class ActivityExtensions
     {
         /// <summary>
         /// Records the exception on the activity and marks its status as
-        /// <see cref="ActivityStatusCode.Error"/>. Use this on the failure
-        /// path; success is the default and does not need to be set.
+        /// <see cref="ActivityStatusCode.Error"/>. Sets the OTel
+        /// <see cref="TelemetryConventions.ErrorType"/> attribute so the
+        /// failure kind is queryable on the span (and on any metric a
+        /// listener derives from it). Use this on the failure path; success
+        /// is the default and does not need to be set.
         /// </summary>
         public Activity Fail(Exception exception)
         {
             activity.AddException(exception);
             activity.SetStatus(ActivityStatusCode.Error, exception.Message);
+            activity.SetTag(TelemetryConventions.ErrorType, exception.GetType().FullName);
             return activity;
         }
     }
