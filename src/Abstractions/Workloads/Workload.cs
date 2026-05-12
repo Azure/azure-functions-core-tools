@@ -5,10 +5,9 @@ namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
 /// Base class for a workload's entry-point. The CLI loader instantiates the
-/// type identified by the workload's <see cref="WorkloadMetadata"/>
-/// (<c>workload.json</c> in the package root), then invokes
-/// <see cref="Configure"/> so the workload can register its services with
-/// <see cref="FunctionsCliBuilder"/>.
+/// type identified by the workload's manifest (<c>workload.json</c> in the
+/// package root), then invokes <see cref="Configure"/> so the workload can
+/// register its services with <see cref="FunctionsCliBuilder"/>.
 ///
 /// Mirrors the shape of WebJobs' <c>IWebJobsStartup</c>. Implementations must
 /// have a parameterless constructor.

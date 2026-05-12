@@ -48,7 +48,7 @@ public sealed class WorkloadInstallerTests : IDisposable
         Assert.Equal(["test", "stub"], result.Entry.Aliases);
         Assert.Equal("Test.dll", result.Entry.EntryPoint!.AssemblyPath);
         Assert.Equal(Path.GetFullPath(nupkg), result.Entry.Source);
-        Assert.True(result.Entry.InstalledExplicitly);
+        Assert.Equal(1, result.Entry.InstallRefCount);
 
         string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
         Assert.True(Directory.Exists(installDir));
@@ -61,7 +61,7 @@ public sealed class WorkloadInstallerTests : IDisposable
                 e.PackageVersion == "1.0.0" &&
                 e.EntryPoint!.AssemblyPath == "Test.dll" &&
                 e.Source == Path.GetFullPath(nupkg) &&
-                e.InstalledExplicitly &&
+                e.InstallRefCount == 1 &&
                 e.Aliases.SequenceEqual(new[] { "test", "stub" })),
             Arg.Any<CancellationToken>());
     }

@@ -66,15 +66,24 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         }
 
         // Reject unknown $schema values strictly rather than partially
-        // interpret a future schema.
+        // interpret a future schema. Wording mirrors WorkloadStore's registry
+        // schema rejection (in WorkloadStore.ReadRegistryAsync) so users see
+        // consistent guidance for both manifests.
         if (!WorkloadManifestSchema.IsPackageManifestSupported(metadata.Schema))
         {
             string supported = string.Join(
-                ", ",
-                WorkloadManifestSchema.SupportedPackageManifestSchemas);
+                Environment.NewLine,
+                WorkloadManifestSchema.SupportedPackageManifestSchemas.Select(s => $"  - {s}"));
+
             throw new InvalidWorkloadException(
-                $"'{metadataPath}' has unsupported or missing $schema '{metadata.Schema}'. " +
-                $"This CLI understands: {supported}. Update the CLI to read newer manifests.");
+                $"The schema '{metadata.Schema}' declared by manifest '{metadataPath}' is not supported."
+                + Environment.NewLine
+                + "Supported schemas are:"
+                + Environment.NewLine
+                + supported
+                + Environment.NewLine
+                + Environment.NewLine
+                + "Check for spelling or try updating the CLI to the latest version.");
         }
 
         switch (metadata.Kind)
@@ -106,8 +115,10 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
     {
         if (metadata.EntryPoint is null)
         {
+            // The kind=workload branch is the only caller, so the kind context
+            // is implicit. Keep the message scoped to the missing field.
             throw new InvalidWorkloadException(
-                $"'{metadataPath}' is missing entryPoint (required for kind 'workload').");
+                $"'{metadataPath}' is missing entryPoint.");
         }
 
         if (string.IsNullOrWhiteSpace(metadata.EntryPoint.AssemblyPath))

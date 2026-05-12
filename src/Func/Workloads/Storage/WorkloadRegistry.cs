@@ -68,10 +68,14 @@ internal sealed class WorkloadEntry
     public string Source { get; init; } = string.Empty;
 
     /// <summary>
-    /// True when installed directly via <c>func workload install &lt;id&gt;</c>;
-    /// false when pulled in as a meta-package member. Defaults to true for legacy entries.
+    /// Number of installs that brought this package in. An explicit
+    /// <c>func workload install &lt;id&gt;</c> bumps the count; each meta package
+    /// that lists this package as a member also bumps the count at meta install.
+    /// Explicit uninstall removes the entry regardless of the count; meta
+    /// uninstall decrements and removes only when the count hits zero.
+    /// Defaults to 1 for legacy entries that pre-date this field.
     /// </summary>
-    public bool InstalledExplicitly { get; init; } = true;
+    public int InstallRefCount { get; init; } = 1;
 
     /// <summary>
     /// Where to find the <see cref="Workload"/> implementation, copied from

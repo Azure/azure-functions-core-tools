@@ -29,23 +29,25 @@ namespace Azure.Functions.Cli.Hosting;
 /// Only the highest installed semver per <c>packageId</c> goes live; older
 /// versions stay in the on-disk registry for rollback but aren't loaded into
 /// the process. Content-only and meta entries are skipped.
+/// <para>
+/// Boot duration is captured by the <c>cli.workload.boot</c> activity opened
+/// here; the <see cref="WorkloadBootMetricListener"/> translates that
+/// activity's stop into the boot-duration histogram so the metric and the
+/// trace stay in sync (workload count, error.type on failure).
+/// </para>
 /// </remarks>
 internal static class WorkloadRegistration
 {
     /// <summary>
     /// Loads every live workload, publishes them via
     /// <see cref="IWorkloadProvider"/>, and invokes
-    /// <see cref="Workload.Configure"/> on each. Returns boot duration and
-    /// loaded count so the caller can emit telemetry after the host is
-    /// started (emitting from here would fire before OTel listeners are
-    /// subscribed and the metric would be dropped).
+    /// <see cref="Workload.Configure"/> on each.
     /// </summary>
     /// <param name="services">The host's service collection. Workload-contributed services are added here.</param>
     /// <param name="configuration">The host's configuration. The <c>Workloads</c> section is read to locate the workload home directory.</param>
     /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
     /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
-    /// <returns>The number of workloads loaded and the elapsed boot time.</returns>
-    public static async Task<WorkloadRegistrationResult> RegisterWorkloadsAsync(
+    public static async Task RegisterWorkloadsAsync(
         IServiceCollection services,
         IConfiguration configuration,
         IInteractionService interaction,
@@ -55,8 +57,28 @@ internal static class WorkloadRegistration
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(interaction);
 
-        var stopwatch = Stopwatch.StartNew();
+        // The activity name doubles as the metric scope: WorkloadBootMetricListener
+        // translates the stop event into cli.workload.boot_duration with the
+        // same count tag and, on failure, the same error.type tag.
+        using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
+        try
+        {
+            int loadedCount = await RegisterCoreAsync(services, configuration, interaction, cancellationToken);
+            activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
+        }
+        catch (Exception ex)
+        {
+            activity?.Fail(ex);
+            throw;
+        }
+    }
 
+    private static async Task<int> RegisterCoreAsync(
+        IServiceCollection services,
+        IConfiguration configuration,
+        IInteractionService interaction,
+        CancellationToken cancellationToken)
+    {
         // Bind WorkloadPathsOptions the same way the host's DI binding does,
         // so FUNC_CLI_Workloads__Home and test overrides flow through.
         var paths = new WorkloadPathsOptions();
@@ -107,7 +129,7 @@ internal static class WorkloadRegistration
             }
             catch (Exception ex)
             {
-                // A misbehaving workload must not brick the CLI — the user
+                // A misbehaving workload must not brick the CLI: the user
                 // still needs `func workload uninstall` to remove it.
                 // Not transactional: services registered before the throw
                 // remain in the collection. Tracked in #4948.
@@ -116,8 +138,7 @@ internal static class WorkloadRegistration
             }
         }
 
-        stopwatch.Stop();
-        return new WorkloadRegistrationResult(workloads.Count, stopwatch.ElapsedMilliseconds);
+        return workloads.Count;
     }
 
     /// <summary>

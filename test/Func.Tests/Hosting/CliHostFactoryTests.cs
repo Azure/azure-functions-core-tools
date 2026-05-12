@@ -51,13 +51,7 @@ public sealed class CliHostFactoryTests : IDisposable
 
         var interaction = new TestInteractionService();
 
-        using var host = await CliHostFactory.CreateHostAsync(
-            interaction,
-            cfg => cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Workloads:Home"] = _home,
-            }));
-
+        using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
         Assert.Contains(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
@@ -72,13 +66,7 @@ public sealed class CliHostFactoryTests : IDisposable
 
         var interaction = new TestInteractionService();
 
-        using var host = await CliHostFactory.CreateHostAsync(
-            interaction,
-            cfg => cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Workloads:Home"] = _home,
-            }));
-
+        using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
         Assert.Contains(
@@ -99,19 +87,31 @@ public sealed class CliHostFactoryTests : IDisposable
 
         var interaction = new TestInteractionService();
 
-        using var host = await CliHostFactory.CreateHostAsync(
-            interaction,
-            cfg => cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Workloads:Home"] = _home,
-            }));
-
+        using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
         var workloads = host.Services.GetRequiredService<IWorkloadProvider>().GetWorkloads();
         Assert.Empty(workloads);
         Assert.DoesNotContain(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         Assert.DoesNotContain(interaction.Lines, l => l.StartsWith("WARNING:", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Mirrors the production boot sequence in Program.cs: build, point at
+    /// the temp home, register workloads, build, start.
+    /// </summary>
+    private async Task<IHost> StartHostAsync(TestInteractionService interaction)
+    {
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Workloads:Home"] = _home,
+        });
+
+        await builder.RegisterWorkloadsAsync();
+        IHost host = builder.Build();
+        await host.StartAsync();
+        return host;
     }
 
     /// <summary>

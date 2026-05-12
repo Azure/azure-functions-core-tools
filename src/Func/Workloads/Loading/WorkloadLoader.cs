@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
-using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Workloads.Loading;
@@ -53,30 +53,26 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
             : contentRoot + Path.DirectorySeparatorChar;
         if (!assemblyPath.StartsWith(contentRootWithSeparator, StringComparison.Ordinal))
         {
-            throw new GracefulException(
-                $"[{entry.PackageId}] Could not load workload: assembly path '{entryPoint.AssemblyPath}' resolves outside the package content root '{contentRoot}'.",
-                isUserError: true);
+            throw new InvalidWorkloadException(
+                $"[{entry.PackageId}] Could not load workload: assembly path '{entryPoint.AssemblyPath}' resolves outside the package content root '{contentRoot}'.");
         }
 
         if (!File.Exists(assemblyPath))
         {
-            throw new GracefulException(
-                $"[{entry.PackageId}] Could not load workload: assembly '{entryPoint.AssemblyPath}' was not found at '{contentRoot}'.",
-                isUserError: true);
+            throw new InvalidWorkloadException(
+                $"[{entry.PackageId}] Could not load workload: assembly '{entryPoint.AssemblyPath}' was not found at '{contentRoot}'.");
         }
 
         Assembly assembly = new WorkloadLoadContext(entry.PackageId, assemblyPath)
             .LoadFromAssemblyPath(assemblyPath);
 
-        Type? type = assembly.GetType(entryPoint.Type, throwOnError: false) ?? throw new GracefulException(
-                $"[{entry.PackageId}] Could not load workload: type '{entryPoint.Type}' was not found in '{entryPoint.AssemblyPath}' (install path: '{installPath}').",
-                isUserError: true);
+        Type? type = assembly.GetType(entryPoint.Type, throwOnError: false) ?? throw new InvalidWorkloadException(
+                $"[{entry.PackageId}] Could not load workload: type '{entryPoint.Type}' was not found in '{entryPoint.AssemblyPath}' (install path: '{installPath}').");
 
         if (!typeof(Workload).IsAssignableFrom(type))
         {
-            throw new GracefulException(
-                $"[{entry.PackageId}] Could not load workload: type '{entryPoint.Type}' does not derive from {nameof(Workload)} (install path: '{installPath}').",
-                isUserError: true);
+            throw new InvalidWorkloadException(
+                $"[{entry.PackageId}] Could not load workload: type '{entryPoint.Type}' does not derive from {nameof(Workload)} (install path: '{installPath}').");
         }
 
         var instance = (Workload)Activator.CreateInstance(type)!;
