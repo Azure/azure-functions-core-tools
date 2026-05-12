@@ -38,19 +38,16 @@ internal sealed class WorkloadResolver(
             return ResolveBySelector(installed, context.StackSelector);
         }
 
-        // 2. FUNCTIONS_WORKER_RUNTIME from local.settings.json.
+        // 2. FUNCTIONS_WORKER_RUNTIME from local.settings.json. If set we
+        // honour it as an explicit declaration from the user: a runtime hit
+        // resolves, a runtime miss errors with a runtime-specific message
+        // rather than falling through to detectors. Falling through would
+        // hide the mismatch ("you declared X but no installed workload
+        // claims it") behind a generic detector-ambiguity error.
         string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
         if (!string.IsNullOrWhiteSpace(runtime))
         {
-            WorkloadResolution? byRuntime = TryResolveByRuntime(installed, runtime);
-            if (byRuntime is not null)
-            {
-                return byRuntime;
-            }
-
-            // Runtime declared but no detector claims it: fall through to
-            // detectors. The per-detector reasons are more useful than a
-            // generic "no detector claimed FUNCTIONS_WORKER_RUNTIME".
+            return ResolveByRuntime(installed, runtime);
         }
 
         // 3. IProjectDetector pass.
@@ -78,7 +75,7 @@ internal sealed class WorkloadResolver(
         };
     }
 
-    private WorkloadResolution? TryResolveByRuntime(IReadOnlyList<WorkloadInfo> installed, string runtime)
+    private WorkloadResolution ResolveByRuntime(IReadOnlyList<WorkloadInfo> installed, string runtime)
     {
         // Group detectors by owning workload to avoid double-counting a
         // workload that ships several detectors all claiming the same runtime.
@@ -91,7 +88,12 @@ internal sealed class WorkloadResolver(
             1 => WorkloadResolution.AsResolved(
                 matches.First(),
                 $"Selected by FUNCTIONS_WORKER_RUNTIME='{runtime}' in local.settings.json."),
-            0 => null,
+            0 => WorkloadResolution.AsNone(
+                $"local.settings.json declares FUNCTIONS_WORKER_RUNTIME='{runtime}' " +
+                $"but no installed workload claims that runtime. " +
+                $"Installed: {FormatInstalled(installed)}. " +
+                $"Run 'func workload install <package>' to add a workload for '{runtime}', " +
+                $"or pass --stack <id> to override."),
             _ => WorkloadResolution.AsAmbiguous(
                 [.. matches],
                 $"Multiple installed workloads claim worker runtime '{runtime}': {FormatPackages(matches)}. " +

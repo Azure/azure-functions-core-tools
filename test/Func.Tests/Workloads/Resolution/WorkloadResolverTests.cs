@@ -96,8 +96,11 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Runtime_FromLocalSettings_NoDetectorClaimsIt_FallsThroughToDetectors()
+    public async Task Runtime_FromLocalSettings_NoDetectorClaimsIt_ReturnsNoneWithRuntimeMessage()
     {
+        // An explicit FUNCTIONS_WORKER_RUNTIME with no claiming workload is a
+        // user-declared mismatch, surface it directly rather than falling
+        // through to detectors and producing a generic ambiguity error.
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         IProjectDetector detector = NewDetector(
             workerRuntimes: [],
@@ -112,9 +115,11 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Resolved, result.Status);
-        Assert.Same(dotnet, result.Resolved);
-        await detector.Received(1).DetectAsync(_dir, Arg.Any<CancellationToken>());
+        Assert.Equal(WorkloadResolutionStatus.None, result.Status);
+        Assert.Contains("FUNCTIONS_WORKER_RUNTIME='custom-runtime'", result.Message);
+        Assert.Contains("no installed workload claims that runtime", result.Message);
+        Assert.Contains("Pkg.Dotnet", result.Message);
+        await detector.DidNotReceive().DetectAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
