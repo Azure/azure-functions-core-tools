@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Arm;
@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Helpers
 
             // we need the first item of the first row
             return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
-                ?? throw new CliException("Error finding the Azure Resource information.");
+                ?? throw new ArmResourceNotFoundException("Error finding the Azure Resource information.");
         }
 
         internal static async Task<bool> IsBasicAuthAllowedForSCM(Site functionApp, string accessToken, string managementURL)
@@ -286,26 +286,42 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken, string managementURL)
         {
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
-            foreach (var subscription in subscriptions)
-            {
-                var storageAccount =
-                    await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
-                        HttpMethod.Get,
-                        ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(managementURL, new
-                        {
-                            subscriptionId = subscription.SubscriptionId,
-                            resourceName = storageAccountName,
-                            resourceType = "Microsoft.Storage/storageAccounts"
-                        }),
-                        accessToken);
+            var subIds = subscriptions.Select(s => s.SubscriptionId).ToList();
 
-                if (storageAccount.Value.Any())
-                {
-                    return await GetStorageAccount(storageAccount.Value.First(), accessToken, managementURL);
-                }
+            if (subIds.Count == 0)
+            {
+                throw new InvalidOperationException("No subscriptions found for the current account.");
             }
 
-            throw new ArmResourceNotFoundException($"Cannot find storage account with name {storageAccountName}");
+            // Resolve storage account via Azure Resource Graph (ARG)
+            var escapedStorageAccountName = storageAccountName.Replace("'", "''");
+            var query =
+               $"where type =~ 'microsoft.storage/storageaccounts' " +
+               $"and name =~ '{escapedStorageAccountName}' | project id | limit 1";
+
+            string resourceId;
+            try
+            {
+                resourceId = await GetResourceIDFromArg(
+                    subIds,
+                    query,
+                    accessToken,
+                    managementURL);
+            }
+            catch (ArmResourceNotFoundException)
+            {
+                throw new ArmResourceNotFoundException(
+                    $"Cannot find storage account with name {storageAccountName}");
+            }
+
+            return await GetStorageAccount(
+                new ArmWrapper<ArmGenericResource>
+                {
+                    Id = resourceId,
+                    Name = storageAccountName
+                },
+                accessToken,
+                managementURL);
         }
 
         private static async Task<StorageAccount> GetStorageAccount(ArmWrapper<ArmGenericResource> armWrapper, string accessToken, string managementURL)
