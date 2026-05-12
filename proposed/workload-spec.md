@@ -104,21 +104,21 @@ returns id, latest version, and description for matching packages.
 #### `func workload install`
 
 ```
-func workload install <package> [--version|-v <v>] [--source <path>] [--exact|-e] [--include-prereleases] [--force|-f]
+func workload install <id> [--version|-v <v>] [--source <path>] [--exact|-e] [--include-prereleases] [--force|-f]
 ```
 
 Acquires and installs a workload. See §6.1 for the full install pipeline.
 
-If any version of `<package>` is already installed, the CLI prompts:
-`<package> is already installed at <existing>. Run 'func workload
-update <package>' instead?` Pass `--force` to skip the prompt and add
+If any version of `<id>` is already installed, the CLI prompts:
+`<id> is already installed at <existing>. Run 'func workload
+update <id>' instead?` Pass `--force` to skip the prompt and add
 the new version side-by-side anyway. In non-interactive contexts (no
 TTY, `--json` upstream), the prompt is treated as decline and the CLI
 exits non-zero with the same hint.
 
 ##### Arguments
 
-- `<package>`
+- `<id>`
   - Required. Matched as an `alias:<name>` tag by default (see §5.3 and
     §6.1 for the resolution flow). With `--exact`, must be the literal
     package id.
@@ -134,7 +134,7 @@ exits non-zero with the same hint.
   - Installs from a local path or alternate feed (e.g. for development
     or internal mirrors) instead of the configured default catalog.
 - `--exact|-e`
-  - Disables alias matching. `<package>` must be the literal package id
+  - Disables alias matching. `<id>` must be the literal package id
     (case-insensitive). Use when an alias collides across multiple
     packages or when scripting against a known id.
 - `--include-prereleases`
@@ -151,14 +151,14 @@ exits non-zero with the same hint.
 #### `func workload uninstall`
 
 ```
-func workload uninstall <package> [--version|-v <v>] [--all-versions|-a] [--exact|-e]
+func workload uninstall <id> [--version|-v <v>] [--all-versions|-a] [--exact|-e]
 ```
 
 Removes an installed workload. By default removes only the active version.
 
 ##### Arguments
 
-- `<package>`
+- `<id>`
   - Required. The workload to remove. Resolved using the same alias
     rules as `install` (see §6.1).
 
@@ -171,14 +171,14 @@ Removes an installed workload. By default removes only the active version.
   - Removes every installed version of the workload. Mutually exclusive
     with `--version`.
 - `--exact|-e`
-  - Disables alias matching. `<package>` must be the literal package id
+  - Disables alias matching. `<id>` must be the literal package id
     (case-insensitive). Use when an alias collides across multiple
     installed packages or when scripting against a known id.
 
 #### `func workload update`
 
 ```
-func workload update [<package>] [--version|-v <v>] [--all] [--major] [--source <path>] [--include-prereleases]
+func workload update [<id>] [--version|-v <v>] [--all] [--major] [--source <path>] [--include-prereleases]
 ```
 
 Updates a workload **in place**: removes one existing installed version
@@ -187,9 +187,9 @@ Default is "same major version only". See §6.4 for the full pipeline.
 
 ##### Arguments
 
-- `<package>`
+- `<id>`
   - Optional. Updates a single workload. Mutually exclusive with
-    `--all`. Omitting both `<package>` and `--all` is an error.
+    `--all`. Omitting both `<id>` and `--all` is an error.
 
 ##### Options
 
@@ -197,10 +197,10 @@ Default is "same major version only". See §6.4 for the full pipeline.
   - Names the **existing installed version** to update. The CLI removes
     `<v>` and installs the new version in its place. Errors if `<v>` is
     not currently installed. Default: updates the latest installed
-    version of `<package>`.
+    version of `<id>`.
 - `--all`
   - Updates every installed workload (the latest installed version of
-    each). Mutually exclusive with `<package>`.
+    each). Mutually exclusive with `<id>`.
 - `--major`
   - Allows crossing a major-version boundary. Default: same major
     version only, to protect against breaking changes.
@@ -214,7 +214,7 @@ Default is "same major version only". See §6.4 for the full pipeline.
 #### `func workload prune`
 
 ```
-func workload prune [<package>] [--exact|-e]
+func workload prune [<id>] [--exact|-e]
 ```
 
 Removes inactive side-by-side installs. For each in-scope `packageId`,
@@ -228,14 +228,14 @@ have left old versions on disk.
 
 ##### Arguments
 
-- `<package>`
+- `<id>`
   - Optional. Prunes only the named workload. Default: prunes every
     installed workload.
 
 ##### Options
 
 - `--exact|-e`
-  - Disables alias matching. `<package>` must be the literal package id
+  - Disables alias matching. `<id>` must be the literal package id
     (case-insensitive).
 
 #### Required behaviors (all `func workload` commands)
@@ -302,7 +302,7 @@ have left old versions on disk.
 - In v1, `func start` resolves the host-runtime workload and delegates
   process startup to it. If the workload is not installed, the Func CLI
   **must** print the install hint
-  (`Run 'func workload install <package>' to install the host runtime.`)
+  (`Run 'func workload install <id>' to install the host runtime.`)
   and exit non-zero; it **must not** auto-install or prompt. Argument
   forwarding, port selection, and log streaming remain CLI responsibilities.
 - Workloads **may** register additional command trees via
@@ -341,7 +341,7 @@ without help they will see a generic "unknown command" error.
   to the workload package id that now provides them.
 - When a user invokes one of these on v5 without the corresponding
   workload installed, the CLI prints (and exits non-zero):
-  `'<cmd>' is now provided by a workload. Install it with 'func workload install <package>'.`
+  `'<cmd>' is now provided by a workload. Install it with 'func workload install <id>'.`
 - The map covers any v4 surface that has moved, not only `func init` /
   `func new`; it applies to all unknown-subcommand paths.
 - The map is **CLI-internal**: workloads do not contribute to it. New
@@ -619,16 +619,16 @@ install` / `uninstall`.
    `'<packageId>' is already installed at <listed versions>. Install
    <new version> side-by-side? [y/N]:` Default: no.
    - **No** (or non-interactive context, e.g. no TTY) → exit non-zero
-     with the hint `Run 'func workload update <package>' to replace the
+     with the hint `Run 'func workload update <id>' to replace the
      existing version, or pass --force to install side-by-side.`
    - **Yes** or `--force` → continue.
 
    This check runs **before** download to avoid wasted network round-
    trips on a likely-cancelled install.
-2. Resolve `<package>` to a package via the catalog (NuGet by default),
+2. Resolve `<id>` to a package via the catalog (NuGet by default),
    filtered to packages declaring the `FuncCliWorkload` package type:
    - **Alias path** (default): the resolver queries the catalog for
-     packages whose tags include `alias:<package>`.
+     packages whose tags include `alias:<id>`.
        - Exactly one match → install it.
        - Zero matches → fall back to exact-match-by-id. If that also
          finds nothing, fail with an actionable error listing close
@@ -636,7 +636,7 @@ install` / `uninstall`.
        - Multiple matches → fail and list the matched package ids;
          the user must re-run with `--exact <packageId>`.
    - **Exact path** (`--exact|-e`): the resolver targets exactly
-     `<package>` as a literal package id (case-insensitive). No alias
+     `<id>` as a literal package id (case-insensitive). No alias
      matching is performed. Fails if no such package exists in the
      catalog.
 3. Download to a staging directory.
@@ -805,12 +805,12 @@ pointer. The "latest installed wins" rule is the entire policy.
 
 ### 6.4 Update
 
-`func workload update <package>` is conceptually an in-place version
+`func workload update <id>` is conceptually an in-place version
 swap: existing version out, new version in. It is **not** a side-by-
 side install (use `install --force` for that, §6.1).
 
 1. **Resolve the target installed version.** Without `--version|-v`,
-   target the highest installed semver for `<package>`. With
+   target the highest installed semver for `<id>`. With
    `--version|-v <existing>`, target that exact installed version;
    error if `<existing>` is not present in the registry (no fallback,
    no auto-install).
@@ -842,12 +842,12 @@ cache to invalidate.
 
 ### 6.5 Removal
 
-- `func workload uninstall <package>` removes the live version: it
+- `func workload uninstall <id>` removes the live version: it
   deletes the version's install directory and removes its row from
   `workloads[]`. If other versions of the same package id remain
   installed, the loader's "highest installed semver wins" rule (§6.2
   step 2) promotes the next-highest on the next `func` invocation.
-  The user is informed (`Live version is now <package>@<promoted>.`).
+  The user is informed (`Live version is now <id>@<promoted>.`).
 - `--version <v>` removes only the named version. The same promotion
   rule applies if the removed version happened to be the live one.
 - `--all-versions` removes every installed version of the package and
@@ -872,8 +872,8 @@ cache to invalidate.
 
 `func workload prune` removes inactive side-by-side installs.
 
-1. **Determine scope.** Without `<package>`, prune every installed
-   package id. With `<package>`, prune only that one (alias-resolved
+1. **Determine scope.** Without `<id>`, prune every installed
+   package id. With `<id>`, prune only that one (alias-resolved
    by default, exact-match with `--exact|-e`; same rules as
    `install`).
 2. **Per package id, identify pruneable rows.** Group rows by
@@ -889,7 +889,7 @@ cache to invalidate.
    "Nothing to prune." message.
 
 Prune never removes the live version of any package id. To revert to
-an older installed version, run `func workload uninstall <package>`
+an older installed version, run `func workload uninstall <id>`
 (or `--version <newer>`) first; the older version then becomes live.
 
 ## 7. Error handling requirements
