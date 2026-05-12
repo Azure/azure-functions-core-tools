@@ -19,21 +19,14 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 internal interface IWorkloadCatalog
 {
     /// <summary>
-    /// Searches the configured sources for workload packages. Results are deduped by
+    /// Searches the configured sources for workload packages and returns the
+    /// results as an <see cref="AsyncPageable{T}"/>. Results are deduped by
     /// package id (highest version wins) and ordered highest-version-first.
     /// </summary>
-    /// <param name="query">Optional free-form query; null or empty returns all matching packages.</param>
-    /// <param name="includePrerelease"><c>true</c> to include prerelease versions.</param>
-    /// <param name="skip">Pagination offset applied per source before merge.</param>
-    /// <param name="take">Maximum number of results requested per source.</param>
-    /// <param name="overrideSource">Optional <c>--source</c> override. When set, only this source is consulted.</param>
+    /// <param name="query">Pagination, filter, and source-override bag.</param>
     /// <param name="cancellationToken">Cancellation propagated to all per-source requests.</param>
-    public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
-        string? query,
-        bool includePrerelease,
-        int skip,
-        int take,
-        string? overrideSource = null,
+    public AsyncPageable<CatalogSearchResult> Search(
+        CatalogSearchQuery query,
         CancellationToken cancellationToken = default);
 
     /// <summary>

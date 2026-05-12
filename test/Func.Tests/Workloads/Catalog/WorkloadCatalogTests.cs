@@ -18,13 +18,13 @@ public sealed class WorkloadCatalogTests
     private static readonly PackageSource _sourceB = new("https://b.test/v3/index.json", "b");
 
     [Fact]
-    public async Task SearchAsync_AggregatesAcrossSources_KeepsHighestVersionPerId()
+    public async Task Search_AggregatesAcrossSources_KeepsHighestVersionPerId()
     {
         WorkloadCatalog catalog = NewCatalog(
             (_sourceA, BuildClient(_sourceA, search: [Metadata("alpha", "1.0.0"), Metadata("beta", "1.0.0")])),
             (_sourceB, BuildClient(_sourceB, search: [Metadata("alpha", "2.0.0"), Metadata("gamma", "1.0.0")])));
 
-        IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(query: null, includePrerelease: false, skip: 0, take: 10);
+        IReadOnlyList<CatalogSearchResult> results = await DrainAsync(catalog.Search(new CatalogSearchQuery()));
 
         Assert.Equal(3, results.Count);
         CatalogSearchResult alpha = Assert.Single(results, r => r.PackageId == "alpha");
@@ -33,18 +33,18 @@ public sealed class WorkloadCatalogTests
     }
 
     [Fact]
-    public async Task SearchAsync_OrdersByVersionDescThenIdAsc()
+    public async Task Search_OrdersByVersionDescThenIdAsc()
     {
         WorkloadCatalog catalog = NewCatalog(
             (_sourceA, BuildClient(_sourceA, search: [Metadata("zeta", "1.0.0"), Metadata("alpha", "2.0.0"), Metadata("beta", "1.0.0")])));
 
-        IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(null, false, 0, 10);
+        IReadOnlyList<CatalogSearchResult> results = await DrainAsync(catalog.Search(new CatalogSearchQuery()));
 
         Assert.Equal(["alpha", "beta", "zeta"], results.Select(r => r.PackageId));
     }
 
     [Fact]
-    public async Task SearchAsync_OverrideSource_ConsultsOnlyOverride()
+    public async Task Search_OverrideSource_ConsultsOnlyOverride()
     {
         var overrideSource = new PackageSource("https://override.test/v3/index.json", "override");
         NuGetProtocolSourceClient defaultClient = BuildClient(_sourceA, search: [Metadata("default-pkg", "1.0.0")]);
@@ -69,7 +69,8 @@ public sealed class WorkloadCatalogTests
             throw new InvalidOperationException($"Unexpected source {source.Name}");
         });
 
-        IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(null, false, 0, 10, overrideSource: "https://override.test/v3/index.json");
+        IReadOnlyList<CatalogSearchResult> results = await DrainAsync(catalog.Search(
+            new CatalogSearchQuery { OverrideSource = "https://override.test/v3/index.json" }));
 
         CatalogSearchResult only = Assert.Single(results);
         Assert.Equal("override-pkg", only.PackageId);
@@ -182,6 +183,17 @@ public sealed class WorkloadCatalogTests
     }
 
     private static NuGetVersion V(string v) => NuGetVersion.Parse(v);
+
+    private static async Task<IReadOnlyList<CatalogSearchResult>> DrainAsync(AsyncPageable<CatalogSearchResult> pageable)
+    {
+        List<CatalogSearchResult> results = [];
+        await foreach (CatalogSearchResult item in pageable)
+        {
+            results.Add(item);
+        }
+
+        return results;
+    }
 
     private static IPackageSearchMetadata Metadata(string id, string version, string? tags = null)
     {

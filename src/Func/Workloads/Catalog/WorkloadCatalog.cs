@@ -23,41 +23,12 @@ internal sealed class WorkloadCatalog(
     private readonly ConcurrentDictionary<string, NuGetProtocolSourceClient> _clients = new(StringComparer.OrdinalIgnoreCase);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
-        string? query,
-        bool includePrerelease,
-        int skip,
-        int take,
-        string? overrideSource = null,
+    public AsyncPageable<CatalogSearchResult> Search(
+        CatalogSearchQuery query,
         CancellationToken cancellationToken = default)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(skip);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
-
-        IReadOnlyList<NuGetProtocolSourceClient> clients = ResolveClients(overrideSource);
-
-        IReadOnlyList<CatalogSearchResult>[] perSource = await Task.WhenAll(
-            clients.Select(c => c.SearchAsync(query, includePrerelease, skip, take, cancellationToken)));
-
-        var byId = new Dictionary<string, CatalogSearchResult>(StringComparer.OrdinalIgnoreCase);
-        foreach (IReadOnlyList<CatalogSearchResult> bucket in perSource)
-        {
-            foreach (CatalogSearchResult entry in bucket)
-            {
-                if (byId.TryGetValue(entry.PackageId, out CatalogSearchResult? existing) && existing.LatestVersion >= entry.LatestVersion)
-                {
-                    continue;
-                }
-
-                byId[entry.PackageId] = entry;
-            }
-        }
-
-        return byId.Values
-            .OrderByDescending(r => r.LatestVersion)
-            .ThenBy(r => r.PackageId, StringComparer.Ordinal)
-            .Take(take)
-            .ToList();
+        ArgumentNullException.ThrowIfNull(query);
+        return new AggregateSearchPageable(this, query, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -123,4 +94,90 @@ internal sealed class WorkloadCatalog(
 
     private NuGetProtocolSourceClient GetOrCreateClient(PackageSource source)
         => _clients.GetOrAdd(source.Name, _ => _clientFactory(source));
+
+    private sealed class AggregateSearchPageable(
+        WorkloadCatalog owner,
+        CatalogSearchQuery query,
+        CancellationToken cancellationToken) : AsyncPageable<CatalogSearchResult>(cancellationToken)
+    {
+        private readonly WorkloadCatalog _owner = owner;
+        private readonly CatalogSearchQuery _query = query;
+
+        public override async IAsyncEnumerable<Page<CatalogSearchResult>> AsPages(
+            string? continuationToken = null,
+            int? pageSizeHint = null)
+        {
+            int pageSize = pageSizeHint
+                ?? _query.PageSize
+                ?? CatalogSearchQuery.DefaultPageSize;
+            int offset = int.TryParse(continuationToken ?? _query.ContinuationToken, out int parsed) ? parsed : 0;
+
+            // Aggregator semantics force eager materialisation: dedup-by-id
+            // (highest version wins) and sort are global operations across
+            // sources, so we drain each per-source pageable before chunking.
+            IReadOnlyList<CatalogSearchResult> all = await MaterialiseAsync().ConfigureAwait(false);
+
+            while (offset < all.Count)
+            {
+                int remaining = all.Count - offset;
+                int take = Math.Min(pageSize, remaining);
+                var slice = new List<CatalogSearchResult>(take);
+                for (int i = 0; i < take; i++)
+                {
+                    slice.Add(all[offset + i]);
+                }
+
+                offset += take;
+                string? nextToken = offset < all.Count ? offset.ToString() : null;
+                yield return Page<CatalogSearchResult>.FromValues(slice, nextToken, response: null!);
+
+                if (nextToken is null)
+                {
+                    yield break;
+                }
+            }
+        }
+
+        private async Task<IReadOnlyList<CatalogSearchResult>> MaterialiseAsync()
+        {
+            IReadOnlyList<NuGetProtocolSourceClient> clients = _owner.ResolveClients(_query.OverrideSource);
+
+            // Drive each per-source pageable to exhaustion in parallel. We pass
+            // a fresh CatalogSearchQuery without our own continuation token so
+            // each source starts from the beginning.
+            CatalogSearchQuery perSourceQuery = _query with { ContinuationToken = null };
+            IEnumerable<CatalogSearchResult>[] perSource = await Task.WhenAll(
+                clients.Select(c => DrainAsync(c.Search(perSourceQuery, CancellationToken))));
+
+            var byId = new Dictionary<string, CatalogSearchResult>(StringComparer.OrdinalIgnoreCase);
+            foreach (IEnumerable<CatalogSearchResult> bucket in perSource)
+            {
+                foreach (CatalogSearchResult entry in bucket)
+                {
+                    if (byId.TryGetValue(entry.PackageId, out CatalogSearchResult? existing) && existing.LatestVersion >= entry.LatestVersion)
+                    {
+                        continue;
+                    }
+
+                    byId[entry.PackageId] = entry;
+                }
+            }
+
+            return byId.Values
+                .OrderByDescending(r => r.LatestVersion)
+                .ThenBy(r => r.PackageId, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        private static async Task<IEnumerable<CatalogSearchResult>> DrainAsync(AsyncPageable<CatalogSearchResult> pageable)
+        {
+            List<CatalogSearchResult> results = [];
+            await foreach (CatalogSearchResult item in pageable.ConfigureAwait(false))
+            {
+                results.Add(item);
+            }
+
+            return results;
+        }
+    }
 }
