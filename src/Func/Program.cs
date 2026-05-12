@@ -12,6 +12,20 @@ using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Telemetry;
 using Microsoft.Extensions.Hosting;
 
+// Force UTF-8 stdout so glyphs like →, ●, ✗, ◉ render correctly on Windows
+// consoles (which default to OEM/ANSI code pages that map them to '?').
+// Safe on non-Windows platforms: the runtime is already UTF-8 there, this is
+// effectively a no-op. Some legacy terminals throw on Out/Error encoding
+// changes (e.g., redirected to a pipe that doesn't allow it), so guard.
+try
+{
+    System.Console.OutputEncoding = System.Text.Encoding.UTF8;
+}
+catch (System.IO.IOException)
+{
+    // Output isn't a real console (e.g., closed handle) — proceed regardless.
+}
+
 DefaultTheme theme = new();
 SpectreInteractionService interaction = new(theme);
 

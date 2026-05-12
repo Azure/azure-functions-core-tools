@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Hosting.Dashboard;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -12,6 +13,7 @@ public class StartCommandTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly TestInteractionService _interaction = new();
+    private readonly FunctionPalette _palette = new();
 
     public StartCommandTests()
     {
@@ -30,7 +32,7 @@ public class StartCommandTests : IDisposable
     [Fact]
     public void StartCommand_HasExpectedOptions()
     {
-        var cmd = new StartCommand(_interaction);
+        var cmd = new StartCommand(_interaction, _palette);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--port", optionNames);
@@ -40,18 +42,8 @@ public class StartCommandTests : IDisposable
         Assert.Contains("--no-build", optionNames);
         Assert.Contains("--enable-auth", optionNames);
         Assert.Contains("--host-version", optionNames);
-    }
-
-    [Fact]
-    public async Task StartCommand_PrintsNotImplementedWarning()
-    {
-        var cmd = new StartCommand(_interaction);
-        var parseResult = cmd.Parse([_tempDir]);
-
-        var exitCode = await parseResult.InvokeAsync();
-
-        Assert.Equal(1, exitCode);
-        Assert.Contains(_interaction.Lines, l => l.Contains("not yet implemented"));
+        Assert.Contains("--output", optionNames);
+        Assert.Contains("--no-tui", optionNames);
     }
 
     [Fact]
@@ -76,5 +68,17 @@ public class StartCommandTests : IDisposable
         var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
         Assert.Contains("does not exist", ex.Message);
         Assert.Contains(nonExistent, ex.Message);
+    }
+
+    [Fact]
+    public async Task StartCommand_InvalidOutputMode_ThrowsGracefulException()
+    {
+        var root = TestParser.CreateRoot(_interaction);
+        var result = root.Parse($"start \"{_tempDir}\" --output=bogus");
+
+        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+        var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
+        Assert.Contains("--output", ex.Message);
+        Assert.Contains("bogus", ex.Message);
     }
 }

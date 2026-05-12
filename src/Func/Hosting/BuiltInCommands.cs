@@ -34,6 +34,11 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, NewCommand>();
         services.AddSingleton<FuncCliCommand, StartCommand>();
 
+        // Shared dashboard primitives (renderers and per-invocation pipeline
+        // are constructed inline by StartCommand so cancellation flows
+        // cleanly through System.CommandLine's invocation scope).
+        services.AddSingleton<Hosting.Dashboard.FunctionPalette>();
+
         // WorkloadCommand has WorkloadListCommand as a subcommand. Register
         // the list command as its own concrete type (not as FuncCliCommand) so
         // it doesn't get added at the top level by GetServices<FuncCliCommand>().
