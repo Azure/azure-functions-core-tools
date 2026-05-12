@@ -74,6 +74,32 @@ internal sealed class WorkloadCatalog(
     }
 
     /// <inheritdoc />
+    public async Task<ResolvedPackage?> ResolveVersionAsync(
+        string packageId,
+        NuGetVersion version,
+        string? overrideSource = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentNullException.ThrowIfNull(version);
+
+        IReadOnlyList<NuGetProtocolSourceClient> clients = ResolveClients(overrideSource);
+
+        // Probe in source precedence order so the first configured source wins
+        // (matches the precedence in IPackageSourceProvider: CLI > env > nuget.org).
+        foreach (NuGetProtocolSourceClient client in clients)
+        {
+            IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync(packageId, cancellationToken);
+            if (versions.Any(v => v.Equals(version)))
+            {
+                return new ResolvedPackage(packageId.ToLowerInvariant(), version, client.Source);
+            }
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
     public Task<Stream> DownloadAsync(ResolvedPackage package, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(package);

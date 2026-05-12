@@ -137,6 +137,55 @@ public sealed class WorkloadCatalogTests
     }
 
     [Fact]
+    public async Task ResolveVersionAsync_ReturnsFirstSourceWithExactVersion()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0"), V("1.5.0")])),
+            (_sourceB, BuildClient(_sourceB, versions: [V("1.0.0"), V("1.5.0"), V("2.0.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("2.0.0"));
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("2.0.0"), resolved!.Version);
+        Assert.Equal(_sourceB.Name, resolved.Source.Name);
+    }
+
+    [Fact]
+    public async Task ResolveVersionAsync_PrefersEarliestSource_WhenBothHaveVersion()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0")])),
+            (_sourceB, BuildClient(_sourceB, versions: [V("1.0.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("1.0.0"));
+
+        Assert.Equal(_sourceA.Name, resolved!.Source.Name);
+    }
+
+    [Fact]
+    public async Task ResolveVersionAsync_NoSourceHasVersion_ReturnsNull()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0")])),
+            (_sourceB, BuildClient(_sourceB, versions: [V("1.5.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("9.9.9"));
+
+        Assert.Null(resolved);
+    }
+
+    [Fact]
+    public async Task ResolveVersionAsync_LowercasesPackageId()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveVersionAsync("Alpha", V("1.0.0"));
+
+        Assert.Equal("alpha", resolved!.PackageId);
+    }
+
+    [Fact]
     public async Task DownloadAsync_DelegatesToResolvedSource()
     {
         byte[] payload = [1, 2, 3];

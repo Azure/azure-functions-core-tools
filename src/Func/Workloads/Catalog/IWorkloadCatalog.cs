@@ -56,6 +56,22 @@ internal interface IWorkloadCatalog
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Resolves an exact <paramref name="version"/> of <paramref name="packageId"/>
+    /// by probing the configured sources in precedence order and returning
+    /// the first source that advertises it. Returns <c>null</c> when no source
+    /// has that version. Used by <c>install --version</c>.
+    /// </summary>
+    /// <param name="packageId">NuGet package id; case-insensitive.</param>
+    /// <param name="version">Exact version to locate.</param>
+    /// <param name="overrideSource">Optional <c>--source</c> override.</param>
+    /// <param name="cancellationToken">Cancellation propagated to per-source requests.</param>
+    public Task<ResolvedPackage?> ResolveVersionAsync(
+        string packageId,
+        NuGetVersion version,
+        string? overrideSource = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Downloads the <c>.nupkg</c> for <paramref name="package"/> to a temp
     /// file and returns an open read stream over it. The caller owns the
     /// returned stream; closing it removes the temp file.
