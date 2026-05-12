@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.DependencyInjection;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -40,7 +41,7 @@ internal static class WorkloadCatalogRegistration
             return new LocalFolderSourceClient(source);
         }
 
-        SourceRepository repository = Repository.Factory.GetCoreV3(source.Location.AbsoluteUri);
-        return new NuGetProtocolSourceClient(source, repository);
+        SourceRepository repository = Repository.Factory.GetCoreV3(source);
+        return new NuGetProtocolSourceClient(repository);
     }
 }

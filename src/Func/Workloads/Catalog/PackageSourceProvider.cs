@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.Options;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
@@ -25,7 +26,7 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
     {
         if (!string.IsNullOrWhiteSpace(overrideSource))
         {
-            return [Classify(overrideSource.Trim(), name: overrideSource.Trim())];
+            return [Build(overrideSource.Trim())];
         }
 
         var resolved = new List<PackageSource>();
@@ -36,7 +37,7 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
                 continue;
             }
 
-            resolved.Add(Classify(entry.Trim(), name: entry.Trim()));
+            resolved.Add(Build(entry.Trim()));
         }
 
         if (resolved.Count > 0)
@@ -44,18 +45,20 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
             return resolved;
         }
 
-        return [new PackageSource(DefaultSourceName, new Uri(DefaultSourceUrl), IsLocal: false)];
+        return [new PackageSource(DefaultSourceUrl, DefaultSourceName)];
     }
 
-    private static PackageSource Classify(string value, string name)
+    private static PackageSource Build(string value)
     {
-        // http/https => remote v3 feed; otherwise must be an existing directory.
+        // Remote v3 feeds: trust the URL as-is; NuGet validates on first use.
         if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
-            return new PackageSource(name, uri, IsLocal: false);
+            return new PackageSource(value, value);
         }
 
+        // Local directories: resolve to an absolute path and verify it exists
+        // so misconfigurations surface eagerly rather than as "no results".
         string fullPath;
         try
         {
@@ -76,6 +79,6 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
                 nameof(value));
         }
 
-        return new PackageSource(name, new Uri(fullPath, UriKind.Absolute), IsLocal: true);
+        return new PackageSource(fullPath, value);
     }
 }

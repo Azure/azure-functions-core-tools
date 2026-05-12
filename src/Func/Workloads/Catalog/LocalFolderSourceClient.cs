@@ -3,19 +3,34 @@
 
 using NuGet.Packaging;
 using NuGet.Versioning;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
 /// Local-directory <see cref="ISourceClient"/>: serves <c>.nupkg</c>s from
-/// <see cref="PackageSource.Location"/>, filtered to the <c>FuncCliWorkload</c> package type.
+/// the directory the <see cref="PackageSource"/> points at, filtered to the
+/// <c>FuncCliWorkload</c> package type.
 /// </summary>
 internal sealed class LocalFolderSourceClient(PackageSource source) : ISourceClient
 {
     private const string PackageType = "FuncCliWorkload";
     private const string AliasTagPrefix = "alias:";
 
-    public PackageSource Source { get; } = source ?? throw new ArgumentNullException(nameof(source));
+    public PackageSource Source { get; } = ValidateLocal(source);
+
+    private static PackageSource ValidateLocal(PackageSource source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (!source.IsLocal)
+        {
+            throw new ArgumentException(
+                $"Source '{source.Name}' is not a local feed; {nameof(LocalFolderSourceClient)} only supports file-system sources.",
+                nameof(source));
+        }
+
+        return source;
+    }
 
     public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
         string? query,
@@ -115,7 +130,7 @@ internal sealed class LocalFolderSourceClient(PackageSource source) : ISourceCli
 
     private IEnumerable<PackageMetadata> EnumerateMetadata(CancellationToken cancellationToken)
     {
-        string root = Source.Location.LocalPath;
+        string root = Source.Source;
         if (!Directory.Exists(root))
         {
             yield break;

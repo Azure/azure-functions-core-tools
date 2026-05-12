@@ -4,6 +4,7 @@
 using NuGet.Common;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
@@ -11,17 +12,17 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// HTTP-backed <see cref="ISourceClient"/> built on <c>NuGet.Protocol</c>.
 /// Drives <see cref="PackageSearchResource"/> and
 /// <see cref="FindPackageByIdResource"/> against the v3 service index of
-/// the supplied <see cref="PackageSource"/>, restricting search to the
+/// the supplied <see cref="SourceRepository"/>, restricting search to the
 /// <c>FuncCliWorkload</c> package type.
 /// </summary>
-internal sealed class NuGetProtocolSourceClient(PackageSource source, SourceRepository repository) : ISourceClient
+internal sealed class NuGetProtocolSourceClient(SourceRepository repository) : ISourceClient
 {
     private const string PackageType = "FuncCliWorkload";
     private const string AliasTagPrefix = "alias:";
 
     private readonly SourceRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
-    public PackageSource Source { get; } = source ?? throw new ArgumentNullException(nameof(source));
+    public PackageSource Source => _repository.PackageSource;
 
     public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
         string? query,

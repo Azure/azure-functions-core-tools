@@ -1,10 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using PackageSource = NuGet.Configuration.PackageSource;
+
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
-/// Resolves the ordered list of package sources the workload catalog consults.
+/// Resolves the ordered list of <see cref="PackageSource"/>s the workload catalog consults.
 /// </summary>
 internal interface IPackageSourceProvider
 {

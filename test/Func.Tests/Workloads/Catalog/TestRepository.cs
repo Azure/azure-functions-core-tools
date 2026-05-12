@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 internal static class TestRepository
 {
     public static SourceRepository Build(
-        string sourceUrl,
+        PackageSource source,
         params INuGetResource?[] resources)
     {
         var providers = new List<Lazy<INuGetResourceProvider>>();
@@ -28,7 +28,7 @@ internal static class TestRepository
             providers.Add(new Lazy<INuGetResourceProvider>(() => new StaticResourceProvider(resource)));
         }
 
-        return new SourceRepository(new PackageSource(sourceUrl), providers);
+        return new SourceRepository(source, providers);
     }
 
     private sealed class StaticResourceProvider(INuGetResource resource) : INuGetResourceProvider

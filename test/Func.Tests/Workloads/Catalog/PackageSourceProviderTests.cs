@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.Options;
 using Xunit;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 
@@ -22,7 +23,7 @@ public sealed class PackageSourceProviderTests : IDisposable
 
         PackageSource only = Assert.Single(sources);
         Assert.False(only.IsLocal);
-        Assert.Equal("https://example.test/v3/index.json", only.Location.AbsoluteUri);
+        Assert.Equal("https://example.test/v3/index.json", only.Source);
     }
 
     [Fact]
@@ -36,7 +37,7 @@ public sealed class PackageSourceProviderTests : IDisposable
 
         PackageSource only = Assert.Single(sources);
         Assert.True(only.IsLocal);
-        Assert.Equal(Path.GetFullPath(folder), only.Location.LocalPath.TrimEnd(Path.DirectorySeparatorChar));
+        Assert.Equal(Path.GetFullPath(folder), only.Source);
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public sealed class PackageSourceProviderTests : IDisposable
         IReadOnlyList<PackageSource> sources = provider.GetSources("https://override.test/v3/index.json");
 
         PackageSource only = Assert.Single(sources);
-        Assert.Equal("https://override.test/v3/index.json", only.Location.AbsoluteUri);
+        Assert.Equal("https://override.test/v3/index.json", only.Source);
     }
 
     [Fact]
@@ -63,7 +64,7 @@ public sealed class PackageSourceProviderTests : IDisposable
 
         Assert.Equal(2, sources.Count);
         Assert.False(sources[0].IsLocal);
-        Assert.Equal("https://first.test/v3/index.json", sources[0].Location.AbsoluteUri);
+        Assert.Equal("https://first.test/v3/index.json", sources[0].Source);
         Assert.True(sources[1].IsLocal);
     }
 
@@ -75,7 +76,7 @@ public sealed class PackageSourceProviderTests : IDisposable
         IReadOnlyList<PackageSource> sources = provider.GetSources();
 
         PackageSource only = Assert.Single(sources);
-        Assert.Equal("https://kept.test/v3/index.json", only.Location.AbsoluteUri);
+        Assert.Equal("https://kept.test/v3/index.json", only.Source);
     }
 
     [Fact]
@@ -87,7 +88,7 @@ public sealed class PackageSourceProviderTests : IDisposable
 
         PackageSource only = Assert.Single(sources);
         Assert.False(only.IsLocal);
-        Assert.Equal(PackageSourceProvider.DefaultSourceUrl, only.Location.AbsoluteUri);
+        Assert.Equal(PackageSourceProvider.DefaultSourceUrl, only.Source);
     }
 
     [Fact]

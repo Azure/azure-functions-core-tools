@@ -5,13 +5,14 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using NSubstitute;
 using NuGet.Versioning;
 using Xunit;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 
 public sealed class WorkloadCatalogTests
 {
-    private static readonly PackageSource _sourceA = new("a", new Uri("https://a.test/v3/index.json"), IsLocal: false);
-    private static readonly PackageSource _sourceB = new("b", new Uri("https://b.test/v3/index.json"), IsLocal: false);
+    private static readonly PackageSource _sourceA = new("https://a.test/v3/index.json", "a");
+    private static readonly PackageSource _sourceB = new("https://b.test/v3/index.json", "b");
 
     [Fact]
     public async Task SearchAsync_AggregatesAcrossSources_KeepsHighestVersionPerId()
@@ -64,7 +65,7 @@ public sealed class WorkloadCatalogTests
     [Fact]
     public async Task SearchAsync_OverrideSource_ConsultsOnlyOverride()
     {
-        var overrideSource = new PackageSource("override", new Uri("https://override.test/v3/index.json"), IsLocal: false);
+        var overrideSource = new PackageSource("https://override.test/v3/index.json", "override");
         ISourceClient overrideClient = Substitute.For<ISourceClient>();
         overrideClient.Source.Returns(overrideSource);
         overrideClient.SearchAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())

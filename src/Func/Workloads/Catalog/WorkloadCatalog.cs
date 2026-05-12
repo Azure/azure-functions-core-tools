@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using NuGet.Versioning;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Workloads.Catalog;
 

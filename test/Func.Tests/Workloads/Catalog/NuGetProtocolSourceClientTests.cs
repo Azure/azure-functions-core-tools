@@ -8,15 +8,15 @@ using NuGet.Packaging.Core;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using Xunit;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 
 public sealed class NuGetProtocolSourceClientTests
 {
     private static readonly PackageSource _source = new(
-        "test",
-        new Uri("https://feed.test/v3/index.json"),
-        IsLocal: false);
+        "https://feed.test/v3/index.json",
+        "test");
 
     [Fact]
     public async Task SearchAsync_PassesPackageTypeFilterAndPrereleaseFlag()
@@ -202,8 +202,8 @@ public sealed class NuGetProtocolSourceClientTests
         PackageSearchResource? searchResource = null,
         FindPackageByIdResource? findResource = null)
     {
-        SourceRepository repo = TestRepository.Build(_source.Location.AbsoluteUri, searchResource, findResource);
-        return new NuGetProtocolSourceClient(_source, repo);
+        SourceRepository repo = TestRepository.Build(_source, searchResource, findResource);
+        return new NuGetProtocolSourceClient(repo);
     }
 
     private static IPackageSearchMetadata Metadata(

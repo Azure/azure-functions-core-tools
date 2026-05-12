@@ -7,6 +7,7 @@ using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
 using Xunit;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 
@@ -104,7 +105,7 @@ public sealed class LocalFolderSourceClientTests : IDisposable
 
     private LocalFolderSourceClient NewClient()
     {
-        var source = new PackageSource("local", new Uri(_root, UriKind.Absolute), IsLocal: true);
+        var source = new PackageSource(_root, "local");
         return new LocalFolderSourceClient(source);
     }
 
