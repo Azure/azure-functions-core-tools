@@ -242,6 +242,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 var entries = archive.Entries.Select(e => e.FullName).OrderBy(n => n).ToArray();
 
                 Assert.Equal(new[] { "bin/app", "host.json" }, entries);
+
+                // Verify Unix exec bit on the binary — without this, the Linux Functions
+                // host won't be able to launch the extracted binary.
+                var appEntry = archive.Entries.Single(e => e.FullName == "bin/app");
+                Assert.Equal(0x49, (appEntry.ExternalAttributes >> 16) & 0x49);
             }
             finally
             {

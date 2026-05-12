@@ -39,17 +39,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override string ResolveOutputPath(string functionAppRoot, string outputPath)
         {
-            if (string.IsNullOrEmpty(outputPath))
-            {
-                return base.ResolveOutputPath(functionAppRoot, outputPath);
-            }
-
-            string resolvedPath = Path.Combine(Environment.CurrentDirectory, outputPath);
-
             // If the user pointed --output at something that already exists as a file (not a
             // directory), surface a clear error rather than letting Directory.CreateDirectory
             // fail with an opaque IOException ("Cannot create ... because a file ... exists").
-            if (File.Exists(resolvedPath))
+            if (!string.IsNullOrEmpty(outputPath)
+                && File.Exists(Path.Combine(Environment.CurrentDirectory, outputPath)))
             {
                 throw new CliException(
                     $"--output '{outputPath}' refers to an existing file. " +

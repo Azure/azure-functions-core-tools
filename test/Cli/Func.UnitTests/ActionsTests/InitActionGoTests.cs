@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO.Abstractions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ConfigurationProfiles;
@@ -94,25 +95,26 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 { Constants.FunctionsWorkerRuntime, settingValue },
             });
 
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Is<string>(p => p.EndsWith("go.mod"))).Returns(true);
+
             var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
-            var previousDir = Environment.CurrentDirectory;
-            var tempDir = Path.Combine(Path.GetTempPath(), "func-test-native-" + Path.GetRandomFileName());
-            Directory.CreateDirectory(tempDir);
+            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             try
             {
-                File.WriteAllText(Path.Combine(tempDir, "go.mod"), "module test");
-                Environment.CurrentDirectory = tempDir;
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
-                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
 
-                GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+                    GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+                }
             }
             finally
             {
-                Environment.CurrentDirectory = previousDir;
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
-                Directory.Delete(tempDir, recursive: true);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
             }
         }
 
@@ -125,24 +127,24 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 { Constants.FunctionsWorkerRuntime, "native" },
             });
 
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(false);
+
             var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
-            var previousDir = Environment.CurrentDirectory;
-            var tempDir = Path.Combine(Path.GetTempPath(), "func-test-native-" + Path.GetRandomFileName());
-            Directory.CreateDirectory(tempDir);
             try
             {
-                Environment.CurrentDirectory = tempDir;
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
-                Action act = () => WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    Action act = () => WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
 
-                act.Should().Throw<CliException>().WithMessage("*native*");
+                    act.Should().Throw<CliException>().WithMessage("*native*");
+                }
             }
             finally
             {
-                Environment.CurrentDirectory = previousDir;
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
-                Directory.Delete(tempDir, recursive: true);
             }
         }
 
