@@ -57,7 +57,7 @@ The shape mirrors WebJobs' `IWebJobsStartup` — `Configure(FunctionsCliBuilder)
 1. Create a class library project that targets `net10.0`
 2. Reference `Azure.Functions.Cli.Abstractions`
 3. Implement `IWorkload`
-4. Inside `Configure`, register an `IProjectInitializer` (and/or contribute top-level commands via `builder.RegisterCommand(...)`, and any supporting services)
+4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
 5. Build, package, and install with `func workload install <path-to-nupkg>`
 
 ## Step 1: Create the Project

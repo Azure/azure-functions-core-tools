@@ -49,10 +49,16 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Wo
         });
     }
 
+    protected override void OnRegisterDetector(IProjectDetector detector)
+    {
+        WorkloadInfo workload = RequireWorkload();
+        Services.AddSingleton(new WorkloadDetectorContribution(workload, detector));
+    }
+
     private WorkloadInfo RequireWorkload()
         => _workload ?? throw new InvalidOperationException(
-            "Commands can only be registered through a workload-scoped builder. " +
-            "RegisterCommand is invoked by the workload loader during Workload.Configure; " +
-            "calling it on the host's global builder is a CLI bug.");
+            "Workload contributions can only be registered through a workload-scoped builder. " +
+            "RegisterCommand / RegisterDetector are invoked by the workload loader during Workload.Configure; " +
+            "calling them on the host's global builder is a CLI bug.");
 }
 

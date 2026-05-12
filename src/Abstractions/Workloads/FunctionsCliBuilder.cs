@@ -98,6 +98,25 @@ public abstract class FunctionsCliBuilder
     /// <see cref="IServiceProvider"/> so the command can request services.
     /// </summary>
     protected abstract void OnRegisterCommand(Func<IServiceProvider, FuncCommand> factory);
+
+    /// <summary>
+    /// Registers an <see cref="IProjectDetector"/> that participates in
+    /// workload resolution for the current project (init, new, pack, start).
+    /// The host tags the registration with the calling workload so resolver
+    /// diagnostics can attribute results to their owner.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="detector"/> is <c>null</c>.</exception>
+    public void RegisterDetector(IProjectDetector detector)
+    {
+        ArgumentNullException.ThrowIfNull(detector);
+        OnRegisterDetector(detector);
+    }
+
+    /// <summary>
+    /// Hook implemented by the host to wire <paramref name="detector"/> into
+    /// the workload resolver, tagged with the calling workload's identity.
+    /// </summary>
+    protected abstract void OnRegisterDetector(IProjectDetector detector);
 }
 
 
