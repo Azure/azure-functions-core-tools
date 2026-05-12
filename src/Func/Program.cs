@@ -46,7 +46,11 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
 {
     try
     {
-        using IHost host = await CliHostFactory.CreateHostAsync(interaction);
+        HostApplicationBuilder builder = CliHost.CreateBuilder(interaction);
+        await builder.RegisterWorkloadsAsync(cts.Token);
+        using IHost host = builder.Build();
+        await host.StartAsync(cts.Token);
+
         FuncRootCommand rootCommand = Parser.CreateCommand(host.Services);
 
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };

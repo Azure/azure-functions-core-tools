@@ -153,7 +153,8 @@ public class WorkloadMetadataReaderTests : IDisposable
         InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
             () => _reader.Read(_tempDir));
 
-        Assert.Contains("$schema", ex.Message);
+        Assert.Contains("schema", ex.Message);
+        Assert.Contains("v999", ex.Message);
     }
 
     [Fact]

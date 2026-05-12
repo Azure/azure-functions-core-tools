@@ -119,7 +119,7 @@ internal sealed class WorkloadInstaller(
                 EntryPoint = metadata.EntryPoint,
                 Kind = metadata.Kind,
                 Source = Path.GetFullPath(nupkgPath),
-                InstalledExplicitly = true,
+                InstallRefCount = 1,
             };
 
             await _store.SaveWorkloadAsync(entry, cancellationToken);

@@ -21,6 +21,13 @@ internal static class TelemetryConventions
     public const string CliCommandName = "cli.command.name";
     public const string ProcessExitCode = "process.exit_code";
     public const string CliWorkloadCount = "cli.workload.count";
+    public const string OutcomeStatus = "outcome";
+
+    public const string OutcomeSuccess = "success";
+    public const string OutcomeError = "error";
+
+    // Activity (span) names.
+    public const string WorkloadBootActivityName = "cli.workload.boot";
 
     // Metric instrument names.
     public const string CommandCountInstrument = "cli.command.count";

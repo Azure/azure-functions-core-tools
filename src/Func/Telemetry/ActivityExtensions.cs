@@ -32,6 +32,16 @@ internal static class ActivityExtensions
             activity?.SetTag(TelemetryConventions.CliCommandName, commandName);
             return activity;
         }
+
+        /// <summary>
+        /// Starts an <see cref="Activity"/> that represents the workload load
+        /// + Configure phase at CLI startup. The activity is also picked up
+        /// by <see cref="WorkloadBootMetricListener"/>, which translates its
+        /// stop into the boot-duration metric so trace and metric stay in
+        /// sync. Returns <c>null</c> when no listener is subscribed.
+        /// </summary>
+        public Activity? StartWorkloadBootActivity()
+            => source.StartActivity(TelemetryConventions.WorkloadBootActivityName, ActivityKind.Internal);
     }
 
     extension(Activity activity)

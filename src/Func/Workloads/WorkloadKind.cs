@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// (workload-package-layout §5.4). Determines whether the loader activates
 /// the package, skips it, or treats it as install-time-only.
 /// </summary>
-public enum WorkloadKind
+internal enum WorkloadKind
 {
     /// <summary>
     /// Default. Carries a runtime payload and a <see cref="Workload"/>

@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// <summary>
 /// Identifies the type that implements <see cref="Workload"/>.
 /// </summary>
-public sealed class EntryPointSpec
+internal sealed class EntryPointSpec
 {
     /// <summary>
     /// Relative path to the workload assembly. In <c>workload.json</c> it is

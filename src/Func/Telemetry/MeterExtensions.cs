@@ -61,13 +61,16 @@ internal static class MeterExtensions
 
         /// <summary>
         /// Records the duration of CLI startup workload loading + Configure
-        /// invocation, tagged with the number of workloads processed.
+        /// invocation, tagged with the number of workloads processed and the
+        /// outcome (<see cref="TelemetryConventions.OutcomeSuccess"/> or
+        /// <see cref="TelemetryConventions.OutcomeError"/>).
         /// </summary>
-        public void RecordWorkloadBoot(int workloadCount, long durationMs)
+        public void RecordWorkloadBoot(int workloadCount, long durationMs, string outcome)
         {
             var tags = new TagList
             {
                 { TelemetryConventions.CliWorkloadCount, workloadCount },
+                { TelemetryConventions.OutcomeStatus, outcome },
             };
 
             _workloadBootDuration.Record(durationMs, tags);

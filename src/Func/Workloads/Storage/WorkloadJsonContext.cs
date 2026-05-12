@@ -11,6 +11,13 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// Source-generated <see cref="JsonSerializerContext"/> for workload storage
 /// shapes. Keeps the JSON path reflection-free (AOT/trim-friendly).
 /// </summary>
+/// <remarks>
+/// We use a custom <see cref="JsonStringEnumConverter{T}"/> instead of
+/// <c>UseStringEnumConverter = true</c> because the source generator's
+/// generated converter does not apply <see cref="JsonNamingPolicy.CamelCase"/>
+/// to enum value names; it would emit <c>"Workload"</c> rather than the
+/// schema-required <c>"workload"</c>.
+/// </remarks>
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     Converters = [typeof(WorkloadKindJsonConverter)])]
@@ -24,3 +31,4 @@ internal sealed partial class WorkloadJsonContext : JsonSerializerContext;
 /// <see cref="JsonStringEnumConverter{TEnum}"/> would emit PascalCase.
 /// </summary>
 internal sealed class WorkloadKindJsonConverter() : JsonStringEnumConverter<WorkloadKind>(JsonNamingPolicy.CamelCase);
+

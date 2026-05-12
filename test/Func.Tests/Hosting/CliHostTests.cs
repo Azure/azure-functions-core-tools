@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 /// layout the loader expects:
 /// <c>&lt;Home&gt;/workloads.json</c> + <c>&lt;Home&gt;/workloads/&lt;pkg&gt;/&lt;ver&gt;/tools/any/&lt;asm&gt;.dll</c>.
 /// </summary>
-public sealed class CliHostFactoryTests : IDisposable
+public sealed class CliHostTests : IDisposable
 {
     private const string FixtureAssembly = "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.dll";
     private const string CommandWorkloadType = "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.StubWorkload";
@@ -44,20 +44,14 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateHostAsync_LoadsInstalledWorkloads_AndAddsTheirCommandsToRoot()
+    public async Task CreateBuilder_LoadsInstalledWorkloads_AndAddsTheirCommandsToRoot()
     {
         StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);
         WriteRegistry(("withcommand.fixture", "1.0.0", CommandWorkloadType));
 
         var interaction = new TestInteractionService();
 
-        using var host = await CliHostFactory.CreateHostAsync(
-            interaction,
-            cfg => cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Workloads:Home"] = _home,
-            }));
-
+        using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
         Assert.Contains(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
@@ -65,20 +59,14 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateHostAsync_WhenWorkloadConfigureThrows_WarnsAndContinues()
+    public async Task CreateBuilder_WhenWorkloadConfigureThrows_WarnsAndContinues()
     {
         StageFixtureWorkload("throwing.fixture", "1.0.0", ThrowingWorkloadType);
         WriteRegistry(("throwing.fixture", "1.0.0", ThrowingWorkloadType));
 
         var interaction = new TestInteractionService();
 
-        using var host = await CliHostFactory.CreateHostAsync(
-            interaction,
-            cfg => cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Workloads:Home"] = _home,
-            }));
-
+        using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
         Assert.Contains(
@@ -92,26 +80,38 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateHostAsync_WithEmptyHome_LoadsHostWithoutWorkloadCommands()
+    public async Task CreateBuilder_WithEmptyHome_LoadsHostWithoutWorkloadCommands()
     {
         Directory.CreateDirectory(_home);
         // No workloads.json written: WorkloadStore returns an empty list.
 
         var interaction = new TestInteractionService();
 
-        using var host = await CliHostFactory.CreateHostAsync(
-            interaction,
-            cfg => cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Workloads:Home"] = _home,
-            }));
-
+        using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
         var workloads = host.Services.GetRequiredService<IWorkloadProvider>().GetWorkloads();
         Assert.Empty(workloads);
         Assert.DoesNotContain(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         Assert.DoesNotContain(interaction.Lines, l => l.StartsWith("WARNING:", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Mirrors the production boot sequence in Program.cs: build, point at
+    /// the temp home, register workloads, build, start.
+    /// </summary>
+    private async Task<IHost> StartHostAsync(TestInteractionService interaction)
+    {
+        HostApplicationBuilder builder = CliHost.CreateBuilder(interaction);
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Workloads:Home"] = _home,
+        });
+
+        await builder.RegisterWorkloadsAsync();
+        IHost host = builder.Build();
+        await host.StartAsync();
+        return host;
     }
 
     /// <summary>

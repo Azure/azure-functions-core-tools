@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// package must ship one at its root; packages without it are not valid
 /// workloads and are rejected at install time.
 /// </summary>
-public sealed class WorkloadMetadata
+internal sealed class WorkloadMetadata
 {
     /// <summary>
     /// JSON Schema URL identifying the manifest format.

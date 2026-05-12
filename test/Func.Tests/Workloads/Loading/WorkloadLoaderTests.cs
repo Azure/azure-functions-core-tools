@@ -2,8 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.Loader;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
@@ -49,9 +49,8 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "DoesNotExist.dll");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
+        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
 
-        Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
         Assert.Contains("DoesNotExist.dll", ex.Message);
         Assert.Contains(AppContext.BaseDirectory, ex.Message);
@@ -63,9 +62,8 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, typeNameOverride: "Some.Missing.Type");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
+        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
 
-        Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
         Assert.Contains("Some.Missing.Type", ex.Message);
         Assert.Contains(AppContext.BaseDirectory, ex.Message);
@@ -79,9 +77,8 @@ public class WorkloadLoaderTests
             FixturePackageId,
             typeNameOverride: "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.NotAWorkload");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
+        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
 
-        Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
         Assert.Contains("NotAWorkload", ex.Message);
         Assert.Contains(nameof(Workload), ex.Message);
@@ -197,9 +194,8 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "../../../escape.dll");
 
-        var ex = Assert.Throws<GracefulException>(() => loader.Load([entry]));
+        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
 
-        Assert.True(ex.IsUserError);
         Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
         Assert.Contains("outside the package content root", ex.Message);
     }
