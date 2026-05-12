@@ -72,6 +72,7 @@ internal static class CliHostFactory
 
         builder.Services.AddBuiltInCommands();
         builder.Services.AddWorkloadStorage();
+        builder.Services.AddWorkloadCatalog();
         builder.Services.AddWorkloadInstaller();
 
         return builder;

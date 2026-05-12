@@ -2,15 +2,18 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using NuGet.Frameworks;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
 using Xunit;
+using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Install;
 
@@ -19,6 +22,7 @@ public sealed class WorkloadInstallerTests : IDisposable
     private readonly string _root = Directory.CreateTempSubdirectory("workload-installer-").FullName;
     private readonly IWorkloadStore _store = Substitute.For<IWorkloadStore>();
     private readonly IWorkloadMetadataReader _metadataReader = Substitute.For<IWorkloadMetadataReader>();
+    private readonly IWorkloadCatalog _catalog = Substitute.For<IWorkloadCatalog>();
     private readonly IWorkloadPaths _paths;
 
     public WorkloadInstallerTests()
@@ -252,9 +256,224 @@ public sealed class WorkloadInstallerTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
-    private WorkloadInstaller NewInstaller() => new(_paths, _store, _metadataReader);
+    [Fact]
+    public async Task InstallFromCatalog_ResolvesAndInstalls()
+    {
+        string nupkg = BuildNupkg();
+        var resolved = NewResolved("test.workload", "1.0.0");
+        _catalog.ResolveLatestVersionAsync(
+                "test.workload", false, null, true, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
 
-    private string BuildNupkg(string? tags = null, bool includeFuncCliWorkloadType = true)
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            "test.workload", version: null, source: null,
+            includePrerelease: false, exact: true, force: false);
+
+        Assert.False(result.AlreadyInstalled);
+        Assert.Equal("test.workload", result.Entry.PackageId);
+        Assert.Equal("1.0.0", result.Entry.PackageVersion);
+        Assert.True(Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")));
+        await _store.Received(1).SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_NoCandidate_Throws()
+    {
+        _catalog.ResolveLatestVersionAsync(
+                "test.workload", false, null, true, null, Arg.Any<CancellationToken>())
+            .Returns((ResolvedPackage?)null);
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
+            () => installer.InstallFromCatalogAsync(
+                "test.workload", version: null, source: null,
+                includePrerelease: false, exact: true, force: false));
+
+        Assert.Contains("test.workload", ex.Message);
+        Assert.Contains("--include-prereleases", ex.Message);
+        await _catalog.DidNotReceive().DownloadAsync(Arg.Any<ResolvedPackage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_ExplicitVersion_RoutesToExactResolution()
+    {
+        string nupkg = BuildNupkg();
+        var requested = NuGetVersion.Parse("1.0.0");
+        var resolved = NewResolved("test.workload", "1.0.0");
+
+        // Explicit version path uses the catalog's exact-version lookup.
+        _catalog.ResolveVersionAsync(
+                "test.workload", requested, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            "test.workload", requested, source: null,
+            includePrerelease: false, exact: true, force: false);
+
+        Assert.Equal("1.0.0", result.Entry.PackageVersion);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NotInstalled_Throws()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        WorkloadInstaller installer = NewInstaller();
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => installer.UpdateAsync(
+                "test.workload", null, null, false, allowMajor: false));
+
+        Assert.Contains("not installed", ex.Message);
+        await _catalog.DidNotReceive().ResolveLatestVersionAsync(
+            Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<NuGetVersion?>(),
+            Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NoUpdateAvailable_ReturnsFlag_RegistryUntouched()
+    {
+        WorkloadEntry current = ExistingEntry("test.workload", "1.0.0");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current]);
+        _catalog.ResolveLatestVersionAsync(
+                "test.workload", false, Arg.Any<NuGetVersion?>(), false, null, Arg.Any<CancellationToken>())
+            .Returns((ResolvedPackage?)null);
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadUpdateResult result = await installer.UpdateAsync(
+            "test.workload", null, null, false, allowMajor: false);
+
+        Assert.True(result.NoUpdateAvailable);
+        Assert.True(result.NoCandidateOnSource);
+        Assert.Equal("1.0.0", result.PreviousVersion);
+        Assert.Same(current, result.Entry);
+        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().RemoveWorkloadAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_CatalogReturnsOlderVersion_NoUpdateButNotMissing()
+    {
+        WorkloadEntry current = ExistingEntry("test.workload", "1.5.0");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current]);
+        _catalog.ResolveLatestVersionAsync(
+                "test.workload", false, Arg.Any<NuGetVersion?>(), false, null, Arg.Any<CancellationToken>())
+            .Returns(NewResolved("test.workload", "1.5.0"));
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadUpdateResult result = await installer.UpdateAsync(
+            "test.workload", null, null, false, allowMajor: false);
+
+        Assert.True(result.NoUpdateAvailable);
+        Assert.False(result.NoCandidateOnSource);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_HappyPath_SwapsRegistryAndDeletesOldDir()
+    {
+        WorkloadEntry current = ExistingEntry("test.workload", "1.0.0");
+        string oldDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
+        Directory.CreateDirectory(oldDir);
+        File.WriteAllText(Path.Combine(oldDir, "marker.txt"), "old");
+
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current]);
+
+        string newNupkg = BuildNupkg(version: "1.1.0");
+        var resolved = NewResolved("test.workload", "1.1.0");
+        _catalog.ResolveLatestVersionAsync(
+                "test.workload", false, Arg.Any<NuGetVersion?>(), false, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(newNupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadUpdateResult result = await installer.UpdateAsync(
+            "test.workload", null, null, false, allowMajor: false);
+
+        Assert.False(result.NoUpdateAvailable);
+        Assert.Equal("1.0.0", result.PreviousVersion);
+        Assert.Equal("1.1.0", result.Entry.PackageVersion);
+
+        string newDir = _paths.GetInstallDirectory("test.workload", "1.1.0");
+        Assert.True(Directory.Exists(newDir));
+        Assert.False(Directory.Exists(oldDir), "old install dir must be deleted after swap");
+
+        Received.InOrder(() =>
+        {
+            _store.ReplaceWorkloadAsync(
+                "test.workload",
+                "1.0.0",
+                Arg.Is<WorkloadEntry>(e => e.PackageId == "test.workload" && e.PackageVersion == "1.1.0"),
+                Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task UpdateAsync_StagingFails_LeavesExistingInstallIntact()
+    {
+        WorkloadEntry current = ExistingEntry("test.workload", "1.0.0");
+        string oldDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
+        Directory.CreateDirectory(oldDir);
+        File.WriteAllText(Path.Combine(oldDir, "marker.txt"), "old");
+
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current]);
+
+        var resolved = NewResolved("test.workload", "1.1.0");
+        _catalog.ResolveLatestVersionAsync(
+                "test.workload", false, Arg.Any<NuGetVersion?>(), false, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new IOException("network glitch"));
+
+        WorkloadInstaller installer = NewInstaller();
+        await Assert.ThrowsAsync<IOException>(() => installer.UpdateAsync(
+            "test.workload", null, null, false, allowMajor: false));
+
+        Assert.True(Directory.Exists(oldDir), "existing install must remain after staging failure");
+        Assert.True(File.Exists(Path.Combine(oldDir, "marker.txt")));
+        await _store.DidNotReceive().ReplaceWorkloadAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_RequestedVersionNotInstalled_Throws()
+    {
+        WorkloadEntry current = ExistingEntry("test.workload", "1.0.0");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current]);
+
+        WorkloadInstaller installer = NewInstaller();
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => installer.UpdateAsync(
+                "test.workload", NuGetVersion.Parse("0.9.0"), null, false, allowMajor: false));
+
+        Assert.Contains("0.9.0", ex.Message);
+        Assert.Contains("not installed", ex.Message);
+    }
+
+    private static WorkloadEntry ExistingEntry(string id, string version) => new()
+    {
+        PackageId = id,
+        PackageVersion = version,
+        Aliases = [],
+        Kind = WorkloadKind.Workload,
+        EntryPoint = new EntryPointSpec { AssemblyPath = "Test.dll", Type = "Test.Type" },
+        InstallRefCount = 1,
+    };
+
+    private static ResolvedPackage NewResolved(string id, string version) => new(
+        id,
+        NuGetVersion.Parse(version),
+        new PackageSource("https://example/v3/index.json", "test"));
+
+    private WorkloadInstaller NewInstaller() => new(_paths, _store, _metadataReader, _catalog);
+
+    private string BuildNupkg(string? tags = null, bool includeFuncCliWorkloadType = true, string version = "1.0.0")
     {
         string stubAssembly = Path.Combine(_root, $"stub-{Guid.NewGuid():N}.dll");
         File.WriteAllBytes(stubAssembly, [0x4D, 0x5A]);
@@ -262,7 +481,7 @@ public sealed class WorkloadInstallerTests : IDisposable
         var builder = new PackageBuilder
         {
             Id = "Test.Workload",
-            Version = NuGetVersion.Parse("1.0.0"),
+            Version = NuGetVersion.Parse(version),
             Description = "For tests.",
         };
         builder.Authors.Add("test");

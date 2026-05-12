@@ -1,10 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Workloads.Install;
 
@@ -17,7 +19,8 @@ namespace Azure.Functions.Cli.Workloads.Install;
 internal sealed class WorkloadInstaller(
     IWorkloadPaths paths,
     IWorkloadStore store,
-    IWorkloadMetadataReader metadataReader) : IWorkloadInstaller
+    IWorkloadMetadataReader metadataReader,
+    IWorkloadCatalog catalog) : IWorkloadInstaller
 {
     /// <summary>
     /// Prefix on nuspec tags that marks the tag as a CLI-facing alias, so
@@ -36,6 +39,7 @@ internal sealed class WorkloadInstaller(
     private readonly IWorkloadPaths _paths = paths ?? throw new ArgumentNullException(nameof(paths));
     private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IWorkloadMetadataReader _metadataReader = metadataReader ?? throw new ArgumentNullException(nameof(metadataReader));
+    private readonly IWorkloadCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
 
     /// <inheritdoc />
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(
@@ -134,6 +138,109 @@ internal sealed class WorkloadInstaller(
     }
 
     /// <inheritdoc />
+    public async Task<WorkloadInstallResult> InstallFromCatalogAsync(
+        string packageId,
+        NuGetVersion? version,
+        string? source,
+        bool includePrerelease,
+        bool exact,
+        bool force,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+
+        string resolvedId = exact
+            ? packageId
+            : await ResolveAliasOrIdAsync(packageId, source, includePrerelease, cancellationToken);
+
+        ResolvedPackage resolved = await ResolveCatalogPackageAsync(
+            resolvedId, version, source, includePrerelease, cancellationToken);
+
+        string tempPath = Path.Combine(
+            Path.GetTempPath(),
+            $"func-workload-{Guid.NewGuid():N}.nupkg");
+
+        try
+        {
+            await using (Stream packageStream = await _catalog.DownloadAsync(resolved, cancellationToken))
+            await using (FileStream tempStream = File.Create(tempPath))
+            {
+                await packageStream.CopyToAsync(tempStream, cancellationToken);
+            }
+
+            return await InstallFromPackageAsync(tempPath, force, cancellationToken);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+            }
+            catch
+            {
+                // Best-effort cleanup of the temp .nupkg; the OS reaps the
+                // temp dir periodically and the registry / install dir are
+                // already consistent at this point.
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<WorkloadUpdateResult> UpdateAsync(
+        string packageId,
+        NuGetVersion? targetInstalledVersion,
+        string? source,
+        bool includePrerelease,
+        bool allowMajor,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+
+        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
+        List<WorkloadEntry> matches = [.. installed
+            .Where(e => string.Equals(e.PackageId, packageId, StringComparison.OrdinalIgnoreCase))];
+
+        if (matches.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Workload '{packageId}' is not installed.");
+        }
+
+        WorkloadEntry currentEntry = ResolveUpdateTarget(packageId, targetInstalledVersion, matches);
+        var currentVersion = NuGetVersion.Parse(currentEntry.PackageVersion);
+
+        ResolvedPackage? resolved = await _catalog.ResolveLatestVersionAsync(
+            currentEntry.PackageId,
+            includePrerelease,
+            currentVersion,
+            allowMajor,
+            source,
+            cancellationToken);
+
+        if (resolved is null)
+        {
+            return new WorkloadUpdateResult(
+                currentEntry,
+                currentEntry.PackageVersion,
+                NoUpdateAvailable: true,
+                NoCandidateOnSource: true);
+        }
+
+        if (resolved.Version <= currentVersion)
+        {
+            return new WorkloadUpdateResult(currentEntry, currentEntry.PackageVersion, NoUpdateAvailable: true);
+        }
+
+        WorkloadEntry newEntry = await StageAndSwapAsync(
+            currentEntry, resolved, cancellationToken);
+
+        return new WorkloadUpdateResult(newEntry, currentEntry.PackageVersion, NoUpdateAvailable: false);
+    }
+
+    /// <inheritdoc />
     public async Task<bool> UninstallAsync(
         string packageId,
         string version,
@@ -151,6 +258,206 @@ internal sealed class WorkloadInstaller(
         string installPath = _paths.GetInstallDirectory(packageId, version);
         TryDeleteDirectory(installPath);
         return true;
+    }
+
+    private async Task<string> ResolveAliasOrIdAsync(
+        string aliasOrId,
+        string? source,
+        bool includePrerelease,
+        CancellationToken cancellationToken)
+    {
+        // Spec §6.1 step 2 (default flow): query the catalog for packages
+        // declaring `alias:<aliasOrId>` and pick the unique match. Zero
+        // matches falls back to treating the input as a literal package id.
+        // Multiple distinct package ids is an error; the user must re-run
+        // with --exact <packageId>.
+        const int aliasSearchTake = 50;
+
+        var query = new CatalogSearchQuery
+        {
+            Filter = aliasOrId,
+            IncludePrerelease = includePrerelease,
+            Take = aliasSearchTake,
+            Source = source,
+        };
+
+        IReadOnlyList<CatalogSearchResult> hits = await _catalog.SearchAsync(query, cancellationToken);
+
+        IReadOnlyList<string> matchedIds = [.. hits
+            .Where(r => r.Aliases.Any(a => string.Equals(a, aliasOrId, StringComparison.OrdinalIgnoreCase)))
+            .Select(r => r.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+
+        if (matchedIds.Count > 1)
+        {
+            throw new AmbiguousAliasException(aliasOrId, matchedIds);
+        }
+
+        return matchedIds.Count == 1 ? matchedIds[0] : aliasOrId;
+    }
+
+    private async Task<ResolvedPackage> ResolveCatalogPackageAsync(
+        string packageId,
+        NuGetVersion? version,
+        string? source,
+        bool includePrerelease,
+        CancellationToken cancellationToken)
+    {
+        ResolvedPackage? resolved = version is null
+            ? await _catalog.ResolveLatestVersionAsync(
+                packageId, includePrerelease, currentVersion: null, allowMajor: true, source: source, cancellationToken)
+            : await _catalog.ResolveVersionAsync(packageId, version, source, cancellationToken);
+
+        if (resolved is null)
+        {
+            string detail = version is null
+                ? "No matching version was found on any configured source."
+                : $"Version '{version.ToNormalizedString()}' was not found on any configured source.";
+
+            string hint = includePrerelease
+                ? string.Empty
+                : " Pass --include-prereleases if it is a prerelease.";
+
+            throw new Catalog.WorkloadPackageNotFoundException(
+                $"Could not resolve workload '{packageId}'. {detail}{hint}");
+        }
+
+        return resolved;
+    }
+
+    private static WorkloadEntry ResolveUpdateTarget(
+        string packageId,
+        NuGetVersion? targetInstalledVersion,
+        IReadOnlyList<WorkloadEntry> matches)
+    {
+        if (targetInstalledVersion is null)
+        {
+            return matches
+                .OrderByDescending(e => NuGetVersion.Parse(e.PackageVersion))
+                .First();
+        }
+
+        string requested = targetInstalledVersion.ToNormalizedString();
+        WorkloadEntry? exact = matches.FirstOrDefault(e =>
+            string.Equals(e.PackageVersion, requested, StringComparison.Ordinal));
+
+        if (exact is null)
+        {
+            string available = string.Join(", ", matches.Select(m => m.PackageVersion));
+            throw new InvalidOperationException(
+                $"Workload '{packageId}' version '{requested}' is not installed. " +
+                $"Installed versions: {available}.");
+        }
+
+        return exact;
+    }
+
+    private async Task<WorkloadEntry> StageAndSwapAsync(
+        WorkloadEntry currentEntry,
+        ResolvedPackage resolved,
+        CancellationToken cancellationToken)
+    {
+        string tempNupkg = Path.Combine(
+            Path.GetTempPath(),
+            $"func-workload-{Guid.NewGuid():N}.nupkg");
+
+        string finalInstallPath = _paths.GetInstallDirectory(
+            resolved.PackageId, resolved.Version.ToNormalizedString());
+        string stagingPath = finalInstallPath + ".staging-" + Guid.NewGuid().ToString("N");
+
+        try
+        {
+            await using (Stream packageStream = await _catalog.DownloadAsync(resolved, cancellationToken))
+            await using (FileStream tempStream = File.Create(tempNupkg))
+            {
+                await packageStream.CopyToAsync(tempStream, cancellationToken);
+            }
+
+            using PackageArchiveReader reader = OpenPackage(tempNupkg);
+            NuspecReader nuspec = reader.NuspecReader;
+
+            string newPackageId = nuspec.GetId().ToLowerInvariant();
+            string newVersion = nuspec.GetVersion().ToNormalizedString();
+            IReadOnlyList<string> aliases = ParseAliases(nuspec.GetTags());
+
+            if (!nuspec.GetPackageTypes().Any(t => string.Equals(t.Name, FuncCliWorkloadPackageType, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidWorkloadException(
+                    $"Package '{newPackageId}' is not a func CLI workload " +
+                    $"(missing package type '{FuncCliWorkloadPackageType}' in its .nuspec).");
+            }
+
+            // Sanity check: the resolved id+version should match the package
+            // we actually downloaded. If not, the source returned a wrong
+            // bundle and we abort before touching the existing install.
+            if (!string.Equals(newPackageId, resolved.PackageId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(newVersion, resolved.Version.ToNormalizedString(), StringComparison.Ordinal))
+            {
+                throw new InvalidWorkloadException(
+                    $"Resolved package '{resolved.PackageId}' {resolved.Version.ToNormalizedString()} but the source returned " +
+                    $"'{newPackageId}' {newVersion}.");
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
+            Directory.CreateDirectory(stagingPath);
+
+            await ExtractPackageAsync(reader, stagingPath, cancellationToken);
+            WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
+
+            WorkloadEntry newEntry = new()
+            {
+                PackageId = newPackageId,
+                PackageVersion = newVersion,
+                Aliases = aliases,
+                EntryPoint = metadata.EntryPoint,
+                Kind = metadata.Kind,
+                Source = resolved.Source.Source,
+                InstallRefCount = currentEntry.InstallRefCount,
+            };
+
+            // Atomic swap (spec §6.4 step 4):
+            //   1. Move staged dir into final location.
+            //   2. Replace registry row in a single write (old removed,
+            //      new added). The orphaned-dir case in §6.4 step 5 is
+            //      recoverable via `func workload prune`.
+            //   3. Delete the previous install directory.
+            Directory.Move(stagingPath, finalInstallPath);
+
+            await _store.ReplaceWorkloadAsync(
+                currentEntry.PackageId,
+                currentEntry.PackageVersion,
+                newEntry,
+                cancellationToken);
+
+            string oldInstallPath = _paths.GetInstallDirectory(currentEntry.PackageId, currentEntry.PackageVersion);
+            if (!string.Equals(oldInstallPath, finalInstallPath, StringComparison.Ordinal))
+            {
+                // Spec §6.4 step 5: a delete failure here leaves an orphan
+                // directory, which `func workload prune` cleans up later.
+                TryDeleteDirectory(oldInstallPath);
+            }
+
+            return newEntry;
+        }
+        catch
+        {
+            TryDeleteDirectory(stagingPath);
+            throw;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempNupkg))
+                {
+                    File.Delete(tempNupkg);
+                }
+            }
+            catch
+            {
+                // Best-effort temp cleanup.
+            }
+        }
     }
 
     private static PackageArchiveReader OpenPackage(string nupkgPath)

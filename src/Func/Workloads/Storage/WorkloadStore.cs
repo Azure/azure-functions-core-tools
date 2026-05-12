@@ -66,6 +66,39 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         return true;
     }
 
+    public async Task ReplaceWorkloadAsync(
+        string oldPackageId,
+        string oldVersion,
+        WorkloadEntry newEntry,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(oldPackageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
+        ArgumentNullException.ThrowIfNull(newEntry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newEntry.PackageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newEntry.PackageVersion);
+
+        WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
+
+        int oldIndex = FindIndex(registry, oldPackageId, oldVersion);
+        if (oldIndex >= 0)
+        {
+            registry.Workloads.RemoveAt(oldIndex);
+        }
+
+        int newIndex = FindIndex(registry, newEntry.PackageId, newEntry.PackageVersion);
+        if (newIndex >= 0)
+        {
+            registry.Workloads[newIndex] = newEntry;
+        }
+        else
+        {
+            registry.Workloads.Add(newEntry);
+        }
+
+        await WriteRegistryAsync(registry, cancellationToken);
+    }
+
     private static int FindIndex(WorkloadRegistry registry, string packageId, string version)
     {
         for (int i = 0; i < registry.Workloads.Count; i++)

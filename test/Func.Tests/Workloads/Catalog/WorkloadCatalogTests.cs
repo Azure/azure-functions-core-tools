@@ -2,9 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Catalog;
+using Newtonsoft.Json.Linq;
 using NSubstitute;
 using NuGet.Common;
-using NuGet.Packaging.Core;
+using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using Xunit;
@@ -20,7 +21,7 @@ public sealed class WorkloadCatalogTests
     [Fact]
     public async Task SearchAsync_DelegatesToConfiguredSource()
     {
-        NuGetProtocolSourceClient client = BuildClient(_defaultSource, search: [Metadata("alpha", "1.0.0")]);
+        NuGetProtocolSourceClient client = BuildClient(_defaultSource, search: [("alpha", "1.0.0")]);
         WorkloadCatalog catalog = NewCatalog((_defaultSource, client));
 
         IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(new CatalogSearchQuery());
@@ -33,8 +34,8 @@ public sealed class WorkloadCatalogTests
     [Fact]
     public async Task SearchAsync_Source_ConsultsOnlyOverride()
     {
-        NuGetProtocolSourceClient defaultClient = BuildClient(_defaultSource, search: [Metadata("default-pkg", "1.0.0")]);
-        NuGetProtocolSourceClient overrideClient = BuildClient(_altSource, search: [Metadata("override-pkg", "1.0.0")]);
+        NuGetProtocolSourceClient defaultClient = BuildClient(_defaultSource, search: [("default-pkg", "1.0.0")]);
+        NuGetProtocolSourceClient overrideClient = BuildClient(_altSource, search: [("override-pkg", "1.0.0")]);
 
         var sourceProvider = Substitute.For<IPackageSourceProvider>();
         sourceProvider.GetSource(null).Returns(_defaultSource);
@@ -173,27 +174,49 @@ public sealed class WorkloadCatalogTests
 
     private static NuGetVersion V(string v) => NuGetVersion.Parse(v);
 
-    private static IPackageSearchMetadata Metadata(string id, string version, string? tags = null)
+    private sealed class FakeClient(SourceRepository repo, JObject? response) : NuGetProtocolSourceClient(repo)
     {
-        IPackageSearchMetadata m = Substitute.For<IPackageSearchMetadata>();
-        m.Identity.Returns(new PackageIdentity(id, NuGetVersion.Parse(version)));
-        m.Tags.Returns(tags);
-        return m;
+        internal override Task<JObject?> FetchSearchResponseAsync(Uri searchUri, CancellationToken cancellationToken)
+            => Task.FromResult(response);
+    }
+
+    private static JObject SearchResponse(params (string Id, string Version)[] hits)
+    {
+        var data = new JArray();
+        foreach ((string id, string version) in hits)
+        {
+            data.Add(new JObject
+            {
+                ["id"] = id,
+                ["version"] = version,
+            });
+        }
+
+        return new JObject { ["data"] = data, ["totalHits"] = hits.Length };
+    }
+
+    private static ServiceIndexResourceV3 NewServiceIndex()
+    {
+        // Minimal V3 service index that advertises a SearchQueryService URL.
+        // The URL itself is irrelevant since FakeClient short-circuits the
+        // actual HTTP fetch; what matters is that TryBuildV3SearchUriAsync
+        // resolves a non-null URI and routes through FetchSearchResponseAsync.
+        var json = JObject.Parse("""
+            {
+              "version": "3.0.0",
+              "resources": [
+                { "@id": "https://search.test/query", "@type": "SearchQueryService" }
+              ]
+            }
+            """);
+        return new ServiceIndexResourceV3(json, DateTime.UtcNow);
     }
 
     private static NuGetProtocolSourceClient BuildClient(
         PackageSource source,
-        IPackageSearchMetadata[]? search = null,
+        (string Id, string Version)[]? search = null,
         IEnumerable<NuGetVersion>? versions = null)
     {
-        PackageSearchResource? searchResource = null;
-        if (search is not null)
-        {
-            searchResource = Substitute.For<PackageSearchResource>();
-            searchResource.SearchAsync(Arg.Any<string>(), Arg.Any<SearchFilter>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<ILogger>(), Arg.Any<CancellationToken>())
-                .Returns(Task.FromResult<IEnumerable<IPackageSearchMetadata>>(search));
-        }
-
         FindPackageByIdResource? findResource = null;
         if (versions is not null)
         {
@@ -202,7 +225,8 @@ public sealed class WorkloadCatalogTests
                 .Returns(Task.FromResult(versions));
         }
 
-        return new NuGetProtocolSourceClient(TestRepository.Build(source, searchResource, findResource));
+        SourceRepository repo = TestRepository.Build(source, NewServiceIndex(), findResource);
+        return new FakeClient(repo, search is null ? null : SearchResponse(search));
     }
 
     private static WorkloadCatalog NewCatalog(params (PackageSource Source, NuGetProtocolSourceClient Client)[] entries)
