@@ -41,13 +41,21 @@ internal sealed class WorkloadResolver(
         // 2. FUNCTIONS_WORKER_RUNTIME from local.settings.json. If set we
         // honour it as an explicit declaration from the user: a runtime hit
         // resolves, a runtime miss errors with a runtime-specific message
-        // rather than falling through to detectors. Falling through would
-        // hide the mismatch ("you declared X but no installed workload
-        // claims it") behind a generic detector-ambiguity error.
+        // rather than falling through to detectors.
         string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
         if (!string.IsNullOrWhiteSpace(runtime))
         {
             return ResolveByRuntime(installed, runtime);
+        }
+
+        // `func init` (spec §4.2): no project to detect against, so steps
+        // 1+2 are the only signals. Report None with an init-shaped hint.
+        if (context.SkipDirectoryDetection)
+        {
+            return new WorkloadResolution.None(
+                "No --stack flag supplied and no FUNCTIONS_WORKER_RUNTIME declared. " +
+                $"Pass --stack <id> to choose a workload. " +
+                $"Installed: {FormatInstalled(installed)}.");
         }
 
         // 3. IProjectDetector pass.
@@ -63,13 +71,13 @@ internal sealed class WorkloadResolver(
 
         return matches.Count switch
         {
-            1 => WorkloadResolution.AsResolved(matches[0], $"Selected by --stack '{selector}'."),
-            0 => WorkloadResolution.AsNone(
+            1 => new WorkloadResolution.Resolved(matches[0], $"Selected by --stack '{selector}'."),
+            0 => new WorkloadResolution.None(
                 $"No installed workload claims stack '{selector}'. " +
                 $"Installed: {FormatInstalled(installed)}. " +
                 $"Run 'func workload install <package>' to add a workload."),
-            _ => WorkloadResolution.AsAmbiguous(
-                matches,
+            _ => new WorkloadResolution.Ambiguous(
+                [.. matches.Select(w => new ResolutionCandidate(w, Reason: null))],
                 $"Multiple installed workloads claim stack '{selector}': {FormatPackages(matches)}. " +
                 $"Pass an exact package id to disambiguate."),
         };
@@ -85,17 +93,17 @@ internal sealed class WorkloadResolver(
 
         return matches.Count switch
         {
-            1 => WorkloadResolution.AsResolved(
+            1 => new WorkloadResolution.Resolved(
                 matches.First(),
                 $"Selected by FUNCTIONS_WORKER_RUNTIME='{runtime}' in local.settings.json."),
-            0 => WorkloadResolution.AsNone(
+            0 => new WorkloadResolution.None(
                 $"local.settings.json declares FUNCTIONS_WORKER_RUNTIME='{runtime}' " +
                 $"but no installed workload claims that runtime. " +
                 $"Installed: {FormatInstalled(installed)}. " +
                 $"Run 'func workload install <package>' to add a workload for '{runtime}', " +
                 $"or pass --stack <id> to override."),
-            _ => WorkloadResolution.AsAmbiguous(
-                [.. matches],
+            _ => new WorkloadResolution.Ambiguous(
+                [.. matches.Select(w => new ResolutionCandidate(w, Reason: null))],
                 $"Multiple installed workloads claim worker runtime '{runtime}': {FormatPackages(matches)}. " +
                 $"Pass --stack <id> to disambiguate."),
         };
@@ -103,9 +111,10 @@ internal sealed class WorkloadResolver(
 
     private async Task<WorkloadResolution> ResolveByDetectorsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
     {
-        // Track the outcome per workload (not per detector) so a workload
-        // that ships multiple detectors counts once.
-        var verdictsByWorkload = new Dictionary<WorkloadInfo, (DetectionConfidence Confidence, string? Reason)>();
+        // Track the claim per workload (not per detector) so a workload that
+        // ships multiple detectors counts once. Keep the first reason a
+        // detector supplied for that workload.
+        var claimsByWorkload = new Dictionary<WorkloadInfo, string?>();
         foreach (WorkloadDetectorContribution contribution in _detectors)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -116,36 +125,34 @@ internal sealed class WorkloadResolver(
             }
 
             DetectionResult result = await contribution.Detector.DetectAsync(directory, cancellationToken);
-            if (result.Confidence == DetectionConfidence.No)
+            if (!result.Claimed)
             {
                 continue;
             }
 
-            // Promote the highest confidence seen for the workload (Yes beats Maybe).
-            if (!verdictsByWorkload.TryGetValue(contribution.Workload, out (DetectionConfidence Confidence, string? Reason) existing)
-                || result.Confidence > existing.Confidence)
+            if (!claimsByWorkload.ContainsKey(contribution.Workload))
             {
-                verdictsByWorkload[contribution.Workload] = (result.Confidence, result.Reason);
+                claimsByWorkload[contribution.Workload] = result.Reason;
             }
         }
 
-        List<KeyValuePair<WorkloadInfo, (DetectionConfidence Confidence, string? Reason)>> yeses =
-            [.. verdictsByWorkload.Where(kvp => kvp.Value.Confidence == DetectionConfidence.Yes)];
+        List<ResolutionCandidate> candidates =
+            [.. claimsByWorkload.Select(kvp => new ResolutionCandidate(kvp.Key, kvp.Value))];
 
-        return yeses.Count switch
+        return candidates.Count switch
         {
-            1 => WorkloadResolution.AsResolved(
-                yeses[0].Key,
-                yeses[0].Value.Reason is { Length: > 0 } reason
-                    ? $"Selected by '{yeses[0].Key.PackageId}' detector: {reason}."
-                    : $"Selected by '{yeses[0].Key.PackageId}' detector."),
-            0 => WorkloadResolution.AsNone(
+            1 => new WorkloadResolution.Resolved(
+                candidates[0].Workload,
+                candidates[0].Reason is { Length: > 0 } reason
+                    ? $"Selected by '{candidates[0].Workload.PackageId}' detector: {reason}."
+                    : $"Selected by '{candidates[0].Workload.PackageId}' detector."),
+            0 => new WorkloadResolution.None(
                 "No installed workload claims this directory. " +
                 "Pass --stack <id> to select one explicitly, or run 'func workload install <package>' to add one."),
-            _ => WorkloadResolution.AsAmbiguous(
-                [.. yeses.Select(kvp => kvp.Key)],
+            _ => new WorkloadResolution.Ambiguous(
+                candidates,
                 $"Multiple installed workloads claim this directory: " +
-                $"{string.Join(", ", yeses.Select(kvp => FormatCandidate(kvp.Key, kvp.Value.Reason)))}. " +
+                $"{string.Join(", ", candidates.Select(c => FormatCandidate(c.Workload, c.Reason)))}. " +
                 $"Pass --stack <id> to disambiguate."),
         };
     }

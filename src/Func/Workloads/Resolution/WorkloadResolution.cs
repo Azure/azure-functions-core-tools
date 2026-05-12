@@ -4,27 +4,27 @@
 namespace Azure.Functions.Cli.Workloads.Resolution;
 
 /// <summary>
-/// Result of <see cref="IWorkloadResolver.ResolveAsync"/>. Records-with-enum
-/// shape (rather than a sealed-class hierarchy) keeps the type cheap to
-/// pattern-match in callers and matches the rest of the codebase (e.g.
-/// <see cref="Install.WorkloadInstallResult"/>).
+/// Outcome of <see cref="IWorkloadResolver.ResolveAsync"/>. Discriminated
+/// union (sealed-record hierarchy) so callers pattern-match exhaustively on
+/// the three outcomes instead of inspecting nullable fields on a single
+/// record.
 /// </summary>
-/// <param name="Status">Discriminates between resolved / ambiguous / none.</param>
-/// <param name="Resolved">The chosen workload when <paramref name="Status"/> is <see cref="WorkloadResolutionStatus.Resolved"/>; otherwise <c>null</c>.</param>
-/// <param name="Candidates">Workloads that claimed the directory when <paramref name="Status"/> is <see cref="WorkloadResolutionStatus.Ambiguous"/>; empty otherwise.</param>
 /// <param name="Message">Human-readable summary suitable for surfacing to the user (resolution rationale or actionable hint).</param>
-internal sealed record WorkloadResolution(
-    WorkloadResolutionStatus Status,
-    WorkloadInfo? Resolved,
-    IReadOnlyList<WorkloadInfo> Candidates,
-    string Message)
+internal abstract record WorkloadResolution(string Message)
 {
-    public static WorkloadResolution AsResolved(WorkloadInfo workload, string message)
-        => new(WorkloadResolutionStatus.Resolved, workload, [], message);
+    /// <summary>Exactly one workload owns the directory.</summary>
+    /// <param name="Workload">The chosen workload.</param>
+    /// <param name="Message">Why it won (e.g. "Selected by --stack 'python'.").</param>
+    public sealed record Resolved(WorkloadInfo Workload, string Message)
+        : WorkloadResolution(Message);
 
-    public static WorkloadResolution AsAmbiguous(IReadOnlyList<WorkloadInfo> candidates, string message)
-        => new(WorkloadResolutionStatus.Ambiguous, Resolved: null, candidates, message);
+    /// <summary>More than one workload claims the directory; the user must disambiguate.</summary>
+    /// <param name="Candidates">Workloads that claimed the directory, with per-detector reasons.</param>
+    /// <param name="Message">Pre-rendered prose listing the conflict and a hint.</param>
+    public sealed record Ambiguous(IReadOnlyList<ResolutionCandidate> Candidates, string Message)
+        : WorkloadResolution(Message);
 
-    public static WorkloadResolution AsNone(string message)
-        => new(WorkloadResolutionStatus.None, Resolved: null, [], message);
+    /// <summary>No installed workload claims the directory.</summary>
+    /// <param name="Message">Actionable hint (typically a <c>func workload install</c> suggestion).</param>
+    public sealed record None(string Message) : WorkloadResolution(Message);
 }

@@ -31,9 +31,9 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: "dotnet-isolated"),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Resolved, result.Status);
-        Assert.Same(dotnet, result.Resolved);
-        Assert.Contains("--stack 'dotnet-isolated'", result.Message);
+        var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
+        Assert.Same(dotnet, resolved.Workload);
+        Assert.Contains("--stack 'dotnet-isolated'", resolved.Message);
     }
 
     [Fact]
@@ -46,10 +46,9 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: "python"),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.None, result.Status);
-        Assert.Null(result.Resolved);
-        Assert.Contains("'python'", result.Message);
-        Assert.Contains("Pkg.Dotnet", result.Message);
+        var none = Assert.IsType<WorkloadResolution.None>(result);
+        Assert.Contains("'python'", none.Message);
+        Assert.Contains("Pkg.Dotnet", none.Message);
     }
 
     [Fact]
@@ -63,10 +62,10 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: "dotnet"),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Ambiguous, result.Status);
-        Assert.Equal(2, result.Candidates.Count);
-        Assert.Contains(a, result.Candidates);
-        Assert.Contains(b, result.Candidates);
+        var ambig = Assert.IsType<WorkloadResolution.Ambiguous>(result);
+        Assert.Equal(2, ambig.Candidates.Count);
+        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, a));
+        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, b));
     }
 
     [Fact]
@@ -86,9 +85,9 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Resolved, result.Status);
-        Assert.Same(dotnet, result.Resolved);
-        Assert.Contains("FUNCTIONS_WORKER_RUNTIME='dotnet-isolated'", result.Message);
+        var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
+        Assert.Same(dotnet, resolved.Workload);
+        Assert.Contains("FUNCTIONS_WORKER_RUNTIME='dotnet-isolated'", resolved.Message);
 
         // Detectors must not have been invoked: runtime path short-circuited.
         await dotnetDetector.DidNotReceive().DetectAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
@@ -99,7 +98,7 @@ public sealed class WorkloadResolverTests
     public async Task Runtime_FromLocalSettings_NoDetectorClaimsIt_ReturnsNoneWithRuntimeMessage()
     {
         // An explicit FUNCTIONS_WORKER_RUNTIME with no claiming workload is a
-        // user-declared mismatch, surface it directly rather than falling
+        // user-declared mismatch; surface it directly rather than falling
         // through to detectors and producing a generic ambiguity error.
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         IProjectDetector detector = NewDetector(
@@ -115,11 +114,32 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.None, result.Status);
-        Assert.Contains("FUNCTIONS_WORKER_RUNTIME='custom-runtime'", result.Message);
-        Assert.Contains("no installed workload claims that runtime", result.Message);
-        Assert.Contains("Pkg.Dotnet", result.Message);
+        var none = Assert.IsType<WorkloadResolution.None>(result);
+        Assert.Contains("FUNCTIONS_WORKER_RUNTIME='custom-runtime'", none.Message);
+        Assert.Contains("no installed workload claims that runtime", none.Message);
+        Assert.Contains("Pkg.Dotnet", none.Message);
         await detector.DidNotReceive().DetectAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Runtime_MultipleDetectorsClaimSameRuntime_ReturnsAmbiguous()
+    {
+        WorkloadInfo a = NewWorkload("Pkg.A");
+        WorkloadInfo b = NewWorkload("Pkg.B");
+        IProjectDetector aDetector = NewDetector(workerRuntimes: ["dotnet"]);
+        IProjectDetector bDetector = NewDetector(workerRuntimes: ["dotnet"]);
+        _settings.ReadWorkerRuntime(_dir).Returns("dotnet");
+
+        WorkloadResolver resolver = NewResolver(
+            workloads: [a, b],
+            detectors: [(a, aDetector), (b, bDetector)]);
+
+        WorkloadResolution result = await resolver.ResolveAsync(
+            new WorkloadResolutionContext(_dir, StackSelector: null),
+            CancellationToken.None);
+
+        var ambig = Assert.IsType<WorkloadResolution.Ambiguous>(result);
+        Assert.Equal(2, ambig.Candidates.Count);
     }
 
     [Fact]
@@ -140,7 +160,7 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.None, result.Status);
+        Assert.IsType<WorkloadResolution.None>(result);
         await detector.DidNotReceive().DetectAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
     }
 
@@ -165,13 +185,13 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Resolved, result.Status);
-        Assert.Same(dotnet, result.Resolved);
+        var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
+        Assert.Same(dotnet, resolved.Workload);
         await detector.Received(1).DetectAsync(_dir, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Detectors_SingleYes_Resolves()
+    public async Task Detectors_SingleClaim_Resolves()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo python = NewWorkload("Pkg.Python");
@@ -186,13 +206,13 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Resolved, result.Status);
-        Assert.Same(dotnet, result.Resolved);
-        Assert.Contains("found .csproj", result.Message);
+        var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
+        Assert.Same(dotnet, resolved.Workload);
+        Assert.Contains("found .csproj", resolved.Message);
     }
 
     [Fact]
-    public async Task Detectors_MultipleYes_ReturnsAmbiguousWithReasons()
+    public async Task Detectors_MultipleClaim_ReturnsAmbiguousWithReasons()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo node = NewWorkload("Pkg.Node");
@@ -207,29 +227,13 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Ambiguous, result.Status);
-        Assert.Equal(2, result.Candidates.Count);
-        Assert.Contains("Pkg.Dotnet (found .csproj)", result.Message);
-        Assert.Contains("Pkg.Node (found package.json)", result.Message);
-        Assert.Contains("--stack", result.Message);
-    }
-
-    [Fact]
-    public async Task Detectors_MaybeOnly_DoesNotResolve_ReturnsNone()
-    {
-        WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
-        IProjectDetector detector = NewDetector(detectResult: DetectionResult.Maybe("might be it"));
-
-        WorkloadResolver resolver = NewResolver(
-            workloads: [dotnet],
-            detectors: [(dotnet, detector)]);
-
-        WorkloadResolution result = await resolver.ResolveAsync(
-            new WorkloadResolutionContext(_dir, StackSelector: null),
-            CancellationToken.None);
-
-        Assert.Equal(WorkloadResolutionStatus.None, result.Status);
-        Assert.Contains("--stack", result.Message);
+        var ambig = Assert.IsType<WorkloadResolution.Ambiguous>(result);
+        Assert.Equal(2, ambig.Candidates.Count);
+        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, dotnet) && c.Reason == "found .csproj");
+        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, node) && c.Reason == "found package.json");
+        Assert.Contains("Pkg.Dotnet (found .csproj)", ambig.Message);
+        Assert.Contains("Pkg.Node (found package.json)", ambig.Message);
+        Assert.Contains("--stack", ambig.Message);
     }
 
     [Fact]
@@ -241,28 +245,42 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.None, result.Status);
+        Assert.IsType<WorkloadResolution.None>(result);
     }
 
     [Fact]
-    public async Task Runtime_MultipleDetectorsClaimSameRuntime_ReturnsAmbiguous()
+    public async Task SkipDirectoryDetection_NoSelectorNoRuntime_ReturnsNoneWithoutInvokingDetectors()
     {
-        WorkloadInfo a = NewWorkload("Pkg.A");
-        WorkloadInfo b = NewWorkload("Pkg.B");
-        IProjectDetector aDetector = NewDetector(workerRuntimes: ["dotnet"]);
-        IProjectDetector bDetector = NewDetector(workerRuntimes: ["dotnet"]);
-        _settings.ReadWorkerRuntime(_dir).Returns("dotnet");
+        WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
+        IProjectDetector detector = NewDetector(detectResult: DetectionResult.Yes("would have matched"));
 
         WorkloadResolver resolver = NewResolver(
-            workloads: [a, b],
-            detectors: [(a, aDetector), (b, bDetector)]);
+            workloads: [dotnet],
+            detectors: [(dotnet, detector)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
-            new WorkloadResolutionContext(_dir, StackSelector: null),
+            new WorkloadResolutionContext(_dir, StackSelector: null, SkipDirectoryDetection: true),
             CancellationToken.None);
 
-        Assert.Equal(WorkloadResolutionStatus.Ambiguous, result.Status);
-        Assert.Equal(2, result.Candidates.Count);
+        var none = Assert.IsType<WorkloadResolution.None>(result);
+        Assert.Contains("No --stack flag", none.Message);
+        Assert.Contains("FUNCTIONS_WORKER_RUNTIME", none.Message);
+        Assert.Contains("Pkg.Dotnet", none.Message);
+        await detector.DidNotReceive().DetectAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SkipDirectoryDetection_WithSelector_StillResolvesBySelector()
+    {
+        WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet", aliases: ["dotnet"]);
+        WorkloadResolver resolver = NewResolver(workloads: [dotnet]);
+
+        WorkloadResolution result = await resolver.ResolveAsync(
+            new WorkloadResolutionContext(_dir, StackSelector: "dotnet", SkipDirectoryDetection: true),
+            CancellationToken.None);
+
+        var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
+        Assert.Same(dotnet, resolved.Workload);
     }
 
     private WorkloadResolver NewResolver(
