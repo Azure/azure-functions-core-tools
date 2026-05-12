@@ -46,10 +46,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity(commandName)
 {
     try
     {
-        HostApplicationBuilder builder = CliHost.CreateBuilder(interaction);
-        await builder.RegisterWorkloadsAsync(cts.Token);
-        using IHost host = builder.Build();
-        await host.StartAsync(cts.Token);
+        using IHost host = await CliHostFactory.CreateHostAsync(interaction, cts.Token);
 
         FuncRootCommand rootCommand = Parser.CreateCommand(host.Services);
 

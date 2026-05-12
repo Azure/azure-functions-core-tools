@@ -12,21 +12,34 @@ using Microsoft.Extensions.Hosting;
 namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
-/// Entry point for building the CLI's <see cref="HostApplicationBuilder"/>.
-/// Wires interaction, telemetry, configuration, built-in commands, and
-/// workload storage into the builder so callers can add their own
-/// configuration before <see cref="HostApplicationBuilder.Build"/>.
+/// Builds and starts the CLI's <see cref="IHost"/>. Encapsulates the boot
+/// sequence (create builder, register installed workloads, build, start) so
+/// callers don't repeat it. Tests that need to intercept builder
+/// configuration use <see cref="CreateBuilder"/> + the
+/// <see cref="HostApplicationBuilderExtensions.RegisterWorkloadsAsync"/>
+/// extension directly.
 /// </summary>
-internal static class CliHost
+internal static class CliHostFactory
 {
     /// <summary>
-    /// Creates a <see cref="HostApplicationBuilder"/> with all CLI-default
-    /// services registered. Callers add any extra configuration, then call
-    /// <see cref="HostApplicationBuilderExtensions.RegisterWorkloadsAsync"/>
-    /// to load installed workloads, then <see cref="HostApplicationBuilder.Build"/>
-    /// and <see cref="IHost.StartAsync"/>.
+    /// Creates the builder, registers installed workloads, builds, and starts
+    /// the host.
     /// </summary>
-    /// <param name="interaction">Interaction service registered as a singleton.</param>
+    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CancellationToken cancellationToken = default)
+    {
+        HostApplicationBuilder builder = CreateBuilder(interaction);
+        await builder.RegisterWorkloadsAsync(cancellationToken);
+        IHost host = builder.Build();
+        await host.StartAsync(cancellationToken);
+        return host;
+    }
+
+    /// <summary>
+    /// Creates a <see cref="HostApplicationBuilder"/> with all CLI-default
+    /// services registered. Exposed for tests that need to add configuration
+    /// before workloads register; production code should use
+    /// <see cref="CreateHostAsync"/>.
+    /// </summary>
     public static HostApplicationBuilder CreateBuilder(IInteractionService interaction)
     {
         ArgumentNullException.ThrowIfNull(interaction);

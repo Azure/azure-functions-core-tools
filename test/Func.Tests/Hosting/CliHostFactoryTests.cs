@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 /// layout the loader expects:
 /// <c>&lt;Home&gt;/workloads.json</c> + <c>&lt;Home&gt;/workloads/&lt;pkg&gt;/&lt;ver&gt;/tools/any/&lt;asm&gt;.dll</c>.
 /// </summary>
-public sealed class CliHostTests : IDisposable
+public sealed class CliHostFactoryTests : IDisposable
 {
     private const string FixtureAssembly = "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.dll";
     private const string CommandWorkloadType = "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.StubWorkload";
@@ -44,7 +44,7 @@ public sealed class CliHostTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateBuilder_LoadsInstalledWorkloads_AndAddsTheirCommandsToRoot()
+    public async Task CreateHostAsync_LoadsInstalledWorkloads_AndAddsTheirCommandsToRoot()
     {
         StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);
         WriteRegistry(("withcommand.fixture", "1.0.0", CommandWorkloadType));
@@ -59,7 +59,7 @@ public sealed class CliHostTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateBuilder_WhenWorkloadConfigureThrows_WarnsAndContinues()
+    public async Task CreateHostAsync_WhenWorkloadConfigureThrows_WarnsAndContinues()
     {
         StageFixtureWorkload("throwing.fixture", "1.0.0", ThrowingWorkloadType);
         WriteRegistry(("throwing.fixture", "1.0.0", ThrowingWorkloadType));
@@ -80,7 +80,7 @@ public sealed class CliHostTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateBuilder_WithEmptyHome_LoadsHostWithoutWorkloadCommands()
+    public async Task CreateHostAsync_WithEmptyHome_LoadsHostWithoutWorkloadCommands()
     {
         Directory.CreateDirectory(_home);
         // No workloads.json written: WorkloadStore returns an empty list.
@@ -102,7 +102,7 @@ public sealed class CliHostTests : IDisposable
     /// </summary>
     private async Task<IHost> StartHostAsync(TestInteractionService interaction)
     {
-        HostApplicationBuilder builder = CliHost.CreateBuilder(interaction);
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Workloads:Home"] = _home,

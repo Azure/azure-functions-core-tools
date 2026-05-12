@@ -57,6 +57,6 @@ internal static class HostApplicationBuilderExtensions
 
         throw new InvalidOperationException(
             $"{nameof(IInteractionService)} singleton is not registered. " +
-            $"Use {nameof(CliHost)}.{nameof(CliHost.CreateBuilder)} to build the host.");
+            $"Use {nameof(CliHostFactory)}.{nameof(CliHostFactory.CreateBuilder)} to build the host.");
     }
 }
