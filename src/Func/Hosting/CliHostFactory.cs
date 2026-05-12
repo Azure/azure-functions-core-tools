@@ -22,16 +22,14 @@ namespace Azure.Functions.Cli.Hosting;
 internal static class CliHostFactory
 {
     /// <summary>
-    /// Creates the builder, registers installed workloads, builds, and starts
-    /// the host.
+    /// Creates the builder, registers installed workloads, and builds the
+    /// host. Caller is responsible for <see cref="IHost.StartAsync"/>.
     /// </summary>
     public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CancellationToken cancellationToken = default)
     {
         HostApplicationBuilder builder = CreateBuilder(interaction);
         await builder.RegisterWorkloadsAsync(cancellationToken);
-        IHost host = builder.Build();
-        await host.StartAsync(cancellationToken);
-        return host;
+        return builder.Build();
     }
 
     /// <summary>
