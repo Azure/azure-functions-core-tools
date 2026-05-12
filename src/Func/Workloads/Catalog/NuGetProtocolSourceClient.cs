@@ -9,13 +9,13 @@ using PackageSource = NuGet.Configuration.PackageSource;
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
-/// HTTP-backed <see cref="ISourceClient"/> built on <c>NuGet.Protocol</c>.
-/// Drives <see cref="PackageSearchResource"/> and
-/// <see cref="FindPackageByIdResource"/> against the v3 service index of
-/// the supplied <see cref="SourceRepository"/>, restricting search to the
+/// HTTP- or file-backed client built on <c>NuGet.Protocol</c>. Drives
+/// <see cref="PackageSearchResource"/> and <see cref="FindPackageByIdResource"/>
+/// against the v3 service index (remote) or the on-disk feed layout (local)
+/// of the supplied <see cref="SourceRepository"/>, restricting search to the
 /// <c>FuncCliWorkload</c> package type.
 /// </summary>
-internal sealed class NuGetProtocolSourceClient(SourceRepository repository) : ISourceClient
+internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
 {
     private const string PackageType = "FuncCliWorkload";
     private const string AliasTagPrefix = "alias:";

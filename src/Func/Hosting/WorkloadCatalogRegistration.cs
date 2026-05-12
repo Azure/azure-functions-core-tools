@@ -28,19 +28,17 @@ internal static class WorkloadCatalogRegistration
             .ValidateOnStart();
 
         services.AddSingleton<IPackageSourceProvider, PackageSourceProvider>();
-        services.AddSingleton<Func<PackageSource, ISourceClient>>(_ => CreateSourceClient);
+        services.AddSingleton<Func<PackageSource, NuGetProtocolSourceClient>>(_ => CreateSourceClient);
         services.AddSingleton<IWorkloadCatalog, WorkloadCatalog>();
 
         return services;
     }
 
-    private static ISourceClient CreateSourceClient(PackageSource source)
+    private static NuGetProtocolSourceClient CreateSourceClient(PackageSource source)
     {
-        if (source.IsLocal)
-        {
-            return new LocalFolderSourceClient(source);
-        }
-
+        // GetCoreV3 dispatches based on the source URI: HTTPS service indexes get the
+        // v3 protocol stack; file:// roots get NuGet's local-feed reader. The catalog
+        // code stays uniform either way.
         SourceRepository repository = Repository.Factory.GetCoreV3(source);
         return new NuGetProtocolSourceClient(repository);
     }

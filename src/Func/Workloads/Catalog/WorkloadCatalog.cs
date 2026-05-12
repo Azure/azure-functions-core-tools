@@ -8,7 +8,7 @@ using PackageSource = NuGet.Configuration.PackageSource;
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
-/// Aggregates one or more <see cref="ISourceClient"/>s into the
+/// Aggregates one or more <see cref="NuGetProtocolSourceClient"/>s into the
 /// catalog-shaped operations workload commands need: search, latest-version
 /// resolution, and package download. Search and resolve query every source
 /// in parallel. Download targets the source the package was resolved on; a
@@ -16,11 +16,11 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// </summary>
 internal sealed class WorkloadCatalog(
     IPackageSourceProvider sourceProvider,
-    Func<PackageSource, ISourceClient> clientFactory) : IWorkloadCatalog
+    Func<PackageSource, NuGetProtocolSourceClient> clientFactory) : IWorkloadCatalog
 {
     private readonly IPackageSourceProvider _sourceProvider = sourceProvider ?? throw new ArgumentNullException(nameof(sourceProvider));
-    private readonly Func<PackageSource, ISourceClient> _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
-    private readonly ConcurrentDictionary<string, ISourceClient> _clients = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<PackageSource, NuGetProtocolSourceClient> _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+    private readonly ConcurrentDictionary<string, NuGetProtocolSourceClient> _clients = new(StringComparer.OrdinalIgnoreCase);
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
@@ -34,7 +34,7 @@ internal sealed class WorkloadCatalog(
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
 
-        IReadOnlyList<ISourceClient> clients = ResolveClients(overrideSource);
+        IReadOnlyList<NuGetProtocolSourceClient> clients = ResolveClients(overrideSource);
 
         IReadOnlyList<CatalogSearchResult>[] perSource = await Task.WhenAll(
             clients.Select(c => c.SearchAsync(query, includePrerelease, skip, take, cancellationToken)));
@@ -71,7 +71,7 @@ internal sealed class WorkloadCatalog(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
-        IReadOnlyList<ISourceClient> clients = ResolveClients(overrideSource);
+        IReadOnlyList<NuGetProtocolSourceClient> clients = ResolveClients(overrideSource);
 
         IReadOnlyList<NuGetVersion>[] perSource = await Task.WhenAll(
             clients.Select(c => c.ListVersionsAsync(packageId, cancellationToken)));
@@ -79,7 +79,7 @@ internal sealed class WorkloadCatalog(
         ResolvedPackage? best = null;
         for (int i = 0; i < clients.Count; i++)
         {
-            ISourceClient client = clients[i];
+            NuGetProtocolSourceClient client = clients[i];
             foreach (NuGetVersion candidate in perSource[i])
             {
                 if (!includePrerelease && candidate.IsPrerelease)
@@ -109,10 +109,10 @@ internal sealed class WorkloadCatalog(
         return GetOrCreateClient(package.Source).OpenPackageAsync(package.PackageId, package.Version, cancellationToken);
     }
 
-    private IReadOnlyList<ISourceClient> ResolveClients(string? overrideSource)
+    private IReadOnlyList<NuGetProtocolSourceClient> ResolveClients(string? overrideSource)
     {
         IReadOnlyList<PackageSource> sources = _sourceProvider.GetSources(overrideSource);
-        var clients = new List<ISourceClient>(sources.Count);
+        var clients = new List<NuGetProtocolSourceClient>(sources.Count);
         foreach (PackageSource source in sources)
         {
             clients.Add(GetOrCreateClient(source));
@@ -121,6 +121,6 @@ internal sealed class WorkloadCatalog(
         return clients;
     }
 
-    private ISourceClient GetOrCreateClient(PackageSource source)
+    private NuGetProtocolSourceClient GetOrCreateClient(PackageSource source)
         => _clients.GetOrAdd(source.Name, _ => _clientFactory(source));
 }
