@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -334,37 +335,37 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
     {
         public SkipIfGoNonExistFact()
         {
-            string goExe;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (!CheckIfGoWorks())
             {
-                goExe = "go.exe";
-            }
-            else
-            {
-                goExe = "go";
-            }
-
-            if (!CheckIfGoExists(goExe))
-            {
-                Skip = "go does not exist";
+                Skip = "go is not installed or not functional";
             }
         }
 
-        private bool CheckIfGoExists(string goExe)
+        private static bool CheckIfGoWorks()
         {
-            string path = Environment.GetEnvironmentVariable("PATH");
-            if (!string.IsNullOrEmpty(path))
+            try
             {
-                foreach (string p in path.Split(Path.PathSeparator))
+                using var process = new Process();
+                process.StartInfo = new ProcessStartInfo
                 {
-                    if (File.Exists(Path.Combine(p, goExe)))
-                    {
-                        return true;
-                    }
-                }
-            }
+                    FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "go.exe" : "go",
+                    Arguments = "version",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
 
-            return false;
+                process.Start();
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit(5000);
+
+                return process.ExitCode == 0 && output.Contains("go");
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
