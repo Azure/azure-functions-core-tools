@@ -52,7 +52,7 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Selector_MultipleMatches_ReturnsAmbiguous()
+    public async Task Selector_MultipleMatches_ReturnsNone()
     {
         WorkloadInfo a = NewWorkload("Pkg.A", aliases: ["dotnet"]);
         WorkloadInfo b = NewWorkload("Pkg.B", aliases: ["dotnet"]);
@@ -62,10 +62,11 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: "dotnet"),
             CancellationToken.None);
 
-        var ambig = Assert.IsType<WorkloadResolution.Ambiguous>(result);
-        Assert.Equal(2, ambig.Candidates.Count);
-        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, a));
-        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, b));
+        var none = Assert.IsType<WorkloadResolution.None>(result);
+        Assert.Contains("Multiple installed workloads claim stack 'dotnet'", none.Message);
+        Assert.Contains("Pkg.A", none.Message);
+        Assert.Contains("Pkg.B", none.Message);
+        Assert.Contains("--stack", none.Message);
     }
 
     [Fact]
@@ -122,7 +123,7 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Runtime_MultipleDetectorsClaimSameRuntime_ReturnsAmbiguous()
+    public async Task Runtime_MultipleDetectorsClaimSameRuntime_ReturnsNone()
     {
         WorkloadInfo a = NewWorkload("Pkg.A");
         WorkloadInfo b = NewWorkload("Pkg.B");
@@ -138,8 +139,11 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        var ambig = Assert.IsType<WorkloadResolution.Ambiguous>(result);
-        Assert.Equal(2, ambig.Candidates.Count);
+        var none = Assert.IsType<WorkloadResolution.None>(result);
+        Assert.Contains("Multiple installed workloads claim worker runtime 'dotnet'", none.Message);
+        Assert.Contains("Pkg.A", none.Message);
+        Assert.Contains("Pkg.B", none.Message);
+        Assert.Contains("--stack", none.Message);
     }
 
     [Fact]
@@ -212,7 +216,7 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Detectors_MultipleClaim_ReturnsAmbiguousWithReasons()
+    public async Task Detectors_MultipleClaim_ReturnsNoneWithReasons()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo node = NewWorkload("Pkg.Node");
@@ -227,13 +231,11 @@ public sealed class WorkloadResolverTests
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
-        var ambig = Assert.IsType<WorkloadResolution.Ambiguous>(result);
-        Assert.Equal(2, ambig.Candidates.Count);
-        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, dotnet) && c.Reason == "found .csproj");
-        Assert.Contains(ambig.Candidates, c => ReferenceEquals(c.Workload, node) && c.Reason == "found package.json");
-        Assert.Contains("Pkg.Dotnet (found .csproj)", ambig.Message);
-        Assert.Contains("Pkg.Node (found package.json)", ambig.Message);
-        Assert.Contains("--stack", ambig.Message);
+        var none = Assert.IsType<WorkloadResolution.None>(result);
+        Assert.Contains("Multiple installed workloads claim this directory", none.Message);
+        Assert.Contains("Pkg.Dotnet (found .csproj)", none.Message);
+        Assert.Contains("Pkg.Node (found package.json)", none.Message);
+        Assert.Contains("--stack", none.Message);
     }
 
     [Fact]

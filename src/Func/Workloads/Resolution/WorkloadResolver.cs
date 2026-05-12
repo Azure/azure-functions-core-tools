@@ -76,10 +76,9 @@ internal sealed class WorkloadResolver(
                 $"No installed workload claims stack '{selector}'. " +
                 $"Installed: {FormatInstalled(installed)}. " +
                 $"Run 'func workload install <package>' to add a workload."),
-            _ => new WorkloadResolution.Ambiguous(
-                [.. matches.Select(w => new ResolutionCandidate(w, Reason: null))],
+            _ => new WorkloadResolution.None(
                 $"Multiple installed workloads claim stack '{selector}': {FormatPackages(matches)}. " +
-                $"Pass an exact package id to disambiguate."),
+                $"Pass --stack with an exact package id to disambiguate."),
         };
     }
 
@@ -102,8 +101,7 @@ internal sealed class WorkloadResolver(
                 $"Installed: {FormatInstalled(installed)}. " +
                 $"Run 'func workload install <package>' to add a workload for '{runtime}', " +
                 $"or pass --stack <id> to override."),
-            _ => new WorkloadResolution.Ambiguous(
-                [.. matches.Select(w => new ResolutionCandidate(w, Reason: null))],
+            _ => new WorkloadResolution.None(
                 $"Multiple installed workloads claim worker runtime '{runtime}': {FormatPackages(matches)}. " +
                 $"Pass --stack <id> to disambiguate."),
         };
@@ -136,23 +134,21 @@ internal sealed class WorkloadResolver(
             }
         }
 
-        List<ResolutionCandidate> candidates =
-            [.. claimsByWorkload.Select(kvp => new ResolutionCandidate(kvp.Key, kvp.Value))];
+        List<KeyValuePair<WorkloadInfo, string?>> candidates = [.. claimsByWorkload];
 
         return candidates.Count switch
         {
             1 => new WorkloadResolution.Resolved(
-                candidates[0].Workload,
-                candidates[0].Reason is { Length: > 0 } reason
-                    ? $"Selected by '{candidates[0].Workload.PackageId}' detector: {reason}."
-                    : $"Selected by '{candidates[0].Workload.PackageId}' detector."),
+                candidates[0].Key,
+                candidates[0].Value is { Length: > 0 } reason
+                    ? $"Selected by '{candidates[0].Key.PackageId}' detector: {reason}."
+                    : $"Selected by '{candidates[0].Key.PackageId}' detector."),
             0 => new WorkloadResolution.None(
                 "No installed workload claims this directory. " +
                 "Pass --stack <id> to select one explicitly, or run 'func workload install <package>' to add one."),
-            _ => new WorkloadResolution.Ambiguous(
-                candidates,
+            _ => new WorkloadResolution.None(
                 $"Multiple installed workloads claim this directory: " +
-                $"{string.Join(", ", candidates.Select(c => FormatCandidate(c.Workload, c.Reason)))}. " +
+                $"{string.Join(", ", candidates.Select(c => FormatCandidate(c.Key, c.Value)))}. " +
                 $"Pass --stack <id> to disambiguate."),
         };
     }

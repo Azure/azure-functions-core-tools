@@ -5,10 +5,16 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 
 /// <summary>
 /// Outcome of <see cref="IWorkloadResolver.ResolveAsync"/>. Discriminated
-/// union (sealed-record hierarchy) so callers pattern-match exhaustively on
-/// the three outcomes instead of inspecting nullable fields on a single
-/// record.
+/// union (sealed-record hierarchy) so callers pattern-match exhaustively
+/// instead of inspecting nullable fields on a single record.
 /// </summary>
+/// <remarks>
+/// Resolution is binary: either one workload owns the directory, or it
+/// does not. "Multiple workloads claim this" and "no workload claims this"
+/// are both <see cref="None"/> outcomes that differ only in their message,
+/// because the caller's response is the same (surface the message, exit).
+/// <c>--stack</c> remains the user escape hatch in the multi-claim case.
+/// </remarks>
 /// <param name="Message">Human-readable summary suitable for surfacing to the user (resolution rationale or actionable hint).</param>
 internal abstract record WorkloadResolution(string Message)
 {
@@ -18,13 +24,7 @@ internal abstract record WorkloadResolution(string Message)
     public sealed record Resolved(WorkloadInfo Workload, string Message)
         : WorkloadResolution(Message);
 
-    /// <summary>More than one workload claims the directory; the user must disambiguate.</summary>
-    /// <param name="Candidates">Workloads that claimed the directory, with per-detector reasons.</param>
-    /// <param name="Message">Pre-rendered prose listing the conflict and a hint.</param>
-    public sealed record Ambiguous(IReadOnlyList<ResolutionCandidate> Candidates, string Message)
-        : WorkloadResolution(Message);
-
-    /// <summary>No installed workload claims the directory.</summary>
-    /// <param name="Message">Actionable hint (typically a <c>func workload install</c> suggestion).</param>
+    /// <summary>No single workload could be chosen: either zero claimed, or several did.</summary>
+    /// <param name="Message">Pre-rendered, actionable prose for the user.</param>
     public sealed record None(string Message) : WorkloadResolution(Message);
 }
