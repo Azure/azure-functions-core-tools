@@ -328,7 +328,7 @@ internal sealed class CompactRenderer(
         IRenderable functions = snapshot.Functions.Count switch
         {
             0 => new Markup("[dim]  No functions loaded yet…[/]"),
-            <= 8 => BuildFunctionsTable(snapshot.Functions),
+            <= 8 => BuildFunctionsTable(snapshot.Functions, snapshot.ListenUri),
             _ => BuildFunctionsStatusStrip(snapshot),
         };
 
@@ -340,7 +340,7 @@ internal sealed class CompactRenderer(
             new Markup($"  [dim]{Markup.Escape(status)}[/]"));
     }
 
-    private IRenderable BuildFunctionsTable(IReadOnlyList<FunctionInfo> functions)
+    private IRenderable BuildFunctionsTable(IReadOnlyList<FunctionInfo> functions, string? listenUri)
     {
         Table table = new Table()
             .Border(TableBorder.None)
@@ -359,13 +359,12 @@ internal sealed class CompactRenderer(
         foreach (FunctionInfo fn in functions.OrderBy(f => f.Name, StringComparer.Ordinal))
         {
             string color = _palette.GetColorFor(fn.Name);
-            string route = !string.IsNullOrEmpty(fn.Route) ? fn.Route : "—";
-            string methodsPrefix = fn.HttpMethods.Count > 0 ? string.Join(",", fn.HttpMethods) + " " : string.Empty;
+            string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri);
 
             table.AddRow(
                 new Markup($"[{color}]{Markup.Escape(fn.Name)}[/]"),
                 new Markup(Markup.Escape(FormatTrigger(fn.TriggerType))),
-                new Markup($"[dim]{Markup.Escape(methodsPrefix + route)}[/]"),
+                new Markup($"[dim]{routeMarkup}[/]"),
                 new Markup(FormatStatus(fn)));
         }
 
@@ -433,8 +432,9 @@ internal sealed class CompactRenderer(
                 case FunctionDiscoveredEvent fd:
                 {
                     string color = _palette.GetColorFor(fd.Function.Name);
+                    string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, _state.Snapshot().ListenUri);
                     return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [dim]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [dim]{Markup.Escape(fd.Function.TriggerType)} {Markup.Escape(fd.Function.Route ?? string.Empty)}[/]"));
+                        $" [dim]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [dim]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"));
                 }
 
                 case InvocationStartedEvent inv:

@@ -5,6 +5,7 @@ using System.Globalization;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
+using Spectre.Console;
 
 namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 
@@ -13,9 +14,10 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// colors by default, stable prefix tokens (<c>[host]</c>, <c>[invocation
 /// start]</c>, …) so the output is both grep-friendly and human readable.
 /// </summary>
-internal sealed class PlainRenderer(IInteractionService interaction) : IDashboardRenderer
+internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsole? console = null) : IDashboardRenderer
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+    private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
     private bool _bannerPrinted;
     private string? _hostVersion;
     private string? _listenUri;
@@ -119,7 +121,32 @@ internal sealed class PlainRenderer(IInteractionService interaction) : IDashboar
                 string methods = fd.Function.HttpMethods.Count > 0
                     ? string.Join(",", fd.Function.HttpMethods) + " "
                     : string.Empty;
-                _interaction.WriteLine($"{FormatTimestamp(fd.Timestamp)}  [function loaded]  {fd.Function.Name,-22} {fd.Function.TriggerType,-8} {methods}{route}");
+
+                string displayRoute = methods + route;
+
+                // For HTTP-triggered functions, render the full clickable
+                // URL so developers can Ctrl/Cmd-click it to invoke the
+                // function — matching the legacy `func start` behavior.
+                // OSC 8 hyperlink emission is gated on the terminal's
+                // declared capability so we don't leak raw escape bytes
+                // into files or pipes.
+                bool isHttp = string.Equals(fd.Function.TriggerType, "http", StringComparison.OrdinalIgnoreCase);
+                if (isHttp && !string.IsNullOrEmpty(_listenUri) && !string.IsNullOrEmpty(fd.Function.Route))
+                {
+                    string url = CombineUrl(_listenUri, fd.Function.Route);
+                    string clickable = _console.Profile.Capabilities.Links
+                        ? Osc8Link(url, url)
+                        : url;
+                    displayRoute = methods + clickable;
+                }
+
+                // Write directly to the underlying TextWriter so the raw
+                // OSC 8 sequence reaches the terminal intact and so the
+                // line doesn't get hard-wrapped at Spectre's profile
+                // width when stdout is redirected.
+                _console.Profile.Out.Writer.WriteLine(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{FormatTimestamp(fd.Timestamp)}  [function loaded]  {fd.Function.Name,-22} {fd.Function.TriggerType,-8} {displayRoute}"));
                 break;
             }
 
@@ -178,4 +205,18 @@ internal sealed class PlainRenderer(IInteractionService interaction) : IDashboar
 
     private static string ShortId(string id)
         => id.Length > 8 ? id[..8] : id;
+
+    private static string CombineUrl(string baseUrl, string route)
+    {
+        string left = baseUrl.TrimEnd('/');
+        string right = route.StartsWith('/') ? route : "/" + route;
+        return left + right;
+    }
+
+    // OSC 8 hyperlink: ESC ] 8 ; ; URL ST DISPLAY ESC ] 8 ; ; ST
+    // ST = ESC '\'. Recognized by Windows Terminal, VS Code, iTerm2,
+    // GNOME Terminal, Konsole, etc. Terminals that don't honor the
+    // sequence render the display text and silently ignore the wrapper.
+    private static string Osc8Link(string url, string display)
+        => $"\u001b]8;;{url}\u001b\\{display}\u001b]8;;\u001b\\";
 }
