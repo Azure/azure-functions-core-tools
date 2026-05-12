@@ -44,10 +44,10 @@ namespace Azure.Functions.Cli.Helpers
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
             {
-                // Go publishes an explicit allowlist (host.json + the cross-compiled 'app' binary)
-                // rather than honoring .funcignore. The 'app' binary needs the executable bit set
-                // when extracted on Linux. Shared by both `func pack` and `func publish`.
-                return await CreateZip(GoHelpers.GetPackFiles(functionAppRoot), functionAppRoot, new[] { $"{GoHelpers.GoBinDir}/{GoHelpers.GoBinaryName}" });
+                // Go deploys an explicit allowlist: host.json + the cross-compiled binary.
+                // The binary lives under bin/ locally (for .gitignore) but must appear at
+                // the zip root as 'app' because the Azure host expects it there.
+                return CreateGoZipPackage(functionAppRoot);
             }
             else
             {
@@ -143,7 +143,49 @@ namespace Azure.Functions.Cli.Helpers
             return memStream;
         }
 
-        // Assumes all bytes of signatureToFind are non zero.
+        /// <summary>
+        /// Creates a zip for Go deployments where the binary is placed at the zip root
+        /// (not under <c>bin/</c>) because the Azure host expects <c>app</c> at the root.
+        /// Locally the binary is built to <c>bin/app</c> for .gitignore convenience.
+        /// </summary>
+        private static Stream CreateGoZipPackage(string functionAppRoot)
+        {
+            const byte CreatedByUnix = 3;
+            const uint centralDirectorySignature = 0x02014B50;
+
+            int unixExecutablePermissions = Convert.ToInt32("100777", 8) << 16;
+            int unixReadWritePermissions = Convert.ToInt32("100666", 8) << 16;
+
+            var hostJsonPath = Path.Combine(functionAppRoot, Constants.HostJsonFileName);
+            var binaryPath = Path.Combine(functionAppRoot, GoHelpers.GoBinDir, GoHelpers.GoBinaryName);
+
+            var memStream = new MemoryStream();
+
+            using (var zip = new ZipArchive(memStream, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                var hostEntry = zip.CreateEntryFromFile(hostJsonPath, Constants.HostJsonFileName);
+                hostEntry.ExternalAttributes = unixReadWritePermissions;
+
+                // Place binary at root as 'app', not 'bin/app'
+                var appEntry = zip.CreateEntryFromFile(binaryPath, GoHelpers.GoBinaryName);
+                appEntry.ExternalAttributes = unixExecutablePermissions;
+            }
+
+            if (OperatingSystem.IsWindows())
+            {
+                memStream.Seek(0, SeekOrigin.End);
+                while (SeekBackwardsToSignature(memStream, centralDirectorySignature))
+                {
+                    memStream.Seek(5, SeekOrigin.Current);
+                    memStream.WriteByte(CreatedByUnix);
+                    memStream.Seek(-6, SeekOrigin.Current);
+                }
+            }
+
+            memStream.Seek(0, SeekOrigin.Begin);
+            return memStream;
+        }
+
         // If the signature is found then returns true and positions stream at first byte of signature
         // If the signature is not found, returns false
         private static bool SeekBackwardsToSignature(Stream stream, uint signatureToFind)
