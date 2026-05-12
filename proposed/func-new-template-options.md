@@ -238,3 +238,60 @@ public async Task<NewResult> CreateAsync(NewContext ctx, IReadOnlyDictionary<str
 | **1. Pure consistency** | None added | Junk drawer | Each workload | Full |
 | **2. Flat + descriptor** | Small (`TemplateDescriptor` with name lists) | Scoped per template | CLI (relevance/required) + workload (semantics) | Full |
 | **3. Schema-driven** | Large (parameter schema) | Scoped per template | CLI (almost all) | Reduced (schema-bounded) |
+
+---
+
+## Orthogonal concern: cross-stack template contribution
+
+The three options above are about **how** a workload exposes its template parameters. A separate but related question is **which workloads contribute templates** to a given `func new` invocation.
+
+### The companion-workload case
+
+Some workloads are stack-specific and own their projects: Python, Node, .NET-isolated each register `IProjectDetector` and claim directories matching their shape. Other workloads are **companions**: Durable Functions, for example, doesn't own a project, but adds templates that apply on top of Python, Node, and .NET-isolated projects.
+
+Per spec §5.1, `IProjectDetector` and `ITemplateProvider` are independent contribution points. A workload can register either, both, or neither:
+
+| Workload kind        | `IProjectDetector` | `ITemplateProvider` | Example                |
+|----------------------|--------------------|---------------------|------------------------|
+| Stack owner          | ✅                  | ✅                   | Python, Node, .NET     |
+| Companion (cross-stack) | ❌               | ✅                   | Durable, extension packs |
+| Command-only         | ❌                  | ❌ (uses `IExternalCommand`) | `func kubernetes`, `func azure` |
+
+### Implications for `func new`
+
+- **Ownership** is single-winner. The `IWorkloadResolver` (spec §5.2) picks the one workload that owns the current directory: Python wins for a `requirements.txt` project, Node wins for a Functions-shaped `package.json`, etc. Companions abstain because they don't register `IProjectDetector`.
+
+- **Template enumeration** is multi-contributor. `func new` injects `IEnumerable<ITemplateProvider>` and aggregates from every installed workload, then filters by the resolved owner's stack.
+
+A workload's `ITemplateProvider` returns templates tagged with the stacks they apply to:
+
+```csharp
+internal sealed class DurableTemplates : ITemplateProvider
+{
+    public IReadOnlyList<TemplateDescriptor> GetTemplates() =>
+    [
+        new("durable-orchestration", Stacks: ["python", "node", "dotnet-isolated"], /* … */),
+        new("durable-activity",      Stacks: ["python", "node", "dotnet-isolated"], /* … */),
+        new("durable-entity",        Stacks: ["dotnet-isolated"], /* … */),
+    ];
+}
+```
+
+`func new` in a Python project then shows:
+
+- HttpTrigger, TimerTrigger, BlobTrigger, … (from Python workload, `Stacks: ["python"]`)
+- DurableOrchestration, DurableActivity (from Durable workload, filtered in because tagged `python`)
+- *Not* DurableEntity (tagged `dotnet-isolated` only)
+
+### Impact on the three options above
+
+- **Option 1.** Flat options compound across workloads. A Python + Durable install adds Durable's options to the Python options. The "junk drawer" problem gets worse, not better, in companion scenarios. ❌
+- **Option 2.** The descriptor's `Stack`/`Stacks` field becomes load-bearing: both for ownership-vs-companion routing in `func new` *and* for filtering options to the right scope. ✅ Falls out naturally.
+- **Option 3.** Same as option 2, plus the CLI owns parameter binding per template — companion templates render identically to owner templates. ✅ Cleanest.
+
+This pushes mildly in favour of option 2 or 3 over option 1: the moment companions exist, a per-template descriptor with stack metadata stops being optional.
+
+### Out of scope here
+
+- Whether a template applies to a stack is currently modelled as a string-list match. More sophisticated rules (e.g. "applies to any Python project where the Durable extension is referenced in `requirements.txt`") are a separate design.
+- How companions discover *which other workloads are installed* — and whether they need to — is a separate concern. The current design says they don't: templates are pre-filtered by stack tag, not by inspecting peers.
