@@ -92,8 +92,11 @@ internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
 
         // Spool to a temp file so the caller gets a seekable stream that
         // PackageArchiveReader can consume without keeping NuGet.Protocol's
-        // internal buffers alive.
-        string tempPath = Path.Combine(Path.GetTempPath(), $"funccli-workload-{Guid.NewGuid():N}.nupkg");
+        // internal buffers alive. The stream is returned to the caller
+        // (transferring ownership), so we can't use `await using` here;
+        // the try/catch guards against leaking the file if the download
+        // fails before we hand it back.
+        string tempPath = Path.Combine(Path.GetTempPath(), $"funccli-workload-{Path.GetRandomFileName()}.nupkg");
         FileStream fileStream = new(tempPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, bufferSize: 4096, FileOptions.DeleteOnClose);
         try
         {
@@ -107,7 +110,6 @@ internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
 
             if (!copied)
             {
-                await fileStream.DisposeAsync();
                 throw new WorkloadPackageNotFoundException(
                     $"Package '{packageId}' {version} was not found on source '{Source.Name}'.");
             }
