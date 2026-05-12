@@ -239,6 +239,32 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
+    public async Task NoRuntimeNoSelector_SingleDetectorClaims_Resolves()
+    {
+        // Flex Consumption customers don't have FUNCTIONS_WORKER_RUNTIME in
+        // local.settings.json (it's not in their Azure config either, by
+        // design). The resolver must still pick a workload from project shape
+        // alone via IProjectDetector. This test pins that contract: no --stack,
+        // no runtime, single claiming detector resolves cleanly.
+        WorkloadInfo python = NewWorkload("Pkg.Python");
+        IProjectDetector pythonDetector = NewDetector(
+            detectResult: DetectionResult.Yes("found requirements.txt"));
+        _settings.ReadWorkerRuntime(_dir).Returns((string?)null);
+
+        WorkloadResolver resolver = NewResolver(
+            workloads: [python],
+            detectors: [(python, pythonDetector)]);
+
+        WorkloadResolution result = await resolver.ResolveAsync(
+            new WorkloadResolutionContext(_dir, StackSelector: null),
+            CancellationToken.None);
+
+        var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
+        Assert.Same(python, resolved.Workload);
+        Assert.Contains("found requirements.txt", resolved.Message);
+    }
+
+    [Fact]
     public async Task Detectors_ZeroCandidates_ReturnsNone()
     {
         WorkloadResolver resolver = NewResolver(workloads: [], detectors: []);
