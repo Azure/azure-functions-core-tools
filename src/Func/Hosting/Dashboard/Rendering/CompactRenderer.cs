@@ -51,6 +51,7 @@ internal sealed class CompactRenderer(
     private int _functionBrowserSelectedIndex;
     private int _functionBrowserRowOffset;
     private string? _activeFunctionFilter;
+    private bool _errorsOnly;
 
     private ITheme Theme => _interaction.Theme;
 
@@ -87,7 +88,7 @@ internal sealed class CompactRenderer(
             return Task.CompletedTask;
         }
 
-        var line = new LogLine(FormatLogLine(entry, events), GetFunctionName(entry, events));
+        var line = new LogLine(FormatLogLine(entry, events), GetFunctionName(entry, events), IsErrorLogLine(entry, events));
         lock (_stateLock)
         {
             _logTail.Enqueue(line);
@@ -232,6 +233,10 @@ internal sealed class CompactRenderer(
 
                 case ConsoleKey.C:
                     ClearVisibleLogs();
+                    return true;
+
+                case ConsoleKey.E:
+                    _errorsOnly = !_errorsOnly;
                     return true;
 
                 case ConsoleKey.Escape when _helpOpen || _functionBrowserOpen:
@@ -426,9 +431,11 @@ internal sealed class CompactRenderer(
         }
 
         string? activeFunctionFilter;
+        bool errorsOnly;
         lock (_uiLock)
         {
             activeFunctionFilter = _activeFunctionFilter;
+            errorsOnly = _errorsOnly;
         }
 
         if (activeFunctionFilter is not null)
@@ -436,6 +443,11 @@ internal sealed class CompactRenderer(
             tail = [.. tail.Where(line =>
                 line.FunctionName is null
                 || string.Equals(line.FunctionName, activeFunctionFilter, StringComparison.Ordinal))];
+        }
+
+        if (errorsOnly)
+        {
+            tail = [.. tail.Where(line => line.IsError)];
         }
 
         // Slice the log tail to what actually fits on screen so we render
@@ -450,7 +462,7 @@ internal sealed class CompactRenderer(
         }
 
         IRenderable logRows = BuildLogRows(tail, activeFunctionFilter, logBudget);
-        IRenderable footer = BuildFooter(snapshot, activeFunctionFilter);
+        IRenderable footer = BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly);
 
         var rows = new Rows(
             header,
@@ -625,10 +637,11 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
         AddHelpRow(table, "a", "Clear the active function filter.");
         AddHelpRow(table, "c", "Clear visible log output.");
+        AddHelpRow(table, "e", "Toggle errors-only log view.");
         AddHelpRow(table, "Esc", "Close the active overlay.");
         AddHelpRow(table, "Ctrl+C", "Stop the host.");
 
-        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]e[/] errors only · [{CommandTag}]1/2/3[/] log level · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
+        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]1/2/3[/] log level · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
         var panel = new Panel(new Rows(
             new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
             table,
@@ -692,7 +705,7 @@ internal sealed class CompactRenderer(
             ? new Markup($"[{MutedTag}]No functions loaded yet…[/]")
             : BuildFunctionBrowserGrid(functions, totalRows, visibleRows, rowOffset, selectedIndex);
 
-        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · a clear filter · c clear logs · t/Esc close[/]");
+        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · a clear filter · c clear · e errors · t/Esc close[/]");
         var panel = new Panel(new Rows(content, new Markup(string.Empty), footer))
         {
             Header = new PanelHeader(string.Create(CultureInfo.InvariantCulture, $"Functions ({functions.Length})")),
@@ -770,6 +783,9 @@ internal sealed class CompactRenderer(
     }
 
     private IRenderable BuildFooter(DashboardSnapshot snapshot, string? activeFunctionFilter)
+        => BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly: false);
+
+    private IRenderable BuildFooterCore(DashboardSnapshot snapshot, string? activeFunctionFilter, bool errorsOnly)
     {
         string state = snapshot.HostState switch
         {
@@ -783,6 +799,9 @@ internal sealed class CompactRenderer(
         string filter = activeFunctionFilter is not null
             ? $" · Filter {activeFunctionFilter}"
             : string.Empty;
+        string errors = errorsOnly
+            ? " · Errors only"
+            : string.Empty;
         bool helpOpen;
         bool functionBrowserOpen;
         lock (_uiLock)
@@ -793,15 +812,15 @@ internal sealed class CompactRenderer(
 
         string controls = (helpOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
-            (true, _, _) => "? close · c clear logs · Esc close · Ctrl+C stop",
-            (_, true, _) => "↑/↓ navigate · Enter filter · c clear logs · t close · Esc close",
-            (_, _, true) => "t functions · a all · c clear logs · ? help · Ctrl+C stop",
-            _ => "t functions · / search · c clear logs · ? help · Ctrl+C stop",
+            (true, _, _) => "? close · c clear · e errors · Esc close · Ctrl+C stop",
+            (_, true, _) => "↑/↓ navigate · Enter filter · c clear · e errors · t close · Esc close",
+            (_, _, true) => "t functions · a all · c clear · e errors · ? help · Ctrl+C stop",
+            _ => "t functions · / search · c clear · e errors · ? help · Ctrl+C stop",
         };
 
         string line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter} │ {controls}");
+            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors} │ {controls}");
 
         return new Markup($"[{MutedTag}]{Markup.Escape(line)}[/]");
     }
@@ -960,7 +979,19 @@ internal sealed class CompactRenderer(
         _ => $"Host {hs.To.ToString().ToLowerInvariant()}",
     };
 
-    private sealed record LogLine(IRenderable Renderable, string? FunctionName);
+    private static bool IsErrorLogLine(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
+    {
+        if (entry.Level is LogLevel.Error or LogLevel.Critical)
+        {
+            return true;
+        }
+
+        return events.Any(static ev =>
+            ev is InvocationCompletedEvent { Result: var result }
+            && string.Equals(result, "failed", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed record LogLine(IRenderable Renderable, string? FunctionName, bool IsError);
 
     private sealed class FunctionNameComparer : IComparer<string>
     {

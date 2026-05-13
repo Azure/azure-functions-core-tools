@@ -44,7 +44,8 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("12 functions", output);
         Assert.Contains("t functions", output);
         Assert.Contains("/ search", output);
-        Assert.Contains("c clear logs", output);
+        Assert.Contains("c clear", output);
+        Assert.Contains("e errors", output);
         Assert.Contains("Ctrl+C stop", output);
     }
 
@@ -76,8 +77,10 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Available compact-mode controls", output);
         Assert.Contains("Toggle this help panel", output);
         Assert.Contains("Clear visible log output", output);
+        Assert.Contains("Toggle errors-only log view", output);
         Assert.Contains("Coming soon", output);
         Assert.DoesNotContain("c clear logs", output);
+        Assert.DoesNotContain("e errors only", output);
     }
 
     [Fact]
@@ -174,6 +177,37 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Waiting for events", output);
     }
 
+    [Fact]
+    public async Task HandleKey_E_TogglesErrorsOnlyLogView()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        await renderer.OnEventAsync(Log("HttpTrigger1", "info compact log"), [], CancellationToken.None);
+        await renderer.OnEventAsync(Log("HttpTrigger1", "error compact log", LogLevel.Error), [], CancellationToken.None);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.Contains("info compact log", output);
+        Assert.Contains("error compact log", output);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('e', ConsoleKey.E)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        output = writer.ToString();
+        Assert.DoesNotContain("info compact log", output);
+        Assert.Contains("error compact log", output);
+        Assert.Contains("Errors only", output);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('e', ConsoleKey.E)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        output = writer.ToString();
+        Assert.Contains("info compact log", output);
+        Assert.Contains("error compact log", output);
+        Assert.DoesNotContain("Errors only", output);
+    }
+
     private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
     {
         var writer = new StringWriter();
@@ -237,11 +271,11 @@ public class CompactRendererFunctionBrowserTests
     private static HostLogEntry MakeEntry(string category, Dictionary<string, object?> attrs)
         => new(DateTimeOffset.UtcNow, category, LogLevel.Information, default, "msg", null, attrs);
 
-    private static HostLogEntry Log(string functionName, string message)
+    private static HostLogEntry Log(string functionName, string message, LogLevel level = LogLevel.Information)
         => new(
             DateTimeOffset.UtcNow,
             $"Function.{functionName}",
-            LogLevel.Information,
+            level,
             default,
             message,
             null,
