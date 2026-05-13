@@ -18,7 +18,7 @@ internal sealed class DefaultAppStackProvider : IAppStackProvider
             return ValueTask.FromResult(".NET");
         }
 
-        if (HasAnyFile(directory, ["requirements.txt", "*.py"]))
+        if (HasAnyFile(directory, ["requirements.txt", "pyproject.toml", "*.py"]))
         {
             return ValueTask.FromResult("Python");
         }
