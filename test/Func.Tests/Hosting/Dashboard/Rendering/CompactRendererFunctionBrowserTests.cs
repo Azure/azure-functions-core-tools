@@ -48,6 +48,36 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
+    public void BuildFooter_WhenHelpOpen_ShowsHelpCloseControls()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
+        SetPrivate(renderer, "_helpOpen", true);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
+
+        string output = writer.ToString();
+        Assert.Contains("? close", output);
+        Assert.Contains("Esc close", output);
+    }
+
+    [Fact]
+    public void BuildHeader_WhenHelpOpen_RendersHelpOverlay()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
+        SetPrivate(renderer, "_helpOpen", true);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
+
+        string output = writer.ToString();
+        Assert.Contains("Help", output);
+        Assert.Contains("Available compact-mode controls", output);
+        Assert.Contains("Toggle this help panel", output);
+        Assert.Contains("Coming soon", output);
+    }
+
+    [Fact]
     public void BuildHeader_WhenFunctionBrowserOpen_RendersTwoColumnBrowser()
     {
         (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
@@ -79,6 +109,35 @@ public class CompactRendererFunctionBrowserTests
 
         Assert.False((bool)GetPrivate(renderer, "_functionBrowserOpen")!);
         Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+    }
+
+    [Fact]
+    public void HandleKey_Question_TogglesHelpOverlayAndClosesFunctionBrowser()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+        SetPrivate(renderer, "_functionBrowserOpen", true);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('?', ConsoleKey.Oem2)));
+
+        Assert.True((bool)GetPrivate(renderer, "_helpOpen")!);
+        Assert.False((bool)GetPrivate(renderer, "_functionBrowserOpen")!);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('?', ConsoleKey.Oem2)));
+
+        Assert.False((bool)GetPrivate(renderer, "_helpOpen")!);
+    }
+
+    [Fact]
+    public void HandleKey_Escape_ClosesHelpOverlay()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+        SetPrivate(renderer, "_helpOpen", true);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\u001b', ConsoleKey.Escape)));
+
+        Assert.False((bool)GetPrivate(renderer, "_helpOpen")!);
     }
 
     [Fact]

@@ -27,6 +27,7 @@ internal sealed class CompactRenderer(
     DashboardRunInfo? runInfo = null) : IDashboardRenderer
 {
     private const int MaxLogTailLines = 200;
+    private const int HelpOverlayLines = 12;
 
     private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
 
@@ -45,6 +46,7 @@ internal sealed class CompactRenderer(
     private Task? _inputTask;
     private int _lastKnownWidth;
     private int _lastKnownHeight;
+    private bool _helpOpen;
     private bool _functionBrowserOpen;
     private int _functionBrowserSelectedIndex;
     private int _functionBrowserRowOffset;
@@ -53,6 +55,7 @@ internal sealed class CompactRenderer(
     private ITheme Theme => _interaction.Theme;
 
     private string HeadingTag => field ??= Theme.Heading.ToMarkup();
+    private string CommandTag => field ??= Theme.Command.ToMarkup();
     private string MutedTag => field ??= Theme.Muted.ToMarkup();
     private string EmphasisTag => field ??= Theme.Emphasis.ToMarkup();
     private string SuccessTag => field ??= Theme.Success.ToMarkup();
@@ -215,13 +218,20 @@ internal sealed class CompactRenderer(
 
         lock (_uiLock)
         {
+            if (key.KeyChar == '?')
+            {
+                ToggleHelpOverlay();
+                return true;
+            }
+
             switch (key.Key)
             {
                 case ConsoleKey.T:
                     ToggleFunctionBrowser(functions);
                     return true;
 
-                case ConsoleKey.Escape when _functionBrowserOpen:
+                case ConsoleKey.Escape when _helpOpen || _functionBrowserOpen:
+                    _helpOpen = false;
                     _functionBrowserOpen = false;
                     return true;
 
@@ -280,6 +290,7 @@ internal sealed class CompactRenderer(
             return;
         }
 
+        _helpOpen = false;
         _functionBrowserRowOffset = 0;
         if (_activeFunctionFilter is null)
         {
@@ -301,6 +312,15 @@ internal sealed class CompactRenderer(
         }
 
         _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex + delta, 0, functions.Length - 1);
+    }
+
+    private void ToggleHelpOverlay()
+    {
+        _helpOpen = !_helpOpen;
+        if (_helpOpen)
+        {
+            _functionBrowserOpen = false;
+        }
     }
 
     private async Task RunLiveLoopAsync(CancellationToken cancellationToken)
@@ -457,12 +477,16 @@ internal sealed class CompactRenderer(
         //   "logs" rule:                            1 line
         //   footer line:                            1 line
         //   safety pad (resize/wrap slack):         2 lines
+        bool helpOpen;
         bool browserOpen;
         int functionsLines;
         lock (_uiLock)
         {
+            helpOpen = _helpOpen;
             browserOpen = _functionBrowserOpen;
-            functionsLines = _functionBrowserOpen
+            functionsLines = _helpOpen
+                ? HelpOverlayLines
+                : _functionBrowserOpen
                 // Panel border (2) + visible grid rows + spacer/footer (2).
                 ? GetFunctionBrowserVisibleRows(snapshot.Functions.Count) + 4
                 : snapshot.Functions.Count switch
@@ -473,8 +497,8 @@ internal sealed class CompactRenderer(
                 };
         }
 
-        int reservedForHeader = browserOpen
-            // Function browser panel + "logs" rule + footer + safety pad.
+        int reservedForHeader = helpOpen || browserOpen
+            // Overlay panel + "logs" rule + footer + safety pad.
             ? functionsLines + 1 + 1 + 2
             // Banner panel + functions block + "logs" rule + footer + safety pad.
             : 3 + functionsLines + 1 + 1 + 2;
@@ -486,10 +510,17 @@ internal sealed class CompactRenderer(
 
     private IRenderable BuildHeader(DashboardSnapshot snapshot)
     {
+        bool helpOpen;
         bool functionBrowserOpen;
         lock (_uiLock)
         {
+            helpOpen = _helpOpen;
             functionBrowserOpen = _functionBrowserOpen;
+        }
+
+        if (helpOpen)
+        {
+            return BuildHelpOverlay();
         }
 
         if (functionBrowserOpen)
@@ -515,7 +546,7 @@ internal sealed class CompactRenderer(
             .AddColumn(new TableColumn(string.Empty).RightAligned().NoWrap().PadLeft(0).PadRight(0));
 
         bannerTable.AddRow(
-            new Markup($"[bold gold1]:high_voltage:[/] [{EmphasisTag}]Azure Functions CLI[/]  [{MutedTag}]Host:[/] [{EmphasisTag}]{Markup.Escape(version)}[/][{MutedTag}] · Profile:[/] [{EmphasisTag}]{Markup.Escape(profile)}[/][{MutedTag}] · Stack:[/] [{EmphasisTag}]{Markup.Escape(stack)}[/]"),
+            new Markup($"[{WarningTag}]:high_voltage:[/] [{EmphasisTag}]Azure Functions CLI[/]  [{MutedTag}]Host:[/] [{EmphasisTag}]{Markup.Escape(version)}[/][{MutedTag}] · Profile:[/] [{EmphasisTag}]{Markup.Escape(profile)}[/][{MutedTag}] · Stack:[/] [{EmphasisTag}]{Markup.Escape(stack)}[/]"),
             new Markup($"[{HyperlinkTag}]{Markup.Escape(listen)}[/]"));
 
         Panel bannerPanel = new Panel(bannerTable)
@@ -564,6 +595,47 @@ internal sealed class CompactRenderer(
         }
 
         return table;
+    }
+
+    private IRenderable BuildHelpOverlay()
+    {
+        Table table = new Table()
+            .Border(TableBorder.None)
+            .HideHeaders()
+            .Expand()
+            .AddColumn(new TableColumn(string.Empty).PadLeft(1).PadRight(3).NoWrap())
+            .AddColumn(new TableColumn(string.Empty).PadRight(0));
+
+        AddHelpRow(table, "?", "Toggle this help panel.");
+        AddHelpRow(table, "t", "Open the function browser.");
+        AddHelpRow(table, "↑/↓", "Move selection in the function browser.");
+        AddHelpRow(table, "PgUp/PgDn", "Jump through the function browser.");
+        AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
+        AddHelpRow(table, "a", "Clear the active function filter.");
+        AddHelpRow(table, "Esc", "Close the active overlay.");
+        AddHelpRow(table, "Ctrl+C", "Stop the host.");
+
+        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]c[/] clear logs · [{CommandTag}]e[/] errors only · [{CommandTag}]1/2/3[/] log level · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
+        var panel = new Panel(new Rows(
+            new Markup($"[{MutedTag}]Available controls[/]"),
+            table,
+            new Markup(string.Empty),
+            planned))
+        {
+            Header = new PanelHeader("Help"),
+            Border = BoxBorder.Rounded,
+            BorderStyle = Theme.Muted,
+            Expand = true,
+        };
+
+        return panel;
+    }
+
+    private void AddHelpRow(Table table, string key, string description)
+    {
+        table.AddRow(
+            new Markup($"[{CommandTag}]{Markup.Escape(key)}[/]"),
+            new Markup($"[{MutedTag}]{Markup.Escape(description)}[/]"));
     }
 
     private IRenderable BuildFunctionBrowser(DashboardSnapshot snapshot)
@@ -698,9 +770,22 @@ internal sealed class CompactRenderer(
         string filter = activeFunctionFilter is not null
             ? $" · Filter {activeFunctionFilter}"
             : string.Empty;
-        string controls = activeFunctionFilter is not null
-            ? "t functions · a clear · ? help · Ctrl+C stop"
-            : "t functions · / search · ? help · Ctrl+C stop";
+        bool helpOpen;
+        bool functionBrowserOpen;
+        lock (_uiLock)
+        {
+            helpOpen = _helpOpen;
+            functionBrowserOpen = _functionBrowserOpen;
+        }
+
+        string controls = (helpOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
+        {
+            (true, _, _) => "? close · Esc close · Ctrl+C stop",
+            (_, true, _) => "↑/↓ navigate · Enter filter · t close · Esc close",
+            (_, _, true) => "t functions · a clear · ? help · Ctrl+C stop",
+            _ => "t functions · / search · ? help · Ctrl+C stop",
+        };
+
         string line = string.Create(
             CultureInfo.InvariantCulture,
             $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter} │ {controls}");
