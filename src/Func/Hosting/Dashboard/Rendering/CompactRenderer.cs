@@ -230,6 +230,10 @@ internal sealed class CompactRenderer(
                     ToggleFunctionBrowser(functions);
                     return true;
 
+                case ConsoleKey.C:
+                    ClearVisibleLogs();
+                    return true;
+
                 case ConsoleKey.Escape when _helpOpen || _functionBrowserOpen:
                     _helpOpen = false;
                     _functionBrowserOpen = false;
@@ -320,6 +324,14 @@ internal sealed class CompactRenderer(
         if (_helpOpen)
         {
             _functionBrowserOpen = false;
+        }
+    }
+
+    private void ClearVisibleLogs()
+    {
+        lock (_stateLock)
+        {
+            _logTail.Clear();
         }
     }
 
@@ -612,12 +624,13 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "PgUp/PgDn", "Jump through the function browser.");
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
         AddHelpRow(table, "a", "Clear the active function filter.");
+        AddHelpRow(table, "c", "Clear visible log output.");
         AddHelpRow(table, "Esc", "Close the active overlay.");
         AddHelpRow(table, "Ctrl+C", "Stop the host.");
 
-        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]c[/] clear logs · [{CommandTag}]e[/] errors only · [{CommandTag}]1/2/3[/] log level · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
+        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]e[/] errors only · [{CommandTag}]1/2/3[/] log level · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
         var panel = new Panel(new Rows(
-            new Markup($"[{MutedTag}]Available controls[/]"),
+            new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
             table,
             new Markup(string.Empty),
             planned))
@@ -679,7 +692,7 @@ internal sealed class CompactRenderer(
             ? new Markup($"[{MutedTag}]No functions loaded yet…[/]")
             : BuildFunctionBrowserGrid(functions, totalRows, visibleRows, rowOffset, selectedIndex);
 
-        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · a clear filter · t/Esc close[/]");
+        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · a clear filter · c clear logs · t/Esc close[/]");
         var panel = new Panel(new Rows(content, new Markup(string.Empty), footer))
         {
             Header = new PanelHeader(string.Create(CultureInfo.InvariantCulture, $"Functions ({functions.Length})")),
@@ -780,10 +793,10 @@ internal sealed class CompactRenderer(
 
         string controls = (helpOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
-            (true, _, _) => "? close · Esc close · Ctrl+C stop",
-            (_, true, _) => "↑/↓ navigate · Enter filter · t close · Esc close",
-            (_, _, true) => "t functions · a clear · ? help · Ctrl+C stop",
-            _ => "t functions · / search · ? help · Ctrl+C stop",
+            (true, _, _) => "? close · c clear logs · Esc close · Ctrl+C stop",
+            (_, true, _) => "↑/↓ navigate · Enter filter · c clear logs · t close · Esc close",
+            (_, _, true) => "t functions · a all · c clear logs · ? help · Ctrl+C stop",
+            _ => "t functions · / search · c clear logs · ? help · Ctrl+C stop",
         };
 
         string line = string.Create(

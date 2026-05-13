@@ -44,6 +44,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("12 functions", output);
         Assert.Contains("t functions", output);
         Assert.Contains("/ search", output);
+        Assert.Contains("c clear logs", output);
         Assert.Contains("Ctrl+C stop", output);
     }
 
@@ -74,7 +75,9 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Help", output);
         Assert.Contains("Available compact-mode controls", output);
         Assert.Contains("Toggle this help panel", output);
+        Assert.Contains("Clear visible log output", output);
         Assert.Contains("Coming soon", output);
+        Assert.DoesNotContain("c clear logs", output);
     }
 
     [Fact]
@@ -152,6 +155,25 @@ public class CompactRendererFunctionBrowserTests
         Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
     }
 
+    [Fact]
+    public async Task HandleKey_C_ClearsVisibleLogTail()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        await renderer.OnEventAsync(Log("HttpTrigger1", "first compact log"), [], CancellationToken.None);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        Assert.Contains("first compact log", writer.ToString());
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('c', ConsoleKey.C)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.DoesNotContain("first compact log", output);
+        Assert.Contains("Waiting for events", output);
+    }
+
     private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
     {
         var writer = new StringWriter();
@@ -214,6 +236,19 @@ public class CompactRendererFunctionBrowserTests
 
     private static HostLogEntry MakeEntry(string category, Dictionary<string, object?> attrs)
         => new(DateTimeOffset.UtcNow, category, LogLevel.Information, default, "msg", null, attrs);
+
+    private static HostLogEntry Log(string functionName, string message)
+        => new(
+            DateTimeOffset.UtcNow,
+            $"Function.{functionName}",
+            LogLevel.Information,
+            default,
+            message,
+            null,
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.FunctionName] = functionName,
+            });
 
     private static ConsoleKeyInfo Key(char keyChar, ConsoleKey key)
         => new(keyChar, key, shift: false, alt: false, control: false);
