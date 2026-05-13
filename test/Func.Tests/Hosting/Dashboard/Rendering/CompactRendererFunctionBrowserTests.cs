@@ -127,6 +127,40 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
+    public void BuildHeader_WhenIntermediateFunctionCount_RendersPriorityTruncatedTable()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        DashboardSnapshot snapshot = BuildStateWithPriorityFunctions().Snapshot();
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
+
+        string output = writer.ToString();
+        Assert.Contains("HttpExtra3", output);
+        Assert.Contains("◉ Active", output);
+        Assert.Contains("HttpExtra2", output);
+        Assert.Contains("✗ Error", output);
+        Assert.Contains("HttpExtra1", output);
+        Assert.Contains("+7 more", output);
+        Assert.Contains("press t to view all", output);
+        Assert.True(output.IndexOf("HttpExtra3", StringComparison.Ordinal) < output.IndexOf("HttpExtra2", StringComparison.Ordinal));
+        Assert.True(output.IndexOf("HttpExtra2", StringComparison.Ordinal) < output.IndexOf("HttpExtra1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildHeader_WhenFunctionCountTooLarge_RendersStatusStrip()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 20);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
+
+        string output = writer.ToString();
+        Assert.Contains("20 functions", output);
+        Assert.Contains("ready", output);
+        Assert.DoesNotContain("press t to view all", output);
+    }
+
+    [Fact]
     public void HandleKey_EnterInFunctionBrowser_AppliesSelectedFunctionFilter()
     {
         (CompactRenderer renderer, _, _) = NewRenderer();
@@ -436,6 +470,16 @@ public class CompactRendererFunctionBrowserTests
     private static DashboardSnapshot BuildSnapshot(int functionCount)
         => BuildState(functionCount).Snapshot();
 
+    private static DashboardState BuildStateWithPriorityFunctions()
+    {
+        var state = BuildState(functionCount: 12);
+        state.Observe(InvocationStarted("HttpExtra3", "active-1"));
+        state.Observe(InvocationStarted("HttpExtra1", "recent-1"));
+        state.Observe(InvocationCompleted("HttpExtra1", "recent-1", "succeeded"));
+        state.Observe(InvocationCompleted("HttpExtra2", "failed-1", "failed"));
+        return state;
+    }
+
     private static DashboardState BuildState(int functionCount)
     {
         var state = new DashboardState();
@@ -468,6 +512,25 @@ public class CompactRendererFunctionBrowserTests
                 [HostLogAttributeKeys.FunctionTriggerType] = "http",
                 [HostLogAttributeKeys.FunctionRoute] = route,
                 [HostLogAttributeKeys.FunctionHttpMethods] = new[] { "GET" },
+            });
+
+    private static HostLogEntry InvocationStarted(string name, string invocationId)
+        => MakeEntry(
+            $"Function.{name}",
+            new()
+            {
+                [HostLogAttributeKeys.FunctionName] = name,
+                [HostLogAttributeKeys.FunctionInvocationId] = invocationId,
+            });
+
+    private static HostLogEntry InvocationCompleted(string name, string invocationId, string result)
+        => MakeEntry(
+            $"Function.{name}",
+            new()
+            {
+                [HostLogAttributeKeys.FunctionName] = name,
+                [HostLogAttributeKeys.FunctionInvocationId] = invocationId,
+                [HostLogAttributeKeys.FunctionResult] = result,
             });
 
     private static HostLogEntry HostState(string state)

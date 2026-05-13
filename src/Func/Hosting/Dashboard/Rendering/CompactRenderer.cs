@@ -16,8 +16,7 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// region — this keeps redraws and log appends consistent without cursor-juggling.
 /// </summary>
 /// <remarks>
-/// Prototype scope: the help overlay and the priority-sorted truncated header variant are not yet implemented. The renderer demonstrates
-/// the live header / live log tail UX and falls back to a status strip when many functions are loaded.
+/// Prototype scope: the renderer demonstrates the live header / live log tail UX against the scripted event source.
 /// </remarks>
 internal sealed class CompactRenderer(
     IInteractionService interaction,
@@ -672,7 +671,7 @@ internal sealed class CompactRenderer(
                 {
                     0 => 1,
                     <= 8 => snapshot.Functions.Count + 1, // 1 column-header row + N data rows
-                    _ => 1, // status strip
+                    _ => GetFunctionsBlockLineCount(snapshot.Functions.Count),
                 };
         }
 
@@ -740,10 +739,12 @@ internal sealed class CompactRenderer(
             .BorderStyle(Theme.Muted)
             .Expand();
 
+        int truncatedRows = GetTruncatedFunctionVisibleRows(snapshot.Functions.Count);
         IRenderable functions = snapshot.Functions.Count switch
         {
             0 => new Markup($"[{MutedTag}]  No functions loaded yet…[/]"),
-            <= 8 => BuildFunctionsTable(snapshot.Functions, snapshot.ListenUri),
+            <= 8 => BuildFunctionsTable(GetSortedFunctions(snapshot), snapshot.ListenUri),
+            _ when truncatedRows > 0 => BuildTruncatedFunctionsTable(snapshot, truncatedRows),
             _ => BuildFunctionsStatusStrip(snapshot),
         };
 
@@ -752,7 +753,7 @@ internal sealed class CompactRenderer(
             new Padder(functions).PadTop(0).PadBottom(0));
     }
 
-    private IRenderable BuildFunctionsTable(IReadOnlyList<FunctionInfo> functions, string? listenUri)
+    private Table BuildFunctionsTable(IReadOnlyList<FunctionInfo> functions, string? listenUri)
     {
         Table table = new Table()
             .Border(TableBorder.None)
@@ -768,7 +769,7 @@ internal sealed class CompactRenderer(
             new Markup($"[{EmphasisTag}]Route / Source[/]"),
             new Markup($"[{EmphasisTag}]Status[/]"));
 
-        foreach (FunctionInfo fn in functions.OrderBy(f => f.Name, StringComparer.Ordinal))
+        foreach (FunctionInfo fn in functions)
         {
             string color = _palette.GetColorFor(fn.Name);
             string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri);
@@ -778,6 +779,27 @@ internal sealed class CompactRenderer(
                 new Markup(Markup.Escape(FormatTrigger(fn.TriggerType))),
                 new Markup($"[{MutedTag}]{routeMarkup}[/]"),
                 new Markup(FormatStatus(fn)));
+        }
+
+        return table;
+    }
+
+    private IRenderable BuildTruncatedFunctionsTable(DashboardSnapshot snapshot, int visibleRows)
+    {
+        FunctionInfo[] ordered = [.. snapshot.Functions
+            .OrderBy(GetFunctionHeaderPriority)
+            .ThenByDescending(f => f.LastInvocationAt ?? DateTimeOffset.MinValue)
+            .ThenBy(f => f.Name, _functionNameComparer)];
+
+        Table table = BuildFunctionsTable(ordered.Take(visibleRows).ToArray(), snapshot.ListenUri);
+        int hidden = ordered.Length - visibleRows;
+        if (hidden > 0)
+        {
+            table.AddRow(
+                new Markup($"[{MutedTag}]  +{hidden.ToString(CultureInfo.InvariantCulture)} more[/]"),
+                new Markup(string.Empty),
+                new Markup($"[{MutedTag}]press t to view all[/]"),
+                new Markup(string.Empty));
         }
 
         return table;
@@ -1173,6 +1195,41 @@ internal sealed class CompactRenderer(
 
     private static FunctionInfo[] GetSortedFunctions(DashboardSnapshot snapshot)
         => [.. snapshot.Functions.OrderBy(f => f.Name, _functionNameComparer)];
+
+    private int GetFunctionsBlockLineCount(int functionCount)
+    {
+        int visibleRows = GetTruncatedFunctionVisibleRows(functionCount);
+        return visibleRows > 0
+            ? visibleRows + 1 + (functionCount > visibleRows ? 1 : 0)
+            : 1;
+    }
+
+    private int GetTruncatedFunctionVisibleRows(int functionCount)
+    {
+        if (functionCount <= 8)
+        {
+            return 0;
+        }
+
+        int viewportHeight = GetViewportHeight();
+        if (viewportHeight < 20)
+        {
+            return 0;
+        }
+
+        int rowBudget = Math.Clamp((viewportHeight / 3) - 3, 3, 8);
+        return functionCount <= rowBudget * 3
+            ? Math.Min(functionCount, rowBudget)
+            : 0;
+    }
+
+    private static int GetFunctionHeaderPriority(FunctionInfo function) => function.Status switch
+    {
+        FunctionStatus.Active => 0,
+        FunctionStatus.Error => 1,
+        _ when function.LastInvocationAt is not null => 2,
+        _ => 3,
+    };
 
     private static FunctionInfo[] GetFunctionSearchMatches(FunctionInfo[] functions, string query)
     {
