@@ -11,26 +11,34 @@ namespace Azure.Functions.Cli.Telemetry;
 /// </summary>
 /// <remarks>
 /// Naming and span shape follow the (experimental) OTel CLI semantic
-/// conventions: <see cref="ActivityKind.Internal"/> kind, span name set to
-/// the subcommand path, and the <c>cli.command.name</c> attribute.
-/// Resource-level attributes (<c>service.name</c>, <c>service.version</c>,
-/// <c>os.*</c>, <c>process.runtime.*</c>) are configured once on the
+/// conventions: <see cref="ActivityKind.Internal"/> kind, fixed operation
+/// name <c>"cli.command"</c>, and the <c>cli.command.name</c> attribute
+/// applied via <see cref="SetCommandName"/> once parsing resolves the
+/// invoked command path. Resource-level attributes
+/// (<c>service.name</c>, <c>service.version</c>, <c>os.*</c>,
+/// <c>process.runtime.*</c>) are configured once on the
 /// <see cref="OpenTelemetry.Resources.ResourceBuilder"/> and inherited by
 /// every span — they should not be set per span here.
 /// </remarks>
 internal static class ActivityExtensions
 {
+    /// <summary>
+    /// Fixed operation name for CLI command spans. The user-facing command
+    /// path is attached as a tag and (when known) as <c>DisplayName</c>.
+    /// </summary>
+    public const string CommandActivityName = "cli.command";
+
     extension(ActivitySource source)
     {
         /// <summary>
         /// Starts an <see cref="Activity"/> that represents the execution of
         /// a CLI command. Returns <c>null</c> when no listener is subscribed.
+        /// Call <see cref="SetCommandName"/> once parsing resolves the
+        /// invoked command path.
         /// </summary>
-        public Activity? StartCommandActivity(string commandName)
+        public Activity? StartCommandActivity()
         {
-            Activity? activity = source.StartActivity(commandName, ActivityKind.Internal);
-            activity?.SetTag(TelemetryConventions.CliCommandName, commandName);
-            return activity;
+            return source.StartActivity(CommandActivityName, ActivityKind.Internal);
         }
 
         /// <summary>
@@ -46,6 +54,19 @@ internal static class ActivityExtensions
 
     extension(Activity activity)
     {
+        /// <summary>
+        /// Tags the activity with the resolved CLI command path and sets the
+        /// display name so trace explorers show <c>"workload list"</c> rather
+        /// than the operation name <c>"cli.command"</c>. Safe to call
+        /// multiple times; the most recent value wins.
+        /// </summary>
+        public Activity SetCommandName(string commandName)
+        {
+            activity.DisplayName = commandName;
+            activity.SetTag(TelemetryConventions.CliCommandName, commandName);
+            return activity;
+        }
+
         /// <summary>
         /// Records the exception on the activity and marks its status as
         /// <see cref="ActivityStatusCode.Error"/>. Sets the OTel
