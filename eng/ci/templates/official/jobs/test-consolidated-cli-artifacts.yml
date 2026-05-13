@@ -51,7 +51,7 @@ jobs:
   - task: GoTool@0
     displayName: 'Install Go'
     inputs:
-      version: '1.20'
+      version: '1.25.9'
 
   - download: current
     displayName: 'Download artifact'

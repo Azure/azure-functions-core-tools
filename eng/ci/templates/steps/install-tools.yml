@@ -4,6 +4,11 @@ steps:
     versionSpec: '18.x'
   displayName: 'Install Node 18.x'
 
+- task: GoTool@0
+  inputs:
+    version: '1.25.9'
+  displayName: 'Install Go 1.25.9'
+
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '3.10'
