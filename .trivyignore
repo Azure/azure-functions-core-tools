@@ -1,0 +1,20 @@
+# Suppressions for `trivy fs` runs in CI (eng/ci/templates/steps/scan-artifact-trivy.yml).
+#
+# Add CVE IDs (one per line) to suppress findings that are tracked elsewhere or do not
+# affect the shipped binary. Each entry MUST include a comment with: justification,
+# tracking link, and review-by date so suppressions don't outlive their cause.
+#
+# Format:
+#   # justification: ...
+#   # tracking: <url>
+#   # review-by: YYYY-MM-DD
+#   CVE-XXXX-NNNNN
+
+# justification: System.Security.Cryptography.Xml 8.0.2 ships inside
+#   Microsoft.Azure.Functions.PowerShellWorker.PS7.4 4.0.4759 (transitive). Fixed in 8.0.3.
+#   Tracked for a worker bump; suppress until then so the gate runs against everything else.
+# tracking: https://github.com/Azure/azure-functions-powershell-worker/issues
+# review-by: 2026-07-01
+CVE-2026-26171
+CVE-2026-33116
+

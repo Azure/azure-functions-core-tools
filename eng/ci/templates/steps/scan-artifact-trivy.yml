@@ -1,0 +1,33 @@
+parameters:
+  - name: artifactPath
+    type: string
+    displayName: 'Filesystem path of the published artifact tree to scan.'
+  - name: trivyVersion
+    type: string
+    default: '0.58.1'
+  - name: severity
+    type: string
+    default: 'HIGH,CRITICAL'
+
+steps:
+- pwsh: |
+    $version = '${{ parameters.trivyVersion }}'
+    $url = "https://github.com/aquasecurity/trivy/releases/download/v$version/trivy_${version}_Windows-64bit.zip"
+    $zip = Join-Path $env:AGENT_TEMPDIRECTORY "trivy.zip"
+    $dest = Join-Path $env:AGENT_TEMPDIRECTORY "trivy"
+    Write-Host "Downloading Trivy $version..."
+    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+    Expand-Archive -Path $zip -DestinationPath $dest -Force
+    Write-Host "##vso[task.setvariable variable=TRIVY_BIN]$dest/trivy.exe"
+  displayName: 'Install Trivy ${{ parameters.trivyVersion }}'
+
+- pwsh: |
+    & "$env:TRIVY_BIN" fs `
+      --severity '${{ parameters.severity }}' `
+      --ignore-unfixed `
+      --exit-code 1 `
+      --no-progress `
+      --scanners vuln `
+      --ignorefile "$(Build.SourcesDirectory)/.trivyignore" `
+      "${{ parameters.artifactPath }}"
+  displayName: 'Trivy scan published artifact'

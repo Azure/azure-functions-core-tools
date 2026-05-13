@@ -3,12 +3,12 @@
   <PropertyGroup>
     <!-- Always suppress these warnings -->
     <NoWarn>$(NoWarn);NU1507;NU1701;NU5118;SA0001</NoWarn>
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU5123</WarningsNotAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU5123</WarningsNotAsErrors>
 
-    <!-- Nuget audit as warnings only, even in TreatWarningsAsErrors. -->
-    <!-- Except for in CI, critical will fail the build. -->
-    <WarningsNotAsErrors Condition="'$(CI)' == 'false'">$(WarningsNotAsErrors);NU1904</WarningsNotAsErrors>
-    <WarningsAsErrors Condition="'$(CI)' == 'true'">$(WarningsAsErrors);NU1904</WarningsAsErrors>
+    <!-- Nuget audit failures all break the build in CI: NU1902 (moderate), NU1903 (high), NU1904 (critical). -->
+    <!-- Outside CI they remain warnings to keep local dev unblocked. -->
+    <WarningsNotAsErrors Condition="'$(CI)' == 'false'">$(WarningsNotAsErrors);NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <WarningsAsErrors Condition="'$(CI)' == 'true'">$(WarningsAsErrors);NU1902;NU1903;NU1904</WarningsAsErrors>
 
     <!-- TreatWarningsAsErrors true only on CI -->
     <TreatWarningsAsErrors>$(CI)</TreatWarningsAsErrors>
@@ -17,6 +17,19 @@
     <NuGetAuditLevel>moderate</NuGetAuditLevel> <!-- warn on moderate severity only. -->
     <NuGetAuditMode>all</NuGetAuditMode> <!-- audit transitive dependencies. -->
   </PropertyGroup>
+
+  <!-- Suppress audit advisories that don't apply to net8.0 builds. -->
+  <ItemGroup>
+    <!--
+      System.Private.Uri 4.3.0 is dragged in by the legacy runtime.* metapackages (runtime.any.System.Runtime,
+      runtime.unix.System.Runtime.Extensions). On net8.0 the actual Uri code lives in the runtime, not in this
+      reference assembly, so the advisories below do not affect the shipped binary. There is no patched 4.x
+      release of System.Private.Uri to upgrade to.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-x5qj-9vmx-7g6g" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-xhfc-gr8f-ffwc" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-5f2m-466j-3848" />
+  </ItemGroup>
 
   <PropertyGroup>
     <LangVersion>latest</LangVersion>

@@ -45,6 +45,10 @@ jobs:
         $isMinified
     displayName: 'Build & Zip CLI'
 
+  - template: /eng/ci/templates/steps/scan-artifact-trivy.yml@self
+    parameters:
+      artifactPath: '$(Build.ArtifactStagingDirectory)/artifacts/${{ parameters.runtime }}'
+
   templateContext:
     outputs:
     - output: pipelineArtifact

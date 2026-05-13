@@ -43,6 +43,10 @@ jobs:
     env:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
+  - template: /eng/ci/templates/steps/scan-artifact-trivy.yml@self
+    parameters:
+      artifactPath: '$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}'
+
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
       folderPath: '$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}'
