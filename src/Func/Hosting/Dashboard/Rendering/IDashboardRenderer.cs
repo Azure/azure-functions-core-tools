@@ -30,3 +30,8 @@ internal interface IDashboardRenderer : IAsyncDisposable
     /// </summary>
     public Task OnSummaryAsync(SummaryEvent summary, CancellationToken cancellationToken);
 }
+
+internal interface IDashboardShutdownRequester
+{
+    public event Action? ShutdownRequested;
+}

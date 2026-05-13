@@ -23,24 +23,37 @@ internal sealed class DashboardPipeline(
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         string exitReason = "sigint";
-        await _renderer.OnStartAsync(_state, cancellationToken);
+        using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Action? shutdownHandler = null;
+        if (_renderer is IDashboardShutdownRequester shutdownRequester)
+        {
+            shutdownHandler = pipelineCts.Cancel;
+            shutdownRequester.ShutdownRequested += shutdownHandler;
+        }
+
+        await _renderer.OnStartAsync(_state, pipelineCts.Token);
 
         try
         {
-            await foreach (HostLogEntry entry in _source.ReadAsync(cancellationToken))
+            await foreach (HostLogEntry entry in _source.ReadAsync(pipelineCts.Token))
             {
                 IReadOnlyList<DashboardEvent> events = _state.Observe(entry);
-                await _renderer.OnEventAsync(entry, events, cancellationToken);
+                await _renderer.OnEventAsync(entry, events, pipelineCts.Token);
             }
 
             exitReason = "source_completed";
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (pipelineCts.IsCancellationRequested)
         {
             exitReason = "sigint";
         }
         finally
         {
+            if (_renderer is IDashboardShutdownRequester requester && shutdownHandler is not null)
+            {
+                requester.ShutdownRequested -= shutdownHandler;
+            }
+
             SummaryEvent summary = _state.BuildSummary(exitReason, DateTimeOffset.UtcNow);
 
             // OnSummaryAsync must run even when the pipeline is cancelled so

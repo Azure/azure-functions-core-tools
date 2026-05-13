@@ -47,7 +47,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("c clear", output);
         Assert.Contains("e errors", output);
         Assert.Contains("L:info", output);
-        Assert.Contains("Ctrl+C", output);
+        Assert.Contains("q/Ctrl+C", output);
     }
 
     [Fact]
@@ -85,6 +85,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.DoesNotContain("c clear logs", output);
         Assert.DoesNotContain("e errors only", output);
         Assert.DoesNotContain("1/2/3 log level", output);
+        Assert.DoesNotContain("q quit", output);
     }
 
     [Fact]
@@ -294,6 +295,19 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("warning compact log", output);
         Assert.Contains("error compact log", output);
         Assert.Contains("L:info", output);
+    }
+
+    [Fact]
+    public void HandleKey_Q_RequestsShutdown()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        bool requested = false;
+        renderer.ShutdownRequested += () => requested = true;
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('q', ConsoleKey.Q)));
+
+        Assert.True(requested);
     }
 
     private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)

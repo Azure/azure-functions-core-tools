@@ -24,7 +24,7 @@ internal sealed class CompactRenderer(
     IInteractionService interaction,
     FunctionPalette palette,
     IAnsiConsole? console = null,
-    DashboardRunInfo? runInfo = null) : IDashboardRenderer
+    DashboardRunInfo? runInfo = null) : IDashboardRenderer, IDashboardShutdownRequester
 {
     private const int MaxLogTailLines = 200;
     private const int HelpOverlayLines = 12;
@@ -65,6 +65,8 @@ internal sealed class CompactRenderer(
     private string WarningTag => field ??= Theme.Warning.ToMarkup();
     private string ActiveTag => field ??= Theme.Active.ToMarkup();
     private string HyperlinkTag => field ??= Theme.Hyperlink.ToMarkup();
+
+    public event Action? ShutdownRequested;
 
     public Task OnStartAsync(DashboardState state, CancellationToken cancellationToken)
     {
@@ -260,6 +262,10 @@ internal sealed class CompactRenderer(
                 case ConsoleKey.D3:
                 case ConsoleKey.NumPad3:
                     return SetMinimumLogLevel(LogLevel.Error);
+
+                case ConsoleKey.Q:
+                    ShutdownRequested?.Invoke();
+                    return true;
 
                 case ConsoleKey.Escape when _helpOpen || _functionBrowserOpen:
                     _helpOpen = false;
@@ -697,10 +703,11 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "c", "Clear visible log output.");
         AddHelpRow(table, "e", "Toggle errors-only log view.");
         AddHelpRow(table, "1/2/3", "Set visible log level: info, warning, or error.");
+        AddHelpRow(table, "q", "Stop the host.");
         AddHelpRow(table, "Esc", "Close the active overlay.");
         AddHelpRow(table, "Ctrl+C", "Stop the host.");
 
-        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
+        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]l[/] log file[/]");
         var panel = new Panel(new Rows(
             new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
             table,
@@ -764,7 +771,7 @@ internal sealed class CompactRenderer(
             ? new Markup($"[{MutedTag}]No functions loaded yet…[/]")
             : BuildFunctionBrowserGrid(functions, totalRows, visibleRows, rowOffset, selectedIndex);
 
-        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · f next · a all · c clear · e errors · t/Esc close[/]");
+        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · f next · a all · c clear · e errors · t/Esc close · q/Ctrl+C[/]");
         var panel = new Panel(new Rows(content, new Markup(string.Empty), footer))
         {
             Header = new PanelHeader(string.Create(CultureInfo.InvariantCulture, $"Functions ({functions.Length})")),
@@ -872,10 +879,10 @@ internal sealed class CompactRenderer(
 
         string controls = (helpOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
-            (true, _, _) => "? close · c clear · e errors · Esc close · Ctrl+C",
-            (_, true, _) => "↑/↓ navigate · Enter filter · f next · t close · Esc close",
-            (_, _, true) => "f next · a all · c clear · e errors · ? help · Ctrl+C",
-            _ => "t functions · f filter · c clear · e errors · ? help · Ctrl+C",
+            (true, _, _) => "? close · c clear · e errors · Esc close · q/Ctrl+C",
+            (_, true, _) => "↑/↓ navigate · Enter filter · f next · t close · Esc close · q/Ctrl+C",
+            (_, _, true) => "f next · a all · c clear · e errors · ? help · q/Ctrl+C",
+            _ => "t functions · f filter · c clear · e errors · ? help · q/Ctrl+C",
         };
 
         string line = string.Create(
