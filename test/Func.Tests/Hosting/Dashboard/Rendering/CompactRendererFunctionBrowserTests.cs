@@ -45,6 +45,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("t funcs", output);
         Assert.Contains("/ search", output);
         Assert.Contains("f filter", output);
+        Assert.Contains("PgUp/PgDn logs", output);
         Assert.Contains("c/e logs", output);
         Assert.DoesNotContain("l log", output);
         Assert.Contains("L:info", output);
@@ -83,6 +84,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Cycle the active function filter", output);
         Assert.Contains("Toggle errors-only log view", output);
         Assert.Contains("Set visible log level", output);
+        Assert.Contains("Scroll logs", output);
         Assert.DoesNotContain("Open the configured log file", output);
         Assert.DoesNotContain("Coming soon", output);
         Assert.DoesNotContain("c clear logs", output);
@@ -372,6 +374,48 @@ public class CompactRendererFunctionBrowserTests
         SetPrivate(renderer, "_state", BuildState(functionCount: 3));
 
         Assert.False(InvokePrivate<bool>(renderer, "HandleKey", Key('l', ConsoleKey.L)));
+    }
+
+    [Fact]
+    public async Task HandleKey_PageUpPageDownAndEnd_ScrollLogTail()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        for (int i = 1; i <= 20; i++)
+        {
+            await renderer.OnEventAsync(Log("HttpTrigger1", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"compact log {i:00}")), [], CancellationToken.None);
+        }
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.DoesNotContain("compact log 01", output);
+        Assert.Contains("compact log 20", output);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageUp)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        output = writer.ToString();
+        Assert.Contains("compact log 01", output);
+        Assert.DoesNotContain("compact log 20", output);
+        Assert.Contains("Scrollback", output);
+
+        await renderer.OnEventAsync(Log("HttpTrigger1", "compact log 21"), [], CancellationToken.None);
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        output = writer.ToString();
+        Assert.Contains("compact log 01", output);
+        Assert.DoesNotContain("compact log 21", output);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.End)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        output = writer.ToString();
+        Assert.DoesNotContain("compact log 01", output);
+        Assert.Contains("compact log 21", output);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageUp)));
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageDown)));
     }
 
     [Fact]

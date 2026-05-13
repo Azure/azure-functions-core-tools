@@ -54,6 +54,7 @@ internal sealed class CompactRenderer(
     private int _functionSearchRowOffset;
     private string _functionSearchQuery = string.Empty;
     private string? _activeFunctionFilter;
+    private int _logScrollOffset;
     private bool _errorsOnly;
     private LogLevel _minimumLogLevel = LogLevel.Information;
 
@@ -106,6 +107,14 @@ internal sealed class CompactRenderer(
             while (_logTail.Count > MaxLogTailLines)
             {
                 _logTail.Dequeue();
+            }
+        }
+
+        lock (_uiLock)
+        {
+            if (_logScrollOffset > 0 && MatchesLogFilters(line, _activeFunctionFilter, _errorsOnly, _minimumLogLevel))
+            {
+                _logScrollOffset = Math.Min(MaxLogTailLines, _logScrollOffset + 1);
             }
         }
 
@@ -259,6 +268,7 @@ internal sealed class CompactRenderer(
 
                 case ConsoleKey.E:
                     _errorsOnly = !_errorsOnly;
+                    ResetLogScroll();
                     return true;
 
                 case ConsoleKey.F:
@@ -288,11 +298,13 @@ internal sealed class CompactRenderer(
 
                 case ConsoleKey.A when _activeFunctionFilter is not null:
                     _activeFunctionFilter = null;
+                    ResetLogScroll();
                     return true;
 
                 case ConsoleKey.Enter when _functionBrowserOpen && functions.Length > 0:
                     _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex, 0, functions.Length - 1);
                     _activeFunctionFilter = functions[_functionBrowserSelectedIndex].Name;
+                    ResetLogScroll();
                     _functionBrowserOpen = false;
                     return true;
 
@@ -312,6 +324,13 @@ internal sealed class CompactRenderer(
                     MoveFunctionBrowserSelection(functions, Math.Max(1, GetFunctionBrowserVisibleRows(functions.Length)));
                     return true;
 
+                case ConsoleKey.PageUp when !_helpOpen:
+                    ScrollLogs(GetLogScrollStep(snapshot));
+                    return true;
+
+                case ConsoleKey.PageDown when !_helpOpen:
+                    return ScrollLogs(-GetLogScrollStep(snapshot));
+
                 case ConsoleKey.Home when _functionBrowserOpen:
                     _functionBrowserSelectedIndex = 0;
                     return functions.Length > 0;
@@ -319,6 +338,13 @@ internal sealed class CompactRenderer(
                 case ConsoleKey.End when _functionBrowserOpen:
                     _functionBrowserSelectedIndex = Math.Max(0, functions.Length - 1);
                     return functions.Length > 0;
+
+                case ConsoleKey.Home when !_helpOpen:
+                    ScrollLogs(MaxLogTailLines);
+                    return true;
+
+                case ConsoleKey.End when !_helpOpen:
+                    return ResetLogScroll();
 
                 case ConsoleKey.LeftArrow when _functionBrowserOpen:
                     MoveFunctionBrowserSelection(functions, -GetFunctionBrowserTotalRows(functions.Length));
@@ -404,6 +430,7 @@ internal sealed class CompactRenderer(
 
                 _functionSearchSelectedIndex = Math.Clamp(_functionSearchSelectedIndex, 0, matches.Length - 1);
                 _activeFunctionFilter = matches[_functionSearchSelectedIndex].Name;
+                ResetLogScroll();
                 _functionSearchOpen = false;
                 return true;
             }
@@ -453,6 +480,8 @@ internal sealed class CompactRenderer(
         {
             _logTail.Clear();
         }
+
+        ResetLogScroll();
     }
 
     private void CycleFunctionFilter(FunctionInfo[] functions)
@@ -460,12 +489,14 @@ internal sealed class CompactRenderer(
         if (functions.Length == 0)
         {
             _activeFunctionFilter = null;
+            ResetLogScroll();
             return;
         }
 
         if (_activeFunctionFilter is null)
         {
             _activeFunctionFilter = functions[0].Name;
+            ResetLogScroll();
             return;
         }
 
@@ -473,6 +504,7 @@ internal sealed class CompactRenderer(
         _activeFunctionFilter = index >= 0 && index < functions.Length - 1
             ? functions[index + 1].Name
             : null;
+        ResetLogScroll();
     }
 
     private bool SetMinimumLogLevel(LogLevel minimumLogLevel)
@@ -483,6 +515,31 @@ internal sealed class CompactRenderer(
         }
 
         _minimumLogLevel = minimumLogLevel;
+        ResetLogScroll();
+        return true;
+    }
+
+    private int GetLogScrollStep(DashboardSnapshot snapshot)
+    {
+        int logBudget = ComputeLogBudgetCore(snapshot, _helpOpen, functionSearchOpen: false, functionBrowserOpen: false);
+        return Math.Max(1, logBudget - 1);
+    }
+
+    private bool ScrollLogs(int delta)
+    {
+        int previous = _logScrollOffset;
+        _logScrollOffset = Math.Clamp(_logScrollOffset + delta, 0, MaxLogTailLines);
+        return _logScrollOffset != previous;
+    }
+
+    private bool ResetLogScroll()
+    {
+        if (_logScrollOffset == 0)
+        {
+            return false;
+        }
+
+        _logScrollOffset = 0;
         return true;
     }
 
@@ -600,15 +657,18 @@ internal sealed class CompactRenderer(
 
         tail = [.. tail.Where(line => line.Level >= minimumLogLevel)];
 
-        // Slice the log tail to what actually fits on screen so we render
-        // true scrolling behavior (newest at the bottom, oldest drop off the
-        // top of the visible region) instead of freezing once the viewport
-        // fills. The queue itself still holds up to MaxLogTailLines for
-        // future scroll-back / resize support.
         int logBudget = ComputeLogBudget(snapshot);
+        int logScrollOffset;
+        lock (_uiLock)
+        {
+            _logScrollOffset = Math.Clamp(_logScrollOffset, 0, Math.Max(0, tail.Length - logBudget));
+            logScrollOffset = _logScrollOffset;
+        }
+
         if (tail.Length > logBudget)
         {
-            tail = tail[(tail.Length - logBudget)..];
+            int start = Math.Max(0, tail.Length - logBudget - logScrollOffset);
+            tail = tail[start..Math.Min(tail.Length, start + logBudget)];
         }
 
         IRenderable logRows = BuildLogRows(tail, activeFunctionFilter, logBudget);
@@ -639,6 +699,25 @@ internal sealed class CompactRenderer(
 
     private int ComputeLogBudget(DashboardSnapshot snapshot)
     {
+        bool helpOpen;
+        bool browserOpen;
+        bool searchOpen;
+        lock (_uiLock)
+        {
+            helpOpen = _helpOpen;
+            browserOpen = _functionBrowserOpen;
+            searchOpen = _functionSearchOpen;
+        }
+
+        return ComputeLogBudgetCore(snapshot, helpOpen, searchOpen, browserOpen);
+    }
+
+    private int ComputeLogBudgetCore(
+        DashboardSnapshot snapshot,
+        bool helpOpen,
+        bool functionSearchOpen,
+        bool functionBrowserOpen)
+    {
         // Spectre reports sentinel values when stdout isn't a real terminal
         // (e.g., redirected to a pipe). Clamp to a sensible default so the
         // compact renderer still produces useful output if it's somehow
@@ -651,31 +730,8 @@ internal sealed class CompactRenderer(
         //   "logs" rule:                            1 line
         //   footer line:                            1 line
         //   safety pad (resize/wrap slack):         2 lines
-        bool helpOpen;
-        bool browserOpen;
-        bool searchOpen;
-        int functionsLines;
-        lock (_uiLock)
-        {
-            helpOpen = _helpOpen;
-            browserOpen = _functionBrowserOpen;
-            searchOpen = _functionSearchOpen;
-            functionsLines = _helpOpen
-                ? HelpOverlayLines
-                : _functionSearchOpen
-                ? SearchOverlayLines
-                : _functionBrowserOpen
-                // Panel border (2) + visible grid rows + spacer/footer (2).
-                ? GetFunctionBrowserVisibleRows(snapshot.Functions.Count) + 4
-                : snapshot.Functions.Count switch
-                {
-                    0 => 1,
-                    <= 8 => snapshot.Functions.Count + 1, // 1 column-header row + N data rows
-                    _ => GetFunctionsBlockLineCount(snapshot.Functions.Count),
-                };
-        }
-
-        int reservedForHeader = helpOpen || browserOpen || searchOpen
+        int functionsLines = ComputeHeaderLineCount(snapshot, helpOpen, functionSearchOpen, functionBrowserOpen);
+        int reservedForHeader = helpOpen || functionBrowserOpen || functionSearchOpen
             // Overlay panel + "logs" rule + footer + safety pad.
             ? functionsLines + 1 + 1 + 2
             // Banner panel + functions block + "logs" rule + footer + safety pad.
@@ -685,6 +741,25 @@ internal sealed class CompactRenderer(
         // useful even on very small terminals (the header simply overflows).
         return Math.Max(3, viewportHeight - reservedForHeader);
     }
+
+    private int ComputeHeaderLineCount(
+        DashboardSnapshot snapshot,
+        bool helpOpen,
+        bool functionSearchOpen,
+        bool functionBrowserOpen)
+        => helpOpen
+            ? HelpOverlayLines
+            : functionSearchOpen
+            ? SearchOverlayLines
+            : functionBrowserOpen
+            // Panel border (2) + visible grid rows + spacer/footer (2).
+            ? GetFunctionBrowserVisibleRows(snapshot.Functions.Count) + 4
+            : snapshot.Functions.Count switch
+            {
+                0 => 1,
+                <= 8 => snapshot.Functions.Count + 1, // 1 column-header row + N data rows
+                _ => GetFunctionsBlockLineCount(snapshot.Functions.Count),
+            };
 
     private IRenderable BuildHeader(DashboardSnapshot snapshot)
     {
@@ -818,7 +893,8 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "t", "Open the function browser.");
         AddHelpRow(table, "/", "Search functions by name, trigger, or route.");
         AddHelpRow(table, "↑/↓", "Move selection in the function browser.");
-        AddHelpRow(table, "PgUp/PgDn", "Jump through the function browser.");
+        AddHelpRow(table, "PgUp/PgDn", "Scroll logs; in the function browser, jump through functions.");
+        AddHelpRow(table, "Home/End", "Jump to oldest logs / latest logs, or first / last function in the browser.");
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
         AddHelpRow(table, "a", "Clear the active function filter.");
         AddHelpRow(table, "f", "Cycle the active function filter.");
@@ -1080,28 +1156,33 @@ internal sealed class CompactRenderer(
             ? " · Errors only"
             : string.Empty;
         string level = $" · L:{FormatMinimumLogLevel(minimumLogLevel)}";
+        int logScrollOffset;
         bool helpOpen;
         bool functionSearchOpen;
         bool functionBrowserOpen;
         lock (_uiLock)
         {
+            logScrollOffset = _logScrollOffset;
             helpOpen = _helpOpen;
             functionSearchOpen = _functionSearchOpen;
             functionBrowserOpen = _functionBrowserOpen;
         }
 
+        string logScroll = logScrollOffset > 0
+            ? $" · Scrollback {logScrollOffset}"
+            : string.Empty;
         string controls = (helpOpen, functionSearchOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
             (true, _, _, _) => "? close · Esc close · q/Ctrl+C",
             (_, true, _, _) => "type query · ↑/↓ select · Enter filter · Esc close",
             (_, _, true, _) => "↑/↓ navigate · Enter filter · / search · f next · t close · Esc close",
-            (_, _, _, true) => "/ search · f next · a all · c/e logs · ? · q/Ctrl+C",
-            _ => "t funcs · / search · f filter · c/e logs · ? · q/Ctrl+C",
+            (_, _, _, true) => "PgUp/PgDn logs · / search · f next · a all · c/e logs · ? · q/Ctrl+C",
+            _ => "PgUp/PgDn logs · t funcs · / search · f filter · c/e logs · ? · q/Ctrl+C",
         };
 
         string line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors}{level} │ {controls}");
+            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors}{level}{logScroll} │ {controls}");
 
         return new Markup($"[{MutedTag}]{Markup.Escape(line)}[/]");
     }
@@ -1355,6 +1436,27 @@ internal sealed class CompactRenderer(
         => isError && entry.Level < LogLevel.Error
             ? LogLevel.Error
             : entry.Level;
+
+    private static bool MatchesLogFilters(
+        LogLine line,
+        string? activeFunctionFilter,
+        bool errorsOnly,
+        LogLevel minimumLogLevel)
+    {
+        if (activeFunctionFilter is not null
+            && line.FunctionName is not null
+            && !string.Equals(line.FunctionName, activeFunctionFilter, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (errorsOnly && !line.IsError)
+        {
+            return false;
+        }
+
+        return line.Level >= minimumLogLevel;
+    }
 
     private static string FormatMinimumLogLevel(LogLevel minimumLogLevel) => minimumLogLevel switch
     {
