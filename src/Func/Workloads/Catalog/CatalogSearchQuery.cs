@@ -23,6 +23,6 @@ internal sealed record CatalogSearchQuery
     /// <summary>Maximum number of results to return; defaults to <see cref="DefaultTake"/>.</summary>
     public int? Take { get; init; }
 
-    /// <summary>Optional <c>--source</c> override.</summary>
-    public string? OverrideSource { get; init; }
+    /// <summary>Optional <c>--source</c> override; <c>null</c> uses the configured / default source.</summary>
+    public string? Source { get; init; }
 }

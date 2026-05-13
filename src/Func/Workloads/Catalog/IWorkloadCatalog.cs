@@ -42,14 +42,14 @@ internal interface IWorkloadCatalog
     /// Default <c>true</c> matches install behaviour; update sets it
     /// <c>false</c> unless <c>--major</c> was passed.
     /// </param>
-    /// <param name="overrideSource">Optional <c>--source</c> override.</param>
+    /// <param name="source">Optional <c>--source</c> override.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
     public Task<ResolvedPackage?> ResolveLatestVersionAsync(
         string packageId,
         bool includePrerelease,
         NuGetVersion? currentVersion = null,
         bool allowMajor = true,
-        string? overrideSource = null,
+        string? source = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -59,12 +59,12 @@ internal interface IWorkloadCatalog
     /// </summary>
     /// <param name="packageId">NuGet package id; case-insensitive.</param>
     /// <param name="version">Exact version to locate.</param>
-    /// <param name="overrideSource">Optional <c>--source</c> override.</param>
+    /// <param name="source">Optional <c>--source</c> override.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
     public Task<ResolvedPackage?> ResolveVersionAsync(
         string packageId,
         NuGetVersion version,
-        string? overrideSource = null,
+        string? source = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

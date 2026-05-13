@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.Concurrent;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
 
@@ -9,9 +8,9 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
 /// Resolves the configured source via <see cref="IPackageSourceProvider"/>,
-/// caches per-source <see cref="NuGetProtocolSourceClient"/> instances, and
-/// delegates the catalog operations workload commands need: search,
-/// version resolution, and package download.
+/// builds a <see cref="NuGetProtocolSourceClient"/> for it, and delegates the
+/// catalog operations workload commands need: search, version resolution,
+/// and package download.
 /// </summary>
 internal sealed class WorkloadCatalog(
     IPackageSourceProvider sourceProvider,
@@ -19,7 +18,6 @@ internal sealed class WorkloadCatalog(
 {
     private readonly IPackageSourceProvider _sourceProvider = sourceProvider ?? throw new ArgumentNullException(nameof(sourceProvider));
     private readonly Func<PackageSource, NuGetProtocolSourceClient> _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
-    private readonly ConcurrentDictionary<string, NuGetProtocolSourceClient> _clients = new(StringComparer.OrdinalIgnoreCase);
 
     /// <inheritdoc />
     public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
@@ -27,7 +25,7 @@ internal sealed class WorkloadCatalog(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        return ResolveClient(query.OverrideSource).SearchAsync(query, cancellationToken);
+        return ResolveClient(query.Source).SearchAsync(query, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -36,12 +34,12 @@ internal sealed class WorkloadCatalog(
         bool includePrerelease,
         NuGetVersion? currentVersion = null,
         bool allowMajor = true,
-        string? overrideSource = null,
+        string? source = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
-        NuGetProtocolSourceClient client = ResolveClient(overrideSource);
+        NuGetProtocolSourceClient client = ResolveClient(source);
         IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync(packageId, cancellationToken);
 
         NuGetVersion? best = null;
@@ -70,13 +68,13 @@ internal sealed class WorkloadCatalog(
     public async Task<ResolvedPackage?> ResolveVersionAsync(
         string packageId,
         NuGetVersion version,
-        string? overrideSource = null,
+        string? source = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentNullException.ThrowIfNull(version);
 
-        NuGetProtocolSourceClient client = ResolveClient(overrideSource);
+        NuGetProtocolSourceClient client = ResolveClient(source);
         IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync(packageId, cancellationToken);
 
         return versions.Any(v => v.Equals(version))
@@ -88,12 +86,9 @@ internal sealed class WorkloadCatalog(
     public Task<Stream> DownloadAsync(ResolvedPackage package, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(package);
-        return GetOrCreateClient(package.Source).OpenPackageAsync(package.PackageId, package.Version, cancellationToken);
+        return _clientFactory(package.Source).OpenPackageAsync(package.PackageId, package.Version, cancellationToken);
     }
 
-    private NuGetProtocolSourceClient ResolveClient(string? overrideSource)
-        => GetOrCreateClient(_sourceProvider.GetSource(overrideSource));
-
-    private NuGetProtocolSourceClient GetOrCreateClient(PackageSource source)
-        => _clients.GetOrAdd(source.Name, _ => _clientFactory(source));
+    private NuGetProtocolSourceClient ResolveClient(string? source)
+        => _clientFactory(_sourceProvider.GetSource(source));
 }

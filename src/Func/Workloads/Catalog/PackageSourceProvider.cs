@@ -22,11 +22,11 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
     private readonly WorkloadCatalogOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
     /// <inheritdoc />
-    public PackageSource GetSource(string? overrideSource = null)
+    public PackageSource GetSource(string? source = null)
     {
-        if (!string.IsNullOrWhiteSpace(overrideSource))
+        if (!string.IsNullOrWhiteSpace(source))
         {
-            return Build(overrideSource.Trim());
+            return Build(source.Trim());
         }
 
         if (!string.IsNullOrWhiteSpace(_options.Source))

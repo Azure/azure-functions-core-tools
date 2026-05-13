@@ -11,16 +11,16 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 internal interface IPackageSourceProvider
 {
     /// <summary>
-    /// Returns the source to consult. Precedence: <paramref name="overrideSource"/>
-    /// (from <c>--source</c>), then the configured <c>Workloads:Catalog:Source</c>,
-    /// then the nuget.org default.
+    /// Returns the source to consult. <paramref name="source"/> takes precedence
+    /// (typically from <c>--source</c>); <c>null</c> falls through to the
+    /// configured <c>Workloads:Catalog:Source</c>, then the nuget.org default.
     /// </summary>
-    /// <param name="overrideSource">
-    /// Optional explicit source from <c>--source</c>: a v3 <c>index.json</c>
-    /// URL or a local directory path.
+    /// <param name="source">
+    /// Optional explicit source: a v3 <c>index.json</c> URL or a local
+    /// directory path. <c>null</c> means "use the configured / default source".
     /// </param>
     /// <exception cref="ArgumentException">
     /// The resolved source is not a recognisable URL or existing directory.
     /// </exception>
-    public PackageSource GetSource(string? overrideSource = null);
+    public PackageSource GetSource(string? source = null);
 }

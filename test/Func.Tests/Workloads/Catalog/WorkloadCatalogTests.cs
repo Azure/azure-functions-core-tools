@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 public sealed class WorkloadCatalogTests
 {
     private static readonly PackageSource _defaultSource = new("https://default.test/v3/index.json", "default");
-    private static readonly PackageSource _overrideSource = new("https://override.test/v3/index.json", "override");
+    private static readonly PackageSource _altSource = new("https://override.test/v3/index.json", "override");
 
     [Fact]
     public async Task SearchAsync_DelegatesToConfiguredSource()
@@ -31,19 +31,19 @@ public sealed class WorkloadCatalogTests
     }
 
     [Fact]
-    public async Task SearchAsync_OverrideSource_ConsultsOnlyOverride()
+    public async Task SearchAsync_Source_ConsultsOnlyOverride()
     {
         NuGetProtocolSourceClient defaultClient = BuildClient(_defaultSource, search: [Metadata("default-pkg", "1.0.0")]);
-        NuGetProtocolSourceClient overrideClient = BuildClient(_overrideSource, search: [Metadata("override-pkg", "1.0.0")]);
+        NuGetProtocolSourceClient overrideClient = BuildClient(_altSource, search: [Metadata("override-pkg", "1.0.0")]);
 
         var sourceProvider = Substitute.For<IPackageSourceProvider>();
         sourceProvider.GetSource(null).Returns(_defaultSource);
-        sourceProvider.GetSource(_overrideSource.Source).Returns(_overrideSource);
+        sourceProvider.GetSource(_altSource.Source).Returns(_altSource);
 
         var catalog = new WorkloadCatalog(sourceProvider, source => source.Name == _defaultSource.Name ? defaultClient : overrideClient);
 
         IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(
-            new CatalogSearchQuery { OverrideSource = _overrideSource.Source });
+            new CatalogSearchQuery { Source = _altSource.Source });
 
         Assert.Equal("override-pkg", Assert.Single(results).PackageId);
     }
