@@ -239,7 +239,7 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
 
             yield return (beforeStart, MakeInvocationStartedFor(fn, invocationId, traceId, http));
 
-            // The classic WebJobs "Executing 'X' (Id=…)" envelope.
+            // The classic Functions "Executing 'X' (Id=…)" envelope.
             yield return (TimeSpan.FromMilliseconds(rng.Next(2, 8)), MakeLog(
                 $"Function.{fn.Name}",
                 LogLevel.Information,

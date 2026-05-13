@@ -39,7 +39,21 @@ internal sealed class CompactRenderer(
     private Task? _liveTask;
     private int _lastKnownWidth;
     private int _lastKnownHeight;
+
     private ITheme Theme => _interaction.Theme;
+
+    // Cached theme-derived markup tags. Spectre's Style.ToMarkup() returns
+    // the bracket-contents form (e.g. "grey", "red bold") so we can embed
+    // them in markup strings as $"[{_mutedTag}]…[/]" while still funneling
+    // every color through ITheme. We snapshot once at first use so each
+    // live-redraw tick doesn't re-stringify the same styles.
+    private string MutedTag => field ??= Theme.Muted.ToMarkup();
+    private string EmphasisTag => field ??= Theme.Emphasis.ToMarkup();
+    private string SuccessTag => field ??= Theme.Success.ToMarkup();
+    private string ErrorTag => field ??= Theme.Error.ToMarkup();
+    private string WarningTag => field ??= Theme.Warning.ToMarkup();
+    private string ActiveTag => field ??= Theme.Active.ToMarkup();
+    private string HyperlinkTag => field ??= Theme.Hyperlink.ToMarkup();
 
     public Task OnStartAsync(DashboardState state, CancellationToken cancellationToken)
     {
@@ -88,7 +102,7 @@ internal sealed class CompactRenderer(
             return false;
         }
 
-        if (IsWebJobsInvocationEnvelope(entry.Message))
+        if (IsFunctionsInvocationEnvelope(entry.Message))
         {
             return true;
         }
@@ -96,7 +110,7 @@ internal sealed class CompactRenderer(
         return false;
     }
 
-    private static bool IsWebJobsInvocationEnvelope(string message)
+    private static bool IsFunctionsInvocationEnvelope(string message)
     {
         if (string.IsNullOrEmpty(message))
         {
@@ -257,7 +271,7 @@ internal sealed class CompactRenderer(
             header,
             new Rule("logs").LeftJustified().RuleStyle(Theme.Muted),
             tail.Length == 0
-                ? new Markup("[dim]Waiting for events…[/]")
+                ? new Markup($"[{MutedTag}]Waiting for events…[/]")
                 : new Rows(tail));
 
         return rows;
@@ -317,8 +331,8 @@ internal sealed class CompactRenderer(
             .AddColumn(new TableColumn(string.Empty).RightAligned().NoWrap().PadLeft(0).PadRight(0));
 
         bannerTable.AddRow(
-            new Markup($"[bold]Azure Functions CLI[/]  [dim]Host {Markup.Escape(version)}[/]"),
-            new Markup($"[blue underline]{Markup.Escape(listen)}[/]"));
+            new Markup($"[{EmphasisTag}]Azure Functions CLI[/]  [{MutedTag}]Host {Markup.Escape(version)}[/]"),
+            new Markup($"[{HyperlinkTag}]{Markup.Escape(listen)}[/]"));
 
         Panel bannerPanel = new Panel(bannerTable)
             .Border(BoxBorder.Rounded)
@@ -327,7 +341,7 @@ internal sealed class CompactRenderer(
 
         IRenderable functions = snapshot.Functions.Count switch
         {
-            0 => new Markup("[dim]  No functions loaded yet…[/]"),
+            0 => new Markup($"[{MutedTag}]  No functions loaded yet…[/]"),
             <= 8 => BuildFunctionsTable(snapshot.Functions, snapshot.ListenUri),
             _ => BuildFunctionsStatusStrip(snapshot),
         };
@@ -337,7 +351,7 @@ internal sealed class CompactRenderer(
         return new Rows(
             bannerPanel,
             new Padder(functions).PadTop(0).PadBottom(0),
-            new Markup($"  [dim]{Markup.Escape(status)}[/]"));
+            new Markup($"  [{MutedTag}]{Markup.Escape(status)}[/]"));
     }
 
     private IRenderable BuildFunctionsTable(IReadOnlyList<FunctionInfo> functions, string? listenUri)
@@ -351,10 +365,10 @@ internal sealed class CompactRenderer(
             .AddColumn(new TableColumn(string.Empty).PadRight(2).NoWrap());
 
         table.AddRow(
-            new Markup("[bold]Function[/]"),
-            new Markup("[bold]Trigger[/]"),
-            new Markup("[bold]Route / Source[/]"),
-            new Markup("[bold]Status[/]"));
+            new Markup($"[{EmphasisTag}]Function[/]"),
+            new Markup($"[{EmphasisTag}]Trigger[/]"),
+            new Markup($"[{EmphasisTag}]Route / Source[/]"),
+            new Markup($"[{EmphasisTag}]Status[/]"));
 
         foreach (FunctionInfo fn in functions.OrderBy(f => f.Name, StringComparer.Ordinal))
         {
@@ -364,20 +378,22 @@ internal sealed class CompactRenderer(
             table.AddRow(
                 new Markup($"[{color}]{Markup.Escape(fn.Name)}[/]"),
                 new Markup(Markup.Escape(FormatTrigger(fn.TriggerType))),
-                new Markup($"[dim]{routeMarkup}[/]"),
+                new Markup($"[{MutedTag}]{routeMarkup}[/]"),
                 new Markup(FormatStatus(fn)));
         }
 
         return table;
     }
 
-    private static IRenderable BuildFunctionsStatusStrip(DashboardSnapshot snapshot)
+    private IRenderable BuildFunctionsStatusStrip(DashboardSnapshot snapshot)
     {
         int ready = snapshot.Functions.Count(f => f.Status == FunctionStatus.Ready);
         int active = snapshot.Functions.Count(f => f.Status == FunctionStatus.Active);
         int errored = snapshot.Functions.Count(f => f.Status == FunctionStatus.Error);
 
-        return new Markup(string.Create(CultureInfo.InvariantCulture, $"  [bold]{snapshot.Functions.Count}[/] functions  ·  [green]● {ready} ready[/]  ·  [cyan]◉ {active} active[/]  ·  [red]✗ {errored} error{(errored == 1 ? string.Empty : "s")}[/]"));
+        return new Markup(string.Create(
+            CultureInfo.InvariantCulture,
+            $"  [{EmphasisTag}]{snapshot.Functions.Count}[/] functions  ·  [{SuccessTag}]● {ready} ready[/]  ·  [{ActiveTag}]◉ {active} active[/]  ·  [{ErrorTag}]✗ {errored} error{(errored == 1 ? string.Empty : "s")}[/]"));
     }
 
     private static string BuildStatusLine(DashboardSnapshot snapshot)
@@ -407,13 +423,13 @@ internal sealed class CompactRenderer(
         _ => trigger,
     };
 
-    private static string FormatStatus(FunctionInfo fn) => fn.Status switch
+    private string FormatStatus(FunctionInfo fn) => fn.Status switch
     {
         FunctionStatus.Active when fn.ActiveInvocations > 1 =>
-            $"[cyan]◉ Active ({fn.ActiveInvocations})[/]",
-        FunctionStatus.Active => "[cyan]◉ Active[/]",
-        FunctionStatus.Error => "[red]✗ Error[/]",
-        _ => "[green]● Ready[/]",
+            $"[{ActiveTag}]◉ Active ({fn.ActiveInvocations})[/]",
+        FunctionStatus.Active => $"[{ActiveTag}]◉ Active[/]",
+        FunctionStatus.Error => $"[{ErrorTag}]✗ Error[/]",
+        _ => $"[{SuccessTag}]● Ready[/]",
     };
 
     private IRenderable FormatLogLine(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
@@ -427,14 +443,14 @@ internal sealed class CompactRenderer(
             {
                 case HostStateChangedEvent hs:
                     return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [dim]{ts}[/]  [dim][[host]][/]             {Markup.Escape(DescribeHostState(hs))}"));
+                        $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]             {Markup.Escape(DescribeHostState(hs))}"));
 
                 case FunctionDiscoveredEvent fd:
                 {
                     string color = _palette.GetColorFor(fd.Function.Name);
                     string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, _state.Snapshot().ListenUri);
                     return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [dim]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [dim]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"));
+                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"));
                 }
 
                 case InvocationStartedEvent inv:
@@ -448,20 +464,20 @@ internal sealed class CompactRenderer(
                     }
 
                     return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [dim]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  [green]→[/]  {Markup.Escape(detail)}"));
+                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  [{SuccessTag}]→[/]  {Markup.Escape(detail)}"));
                 }
 
                 case InvocationCompletedEvent inv:
                 {
                     string color = _palette.GetColorFor(inv.Function);
                     bool failed = string.Equals(inv.Result, "failed", StringComparison.OrdinalIgnoreCase);
-                    string arrow = failed ? "[red]✗[/]" : "[green]←[/]";
+                    string arrow = failed ? $"[{ErrorTag}]✗[/]" : $"[{SuccessTag}]←[/]";
                     string suffix = failed
-                        ? $"[red]{Markup.Escape(inv.ErrorType ?? string.Empty)}: {Markup.Escape(inv.ErrorMessage ?? string.Empty)}[/]"
-                        : $"[dim]{(inv.DurationMs.HasValue ? ((long)inv.DurationMs.Value).ToString(CultureInfo.InvariantCulture) + "ms" : string.Empty)}[/]";
+                        ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorType ?? string.Empty)}: {Markup.Escape(inv.ErrorMessage ?? string.Empty)}[/]"
+                        : $"[{MutedTag}]{(inv.DurationMs.HasValue ? ((long)inv.DurationMs.Value).ToString(CultureInfo.InvariantCulture) + "ms" : string.Empty)}[/]";
 
                     return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [dim]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  {arrow}  {suffix}"));
+                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  {arrow}  {suffix}"));
                 }
             }
         }
@@ -470,17 +486,17 @@ internal sealed class CompactRenderer(
         string? functionName = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName);
         string nameMarkup = functionName is not null
             ? $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-18}[/]"
-            : $"[dim]{Markup.Escape(entry.Category),-18}[/]";
+            : $"[{MutedTag}]{Markup.Escape(entry.Category),-18}[/]";
 
         string levelMarkup = entry.Level switch
         {
-            LogLevel.Error or LogLevel.Critical => "[red]✗[/]",
-            LogLevel.Warning => "[yellow]![/]",
-            _ => "[dim]·[/]",
+            LogLevel.Error or LogLevel.Critical => $"[{ErrorTag}]✗[/]",
+            LogLevel.Warning => $"[{WarningTag}]![/]",
+            _ => $"[{MutedTag}]·[/]",
         };
 
         return new Markup(string.Create(CultureInfo.InvariantCulture,
-            $" [dim]{ts}[/]  {nameMarkup}  {levelMarkup}  {Markup.Escape(entry.Message)}"));
+            $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  {Markup.Escape(entry.Message)}"));
     }
 
     private static string DescribeHostState(HostStateChangedEvent hs) => (hs.From, hs.To) switch

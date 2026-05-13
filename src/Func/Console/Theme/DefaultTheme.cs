@@ -33,4 +33,8 @@ internal sealed class DefaultTheme : ITheme
     public Style Error { get; } = new(Color.Red, decoration: Decoration.Bold);
 
     public Style Warning { get; } = new(Color.Yellow, decoration: Decoration.Bold);
+
+    public Style Active { get; } = new(Color.Cyan1);
+
+    public Style Hyperlink { get; } = new(Color.Blue, decoration: Decoration.Underline);
 }

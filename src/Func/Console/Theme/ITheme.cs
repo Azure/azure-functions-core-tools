@@ -48,4 +48,10 @@ internal interface ITheme
 
     /// <summary>Warning messages.</summary>
     public Style Warning { get; }
+
+    /// <summary>In-progress / running state indicators (e.g. active invocations).</summary>
+    public Style Active { get; }
+
+    /// <summary>Clickable URLs and hyperlinks in chrome (banner, route columns).</summary>
+    public Style Hyperlink { get; }
 }
