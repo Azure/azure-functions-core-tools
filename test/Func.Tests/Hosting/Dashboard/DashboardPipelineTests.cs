@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard;
@@ -29,6 +30,39 @@ public class DashboardPipelineTests
         Assert.NotNull(renderer.Summary);
         Assert.Equal("sigint", renderer.Summary.ExitReason);
         Assert.True(renderer.Disposed);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithEventSink_MirrorsRawAndDerivedEvents()
+    {
+        var state = new DashboardState();
+        var source = new InMemoryHostEventStream();
+        source.Write(new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Function.HttpTrigger1",
+            LogLevel.Error,
+            default,
+            "Invocation failed",
+            null,
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.FunctionName] = "HttpTrigger1",
+                [HostLogAttributeKeys.FunctionInvocationId] = "invocation-1",
+                [HostLogAttributeKeys.FunctionResult] = "failed",
+                [HostLogAttributeKeys.DurationMs] = 42d,
+            }));
+        source.Complete();
+        var writer = new StringWriter();
+        var sink = new DashboardLogFileSink(writer);
+        var renderer = new ShutdownRequestingRenderer();
+        var pipeline = new DashboardPipeline(state, source, renderer, sink);
+
+        int exitCode = await pipeline.RunAsync(CancellationToken.None);
+
+        string output = writer.ToString();
+        Assert.Equal(0, exitCode);
+        Assert.Contains("[error] Function.HttpTrigger1: Invocation failed", output);
+        Assert.Contains("invocation_completed HttpTrigger1 invocation-1 failed duration_ms=42", output);
     }
 
     private sealed class NeverEndingEventStream : IHostEventStream

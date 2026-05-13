@@ -14,11 +14,13 @@ namespace Azure.Functions.Cli.Hosting.Dashboard;
 internal sealed class DashboardPipeline(
     DashboardState state,
     IHostEventStream source,
-    IDashboardRenderer renderer)
+    IDashboardRenderer renderer,
+    IDashboardEventSink? eventSink = null)
 {
     private readonly DashboardState _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly IHostEventStream _source = source ?? throw new ArgumentNullException(nameof(source));
     private readonly IDashboardRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
+    private readonly IDashboardEventSink? _eventSink = eventSink;
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
@@ -38,6 +40,11 @@ internal sealed class DashboardPipeline(
             await foreach (HostLogEntry entry in _source.ReadAsync(pipelineCts.Token))
             {
                 IReadOnlyList<DashboardEvent> events = _state.Observe(entry);
+                if (_eventSink is not null)
+                {
+                    await _eventSink.OnEventAsync(entry, events, pipelineCts.Token);
+                }
+
                 await _renderer.OnEventAsync(entry, events, pipelineCts.Token);
             }
 
@@ -70,6 +77,10 @@ internal sealed class DashboardPipeline(
             }
 
             await _renderer.DisposeAsync();
+            if (_eventSink is not null)
+            {
+                await _eventSink.DisposeAsync();
+            }
         }
 
         return 0;

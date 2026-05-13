@@ -20,11 +20,11 @@ internal sealed class FunctionPalette
     [
         "blue",
         "cyan",
-        "magenta1",
+        "darkmagenta_1",
         "yellow",
         "green",
         "blue1",
-        "magenta2",
+        "gold1",
         "cyan1",
     ];
 
@@ -37,6 +37,7 @@ internal sealed class FunctionPalette
     public string GetColorFor(string functionName)
     {
         ArgumentException.ThrowIfNullOrEmpty(functionName);
+
         return _cache.GetOrAdd(functionName, static name => _palette[(int)(Fnv1a(name) % (uint)_palette.Length)]);
     }
 

@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Diagnostics;
 using System.Globalization;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
@@ -808,12 +807,9 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "Esc", "Close the active overlay.");
         AddHelpRow(table, "Ctrl+C", "Stop the host.");
 
-        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]l[/] log file[/]");
         var panel = new Panel(new Rows(
             new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
-            table,
-            new Markup(string.Empty),
-            planned))
+            table))
         {
             Header = new PanelHeader("Help"),
             Border = BoxBorder.Rounded,
@@ -1077,8 +1073,8 @@ internal sealed class CompactRenderer(
             (true, _, _, _) => "? close · Esc close · q/Ctrl+C",
             (_, true, _, _) => "type query · ↑/↓ select · Enter filter · Esc close",
             (_, _, true, _) => "↑/↓ navigate · Enter filter · / search · f next · t close · Esc close",
-            (_, _, _, true) => "/ search · f next · a all · c/e logs · ? help · q/Ctrl+C",
-            _ => "t functions · / search · f filter · c/e logs · ? help · q/Ctrl+C",
+            (_, _, _, true) => "/ search · f next · a all · c/e logs · ? · q/Ctrl+C",
+            _ => "t funcs · / search · f filter · c/e logs · ? · q/Ctrl+C",
         };
 
         string line = string.Create(

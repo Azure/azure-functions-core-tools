@@ -42,10 +42,11 @@ public class CompactRendererFunctionBrowserTests
 
         string output = writer.ToString();
         Assert.Contains("12 functions", output);
-        Assert.Contains("t functions", output);
+        Assert.Contains("t funcs", output);
         Assert.Contains("/ search", output);
         Assert.Contains("f filter", output);
         Assert.Contains("c/e logs", output);
+        Assert.DoesNotContain("l log", output);
         Assert.Contains("L:info", output);
         Assert.Contains("q/Ctrl+C", output);
     }
@@ -82,7 +83,8 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Cycle the active function filter", output);
         Assert.Contains("Toggle errors-only log view", output);
         Assert.Contains("Set visible log level", output);
-        Assert.Contains("Coming soon", output);
+        Assert.DoesNotContain("Open the configured log file", output);
+        Assert.DoesNotContain("Coming soon", output);
         Assert.DoesNotContain("c clear logs", output);
         Assert.DoesNotContain("e errors only", output);
         Assert.DoesNotContain("1/2/3 log level", output);
@@ -330,6 +332,15 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
+    public void HandleKey_L_IsNotHandled()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+
+        Assert.False(InvokePrivate<bool>(renderer, "HandleKey", Key('l', ConsoleKey.L)));
+    }
+
+    [Fact]
     public void HandleKey_SlashSearchEnter_AppliesSelectedMatch()
     {
         (CompactRenderer renderer, _, _) = NewRenderer();
@@ -398,7 +409,8 @@ public class CompactRendererFunctionBrowserTests
         Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
     }
 
-    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
+    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(
+        DashboardRunInfo? runInfo = null)
     {
         var writer = new StringWriter();
         IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
@@ -512,4 +524,5 @@ public class CompactRendererFunctionBrowserTests
 
         field.SetValue(instance, value);
     }
+
 }

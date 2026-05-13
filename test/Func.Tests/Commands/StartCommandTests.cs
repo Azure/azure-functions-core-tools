@@ -49,6 +49,7 @@ public class StartCommandTests : IDisposable
         Assert.Contains("--host-version", optionNames);
         Assert.Contains("--output", optionNames);
         Assert.Contains("--no-tui", optionNames);
+        Assert.Contains("--log-file", optionNames);
     }
 
     [Fact]

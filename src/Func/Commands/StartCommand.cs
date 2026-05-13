@@ -70,6 +70,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Alias for --output=plain. Disables the interactive TUI."
     };
 
+    public Option<string?> LogFileOption { get; } = new("--log-file")
+    {
+        Description = "Mirror all host events to the specified log file."
+    };
+
     // Prototype-only knob: scales the number of functions DemoEventSource
     // generates so layout variants (full-table ≤8 vs. status-strip >8) can
     // be demoed without code changes. Hidden from --help; intended for
@@ -105,6 +110,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(HostVersionOption);
         Options.Add(OutputOption);
         Options.Add(NoTuiOption);
+        Options.Add(LogFileOption);
         Options.Add(DemoFunctionsOption);
     }
 
@@ -136,13 +142,35 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
                 Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
         };
 
+        string? logFilePath = parseResult.GetValue(LogFileOption);
+        IDashboardEventSink? eventSink = CreateLogFileSink(logFilePath);
         string stackName = await _appStackProvider.GetStackNameAsync(workingDirectory, cancellationToken);
         var runInfo = new DashboardRunInfo(ProfileName: "none", StackName: stackName);
         var state = new DashboardState();
         IDashboardRenderer renderer = CreateRenderer(mode, runInfo);
 
-        var pipeline = new DashboardPipeline(state, source, renderer);
+        var pipeline = new DashboardPipeline(state, source, renderer, eventSink);
         return await pipeline.RunAsync(cancellationToken);
+    }
+
+    private static IDashboardEventSink? CreateLogFileSink(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return DashboardLogFileSink.Create(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            throw new GracefulException(
+                $"Could not open log file '{path}': {ex.Message}",
+                isUserError: true,
+                verboseMessage: ex.ToString());
+        }
     }
 
     private static double ParseSpeedMultiplier(string? raw)
