@@ -3,6 +3,8 @@
 `func start --output=json` (alias: `--output json`) emits one self-contained
 JSON object per line on stdout (newline-delimited JSON, NDJSON / JSON Lines).
 Records are not wrapped in an array; there are no commas between them.
+See [`func-start-output-modes.md`](func-start-output-modes.md) for how JSON
+fits alongside the compact and plain renderers.
 
 The schema is designed for programmatic consumers (CI logs, log shippers, AI
 agents) and is versioned via the `schema_version` field. v1 is the contract
