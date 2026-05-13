@@ -43,9 +43,9 @@ public class CompactRendererFunctionBrowserTests
         string output = writer.ToString();
         Assert.Contains("12 functions", output);
         Assert.Contains("t functions", output);
+        Assert.Contains("/ search", output);
         Assert.Contains("f filter", output);
-        Assert.Contains("c clear", output);
-        Assert.Contains("e errors", output);
+        Assert.Contains("c/e logs", output);
         Assert.Contains("L:info", output);
         Assert.Contains("q/Ctrl+C", output);
     }
@@ -77,6 +77,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Help", output);
         Assert.Contains("Available compact-mode controls", output);
         Assert.Contains("Toggle this help panel", output);
+        Assert.Contains("Search functions by name", output);
         Assert.Contains("Clear visible log output", output);
         Assert.Contains("Cycle the active function filter", output);
         Assert.Contains("Toggle errors-only log view", output);
@@ -86,6 +87,24 @@ public class CompactRendererFunctionBrowserTests
         Assert.DoesNotContain("e errors only", output);
         Assert.DoesNotContain("1/2/3 log level", output);
         Assert.DoesNotContain("q quit", output);
+        Assert.DoesNotContain("/ search", output);
+    }
+
+    [Fact]
+    public void BuildHeader_WhenFunctionSearchOpen_RendersSearchOverlay()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
+        SetPrivate(renderer, "_functionSearchOpen", true);
+        SetPrivate(renderer, "_functionSearchQuery", "extra2");
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
+
+        string output = writer.ToString();
+        Assert.Contains("Search functions", output);
+        Assert.Contains("extra2", output);
+        Assert.Contains("HttpExtra2", output);
+        Assert.DoesNotContain("HttpExtra1 ", output);
     }
 
     [Fact]
@@ -310,6 +329,75 @@ public class CompactRendererFunctionBrowserTests
         Assert.True(requested);
     }
 
+    [Fact]
+    public void HandleKey_SlashSearchEnter_AppliesSelectedMatch()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
+        foreach (char c in "extra2")
+        {
+            Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))));
+        }
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)));
+
+        Assert.False((bool)GetPrivate(renderer, "_functionSearchOpen")!);
+        Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+    }
+
+    [Fact]
+    public void HandleKey_SlashSearchDownEnter_AppliesSelectedSearchResult()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
+        foreach (char c in "extra")
+        {
+            Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))));
+        }
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.DownArrow)));
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)));
+
+        Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+    }
+
+    [Fact]
+    public void HandleKey_SlashSearchEscape_CancelsSearchWithoutChangingFilter()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+        SetPrivate(renderer, "_activeFunctionFilter", "HttpTrigger1");
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('x', ConsoleKey.X)));
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\u001b', ConsoleKey.Escape)));
+
+        Assert.False((bool)GetPrivate(renderer, "_functionSearchOpen")!);
+        Assert.Equal("HttpTrigger1", GetPrivate(renderer, "_activeFunctionFilter"));
+    }
+
+    [Fact]
+    public void HandleKey_SlashSearchEnterWithNoMatches_KeepsSearchOpen()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
+        foreach (char c in "zzz")
+        {
+            Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))));
+        }
+
+        Assert.False(InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)));
+
+        Assert.True((bool)GetPrivate(renderer, "_functionSearchOpen")!);
+        Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
+    }
+
     private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
     {
         var writer = new StringWriter();
@@ -397,6 +485,9 @@ public class CompactRendererFunctionBrowserTests
 
     private static ConsoleKeyInfo Key(char keyChar, ConsoleKey key)
         => new(keyChar, key, shift: false, alt: false, control: false);
+
+    private static ConsoleKey CharToConsoleKey(char value)
+        => Enum.Parse<ConsoleKey>(value.ToString().ToUpperInvariant());
 
     private static T InvokePrivate<T>(object instance, string name, params object?[] args)
     {

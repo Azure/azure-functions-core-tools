@@ -28,6 +28,7 @@ internal sealed class CompactRenderer(
 {
     private const int MaxLogTailLines = 200;
     private const int HelpOverlayLines = 12;
+    private const int SearchOverlayLines = 10;
 
     private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
 
@@ -48,8 +49,12 @@ internal sealed class CompactRenderer(
     private int _lastKnownHeight;
     private bool _helpOpen;
     private bool _functionBrowserOpen;
+    private bool _functionSearchOpen;
     private int _functionBrowserSelectedIndex;
     private int _functionBrowserRowOffset;
+    private int _functionSearchSelectedIndex;
+    private int _functionSearchRowOffset;
+    private string _functionSearchQuery = string.Empty;
     private string? _activeFunctionFilter;
     private bool _errorsOnly;
     private LogLevel _minimumLogLevel = LogLevel.Information;
@@ -227,9 +232,20 @@ internal sealed class CompactRenderer(
 
         lock (_uiLock)
         {
+            if (_functionSearchOpen)
+            {
+                return HandleFunctionSearchKey(key, functions);
+            }
+
             if (key.KeyChar == '?')
             {
                 ToggleHelpOverlay();
+                return true;
+            }
+
+            if (key.KeyChar == '/')
+            {
+                OpenFunctionSearch();
                 return true;
             }
 
@@ -328,6 +344,7 @@ internal sealed class CompactRenderer(
         }
 
         _helpOpen = false;
+        _functionSearchOpen = false;
         _functionBrowserRowOffset = 0;
         if (_activeFunctionFilter is null)
         {
@@ -357,7 +374,79 @@ internal sealed class CompactRenderer(
         if (_helpOpen)
         {
             _functionBrowserOpen = false;
+            _functionSearchOpen = false;
         }
+    }
+
+    private void OpenFunctionSearch()
+    {
+        _functionSearchOpen = true;
+        _helpOpen = false;
+        _functionBrowserOpen = false;
+        _functionSearchQuery = string.Empty;
+        _functionSearchSelectedIndex = 0;
+        _functionSearchRowOffset = 0;
+    }
+
+    private bool HandleFunctionSearchKey(ConsoleKeyInfo key, FunctionInfo[] functions)
+    {
+        switch (key.Key)
+        {
+            case ConsoleKey.Escape:
+                _functionSearchOpen = false;
+                return true;
+
+            case ConsoleKey.Enter:
+            {
+                FunctionInfo[] matches = GetFunctionSearchMatches(functions, _functionSearchQuery);
+                if (matches.Length == 0)
+                {
+                    return false;
+                }
+
+                _functionSearchSelectedIndex = Math.Clamp(_functionSearchSelectedIndex, 0, matches.Length - 1);
+                _activeFunctionFilter = matches[_functionSearchSelectedIndex].Name;
+                _functionSearchOpen = false;
+                return true;
+            }
+
+            case ConsoleKey.UpArrow:
+                MoveFunctionSearchSelection(functions, -1);
+                return true;
+
+            case ConsoleKey.DownArrow:
+                MoveFunctionSearchSelection(functions, 1);
+                return true;
+
+            case ConsoleKey.Backspace when _functionSearchQuery.Length > 0:
+                _functionSearchQuery = _functionSearchQuery[..^1];
+                _functionSearchSelectedIndex = 0;
+                _functionSearchRowOffset = 0;
+                return true;
+        }
+
+        if (!char.IsControl(key.KeyChar))
+        {
+            _functionSearchQuery += key.KeyChar;
+            _functionSearchSelectedIndex = 0;
+            _functionSearchRowOffset = 0;
+            return true;
+        }
+
+        return false;
+    }
+
+    private void MoveFunctionSearchSelection(FunctionInfo[] functions, int delta)
+    {
+        FunctionInfo[] matches = GetFunctionSearchMatches(functions, _functionSearchQuery);
+        if (matches.Length == 0)
+        {
+            _functionSearchSelectedIndex = 0;
+            _functionSearchRowOffset = 0;
+            return;
+        }
+
+        _functionSearchSelectedIndex = Math.Clamp(_functionSearchSelectedIndex + delta, 0, matches.Length - 1);
     }
 
     private void ClearVisibleLogs()
@@ -566,13 +655,17 @@ internal sealed class CompactRenderer(
         //   safety pad (resize/wrap slack):         2 lines
         bool helpOpen;
         bool browserOpen;
+        bool searchOpen;
         int functionsLines;
         lock (_uiLock)
         {
             helpOpen = _helpOpen;
             browserOpen = _functionBrowserOpen;
+            searchOpen = _functionSearchOpen;
             functionsLines = _helpOpen
                 ? HelpOverlayLines
+                : _functionSearchOpen
+                ? SearchOverlayLines
                 : _functionBrowserOpen
                 // Panel border (2) + visible grid rows + spacer/footer (2).
                 ? GetFunctionBrowserVisibleRows(snapshot.Functions.Count) + 4
@@ -584,7 +677,7 @@ internal sealed class CompactRenderer(
                 };
         }
 
-        int reservedForHeader = helpOpen || browserOpen
+        int reservedForHeader = helpOpen || browserOpen || searchOpen
             // Overlay panel + "logs" rule + footer + safety pad.
             ? functionsLines + 1 + 1 + 2
             // Banner panel + functions block + "logs" rule + footer + safety pad.
@@ -598,16 +691,23 @@ internal sealed class CompactRenderer(
     private IRenderable BuildHeader(DashboardSnapshot snapshot)
     {
         bool helpOpen;
+        bool functionSearchOpen;
         bool functionBrowserOpen;
         lock (_uiLock)
         {
             helpOpen = _helpOpen;
+            functionSearchOpen = _functionSearchOpen;
             functionBrowserOpen = _functionBrowserOpen;
         }
 
         if (helpOpen)
         {
             return BuildHelpOverlay();
+        }
+
+        if (functionSearchOpen)
+        {
+            return BuildFunctionSearch(snapshot);
         }
 
         if (functionBrowserOpen)
@@ -695,6 +795,7 @@ internal sealed class CompactRenderer(
 
         AddHelpRow(table, "?", "Toggle this help panel.");
         AddHelpRow(table, "t", "Open the function browser.");
+        AddHelpRow(table, "/", "Search functions by name, trigger, or route.");
         AddHelpRow(table, "↑/↓", "Move selection in the function browser.");
         AddHelpRow(table, "PgUp/PgDn", "Jump through the function browser.");
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
@@ -707,7 +808,7 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "Esc", "Close the active overlay.");
         AddHelpRow(table, "Ctrl+C", "Stop the host.");
 
-        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]l[/] log file[/]");
+        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]l[/] log file[/]");
         var panel = new Panel(new Rows(
             new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
             table,
@@ -721,6 +822,98 @@ internal sealed class CompactRenderer(
         };
 
         return panel;
+    }
+
+    private IRenderable BuildFunctionSearch(DashboardSnapshot snapshot)
+    {
+        FunctionInfo[] functions = GetSortedFunctions(snapshot);
+        string query;
+        int selectedIndex;
+        int rowOffset;
+        FunctionInfo[] matches;
+        int visibleRows;
+        lock (_uiLock)
+        {
+            query = _functionSearchQuery;
+            matches = GetFunctionSearchMatches(functions, query);
+            visibleRows = GetFunctionSearchVisibleRows(matches.Length);
+            if (matches.Length == 0)
+            {
+                _functionSearchSelectedIndex = 0;
+                _functionSearchRowOffset = 0;
+            }
+            else
+            {
+                _functionSearchSelectedIndex = Math.Clamp(_functionSearchSelectedIndex, 0, matches.Length - 1);
+                int maxOffset = Math.Max(0, matches.Length - visibleRows);
+                if (_functionSearchRowOffset > _functionSearchSelectedIndex)
+                {
+                    _functionSearchRowOffset = _functionSearchSelectedIndex;
+                }
+                else if (_functionSearchRowOffset + visibleRows <= _functionSearchSelectedIndex)
+                {
+                    _functionSearchRowOffset = _functionSearchSelectedIndex - visibleRows + 1;
+                }
+
+                _functionSearchRowOffset = Math.Clamp(_functionSearchRowOffset, 0, maxOffset);
+            }
+
+            selectedIndex = _functionSearchSelectedIndex;
+            rowOffset = _functionSearchRowOffset;
+        }
+
+        IRenderable results = matches.Length == 0
+            ? new Markup($"[{MutedTag}]  No functions match \"{Markup.Escape(query)}\"[/]")
+            : BuildFunctionSearchResults(matches, visibleRows, rowOffset, selectedIndex);
+
+        string displayQuery = query.Length == 0 ? "type to search" : query;
+        var panel = new Panel(new Rows(
+            new Markup($"[{MutedTag}]Search:[/] [{EmphasisTag}]{Markup.Escape(displayQuery)}[/]"),
+            results,
+            new Markup(string.Empty),
+            new Markup($"[{MutedTag}]Type to filter · Up/Down select · Enter apply · Esc cancel[/]")))
+        {
+            Header = new PanelHeader("Search functions"),
+            Border = BoxBorder.Rounded,
+            BorderStyle = Theme.Muted,
+            Expand = true,
+        };
+
+        return panel;
+    }
+
+    private IRenderable BuildFunctionSearchResults(FunctionInfo[] matches, int visibleRows, int rowOffset, int selectedIndex)
+    {
+        Table table = new Table()
+            .Border(TableBorder.None)
+            .HideHeaders()
+            .Expand()
+            .AddColumn(new TableColumn(string.Empty).PadLeft(1).PadRight(2).NoWrap())
+            .AddColumn(new TableColumn(string.Empty).PadRight(2).NoWrap())
+            .AddColumn(new TableColumn(string.Empty).PadRight(0));
+
+        for (int i = 0; i < visibleRows; i++)
+        {
+            int index = rowOffset + i;
+            if ((uint)index >= (uint)matches.Length)
+            {
+                break;
+            }
+
+            FunctionInfo fn = matches[index];
+            string marker = index == selectedIndex
+                ? $"[{EmphasisTag}]>[/]"
+                : " ";
+            string color = _palette.GetColorFor(fn.Name);
+            string route = string.IsNullOrEmpty(fn.Route) ? FormatTrigger(fn.TriggerType) : fn.Route;
+
+            table.AddRow(
+                new Markup(marker),
+                new Markup($"[{color}]{Markup.Escape(fn.Name)}[/]"),
+                new Markup($"[{MutedTag}]{Markup.Escape(route)}[/]"));
+        }
+
+        return table;
     }
 
     private void AddHelpRow(Table table, string key, string description)
@@ -771,7 +964,7 @@ internal sealed class CompactRenderer(
             ? new Markup($"[{MutedTag}]No functions loaded yet…[/]")
             : BuildFunctionBrowserGrid(functions, totalRows, visibleRows, rowOffset, selectedIndex);
 
-        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · f next · a all · c clear · e errors · t/Esc close · q/Ctrl+C[/]");
+        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · / search · f next · a all · t/Esc close · q/Ctrl+C[/]");
         var panel = new Panel(new Rows(content, new Markup(string.Empty), footer))
         {
             Header = new PanelHeader(string.Create(CultureInfo.InvariantCulture, $"Functions ({functions.Length})")),
@@ -870,19 +1063,22 @@ internal sealed class CompactRenderer(
             : string.Empty;
         string level = $" · L:{FormatMinimumLogLevel(minimumLogLevel)}";
         bool helpOpen;
+        bool functionSearchOpen;
         bool functionBrowserOpen;
         lock (_uiLock)
         {
             helpOpen = _helpOpen;
+            functionSearchOpen = _functionSearchOpen;
             functionBrowserOpen = _functionBrowserOpen;
         }
 
-        string controls = (helpOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
+        string controls = (helpOpen, functionSearchOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
-            (true, _, _) => "? close · c clear · e errors · Esc close · q/Ctrl+C",
-            (_, true, _) => "↑/↓ navigate · Enter filter · f next · t close · Esc close · q/Ctrl+C",
-            (_, _, true) => "f next · a all · c clear · e errors · ? help · q/Ctrl+C",
-            _ => "t functions · f filter · c clear · e errors · ? help · q/Ctrl+C",
+            (true, _, _, _) => "? close · Esc close · q/Ctrl+C",
+            (_, true, _, _) => "type query · ↑/↓ select · Enter filter · Esc close",
+            (_, _, true, _) => "↑/↓ navigate · Enter filter · / search · f next · t close · Esc close",
+            (_, _, _, true) => "/ search · f next · a all · c/e logs · ? help · q/Ctrl+C",
+            _ => "t functions · / search · f filter · c/e logs · ? help · q/Ctrl+C",
         };
 
         string line = string.Create(
@@ -982,6 +1178,43 @@ internal sealed class CompactRenderer(
     private static FunctionInfo[] GetSortedFunctions(DashboardSnapshot snapshot)
         => [.. snapshot.Functions.OrderBy(f => f.Name, _functionNameComparer)];
 
+    private static FunctionInfo[] GetFunctionSearchMatches(FunctionInfo[] functions, string query)
+    {
+        string trimmed = query.Trim();
+        if (trimmed.Length == 0)
+        {
+            return functions;
+        }
+
+        return [.. functions.Where(fn =>
+            IsFuzzyMatch(fn.Name, trimmed)
+            || IsFuzzyMatch(fn.TriggerType, trimmed)
+            || IsFuzzyMatch(fn.Route, trimmed))];
+    }
+
+    private static bool IsFuzzyMatch(string? value, string query)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        int queryIndex = 0;
+        foreach (char valueChar in value)
+        {
+            if (char.ToUpperInvariant(valueChar) == char.ToUpperInvariant(query[queryIndex]))
+            {
+                queryIndex++;
+                if (queryIndex == query.Length)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static int GetFunctionBrowserTotalRows(int functionCount)
         => Math.Max(1, (functionCount + 1) / 2);
 
@@ -999,6 +1232,13 @@ internal sealed class CompactRenderer(
         // in the two-column browser before scrolling is needed.
         int maxRows = Math.Max(4, viewportHeight - 10);
         return Math.Min(totalRows, maxRows);
+    }
+
+    private int GetFunctionSearchVisibleRows(int matchCount)
+    {
+        int viewportHeight = GetViewportHeight();
+        int maxRows = Math.Max(3, viewportHeight - 14);
+        return Math.Min(matchCount, maxRows);
     }
 
     private int GetViewportHeight()
