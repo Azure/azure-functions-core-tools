@@ -1,8 +1,8 @@
-# Azure Functions CLI 4.10.0
+# Azure Functions CLI 4.11.0
 
 #### Host Version
 
-- Host Runtime Version: 4.1048.200
+- Host Runtime Version: 4.1050.100
 - In-Proc CLI:
   - CLI Version: 4.5.0
   - Host Runtime Version: 4.48.100 (includes 4.848.100, 4.648.100)
@@ -16,3 +16,14 @@
 - Fix `func kubernetes delete` to honor `--no-docker` instead of failing on registry auth (#4919)
 - Add `McpPromptTrigger` template for dotnet-isolated `func new` (#4891)
 - Fix func azure storage fetch-connection-string failing with "Cannot find storage account" due to ARM eventual consistency (#4884)
+- Updated target framework to .NET 10
+    - Migrated from deprecated `Microsoft.DotNet.PlatformAbstractions` to `System.Runtime.InteropServices.RuntimeInformation`
+    - Migrated from deprecated `X509Certificate2` constructor to `X509CertificateLoader`
+    - Bumped `Microsoft.Extensions.DependencyInjection` to 10.0.0
+    - Bumped `Microsoft.Extensions.Logging` / `Logging.Abstractions` to 10.0.0 / 10.0.3
+    - Bumped `Azure.Identity` to 1.20.0, `Azure.Security.KeyVault.Secrets` to 4.9.0
+    - Bumped `Microsoft.Identity.Client` to 4.83.3
+    - Bumped `Newtonsoft.Json` to 13.0.4, `WindowsAzure.Storage` to 9.3.3
+    - Removed unnecessary transitive pinning of `System.Text.Json`, `System.Formats.Asn1`, `System.Private.Uri`
+    - Updated worker versions to match host requirements (NodeJs 3.13.0, Python 4.44.0)
+

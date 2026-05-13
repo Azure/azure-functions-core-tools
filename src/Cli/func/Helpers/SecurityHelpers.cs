@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.Helpers
                 certPassword = File.Exists(certPassword)
                     ? File.ReadAllText(certPassword).Trim()
                     : certPassword;
-                return new X509Certificate2(certPath, certPassword);
+                return X509CertificateLoader.LoadPkcs12FromFile(certPath, certPassword);
             }
             else if (CommandChecker.CommandExists("openssl"))
             {
@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Could not create a Certificate using openssl.");
             }
 
-            return new X509Certificate2($"{certFileNames}certificate.pfx", DEFAULT_PASSWORD);
+            return X509CertificateLoader.LoadPkcs12FromFile($"{certFileNames}certificate.pfx", DEFAULT_PASSWORD);
         }
 
         public static string CalculateMd5(Stream stream)

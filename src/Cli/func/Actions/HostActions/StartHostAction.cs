@@ -185,6 +185,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return base.ParseArgs(args);
         }
 
+#pragma warning disable ASPDEPR008 // Startup implements IStartup which requires IWebHost lifecycle
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, UserLogLevel);
@@ -281,6 +282,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 })
                 .Build();
         }
+#pragma warning restore ASPDEPR008
 
         internal async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
@@ -465,7 +467,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 await ExtensionBundleHelper.GetExtensionBundle();
             }
 
+#pragma warning disable ASPDEPR008
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
+#pragma warning restore ASPDEPR008
             var runTask = host.RunAsync();
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
 
