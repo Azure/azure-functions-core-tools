@@ -239,6 +239,10 @@ internal sealed class CompactRenderer(
                     _errorsOnly = !_errorsOnly;
                     return true;
 
+                case ConsoleKey.F:
+                    CycleFunctionFilter(functions);
+                    return functions.Length > 0 || _activeFunctionFilter is not null;
+
                 case ConsoleKey.Escape when _helpOpen || _functionBrowserOpen:
                     _helpOpen = false;
                     _functionBrowserOpen = false;
@@ -338,6 +342,26 @@ internal sealed class CompactRenderer(
         {
             _logTail.Clear();
         }
+    }
+
+    private void CycleFunctionFilter(FunctionInfo[] functions)
+    {
+        if (functions.Length == 0)
+        {
+            _activeFunctionFilter = null;
+            return;
+        }
+
+        if (_activeFunctionFilter is null)
+        {
+            _activeFunctionFilter = functions[0].Name;
+            return;
+        }
+
+        int index = Array.FindIndex(functions, f => string.Equals(f.Name, _activeFunctionFilter, StringComparison.Ordinal));
+        _activeFunctionFilter = index >= 0 && index < functions.Length - 1
+            ? functions[index + 1].Name
+            : null;
     }
 
     private async Task RunLiveLoopAsync(CancellationToken cancellationToken)
@@ -636,6 +660,7 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "PgUp/PgDn", "Jump through the function browser.");
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
         AddHelpRow(table, "a", "Clear the active function filter.");
+        AddHelpRow(table, "f", "Cycle the active function filter.");
         AddHelpRow(table, "c", "Clear visible log output.");
         AddHelpRow(table, "e", "Toggle errors-only log view.");
         AddHelpRow(table, "Esc", "Close the active overlay.");
@@ -705,7 +730,7 @@ internal sealed class CompactRenderer(
             ? new Markup($"[{MutedTag}]No functions loaded yet…[/]")
             : BuildFunctionBrowserGrid(functions, totalRows, visibleRows, rowOffset, selectedIndex);
 
-        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · a clear filter · c clear · e errors · t/Esc close[/]");
+        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · f next · a all · c clear · e errors · t/Esc close[/]");
         var panel = new Panel(new Rows(content, new Markup(string.Empty), footer))
         {
             Header = new PanelHeader(string.Create(CultureInfo.InvariantCulture, $"Functions ({functions.Length})")),
@@ -813,9 +838,9 @@ internal sealed class CompactRenderer(
         string controls = (helpOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
             (true, _, _) => "? close · c clear · e errors · Esc close · Ctrl+C stop",
-            (_, true, _) => "↑/↓ navigate · Enter filter · c clear · e errors · t close · Esc close",
-            (_, _, true) => "t functions · a all · c clear · e errors · ? help · Ctrl+C stop",
-            _ => "t functions · / search · c clear · e errors · ? help · Ctrl+C stop",
+            (_, true, _) => "↑/↓ navigate · Enter filter · f next · t close · Esc close",
+            (_, _, true) => "f next · a all · c clear · e errors · ? help · Ctrl+C stop",
+            _ => "t functions · f filter · c clear · e errors · ? help · Ctrl+C stop",
         };
 
         string line = string.Create(

@@ -43,7 +43,7 @@ public class CompactRendererFunctionBrowserTests
         string output = writer.ToString();
         Assert.Contains("12 functions", output);
         Assert.Contains("t functions", output);
-        Assert.Contains("/ search", output);
+        Assert.Contains("f filter", output);
         Assert.Contains("c clear", output);
         Assert.Contains("e errors", output);
         Assert.Contains("Ctrl+C stop", output);
@@ -77,6 +77,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Available compact-mode controls", output);
         Assert.Contains("Toggle this help panel", output);
         Assert.Contains("Clear visible log output", output);
+        Assert.Contains("Cycle the active function filter", output);
         Assert.Contains("Toggle errors-only log view", output);
         Assert.Contains("Coming soon", output);
         Assert.DoesNotContain("c clear logs", output);
@@ -159,6 +160,34 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
+    public async Task BuildLayout_WhenHostRecycles_PreservesActiveFunctionFilterAfterRediscovery()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        var state = BuildState(functionCount: 3);
+        SetPrivate(renderer, "_state", state);
+        SetPrivate(renderer, "_activeFunctionFilter", "HttpTrigger1");
+        await renderer.OnEventAsync(Log("HttpTrigger1", "selected before recycle"), [], CancellationToken.None);
+        await renderer.OnEventAsync(Log("HttpExtra1", "other before recycle"), [], CancellationToken.None);
+
+        state.Observe(HostState("recycling"));
+        state.Observe(HostState("ready"));
+        state.Observe(Discover("HttpTrigger1", "/api/hello"));
+        state.Observe(Discover("HttpExtra1", "/api/extra-1"));
+        await renderer.OnEventAsync(Log("HttpTrigger1", "selected after recycle"), [], CancellationToken.None);
+        await renderer.OnEventAsync(Log("HttpExtra1", "other after recycle"), [], CancellationToken.None);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.Equal("HttpTrigger1", GetPrivate(renderer, "_activeFunctionFilter"));
+        Assert.Contains("Filter HttpTrigger1", output);
+        Assert.Contains("selected before recycle", output);
+        Assert.Contains("selected after recycle", output);
+        Assert.DoesNotContain("other before recycle", output);
+        Assert.DoesNotContain("other after recycle", output);
+    }
+
+    [Fact]
     public async Task HandleKey_C_ClearsVisibleLogTail()
     {
         (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
@@ -206,6 +235,25 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("info compact log", output);
         Assert.Contains("error compact log", output);
         Assert.DoesNotContain("Errors only", output);
+    }
+
+    [Fact]
+    public void HandleKey_F_CyclesFunctionFilterInDeterministicOrderThenAllFunctions()
+    {
+        (CompactRenderer renderer, _, _) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
+        Assert.Equal("HttpExtra1", GetPrivate(renderer, "_activeFunctionFilter"));
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
+        Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
+        Assert.Equal("HttpTrigger1", GetPrivate(renderer, "_activeFunctionFilter"));
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
+        Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
     }
 
     private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
@@ -266,6 +314,15 @@ public class CompactRendererFunctionBrowserTests
                 [HostLogAttributeKeys.FunctionTriggerType] = "http",
                 [HostLogAttributeKeys.FunctionRoute] = route,
                 [HostLogAttributeKeys.FunctionHttpMethods] = new[] { "GET" },
+            });
+
+    private static HostLogEntry HostState(string state)
+        => MakeEntry(
+            "Host.Lifecycle",
+            new()
+            {
+                [HostLogAttributeKeys.CliEventKind] = CliEventKinds.HostStateChanged,
+                [HostLogAttributeKeys.HostState] = state,
             });
 
     private static HostLogEntry MakeEntry(string category, Dictionary<string, object?> attrs)
