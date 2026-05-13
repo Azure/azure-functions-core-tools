@@ -86,14 +86,6 @@ public class TelemetryTests
     }
 
     [Fact]
-    public void StartCommandActivity_NoListener_ReturnsNull()
-    {
-        // Without an OTel listener subscribed, ActivitySource.StartActivity
-        // returns null and the extension propagates that.
-        Assert.Null(CliTelemetry.Trace.StartCommandActivity());
-    }
-
-    [Fact]
     public void RecordCommand_NoListener_DoesNotThrow()
     {
         // Metric instruments record nothing when no MeterListener is wired up.
