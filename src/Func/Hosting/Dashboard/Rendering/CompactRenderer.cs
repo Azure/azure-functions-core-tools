@@ -25,8 +25,9 @@ internal sealed class CompactRenderer(
     DashboardRunInfo? runInfo = null) : IDashboardRenderer, IDashboardShutdownRequester
 {
     private const int MaxLogTailLines = 200;
-    private const int HelpOverlayLines = 12;
-    private const int SearchOverlayLines = 10;
+    private const int HelpOverlayCommandRows = 15;
+    private const int HelpOverlayLines = HelpOverlayCommandRows + 3;
+    private const int SearchOverlayChromeLines = 5;
 
     private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
 
@@ -521,7 +522,7 @@ internal sealed class CompactRenderer(
 
     private int GetLogScrollStep(DashboardSnapshot snapshot)
     {
-        int logBudget = ComputeLogBudgetCore(snapshot, _helpOpen, functionSearchOpen: false, functionBrowserOpen: false);
+        int logBudget = ComputeLogBudgetCore(snapshot, _helpOpen, functionSearchOpen: false, functionBrowserOpen: false, searchQuery: string.Empty);
         return Math.Max(1, logBudget - 1);
     }
 
@@ -685,6 +686,11 @@ internal sealed class CompactRenderer(
 
     private IRenderable BuildLogRows(LogLine[] tail, string? activeFunctionFilter, int logBudget)
     {
+        if (logBudget <= 0)
+        {
+            return new Rows(Array.Empty<IRenderable>());
+        }
+
         List<IRenderable> rows = tail.Length == 0
             ? [new Markup($"[{MutedTag}]{Markup.Escape(GetEmptyLogMessage(activeFunctionFilter))}[/]")]
             : [.. tail.Select(static line => line.Renderable)];
@@ -702,21 +708,24 @@ internal sealed class CompactRenderer(
         bool helpOpen;
         bool browserOpen;
         bool searchOpen;
+        string searchQuery;
         lock (_uiLock)
         {
             helpOpen = _helpOpen;
             browserOpen = _functionBrowserOpen;
             searchOpen = _functionSearchOpen;
+            searchQuery = _functionSearchQuery;
         }
 
-        return ComputeLogBudgetCore(snapshot, helpOpen, searchOpen, browserOpen);
+        return ComputeLogBudgetCore(snapshot, helpOpen, searchOpen, browserOpen, searchQuery);
     }
 
     private int ComputeLogBudgetCore(
         DashboardSnapshot snapshot,
         bool helpOpen,
         bool functionSearchOpen,
-        bool functionBrowserOpen)
+        bool functionBrowserOpen,
+        string searchQuery)
     {
         // Spectre reports sentinel values when stdout isn't a real terminal
         // (e.g., redirected to a pipe). Clamp to a sensible default so the
@@ -730,15 +739,19 @@ internal sealed class CompactRenderer(
         //   "logs" rule:                            1 line
         //   footer line:                            1 line
         //   safety pad (resize/wrap slack):         2 lines
-        int functionsLines = ComputeHeaderLineCount(snapshot, helpOpen, functionSearchOpen, functionBrowserOpen);
-        int reservedForHeader = helpOpen || functionBrowserOpen || functionSearchOpen
-            // Overlay panel + "logs" rule + footer + safety pad.
-            ? functionsLines + 1 + 1 + 2
-            // Banner panel + functions block + "logs" rule + footer + safety pad.
-            : 3 + functionsLines + 1 + 1 + 2;
+        int functionsLines = ComputeHeaderLineCount(snapshot, helpOpen, functionSearchOpen, functionBrowserOpen, searchQuery);
+        if (helpOpen || functionBrowserOpen || functionSearchOpen)
+        {
+            // Overlay panel + "logs" rule + footer. Do not reserve extra
+            // slack here: if the target exceeds the viewport, Spectre crops
+            // from the top and hides the overlay header.
+            int reservedForOverlay = functionsLines + 1 + 1;
+            return Math.Max(0, viewportHeight - reservedForOverlay);
+        }
 
         // Always reserve at least 3 lines for logs so the dashboard remains
         // useful even on very small terminals (the header simply overflows).
+        int reservedForHeader = 3 + functionsLines + 1 + 1 + 2;
         return Math.Max(3, viewportHeight - reservedForHeader);
     }
 
@@ -746,11 +759,12 @@ internal sealed class CompactRenderer(
         DashboardSnapshot snapshot,
         bool helpOpen,
         bool functionSearchOpen,
-        bool functionBrowserOpen)
+        bool functionBrowserOpen,
+        string searchQuery)
         => helpOpen
             ? HelpOverlayLines
             : functionSearchOpen
-            ? SearchOverlayLines
+            ? GetFunctionSearchVisibleRows(GetFunctionSearchMatches(GetSortedFunctions(snapshot), searchQuery).Length) + SearchOverlayChromeLines
             : functionBrowserOpen
             // Panel border (2) + visible grid rows + spacer/footer (2).
             ? GetFunctionBrowserVisibleRows(snapshot.Functions.Count) + 4

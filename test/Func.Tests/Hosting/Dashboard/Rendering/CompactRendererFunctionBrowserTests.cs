@@ -95,6 +95,20 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
+    public void BuildLayout_WhenHelpOpen_ReservesEnoughRowsForPanelHeader()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+        SetPrivate(renderer, "_helpOpen", true);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.Contains("Help", output);
+        Assert.True(CountRenderedLines(output) <= console.Profile.Height);
+    }
+
+    [Fact]
     public void BuildHeader_WhenFunctionSearchOpen_RendersSearchOverlay()
     {
         (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
@@ -109,6 +123,21 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("extra2", output);
         Assert.Contains("HttpExtra2", output);
         Assert.DoesNotContain("HttpExtra1 ", output);
+    }
+
+    [Fact]
+    public void BuildLayout_WhenFunctionSearchOpen_ReservesEnoughRowsForPanelHeader()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 12));
+        SetPrivate(renderer, "_functionSearchOpen", true);
+        SetPrivate(renderer, "_functionSearchQuery", "extra");
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.Contains("Search functions", output);
+        Assert.True(CountRenderedLines(output) <= console.Profile.Height);
     }
 
     [Fact]
@@ -509,6 +538,14 @@ public class CompactRendererFunctionBrowserTests
     {
         writer.GetStringBuilder().Clear();
         console.Write(renderable);
+    }
+
+    private static int CountRenderedLines(string output)
+    {
+        string normalized = output.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n');
+        return normalized.Length == 0
+            ? 0
+            : normalized.Split('\n').Length;
     }
 
     private static DashboardSnapshot BuildSnapshot(int functionCount)
