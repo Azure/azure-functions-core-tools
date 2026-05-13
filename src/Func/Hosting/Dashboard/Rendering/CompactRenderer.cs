@@ -52,6 +52,7 @@ internal sealed class CompactRenderer(
     private int _functionBrowserRowOffset;
     private string? _activeFunctionFilter;
     private bool _errorsOnly;
+    private LogLevel _minimumLogLevel = LogLevel.Information;
 
     private ITheme Theme => _interaction.Theme;
 
@@ -88,7 +89,12 @@ internal sealed class CompactRenderer(
             return Task.CompletedTask;
         }
 
-        var line = new LogLine(FormatLogLine(entry, events), GetFunctionName(entry, events), IsErrorLogLine(entry, events));
+        bool isError = IsErrorLogLine(entry, events);
+        var line = new LogLine(
+            FormatLogLine(entry, events),
+            GetFunctionName(entry, events),
+            isError,
+            GetEffectiveLogLevel(entry, isError));
         lock (_stateLock)
         {
             _logTail.Enqueue(line);
@@ -243,6 +249,18 @@ internal sealed class CompactRenderer(
                     CycleFunctionFilter(functions);
                     return functions.Length > 0 || _activeFunctionFilter is not null;
 
+                case ConsoleKey.D1:
+                case ConsoleKey.NumPad1:
+                    return SetMinimumLogLevel(LogLevel.Information);
+
+                case ConsoleKey.D2:
+                case ConsoleKey.NumPad2:
+                    return SetMinimumLogLevel(LogLevel.Warning);
+
+                case ConsoleKey.D3:
+                case ConsoleKey.NumPad3:
+                    return SetMinimumLogLevel(LogLevel.Error);
+
                 case ConsoleKey.Escape when _helpOpen || _functionBrowserOpen:
                     _helpOpen = false;
                     _functionBrowserOpen = false;
@@ -364,6 +382,17 @@ internal sealed class CompactRenderer(
             : null;
     }
 
+    private bool SetMinimumLogLevel(LogLevel minimumLogLevel)
+    {
+        if (_minimumLogLevel == minimumLogLevel)
+        {
+            return false;
+        }
+
+        _minimumLogLevel = minimumLogLevel;
+        return true;
+    }
+
     private async Task RunLiveLoopAsync(CancellationToken cancellationToken)
     {
         // Outer loop: each iteration runs one LiveDisplay session. When a
@@ -456,10 +485,12 @@ internal sealed class CompactRenderer(
 
         string? activeFunctionFilter;
         bool errorsOnly;
+        LogLevel minimumLogLevel;
         lock (_uiLock)
         {
             activeFunctionFilter = _activeFunctionFilter;
             errorsOnly = _errorsOnly;
+            minimumLogLevel = _minimumLogLevel;
         }
 
         if (activeFunctionFilter is not null)
@@ -474,6 +505,8 @@ internal sealed class CompactRenderer(
             tail = [.. tail.Where(line => line.IsError)];
         }
 
+        tail = [.. tail.Where(line => line.Level >= minimumLogLevel)];
+
         // Slice the log tail to what actually fits on screen so we render
         // true scrolling behavior (newest at the bottom, oldest drop off the
         // top of the visible region) instead of freezing once the viewport
@@ -486,7 +519,7 @@ internal sealed class CompactRenderer(
         }
 
         IRenderable logRows = BuildLogRows(tail, activeFunctionFilter, logBudget);
-        IRenderable footer = BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly);
+        IRenderable footer = BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly, minimumLogLevel);
 
         var rows = new Rows(
             header,
@@ -663,10 +696,11 @@ internal sealed class CompactRenderer(
         AddHelpRow(table, "f", "Cycle the active function filter.");
         AddHelpRow(table, "c", "Clear visible log output.");
         AddHelpRow(table, "e", "Toggle errors-only log view.");
+        AddHelpRow(table, "1/2/3", "Set visible log level: info, warning, or error.");
         AddHelpRow(table, "Esc", "Close the active overlay.");
         AddHelpRow(table, "Ctrl+C", "Stop the host.");
 
-        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]1/2/3[/] log level · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
+        var planned = new Markup($"[{MutedTag}]Coming soon: [{CommandTag}]/[/] search · [{CommandTag}]l[/] log file · [{CommandTag}]q[/] quit[/]");
         var panel = new Panel(new Rows(
             new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
             table,
@@ -808,9 +842,9 @@ internal sealed class CompactRenderer(
     }
 
     private IRenderable BuildFooter(DashboardSnapshot snapshot, string? activeFunctionFilter)
-        => BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly: false);
+        => BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly: false, LogLevel.Information);
 
-    private IRenderable BuildFooterCore(DashboardSnapshot snapshot, string? activeFunctionFilter, bool errorsOnly)
+    private IRenderable BuildFooterCore(DashboardSnapshot snapshot, string? activeFunctionFilter, bool errorsOnly, LogLevel minimumLogLevel)
     {
         string state = snapshot.HostState switch
         {
@@ -827,6 +861,7 @@ internal sealed class CompactRenderer(
         string errors = errorsOnly
             ? " · Errors only"
             : string.Empty;
+        string level = $" · L:{FormatMinimumLogLevel(minimumLogLevel)}";
         bool helpOpen;
         bool functionBrowserOpen;
         lock (_uiLock)
@@ -837,15 +872,15 @@ internal sealed class CompactRenderer(
 
         string controls = (helpOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
-            (true, _, _) => "? close · c clear · e errors · Esc close · Ctrl+C stop",
+            (true, _, _) => "? close · c clear · e errors · Esc close · Ctrl+C",
             (_, true, _) => "↑/↓ navigate · Enter filter · f next · t close · Esc close",
-            (_, _, true) => "f next · a all · c clear · e errors · ? help · Ctrl+C stop",
-            _ => "t functions · f filter · c clear · e errors · ? help · Ctrl+C stop",
+            (_, _, true) => "f next · a all · c clear · e errors · ? help · Ctrl+C",
+            _ => "t functions · f filter · c clear · e errors · ? help · Ctrl+C",
         };
 
         string line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors} │ {controls}");
+            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors}{level} │ {controls}");
 
         return new Markup($"[{MutedTag}]{Markup.Escape(line)}[/]");
     }
@@ -1016,7 +1051,19 @@ internal sealed class CompactRenderer(
             && string.Equals(result, "failed", StringComparison.OrdinalIgnoreCase));
     }
 
-    private sealed record LogLine(IRenderable Renderable, string? FunctionName, bool IsError);
+    private static LogLevel GetEffectiveLogLevel(HostLogEntry entry, bool isError)
+        => isError && entry.Level < LogLevel.Error
+            ? LogLevel.Error
+            : entry.Level;
+
+    private static string FormatMinimumLogLevel(LogLevel minimumLogLevel) => minimumLogLevel switch
+    {
+        LogLevel.Warning => "warn",
+        LogLevel.Error or LogLevel.Critical => "error",
+        _ => "info",
+    };
+
+    private sealed record LogLine(IRenderable Renderable, string? FunctionName, bool IsError, LogLevel Level);
 
     private sealed class FunctionNameComparer : IComparer<string>
     {

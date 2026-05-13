@@ -46,7 +46,8 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("f filter", output);
         Assert.Contains("c clear", output);
         Assert.Contains("e errors", output);
-        Assert.Contains("Ctrl+C stop", output);
+        Assert.Contains("L:info", output);
+        Assert.Contains("Ctrl+C", output);
     }
 
     [Fact]
@@ -79,9 +80,11 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Clear visible log output", output);
         Assert.Contains("Cycle the active function filter", output);
         Assert.Contains("Toggle errors-only log view", output);
+        Assert.Contains("Set visible log level", output);
         Assert.Contains("Coming soon", output);
         Assert.DoesNotContain("c clear logs", output);
         Assert.DoesNotContain("e errors only", output);
+        Assert.DoesNotContain("1/2/3 log level", output);
     }
 
     [Fact]
@@ -254,6 +257,43 @@ public class CompactRendererFunctionBrowserTests
 
         Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
         Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
+    }
+
+    [Fact]
+    public async Task HandleKey_123_SetVisibleLogLevelFilter()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        await renderer.OnEventAsync(Log("HttpTrigger1", "info compact log"), [], CancellationToken.None);
+        await renderer.OnEventAsync(Log("HttpTrigger1", "warning compact log", LogLevel.Warning), [], CancellationToken.None);
+        await renderer.OnEventAsync(Log("HttpTrigger1", "error compact log", LogLevel.Error), [], CancellationToken.None);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('2', ConsoleKey.D2)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.DoesNotContain("info compact log", output);
+        Assert.Contains("warning compact log", output);
+        Assert.Contains("error compact log", output);
+        Assert.Contains("L:warn", output);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('3', ConsoleKey.D3)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        output = writer.ToString();
+        Assert.DoesNotContain("info compact log", output);
+        Assert.DoesNotContain("warning compact log", output);
+        Assert.Contains("error compact log", output);
+        Assert.Contains("L:error", output);
+
+        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('1', ConsoleKey.D1)));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        output = writer.ToString();
+        Assert.Contains("info compact log", output);
+        Assert.Contains("warning compact log", output);
+        Assert.Contains("error compact log", output);
+        Assert.Contains("L:info", output);
     }
 
     private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
