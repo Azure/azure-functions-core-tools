@@ -35,6 +35,21 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
     public bool AutoExit { get; init; }
 
     /// <summary>
+    /// Number of functions to discover during the demo. Defaults to <c>5</c>
+    /// — the canonical roster from the design plan, which keeps the
+    /// compact dashboard on its full-table layout (≤8 functions). Set higher
+    /// to demo the &gt;8 status-strip layout: any value above 5 adds extra
+    /// HTTP functions with sequential names (<c>HttpExtra1</c>, …) and
+    /// routes (<c>/api/extra-1</c>, …). Values below 5 are clamped to 5
+    /// because the scripted opener unconditionally discovers the original
+    /// 3 (HttpTrigger1, QueueProcessor, TimerCleanup) plus the expansion
+    /// pair (HttpTriggerOrders, BlobIngest). Overridable via the
+    /// <c>FUNC_DEMO_FUNCTIONS</c> environment variable or the hidden
+    /// <c>--demo-functions</c> CLI option.
+    /// </summary>
+    public int FunctionCount { get; init; } = 5;
+
+    /// <summary>
     /// Number of invocations to generate in the procedural burst phase that
     /// follows the scripted opening. With the 5-function demo roster this
     /// default produces roughly 200-260 records (≈3-4 records per invocation)
@@ -47,7 +62,10 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
     public async IAsyncEnumerable<HostLogEntry> ReadAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        foreach ((TimeSpan delay, HostLogEntry entry) in BuildTimeline(BurstInvocationCount))
+        int functionCount = Math.Max(BaselineFunctionCount, FunctionCount);
+        (string Name, string Trigger, string? Route, string[] Methods)[] extras = BuildExtraHttpFunctions(functionCount - BaselineFunctionCount);
+
+        foreach ((TimeSpan delay, HostLogEntry entry) in BuildTimeline(BurstInvocationCount, extras))
         {
             if (delay > TimeSpan.Zero)
             {
@@ -72,7 +90,9 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
 
     private TimeSpan Scale(TimeSpan ts) => TimeSpan.FromMilliseconds(ts.TotalMilliseconds * SpeedMultiplier);
 
-    private static IEnumerable<(TimeSpan Delay, HostLogEntry Entry)> BuildTimeline(int burstCount)
+    private static IEnumerable<(TimeSpan Delay, HostLogEntry Entry)> BuildTimeline(
+        int burstCount,
+        (string Name, string Trigger, string? Route, string[] Methods)[] extras)
     {
         foreach ((TimeSpan, HostLogEntry) ev in BuildOpening())
         {
@@ -84,9 +104,57 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
             yield return ev;
         }
 
-        foreach ((TimeSpan, HostLogEntry) ev in BuildBurst(burstCount))
+        foreach ((TimeSpan, HostLogEntry) ev in BuildExtras(extras))
         {
             yield return ev;
+        }
+
+        // Burst draws from the original HTTP roster plus any generated
+        // extras so larger function-count demos exercise the new functions
+        // with real invocation traffic — otherwise extras would sit at
+        // "Ready" forever and the status strip wouldn't move.
+        (string Name, string Trigger, string? Route, string[] Methods)[] httpPool = [.. _httpFunctions, .. extras];
+
+        foreach ((TimeSpan, HostLogEntry) ev in BuildBurst(burstCount, httpPool, extras))
+        {
+            yield return ev;
+        }
+    }
+
+    /// <summary>
+    /// Total number of functions discovered by the scripted opener and
+    /// expansion combined: HttpTrigger1, QueueProcessor, TimerCleanup,
+    /// HttpTriggerOrders, BlobIngest.
+    /// </summary>
+    private const int BaselineFunctionCount = 5;
+
+    private static (string Name, string Trigger, string? Route, string[] Methods)[] BuildExtraHttpFunctions(int count)
+    {
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        var extras = new (string Name, string Trigger, string? Route, string[] Methods)[count];
+        for (int i = 0; i < count; i++)
+        {
+            int n = i + 1;
+            extras[i] = (
+                Name: string.Create(System.Globalization.CultureInfo.InvariantCulture, $"HttpExtra{n}"),
+                Trigger: "http",
+                Route: string.Create(System.Globalization.CultureInfo.InvariantCulture, $"/api/extra-{n}"),
+                Methods: ["GET"]);
+        }
+
+        return extras;
+    }
+
+    private static IEnumerable<(TimeSpan Delay, HostLogEntry Entry)> BuildExtras(
+        (string Name, string Trigger, string? Route, string[] Methods)[] extras)
+    {
+        foreach ((string Name, string Trigger, string? Route, string[] Methods) fn in extras)
+        {
+            yield return (TimeSpan.FromMilliseconds(30), MakeFunctionDiscovered(fn.Name, fn.Trigger, fn.Route, fn.Methods));
         }
     }
 
@@ -204,7 +272,10 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
     ///   <item>A mid-burst host recycle to exercise the wipe → repopulate path.</item>
     /// </list>
     /// </summary>
-    private static IEnumerable<(TimeSpan Delay, HostLogEntry Entry)> BuildBurst(int invocationCount)
+    private static IEnumerable<(TimeSpan Delay, HostLogEntry Entry)> BuildBurst(
+        int invocationCount,
+        (string Name, string Trigger, string? Route, string[] Methods)[] httpPool,
+        (string Name, string Trigger, string? Route, string[] Methods)[] extras)
     {
         var rng = new Random(20251112);
         TimeSpan sinceLastTimer = TimeSpan.Zero;
@@ -226,7 +297,7 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
                 }
             }
 
-            (string Name, string Trigger, string? Route, string[] Methods) fn = PickInvocationFunction(rng);
+            (string Name, string Trigger, string? Route, string[] Methods) fn = PickInvocationFunction(rng, httpPool);
             string invocationId = NewGuid(rng);
             string traceId = NewTraceId(rng);
             bool fail = rng.NextDouble() < 0.07;
@@ -298,7 +369,7 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
             if (!midBurstRecycleEmitted && i == recycleAt)
             {
                 midBurstRecycleEmitted = true;
-                foreach ((TimeSpan, HostLogEntry) ev in EmitMidBurstRecycle())
+                foreach ((TimeSpan, HostLogEntry) ev in EmitMidBurstRecycle(extras))
                 {
                     yield return ev;
                 }
@@ -330,7 +401,8 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
             Name, id, trace, "succeeded", dur));
     }
 
-    private static IEnumerable<(TimeSpan, HostLogEntry)> EmitMidBurstRecycle()
+    private static IEnumerable<(TimeSpan, HostLogEntry)> EmitMidBurstRecycle(
+        (string Name, string Trigger, string? Route, string[] Methods)[] extras)
     {
         yield return (TimeSpan.FromMilliseconds(120), MakeHostEvent(
             state: "recycling",
@@ -353,17 +425,28 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
         {
             yield return (TimeSpan.FromMilliseconds(15), MakeFunctionDiscovered(fn.Name, fn.Trigger, fn.Route, fn.Methods));
         }
+
+        // Also re-discover any caller-supplied extras so the recycled
+        // function set matches what was loaded before the wipe.
+        foreach ((string Name, string Trigger, string? Route, string[] Methods) fn in extras)
+        {
+            yield return (TimeSpan.FromMilliseconds(15), MakeFunctionDiscovered(fn.Name, fn.Trigger, fn.Route, fn.Methods));
+        }
     }
 
-    private static (string Name, string Trigger, string? Route, string[] Methods) PickInvocationFunction(Random rng)
+    private static (string Name, string Trigger, string? Route, string[] Methods) PickInvocationFunction(
+        Random rng,
+        (string Name, string Trigger, string? Route, string[] Methods)[] httpPool)
     {
-        // Weighted pick across the 5-function roster. HTTP is the most common
+        // Weighted pick across the live roster. HTTP is the most common
         // traffic source in a real project, followed by queues and blobs.
-        // Timer fires occasionally on its scheduled cadence.
+        // Timer fires occasionally on its scheduled cadence. The HTTP pool
+        // is supplied by the caller so generated extras participate in the
+        // burst.
         double roll = rng.NextDouble();
         if (roll < 0.55)
         {
-            return _httpFunctions[rng.Next(_httpFunctions.Length)];
+            return httpPool[rng.Next(httpPool.Length)];
         }
 
         if (roll < 0.80)

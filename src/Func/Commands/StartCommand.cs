@@ -69,6 +69,17 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Alias for --output=plain. Disables the interactive TUI."
     };
 
+    // Prototype-only knob: scales the number of functions DemoEventSource
+    // generates so layout variants (full-table ≤8 vs. status-strip >8) can
+    // be demoed without code changes. Hidden from --help; intended for
+    // demos and screenshots until real host integration replaces the
+    // synthetic event source. Also overridable via FUNC_DEMO_FUNCTIONS.
+    public Option<int?> DemoFunctionsOption { get; } = new("--demo-functions")
+    {
+        Description = "Demo: number of functions to load (clamped to a minimum of 5).",
+        Hidden = true,
+    };
+
     private readonly IInteractionService _interaction;
     private readonly FunctionPalette _palette;
 
@@ -90,6 +101,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(HostVersionOption);
         Options.Add(OutputOption);
         Options.Add(NoTuiOption);
+        Options.Add(DemoFunctionsOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -115,6 +127,9 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         {
             SpeedMultiplier = ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
             AutoExit = ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")),
+            FunctionCount = ParseFunctionCount(
+                parseResult.GetValue(DemoFunctionsOption),
+                Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
         };
 
         var state = new DashboardState();
@@ -145,6 +160,28 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         }
 
         return raw.Trim() is "1" or "true" or "TRUE" or "True" or "yes" or "YES" or "on" or "ON";
+    }
+
+    private static int ParseFunctionCount(int? cliValue, string? envRaw)
+    {
+        // CLI option takes precedence over the env-var fallback. Both are
+        // clamped to a minimum of 5 because the scripted opener and
+        // expansion together always discover 5 functions; lower values
+        // would be silently overridden by the source anyway.
+        const int Default = 5;
+
+        if (cliValue is { } cli)
+        {
+            return Math.Max(Default, cli);
+        }
+
+        if (!string.IsNullOrWhiteSpace(envRaw)
+            && int.TryParse(envRaw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int parsed))
+        {
+            return Math.Max(Default, parsed);
+        }
+
+        return Default;
     }
 
     private OutputMode ResolveOutputMode(ParseResult parseResult)
