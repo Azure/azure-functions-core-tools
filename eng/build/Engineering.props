@@ -32,6 +32,21 @@
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-x5qj-9vmx-7g6g" />
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-xhfc-gr8f-ffwc" />
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-5f2m-466j-3848" />
+
+    <!--
+      OpenTelemetry 1.14.0 advisories. These packages are pulled in transitively by the host
+      (Microsoft.Azure.WebJobs.Script.WebHost via Azure.Monitor.OpenTelemetry.Exporter). The host
+      pins the entire OT family at 1.14.0 in its own Directory.Packages.props, so overriding here
+      via CPM transitive pinning would force the host to load an OT version it was not built and
+      tested against. Suppress until host bumps to 1.15.x.
+
+      TODO: Remove these once https://github.com/Azure/azure-functions-host/issues/11773 lands and
+      we pick up a new Microsoft.Azure.WebJobs.Script.WebHost release.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-g94r-2vxg-569j" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-4625-4j76-fww9" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-mr8r-92fq-pj8p" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-q834-8qmm-v933" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -43,18 +43,6 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.NETCore.DotNetAppHost" Version="8.0.8" />
   </ItemGroup>
-  <!-- transitive vulnerability fixes (CPM transitive-pinning overrides) -->
-  <ItemGroup>
-    <!-- Patches OpenTelemetry parsing/memory advisories: GHSA-g94r-2vxg-569j, GHSA-4625-4j76-fww9, GHSA-mr8r-92fq-pj8p, GHSA-q834-8qmm-v933 (fixed in 1.15.3). -->
-    <PackageVersion Include="OpenTelemetry" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Api.ProviderBuilderExtensions" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
-  </ItemGroup>
   <!-- test projects -->
   <ItemGroup>
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
