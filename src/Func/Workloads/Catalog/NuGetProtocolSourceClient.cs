@@ -24,17 +24,37 @@ internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
 
     public PackageSource Source => _repository.PackageSource;
 
-    /// <summary>
-    /// Returns an <see cref="AsyncPageable{T}"/> over the search results for
-    /// this source. Paging is driven by NuGet's <c>skip</c>/<c>take</c>; the
-    /// continuation token encodes the next skip offset.
-    /// </summary>
-    public AsyncPageable<CatalogSearchResult> Search(
+    public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
         CatalogSearchQuery query,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        return new SearchPageable(_repository, Source, query, cancellationToken);
+
+        PackageSearchResource searchResource = await _repository.GetResourceAsync<PackageSearchResource>(cancellationToken);
+        SearchFilter filter = new(query.IncludePrerelease)
+        {
+            PackageTypes = [PackageType],
+        };
+
+        IEnumerable<IPackageSearchMetadata> hits = await searchResource.SearchAsync(
+            query.Filter ?? string.Empty,
+            filter,
+            query.Skip,
+            query.Take ?? CatalogSearchQuery.DefaultTake,
+            NullLogger.Instance,
+            cancellationToken);
+
+        var results = new List<CatalogSearchResult>();
+        foreach (IPackageSearchMetadata hit in hits)
+        {
+            CatalogSearchResult? result = ToResult(hit, Source);
+            if (result is not null)
+            {
+                results.Add(result);
+            }
+        }
+
+        return results;
     }
 
     public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(
@@ -132,66 +152,5 @@ internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
         }
 
         return aliases;
-    }
-
-    private sealed class SearchPageable(
-        SourceRepository repository,
-        PackageSource source,
-        CatalogSearchQuery query,
-        CancellationToken cancellationToken) : AsyncPageable<CatalogSearchResult>(cancellationToken)
-    {
-        private readonly SourceRepository _repository = repository;
-        private readonly PackageSource _source = source;
-        private readonly CatalogSearchQuery _query = query;
-
-        public override async IAsyncEnumerable<Page<CatalogSearchResult>> AsPages(
-            string? continuationToken = null,
-            int? pageSizeHint = null)
-        {
-            int pageSize = pageSizeHint
-                ?? _query.PageSize
-                ?? CatalogSearchQuery.DefaultPageSize;
-            int skip = int.TryParse(continuationToken ?? _query.ContinuationToken, out int parsed) ? parsed : 0;
-
-            CancellationToken ct = CancellationToken;
-            PackageSearchResource searchResource = await _repository.GetResourceAsync<PackageSearchResource>(ct);
-            SearchFilter filter = new(_query.IncludePrerelease)
-            {
-                PackageTypes = [PackageType],
-            };
-
-            while (true)
-            {
-                IEnumerable<IPackageSearchMetadata> hits = await searchResource.SearchAsync(
-                    _query.Filter ?? string.Empty,
-                    filter,
-                    skip,
-                    pageSize,
-                    NullLogger.Instance,
-                    ct);
-
-                var values = new List<CatalogSearchResult>();
-                foreach (IPackageSearchMetadata hit in hits)
-                {
-                    CatalogSearchResult? result = ToResult(hit, _source);
-                    if (result is not null)
-                    {
-                        values.Add(result);
-                    }
-                }
-
-                // A short page ends the stream. v3 doesn't expose a totalHits
-                // we can trust, so we infer end-of-stream from page size.
-                string? nextToken = values.Count < pageSize ? null : (skip + pageSize).ToString();
-                yield return Page<CatalogSearchResult>.FromValues(values, nextToken, response: null!);
-
-                if (nextToken is null)
-                {
-                    yield break;
-                }
-
-                skip += pageSize;
-            }
-        }
     }
 }

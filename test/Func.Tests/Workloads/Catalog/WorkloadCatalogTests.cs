@@ -14,86 +14,58 @@ namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 
 public sealed class WorkloadCatalogTests
 {
-    private static readonly PackageSource _sourceA = new("https://a.test/v3/index.json", "a");
-    private static readonly PackageSource _sourceB = new("https://b.test/v3/index.json", "b");
+    private static readonly PackageSource _defaultSource = new("https://default.test/v3/index.json", "default");
+    private static readonly PackageSource _overrideSource = new("https://override.test/v3/index.json", "override");
 
     [Fact]
-    public async Task Search_AggregatesAcrossSources_KeepsHighestVersionPerId()
+    public async Task SearchAsync_DelegatesToConfiguredSource()
     {
-        WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, search: [Metadata("alpha", "1.0.0"), Metadata("beta", "1.0.0")])),
-            (_sourceB, BuildClient(_sourceB, search: [Metadata("alpha", "2.0.0"), Metadata("gamma", "1.0.0")])));
+        NuGetProtocolSourceClient client = BuildClient(_defaultSource, search: [Metadata("alpha", "1.0.0")]);
+        WorkloadCatalog catalog = NewCatalog((_defaultSource, client));
 
-        IReadOnlyList<CatalogSearchResult> results = await DrainAsync(catalog.Search(new CatalogSearchQuery()));
-
-        Assert.Equal(3, results.Count);
-        CatalogSearchResult alpha = Assert.Single(results, r => r.PackageId == "alpha");
-        Assert.Equal(NuGetVersion.Parse("2.0.0"), alpha.LatestVersion);
-        Assert.Equal(_sourceB.Name, alpha.Source.Name);
-    }
-
-    [Fact]
-    public async Task Search_OrdersByVersionDescThenIdAsc()
-    {
-        WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, search: [Metadata("zeta", "1.0.0"), Metadata("alpha", "2.0.0"), Metadata("beta", "1.0.0")])));
-
-        IReadOnlyList<CatalogSearchResult> results = await DrainAsync(catalog.Search(new CatalogSearchQuery()));
-
-        Assert.Equal(["alpha", "beta", "zeta"], results.Select(r => r.PackageId));
-    }
-
-    [Fact]
-    public async Task Search_OverrideSource_ConsultsOnlyOverride()
-    {
-        var overrideSource = new PackageSource("https://override.test/v3/index.json", "override");
-        NuGetProtocolSourceClient defaultClient = BuildClient(_sourceA, search: [Metadata("default-pkg", "1.0.0")]);
-        NuGetProtocolSourceClient overrideClient = BuildClient(overrideSource, search: [Metadata("override-pkg", "1.0.0")]);
-
-        var sourceProvider = Substitute.For<IPackageSourceProvider>();
-        sourceProvider.GetSources(null).Returns([_sourceA]);
-        sourceProvider.GetSources("https://override.test/v3/index.json").Returns([overrideSource]);
-
-        var catalog = new WorkloadCatalog(sourceProvider, source =>
-        {
-            if (source.Name == _sourceA.Name)
-            {
-                return defaultClient;
-            }
-
-            if (source.Name == overrideSource.Name)
-            {
-                return overrideClient;
-            }
-
-            throw new InvalidOperationException($"Unexpected source {source.Name}");
-        });
-
-        IReadOnlyList<CatalogSearchResult> results = await DrainAsync(catalog.Search(
-            new CatalogSearchQuery { OverrideSource = "https://override.test/v3/index.json" }));
+        IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(new CatalogSearchQuery());
 
         CatalogSearchResult only = Assert.Single(results);
-        Assert.Equal("override-pkg", only.PackageId);
+        Assert.Equal("alpha", only.PackageId);
+        Assert.Equal(_defaultSource.Name, only.Source.Name);
+    }
+
+    [Fact]
+    public async Task SearchAsync_OverrideSource_ConsultsOnlyOverride()
+    {
+        NuGetProtocolSourceClient defaultClient = BuildClient(_defaultSource, search: [Metadata("default-pkg", "1.0.0")]);
+        NuGetProtocolSourceClient overrideClient = BuildClient(_overrideSource, search: [Metadata("override-pkg", "1.0.0")]);
+
+        var sourceProvider = Substitute.For<IPackageSourceProvider>();
+        sourceProvider.GetSource(null).Returns(_defaultSource);
+        sourceProvider.GetSource(_overrideSource.Source).Returns(_overrideSource);
+
+        var catalog = new WorkloadCatalog(sourceProvider, source => source.Name == _defaultSource.Name ? defaultClient : overrideClient);
+
+        IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(
+            new CatalogSearchQuery { OverrideSource = _overrideSource.Source });
+
+        Assert.Equal("override-pkg", Assert.Single(results).PackageId);
     }
 
     [Fact]
     public async Task ResolveLatestVersionAsync_PicksHighestStable_WhenPrereleaseDisabled()
     {
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: false);
 
         Assert.NotNull(resolved);
         Assert.Equal(V("1.5.0"), resolved!.Version);
-        Assert.Equal(_sourceA.Name, resolved.Source.Name);
+        Assert.Equal(_defaultSource.Name, resolved.Source.Name);
     }
 
     [Fact]
     public async Task ResolveLatestVersionAsync_IncludesPrerelease_WhenEnabled()
     {
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: true);
 
@@ -104,7 +76,7 @@ public sealed class WorkloadCatalogTests
     public async Task ResolveLatestVersionAsync_ConstrainsToSameMajor_WhenAllowMajorFalse()
     {
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0"), V("1.5.0"), V("2.0.0"), V("2.1.0")])));
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("1.5.0"), V("2.0.0"), V("2.1.0")])));
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync(
             "alpha", includePrerelease: false, currentVersion: V("1.0.0"), allowMajor: false);
@@ -116,7 +88,7 @@ public sealed class WorkloadCatalogTests
     public async Task ResolveLatestVersionAsync_NoMatch_ReturnsNull()
     {
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0-beta")])));
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0-beta")])));
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: false);
 
@@ -124,50 +96,23 @@ public sealed class WorkloadCatalogTests
     }
 
     [Fact]
-    public async Task ResolveLatestVersionAsync_AggregatesAcrossSources()
+    public async Task ResolveVersionAsync_ReturnsResolvedPackage_WhenSourceHasVersion()
     {
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0")])),
-            (_sourceB, BuildClient(_sourceB, versions: [V("2.0.0")])));
-
-        ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: false);
-
-        Assert.Equal(V("2.0.0"), resolved!.Version);
-        Assert.Equal(_sourceB.Name, resolved.Source.Name);
-    }
-
-    [Fact]
-    public async Task ResolveVersionAsync_ReturnsFirstSourceWithExactVersion()
-    {
-        WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0"), V("1.5.0")])),
-            (_sourceB, BuildClient(_sourceB, versions: [V("1.0.0"), V("1.5.0"), V("2.0.0")])));
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0")])));
 
         ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("2.0.0"));
 
         Assert.NotNull(resolved);
         Assert.Equal(V("2.0.0"), resolved!.Version);
-        Assert.Equal(_sourceB.Name, resolved.Source.Name);
+        Assert.Equal(_defaultSource.Name, resolved.Source.Name);
     }
 
     [Fact]
-    public async Task ResolveVersionAsync_PrefersEarliestSource_WhenBothHaveVersion()
+    public async Task ResolveVersionAsync_VersionMissing_ReturnsNull()
     {
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0")])),
-            (_sourceB, BuildClient(_sourceB, versions: [V("1.0.0")])));
-
-        ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("1.0.0"));
-
-        Assert.Equal(_sourceA.Name, resolved!.Source.Name);
-    }
-
-    [Fact]
-    public async Task ResolveVersionAsync_NoSourceHasVersion_ReturnsNull()
-    {
-        WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0")])),
-            (_sourceB, BuildClient(_sourceB, versions: [V("1.5.0")])));
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0")])));
 
         ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("9.9.9"));
 
@@ -178,7 +123,7 @@ public sealed class WorkloadCatalogTests
     public async Task ResolveVersionAsync_LowercasesPackageId()
     {
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, BuildClient(_sourceA, versions: [V("1.0.0")])));
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0")])));
 
         ResolvedPackage? resolved = await catalog.ResolveVersionAsync("Alpha", V("1.0.0"));
 
@@ -189,8 +134,8 @@ public sealed class WorkloadCatalogTests
     public async Task DownloadAsync_DelegatesToResolvedSource()
     {
         byte[] payload = [1, 2, 3];
-        FindPackageByIdResource findA = Substitute.For<FindPackageByIdResource>();
-        findA.CopyNupkgToStreamAsync(
+        FindPackageByIdResource find = Substitute.For<FindPackageByIdResource>();
+        find.CopyNupkgToStreamAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(),
                 Arg.Any<SourceCacheContext>(), Arg.Any<ILogger>(), Arg.Any<CancellationToken>())
             .Returns(async ci =>
@@ -199,24 +144,19 @@ public sealed class WorkloadCatalogTests
                 await dest.WriteAsync(payload);
                 return true;
             });
-        FindPackageByIdResource findB = Substitute.For<FindPackageByIdResource>();
 
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, new NuGetProtocolSourceClient(TestRepository.Build(_sourceA, findA))),
-            (_sourceB, new NuGetProtocolSourceClient(TestRepository.Build(_sourceB, findB))));
+            (_defaultSource, new NuGetProtocolSourceClient(TestRepository.Build(_defaultSource, find))));
 
-        await using Stream result = await catalog.DownloadAsync(new ResolvedPackage("alpha", V("1.0.0"), _sourceA));
+        await using Stream result = await catalog.DownloadAsync(new ResolvedPackage("alpha", V("1.0.0"), _defaultSource));
 
         var copied = new MemoryStream();
         await result.CopyToAsync(copied);
         Assert.Equal(payload, copied.ToArray());
-        await findB.DidNotReceive().CopyNupkgToStreamAsync(
-            Arg.Any<string>(), Arg.Any<NuGetVersion>(), Arg.Any<Stream>(),
-            Arg.Any<SourceCacheContext>(), Arg.Any<ILogger>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task DownloadAsync_NotFoundOnResolvedSource_Throws()
+    public async Task DownloadAsync_NotFound_Throws()
     {
         FindPackageByIdResource find = Substitute.For<FindPackageByIdResource>();
         find.CopyNupkgToStreamAsync(
@@ -225,24 +165,13 @@ public sealed class WorkloadCatalogTests
             .Returns(Task.FromResult(false));
 
         WorkloadCatalog catalog = NewCatalog(
-            (_sourceA, new NuGetProtocolSourceClient(TestRepository.Build(_sourceA, find))));
+            (_defaultSource, new NuGetProtocolSourceClient(TestRepository.Build(_defaultSource, find))));
 
         await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
-            () => catalog.DownloadAsync(new ResolvedPackage("alpha", V("1.0.0"), _sourceA)));
+            () => catalog.DownloadAsync(new ResolvedPackage("alpha", V("1.0.0"), _defaultSource)));
     }
 
     private static NuGetVersion V(string v) => NuGetVersion.Parse(v);
-
-    private static async Task<IReadOnlyList<CatalogSearchResult>> DrainAsync(AsyncPageable<CatalogSearchResult> pageable)
-    {
-        List<CatalogSearchResult> results = [];
-        await foreach (CatalogSearchResult item in pageable)
-        {
-            results.Add(item);
-        }
-
-        return results;
-    }
 
     private static IPackageSearchMetadata Metadata(string id, string version, string? tags = null)
     {
@@ -279,7 +208,7 @@ public sealed class WorkloadCatalogTests
     private static WorkloadCatalog NewCatalog(params (PackageSource Source, NuGetProtocolSourceClient Client)[] entries)
     {
         var sourceProvider = Substitute.For<IPackageSourceProvider>();
-        sourceProvider.GetSources(Arg.Any<string?>()).Returns([.. entries.Select(e => e.Source)]);
+        sourceProvider.GetSource(Arg.Any<string?>()).Returns(entries[0].Source);
 
         var byName = entries.ToDictionary(e => e.Source.Name, e => e.Client, StringComparer.OrdinalIgnoreCase);
         return new WorkloadCatalog(sourceProvider, source => byName[source.Name]);

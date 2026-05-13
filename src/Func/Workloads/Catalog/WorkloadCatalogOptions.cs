@@ -5,15 +5,14 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
 /// Configuration for the workload catalog. Bound from the
-/// <c>Workloads:Catalog</c> section; environment variables follow the
-/// <c>FUNC_CLI_Workloads__Catalog__Sources__N</c> indexing convention.
+/// <c>Workloads:Catalog</c> section; the matching environment variable is
+/// <c>FUNC_CLI_Workloads__Catalog__Source</c>.
 /// </summary>
 internal sealed class WorkloadCatalogOptions
 {
     /// <summary>
-    /// Ordered list of feed locations to consult. Each entry is either a
-    /// v3 <c>index.json</c> URL or a local directory path. Empty / unset
-    /// means fall back to the default nuget.org feed.
+    /// Feed location to consult: either a v3 <c>index.json</c> URL or a
+    /// local directory path. <c>null</c> / empty falls back to nuget.org.
     /// </summary>
-    public IList<string> Sources { get; set; } = [];
+    public string? Source { get; set; }
 }

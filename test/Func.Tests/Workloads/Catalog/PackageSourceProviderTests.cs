@@ -15,103 +15,81 @@ public sealed class PackageSourceProviderTests : IDisposable
     public void Dispose() => Directory.Delete(_tempRoot, recursive: true);
 
     [Fact]
-    public void GetSources_OverrideUrl_ReturnsSingleRemoteSource()
+    public void GetSource_OverrideUrl_ReturnsRemoteSource()
     {
         PackageSourceProvider provider = NewProvider();
 
-        IReadOnlyList<PackageSource> sources = provider.GetSources("https://example.test/v3/index.json");
+        PackageSource source = provider.GetSource("https://example.test/v3/index.json");
 
-        PackageSource only = Assert.Single(sources);
-        Assert.False(only.IsLocal);
-        Assert.Equal("https://example.test/v3/index.json", only.Source);
+        Assert.False(source.IsLocal);
+        Assert.Equal("https://example.test/v3/index.json", source.Source);
     }
 
     [Fact]
-    public void GetSources_OverrideLocalDir_ReturnsLocalSource()
+    public void GetSource_OverrideLocalDir_ReturnsLocalSource()
     {
         string folder = Path.Combine(_tempRoot, "feed");
         Directory.CreateDirectory(folder);
         PackageSourceProvider provider = NewProvider();
 
-        IReadOnlyList<PackageSource> sources = provider.GetSources(folder);
+        PackageSource source = provider.GetSource(folder);
 
-        PackageSource only = Assert.Single(sources);
-        Assert.True(only.IsLocal);
-        Assert.Equal(Path.GetFullPath(folder), only.Source);
+        Assert.True(source.IsLocal);
+        Assert.Equal(Path.GetFullPath(folder), source.Source);
     }
 
     [Fact]
-    public void GetSources_OverrideShortCircuitsConfiguredSources()
+    public void GetSource_OverrideShortCircuitsConfiguredSource()
     {
         PackageSourceProvider provider = NewProvider("https://other.test/v3/index.json");
 
-        IReadOnlyList<PackageSource> sources = provider.GetSources("https://override.test/v3/index.json");
+        PackageSource source = provider.GetSource("https://override.test/v3/index.json");
 
-        PackageSource only = Assert.Single(sources);
-        Assert.Equal("https://override.test/v3/index.json", only.Source);
+        Assert.Equal("https://override.test/v3/index.json", source.Source);
     }
 
     [Fact]
-    public void GetSources_NoOverride_ReturnsConfiguredSourcesInOrder()
+    public void GetSource_NoOverride_ReturnsConfiguredSource()
     {
-        string folder = Path.Combine(_tempRoot, "feed");
-        Directory.CreateDirectory(folder);
-        PackageSourceProvider provider = NewProvider(
-            "https://first.test/v3/index.json",
-            folder);
+        PackageSourceProvider provider = NewProvider("https://configured.test/v3/index.json");
 
-        IReadOnlyList<PackageSource> sources = provider.GetSources();
+        PackageSource source = provider.GetSource();
 
-        Assert.Equal(2, sources.Count);
-        Assert.False(sources[0].IsLocal);
-        Assert.Equal("https://first.test/v3/index.json", sources[0].Source);
-        Assert.True(sources[1].IsLocal);
+        Assert.Equal("https://configured.test/v3/index.json", source.Source);
     }
 
     [Fact]
-    public void GetSources_EmptyAndWhitespaceEntries_AreSkipped()
-    {
-        PackageSourceProvider provider = NewProvider(string.Empty, "   ", "https://kept.test/v3/index.json");
-
-        IReadOnlyList<PackageSource> sources = provider.GetSources();
-
-        PackageSource only = Assert.Single(sources);
-        Assert.Equal("https://kept.test/v3/index.json", only.Source);
-    }
-
-    [Fact]
-    public void GetSources_NoOverride_NoConfigured_ReturnsNuGetOrgDefault()
+    public void GetSource_NoOverride_NoConfigured_ReturnsNuGetOrgDefault()
     {
         PackageSourceProvider provider = NewProvider();
 
-        IReadOnlyList<PackageSource> sources = provider.GetSources();
+        PackageSource source = provider.GetSource();
 
-        PackageSource only = Assert.Single(sources);
-        Assert.False(only.IsLocal);
-        Assert.Equal(PackageSourceProvider.DefaultSourceUrl, only.Source);
+        Assert.False(source.IsLocal);
+        Assert.Equal(PackageSourceProvider.DefaultSourceUrl, source.Source);
     }
 
     [Fact]
-    public void GetSources_OverrideMissingDirectory_Throws()
+    public void GetSource_OverrideMissingDirectory_Throws()
     {
         PackageSourceProvider provider = NewProvider();
 
         ArgumentException ex = Assert.Throws<ArgumentException>(
-            () => provider.GetSources(Path.Combine(_tempRoot, "does-not-exist")));
+            () => provider.GetSource(Path.Combine(_tempRoot, "does-not-exist")));
         Assert.Contains("does not exist", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void GetSources_ConfiguredInvalidEntry_Throws()
+    public void GetSource_ConfiguredInvalidEntry_Throws()
     {
         PackageSourceProvider provider = NewProvider("ftp://unsupported.example/feed");
 
-        Assert.Throws<ArgumentException>(() => provider.GetSources());
+        Assert.Throws<ArgumentException>(() => provider.GetSource());
     }
 
-    private static PackageSourceProvider NewProvider(params string[] sources)
+    private static PackageSourceProvider NewProvider(string? source = null)
     {
-        var options = Options.Create(new WorkloadCatalogOptions { Sources = [.. sources] });
+        var options = Options.Create(new WorkloadCatalogOptions { Source = source });
         return new PackageSourceProvider(options);
     }
 }

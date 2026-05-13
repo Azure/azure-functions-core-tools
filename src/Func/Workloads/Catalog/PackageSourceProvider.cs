@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
 /// Default <see cref="IPackageSourceProvider"/>. Precedence: <c>--source</c> override,
-/// then <see cref="WorkloadCatalogOptions.Sources"/>, then nuget.org as a fallback.
+/// then <see cref="WorkloadCatalogOptions.Source"/>, then nuget.org as a fallback.
 /// </summary>
 internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> options) : IPackageSourceProvider
 {
@@ -22,30 +22,19 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
     private readonly WorkloadCatalogOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
     /// <inheritdoc />
-    public IReadOnlyList<PackageSource> GetSources(string? overrideSource = null)
+    public PackageSource GetSource(string? overrideSource = null)
     {
         if (!string.IsNullOrWhiteSpace(overrideSource))
         {
-            return [Build(overrideSource.Trim())];
+            return Build(overrideSource.Trim());
         }
 
-        var resolved = new List<PackageSource>();
-        foreach (string entry in _options.Sources)
+        if (!string.IsNullOrWhiteSpace(_options.Source))
         {
-            if (string.IsNullOrWhiteSpace(entry))
-            {
-                continue;
-            }
-
-            resolved.Add(Build(entry.Trim()));
+            return Build(_options.Source.Trim());
         }
 
-        if (resolved.Count > 0)
-        {
-            return resolved;
-        }
-
-        return [new PackageSource(DefaultSourceUrl, DefaultSourceName)];
+        return new PackageSource(DefaultSourceUrl, DefaultSourceName);
     }
 
     private static PackageSource Build(string value)

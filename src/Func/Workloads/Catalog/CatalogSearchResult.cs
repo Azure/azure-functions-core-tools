@@ -25,7 +25,6 @@ internal sealed record CatalogSearchResult(
 
 /// <summary>
 /// A package id + version pinned to the source it was discovered on. Returned
-/// by <see cref="IWorkloadCatalog.ResolveLatestVersionAsync"/> so the caller
-/// can download without re-resolving across all sources.
+/// by the resolve methods so the caller can download without re-resolving.
 /// </summary>
 internal sealed record ResolvedPackage(string PackageId, NuGetVersion Version, PackageSource Source);
