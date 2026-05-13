@@ -55,7 +55,6 @@ jobs:
 
   - bash: |
       chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
-      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
     displayName: 'Make CLI binaries executable'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self

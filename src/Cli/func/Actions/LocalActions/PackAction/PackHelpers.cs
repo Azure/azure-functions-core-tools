@@ -64,9 +64,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public static async Task CreatePackage(string packingRoot, string outputPath, bool noBuild, IDictionary<string, string> telemetryCommandEvents, bool buildNativeDeps = false)
         {
-            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
-            TelemetryHelpers.AddCommandEventToDictionary(telemetryCommandEvents, "UseGoZip", useGoZip.ToString());
-
             var stream = await ZipHelper.GetAppZipFile(packingRoot, buildNativeDeps, BuildOption.Default, noBuild: noBuild);
 
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");

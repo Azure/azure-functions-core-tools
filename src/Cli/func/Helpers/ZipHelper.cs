@@ -1,9 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
-using System.Reflection;
-using System.Text;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
@@ -53,43 +51,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task<Stream> CreateZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables)
-        {
-            // temporarily provide an escape hatch to use gozip in case there are bugs in the dotnet implementation
-            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
-
-            if (useGoZip)
-            {
-                if (GoZipExists(out string goZipLocation))
-                {
-                    ColoredConsole.WriteLine(DarkYellow("Using gozip for packaging."));
-                    var zipFilePath = Path.GetTempFileName();
-                    return await CreateGoZip(files, rootPath, zipFilePath, goZipLocation, executables);
-                }
-
-                ColoredConsole.WriteLine(Yellow("Could not find gozip for packaging. Using DotNetZip to package. " +
-                    "This may cause problems preserving file permissions when using in a Linux based environment."));
-            }
-
-            return CreateDotNetZip(files, rootPath, executables);
-        }
-
-        public static bool GoZipExists(out string fileLocation)
-        {
-            // It can be gozip.exe or gozip
-            fileLocation = Directory.GetFiles(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location))
-                .Where(f => Path.GetFileNameWithoutExtension(f).Equals(Constants.GoZipFileName, StringComparison.OrdinalIgnoreCase))
-                .FirstOrDefault();
-
-            if (fileLocation != null)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        public static Stream CreateDotNetZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables)
+        public static Task<Stream> CreateZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables)
         {
             // See section 4.4.2.2 in the zip spec: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
             const byte CreatedByUnix = 3;
@@ -133,7 +95,7 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             memStream.Seek(0, SeekOrigin.Begin);
-            return memStream;
+            return Task.FromResult<Stream>(memStream);
         }
 
         // Assumes all bytes of signatureToFind are non zero.
@@ -206,21 +168,6 @@ namespace Azure.Functions.Cli.Helpers
                 bufferPointer = bytesToRead - 1;
                 return true;
             }
-        }
-
-        public static async Task<Stream> CreateGoZip(IEnumerable<string> files, string rootPath, string zipFilePath, string goZipLocation, IEnumerable<string> executables)
-        {
-            var contentsFile = Path.GetTempFileName();
-            await File.WriteAllLinesAsync(contentsFile, files);
-            var args = new StringBuilder($"-base-dir \"{rootPath}\" -input-file \"{contentsFile}\" -output \"{zipFilePath}\"");
-            foreach (var executable in executables)
-            {
-                args.Append($" --set-executable \"{executable}\"");
-            }
-
-            var goZipExe = new Executable(goZipLocation, args.ToString());
-            await goZipExe.RunAsync();
-            return new FileStream(zipFilePath, FileMode.Open, FileAccess.Read);
         }
 
         public static string FixFileNameForZip(this string value, string zipRoot)
