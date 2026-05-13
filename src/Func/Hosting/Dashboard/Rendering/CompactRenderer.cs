@@ -16,9 +16,8 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// region — this keeps redraws and log appends consistent without cursor-juggling.
 /// </summary>
 /// <remarks>
-/// Prototype scope: keyboard input handling, the help overlay, the function-browser overlay, and the priority-sorted truncated header
-/// variant are not yet implemented. The renderer demonstrates the live header / live log tail UX and falls back to a status strip when many
-/// functions are loaded.
+/// Prototype scope: the help overlay and the priority-sorted truncated header variant are not yet implemented. The renderer demonstrates
+/// the live header / live log tail UX and falls back to a status strip when many functions are loaded.
 /// </remarks>
 internal sealed class CompactRenderer(
     IInteractionService interaction,
@@ -27,26 +26,29 @@ internal sealed class CompactRenderer(
 {
     private const int MaxLogTailLines = 200;
 
+    private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
+
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
-    private readonly object _stateLock = new();
-    private readonly Queue<IRenderable> _logTail = new();
+    private readonly Lock _stateLock = new();
+    private readonly Lock _uiLock = new();
+    private readonly Queue<LogLine> _logTail = new();
 
     private DashboardState _state = null!;
     private CancellationTokenSource? _liveCts;
     private SemaphoreSlim? _redrawSignal;
     private Task? _liveTask;
+    private Task? _inputTask;
     private int _lastKnownWidth;
     private int _lastKnownHeight;
+    private bool _functionBrowserOpen;
+    private int _functionBrowserSelectedIndex;
+    private int _functionBrowserRowOffset;
+    private string? _activeFunctionFilter;
 
     private ITheme Theme => _interaction.Theme;
 
-    // Cached theme-derived markup tags. Spectre's Style.ToMarkup() returns
-    // the bracket-contents form (e.g. "grey", "red bold") so we can embed
-    // them in markup strings as $"[{_mutedTag}]…[/]" while still funneling
-    // every color through ITheme. We snapshot once at first use so each
-    // live-redraw tick doesn't re-stringify the same styles.
     private string MutedTag => field ??= Theme.Muted.ToMarkup();
     private string EmphasisTag => field ??= Theme.Emphasis.ToMarkup();
     private string SuccessTag => field ??= Theme.Success.ToMarkup();
@@ -62,6 +64,12 @@ internal sealed class CompactRenderer(
         _liveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _console.Cursor.Hide();
         _liveTask = Task.Run(() => RunLiveLoopAsync(_liveCts.Token));
+
+        if (_interaction.IsInteractive)
+        {
+            _inputTask = Task.Run(() => RunInputLoopAsync(_liveCts.Token), cancellationToken);
+        }
+
         return Task.CompletedTask;
     }
 
@@ -72,7 +80,7 @@ internal sealed class CompactRenderer(
             return Task.CompletedTask;
         }
 
-        IRenderable line = FormatLogLine(entry, events);
+        var line = new LogLine(FormatLogLine(entry, events), GetFunctionName(entry, events));
         lock (_stateLock)
         {
             _logTail.Enqueue(line);
@@ -88,7 +96,7 @@ internal sealed class CompactRenderer(
 
     /// <summary>
     /// Filters out raw log lines that are already covered by a synthetic
-    /// event in this batch, plus the classic WebJobs <c>Executing '...'</c> /
+    /// event in this batch, plus the classic Functions <c>Executing '...'</c> /
     /// <c>Executed '...'</c> envelope which restates information already
     /// captured by <see cref="InvocationStartedEvent"/> and
     /// <see cref="InvocationCompletedEvent"/>.
@@ -140,6 +148,18 @@ internal sealed class CompactRenderer(
             }
         }
 
+        if (_inputTask is { } inputTask)
+        {
+            try
+            {
+                await inputTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on clean shutdown.
+            }
+        }
+
         _console.Cursor.Show();
 
         var uptime = TimeSpan.FromSeconds(summary.UptimeSeconds);
@@ -165,6 +185,118 @@ internal sealed class CompactRenderer(
         {
             // Live loop already torn down.
         }
+    }
+
+    private async Task RunInputLoopAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            ConsoleKeyInfo? key = await _console.Input.ReadKeyAsync(intercept: true, cancellationToken);
+            if (key is null)
+            {
+                continue;
+            }
+
+            if (HandleKey(key.Value))
+            {
+                SignalRedraw();
+            }
+        }
+    }
+
+    private bool HandleKey(ConsoleKeyInfo key)
+    {
+        DashboardSnapshot snapshot = _state.Snapshot();
+        FunctionInfo[] functions = GetSortedFunctions(snapshot);
+
+        lock (_uiLock)
+        {
+            switch (key.Key)
+            {
+                case ConsoleKey.T:
+                    ToggleFunctionBrowser(functions);
+                    return true;
+
+                case ConsoleKey.Escape when _functionBrowserOpen:
+                    _functionBrowserOpen = false;
+                    return true;
+
+                case ConsoleKey.A when _activeFunctionFilter is not null:
+                    _activeFunctionFilter = null;
+                    return true;
+
+                case ConsoleKey.Enter when _functionBrowserOpen && functions.Length > 0:
+                    _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex, 0, functions.Length - 1);
+                    _activeFunctionFilter = functions[_functionBrowserSelectedIndex].Name;
+                    _functionBrowserOpen = false;
+                    return true;
+
+                case ConsoleKey.UpArrow when _functionBrowserOpen:
+                    MoveFunctionBrowserSelection(functions, -1);
+                    return true;
+
+                case ConsoleKey.DownArrow when _functionBrowserOpen:
+                    MoveFunctionBrowserSelection(functions, 1);
+                    return true;
+
+                case ConsoleKey.PageUp when _functionBrowserOpen:
+                    MoveFunctionBrowserSelection(functions, -Math.Max(1, GetFunctionBrowserVisibleRows(functions.Length)));
+                    return true;
+
+                case ConsoleKey.PageDown when _functionBrowserOpen:
+                    MoveFunctionBrowserSelection(functions, Math.Max(1, GetFunctionBrowserVisibleRows(functions.Length)));
+                    return true;
+
+                case ConsoleKey.Home when _functionBrowserOpen:
+                    _functionBrowserSelectedIndex = 0;
+                    return functions.Length > 0;
+
+                case ConsoleKey.End when _functionBrowserOpen:
+                    _functionBrowserSelectedIndex = Math.Max(0, functions.Length - 1);
+                    return functions.Length > 0;
+
+                case ConsoleKey.LeftArrow when _functionBrowserOpen:
+                    MoveFunctionBrowserSelection(functions, -GetFunctionBrowserTotalRows(functions.Length));
+                    return true;
+
+                case ConsoleKey.RightArrow when _functionBrowserOpen:
+                    MoveFunctionBrowserSelection(functions, GetFunctionBrowserTotalRows(functions.Length));
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ToggleFunctionBrowser(FunctionInfo[] functions)
+    {
+        _functionBrowserOpen = !_functionBrowserOpen;
+        if (!_functionBrowserOpen)
+        {
+            return;
+        }
+
+        _functionBrowserRowOffset = 0;
+        if (_activeFunctionFilter is null)
+        {
+            _functionBrowserSelectedIndex = 0;
+            return;
+        }
+
+        int index = Array.FindIndex(functions, f => string.Equals(f.Name, _activeFunctionFilter, StringComparison.Ordinal));
+        _functionBrowserSelectedIndex = Math.Max(0, index);
+    }
+
+    private void MoveFunctionBrowserSelection(FunctionInfo[] functions, int delta)
+    {
+        if (functions.Length == 0)
+        {
+            _functionBrowserSelectedIndex = 0;
+            _functionBrowserRowOffset = 0;
+            return;
+        }
+
+        _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex + delta, 0, functions.Length - 1);
     }
 
     private async Task RunLiveLoopAsync(CancellationToken cancellationToken)
@@ -210,6 +342,7 @@ internal sealed class CompactRenderer(
                             }
 
                             ctx.UpdateTarget(BuildLayout());
+
                             try
                             {
                                 await _redrawSignal!.WaitAsync(TimeSpan.FromMilliseconds(500), cancellationToken);
@@ -250,10 +383,23 @@ internal sealed class CompactRenderer(
         DashboardSnapshot snapshot = _state.Snapshot();
         IRenderable header = BuildHeader(snapshot);
 
-        IRenderable[] tail;
+        LogLine[] tail;
         lock (_stateLock)
         {
             tail = [.. _logTail];
+        }
+
+        string? activeFunctionFilter;
+        lock (_uiLock)
+        {
+            activeFunctionFilter = _activeFunctionFilter;
+        }
+
+        if (activeFunctionFilter is not null)
+        {
+            tail = [.. tail.Where(line =>
+                line.FunctionName is null
+                || string.Equals(line.FunctionName, activeFunctionFilter, StringComparison.Ordinal))];
         }
 
         // Slice the log tail to what actually fits on screen so we render
@@ -271,8 +417,8 @@ internal sealed class CompactRenderer(
             header,
             new Rule("logs").LeftJustified().RuleStyle(Theme.Muted),
             tail.Length == 0
-                ? new Markup($"[{MutedTag}]Waiting for events…[/]")
-                : new Rows(tail));
+                ? new Markup($"[{MutedTag}]{Markup.Escape(GetEmptyLogMessage(activeFunctionFilter))}[/]")
+                : new Rows(tail.Select(static line => line.Renderable)));
 
         return rows;
     }
@@ -283,11 +429,7 @@ internal sealed class CompactRenderer(
         // (e.g., redirected to a pipe). Clamp to a sensible default so the
         // compact renderer still produces useful output if it's somehow
         // reached without the terminal-safety fallback firing.
-        int viewportHeight = _console.Profile.Height;
-        if (viewportHeight <= 0 || viewportHeight > 1000)
-        {
-            viewportHeight = 30;
-        }
+        int viewportHeight = GetViewportHeight();
 
         // Header lines breakdown (matches BuildHeader output):
         //   bannerPanel (rounded box):              3 lines
@@ -295,14 +437,27 @@ internal sealed class CompactRenderer(
         //   status line:                            1 line
         //   "logs" rule:                            1 line
         //   safety pad (resize/wrap slack):         2 lines
-        int functionsLines = snapshot.Functions.Count switch
+        bool browserOpen;
+        int functionsLines;
+        lock (_uiLock)
         {
-            0 => 1,
-            <= 8 => snapshot.Functions.Count + 1, // 1 column-header row + N data rows
-            _ => 1, // status strip
-        };
+            browserOpen = _functionBrowserOpen;
+            functionsLines = _functionBrowserOpen
+                // Panel border (2) + visible grid rows + spacer/footer (2).
+                ? GetFunctionBrowserVisibleRows(snapshot.Functions.Count) + 4
+                : snapshot.Functions.Count switch
+                {
+                    0 => 1,
+                    <= 8 => snapshot.Functions.Count + 1, // 1 column-header row + N data rows
+                    _ => 1, // status strip
+                };
+        }
 
-        int reservedForHeader = 3 + functionsLines + 1 + 1 + 2;
+        int reservedForHeader = browserOpen
+            // Function browser panel + "logs" rule + safety pad.
+            ? functionsLines + 1 + 2
+            // Banner panel + functions block + status line + "logs" rule + safety pad.
+            : 3 + functionsLines + 1 + 1 + 2;
 
         // Always reserve at least 3 lines for logs so the dashboard remains
         // useful even on very small terminals (the header simply overflows).
@@ -311,6 +466,17 @@ internal sealed class CompactRenderer(
 
     private IRenderable BuildHeader(DashboardSnapshot snapshot)
     {
+        bool functionBrowserOpen;
+        lock (_uiLock)
+        {
+            functionBrowserOpen = _functionBrowserOpen;
+        }
+
+        if (functionBrowserOpen)
+        {
+            return BuildFunctionBrowser(snapshot);
+        }
+
         string version = snapshot.HostVersion ?? "—";
         string listen = snapshot.ListenUri ?? "—";
 
@@ -385,6 +551,113 @@ internal sealed class CompactRenderer(
         return table;
     }
 
+    private IRenderable BuildFunctionBrowser(DashboardSnapshot snapshot)
+    {
+        FunctionInfo[] functions = GetSortedFunctions(snapshot);
+        int totalRows = GetFunctionBrowserTotalRows(functions.Length);
+        int visibleRows = GetFunctionBrowserVisibleRows(functions.Length);
+        int selectedIndex;
+        int rowOffset;
+
+        lock (_uiLock)
+        {
+            if (functions.Length == 0)
+            {
+                _functionBrowserSelectedIndex = 0;
+                _functionBrowserRowOffset = 0;
+            }
+            else
+            {
+                _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex, 0, functions.Length - 1);
+                int selectedRow = GetFunctionBrowserRow(_functionBrowserSelectedIndex, totalRows);
+                int maxOffset = Math.Max(0, totalRows - visibleRows);
+
+                if (_functionBrowserRowOffset > selectedRow)
+                {
+                    _functionBrowserRowOffset = selectedRow;
+                }
+                else if (_functionBrowserRowOffset + visibleRows <= selectedRow)
+                {
+                    _functionBrowserRowOffset = selectedRow - visibleRows + 1;
+                }
+
+                _functionBrowserRowOffset = Math.Clamp(_functionBrowserRowOffset, 0, maxOffset);
+            }
+
+            selectedIndex = _functionBrowserSelectedIndex;
+            rowOffset = _functionBrowserRowOffset;
+        }
+
+        IRenderable content = functions.Length == 0
+            ? new Markup($"[{MutedTag}]No functions loaded yet…[/]")
+            : BuildFunctionBrowserGrid(functions, totalRows, visibleRows, rowOffset, selectedIndex);
+
+        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · a clear filter · t/Esc close[/]");
+        var panel = new Panel(new Rows(content, new Markup(string.Empty), footer))
+        {
+            Header = new PanelHeader(string.Create(CultureInfo.InvariantCulture, $"Functions ({functions.Length})")),
+            Border = BoxBorder.Rounded,
+            BorderStyle = Theme.Muted,
+            Expand = true,
+        };
+
+        return panel;
+    }
+
+    private IRenderable BuildFunctionBrowserGrid(
+        FunctionInfo[] functions,
+        int totalRows,
+        int visibleRows,
+        int rowOffset,
+        int selectedIndex)
+    {
+        Table table = new Table()
+            .Border(TableBorder.None)
+            .HideHeaders()
+            .Expand()
+            .AddColumn(new TableColumn(string.Empty).PadLeft(1).PadRight(4).NoWrap())
+            .AddColumn(new TableColumn(string.Empty).PadLeft(1).PadRight(0).NoWrap());
+
+        for (int row = 0; row < visibleRows; row++)
+        {
+            int leftIndex = rowOffset + row;
+            int rightIndex = leftIndex + totalRows;
+
+            table.AddRow(
+                new Markup(FormatFunctionBrowserCell(functions, leftIndex, selectedIndex)),
+                new Markup(FormatFunctionBrowserCell(functions, rightIndex, selectedIndex)));
+        }
+
+        return table;
+    }
+
+    private string FormatFunctionBrowserCell(FunctionInfo[] functions, int index, int selectedIndex)
+    {
+        if ((uint)index >= (uint)functions.Length)
+        {
+            return string.Empty;
+        }
+
+        FunctionInfo fn = functions[index];
+        string marker = index == selectedIndex
+            ? $"[{EmphasisTag}]>[/]"
+            : " ";
+        string status = FormatFunctionBrowserStatus(fn);
+        string color = _palette.GetColorFor(fn.Name);
+        string activeCount = fn.Status == FunctionStatus.Active && fn.ActiveInvocations > 1
+            ? string.Create(CultureInfo.InvariantCulture, $" ({fn.ActiveInvocations})")
+            : string.Empty;
+
+        return $"{marker} {status} [{color}]{Markup.Escape(fn.Name)}[/]{activeCount}";
+    }
+
+    private string FormatFunctionBrowserStatus(FunctionInfo fn) => fn.Status switch
+    {
+        FunctionStatus.Active => $"[{ActiveTag}]◉[/]",
+        FunctionStatus.Error => $"[{ErrorTag}]✗[/]",
+        _ => $"[{SuccessTag}]●[/]",
+    };
+
     private IRenderable BuildFunctionsStatusStrip(DashboardSnapshot snapshot)
     {
         int ready = snapshot.Functions.Count(f => f.Status == FunctionStatus.Ready);
@@ -396,7 +669,7 @@ internal sealed class CompactRenderer(
             $"  [{EmphasisTag}]{snapshot.Functions.Count}[/] functions  ·  [{SuccessTag}]● {ready} ready[/]  ·  [{ActiveTag}]◉ {active} active[/]  ·  [{ErrorTag}]✗ {errored} error{(errored == 1 ? string.Empty : "s")}[/]"));
     }
 
-    private static string BuildStatusLine(DashboardSnapshot snapshot)
+    private string BuildStatusLine(DashboardSnapshot snapshot)
     {
         string state = snapshot.HostState switch
         {
@@ -407,9 +680,21 @@ internal sealed class CompactRenderer(
             _ => "—",
         };
 
+        string? activeFunctionFilter;
+        lock (_uiLock)
+        {
+            activeFunctionFilter = _activeFunctionFilter;
+        }
+
+        string suffix = activeFunctionFilter is not null
+            ? $"  ·  Filter: {activeFunctionFilter} (a clear)"
+            : snapshot.Functions.Count > 8
+                ? "  ·  Press t to view all"
+                : string.Empty;
+
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"Host {state}  ·  {snapshot.Functions.Count} functions  ·  {snapshot.TotalInvocations} invocations  ·  {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}  ·  Press Ctrl+C to stop");
+            $"Host {state}  ·  {snapshot.Functions.Count} functions  ·  {snapshot.TotalInvocations} invocations  ·  {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{suffix}  ·  Press Ctrl+C to stop");
     }
 
     private static string FormatTrigger(string trigger) => trigger switch
@@ -499,6 +784,62 @@ internal sealed class CompactRenderer(
             $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  {Markup.Escape(entry.Message)}"));
     }
 
+    private static FunctionInfo[] GetSortedFunctions(DashboardSnapshot snapshot)
+        => [.. snapshot.Functions.OrderBy(f => f.Name, _functionNameComparer)];
+
+    private static int GetFunctionBrowserTotalRows(int functionCount)
+        => Math.Max(1, (functionCount + 1) / 2);
+
+    private static int GetFunctionBrowserRow(int index, int totalRows)
+        => totalRows <= 0 ? 0 : index % totalRows;
+
+    private int GetFunctionBrowserVisibleRows(int functionCount)
+    {
+        int totalRows = GetFunctionBrowserTotalRows(functionCount);
+        int viewportHeight = GetViewportHeight();
+
+        // Reserve: logs rule (1), minimum log tail (3), safety pad (2), and
+        // browser panel chrome/spacer/footer (4). On a 24-row terminal this
+        // leaves room for about 14 grid rows, which shows up to 28 functions
+        // in the two-column browser before scrolling is needed.
+        int maxRows = Math.Max(4, viewportHeight - 10);
+        return Math.Min(totalRows, maxRows);
+    }
+
+    private int GetViewportHeight()
+    {
+        int viewportHeight = _console.Profile.Height;
+        if (viewportHeight <= 0 || viewportHeight > 1000)
+        {
+            viewportHeight = 30;
+        }
+
+        return viewportHeight;
+    }
+
+    private static string? GetFunctionName(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
+    {
+        foreach (DashboardEvent ev in events)
+        {
+            switch (ev)
+            {
+                case FunctionDiscoveredEvent fd:
+                    return fd.Function.Name;
+                case InvocationStartedEvent started:
+                    return started.Function;
+                case InvocationCompletedEvent completed:
+                    return completed.Function;
+            }
+        }
+
+        return entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName);
+    }
+
+    private static string GetEmptyLogMessage(string? activeFunctionFilter)
+        => activeFunctionFilter is null
+            ? "Waiting for events…"
+            : $"No logs for {activeFunctionFilter} yet…";
+
     private static string DescribeHostState(HostStateChangedEvent hs) => (hs.From, hs.To) switch
     {
         (_, HostLifecycleState.Ready) when hs.DurationMs is { } d => $"Host ready ({(d / 1000.0).ToString("F1", CultureInfo.InvariantCulture)}s)",
@@ -509,4 +850,66 @@ internal sealed class CompactRenderer(
         (_, HostLifecycleState.Stopped) => "Host stopped",
         _ => $"Host {hs.To.ToString().ToLowerInvariant()}",
     };
+
+    private sealed record LogLine(IRenderable Renderable, string? FunctionName);
+
+    private sealed class FunctionNameComparer : IComparer<string>
+    {
+        public int Compare(string? x, string? y)
+        {
+            if (string.Equals(x, y, StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            if (x is null)
+            {
+                return -1;
+            }
+
+            if (y is null)
+            {
+                return 1;
+            }
+
+            (string XPrefix, int? XNumber) = SplitTrailingNumber(x);
+            (string YPrefix, int? YNumber) = SplitTrailingNumber(y);
+
+            int prefixComparison = string.Compare(XPrefix, YPrefix, StringComparison.Ordinal);
+            if (prefixComparison != 0)
+            {
+                return prefixComparison;
+            }
+
+            if (XNumber is { } xn && YNumber is { } yn)
+            {
+                int numberComparison = xn.CompareTo(yn);
+                if (numberComparison != 0)
+                {
+                    return numberComparison;
+                }
+            }
+
+            return string.Compare(x, y, StringComparison.Ordinal);
+        }
+
+        private static (string Prefix, int? Number) SplitTrailingNumber(string value)
+        {
+            int digitStart = value.Length;
+            while (digitStart > 0 && char.IsDigit(value[digitStart - 1]))
+            {
+                digitStart--;
+            }
+
+            if (digitStart == value.Length)
+            {
+                return (value, null);
+            }
+
+            string suffix = value[digitStart..];
+            return int.TryParse(suffix, NumberStyles.Integer, CultureInfo.InvariantCulture, out int number)
+                ? (value[..digitStart], number)
+                : (value, null);
+        }
+    }
 }

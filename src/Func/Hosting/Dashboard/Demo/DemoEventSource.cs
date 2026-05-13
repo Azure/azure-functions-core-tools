@@ -486,7 +486,7 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
 
     private static double TriggerDurationMs(string trigger, Random rng) => trigger switch
     {
-        "http" => rng.Next(3, 90),
+        "http" => rng.Next(500, 3000),
         "queue" => rng.Next(8, 140),
         "blob" => rng.Next(40, 320),
         "eventhub" or "cosmos" or "servicebus" => rng.Next(4, 60),
