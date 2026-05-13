@@ -25,6 +25,9 @@
       runtime.unix.System.Runtime.Extensions). On net8.0 the actual Uri code lives in the runtime, not in this
       reference assembly, so the advisories below do not affect the shipped binary. There is no patched 4.x
       release of System.Private.Uri to upgrade to.
+
+      TODO: Remove these suppressions once the host / middleware bumps in #4850 land on main. Those
+      upgrades drop the legacy 4.3.x runtime.* metapackage chain entirely, so the transitive disappears.
     -->
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-x5qj-9vmx-7g6g" />
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-xhfc-gr8f-ffwc" />
