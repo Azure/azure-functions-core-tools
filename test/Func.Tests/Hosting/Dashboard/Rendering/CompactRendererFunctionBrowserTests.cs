@@ -17,16 +17,34 @@ namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 public class CompactRendererFunctionBrowserTests
 {
     [Fact]
-    public void BuildHeader_WhenManyFunctionsLoaded_ShowsFunctionBrowserHint()
+    public void BuildHeader_IncludesProfileAndStackMetadata()
     {
-        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        var runInfo = new DashboardRunInfo(ProfileName: "flex", StackName: ".NET");
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer(runInfo);
         DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
 
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
+        Assert.Contains("⚡ Azure Functions CLI", output);
+        Assert.Contains("Host: 4.834.0", output);
+        Assert.Contains("Profile: flex", output);
+        Assert.Contains("Stack: .NET", output);
+    }
+
+    [Fact]
+    public void BuildFooter_WhenManyFunctionsLoaded_ShowsControls()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
+
+        string output = writer.ToString();
         Assert.Contains("12 functions", output);
-        Assert.Contains("Press t to view all", output);
+        Assert.Contains("t functions", output);
+        Assert.Contains("/ search", output);
+        Assert.Contains("Ctrl+C stop", output);
     }
 
     [Fact]
@@ -75,7 +93,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
     }
 
-    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer()
+    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
     {
         var writer = new StringWriter();
         IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
@@ -89,7 +107,7 @@ public class CompactRendererFunctionBrowserTests
         console.Profile.Height = 24;
 
         IInteractionService interaction = new SpectreInteractionService(new DefaultTheme(), console, console);
-        return (new CompactRenderer(interaction, new FunctionPalette(), console), console, writer);
+        return (new CompactRenderer(interaction, new FunctionPalette(), console, runInfo), console, writer);
     }
 
     private static void Render(IAnsiConsole console, StringWriter writer, IRenderable renderable)

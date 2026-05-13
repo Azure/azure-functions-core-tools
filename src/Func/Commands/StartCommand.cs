@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Hosting.AppStacks;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
@@ -82,14 +83,17 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
     private readonly IInteractionService _interaction;
     private readonly FunctionPalette _palette;
+    private readonly IAppStackProvider _appStackProvider;
 
-    public StartCommand(IInteractionService interaction, FunctionPalette palette)
+    public StartCommand(IInteractionService interaction, FunctionPalette palette, IAppStackProvider appStackProvider)
         : base("start", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(palette);
+        ArgumentNullException.ThrowIfNull(appStackProvider);
         _interaction = interaction;
         _palette = palette;
+        _appStackProvider = appStackProvider;
 
         AddPathArgument();
         Options.Add(PortOption);
@@ -132,8 +136,10 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
                 Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
         };
 
+        string stackName = await _appStackProvider.GetStackNameAsync(workingDirectory, cancellationToken);
+        var runInfo = new DashboardRunInfo(ProfileName: "none", StackName: stackName);
         var state = new DashboardState();
-        IDashboardRenderer renderer = CreateRenderer(mode);
+        IDashboardRenderer renderer = CreateRenderer(mode, runInfo);
 
         var pipeline = new DashboardPipeline(state, source, renderer);
         return await pipeline.RunAsync(cancellationToken);
@@ -204,11 +210,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         return OutputModeResolver.Resolve(explicitMode, noTui, _interaction);
     }
 
-    private IDashboardRenderer CreateRenderer(OutputMode mode) => mode switch
+    private IDashboardRenderer CreateRenderer(OutputMode mode, DashboardRunInfo runInfo) => mode switch
     {
         OutputMode.Json => new JsonRenderer(),
         OutputMode.Plain => new PlainRenderer(_interaction),
-        OutputMode.Compact => new CompactRenderer(_interaction, _palette),
+        OutputMode.Compact => new CompactRenderer(_interaction, _palette, runInfo: runInfo),
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 }

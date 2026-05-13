@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using System.Globalization;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
@@ -22,7 +23,8 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 internal sealed class CompactRenderer(
     IInteractionService interaction,
     FunctionPalette palette,
-    IAnsiConsole? console = null) : IDashboardRenderer
+    IAnsiConsole? console = null,
+    DashboardRunInfo? runInfo = null) : IDashboardRenderer
 {
     private const int MaxLogTailLines = 200;
 
@@ -31,6 +33,7 @@ internal sealed class CompactRenderer(
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
+    private readonly DashboardRunInfo _runInfo = runInfo ?? new();
     private readonly Lock _stateLock = new();
     private readonly Lock _uiLock = new();
     private readonly Queue<LogLine> _logTail = new();
@@ -49,6 +52,7 @@ internal sealed class CompactRenderer(
 
     private ITheme Theme => _interaction.Theme;
 
+    private string HeadingTag => field ??= Theme.Heading.ToMarkup();
     private string MutedTag => field ??= Theme.Muted.ToMarkup();
     private string EmphasisTag => field ??= Theme.Emphasis.ToMarkup();
     private string SuccessTag => field ??= Theme.Success.ToMarkup();
@@ -413,14 +417,30 @@ internal sealed class CompactRenderer(
             tail = tail[(tail.Length - logBudget)..];
         }
 
+        IRenderable logRows = BuildLogRows(tail, activeFunctionFilter, logBudget);
+        IRenderable footer = BuildFooter(snapshot, activeFunctionFilter);
+
         var rows = new Rows(
             header,
             new Rule("logs").LeftJustified().RuleStyle(Theme.Muted),
-            tail.Length == 0
-                ? new Markup($"[{MutedTag}]{Markup.Escape(GetEmptyLogMessage(activeFunctionFilter))}[/]")
-                : new Rows(tail.Select(static line => line.Renderable)));
+            logRows,
+            footer);
 
         return rows;
+    }
+
+    private IRenderable BuildLogRows(LogLine[] tail, string? activeFunctionFilter, int logBudget)
+    {
+        List<IRenderable> rows = tail.Length == 0
+            ? [new Markup($"[{MutedTag}]{Markup.Escape(GetEmptyLogMessage(activeFunctionFilter))}[/]")]
+            : [.. tail.Select(static line => line.Renderable)];
+
+        while (rows.Count < logBudget)
+        {
+            rows.Add(new Markup(string.Empty));
+        }
+
+        return new Rows(rows);
     }
 
     private int ComputeLogBudget(DashboardSnapshot snapshot)
@@ -431,11 +451,11 @@ internal sealed class CompactRenderer(
         // reached without the terminal-safety fallback firing.
         int viewportHeight = GetViewportHeight();
 
-        // Header lines breakdown (matches BuildHeader output):
+        // Chrome lines breakdown (matches BuildLayout output):
         //   bannerPanel (rounded box):              3 lines
         //   functions block (count-dependent):      see switch
-        //   status line:                            1 line
         //   "logs" rule:                            1 line
+        //   footer line:                            1 line
         //   safety pad (resize/wrap slack):         2 lines
         bool browserOpen;
         int functionsLines;
@@ -454,9 +474,9 @@ internal sealed class CompactRenderer(
         }
 
         int reservedForHeader = browserOpen
-            // Function browser panel + "logs" rule + safety pad.
-            ? functionsLines + 1 + 2
-            // Banner panel + functions block + status line + "logs" rule + safety pad.
+            // Function browser panel + "logs" rule + footer + safety pad.
+            ? functionsLines + 1 + 1 + 2
+            // Banner panel + functions block + "logs" rule + footer + safety pad.
             : 3 + functionsLines + 1 + 1 + 2;
 
         // Always reserve at least 3 lines for logs so the dashboard remains
@@ -479,11 +499,9 @@ internal sealed class CompactRenderer(
 
         string version = snapshot.HostVersion ?? "—";
         string listen = snapshot.ListenUri ?? "—";
+        string profile = string.IsNullOrWhiteSpace(_runInfo.ProfileName) ? "none" : _runInfo.ProfileName;
+        string stack = string.IsNullOrWhiteSpace(_runInfo.StackName) ? "unknown" : _runInfo.StackName;
 
-        // No emoji in the banner: ⚡ (U+26A1) is ambiguous-width — terminals
-        // render it as 2 cells while Spectre's wcwidth treats it as 1, which
-        // misaligns the panel's right border by one column.
-        //
         // Layout: brand + host version on the left, listen URL pinned to
         // the right. We use a borderless/headerless Table (not a Grid)
         // because Table.Expand() actually stretches to fill the parent
@@ -497,7 +515,7 @@ internal sealed class CompactRenderer(
             .AddColumn(new TableColumn(string.Empty).RightAligned().NoWrap().PadLeft(0).PadRight(0));
 
         bannerTable.AddRow(
-            new Markup($"[{EmphasisTag}]Azure Functions CLI[/]  [{MutedTag}]Host {Markup.Escape(version)}[/]"),
+            new Markup($"[bold gold1]:high_voltage:[/] [{EmphasisTag}]Azure Functions CLI[/]  [{MutedTag}]Host:[/] [{EmphasisTag}]{Markup.Escape(version)}[/][{MutedTag}] · Profile:[/] [{EmphasisTag}]{Markup.Escape(profile)}[/][{MutedTag}] · Stack:[/] [{EmphasisTag}]{Markup.Escape(stack)}[/]"),
             new Markup($"[{HyperlinkTag}]{Markup.Escape(listen)}[/]"));
 
         Panel bannerPanel = new Panel(bannerTable)
@@ -512,12 +530,9 @@ internal sealed class CompactRenderer(
             _ => BuildFunctionsStatusStrip(snapshot),
         };
 
-        string status = BuildStatusLine(snapshot);
-
         return new Rows(
             bannerPanel,
-            new Padder(functions).PadTop(0).PadBottom(0),
-            new Markup($"  [{MutedTag}]{Markup.Escape(status)}[/]"));
+            new Padder(functions).PadTop(0).PadBottom(0));
     }
 
     private IRenderable BuildFunctionsTable(IReadOnlyList<FunctionInfo> functions, string? listenUri)
@@ -669,32 +684,28 @@ internal sealed class CompactRenderer(
             $"  [{EmphasisTag}]{snapshot.Functions.Count}[/] functions  ·  [{SuccessTag}]● {ready} ready[/]  ·  [{ActiveTag}]◉ {active} active[/]  ·  [{ErrorTag}]✗ {errored} error{(errored == 1 ? string.Empty : "s")}[/]"));
     }
 
-    private string BuildStatusLine(DashboardSnapshot snapshot)
+    private IRenderable BuildFooter(DashboardSnapshot snapshot, string? activeFunctionFilter)
     {
         string state = snapshot.HostState switch
         {
-            HostLifecycleState.Starting => "starting…",
-            HostLifecycleState.Ready => "ready",
-            HostLifecycleState.Recycling => "recycling…",
-            HostLifecycleState.Stopped => "stopped",
+            HostLifecycleState.Starting => "Starting…",
+            HostLifecycleState.Ready => "Ready",
+            HostLifecycleState.Recycling => "Recycling…",
+            HostLifecycleState.Stopped => "Stopped",
             _ => "—",
         };
 
-        string? activeFunctionFilter;
-        lock (_uiLock)
-        {
-            activeFunctionFilter = _activeFunctionFilter;
-        }
-
-        string suffix = activeFunctionFilter is not null
-            ? $"  ·  Filter: {activeFunctionFilter} (a clear)"
-            : snapshot.Functions.Count > 8
-                ? "  ·  Press t to view all"
-                : string.Empty;
-
-        return string.Create(
+        string filter = activeFunctionFilter is not null
+            ? $" · Filter {activeFunctionFilter}"
+            : string.Empty;
+        string controls = activeFunctionFilter is not null
+            ? "t functions · a clear · ? help · Ctrl+C stop"
+            : "t functions · / search · ? help · Ctrl+C stop";
+        string line = string.Create(
             CultureInfo.InvariantCulture,
-            $"Host {state}  ·  {snapshot.Functions.Count} functions  ·  {snapshot.TotalInvocations} invocations  ·  {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{suffix}  ·  Press Ctrl+C to stop");
+            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter} │ {controls}");
+
+        return new Markup($"[{MutedTag}]{Markup.Escape(line)}[/]");
     }
 
     private static string FormatTrigger(string trigger) => trigger switch

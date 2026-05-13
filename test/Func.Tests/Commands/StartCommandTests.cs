@@ -4,7 +4,9 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Hosting.AppStacks;
 using Azure.Functions.Cli.Hosting.Dashboard;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -14,11 +16,14 @@ public class StartCommandTests : IDisposable
     private readonly string _tempDir;
     private readonly TestInteractionService _interaction = new();
     private readonly FunctionPalette _palette = new();
+    private readonly IAppStackProvider _appStackProvider = Substitute.For<IAppStackProvider>();
 
     public StartCommandTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"func-start-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
+        _appStackProvider.GetStackNameAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
+            .Returns("unknown");
     }
 
     public void Dispose()
@@ -32,7 +37,7 @@ public class StartCommandTests : IDisposable
     [Fact]
     public void StartCommand_HasExpectedOptions()
     {
-        var cmd = new StartCommand(_interaction, _palette);
+        var cmd = new StartCommand(_interaction, _palette, _appStackProvider);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--port", optionNames);
