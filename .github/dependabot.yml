@@ -32,3 +32,35 @@ updates:
         patterns:
           - "Microsoft.Extensions.*"
           - "System.*"
+
+  # Publish-tooling npm package (eng/tools/publish-tools/npm).
+  - package-ecosystem: "npm"
+    directory: "/eng/tools/publish-tools/npm"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
+
+  # Publish-tooling Python requirements.
+  - package-ecosystem: "pip"
+    directory: "/eng/tools/publish-tools"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
+
+  # Container base image.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
+
+  # GitHub Actions workflow versions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
