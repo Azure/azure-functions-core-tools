@@ -6,14 +6,14 @@ namespace Azure.Functions.Cli.Workloads;
 /// <summary>
 /// Decides whether a directory is a project owned by this workload.
 /// Registered from <see cref="Workload.Configure"/> via
-/// <see cref="FunctionsCliBuilder.RegisterProjectDetector"/>.
+/// <see cref="FunctionsCliBuilder.RegisterProjectResolver"/>.
 /// </summary>
-public interface IProjectDetector
+public interface IProjectResolver
 {
     /// <summary>
     /// Inspects <paramref name="workingDirectory"/> and returns whether the
     /// workload claims it. Implementers do their own pre-filtering and
     /// should return quickly when the directory clearly isn't theirs.
     /// </summary>
-    public Task<DetectionResult> DetectAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken);
+    public Task<EvaluationResult> EvaluateAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken);
 }

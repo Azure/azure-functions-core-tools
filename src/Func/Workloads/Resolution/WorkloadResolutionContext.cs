@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 /// <param name="Directory">The directory the command is operating on.</param>
 /// <param name="StackSelector">Value of <c>--stack</c>, or <c>null</c> when the user did not supply one.</param>
 /// <param name="SkipDirectoryDetection">
-/// When <c>true</c>, the resolver does not invoke detectors (used by
+/// When <c>true</c>, the resolver does not invoke resolvers (used by
 /// <c>func init</c>, where there is no project to inspect yet).
 /// </param>
 internal sealed record WorkloadResolutionContext(

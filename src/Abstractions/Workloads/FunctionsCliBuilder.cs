@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
 /// Bootstrap surface passed to <see cref="Workload.Configure"/>. Workloads
-/// register services, project initializers, commands, and detectors through
+/// register services, project initializers, commands, and project resolvers through
 /// <see cref="Services"/> and the <c>Register*</c> methods.
 /// </summary>
 /// <remarks>
@@ -46,10 +46,10 @@ public abstract class FunctionsCliBuilder
     public abstract void RegisterCommand(Type commandType);
 
     /// <summary>
-    /// Registers an <see cref="IProjectDetector"/> that participates in
+    /// Registers an <see cref="IProjectResolver"/> that participates in
     /// workload resolution. The host tags the registration with the calling
     /// workload.
     /// </summary>
-    /// <exception cref="ArgumentNullException"><paramref name="detector"/> is <c>null</c>.</exception>
-    public abstract void RegisterProjectDetector(IProjectDetector detector);
+    /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <c>null</c>.</exception>
+    public abstract void RegisterProjectResolver(IProjectResolver resolver);
 }

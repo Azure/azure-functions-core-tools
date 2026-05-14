@@ -4,7 +4,7 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Pairs an <see cref="IProjectDetector"/> with the workload that registered
+/// Pairs an <see cref="IProjectResolver"/> with the workload that registered
 /// it so the resolver can attribute results back to their owner.
 /// </summary>
-internal sealed record WorkloadDetectorContribution(WorkloadInfo Workload, IProjectDetector Detector);
+internal sealed record WorkloadProjectResolverContribution(WorkloadInfo Workload, IProjectResolver Resolver);

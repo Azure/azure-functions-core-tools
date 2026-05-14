@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Hosting;
 /// </summary>
 /// <remarks>
 /// A builder constructed without a workload is used during host bootstrap;
-/// calling <c>RegisterCommand</c> or <c>RegisterProjectDetector</c> on it
+/// calling <c>RegisterCommand</c> or <c>RegisterProjectResolver</c> on it
 /// throws so an untracked contribution can never reach the parser.
 /// </remarks>
 internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, WorkloadInfo? workload) : FunctionsCliBuilder
@@ -67,11 +67,11 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Wo
         RegisterCommandFactory(sp => (FuncCommand)ActivatorUtilities.GetServiceOrCreateInstance(sp, commandType));
     }
 
-    public override void RegisterProjectDetector(IProjectDetector detector)
+    public override void RegisterProjectResolver(IProjectResolver resolver)
     {
-        ArgumentNullException.ThrowIfNull(detector);
+        ArgumentNullException.ThrowIfNull(resolver);
         WorkloadInfo workload = RequireWorkload();
-        Services.AddSingleton(new WorkloadDetectorContribution(workload, detector));
+        Services.AddSingleton(new WorkloadProjectResolverContribution(workload, resolver));
     }
 
     private void RegisterCommandFactory(Func<IServiceProvider, FuncCommand> factory)

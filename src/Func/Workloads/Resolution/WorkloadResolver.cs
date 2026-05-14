@@ -10,12 +10,12 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 /// </summary>
 internal sealed class WorkloadResolver(
     IWorkloadProvider workloads,
-    IEnumerable<WorkloadDetectorContribution> detectors,
+    IEnumerable<WorkloadProjectResolverContribution> resolvers,
     ILocalSettingsReader localSettings) : IWorkloadResolver
 {
     private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
-    private readonly IReadOnlyList<WorkloadDetectorContribution> _detectors =
-        (detectors ?? throw new ArgumentNullException(nameof(detectors))).ToList();
+    private readonly IReadOnlyList<WorkloadProjectResolverContribution> _resolvers =
+        (resolvers ?? throw new ArgumentNullException(nameof(resolvers))).ToList();
     private readonly ILocalSettingsReader _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
 
     public async Task<WorkloadResolution> ResolveAsync(WorkloadResolutionContext context, CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ internal sealed class WorkloadResolver(
                 $"Installed: {FormatInstalled(installed)}.");
         }
 
-        IReadOnlyList<DetectorClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
+        IReadOnlyList<ResolverClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
 
         // FUNCTIONS_WORKER_RUNTIME, when set, is treated as an explicit
         // declaration: only claims with a matching WorkerRuntime count.
@@ -52,24 +52,24 @@ internal sealed class WorkloadResolver(
         return ResolveByClaims(claims);
     }
 
-    private async Task<IReadOnlyList<DetectorClaim>> CollectClaimsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ResolverClaim>> CollectClaimsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
     {
-        // Track per workload so a workload that ships multiple detectors
+        // Track per workload so a workload that ships multiple resolvers
         // counts once.
-        var claimsByWorkload = new Dictionary<WorkloadInfo, DetectorClaim>();
-        foreach (WorkloadDetectorContribution contribution in _detectors)
+        var claimsByWorkload = new Dictionary<WorkloadInfo, ResolverClaim>();
+        foreach (WorkloadProjectResolverContribution contribution in _resolvers)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            DetectionResult result = await contribution.Detector.DetectAsync(directory, cancellationToken);
-            if (!result.Claimed)
+            EvaluationResult result = await contribution.Resolver.EvaluateAsync(directory, cancellationToken);
+            if (!result.IsMatch)
             {
                 continue;
             }
 
             if (!claimsByWorkload.ContainsKey(contribution.Workload))
             {
-                claimsByWorkload[contribution.Workload] = new DetectorClaim(contribution.Workload, result);
+                claimsByWorkload[contribution.Workload] = new ResolverClaim(contribution.Workload, result);
             }
         }
 
@@ -97,10 +97,10 @@ internal sealed class WorkloadResolver(
 
     private static WorkloadResolution ResolveByRuntime(
         IReadOnlyList<WorkloadInfo> installed,
-        IReadOnlyList<DetectorClaim> claims,
+        IReadOnlyList<ResolverClaim> claims,
         string runtime)
     {
-        List<DetectorClaim> matches = [.. claims.Where(c =>
+        List<ResolverClaim> matches = [.. claims.Where(c =>
             c.Result.WorkerRuntime is { Length: > 0 } r &&
             string.Equals(r, runtime, StringComparison.OrdinalIgnoreCase))];
 
@@ -122,15 +122,15 @@ internal sealed class WorkloadResolver(
         };
     }
 
-    private static WorkloadResolution ResolveByClaims(IReadOnlyList<DetectorClaim> claims)
+    private static WorkloadResolution ResolveByClaims(IReadOnlyList<ResolverClaim> claims)
     {
         return claims.Count switch
         {
             1 => new WorkloadResolution.Resolved(
                 claims[0].Workload,
                 claims[0].Result.Reason is { Length: > 0 } reason
-                    ? $"Selected by '{claims[0].Workload.PackageId}' detector: {reason}."
-                    : $"Selected by '{claims[0].Workload.PackageId}' detector."),
+                    ? $"Selected by '{claims[0].Workload.PackageId}' resolver: {reason}."
+                    : $"Selected by '{claims[0].Workload.PackageId}' resolver."),
             0 => new WorkloadResolution.None(
                 "No installed workload claims this directory. " +
                 "Pass --stack <id> to select one explicitly, or run 'func workload install <package>' to add one."),
@@ -152,5 +152,5 @@ internal sealed class WorkloadResolver(
     private static string FormatInstalled(IReadOnlyList<WorkloadInfo> installed)
         => installed.Count == 0 ? "(none)" : FormatPackages(installed);
 
-    private readonly record struct DetectorClaim(WorkloadInfo Workload, DetectionResult Result);
+    private readonly record struct ResolverClaim(WorkloadInfo Workload, EvaluationResult Result);
 }

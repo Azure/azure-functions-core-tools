@@ -71,14 +71,14 @@ public sealed class WorkloadResolverTests
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo python = NewWorkload("Pkg.Python");
-        IProjectDetector dotnetDetector = NewDetector(
-            DetectionResult.Yes("found .csproj", workerRuntime: "dotnet-isolated"));
-        IProjectDetector pythonDetector = NewDetector(DetectionResult.No());
+        IProjectResolver dotnetResolver = NewProjectResolver(
+            EvaluationResult.Match("found .csproj", workerRuntime: "dotnet-isolated"));
+        IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.NoMatch());
         _settings.ReadWorkerRuntime(_dir).Returns("dotnet-isolated");
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet, python],
-            detectors: [(dotnet, dotnetDetector), (python, pythonDetector)]);
+            resolvers: [(dotnet, dotnetResolver), (python, pythonResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -92,18 +92,18 @@ public sealed class WorkloadResolverTests
     [Fact]
     public async Task Runtime_FromLocalSettings_NoClaimWithMatchingRuntime_ReturnsRuntimeMessage()
     {
-        // local.settings.json declares a runtime no detector backs for this
-        // directory (here: detector claims the dir but reports a different
+        // local.settings.json declares a runtime no resolver backs for this
+        // directory (here: resolver matches the dir but reports a different
         // runtime). Surface a runtime-specific message rather than falling
         // through to the generic "no claim" path.
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
-        IProjectDetector detector = NewDetector(
-            DetectionResult.Yes("found .csproj", workerRuntime: "dotnet-isolated"));
+        IProjectResolver resolverStub = NewProjectResolver(
+            EvaluationResult.Match("found .csproj", workerRuntime: "dotnet-isolated"));
         _settings.ReadWorkerRuntime(_dir).Returns("custom-runtime");
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet],
-            detectors: [(dotnet, detector)]);
+            resolvers: [(dotnet, resolverStub)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -120,15 +120,15 @@ public sealed class WorkloadResolverTests
     {
         WorkloadInfo a = NewWorkload("Pkg.A");
         WorkloadInfo b = NewWorkload("Pkg.B");
-        IProjectDetector aDetector = NewDetector(
-            DetectionResult.Yes("matched", workerRuntime: "dotnet"));
-        IProjectDetector bDetector = NewDetector(
-            DetectionResult.Yes("matched", workerRuntime: "dotnet"));
+        IProjectResolver aResolver = NewProjectResolver(
+            EvaluationResult.Match("matched", workerRuntime: "dotnet"));
+        IProjectResolver bResolver = NewProjectResolver(
+            EvaluationResult.Match("matched", workerRuntime: "dotnet"));
         _settings.ReadWorkerRuntime(_dir).Returns("dotnet");
 
         WorkloadResolver resolver = NewResolver(
             workloads: [a, b],
-            detectors: [(a, aDetector), (b, bDetector)]);
+            resolvers: [(a, aResolver), (b, bResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -142,16 +142,16 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Detectors_NotClaimed_AreIgnored()
+    public async Task Resolvers_NoMatch_AreIgnored()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo python = NewWorkload("Pkg.Python");
-        IProjectDetector dotnetDetector = NewDetector(DetectionResult.No("no .csproj"));
-        IProjectDetector pythonDetector = NewDetector(DetectionResult.Yes("found requirements.txt"));
+        IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.NoMatch("no .csproj"));
+        IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.Match("found requirements.txt"));
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet, python],
-            detectors: [(dotnet, dotnetDetector), (python, pythonDetector)]);
+            resolvers: [(dotnet, dotnetResolver), (python, pythonResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -162,16 +162,16 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Detectors_SingleClaim_Resolves()
+    public async Task Resolvers_SingleMatch_Resolves()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo python = NewWorkload("Pkg.Python");
-        IProjectDetector dotnetDetector = NewDetector(DetectionResult.Yes("found .csproj"));
-        IProjectDetector pythonDetector = NewDetector(DetectionResult.No());
+        IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.Match("found .csproj"));
+        IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.NoMatch());
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet, python],
-            detectors: [(dotnet, dotnetDetector), (python, pythonDetector)]);
+            resolvers: [(dotnet, dotnetResolver), (python, pythonResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -183,16 +183,16 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Detectors_MultipleClaim_ReturnsNoneWithReasons()
+    public async Task Resolvers_MultipleMatches_ReturnsNoneWithReasons()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo node = NewWorkload("Pkg.Node");
-        IProjectDetector dotnetDetector = NewDetector(DetectionResult.Yes("found .csproj"));
-        IProjectDetector nodeDetector = NewDetector(DetectionResult.Yes("found package.json"));
+        IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.Match("found .csproj"));
+        IProjectResolver nodeResolver = NewProjectResolver(EvaluationResult.Match("found package.json"));
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet, node],
-            detectors: [(dotnet, dotnetDetector), (node, nodeDetector)]);
+            resolvers: [(dotnet, dotnetResolver), (node, nodeResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -206,21 +206,21 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task NoRuntimeNoSelector_SingleDetectorClaims_Resolves()
+    public async Task NoRuntimeNoSelector_SingleResolverMatches_Resolves()
     {
         // Flex Consumption customers don't have FUNCTIONS_WORKER_RUNTIME in
         // local.settings.json (it's not in their Azure config either, by
         // design). The resolver must still pick a workload from project shape
-        // alone via IProjectDetector. This test pins that contract: no --stack,
-        // no runtime, single claiming detector resolves cleanly.
+        // alone via IProjectResolver's evaluation. This test pins that contract: no --stack,
+        // no runtime, single matching resolver resolves cleanly.
         WorkloadInfo python = NewWorkload("Pkg.Python");
-        IProjectDetector pythonDetector = NewDetector(
-            DetectionResult.Yes("found requirements.txt"));
+        IProjectResolver pythonResolver = NewProjectResolver(
+            EvaluationResult.Match("found requirements.txt"));
         _settings.ReadWorkerRuntime(_dir).Returns((string?)null);
 
         WorkloadResolver resolver = NewResolver(
             workloads: [python],
-            detectors: [(python, pythonDetector)]);
+            resolvers: [(python, pythonResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -232,9 +232,9 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task Detectors_ZeroCandidates_ReturnsNone()
+    public async Task Resolvers_ZeroCandidates_ReturnsNone()
     {
-        WorkloadResolver resolver = NewResolver(workloads: [], detectors: []);
+        WorkloadResolver resolver = NewResolver(workloads: [], resolvers: []);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -244,14 +244,14 @@ public sealed class WorkloadResolverTests
     }
 
     [Fact]
-    public async Task SkipDirectoryDetection_NoSelector_ReturnsNoneWithoutInvokingDetectors()
+    public async Task SkipDirectoryDetection_NoSelector_ReturnsNoneWithoutInvokingResolvers()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
-        IProjectDetector detector = NewDetector(DetectionResult.Yes("would have matched"));
+        IProjectResolver resolverStub = NewProjectResolver(EvaluationResult.Match("would have matched"));
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet],
-            detectors: [(dotnet, detector)]);
+            resolvers: [(dotnet, resolverStub)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null, SkipDirectoryDetection: true),
@@ -260,7 +260,7 @@ public sealed class WorkloadResolverTests
         var none = Assert.IsType<WorkloadResolution.None>(result);
         Assert.Contains("No --stack flag", none.Message);
         Assert.Contains("Pkg.Dotnet", none.Message);
-        await detector.DidNotReceive().DetectAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
+        await resolverStub.DidNotReceive().EvaluateAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -279,21 +279,21 @@ public sealed class WorkloadResolverTests
 
     private WorkloadResolver NewResolver(
         IReadOnlyList<WorkloadInfo>? workloads = null,
-        IReadOnlyList<(WorkloadInfo Workload, IProjectDetector Detector)>? detectors = null)
+        IReadOnlyList<(WorkloadInfo Workload, IProjectResolver Resolver)>? resolvers = null)
         => new(
             new StubWorkloadProvider(workloads ?? []),
-            (detectors ?? []).Select(d => new WorkloadDetectorContribution(d.Workload, d.Detector)).ToList(),
+            (resolvers ?? []).Select(d => new WorkloadProjectResolverContribution(d.Workload, d.Resolver)).ToList(),
             _settings);
 
     private static WorkloadInfo NewWorkload(string packageId, IReadOnlyList<string>? aliases = null)
         => TestWorkloads.CreateInfo(packageId) with { Aliases = aliases ?? [] };
 
-    private static IProjectDetector NewDetector(DetectionResult detectResult)
+    private static IProjectResolver NewProjectResolver(EvaluationResult result)
     {
-        IProjectDetector detector = Substitute.For<IProjectDetector>();
-        detector.DetectAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
-            .Returns(detectResult);
-        return detector;
+        IProjectResolver resolver = Substitute.For<IProjectResolver>();
+        resolver.EvaluateAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(result);
+        return resolver;
     }
 
     private sealed class StubWorkloadProvider(IReadOnlyList<WorkloadInfo> workloads) : IWorkloadProvider

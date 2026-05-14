@@ -176,35 +176,35 @@ public class DefaultFunctionsCliBuilderTests
     }
 
     [Fact]
-    public void RegisterProjectDetector_ProducesContributionWithWorkloadInfo()
+    public void RegisterProjectResolver_ProducesContributionWithWorkloadInfo()
     {
         var services = new ServiceCollection();
         var workload = TestWorkloads.CreateInfo("My.Workload");
         var builder = new DefaultFunctionsCliBuilder(services, workload);
-        var detector = Substitute.For<IProjectDetector>();
+        var resolver = Substitute.For<IProjectResolver>();
 
-        builder.RegisterProjectDetector(detector);
+        builder.RegisterProjectResolver(resolver);
 
-        var contribution = Assert.Single(services.BuildServiceProvider().GetServices<WorkloadDetectorContribution>());
+        var contribution = Assert.Single(services.BuildServiceProvider().GetServices<WorkloadProjectResolverContribution>());
         Assert.Same(workload, contribution.Workload);
-        Assert.Same(detector, contribution.Detector);
+        Assert.Same(resolver, contribution.Resolver);
     }
 
     [Fact]
-    public void RegisterProjectDetector_NullDetector_Throws()
+    public void RegisterProjectResolver_NullResolver_Throws()
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        Assert.Throws<ArgumentNullException>(() => builder.RegisterProjectDetector(null!));
+        Assert.Throws<ArgumentNullException>(() => builder.RegisterProjectResolver(null!));
     }
 
     [Fact]
-    public void RegisterProjectDetector_WithoutWorkloadContext_Throws()
+    public void RegisterProjectResolver_WithoutWorkloadContext_Throws()
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
-        var detector = Substitute.For<IProjectDetector>();
+        var resolver = Substitute.For<IProjectResolver>();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => builder.RegisterProjectDetector(detector));
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.RegisterProjectResolver(resolver));
         Assert.Contains("workload-scoped builder", ex.Message);
     }
 
