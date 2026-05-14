@@ -48,7 +48,7 @@
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.22.1" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.19.1" />
-    <PackageVersion Include="FluentAssertions" Version="5.2.0" />
+    <PackageVersion Include="FluentAssertions" Version="8.10.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="15.6.2" />
     <PackageVersion Include="Moq" Version="4.8.2" />
     <PackageVersion Include="NSubstitute" Version="3.1.0" />
