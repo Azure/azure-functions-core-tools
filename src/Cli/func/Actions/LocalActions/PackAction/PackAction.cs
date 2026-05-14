@@ -85,9 +85,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 Environment.CurrentDirectory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, FolderPath));
             }
 
-            // Detect the runtime from environment variable or local.settings.json
-            WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(_secretsManager);
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+            // Detect the runtime from environment variable or local.settings.json.
+            // ResolveNativeWorkerRuntime maps FUNCTIONS_WORKER_RUNTIME=native to a concrete
+            // runtime (e.g. Go) using project markers; if it succeeds, prefer that result
+            WorkerRuntime workerRuntime = WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(_secretsManager);
+            if (workerRuntime == WorkerRuntime.None)
+            {
+                workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+            }
 
             if (workerRuntime == WorkerRuntime.None && NoBuild)
             {

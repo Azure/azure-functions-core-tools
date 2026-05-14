@@ -229,7 +229,7 @@ namespace Azure.Functions.Cli.Helpers
         /// <summary>
         /// Resolves <c>FUNCTIONS_WORKER_RUNTIME=native</c> to a concrete <see cref="WorkerRuntime"/>
         /// by inspecting project-marker files in the current directory. If the setting is not
-        /// <c>"native"</c>, this method is a no-op.
+        /// <c>"native"</c>, this method is a no-op and returns <see cref="WorkerRuntime.None"/>.
         /// </summary>
         /// <remarks>
         /// The Functions host registers certain workers under the <c>"native"</c> language
@@ -243,7 +243,11 @@ namespace Azure.Functions.Cli.Helpers
         /// Call this early in any command that reads <see cref="GlobalCoreToolsSettings.CurrentWorkerRuntime"/>
         /// and needs native resolution (e.g. <c>func start</c>, <c>func pack</c>, <c>func publish</c>).
         /// </remarks>
-        public static void ResolveNativeWorkerRuntime(ISecretsManager secretsManager)
+        /// <returns>
+        /// The resolved <see cref="WorkerRuntime"/> when the setting was <c>"native"</c> and a
+        /// supported project marker was found; otherwise <see cref="WorkerRuntime.None"/>.
+        /// </returns>
+        public static WorkerRuntime ResolveNativeWorkerRuntime(ISecretsManager secretsManager)
         {
             var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
 
@@ -259,14 +263,14 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 catch (CliException)
                 {
-                    return;
+                    return WorkerRuntime.None;
                 }
             }
 
             if (string.IsNullOrWhiteSpace(setting)
                 || !string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return WorkerRuntime.None;
             }
 
             if (FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, GoHelpers.GoModFileName)))
@@ -277,7 +281,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
 
                 GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
-                return;
+                return WorkerRuntime.Go;
             }
 
             throw new CliException(
