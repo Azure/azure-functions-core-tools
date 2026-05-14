@@ -9,14 +9,14 @@ const consolidatedBuildId = "4.0." + require('../package.json').consolidatedBuil
 const chalk = require('chalk');
 const path = require('path');
 const fs = require('fs');
-const rimraf = require('rimraf');
+const { rimrafSync } = require('rimraf');
 const ProgressBar = require('progress');
 const os = require('os');
 
 function getPath() {
     const bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
     if (fs.existsSync(bin)) {
-        rimraf.sync(bin);
+        rimrafSync(bin);
     }
     return bin
 }
