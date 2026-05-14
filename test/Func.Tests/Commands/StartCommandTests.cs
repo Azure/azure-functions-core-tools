@@ -17,6 +17,8 @@ public class StartCommandTests : IDisposable
     private readonly TestInteractionService _interaction = new();
     private readonly FunctionPalette _palette = new();
     private readonly IAppStackProvider _appStackProvider = Substitute.For<IAppStackProvider>();
+    private readonly ICliVersionProvider _cliVersionProvider = Substitute.For<ICliVersionProvider>();
+
 
     public StartCommandTests()
     {
@@ -37,7 +39,7 @@ public class StartCommandTests : IDisposable
     [Fact]
     public void StartCommand_HasExpectedOptions()
     {
-        var cmd = new StartCommand(_interaction, _palette, _appStackProvider);
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _appStackProvider);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--port", optionNames);

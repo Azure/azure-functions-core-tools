@@ -88,16 +88,19 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
     private readonly IInteractionService _interaction;
     private readonly FunctionPalette _palette;
+    private readonly ICliVersionProvider _versionProvider;
     private readonly IAppStackProvider _appStackProvider;
 
-    public StartCommand(IInteractionService interaction, FunctionPalette palette, IAppStackProvider appStackProvider)
+    public StartCommand(IInteractionService interaction, FunctionPalette palette,ICliVersionProvider versionProvider, IAppStackProvider appStackProvider)
         : base("start", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(palette);
         ArgumentNullException.ThrowIfNull(appStackProvider);
+
         _interaction = interaction;
         _palette = palette;
+        _versionProvider = versionProvider;
         _appStackProvider = appStackProvider;
 
         AddPathArgument();
@@ -144,9 +147,12 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         string? logFilePath = parseResult.GetValue(LogFileOption);
         IDashboardEventSink? eventSink = CreateLogFileSink(logFilePath);
+
         string stackName = await _appStackProvider.GetStackNameAsync(workingDirectory, cancellationToken);
-        var runInfo = new DashboardRunInfo(ProfileName: "none", StackName: stackName);
+
+        var runInfo = new DashboardRunInfo(CliVersion: _versionProvider.Version, ProfileName: "none", StackName: stackName);
         var state = new DashboardState();
+
         IDashboardRenderer renderer = CreateRenderer(mode, runInfo);
 
         var pipeline = new DashboardPipeline(state, source, renderer, eventSink);

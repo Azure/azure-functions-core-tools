@@ -27,6 +27,7 @@ internal sealed class DashboardPipeline(
         string exitReason = "sigint";
         using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Action? shutdownHandler = null;
+
         if (_renderer is IDashboardShutdownRequester shutdownRequester)
         {
             shutdownHandler = pipelineCts.Cancel;

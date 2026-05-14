@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Events;
@@ -28,6 +29,13 @@ internal sealed class CompactRenderer(
     private const int HelpOverlayCommandRows = 15;
     private const int HelpOverlayLines = HelpOverlayCommandRows + 3;
     private const int SearchOverlayChromeLines = 5;
+
+    private const string HelpCloseControlLabel = "?/Esc close";
+    private const string LogsNavigationControlLabel = "PgUp/PgDn logs";
+    private const string FunctionBrowserControlLabel = "t functions";
+    private const string QuitControlLabel = "q/Ctrl+C quit";
+    private const string FunctionFilterToggleControlLabel = "f next";
+    private const string HelpControlLabel = "? help";
 
     private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
 
@@ -65,6 +73,7 @@ internal sealed class CompactRenderer(
     private string CommandTag => field ??= Theme.Command.ToMarkup();
     private string MutedTag => field ??= Theme.Muted.ToMarkup();
     private string EmphasisTag => field ??= Theme.Emphasis.ToMarkup();
+    private string TitleTag => field ??= Theme.Title.ToMarkup();
     private string SuccessTag => field ??= Theme.Success.ToMarkup();
     private string ErrorTag => field ??= Theme.Error.ToMarkup();
     private string WarningTag => field ??= Theme.Warning.ToMarkup();
@@ -688,7 +697,7 @@ internal sealed class CompactRenderer(
     {
         if (logBudget <= 0)
         {
-            return new Rows(Array.Empty<IRenderable>());
+            return new Rows([]);
         }
 
         List<IRenderable> rows = tail.Length == 0
@@ -802,11 +811,10 @@ internal sealed class CompactRenderer(
             return BuildFunctionBrowser(snapshot);
         }
 
-        string version = snapshot.HostVersion ?? "—";
+        
+        string hostVersion = snapshot.HostVersion ?? "—";
         string listen = snapshot.ListenUri ?? "—";
-        string profile = string.IsNullOrWhiteSpace(_runInfo.ProfileName) ? "none" : _runInfo.ProfileName;
-        string stack = string.IsNullOrWhiteSpace(_runInfo.StackName) ? "unknown" : _runInfo.StackName;
-
+        
         // Layout: brand + host version on the left, listen URL pinned to
         // the right. We use a borderless/headerless Table (not a Grid)
         // because Table.Expand() actually stretches to fill the parent
@@ -820,7 +828,10 @@ internal sealed class CompactRenderer(
             .AddColumn(new TableColumn(string.Empty).RightAligned().NoWrap().PadLeft(0).PadRight(0));
 
         bannerTable.AddRow(
-            new Markup($"[{WarningTag}]:high_voltage:[/] [{EmphasisTag}]Azure Functions CLI[/]  [{MutedTag}]Host:[/] [{EmphasisTag}]{Markup.Escape(version)}[/][{MutedTag}] · Profile:[/] [{EmphasisTag}]{Markup.Escape(profile)}[/][{MutedTag}] · Stack:[/] [{EmphasisTag}]{Markup.Escape(stack)}[/]"),
+            new Markup($"[{WarningTag}]:high_voltage:[/] [{TitleTag}]Azure Functions CLI[/]  " +
+            $"[{MutedTag}]Host:[/] [{EmphasisTag}]{Markup.Escape(hostVersion)}[/][{MutedTag}] · " +
+            $"Profile:[/] [{EmphasisTag}]{Markup.Escape(_runInfo.ProfileName)}[/][{MutedTag}] · " +
+            $"Stack:[/] [{EmphasisTag}]{Markup.Escape(_runInfo.StackName)}[/]"),
             new Markup($"[{HyperlinkTag}]{Markup.Escape(listen)}[/]"));
 
         Panel bannerPanel = new Panel(bannerTable)
@@ -861,7 +872,7 @@ internal sealed class CompactRenderer(
         foreach (FunctionInfo fn in functions)
         {
             string color = _palette.GetColorFor(fn.Name);
-            string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri);
+            string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri, Theme);
 
             table.AddRow(
                 new Markup($"[{color}]{Markup.Escape(fn.Name)}[/]"),
@@ -1154,26 +1165,20 @@ internal sealed class CompactRenderer(
 
     private IRenderable BuildFooterCore(DashboardSnapshot snapshot, string? activeFunctionFilter, bool errorsOnly, LogLevel minimumLogLevel)
     {
-        string state = snapshot.HostState switch
-        {
-            HostLifecycleState.Starting => "Starting…",
-            HostLifecycleState.Ready => "Ready",
-            HostLifecycleState.Recycling => "Recycling…",
-            HostLifecycleState.Stopped => "Stopped",
-            _ => "—",
-        };
-
-        string filter = activeFunctionFilter is not null
+       string filter = activeFunctionFilter is not null
             ? $" · Filter {activeFunctionFilter}"
             : string.Empty;
+
         string errors = errorsOnly
             ? " · Errors only"
             : string.Empty;
+
         string level = $" · L:{FormatMinimumLogLevel(minimumLogLevel)}";
         int logScrollOffset;
         bool helpOpen;
         bool functionSearchOpen;
         bool functionBrowserOpen;
+
         lock (_uiLock)
         {
             logScrollOffset = _logScrollOffset;
@@ -1185,18 +1190,19 @@ internal sealed class CompactRenderer(
         string logScroll = logScrollOffset > 0
             ? $" · Scrollback {logScrollOffset}"
             : string.Empty;
+
         string controls = (helpOpen, functionSearchOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
-            (true, _, _, _) => "? close · Esc close · q/Ctrl+C",
+            (true, _, _, _) => $"{HelpCloseControlLabel} · {QuitControlLabel}",
             (_, true, _, _) => "type query · ↑/↓ select · Enter filter · Esc close",
-            (_, _, true, _) => "↑/↓ navigate · Enter filter · / search · f next · t close · Esc close",
-            (_, _, _, true) => "PgUp/PgDn logs · / search · f next · a all · c/e logs · ? · q/Ctrl+C",
-            _ => "PgUp/PgDn logs · t funcs · / search · f filter · c/e logs · ? · q/Ctrl+C",
+            (_, _, true, _) => $"↑/↓ navigate · Enter filter · {FunctionFilterToggleControlLabel} · {FunctionBrowserControlLabel}",
+            (_, _, _, true) => $"{LogsNavigationControlLabel} · {FunctionFilterToggleControlLabel} · a all · {HelpControlLabel} · {QuitControlLabel}",
+            _ => $"{LogsNavigationControlLabel} · {FunctionBrowserControlLabel} · {HelpControlLabel} · {QuitControlLabel}",
         };
 
         string line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{state} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors}{level}{logScroll} │ {controls}");
+            $"{_runInfo.CliVersion} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors}{level}{logScroll} │ {controls}");
 
         return new Markup($"[{MutedTag}]{Markup.Escape(line)}[/]");
     }
@@ -1237,7 +1243,7 @@ internal sealed class CompactRenderer(
                 case FunctionDiscoveredEvent fd:
                 {
                     string color = _palette.GetColorFor(fd.Function.Name);
-                    string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, _state.Snapshot().ListenUri);
+                    string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, _state.Snapshot().ListenUri, Theme);
                     return new Markup(string.Create(CultureInfo.InvariantCulture,
                         $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"));
                 }
@@ -1421,7 +1427,7 @@ internal sealed class CompactRenderer(
     private static string GetEmptyLogMessage(string? activeFunctionFilter)
         => activeFunctionFilter is null
             ? "Waiting for events…"
-            : $"No logs for {activeFunctionFilter} yet…";
+            : $"No logs for {activeFunctionFilter}…";
 
     private static string DescribeHostState(HostStateChangedEvent hs) => (hs.From, hs.To) switch
     {

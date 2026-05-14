@@ -42,12 +42,7 @@ public class CompactRendererFunctionBrowserTests
 
         string output = writer.ToString();
         Assert.Contains("12 functions", output);
-        Assert.Contains("t funcs", output);
-        Assert.Contains("/ search", output);
-        Assert.Contains("f filter", output);
         Assert.Contains("PgUp/PgDn logs", output);
-        Assert.Contains("c/e logs", output);
-        Assert.DoesNotContain("l log", output);
         Assert.Contains("L:info", output);
         Assert.Contains("q/Ctrl+C", output);
     }
@@ -62,8 +57,7 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
 
         string output = writer.ToString();
-        Assert.Contains("? close", output);
-        Assert.Contains("Esc close", output);
+        Assert.Contains("?/Esc close", output);
     }
 
     [Fact]

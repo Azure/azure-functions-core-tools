@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Console.Theme;
 using Spectre.Console;
 
 namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
@@ -26,7 +27,7 @@ internal static class HttpRouteFormatter
     /// Returns Spectre markup describing the function's route. The returned
     /// string is safe to embed directly into another markup template.
     /// </summary>
-    public static string FormatRouteMarkup(FunctionInfo function, string? listenUri)
+    public static string FormatRouteMarkup(FunctionInfo function, string? listenUri, ITheme theme)
     {
         ArgumentNullException.ThrowIfNull(function);
 
@@ -47,7 +48,7 @@ internal static class HttpRouteFormatter
         // the full URL as the display text so it's obvious what gets opened
         // when clicked, and so the output remains useful when copy-pasted
         // into a terminal that doesn't honor the hyperlink sequence.
-        return $"{Markup.Escape(methodsPrefix)}[link={Markup.Escape(url)}]{Markup.Escape(url)}[/]";
+        return $"{Markup.Escape(methodsPrefix)}[{theme.Hyperlink.ToMarkup()} link={Markup.Escape(url)}]{Markup.Escape(url)}[/]";
     }
 
     private static string CombineUrl(string baseUrl, string route)

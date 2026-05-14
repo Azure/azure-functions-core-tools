@@ -2,8 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
+using NSubstitute;
+using NSubstitute.Extensions;
 using Spectre.Console;
 using Xunit;
 
@@ -11,15 +15,22 @@ namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
 public class HttpRouteFormatterTests
 {
+    private readonly ITheme _theme = Substitute.For<ITheme>();
+
+    public HttpRouteFormatterTests()
+    {
+        _theme.Hyperlink.Returns(new Style(Color.Blue, decoration: Decoration.Underline));
+    }
+
     [Fact]
     public void HttpFunction_WithListenUri_EmitsLinkMarkup()
     {
         var fn = MakeFunction(triggerType: "http", route: "/api/hello", methods: ["GET", "POST"]);
 
-        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071");
+        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071", _theme);
 
         const string url = "http://localhost:7071/api/hello";
-        Assert.Equal($"GET,POST [link={url}]{url}[/]", result);
+        Assert.Equal($"GET,POST [underline blue link={url}]{url}[/]", result);
     }
 
     [Fact]
@@ -27,9 +38,9 @@ public class HttpRouteFormatterTests
     {
         var fn = MakeFunction(triggerType: "http", route: "api/orders", methods: ["GET"]);
 
-        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071/");
+        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071/", _theme);
 
-        Assert.Contains("[link=http://localhost:7071/api/orders]", result);
+        Assert.Contains("[underline blue link=http://localhost:7071/api/orders]", result);
     }
 
     [Fact]
@@ -37,7 +48,7 @@ public class HttpRouteFormatterTests
     {
         var fn = MakeFunction(triggerType: "http", route: "/api/hello", methods: ["GET"]);
 
-        string result = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri: null);
+        string result = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri: null, _theme);
 
         Assert.Equal("GET /api/hello", result);
         Assert.DoesNotContain("[link=", result);
@@ -48,7 +59,7 @@ public class HttpRouteFormatterTests
     {
         var fn = MakeFunction(triggerType: "queue", route: "my-queue", methods: []);
 
-        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071");
+        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071", _theme);
 
         Assert.Equal("my-queue", result);
         Assert.DoesNotContain("[link=", result);
@@ -59,7 +70,7 @@ public class HttpRouteFormatterTests
     {
         var fn = MakeFunction(triggerType: "http", route: null, methods: ["GET"]);
 
-        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071");
+        string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071", _theme);
 
         Assert.Equal("GET —", result);
         Assert.DoesNotContain("[link=", result);
@@ -89,7 +100,7 @@ public class HttpRouteFormatterTests
         console.Profile.Width = 200;
 
         var fn = MakeFunction(triggerType: "http", route: "/api/hello", methods: ["GET", "POST"]);
-        string markup = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071");
+        string markup = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071", _theme);
 
         console.Markup(markup);
         string output = writer.ToString();

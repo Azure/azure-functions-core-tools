@@ -7,5 +7,6 @@ namespace Azure.Functions.Cli.Hosting.Dashboard;
 /// Metadata about the current host run that is not derived from the log stream.
 /// </summary>
 internal sealed record DashboardRunInfo(
+    string CliVersion = "n/a",
     string ProfileName = "none",
     string StackName = "unknown");
