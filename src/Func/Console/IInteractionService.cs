@@ -75,6 +75,14 @@ internal interface IInteractionService
     /// <summary>Writes a bordered data table.</summary>
     public void WriteTable(string[] columns, IEnumerable<string[]> rows);
 
+    /// <summary>
+    /// Serializes <paramref name="value"/> to indented JSON and writes it to
+    /// stdout as a single block. Intended for the <c>--json</c> flag on
+    /// commands that surface machine-readable output. Bypasses theming
+    /// because JSON is data, not styled text.
+    /// </summary>
+    public void WriteJson(object value);
+
     /// <summary>Displays a status spinner while executing an async operation.</summary>
     public Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
 

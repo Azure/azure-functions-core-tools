@@ -42,6 +42,7 @@ internal static class BuiltInCommands
         services.AddSingleton<WorkloadUninstallCommand>();
         services.AddSingleton<WorkloadUpdateCommand>();
         services.AddSingleton<WorkloadSearchCommand>();
+        services.AddSingleton<WorkloadPruneCommand>();
         services.AddSingleton<FuncCliCommand, WorkloadCommand>();
 
         return services;

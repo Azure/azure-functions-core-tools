@@ -71,6 +71,19 @@ internal class TestInteractionService : IInteractionService
         }
     }
 
+    public void WriteJson(object value)
+    {
+        // Capture a normalized JSON projection so tests can assert structure
+        // without being sensitive to indentation.
+        string json = System.Text.Json.JsonSerializer.Serialize(value, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = false,
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        });
+        _lines.Add($"JSON: {json}");
+    }
+
     // --- Interactive ---
 
     public async Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)

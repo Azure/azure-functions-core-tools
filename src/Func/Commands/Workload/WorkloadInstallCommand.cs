@@ -22,6 +22,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 {
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
+    private readonly IWorkloadStore _store;
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
@@ -53,11 +54,15 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
-    public WorkloadInstallCommand(IInteractionService interaction, IWorkloadInstaller installer)
+    public WorkloadInstallCommand(
+        IInteractionService interaction,
+        IWorkloadInstaller installer,
+        IWorkloadStore store)
         : base("install", "Install a workload.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
 
         WorkloadArgument.AddRequiredIdValidator();
         VersionOption.AddSemVerValidator();
@@ -78,6 +83,20 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
         bool force = parseResult.GetValue(ForceOption);
+
+        if (!force && !LooksLikeLocalPackagePath(workload))
+        {
+            // Spec §4.1: when any version of <package> is already installed,
+            // prompt the user to use `update` instead. --force skips the
+            // prompt entirely. Non-interactive contexts treat the prompt as
+            // a decline and exit non-zero with the same hint. Local .nupkg
+            // installs bypass the check since the resolver path differs.
+            int? earlyExit = await CheckAlreadyInstalledAsync(workload, exact, cancellationToken);
+            if (earlyExit is { } code)
+            {
+                return code;
+            }
+        }
 
         try
         {
@@ -128,6 +147,54 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     /// </summary>
     private static bool LooksLikeLocalPackagePath(string value)
         => value.EndsWith(".nupkg", StringComparison.OrdinalIgnoreCase) && File.Exists(value);
+
+    private async Task<int?> CheckAlreadyInstalledAsync(
+        string identifier,
+        bool exact,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
+        if (installed.Count == 0)
+        {
+            return null;
+        }
+
+        // Same matching rules as uninstall/update: by package id always,
+        // by alias unless --exact. We don't need to enforce uniqueness
+        // here; if any version matches we prompt.
+        WorkloadEntry? match = installed.FirstOrDefault(e =>
+            string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+            || (!exact && (e.Aliases?.Any(a => string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)) ?? false)));
+
+        if (match is null)
+        {
+            return null;
+        }
+
+        string canonicalId = match.PackageId;
+        string prompt =
+            $"'{canonicalId}' is already installed at {match.PackageVersion}. " +
+            $"Run 'func workload update {canonicalId}' instead?";
+
+        if (!_interaction.IsInteractive)
+        {
+            _interaction.WriteHint(
+                $"'{canonicalId}' is already installed at {match.PackageVersion}. " +
+                $"Run 'func workload update {canonicalId}' to upgrade, or pass --force to install side-by-side.");
+            return 1;
+        }
+
+        bool useUpdate = await _interaction.ConfirmAsync(prompt, defaultValue: true, cancellationToken);
+        if (useUpdate)
+        {
+            _interaction.WriteHint($"Run 'func workload update {canonicalId}' to upgrade.");
+            return 1;
+        }
+
+        // User declined the suggestion: fall through to a normal install,
+        // which will go side-by-side or no-op for the same version.
+        return null;
+    }
 
     private static string BuildSuccessMessage(WorkloadInstallResult result)
     {

@@ -117,6 +117,23 @@ internal class SpectreInteractionService : IInteractionService
         _stdout.Write(table);
     }
 
+    public void WriteJson(object value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        // Bypass _stdout (which would re-render via Spectre) and write the
+        // raw JSON directly so consumers piping `--json` get clean output.
+        string json = System.Text.Json.JsonSerializer.Serialize(value, _jsonOptions);
+        System.Console.Out.WriteLine(json);
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+
     public async Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
     {
         if (!IsInteractive)
