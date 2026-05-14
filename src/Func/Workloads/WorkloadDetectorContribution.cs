@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// that registered the detector.
 ///
 /// Internal: workloads register a bare <see cref="IProjectDetector"/> through
-/// <see cref="FunctionsCliBuilder.RegisterDetector"/>; the host wraps it here.
+/// <see cref="FunctionsCliBuilder.RegisterProjectDetector"/>; the host wraps it here.
 /// </summary>
 /// <param name="Workload">The workload that registered <paramref name="Detector"/>.</param>
 /// <param name="Detector">The detector instance the workload supplied.</param>

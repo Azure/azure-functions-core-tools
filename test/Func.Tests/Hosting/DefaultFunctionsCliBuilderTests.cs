@@ -176,14 +176,14 @@ public class DefaultFunctionsCliBuilderTests
     }
 
     [Fact]
-    public void RegisterDetector_ProducesContributionWithWorkloadInfo()
+    public void RegisterProjectDetector_ProducesContributionWithWorkloadInfo()
     {
         var services = new ServiceCollection();
         var workload = TestWorkloads.CreateInfo("My.Workload");
         var builder = new DefaultFunctionsCliBuilder(services, workload);
         var detector = Substitute.For<IProjectDetector>();
 
-        builder.RegisterDetector(detector);
+        builder.RegisterProjectDetector(detector);
 
         var contribution = Assert.Single(services.BuildServiceProvider().GetServices<WorkloadDetectorContribution>());
         Assert.Same(workload, contribution.Workload);
@@ -191,20 +191,20 @@ public class DefaultFunctionsCliBuilderTests
     }
 
     [Fact]
-    public void RegisterDetector_NullDetector_Throws()
+    public void RegisterProjectDetector_NullDetector_Throws()
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        Assert.Throws<ArgumentNullException>(() => builder.RegisterDetector(null!));
+        Assert.Throws<ArgumentNullException>(() => builder.RegisterProjectDetector(null!));
     }
 
     [Fact]
-    public void RegisterDetector_WithoutWorkloadContext_Throws()
+    public void RegisterProjectDetector_WithoutWorkloadContext_Throws()
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
         var detector = Substitute.For<IProjectDetector>();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => builder.RegisterDetector(detector));
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.RegisterProjectDetector(detector));
         Assert.Contains("workload-scoped builder", ex.Message);
     }
 

@@ -7,21 +7,22 @@ namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
 /// Bootstrap surface passed to <see cref="Workload.Configure"/>.
-/// Workloads register their services — project initializers, commands, and
-/// any other supporting types — through <see cref="Services"/> and the
-/// <see cref="RegisterCommand(FuncCommand)"/> overloads.
-///
+/// Workloads register their services, project initializers, commands, and
+/// detectors through <see cref="Services"/> and the <c>Register*</c> methods.
+/// </summary>
+/// <remarks>
 /// Modeled after WebJobs' <c>IWebJobsBuilder</c>: the builder exposes the DI
 /// container so workloads can use any standard .NET DI extension method, and
 /// the host picks up the registered services after every workload has been
-/// configured.
-///
-/// Abstract class (rather than an interface) so we can grow the surface with
-/// new properties or virtual members without breaking existing workloads.
-/// </summary>
+/// configured. Abstract class (rather than an interface) so we can grow the
+/// surface with new properties or virtual members without breaking existing
+/// workloads.
+/// </remarks>
 public abstract class FunctionsCliBuilder
 {
-    /// <summary>The DI service collection workloads contribute to.</summary>
+    /// <summary>
+    /// The DI service collection workloads contribute to.
+    /// </summary>
     public abstract IServiceCollection Services { get; }
 
     /// <summary>
@@ -30,11 +31,7 @@ public abstract class FunctionsCliBuilder
     /// state being held on the command itself.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="command"/> is <c>null</c>.</exception>
-    public void RegisterCommand(FuncCommand command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-        OnRegisterCommand(_ => command);
-    }
+    public abstract void RegisterCommand(FuncCommand command);
 
     /// <summary>
     /// Registers a top-level command by type. The command is constructed
@@ -45,59 +42,20 @@ public abstract class FunctionsCliBuilder
     /// </summary>
     /// <typeparam name="TCommand">A concrete <see cref="FuncCommand"/>.</typeparam>
     /// <exception cref="ArgumentException"><typeparamref name="TCommand"/> is abstract.</exception>
-    public void RegisterCommand<TCommand>()
-        where TCommand : FuncCommand
-    {
-        if (typeof(TCommand).IsAbstract)
-        {
-            throw new ArgumentException(
-                $"Cannot register abstract command type '{typeof(TCommand)}'. Pass a concrete FuncCommand subclass.",
-                nameof(TCommand));
-        }
-
-        OnRegisterCommand(ActivatorUtilities.GetServiceOrCreateInstance<TCommand>);
-    }
+    public abstract void RegisterCommand<TCommand>()
+        where TCommand : FuncCommand;
 
     /// <summary>
     /// Registers a top-level command by runtime <see cref="Type"/>. Useful
     /// when the command type is only known at runtime (e.g. discovered from
-    /// configuration). The type must be a concrete <see cref="FuncCommand"/>;
-    /// it is constructed through
-    /// <see cref="ActivatorUtilities.GetServiceOrCreateInstance(IServiceProvider, Type)"/>.
+    /// configuration).
     /// </summary>
     /// <param name="commandType">A concrete type assignable to <see cref="FuncCommand"/>.</param>
     /// <exception cref="ArgumentNullException"><paramref name="commandType"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">
     /// <paramref name="commandType"/> is not assignable to <see cref="FuncCommand"/>, or it is abstract.
     /// </exception>
-    public void RegisterCommand(Type commandType)
-    {
-        ArgumentNullException.ThrowIfNull(commandType);
-
-        if (!typeof(FuncCommand).IsAssignableFrom(commandType))
-        {
-            throw new ArgumentException(
-                $"Type '{commandType}' is not assignable to {nameof(FuncCommand)}.",
-                nameof(commandType));
-        }
-
-        if (commandType.IsAbstract)
-        {
-            throw new ArgumentException(
-                $"Cannot register abstract command type '{commandType}'. Pass a concrete FuncCommand subclass.",
-                nameof(commandType));
-        }
-
-        OnRegisterCommand(sp => (FuncCommand)ActivatorUtilities.GetServiceOrCreateInstance(sp, commandType));
-    }
-
-    /// <summary>
-    /// Hook implemented by the host to wire a <see cref="FuncCommand"/>
-    /// produced by <paramref name="factory"/> into the parser. The factory
-    /// is invoked when the host resolves commands; it is given the host's
-    /// <see cref="IServiceProvider"/> so the command can request services.
-    /// </summary>
-    protected abstract void OnRegisterCommand(Func<IServiceProvider, FuncCommand> factory);
+    public abstract void RegisterCommand(Type commandType);
 
     /// <summary>
     /// Registers an <see cref="IProjectDetector"/> that participates in
@@ -106,17 +64,5 @@ public abstract class FunctionsCliBuilder
     /// diagnostics can attribute results to their owner.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="detector"/> is <c>null</c>.</exception>
-    public void RegisterDetector(IProjectDetector detector)
-    {
-        ArgumentNullException.ThrowIfNull(detector);
-        OnRegisterDetector(detector);
-    }
-
-    /// <summary>
-    /// Hook implemented by the host to wire <paramref name="detector"/> into
-    /// the workload resolver, tagged with the calling workload's identity.
-    /// </summary>
-    protected abstract void OnRegisterDetector(IProjectDetector detector);
+    public abstract void RegisterProjectDetector(IProjectDetector detector);
 }
-
-

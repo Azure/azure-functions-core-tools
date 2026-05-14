@@ -17,14 +17,12 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 internal sealed class WorkloadResolver(
     IWorkloadProvider workloads,
     IEnumerable<WorkloadDetectorContribution> detectors,
-    ILocalSettingsReader localSettings,
-    IDirectoryMarkerMatcher markerMatcher) : IWorkloadResolver
+    ILocalSettingsReader localSettings) : IWorkloadResolver
 {
     private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
     private readonly IReadOnlyList<WorkloadDetectorContribution> _detectors =
         (detectors ?? throw new ArgumentNullException(nameof(detectors))).ToList();
     private readonly ILocalSettingsReader _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
-    private readonly IDirectoryMarkerMatcher _markerMatcher = markerMatcher ?? throw new ArgumentNullException(nameof(markerMatcher));
 
     public async Task<WorkloadResolution> ResolveAsync(WorkloadResolutionContext context, CancellationToken cancellationToken)
     {
@@ -38,28 +36,56 @@ internal sealed class WorkloadResolver(
             return ResolveBySelector(installed, context.StackSelector);
         }
 
-        // 2. FUNCTIONS_WORKER_RUNTIME from local.settings.json. If set we
-        // honour it as an explicit declaration from the user: a runtime hit
-        // resolves, a runtime miss errors with a runtime-specific message
-        // rather than falling through to detectors.
-        string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
-        if (!string.IsNullOrWhiteSpace(runtime))
-        {
-            return ResolveByRuntime(installed, runtime);
-        }
-
-        // `func init` (spec §4.2): no project to detect against, so steps
-        // 1+2 are the only signals. Report None with an init-shaped hint.
+        // `func init` (spec §4.2): no project to detect against, so detectors
+        // would all return "no claim". Skip them and report None with an
+        // init-shaped hint pointing the user at --stack.
         if (context.SkipDirectoryDetection)
         {
             return new WorkloadResolution.None(
-                "No --stack flag supplied and no FUNCTIONS_WORKER_RUNTIME declared. " +
-                $"Pass --stack <id> to choose a workload. " +
+                "No --stack flag supplied. " +
+                "Pass --stack <id> to choose a workload. " +
                 $"Installed: {FormatInstalled(installed)}.");
         }
 
-        // 3. IProjectDetector pass.
-        return await ResolveByDetectorsAsync(context.Directory, cancellationToken);
+        // 2. Run all detectors and collect claims.
+        IReadOnlyList<DetectorClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
+
+        // 3. If FUNCTIONS_WORKER_RUNTIME is set in local.settings.json, treat
+        // it as an explicit declaration: prefer claims whose WorkerRuntime
+        // matches; if none match, surface a runtime-specific message.
+        string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
+        if (!string.IsNullOrWhiteSpace(runtime))
+        {
+            return ResolveByRuntime(installed, claims, runtime);
+        }
+
+        // 4. No runtime hint: pick the unique claim, otherwise None.
+        return ResolveByClaims(claims);
+    }
+
+    private async Task<IReadOnlyList<DetectorClaim>> CollectClaimsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
+    {
+        // Track the claim per workload (not per detector) so a workload that
+        // ships multiple detectors counts once. Keep the first claim a
+        // detector supplied for that workload.
+        var claimsByWorkload = new Dictionary<WorkloadInfo, DetectorClaim>();
+        foreach (WorkloadDetectorContribution contribution in _detectors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            DetectionResult result = await contribution.Detector.DetectAsync(directory, cancellationToken);
+            if (!result.Claimed)
+            {
+                continue;
+            }
+
+            if (!claimsByWorkload.ContainsKey(contribution.Workload))
+            {
+                claimsByWorkload[contribution.Workload] = new DetectorClaim(contribution.Workload, result);
+            }
+        }
+
+        return [.. claimsByWorkload.Values];
     }
 
     private static WorkloadResolution ResolveBySelector(IReadOnlyList<WorkloadInfo> installed, string selector)
@@ -82,73 +108,48 @@ internal sealed class WorkloadResolver(
         };
     }
 
-    private WorkloadResolution ResolveByRuntime(IReadOnlyList<WorkloadInfo> installed, string runtime)
+    private static WorkloadResolution ResolveByRuntime(
+        IReadOnlyList<WorkloadInfo> installed,
+        IReadOnlyList<DetectorClaim> claims,
+        string runtime)
     {
-        // Group detectors by owning workload to avoid double-counting a
-        // workload that ships several detectors all claiming the same runtime.
-        HashSet<WorkloadInfo> matches = [.. _detectors
-            .Where(d => d.Detector.WorkerRuntimes.Any(r => string.Equals(r, runtime, StringComparison.OrdinalIgnoreCase)))
-            .Select(d => d.Workload)];
+        List<DetectorClaim> matches = [.. claims.Where(c =>
+            c.Result.WorkerRuntime is { Length: > 0 } r &&
+            string.Equals(r, runtime, StringComparison.OrdinalIgnoreCase))];
 
         return matches.Count switch
         {
             1 => new WorkloadResolution.Resolved(
-                matches.First(),
+                matches[0].Workload,
                 $"Selected by FUNCTIONS_WORKER_RUNTIME='{runtime}' in local.settings.json."),
             0 => new WorkloadResolution.None(
                 $"local.settings.json declares FUNCTIONS_WORKER_RUNTIME='{runtime}' " +
-                $"but no installed workload claims that runtime. " +
+                $"but no installed workload claims that runtime for this directory. " +
                 $"Installed: {FormatInstalled(installed)}. " +
                 $"Run 'func workload install <package>' to add a workload for '{runtime}', " +
                 $"or pass --stack <id> to override."),
             _ => new WorkloadResolution.None(
-                $"Multiple installed workloads claim worker runtime '{runtime}': {FormatPackages(matches)}. " +
+                $"Multiple installed workloads claim worker runtime '{runtime}': " +
+                $"{FormatPackages(matches.Select(m => m.Workload))}. " +
                 $"Pass --stack <id> to disambiguate."),
         };
     }
 
-    private async Task<WorkloadResolution> ResolveByDetectorsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
+    private static WorkloadResolution ResolveByClaims(IReadOnlyList<DetectorClaim> claims)
     {
-        // Track the claim per workload (not per detector) so a workload that
-        // ships multiple detectors counts once. Keep the first reason a
-        // detector supplied for that workload.
-        var claimsByWorkload = new Dictionary<WorkloadInfo, string?>();
-        foreach (WorkloadDetectorContribution contribution in _detectors)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (!_markerMatcher.AnyMatch(directory, contribution.Detector.ProjectMarkers))
-            {
-                continue;
-            }
-
-            DetectionResult result = await contribution.Detector.DetectAsync(directory, cancellationToken);
-            if (!result.Claimed)
-            {
-                continue;
-            }
-
-            if (!claimsByWorkload.ContainsKey(contribution.Workload))
-            {
-                claimsByWorkload[contribution.Workload] = result.Reason;
-            }
-        }
-
-        List<KeyValuePair<WorkloadInfo, string?>> candidates = [.. claimsByWorkload];
-
-        return candidates.Count switch
+        return claims.Count switch
         {
             1 => new WorkloadResolution.Resolved(
-                candidates[0].Key,
-                candidates[0].Value is { Length: > 0 } reason
-                    ? $"Selected by '{candidates[0].Key.PackageId}' detector: {reason}."
-                    : $"Selected by '{candidates[0].Key.PackageId}' detector."),
+                claims[0].Workload,
+                claims[0].Result.Reason is { Length: > 0 } reason
+                    ? $"Selected by '{claims[0].Workload.PackageId}' detector: {reason}."
+                    : $"Selected by '{claims[0].Workload.PackageId}' detector."),
             0 => new WorkloadResolution.None(
                 "No installed workload claims this directory. " +
                 "Pass --stack <id> to select one explicitly, or run 'func workload install <package>' to add one."),
             _ => new WorkloadResolution.None(
                 $"Multiple installed workloads claim this directory: " +
-                $"{string.Join(", ", candidates.Select(c => FormatCandidate(c.Key, c.Value)))}. " +
+                $"{string.Join(", ", claims.Select(c => FormatCandidate(c.Workload, c.Result.Reason)))}. " +
                 $"Pass --stack <id> to disambiguate."),
         };
     }
@@ -163,4 +164,6 @@ internal sealed class WorkloadResolver(
 
     private static string FormatInstalled(IReadOnlyList<WorkloadInfo> installed)
         => installed.Count == 0 ? "(none)" : FormatPackages(installed);
+
+    private readonly record struct DetectorClaim(WorkloadInfo Workload, DetectionResult Result);
 }
