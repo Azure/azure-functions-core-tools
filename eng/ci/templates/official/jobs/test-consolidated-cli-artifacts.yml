@@ -48,11 +48,6 @@ jobs:
           Get-ChildItem 'C:\Program Files (x86)\dotnet\shared\Microsoft.NETCore.App'
           Get-ChildItem 'C:\Program Files (x86)\dotnet\shared\Microsoft.AspNetCore.App'
 
-  - task: GoTool@0
-    displayName: 'Install Go'
-    inputs:
-      version: '1.20'
-
   - download: current
     displayName: 'Download artifact'
     artifact: func-cli-${{ parameters.arch }}
@@ -94,11 +89,8 @@ jobs:
     - ${{ if not(contains(parameters.arch, 'win')) }}:
       - bash: |
           chmod +x $(Pipeline.Workspace)/staging/func-cli/func
-          chmod +x $(Pipeline.Workspace)/staging/func-cli/gozip
           chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc6/func
-          chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc6/gozip
           chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc8/func
-          chmod +x $(Pipeline.Workspace)/staging/func-cli/in-proc8/gozip
         displayName: 'Make CLI binaries executable'
 
     - task: PowerShell@2

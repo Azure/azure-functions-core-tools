@@ -71,7 +71,7 @@ jobs:
     - template: /eng/ci/templates/official/steps/sign-linux.yml@self
       parameters:
         folderPath: '$(Build.Repository.LocalPath)/artifacts'
-        signPatterns: 'func,gozip'
+        signPatterns: 'func'
 
   # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
   - ${{ if startsWith(parameters.runtime, 'win-x') }}:
