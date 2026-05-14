@@ -229,7 +229,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             if (shouldInclude)
             {
                 // Version should be >= start and < end
-                CompareVersionStrings(version, parsed.Value.Start).Should().BeGreaterOrEqualTo(0);
+                CompareVersionStrings(version, parsed.Value.Start).Should().BeGreaterThanOrEqualTo(0);
                 CompareVersionStrings(version, parsed.Value.End).Should().BeLessThan(0);
             }
             else

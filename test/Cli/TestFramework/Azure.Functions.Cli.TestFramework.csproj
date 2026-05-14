@@ -12,7 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Queues" />
     <PackageReference Include="xunit" />
-    <PackageReference Include="FluentAssertions"/>
+    <PackageReference Include="AwesomeAssertions"/>
     <PackageReference Include="StyleCop.Analyzers" />
   </ItemGroup>
 

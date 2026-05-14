@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Moq" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="NSubstitute" />
