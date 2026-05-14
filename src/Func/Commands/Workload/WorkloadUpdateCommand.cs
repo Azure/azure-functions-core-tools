@@ -26,12 +26,12 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
     public Argument<string?> WorkloadArgument { get; } = new("id")
     {
         Arity = ArgumentArity.ZeroOrOne,
-        Description = "ID or alias of the installed workload to update. Mutually exclusive with --all.",
+        Description = "Workload package id or alias to update. Mutually exclusive with --all.",
     };
 
     public Option<string?> VersionOption { get; } = new("--version", "-v")
     {
-        Description = "Installed version to replace. Defaults to the highest installed semver.",
+        Description = "Installed version to replace. Default: the highest installed semver.",
     };
 
     public Option<bool> AllOption { get; } = new("--all")
@@ -46,17 +46,17 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     public Option<string?> SourceOption { get; } = new("--source")
     {
-        Description = "Catalog source URL or local directory to resolve from.",
+        Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
     };
 
-    public Option<bool> IncludePrereleasesOption { get; } = new("--include-prereleases")
+    public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving the new version.",
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable only.",
     };
 
     public Option<bool> ExactOption { get; } = new("--exact", "-e")
     {
-        Description = "Match the argument as a literal package id; do not look up aliases.",
+        Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
     public WorkloadUpdateCommand(
@@ -69,21 +69,15 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
 
-        VersionOption.Validators.Add(result =>
-        {
-            string? value = result.GetValue(VersionOption);
-            if (!string.IsNullOrWhiteSpace(value) && !NuGetVersion.TryParse(value, out _))
-            {
-                result.AddError($"'{value}' is not a valid semver version.");
-            }
-        });
+        WorkloadArgument.AddOptionalIdValidator();
+        VersionOption.AddSemVerValidator();
 
         Arguments.Add(WorkloadArgument);
         Options.Add(VersionOption);
         Options.Add(AllOption);
         Options.Add(MajorOption);
         Options.Add(SourceOption);
-        Options.Add(IncludePrereleasesOption);
+        Options.Add(IncludePrereleaseOption);
         Options.Add(ExactOption);
 
         Validators.Add(result =>
@@ -103,9 +97,17 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 return;
             }
 
-            if (all && !string.IsNullOrWhiteSpace(result.GetValue(VersionOption)))
+            if (all && result.GetResult(VersionOption) is not null)
             {
                 result.AddError("--version cannot be combined with --all.");
+            }
+
+            if (all && result.GetResult(ExactOption) is not null && result.GetValue(ExactOption))
+            {
+                // --exact only narrows alias resolution for a single id, so
+                // it's meaningless without one. Reject explicitly so the
+                // user doesn't think it filtered the --all set somehow.
+                result.AddError("--exact cannot be combined with --all.");
             }
         });
     }
@@ -117,12 +119,12 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? versionText = parseResult.GetValue(VersionOption);
         bool allowMajor = parseResult.GetValue(MajorOption);
         string? source = parseResult.GetValue(SourceOption);
-        bool includePrereleases = parseResult.GetValue(IncludePrereleasesOption);
+        bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
 
         if (all)
         {
-            return await UpdateAllAsync(source, includePrereleases, allowMajor, cancellationToken);
+            return await UpdateAllAsync(source, includePrerelease, allowMajor, cancellationToken);
         }
 
         string packageId = await ResolveInstalledPackageIdAsync(identifier!, exact, cancellationToken);
@@ -131,7 +133,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             packageId,
             string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
             source,
-            includePrereleases,
+            includePrerelease,
             allowMajor,
             cancellationToken);
     }
@@ -171,14 +173,14 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string packageId,
         NuGetVersion? targetVersion,
         string? source,
-        bool includePrereleases,
+        bool includePrerelease,
         bool allowMajor,
         CancellationToken cancellationToken)
     {
         try
         {
             WorkloadUpdateResult result = await _installer.UpdateAsync(
-                packageId, targetVersion, source, includePrereleases, allowMajor, cancellationToken);
+                packageId, targetVersion, source, includePrerelease, allowMajor, cancellationToken);
 
             RenderSingle(result);
             return 0;
@@ -203,7 +205,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     private async Task<int> UpdateAllAsync(
         string? source,
-        bool includePrereleases,
+        bool includePrerelease,
         bool allowMajor,
         CancellationToken cancellationToken)
     {
@@ -218,7 +220,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             return 0;
         }
 
-        int failed = 0;
+        bool anyFailed = false;
         foreach (string packageId in packageIds)
         {
             try
@@ -227,7 +229,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                     packageId,
                     targetInstalledVersion: null,
                     source,
-                    includePrereleases,
+                    includePrerelease,
                     allowMajor,
                     cancellationToken);
                 RenderSingle(result);
@@ -241,12 +243,12 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 // Per-id failure must not block other workloads. Surface
                 // the message and keep going; the final exit code reflects
                 // whether any failed.
-                failed++;
+                anyFailed = true;
                 _interaction.WriteError($"Update failed for '{packageId}': {ex.Message}");
             }
         }
 
-        return failed == 0 ? 0 : 1;
+        return anyFailed ? 1 : 0;
     }
 
     private void RenderSingle(WorkloadUpdateResult result)

@@ -293,7 +293,7 @@ public sealed class WorkloadInstallerTests : IDisposable
                 includePrerelease: false, exact: true, force: false));
 
         Assert.Contains("test.workload", ex.Message);
-        Assert.Contains("--include-prereleases", ex.Message);
+        Assert.Contains("--prerelease", ex.Message);
         await _catalog.DidNotReceive().DownloadAsync(Arg.Any<ResolvedPackage>(), Arg.Any<CancellationToken>());
     }
 

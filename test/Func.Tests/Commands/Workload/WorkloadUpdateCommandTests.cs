@@ -31,7 +31,7 @@ public class WorkloadUpdateCommandTests
         Assert.Contains(cmd.Options, o => o.Name == "--all");
         Assert.Contains(cmd.Options, o => o.Name == "--major");
         Assert.Contains(cmd.Options, o => o.Name == "--source");
-        Assert.Contains(cmd.Options, o => o.Name == "--include-prereleases");
+        Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
         Assert.Contains(cmd.Options, o => o.Name == "--exact");
     }
 
@@ -57,6 +57,57 @@ public class WorkloadUpdateCommandTests
         ParseResult parse = root.Parse([cmd.Name, "test.workload", "--all"]);
 
         Assert.NotEmpty(parse.Errors);
+    }
+
+    [Fact]
+    public void Update_AllAndVersion_FailsValidation()
+    {
+        var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store);
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
+
+        ParseResult parse = root.Parse([cmd.Name, "--all", "--version", "1.0.0"]);
+
+        Assert.NotEmpty(parse.Errors);
+        Assert.Contains(parse.Errors, e => e.Message.Contains("--version cannot be combined with --all"));
+    }
+
+    [Fact]
+    public void Update_AllAndExact_FailsValidation()
+    {
+        var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store);
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
+
+        ParseResult parse = root.Parse([cmd.Name, "--all", "--exact"]);
+
+        Assert.NotEmpty(parse.Errors);
+        Assert.Contains(parse.Errors, e => e.Message.Contains("--exact cannot be combined with --all"));
+    }
+
+    [Fact]
+    public void Update_WhitespaceArg_FailsValidation()
+    {
+        var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store);
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
+
+        ParseResult parse = root.Parse([cmd.Name, "   "]);
+
+        Assert.NotEmpty(parse.Errors);
+    }
+
+    [Fact]
+    public void Update_InvalidVersion_FailsValidation()
+    {
+        var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store);
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
+
+        ParseResult parse = root.Parse([cmd.Name, "Test.Workload", "--version", "not-semver"]);
+
+        Assert.NotEmpty(parse.Errors);
+        Assert.Contains(parse.Errors, e => e.Message.Contains("not a valid semver"));
     }
 
     [Fact]
@@ -124,7 +175,7 @@ public class WorkloadUpdateCommandTests
             "--version", "1.0.0",
             "--major",
             "--source", "https://example/v3/index.json",
-            "--include-prereleases");
+            "--prerelease");
 
         Assert.Equal(0, exit);
         await _installer.Received(1).UpdateAsync(

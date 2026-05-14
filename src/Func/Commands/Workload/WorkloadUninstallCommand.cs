@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.CommandLine.Parsing;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads.Install;
@@ -22,12 +21,12 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
-        Description = "ID or alias of the workload to uninstall.",
+        Description = "Workload package id or alias to uninstall.",
     };
 
     public Option<string?> VersionOption { get; } = new("--version", "-v")
     {
-        Description = "Specific version to uninstall. Omit when only one version is installed.",
+        Description = "Specific version to uninstall. Default: the only installed version.",
     };
 
     public Option<bool> AllVersionsOption { get; } = new("--all-versions", "-a")
@@ -37,7 +36,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
     public Option<bool> ExactOption { get; } = new("--exact", "-e")
     {
-        Description = "Match the argument as a literal package id; do not look up aliases.",
+        Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
     public WorkloadUninstallCommand(
@@ -50,14 +49,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
 
-        WorkloadArgument.Validators.Add(result =>
-        {
-            string? value = result.GetValue(WorkloadArgument);
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                result.AddError("A workload id is required.");
-            }
-        });
+        WorkloadArgument.AddRequiredIdValidator();
 
         Arguments.Add(WorkloadArgument);
         Options.Add(VersionOption);
@@ -66,11 +58,13 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
         Validators.Add(result =>
         {
-            int specified = result.Children
-                .OfType<OptionResult>()
-                .Count(or => or.Option == VersionOption || or.Option == AllVersionsOption);
+            // --version names a single version; --all-versions wipes them
+            // all. They contradict each other, so reject the combination
+            // at parse time rather than picking a precedence at runtime.
+            bool versionSpecified = result.GetResult(VersionOption) is not null;
+            bool allSpecified = result.GetResult(AllVersionsOption) is not null;
 
-            if (specified > 1)
+            if (versionSpecified && allSpecified)
             {
                 result.AddError("--all-versions and --version cannot be combined.");
             }

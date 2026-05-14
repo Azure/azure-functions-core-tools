@@ -290,7 +290,7 @@ internal sealed class WorkloadInstaller(
 
         if (matchedIds.Count > 1)
         {
-            throw new AmbiguousAliasException(aliasOrId, matchedIds);
+            throw new AmbiguousPackageMatchException(aliasOrId, matchedIds);
         }
 
         return matchedIds.Count == 1 ? matchedIds[0] : aliasOrId;
@@ -316,7 +316,7 @@ internal sealed class WorkloadInstaller(
 
             string hint = includePrerelease
                 ? string.Empty
-                : " Pass --include-prereleases if it is a prerelease.";
+                : " Pass --prerelease if it is a prerelease.";
 
             throw new Catalog.WorkloadPackageNotFoundException(
                 $"Could not resolve workload '{packageId}'. {detail}{hint}");

@@ -70,7 +70,7 @@ internal interface IWorkloadInstaller
     /// <exception cref="WorkloadPackageNotFoundException">
     /// No version matched on any configured source.
     /// </exception>
-    /// <exception cref="AmbiguousAliasException">
+    /// <exception cref="AmbiguousPackageMatchException">
     /// The alias matches multiple packages and <paramref name="exact"/> is
     /// <c>false</c>.
     /// </exception>

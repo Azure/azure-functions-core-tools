@@ -8,9 +8,9 @@ namespace Azure.Functions.Cli.Workloads.Install;
 /// more than one package id in the catalog (spec §6.1 step 2). The user
 /// must re-run with <c>--exact</c> and a specific package id.
 /// </summary>
-internal sealed class AmbiguousAliasException : Exception
+internal sealed class AmbiguousPackageMatchException : Exception
 {
-    public AmbiguousAliasException(string alias, IReadOnlyList<string> packageIds)
+    public AmbiguousPackageMatchException(string alias, IReadOnlyList<string> packageIds)
         : base(BuildMessage(alias, packageIds))
     {
         Alias = alias;

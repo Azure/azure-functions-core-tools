@@ -143,6 +143,19 @@ public class WorkloadUninstallCommandTests
     }
 
     [Fact]
+    public void Uninstall_WhitespaceArg_FailsValidation()
+    {
+        var cmd = NewCommand();
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
+
+        ParseResult parse = root.Parse([cmd.Name, "   "]);
+
+        Assert.NotEmpty(parse.Errors);
+        Assert.Contains(parse.Errors, e => e.Message.Contains("workload id is required"));
+    }
+
+    [Fact]
     public async Task Uninstall_PackageIdMatchIsCaseInsensitive()
     {
         StubInstalled(("Test.Workload", "1.0.0"));

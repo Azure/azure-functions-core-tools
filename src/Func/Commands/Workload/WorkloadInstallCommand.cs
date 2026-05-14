@@ -25,7 +25,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
-        Description = "Workload package id or alias to install.",
+        Description = "Workload package id, alias, or path to a local .nupkg.",
     };
 
     public Option<string?> VersionOption { get; } = new("--version", "-v")
@@ -38,9 +38,9 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
     };
 
-    public Option<bool> IncludePrereleasesOption { get; } = new("--include-prereleases")
+    public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving from the catalog.",
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable only.",
     };
 
     public Option<bool> ForceOption { get; } = new("--force", "-f")
@@ -59,28 +59,13 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
 
-        WorkloadArgument.Validators.Add(result =>
-        {
-            string? value = result.GetValue(WorkloadArgument);
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                result.AddError("A workload id is required.");
-            }
-        });
-
-        VersionOption.Validators.Add(result =>
-        {
-            string? value = result.GetValue(VersionOption);
-            if (!string.IsNullOrWhiteSpace(value) && !NuGetVersion.TryParse(value, out _))
-            {
-                result.AddError($"'{value}' is not a valid semver version.");
-            }
-        });
+        WorkloadArgument.AddRequiredIdValidator();
+        VersionOption.AddSemVerValidator();
 
         Arguments.Add(WorkloadArgument);
         Options.Add(VersionOption);
         Options.Add(SourceOption);
-        Options.Add(IncludePrereleasesOption);
+        Options.Add(IncludePrereleaseOption);
         Options.Add(ExactOption);
         Options.Add(ForceOption);
     }
@@ -90,20 +75,22 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string workload = parseResult.GetValue(WorkloadArgument)!;
         string? versionText = parseResult.GetValue(VersionOption);
         string? source = parseResult.GetValue(SourceOption);
-        bool includePrereleases = parseResult.GetValue(IncludePrereleasesOption);
+        bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
         bool force = parseResult.GetValue(ForceOption);
 
         try
         {
-            WorkloadInstallResult result = await _installer.InstallFromCatalogAsync(
-                workload,
-                string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
-                source,
-                includePrereleases,
-                exact,
-                force,
-                cancellationToken);
+            WorkloadInstallResult result = LooksLikeLocalPackagePath(workload)
+                ? await _installer.InstallFromPackageAsync(workload, force, cancellationToken)
+                : await _installer.InstallFromCatalogAsync(
+                    workload,
+                    string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
+                    source,
+                    includePrerelease,
+                    exact,
+                    force,
+                    cancellationToken);
 
             _interaction.WriteSuccess(BuildSuccessMessage(result));
             return 0;
@@ -112,11 +99,15 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
-        catch (AmbiguousAliasException ex)
+        catch (AmbiguousPackageMatchException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
         catch (InvalidWorkloadException ex)
+        {
+            throw new GracefulException(ex.Message, isUserError: true);
+        }
+        catch (FileNotFoundException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
@@ -127,6 +118,16 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                 isUserError: true);
         }
     }
+
+    /// <summary>
+    /// Returns <c>true</c> when the positional argument looks like a path
+    /// to a <c>.nupkg</c> on disk (i.e. ends in <c>.nupkg</c> and points to
+    /// an existing file). Lets the user install a local package without
+    /// going through the catalog. NuGet package ids cannot legally end in
+    /// <c>.nupkg</c>, so this is unambiguous.
+    /// </summary>
+    private static bool LooksLikeLocalPackagePath(string value)
+        => value.EndsWith(".nupkg", StringComparison.OrdinalIgnoreCase) && File.Exists(value);
 
     private static string BuildSuccessMessage(WorkloadInstallResult result)
     {

@@ -29,10 +29,10 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     public Option<string?> SourceOption { get; } = new("--source")
     {
-        Description = "Catalog source URL or local directory to search.",
+        Description = "NuGet feed URI to search.",
     };
 
-    public Option<bool> IncludePrereleasesOption { get; } = new("--include-prereleases")
+    public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
         Description = "Include prerelease versions in the results.",
     };
@@ -45,19 +45,21 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
         Arguments.Add(QueryArgument);
         Options.Add(SourceOption);
-        Options.Add(IncludePrereleasesOption);
+        Options.Add(IncludePrereleaseOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         string? query = parseResult.GetValue(QueryArgument);
         string? source = parseResult.GetValue(SourceOption);
-        bool includePrereleases = parseResult.GetValue(IncludePrereleasesOption);
+        bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
 
+        // TODO: surface --skip and --take for paging once we have a UX
+        // story for repeated queries (see workload spec §4.1).
         var searchQuery = new CatalogSearchQuery
         {
             Filter = query,
-            IncludePrerelease = includePrereleases,
+            IncludePrerelease = includePrerelease,
             Take = DefaultTake,
             Source = source,
         };

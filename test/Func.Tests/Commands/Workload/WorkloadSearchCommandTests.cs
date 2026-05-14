@@ -24,7 +24,7 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog);
         Assert.Single(cmd.Arguments, a => a.Name == "query");
         Assert.Contains(cmd.Options, o => o.Name == "--source");
-        Assert.Contains(cmd.Options, o => o.Name == "--include-prereleases");
+        Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class WorkloadSearchCommandTests
             cmd,
             "python",
             "--source", "https://example/v3/index.json",
-            "--include-prereleases");
+            "--prerelease");
 
         Assert.Equal(0, exit);
         Assert.NotNull(captured);
