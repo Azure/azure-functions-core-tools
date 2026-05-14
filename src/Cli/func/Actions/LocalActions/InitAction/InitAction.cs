@@ -471,6 +471,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 : Constants.StorageEmulatorConnectionString;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", azureWebJobsStorageValue);
 
+            // Add the explicit Go preview opt-in so the CLI doesn't have to fall back to scanning
+            // for go.mod on every command. See WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage.
+            if (workerRuntime == Helpers.WorkerRuntime.Go)
+            {
+                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsCliGoPreview, "true");
+            }
+
             if (workerRuntime == Helpers.WorkerRuntime.Powershell)
             {
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
