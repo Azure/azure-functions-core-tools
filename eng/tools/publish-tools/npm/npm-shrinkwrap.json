@@ -17,7 +17,7 @@
       "dependencies": {
         "chalk": "3.0.0",
         "extract-zip": "^2.0.1",
-        "https-proxy-agent": "5.0.1",
+        "https-proxy-agent": "9.0.0",
         "progress": "2.0.3",
         "rimraf": "^5.0.10"
       },
@@ -78,15 +78,12 @@
       }
     },
     "node_modules/agent-base": {
-      "version": "6.0.2",
-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-6.0.2.tgz",
-      "integrity": "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==",
+      "version": "9.0.0",
+      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-9.0.0.tgz",
+      "integrity": "sha512-TQf59BsZnytt8GdJKLPfUZ54g/iaUL2OWDSFCCvMOhsHduDQxO8xC4PNeyIkVcA5KwL2phPSv0douC0fgWzmnA==",
       "license": "MIT",
-      "dependencies": {
-        "debug": "4"
-      },
       "engines": {
-        "node": ">= 6.0.0"
+        "node": ">= 20"
       }
     },
     "node_modules/ansi-regex": {
@@ -314,16 +311,16 @@
       }
     },
     "node_modules/https-proxy-agent": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz",
-      "integrity": "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==",
+      "version": "9.0.0",
+      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-9.0.0.tgz",
+      "integrity": "sha512-/MVmHp58WkOypgFhCLk4fzpPcFQvTJ/e6LBI7irpIO2HfxUbpmYoHF+KzipzJpxxzJu7aJNWQ0xojJ/dzV2G5g==",
       "license": "MIT",
       "dependencies": {
-        "agent-base": "6",
-        "debug": "4"
+        "agent-base": "9.0.0",
+        "debug": "^4.3.4"
       },
       "engines": {
-        "node": ">= 6"
+        "node": ">= 20"
       }
     },
     "node_modules/is-fullwidth-code-point": {
