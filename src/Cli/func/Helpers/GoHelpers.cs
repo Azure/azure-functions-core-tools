@@ -363,27 +363,32 @@ namespace Azure.Functions.Cli.Helpers
         {
             try
             {
-                var exe = new Executable(goExe, "version");
-                var sb = new StringBuilder();
-                var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
-
-                if (exitCode == 0)
+                // Use Process directly with synchronous stdout capture instead of Executable's
+                // async event-based pipe. For sub-second commands like `go version`, the async
+                // event pump can race past Process.WaitForExit on macOS/Linux agents under load
+                // (observed: GoHelperTests on Linux CI, GoInitTests on macOS E2E). ReadToEnd
+                // blocks until EOF and is what SkipIfGoNonExistFact uses reliably.
+                using var process = new System.Diagnostics.Process
                 {
-                    // Executable.DrainAsyncOutput flushes the async stdout/stderr event pump
-                    // after process exit, but for very short-lived commands like `go version`
-                    // on Linux CI the OS pipe drain can still lag. Mirror PythonHelpers.VerifyVersion
-                    // and poll briefly for the output to materialize before parsing.
-                    var trials = 0;
-                    while (string.IsNullOrWhiteSpace(sb.ToString()) && trials < 5)
+                    StartInfo = new System.Diagnostics.ProcessStartInfo
                     {
-                        trials++;
-                        await Task.Delay(TimeSpan.FromMilliseconds(200));
-                    }
+                        FileName = goExe,
+                        Arguments = "version",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                    },
+                };
 
-                    var output = sb.ToString().Trim();
+                process.Start();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
 
+                if (process.ExitCode == 0)
+                {
                     // Parse "go version go1.24.2 linux/amd64" format
-                    var match = Regex.Match(output, @"go(\d+\.\d+(?:\.\d+)?)");
+                    var match = Regex.Match(output.Trim(), @"go(\d+\.\d+(?:\.\d+)?)");
                     if (match.Success)
                     {
                         return new WorkerLanguageVersionInfo(WorkerRuntime.Go, match.Groups[1].Value, goExe);
