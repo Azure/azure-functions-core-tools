@@ -1,4 +1,15 @@
 version: 2
+
+# Grouping strategy:
+# - Each ecosystem produces ONE PR for all minor + patch updates per week.
+# - Major version bumps stay as individual PRs so they can be reviewed and
+#   merged on their own (they often require code changes or coordination).
+# - A few NuGet sub-groups stay separate (workers, microsoft-bcl,
+#   opentelemetry) because they want to be bumped together regardless of
+#   semver level.
+# - Security updates are surfaced via the Security tab regardless of
+#   grouping; the weekly cadence here is for routine version drift PRs.
+
 updates:
   - package-ecosystem: "dotnet-sdk"
     directory: "/"
@@ -7,13 +18,10 @@ updates:
       day: "wednesday"
     ignore:
       - dependency-name: "*"
-        update-types: 
+        update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
 
-  # NuGet packages (transitives included via central package management).
-  # Security advisories are surfaced through the Security tab regardless of schedule;
-  # the weekly cadence is for routine version drift PRs.
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
@@ -21,46 +29,85 @@ updates:
       day: "wednesday"
     open-pull-requests-limit: 10
     groups:
-      powershell-workers:
+      # Workers are bumped together (and tied to host bumps); group all
+      # semver levels here.
+      workers:
         patterns:
+          - "Microsoft.Azure.Functions.JavaWorker"
+          - "Microsoft.Azure.Functions.NodeJsWorker"
           - "Microsoft.Azure.Functions.PowerShellWorker.*"
+          - "Microsoft.Azure.Functions.PythonWorker"
       opentelemetry:
         patterns:
           - "OpenTelemetry*"
           - "Azure.Monitor.OpenTelemetry.*"
+      # BCL/runtime packages are versioned together (e.g. .NET 9 -> 10);
+      # group all semver levels.
       microsoft-bcl:
         patterns:
           - "Microsoft.Extensions.*"
           - "System.*"
+      # Catch-all: every remaining NuGet package, minor + patch only.
+      # Major bumps fall through and get individual PRs.
+      nuget-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
-  # Publish-tooling npm package (eng/tools/publish-tools/npm).
   - package-ecosystem: "npm"
     directory: "/eng/tools/publish-tools/npm"
     schedule:
       interval: "weekly"
       day: "wednesday"
     open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
-  # Publish-tooling Python requirements.
   - package-ecosystem: "pip"
     directory: "/eng/tools/publish-tools"
     schedule:
       interval: "weekly"
       day: "wednesday"
     open-pull-requests-limit: 5
+    groups:
+      pip-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
-  # Container base image.
   - package-ecosystem: "docker"
     directory: "/docker"
     schedule:
       interval: "weekly"
       day: "wednesday"
     open-pull-requests-limit: 5
+    groups:
+      docker-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
-  # GitHub Actions workflow versions.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "wednesday"
     open-pull-requests-limit: 5
+    groups:
+      github-actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
