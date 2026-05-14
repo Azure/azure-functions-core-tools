@@ -160,7 +160,7 @@ internal sealed class DemoStartInitializationRunner(
     private async Task DelayAsync(StartInitializationContext context, CancellationToken cancellationToken)
     {
         double multiplier = context.DemoSpeedMultiplier <= 0 ? 0.25 : context.DemoSpeedMultiplier;
-        await Task.Delay(TimeSpan.FromMilliseconds(120 * multiplier), _time, cancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(1000 * multiplier), _time, cancellationToken);
     }
 
     private async Task EmitAsync(
