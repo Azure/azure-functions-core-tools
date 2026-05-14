@@ -41,12 +41,12 @@ jobs:
       old_tag: ${{ steps.tags.outputs.old_tag }}
     steps:
       - name: Checkout current release
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -118,7 +118,7 @@ jobs:
 
       - name: Upload artifacts
         if: steps.diff.outputs.has_changes == 'True'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: command-diff
           path: |
@@ -142,7 +142,7 @@ jobs:
 
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.DOC_SYNC_APP_ID }}
           private-key: ${{ secrets.DOC_SYNC_APP_PRIVATE_KEY }}
@@ -150,26 +150,26 @@ jobs:
           repositories: ${{ steps.fork.outputs.repo }}
 
       - name: Download diff artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: command-diff
           path: /tmp/artifacts
 
       - name: Checkout core-tools repo (for scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: core-tools
           sparse-checkout: .github/scripts
 
       - name: Checkout fork repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.DOCS_FORK_REPO }}
           token: ${{ steps.app-token.outputs.token }}
           path: docs-repo
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
