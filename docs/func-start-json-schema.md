@@ -25,6 +25,9 @@ described in this document.
 - **Records are self-contained.** No record references "the previous line".
 - **No interactive output.** ANSI / spinners / prompts are never emitted
   regardless of the parent TTY state.
+- **Initialization records precede host records.** The start initialization
+  phase emits `start_initialization_*` records before the first host `log`
+  record.
 - **Final record is `kind: "summary"`** before stdout closes. Agents can use
   it as an end-of-stream sentinel.
 
@@ -48,6 +51,71 @@ agent that reconstructs state.
 The following `kind` discriminator values are part of the v1 contract.
 Unknown kinds may be added in later versions; consumers should ignore kinds
 they don't recognise.
+
+### Start initialization records
+
+Before the host event stream starts, `func start` emits structured records for
+profile/constraint resolution, workload validation, simulated installs, and
+host launch.
+
+Kinds:
+
+| Kind | Purpose |
+|------|---------|
+| `start_initialization_started` | Initialization began. |
+| `start_initialization_step_started` | A named initialization step began. |
+| `start_initialization_progress` | A progress-based step advanced. |
+| `start_initialization_step_completed` | A named initialization step completed. |
+| `start_initialization_completed` | Initialization completed and the dashboard stream can start. |
+
+```json
+{
+  "schema_version": 1,
+  "kind": "start_initialization_step_started",
+  "timestamp": "2026-05-11T07:15:30.000Z",
+  "step": "install_host_workload",
+  "title": "Install host workload",
+  "display": "progress",
+  "detail": "Azure Functions host 4.834.0"
+}
+```
+
+```json
+{
+  "schema_version": 1,
+  "kind": "start_initialization_progress",
+  "timestamp": "2026-05-11T07:15:30.120Z",
+  "step": "install_host_workload",
+  "percent": 55,
+  "message": "Verifying package"
+}
+```
+
+```json
+{
+  "schema_version": 1,
+  "kind": "start_initialization_completed",
+  "timestamp": "2026-05-11T07:15:31.000Z",
+  "profile": "none",
+  "stack": ".NET",
+  "host_version": "4.834.0",
+  "bundle_required": false
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `profile` | string | Active profile name, or `none`. |
+| `step` | string | Stable step identifier such as `resolve_profile`, `install_host_workload`, or `start_host`. |
+| `title` | string | Human-readable step title. |
+| `display` | string | `status` or `progress`. |
+| `detail` | string \| absent | Additional step context. |
+| `percent` | number | Progress value from `0` to `100`. |
+| `message` | string \| absent | Step/progress result text. |
+| `stack` | string | Resolved app stack display name. |
+| `host_version` | string | Resolved host runtime version. |
+| `bundle_required` | boolean | Whether an extension bundle is required. |
+| `bundle_version` | string \| absent | Resolved extension bundle version when one is required. |
 
 ### `log`
 
@@ -323,6 +391,13 @@ The canonical sequence used by the demo source and by the mockups in the
 design plan produces:
 
 ```text
+start_initialization_started
+start_initialization_step_started
+start_initialization_step_completed
+start_initialization_step_started
+start_initialization_progress
+start_initialization_step_completed
+start_initialization_completed
 log
 host_state_changed
 log               function_discovered  (×3)

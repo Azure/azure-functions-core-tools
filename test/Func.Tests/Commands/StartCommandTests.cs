@@ -2,10 +2,14 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard;
+using Azure.Functions.Cli.Hosting.Events;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Xunit;
 
@@ -18,7 +22,6 @@ public class StartCommandTests : IDisposable
     private readonly FunctionPalette _palette = new();
     private readonly IStartInitializationRunner _initializationRunner = Substitute.For<IStartInitializationRunner>();
     private readonly ICliVersionProvider _cliVersionProvider = Substitute.For<ICliVersionProvider>();
-
 
     public StartCommandTests()
     {
@@ -87,5 +90,42 @@ public class StartCommandTests : IDisposable
         var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
         Assert.Contains("--output", ex.Message);
         Assert.Contains("bogus", ex.Message);
+    }
+
+    [Fact]
+    public async Task StartCommand_RunsInitializationBeforeDashboardPipeline()
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        var initializationResult = new StartInitializationResult(
+            new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET"),
+            source,
+            HostVersion: "4.834.0",
+            BundleRequired: false,
+            BundleVersion: null);
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(initializationResult);
+
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, services =>
+        {
+            services.AddSingleton(_cliVersionProvider);
+            services.AddSingleton(_initializationRunner);
+        });
+        var root = Parser.CreateCommand(services);
+        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+
+        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        Assert.Equal(0, exitCode);
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context =>
+                context.WorkingDirectory.Info.FullName == new DirectoryInfo(_tempDir).FullName
+                && context.ProfileName == "none"
+                && context.CliVersion == "5.0.0-test"),
+            Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>());
     }
 }

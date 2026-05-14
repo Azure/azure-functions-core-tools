@@ -234,8 +234,9 @@ internal sealed class CompactStartInitializationRenderer(
         const int Width = 18;
         int filled = (int)Math.Round(Math.Clamp(percent, 0, 100) / 100 * Width);
         string bar = new string('#', filled) + new string('-', Width - filled);
+        string progress = Markup.Escape($"[{bar}] {percent,3:0}%");
         string suffix = string.IsNullOrWhiteSpace(message) ? string.Empty : $" {Markup.Escape(message)}";
-        return $"[{SuccessTag}][{bar}] {percent,3:0}%[/][{MutedTag}]{suffix}[/]";
+        return $"[{SuccessTag}]{progress}[/][{MutedTag}]{suffix}[/]";
     }
 
     private sealed class StepState(StartInitializationStep step)

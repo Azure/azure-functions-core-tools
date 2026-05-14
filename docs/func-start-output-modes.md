@@ -34,9 +34,11 @@ the command downgrades to `plain` and writes a one-line notice to stderr.
 
 ## `compact`
 
-`compact` is the interactive local-development view. It uses a pinned header,
-adaptive function summary, streaming log tail, and pinned footer with compact
-controls.
+`compact` is the interactive local-development view. During start
+initialization, it renders the same top header plus status/progress UI for
+profile, workload, and host-launch steps. After initialization completes, it
+switches to the pinned header, adaptive function summary, streaming log tail,
+and pinned footer with compact controls.
 
 Use it when:
 
@@ -49,8 +51,9 @@ you need a complete copy of every host event while staying in compact mode.
 
 ## `plain`
 
-`plain` is the streaming text fallback. It avoids animation and interactive
-terminal features, so it is safe for CI, redirected output, and log capture.
+`plain` is the streaming text fallback. It writes initialization status lines
+before host logs and avoids animation and interactive terminal features, so it
+is safe for CI, redirected output, and log capture.
 
 Use it when:
 
@@ -61,7 +64,9 @@ Use it when:
 ## `json`
 
 `json` emits newline-delimited JSON (NDJSON): one self-contained JSON object
-per line, with no surrounding array and no commas between records.
+per line, with no surrounding array and no commas between records. Start
+initialization is represented with structured `start_initialization_*` records
+before host log records begin.
 
 Use it when:
 
