@@ -142,7 +142,7 @@ jobs:
 
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.DOC_SYNC_APP_ID }}
           private-key: ${{ secrets.DOC_SYNC_APP_PRIVATE_KEY }}
