@@ -57,4 +57,19 @@ public class HelpCommandTests
         Assert.Equal(1, exitCode);
         Assert.Contains("Unknown command", _interaction.AllOutput);
     }
+
+    [Fact]
+    public void RenderCommandHelp_WithNestedSubcommand_UsesFullPath()
+    {
+        var workloadCommand = _rootCommand.Subcommands
+            .First(c => c.Name == "workload");
+        var installCommand = workloadCommand.Subcommands
+            .First(c => c.Name == "install");
+
+        _helpCommand.RenderCommandHelp(installCommand);
+
+        var output = _interaction.AllOutput;
+        Assert.Contains("func workload install", output);
+        Assert.DoesNotContain("func install ", output);
+    }
 }
