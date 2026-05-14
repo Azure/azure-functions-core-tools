@@ -10,3 +10,57 @@ updates:
         update-types: 
           - "version-update:semver-major"
           - "version-update:semver-minor"
+
+  # NuGet packages (transitives included via central package management).
+  # Security advisories are surfaced through the Security tab regardless of schedule;
+  # the weekly cadence is for routine version drift PRs.
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 10
+    groups:
+      powershell-workers:
+        patterns:
+          - "Microsoft.Azure.Functions.PowerShellWorker.*"
+      opentelemetry:
+        patterns:
+          - "OpenTelemetry*"
+          - "Azure.Monitor.OpenTelemetry.*"
+      microsoft-bcl:
+        patterns:
+          - "Microsoft.Extensions.*"
+          - "System.*"
+
+  # Publish-tooling npm package (eng/tools/publish-tools/npm).
+  - package-ecosystem: "npm"
+    directory: "/eng/tools/publish-tools/npm"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
+
+  # Publish-tooling Python requirements.
+  - package-ecosystem: "pip"
+    directory: "/eng/tools/publish-tools"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
+
+  # Container base image.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
+
+  # GitHub Actions workflow versions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    open-pull-requests-limit: 5
