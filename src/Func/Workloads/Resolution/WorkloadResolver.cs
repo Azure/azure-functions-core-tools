@@ -4,16 +4,10 @@
 namespace Azure.Functions.Cli.Workloads.Resolution;
 
 /// <summary>
-/// Default <see cref="IWorkloadResolver"/>. Implements the spec §5.2
-/// algorithm against the live <see cref="IWorkloadProvider"/> and the set
-/// of registered <see cref="WorkloadDetectorContribution"/>s.
+/// Default <see cref="IWorkloadResolver"/>. Read-only: it reports a verdict
+/// and never mutates state. Callers handle the response (print hints,
+/// dispatch, etc.).
 /// </summary>
-/// <remarks>
-/// The resolver is read-only: it reports a verdict, it never mutates state.
-/// All "what to do next" decisions (print install hint, prompt for
-/// <c>--stack</c>, dispatch to a workload, etc.) live with the calling
-/// command.
-/// </remarks>
 internal sealed class WorkloadResolver(
     IWorkloadProvider workloads,
     IEnumerable<WorkloadDetectorContribution> detectors,
@@ -36,9 +30,7 @@ internal sealed class WorkloadResolver(
             return ResolveBySelector(installed, context.StackSelector);
         }
 
-        // `func init` (spec §4.2): no project to detect against, so detectors
-        // would all return "no claim". Skip them and report None with an
-        // init-shaped hint pointing the user at --stack.
+        // No project to inspect (e.g. `func init`).
         if (context.SkipDirectoryDetection)
         {
             return new WorkloadResolution.None(
@@ -47,27 +39,23 @@ internal sealed class WorkloadResolver(
                 $"Installed: {FormatInstalled(installed)}.");
         }
 
-        // 2. Run all detectors and collect claims.
         IReadOnlyList<DetectorClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
 
-        // 3. If FUNCTIONS_WORKER_RUNTIME is set in local.settings.json, treat
-        // it as an explicit declaration: prefer claims whose WorkerRuntime
-        // matches; if none match, surface a runtime-specific message.
+        // FUNCTIONS_WORKER_RUNTIME, when set, is treated as an explicit
+        // declaration: only claims with a matching WorkerRuntime count.
         string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
         if (!string.IsNullOrWhiteSpace(runtime))
         {
             return ResolveByRuntime(installed, claims, runtime);
         }
 
-        // 4. No runtime hint: pick the unique claim, otherwise None.
         return ResolveByClaims(claims);
     }
 
     private async Task<IReadOnlyList<DetectorClaim>> CollectClaimsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
     {
-        // Track the claim per workload (not per detector) so a workload that
-        // ships multiple detectors counts once. Keep the first claim a
-        // detector supplied for that workload.
+        // Track per workload so a workload that ships multiple detectors
+        // counts once.
         var claimsByWorkload = new Dictionary<WorkloadInfo, DetectorClaim>();
         foreach (WorkloadDetectorContribution contribution in _detectors)
         {
@@ -90,8 +78,7 @@ internal sealed class WorkloadResolver(
 
     private static WorkloadResolution ResolveBySelector(IReadOnlyList<WorkloadInfo> installed, string selector)
     {
-        // Match against aliases on the workload itself; this mirrors how
-        // `func workload install <alias>` resolves user input.
+        // Match against aliases; mirrors `func workload install <alias>`.
         List<WorkloadInfo> matches = [.. installed.Where(w =>
             w.Aliases.Any(a => string.Equals(a, selector, StringComparison.OrdinalIgnoreCase)))];
 

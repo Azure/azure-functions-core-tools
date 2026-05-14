@@ -12,9 +12,8 @@ public interface IProjectDetector
 {
     /// <summary>
     /// Inspects <paramref name="workingDirectory"/> and returns whether the
-    /// workload claims it. Implementers do their own pre-filtering (file
-    /// globs, marker presence, etc.) and should return quickly when the
-    /// directory clearly isn't theirs.
+    /// workload claims it. Implementers do their own pre-filtering and
+    /// should return quickly when the directory clearly isn't theirs.
     /// </summary>
     public Task<DetectionResult> DetectAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken);
 }

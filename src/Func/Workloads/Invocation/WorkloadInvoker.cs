@@ -6,16 +6,10 @@ using Azure.Functions.Cli.Common;
 namespace Azure.Functions.Cli.Workloads.Invocation;
 
 /// <summary>
-/// Default <see cref="IWorkloadInvoker"/>. Single source of truth for the
-/// spec §6.3 error contract; built-in commands that delegate to a workload
-/// (init, new, pack, start, etc.) call through here so the
-/// <c>[&lt;workload-id&gt;]</c> prefix and the user-facing /
-/// protocol-failure split stay consistent.
+/// Default <see cref="IWorkloadInvoker"/>. Built-in commands that delegate
+/// to a workload (init, new, pack, start, ...) call through here so error
+/// rendering stays consistent.
 /// </summary>
-/// <remarks>
-/// The prefix uses <see cref="WorkloadInfo.PackageId"/> until the spec's
-/// <c>Workload.Name</c> identity ships; the two are conventionally equal.
-/// </remarks>
 internal sealed class WorkloadInvoker : IWorkloadInvoker
 {
     public async Task InvokeAsync(WorkloadInfo workload, Func<CancellationToken, Task> operation, CancellationToken cancellationToken)

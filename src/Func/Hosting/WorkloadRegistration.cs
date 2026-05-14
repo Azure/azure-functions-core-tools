@@ -120,9 +120,6 @@ internal static class WorkloadRegistration
 
         services.AddSingleton<IWorkloadProvider, WorkloadProvider>();
 
-        // Resolution + invocation services. Live alongside the workloads
-        // themselves so callers can depend on a stable set of singletons
-        // regardless of how many (or which) workloads are installed.
         services.AddSingleton<ILocalSettingsReader, LocalSettingsReader>();
         services.AddSingleton<IWorkloadResolver, WorkloadResolver>();
         services.AddSingleton<IWorkloadInvoker, WorkloadInvoker>();

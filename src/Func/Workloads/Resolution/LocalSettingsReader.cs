@@ -6,12 +6,8 @@ using System.Text.Json;
 namespace Azure.Functions.Cli.Workloads.Resolution;
 
 /// <summary>
-/// Default <see cref="ILocalSettingsReader"/>. Reads
-/// <c>&lt;directory&gt;/local.settings.json</c> and returns
-/// <c>Values.FUNCTIONS_WORKER_RUNTIME</c>. Tolerant of every "this file is
-/// not what we expected" failure (missing, malformed, wrong shape, wrong
-/// type) so the resolver can fall through to the detector pass on a
-/// best-effort basis.
+/// Default <see cref="ILocalSettingsReader"/>. Tolerant of missing,
+/// malformed, or wrong-shape files so the resolver can fall through.
 /// </summary>
 internal sealed class LocalSettingsReader : ILocalSettingsReader
 {

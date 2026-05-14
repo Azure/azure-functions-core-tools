@@ -7,14 +7,8 @@ namespace Azure.Functions.Cli.Workloads.Invocation;
 
 /// <summary>
 /// Raised when an unexpected exception escapes a workload-owned operation.
-/// Subclasses <see cref="GracefulException"/> so the existing top-level error
-/// handler renders it without a stack trace; carries the owning
-/// <see cref="WorkloadInfo"/> for diagnostics and telemetry.
-///
-/// Distinct from <see cref="WorkloadOperationException"/>, which surfaces
-/// host-detected problems with a workload's <em>declarations</em> (option
-/// duplicates, etc.); this one surfaces failures from the workload's
-/// <em>execution</em>.
+/// Subclasses <see cref="GracefulException"/> so the top-level error
+/// handler renders it without a stack trace.
 /// </summary>
 internal sealed class WorkloadProtocolException : GracefulException
 {
@@ -26,9 +20,7 @@ internal sealed class WorkloadProtocolException : GracefulException
         OriginalException = innerException ?? throw new ArgumentNullException(nameof(innerException));
     }
 
-    /// <summary>The workload whose operation produced the unexpected exception.</summary>
     public WorkloadInfo Workload { get; }
 
-    /// <summary>The exception the workload threw before the invoker wrapped it.</summary>
     public Exception OriginalException { get; }
 }
