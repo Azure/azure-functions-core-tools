@@ -28,6 +28,7 @@ updates:
         patterns:
           - "OpenTelemetry*"
           - "Azure.Monitor.OpenTelemetry.*"
-      microsoft-extensions:
+      microsoft-bcl:
         patterns:
           - "Microsoft.Extensions.*"
+          - "System.*"
