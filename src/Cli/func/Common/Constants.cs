@@ -21,6 +21,12 @@ namespace Azure.Functions.Cli.Common
         public const string GoZipFileName = "gozip";
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
+
+        // CLI-only preview opt-in for the Go worker. Read from env first, then local.settings.json
+        // (Values). Never sent to the host or to Azure (the CLI strips local.settings on publish).
+        // Intentionally Go-specific and short-lived: when the platform exposes a first-class
+        // mapping for "native" → concrete language, this flag and its consumers should be removed.
+        public const string FunctionsCliGoPreview = "FUNCTIONS_CLI_GO_PREVIEW";
         public const string RequirementsTxt = "requirements.txt";
         public const string PythonGettingStarted = "getting_started.md";
         public const string PySteinFunctionAppPy = "function_app.py";

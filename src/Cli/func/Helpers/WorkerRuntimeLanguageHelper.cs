@@ -227,28 +227,36 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         /// <summary>
-        /// Resolves <c>FUNCTIONS_WORKER_RUNTIME=native</c> to a concrete <see cref="WorkerRuntime"/>
-        /// by inspecting project-marker files in the current directory. If the setting is not
-        /// <c>"native"</c>, this method is a no-op and returns <see cref="WorkerRuntime.None"/>.
+        /// Resolves the active worker runtime for "native"-language projects (currently only Go).
         /// </summary>
         /// <remarks>
-        /// The Functions host registers certain workers under the <c>"native"</c> language
-        /// identifier (see <c>worker.config.json</c>). The CLI writes that value to
-        /// <c>local.settings.json</c> during <c>func init</c>, but needs to map it back to
-        /// the correct <see cref="WorkerRuntime"/> at command time. Resolution is based on
-        /// well-known project files so it stays extensible as new native languages are added.
-        /// <list type="bullet">
-        ///   <item><c>go.mod</c> → <see cref="WorkerRuntime.Go"/></item>
+        /// Resolution precedence:
+        /// <list type="number">
+        ///   <item>Env var <c>FUNCTIONS_CLI_GO_PREVIEW</c> truthy ("1"/"true") → <see cref="WorkerRuntime.Go"/>.</item>
+        ///   <item><c>local.settings.json</c> value <c>FUNCTIONS_CLI_GO_PREVIEW</c> truthy → <see cref="WorkerRuntime.Go"/>.</item>
+        ///   <item>Legacy fallback: <c>FUNCTIONS_WORKER_RUNTIME=native</c> + <c>go.mod</c> present → <see cref="WorkerRuntime.Go"/>.</item>
         /// </list>
+        /// The legacy fallback exists for projects initialized before the preview flag was introduced;
+        /// once those projects are re-initialized, the explicit flag is the source of truth.
+        /// Returns <see cref="WorkerRuntime.None"/> when nothing matches and the call is a no-op.
+        /// Throws <see cref="CliException"/> only for the legacy <c>"native"</c> path when no
+        /// supported project marker is present, since that combination is unambiguously broken.
         /// Call this early in any command that reads <see cref="GlobalCoreToolsSettings.CurrentWorkerRuntime"/>
-        /// and needs native resolution (e.g. <c>func start</c>, <c>func pack</c>, <c>func publish</c>).
+        /// (e.g. <c>func start</c>, <c>func new</c>, <c>func pack</c>, <c>func publish</c>).
         /// </remarks>
-        /// <returns>
-        /// The resolved <see cref="WorkerRuntime"/> when the setting was <c>"native"</c> and a
-        /// supported project marker was found; otherwise <see cref="WorkerRuntime.None"/>.
-        /// </returns>
         public static WorkerRuntime ResolveNativeWorkerRuntime(ISecretsManager secretsManager)
         {
+            if (TryResolveGoPreviewFlag(secretsManager))
+            {
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({Constants.FunctionsCliGoPreview} is set)."));
+                }
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
+                return WorkerRuntime.Go;
+            }
+
             var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
 
             if (string.IsNullOrWhiteSpace(setting))
@@ -277,7 +285,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (GlobalCoreToolsSettings.IsVerbose)
                 {
-                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found)."));
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found; consider setting {Constants.FunctionsCliGoPreview}=true in local.settings.json)."));
                 }
 
                 GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
@@ -286,7 +294,38 @@ namespace Azure.Functions.Cli.Helpers
 
             throw new CliException(
                 $"FUNCTIONS_WORKER_RUNTIME is set to 'native' but no supported project marker was found in '{Environment.CurrentDirectory}'. " +
-                "Run 'func init' to initialize a supported function app in this directory.");
+                $"Set '{Constants.FunctionsCliGoPreview}=true' in local.settings.json, or run 'func init' to initialize a supported function app in this directory.");
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when the Go preview flag is set to a truthy value either in the
+        /// process environment or in <c>local.settings.json</c>. Env var wins; local.settings.json
+        /// access failures (e.g. command run from outside a project root) are treated as "not set".
+        /// </summary>
+        private static bool TryResolveGoPreviewFlag(ISecretsManager secretsManager)
+        {
+            if (EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCliGoPreview))
+            {
+                return true;
+            }
+
+            string fromSettings;
+            try
+            {
+                fromSettings = secretsManager.GetSecrets()?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsCliGoPreview, StringComparison.OrdinalIgnoreCase)).Value;
+            }
+            catch (CliException)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(fromSettings))
+            {
+                return false;
+            }
+
+            return fromSettings.Equals("1", StringComparison.Ordinal)
+                || fromSettings.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
