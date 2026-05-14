@@ -43,6 +43,7 @@ internal sealed class CompactRenderer(
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
     private readonly DashboardRunInfo _runInfo = runInfo ?? new();
+    private readonly CompactHeaderBuilder _headerBuilder = new(interaction.Theme, runInfo ?? new());
     private readonly Lock _stateLock = new();
     private readonly Lock _uiLock = new();
     private readonly Queue<LogLine> _logTail = new();
@@ -73,12 +74,10 @@ internal sealed class CompactRenderer(
     private string CommandTag => field ??= Theme.Command.ToMarkup();
     private string MutedTag => field ??= Theme.Muted.ToMarkup();
     private string EmphasisTag => field ??= Theme.Emphasis.ToMarkup();
-    private string TitleTag => field ??= Theme.Title.ToMarkup();
     private string SuccessTag => field ??= Theme.Success.ToMarkup();
     private string ErrorTag => field ??= Theme.Error.ToMarkup();
     private string WarningTag => field ??= Theme.Warning.ToMarkup();
     private string ActiveTag => field ??= Theme.Active.ToMarkup();
-    private string HyperlinkTag => field ??= Theme.Hyperlink.ToMarkup();
 
     public event Action? ShutdownRequested;
 
@@ -812,32 +811,7 @@ internal sealed class CompactRenderer(
         }
 
         
-        string hostVersion = snapshot.HostVersion ?? "—";
-        string listen = snapshot.ListenUri ?? "—";
-        
-        // Layout: brand + host version on the left, listen URL pinned to
-        // the right. We use a borderless/headerless Table (not a Grid)
-        // because Table.Expand() actually stretches to fill the parent
-        // Panel's width — Grid measures to its content and would leave the
-        // "right-aligned" column with no slack to align against.
-        Table bannerTable = new Table()
-            .Border(TableBorder.None)
-            .HideHeaders()
-            .Expand()
-            .AddColumn(new TableColumn(string.Empty).NoWrap().PadLeft(0).PadRight(0))
-            .AddColumn(new TableColumn(string.Empty).RightAligned().NoWrap().PadLeft(0).PadRight(0));
-
-        bannerTable.AddRow(
-            new Markup($"[{WarningTag}]:high_voltage:[/] [{TitleTag}]Azure Functions CLI[/]  " +
-            $"[{MutedTag}]Host:[/] [{EmphasisTag}]{Markup.Escape(hostVersion)}[/][{MutedTag}] · " +
-            $"Profile:[/] [{EmphasisTag}]{Markup.Escape(_runInfo.ProfileName)}[/][{MutedTag}] · " +
-            $"Stack:[/] [{EmphasisTag}]{Markup.Escape(_runInfo.StackName)}[/]"),
-            new Markup($"[{HyperlinkTag}]{Markup.Escape(listen)}[/]"));
-
-        Panel bannerPanel = new Panel(bannerTable)
-            .Border(BoxBorder.Rounded)
-            .BorderStyle(Theme.Muted)
-            .Expand();
+        IRenderable bannerPanel = _headerBuilder.BuildBanner(snapshot.HostVersion, snapshot.ListenUri);
 
         int truncatedRows = GetTruncatedFunctionVisibleRows(snapshot.Functions.Count);
         IRenderable functions = snapshot.Functions.Count switch

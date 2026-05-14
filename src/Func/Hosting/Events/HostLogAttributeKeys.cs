@@ -97,4 +97,14 @@ internal static class CliEventKinds
     public const string CliDiagnostic = "cli_diagnostic";
 
     public const string Summary = "summary";
+
+    public const string StartInitializationStarted = "start_initialization_started";
+
+    public const string StartInitializationStepStarted = "start_initialization_step_started";
+
+    public const string StartInitializationProgress = "start_initialization_progress";
+
+    public const string StartInitializationStepCompleted = "start_initialization_step_completed";
+
+    public const string StartInitializationCompleted = "start_initialization_completed";
 }
