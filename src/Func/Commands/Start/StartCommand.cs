@@ -2,14 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
-using Azure.Functions.Cli.Hosting.AppStacks;
 using Azure.Functions.Cli.Hosting.Dashboard;
-using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
-using Azure.Functions.Cli.Hosting.Events;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -89,19 +88,24 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     private readonly IInteractionService _interaction;
     private readonly FunctionPalette _palette;
     private readonly ICliVersionProvider _versionProvider;
-    private readonly IAppStackProvider _appStackProvider;
+    private readonly IStartInitializationRunner _initializationRunner;
 
-    public StartCommand(IInteractionService interaction, FunctionPalette palette,ICliVersionProvider versionProvider, IAppStackProvider appStackProvider)
+    public StartCommand(
+        IInteractionService interaction,
+        FunctionPalette palette,
+        ICliVersionProvider versionProvider,
+        IStartInitializationRunner initializationRunner)
         : base("start", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(palette);
-        ArgumentNullException.ThrowIfNull(appStackProvider);
+        ArgumentNullException.ThrowIfNull(versionProvider);
+        ArgumentNullException.ThrowIfNull(initializationRunner);
 
         _interaction = interaction;
         _palette = palette;
         _versionProvider = versionProvider;
-        _appStackProvider = appStackProvider;
+        _initializationRunner = initializationRunner;
 
         AddPathArgument();
         Options.Add(PortOption);
@@ -136,26 +140,32 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             System.Console.Error.WriteLine("notice: stdout is not an interactive terminal; falling back to --output=plain.");
         }
 
-        IHostEventStream source = new DemoEventSource
-        {
-            SpeedMultiplier = ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
-            AutoExit = ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")),
-            FunctionCount = ParseFunctionCount(
-                parseResult.GetValue(DemoFunctionsOption),
-                Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
-        };
-
         string? logFilePath = parseResult.GetValue(LogFileOption);
         IDashboardEventSink? eventSink = CreateLogFileSink(logFilePath);
 
-        string stackName = await _appStackProvider.GetStackNameAsync(workingDirectory, cancellationToken);
+        var initialRunInfo = new DashboardRunInfo(CliVersion: _versionProvider.Version, ProfileName: "none", StackName: "unknown");
+        var initializationContext = new StartInitializationContext(
+            workingDirectory,
+            _versionProvider.Version,
+            ProfileName: "none",
+            RequestedHostVersion: parseResult.GetValue(HostVersionOption),
+            DemoFunctionCount: ParseFunctionCount(
+                parseResult.GetValue(DemoFunctionsOption),
+                Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
+            DemoSpeedMultiplier: ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
+            DemoAutoExit: ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")));
 
-        var runInfo = new DashboardRunInfo(CliVersion: _versionProvider.Version, ProfileName: "none", StackName: stackName);
+        StartInitializationResult initializationResult;
+        await using (IStartInitializationRenderer initializationRenderer = CreateInitializationRenderer(mode, initialRunInfo))
+        {
+            initializationResult = await _initializationRunner.RunAsync(initializationContext, initializationRenderer, cancellationToken);
+        }
+
         var state = new DashboardState();
 
-        IDashboardRenderer renderer = CreateRenderer(mode, runInfo);
+        IDashboardRenderer renderer = CreateRenderer(mode, initializationResult.RunInfo);
 
-        var pipeline = new DashboardPipeline(state, source, renderer, eventSink);
+        var pipeline = new DashboardPipeline(state, initializationResult.EventStream, renderer, eventSink);
         return await pipeline.RunAsync(cancellationToken);
     }
 
@@ -249,6 +259,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         OutputMode.Json => new JsonRenderer(),
         OutputMode.Plain => new PlainRenderer(_interaction),
         OutputMode.Compact => new CompactRenderer(_interaction, _palette, runInfo: runInfo),
+        _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
+    };
+
+    private IStartInitializationRenderer CreateInitializationRenderer(OutputMode mode, DashboardRunInfo runInfo) => mode switch
+    {
+        OutputMode.Json => new JsonStartInitializationRenderer(),
+        OutputMode.Plain => new PlainStartInitializationRenderer(_interaction),
+        OutputMode.Compact => new CompactStartInitializationRenderer(_interaction, runInfo: runInfo),
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 }

@@ -3,8 +3,8 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Hosting.AppStacks;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using NSubstitute;
 using Xunit;
@@ -16,7 +16,7 @@ public class StartCommandTests : IDisposable
     private readonly string _tempDir;
     private readonly TestInteractionService _interaction = new();
     private readonly FunctionPalette _palette = new();
-    private readonly IAppStackProvider _appStackProvider = Substitute.For<IAppStackProvider>();
+    private readonly IStartInitializationRunner _initializationRunner = Substitute.For<IStartInitializationRunner>();
     private readonly ICliVersionProvider _cliVersionProvider = Substitute.For<ICliVersionProvider>();
 
 
@@ -24,8 +24,7 @@ public class StartCommandTests : IDisposable
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"func-start-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
-        _appStackProvider.GetStackNameAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
-            .Returns("unknown");
+        _cliVersionProvider.Version.Returns("5.0.0-test");
     }
 
     public void Dispose()
@@ -39,7 +38,7 @@ public class StartCommandTests : IDisposable
     [Fact]
     public void StartCommand_HasExpectedOptions()
     {
-        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _appStackProvider);
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--port", optionNames);
