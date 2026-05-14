@@ -41,7 +41,7 @@ jobs:
       old_tag: ${{ steps.tags.outputs.old_tag }}
     steps:
       - name: Checkout current release
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -156,13 +156,13 @@ jobs:
           path: /tmp/artifacts
 
       - name: Checkout core-tools repo (for scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: core-tools
           sparse-checkout: .github/scripts
 
       - name: Checkout fork repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.DOCS_FORK_REPO }}
           token: ${{ steps.app-token.outputs.token }}
