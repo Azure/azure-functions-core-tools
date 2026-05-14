@@ -369,6 +369,17 @@ namespace Azure.Functions.Cli.Helpers
 
                 if (exitCode == 0)
                 {
+                    // Executable.DrainAsyncOutput flushes the async stdout/stderr event pump
+                    // after process exit, but for very short-lived commands like `go version`
+                    // on Linux CI the OS pipe drain can still lag. Mirror PythonHelpers.VerifyVersion
+                    // and poll briefly for the output to materialize before parsing.
+                    var trials = 0;
+                    while (string.IsNullOrWhiteSpace(sb.ToString()) && trials < 5)
+                    {
+                        trials++;
+                        await Task.Delay(TimeSpan.FromMilliseconds(200));
+                    }
+
                     var output = sb.ToString().Trim();
 
                     // Parse "go version go1.24.2 linux/amd64" format
