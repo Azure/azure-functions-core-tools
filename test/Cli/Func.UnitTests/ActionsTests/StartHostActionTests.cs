@@ -19,6 +19,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
+    [Collection("NativeWorkerRuntimeTests")]
     public class StartHostActionTests
     {
         [SkippableFact]

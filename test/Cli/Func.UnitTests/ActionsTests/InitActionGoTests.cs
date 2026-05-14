@@ -13,6 +13,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
+    [Collection("NativeWorkerRuntimeTests")]
     public class InitActionGoTests
     {
         private static InitAction CreateAction()
@@ -167,6 +168,142 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             finally
             {
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+            }
+        }
+
+        [Theory]
+        [InlineData("true")]
+        [InlineData("True")]
+        [InlineData("TRUE")]
+        [InlineData("1")]
+        public void ResolveNativeWorkerRuntime_GoPreviewEnvVar_ResolvesToGo(string envValue)
+        {
+            // Env var takes precedence over local.settings.json and the go.mod fallback.
+            // Even with no project markers and no FUNCTIONS_WORKER_RUNTIME, the explicit
+            // preview opt-in is enough to select the Go runtime.
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, envValue);
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
+            }
+        }
+
+        [Theory]
+        [InlineData("true")]
+        [InlineData("True")]
+        [InlineData("1")]
+        public void ResolveNativeWorkerRuntime_GoPreviewSetting_ResolvesToGo(string settingValue)
+        {
+            // local.settings.json wins when the env var isn't set, without any go.mod scan.
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsCliGoPreview, settingValue },
+                { Constants.FunctionsWorkerRuntime, "native" },
+            });
+
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, null);
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
+            }
+        }
+
+        [Theory]
+        [InlineData("false")]
+        [InlineData("0")]
+        [InlineData("yes")]
+        [InlineData("")]
+        public void ResolveNativeWorkerRuntime_GoPreviewFalsy_FallsThroughToLegacyResolution(string flagValue)
+        {
+            // Falsy flag values must not short-circuit; the legacy native+go.mod path should still run.
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsCliGoPreview, flagValue },
+                { Constants.FunctionsWorkerRuntime, "native" },
+            });
+
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Is<string>(p => p.EndsWith("go.mod"))).Returns(true);
+
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, null);
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+
+                    GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
+            }
+        }
+
+        [Fact]
+        public void ResolveNativeWorkerRuntime_GoPreviewEnvVar_BeatsSecretsManagerThrow()
+        {
+            // SecretsManager throwing (e.g. command run from outside a project root) must not
+            // mask an explicit env-var opt-in.
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(_ => throw new CliException("no project"));
+
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, "true");
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
             }
         }
     }

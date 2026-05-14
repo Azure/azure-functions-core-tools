@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             var testName = nameof(Init_WithGo_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
-            var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "native" };
+            var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "native", Common.Constants.FunctionsCliGoPreview, "true" };
             var hostJsonPath = Path.Combine(workingDir, "host.json");
             var expectedHostJsonContent = new[] { "extensionBundle" };
             var mainGoPath = Path.Combine(workingDir, "main.go");
