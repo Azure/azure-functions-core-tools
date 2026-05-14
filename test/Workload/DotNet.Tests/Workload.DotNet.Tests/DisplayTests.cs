@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Workload.DotNet;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace Workload.DotNet.Tests;
 
