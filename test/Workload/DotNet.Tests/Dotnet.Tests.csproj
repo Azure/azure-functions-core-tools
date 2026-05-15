@@ -11,7 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Workload/DotNet/Workload.DotNet.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workload/DotNet/Azure.Functions.Cli.Workload.DotNet.csproj" />
   </ItemGroup>
 
 </Project>

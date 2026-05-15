@@ -13,7 +13,7 @@ internal sealed class DotNetProjectInitializer : IProjectInitializer
 {
     public string Stack => "dotnet";
 
-    public IReadOnlyList<string> SupportedLanguages => ["C#", "F#"];
+    public IReadOnlyList<string> SupportedLanguages => ["C#", "F#", "csharp", "fsharp"];
 
     public IReadOnlyList<Option> GetInitOptions() => [];
 

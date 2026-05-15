@@ -3,6 +3,6 @@
   "kind": "workload",
   "entryPoint": {
     "assemblyPath": "Azure.Functions.Cli.Workload.DotNet.dll",
-    "type": "Azure.Functions.Cli.Workload.DotNet"
+    "type": "Azure.Functions.Cli.Workload.DotNet.DotNetWorkload"
   }
 }
