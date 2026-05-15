@@ -4,43 +4,76 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
 public class DotNetProjectInitializerTests
 {
-    [Fact]
-    public async Task InitializeAsync_Throws_NotImplemented()
-    {
-        var initializer = new DotNetProjectInitializer();
-        var context = new InitContext(
-            WorkingDirectory.FromExplicit(Path.GetTempPath()),
-            ProjectName: "test",
-            Language: null,
-            Force: false);
+    private readonly IDotnetCliRunner _dotnetCli = Substitute.For<IDotnetCliRunner>();
 
-        NotImplementedException exception = await Assert.ThrowsAsync<NotImplementedException>(
-            () => initializer.InitializeAsync(context, new RootCommand().Parse(string.Empty)));
-
-        Assert.Equal(".NET project initialization is not implemented yet.", exception.Message);
-    }
+    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli);
 
     [Fact]
     public void Stack_IsDotNet()
     {
-        Assert.Equal("dotnet", new DotNetProjectInitializer().Stack);
+        Assert.Equal("dotnet", CreateInitializer().Stack);
     }
 
     [Fact]
-    public void GetInitOptions_IsEmpty()
+    public void GetInitOptions_ContainsFrameworkOption()
     {
-        Assert.Empty(new DotNetProjectInitializer().GetInitOptions());
+        DotNetProjectInitializer initializer = CreateInitializer();
+        IReadOnlyList<Option> options = initializer.GetInitOptions();
+
+        Assert.Single(options);
+        Assert.Same(initializer.FrameworkOption, options[0]);
     }
 
     [Fact]
     public void SupportedLanguages_ReturnsExpectedLanguages()
     {
-        Assert.Equal(["C#", "F#", "csharp", "fsharp"], new DotNetProjectInitializer().SupportedLanguages);
+        Assert.Equal(["C#", "F#", "csharp", "fsharp"], CreateInitializer().SupportedLanguages);
+    }
+
+    [Fact]
+    public void TemplatesPackageName_IsCorrect()
+    {
+        Assert.Equal("Microsoft.Azure.Functions.Worker.ProjectTemplates", DotNetProjectInitializer.TemplatesPackageName);
+    }
+
+    [Fact]
+    public void TemplatesPackageVersion_IsCorrect()
+    {
+        Assert.Equal("4.0.5544", DotNetProjectInitializer.TemplatesPackageVersion);
+    }
+
+    [Fact]
+    public void DefaultFramework_IsNet10()
+    {
+        Assert.Equal("net10.0", DotNetProjectInitializer.DefaultFramework);
+    }
+
+    [Theory]
+    [InlineData(null, "C#")]
+    [InlineData("", "C#")]
+    [InlineData("  ", "C#")]
+    [InlineData("csharp", "C#")]
+    [InlineData("CSHARP", "C#")]
+    [InlineData("C#", "C#")]
+    [InlineData("fsharp", "F#")]
+    [InlineData("FSHARP", "F#")]
+    [InlineData("F#", "F#")]
+    [InlineData("unknown", "unknown")]
+    public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
+    {
+        Assert.Equal(expected, DotNetProjectInitializer.NormalizeLanguage(input));
+    }
+
+    [Fact]
+    public void Constructor_ThrowsOnNullRunner()
+    {
+        Assert.Throws<ArgumentNullException>(() => new DotNetProjectInitializer(null!));
     }
 }
