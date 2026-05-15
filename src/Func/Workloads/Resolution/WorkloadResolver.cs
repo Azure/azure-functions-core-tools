@@ -39,6 +39,17 @@ internal sealed class WorkloadResolver(
                 $"Installed: {FormatInstalled(installed)}.");
         }
 
+        // CLI-wide invariant: a directory without host.json is not a
+        // Functions project. Gate here so per-stack resolvers can focus
+        // on their fingerprints and we surface one consistent diagnostic.
+        if (!File.Exists(Path.Combine(context.Directory.FullName, "host.json")))
+        {
+            return new WorkloadResolution.None(
+                "This directory does not look like an Azure Functions project. " +
+                $"No 'host.json' was found in '{context.Directory.FullName}'. " +
+                "Run 'func init' to scaffold one, or change to a Functions project directory.");
+        }
+
         IReadOnlyList<ResolverClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
 
         // FUNCTIONS_WORKER_RUNTIME, when set, is treated as an explicit
