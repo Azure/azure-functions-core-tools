@@ -5,9 +5,13 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 
 /// <summary>
 /// Decides which installed workload owns a given directory. Order:
-/// explicit <c>--stack</c> selector, then registered
-/// <see cref="IProjectResolver"/>s with <c>FUNCTIONS_WORKER_RUNTIME</c> in
-/// <c>local.settings.json</c> as a tie-breaker.
+/// explicit <c>--stack</c> selector, then <c>.func/config.json</c>'s
+/// <c>stack</c> as a project-pinned declaration, then a <c>host.json</c>
+/// gate that rejects directories which don't look like Functions projects,
+/// then <c>FUNCTIONS_WORKER_RUNTIME</c> in <c>local.settings.json</c>
+/// filtering registered <see cref="IProjectResolver"/> claims by worker
+/// runtime, then unfiltered <see cref="IProjectResolver"/> auto-detection
+/// as a fallback.
 /// </summary>
 internal interface IWorkloadResolver
 {

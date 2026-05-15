@@ -121,6 +121,7 @@ internal static class WorkloadRegistration
         services.AddSingleton<IWorkloadProvider, WorkloadProvider>();
 
         services.AddSingleton<ILocalSettingsReader, LocalSettingsReader>();
+        services.AddSingleton<IFuncProjectConfigReader, FuncProjectConfigReader>();
         services.AddSingleton<IWorkloadResolver, WorkloadResolver>();
         services.AddSingleton<IWorkloadInvoker, WorkloadInvoker>();
 
