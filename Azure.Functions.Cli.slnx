@@ -7,9 +7,11 @@
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
+    <Project Path="src/Workload/Python/Workload.Python.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
+    <Project Path="test/Workload/Python.Tests/Workload.Python.Tests.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.Default/Workload.Tests.Fixtures.Default.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.Sdk/Workload.Tests.Fixtures.Sdk.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.WithCommand/Workload.Tests.Fixtures.WithCommand.csproj" />
