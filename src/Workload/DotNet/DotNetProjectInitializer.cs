@@ -8,19 +8,20 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// <summary>
 /// Project initializer for .NET (C# and F#) Azure Functions.
 /// </summary>
-public sealed class DotNetProjectInitializer : IProjectInitializer
+internal sealed class DotNetProjectInitializer : IProjectInitializer
 {
     public string Stack => "dotnet";
 
     public IReadOnlyList<string> SupportedLanguages => ["C#", "F#"];
 
-    public IReadOnlyList<Option> GetInitOptions()
-    {
-        throw new NotImplementedException();
-    }
+    public IReadOnlyList<Option> GetInitOptions() => [];
 
-    public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
+    public Task InitializeAsync(
+        InitContext context,
+        ParseResult parseResult,
+        CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        throw new NotImplementedException(
+            ".NET project initialization is not implemented yet.");
     }
 }

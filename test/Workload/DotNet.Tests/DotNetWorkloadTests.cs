@@ -6,7 +6,7 @@ using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Workload.DotNet.Tests;
+namespace Azure.Functions.Cli.Workload.DotNet.Tests;
 
 public class DotNetWorkloadTests
 {
@@ -28,7 +28,7 @@ public class DotNetWorkloadTests
         var workload = new DotNetWorkload();
 
         // Act & Assert
-        Assert.Equal("func init / func new support for C#", workload.Description);
+        Assert.Equal("Azure Functions tooling for .NET (C#) projects.", workload.Description);
     }
 
     private sealed class TestBuilder(IServiceCollection services) : FunctionsCliBuilder
@@ -41,5 +41,3 @@ public class DotNetWorkloadTests
         }
     }
 }
-
-

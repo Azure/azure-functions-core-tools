@@ -5,18 +5,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
+/// <summary>
+/// Workload for .NET (C#) Azure Functions. Provides tooling and project initialization for .NET Azure Functions projects.
+/// </summary>
 public sealed class DotNetWorkload : Workloads.Workload
 {
-    public string PackageId => "Azure.Functions.Cli.Workload.DotNet";
+    public override string DisplayName => ".NET";
 
-    public string PackageVersion => "1.0.0";
-
-    public override string DisplayName { get; } = ".NET";
-
-    public override string Description { get; } = "func init / func new support for C#";
+    public override string Description => "Azure Functions tooling for .NET (C#) projects.";
 
     public override void Configure(FunctionsCliBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
     }
 }

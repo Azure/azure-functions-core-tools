@@ -2,7 +2,7 @@
   "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
   "kind": "workload",
   "entryPoint": {
-    "assemblyPath": "Workload.DotNet.dll",
-    "type": "Azure.Functions.Cli.Workload.DotNet.DotNetWorkload"
+    "assemblyPath": "Azure.Functions.Cli.Workload.DotNet.dll",
+    "type": "Azure.Functions.Cli.Workload.DotNet"
   }
 }

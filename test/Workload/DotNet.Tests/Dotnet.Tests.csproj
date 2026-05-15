@@ -6,11 +6,13 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <AssemblyName>Azure.Functions.Cli.Workload.DotNet.Tests</AssemblyName>
+    <RootNamespace>Azure.Functions.Cli.Workload.DotNet.Tests</RootNamespace>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
-    <ProjectReference Include="$(SrcRoot)Workloads/Workload.DotNet/Workload.DotNet.csproj" />
+    <ProjectReference Include="..\..\..\src\Workloads\Workload.DotNet\Azure.Functions.Cli.Workload.DotNet.csproj" />
   </ItemGroup>
 
 </Project>
