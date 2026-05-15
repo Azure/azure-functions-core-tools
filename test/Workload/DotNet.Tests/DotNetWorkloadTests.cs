@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Workloads;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workload.DotNet.Tests;
@@ -28,15 +26,5 @@ public class DotNetWorkloadTests
 
         // Act & Assert
         Assert.Equal("Azure Functions tooling for .NET (C#) projects.", workload.Description);
-    }
-
-    private sealed class TestBuilder(IServiceCollection services) : FunctionsCliBuilder
-    {
-        public override IServiceCollection Services { get; } = services;
-
-        protected override void OnRegisterCommand(Func<IServiceProvider, FuncCommand> factory)
-        {
-            // Test implementation - no-op for basic service registration tests
-        }
     }
 }
