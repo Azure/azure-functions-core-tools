@@ -1,8 +1,10 @@
 # Building a New Workload
 
-This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior — most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
+This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior, most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
 
 > **Status**: the abstractions, DI host, and `func workload install` / `uninstall` commands described below are in the tree as of this PR. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up.
+>
+> **Spec**: this guide is the authoring view. The on-disk and on-feed layout, the `workload.json` schema, the `kind` discriminator (`workload` / `content` / `meta`), and the install pipeline are specified in [`docs/proposed/workload-package-layout.md`](./proposed/workload-package-layout.md). Consult that doc for the contract; this guide stays focused on the happy-path authoring experience for `kind: workload`.
 
 ## Architecture
 
@@ -76,9 +78,10 @@ Create the `Workload.Node.csproj`. The csproj is the single source of truth for 
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Title>Node.js</Title>
     <Description>Azure Functions CLI Node.js workload.</Description>
     <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>alias:node alias:javascript alias:typescript func-workload</PackageTags>
+    <PackageTags>kind:workload alias:node alias:javascript alias:typescript func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
@@ -105,11 +108,15 @@ Create the `Workload.Node.csproj`. The csproj is the single source of truth for 
 
 What each piece does:
 
-- `PackageType=FuncCliWorkload` is how the CLI's catalog discovers workload packages.
+- `PackageType=FuncCliWorkload` is how the CLI's catalog discovers workload packages (see `docs/proposed/workload-package-layout.md` §5, §7).
+- `Title` is the display name surfaced by NuGet feed UIs; `Description` is the one-line summary. The `Workload` class's `DisplayName` / `Description` overrides serve the same purpose for `func workload list` (no duplication: feed metadata vs. running CLI).
+- `PackageTags` should include exactly one `kind:<workload|content|meta>` tag matching `workload.json`'s `kind`, plus one or more `alias:<name>` tags so `func workload install <alias>` resolves. `func-workload` is recommended for generic feed UI discoverability.
 - `IncludeBuildOutput=false` + the explicit `<None Include="$(OutputPath)$(AssemblyName).dll" ... PackagePath="tools/any/" />` puts the workload assembly under `tools/any/` instead of `lib/`, which is where the loader looks.
 - `<None Include="workload.json" ... PackagePath="/" />` ships the manifest at the package root.
-- `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on the `Abstractions` reference keep the workload self-contained: the CLI provides Abstractions at runtime.
+- `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on the `Abstractions` reference keep the workload self-contained: the CLI provides Abstractions (and the other host-shared contract assemblies, see §9.2 of the layout spec) at runtime. The same `PrivateAssets=all` rule applies to **every** `<PackageReference>` you add later, not just `Abstractions`.
 - `NU5128`/`NU5100` are suppressed because we deliberately ship without `lib/` and place files under `tools/any/`.
+
+> **Pack scope today.** The csproj above packs only the workload assembly itself. That works for stubs and for workloads whose runtime closure is just the host-shared contracts. As soon as a workload pulls in a transitive managed dependency (e.g., `Newtonsoft.Json`), the long-term shape from the package-layout spec applies: the package must contain the publish output (workload `.dll`, `.deps.json`, optional `.pdb`, every transitive managed dep, and any `runtimes/<rid>/` assets the deps ship). The upcoming `Workload.Sdk` package will provide the publish-into-`tools/any/` target; until then, workloads with transitive deps need to wire that step manually. See `docs/proposed/workload-package-layout.md` §5 and §9.
 
 Add a sibling `Directory.Version.props` for the workload version:
 
@@ -132,7 +139,7 @@ And a `release_notes.md`:
 - Initial scaffold of the Node.js workload (entry point + stub project initializer).
 ```
 
-Add a `workload.json` that points at your entry-point type:
+Add a `workload.json` that points at your entry-point type. `assemblyPath` is **relative to `tools/any/`**, conventionally a bare filename (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass.
 
 ```json
 {

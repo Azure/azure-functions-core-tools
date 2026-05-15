@@ -5,7 +5,9 @@ description: 'Use when adding a new func CLI workload (e.g. Node, Python, Java).
 
 # Create a New Workload
 
-See `docs/building-a-workload.md` for the full guide and rationale. Use the
+See `docs/building-a-workload.md` for the authoring guide and rationale, and
+`docs/proposed/workload-package-layout.md` for the package-layout spec
+(`workload.json` schema, `kind` discriminator, install pipeline). Use the
 Python workload (`src/Workload/Python/`) as the canonical reference.
 
 ## Workload Project Checklist
@@ -22,9 +24,10 @@ Create the following files:
   <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
       <TargetFramework>net10.0</TargetFramework>
+      <Title><Name></Title>
       <Description>Azure Functions CLI <Name> workload.</Description>
       <PackageType>FuncCliWorkload</PackageType>
-      <PackageTags>alias:<name> func-workload</PackageTags>
+      <PackageTags>kind:workload alias:<name> func-workload</PackageTags>
       <IncludeBuildOutput>false</IncludeBuildOutput>
       <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
       <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
@@ -48,9 +51,11 @@ Create the following files:
   </Project>
   ```
   - `PackageType=FuncCliWorkload` is required for catalog discovery.
+  - `Title` is the feed-UI display name; `Description` is the one-line summary. The `Workload` class's `DisplayName` / `Description` overrides serve the same purpose for the running CLI.
+  - `PackageTags` should include exactly one `kind:<workload|content|meta>` tag matching `workload.json`'s `kind` field, plus one or more `alias:<name>` tags so users can install by short name. `func-workload` is recommended for generic feed UI discoverability.
   - `IncludeBuildOutput=false` plus the explicit `tools/any/` pack item is what makes the loader find the workload assembly.
-  - `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on Abstractions keep the workload self-contained: the CLI provides Abstractions at runtime.
-  - Add additional aliases to `PackageTags` as needed (e.g., `alias:javascript alias:typescript`).
+  - `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on Abstractions keep the workload self-contained: the CLI provides Abstractions (and the other host-shared contract assemblies) at runtime. Apply the same `PrivateAssets=all` rule to **every** future `<PackageReference>`.
+  - The csproj above only packs the workload's own assembly. As soon as the workload pulls in transitive managed dependencies, you'll need to pack the `dotnet publish` output (workload `.dll`, `.deps.json`, transitive deps, optional `runtimes/`). The upcoming `Workload.Sdk` package will provide that pack target. See `docs/proposed/workload-package-layout.md` §5 and §9.
   - Csproj/assembly name must be `Azure.Functions.Cli.Workload.<Name>` (set via the project filename and matched in the package id).
 - [ ] `Directory.Version.props`, the workload's version:
   ```xml
@@ -69,7 +74,7 @@ Create the following files:
 
   - Initial scaffold of the <Name> workload (entry point + stub project initializer).
   ```
-- [ ] `workload.json`, the entry-point manifest packed at the package root:
+- [ ] `workload.json`, the entry-point manifest packed at the package root. `assemblyPath` is relative to `tools/any/` (bare filename; no leading `/`, no `..`); `type` is the FQN of the `Workload` subclass:
   ```json
   {
     "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
@@ -195,6 +200,8 @@ dotnet test
 A correctly built workload package should:
 
 - Have package id `Azure.Functions.Cli.Workload.<Name>` and `packageType=FuncCliWorkload`.
+- Carry tags `kind:workload alias:<name>` (plus optional extra `alias:` entries and `func-workload`).
 - Contain `workload.json` at the package root.
 - Contain the workload assembly at `tools/any/Azure.Functions.Cli.Workload.<Name>.dll`.
-- Not contain Abstractions or any of its transitive dependencies.
+- Have an empty `<dependencies>` element in its `.nuspec`.
+- Not contain Abstractions or any of the other host-shared contract assemblies.
