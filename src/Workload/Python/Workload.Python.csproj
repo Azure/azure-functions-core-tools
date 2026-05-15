@@ -2,9 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Title>Python</Title>
     <Description>Azure Functions CLI Python workload.</Description>
     <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>alias:python func-workload</PackageTags>
+    <PackageTags>kind:workload alias:python func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
