@@ -1,0 +1,74 @@
+<Project>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Tools/TemplateGenerator/Tools.TemplateGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateVersion" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateLanguage" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateAssetKind" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <_TemplatesV1Folder>$(BaseIntermediateOutputPath)templates/v1/</_TemplatesV1Folder>
+    <_TemplatesV2Folder>$(BaseIntermediateOutputPath)templates/v2/</_TemplatesV2Folder>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- We do not fetch 'en-US' as it is identical to the default file. -->
+    <_TemplateResourceLang Include="cs-CZ;de-DE;es-ES;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <_V1TemplateFilesToDownload Include="templates/templates.json" />
+    <_V1TemplateFilesToDownload Include="bindings/bindings.json" />
+    <_V1TemplateFilesToDownload Include="resources/Resources.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <_V2TemplateFilesToDownload Include="templates/templates.json" />
+    <_V2TemplateFilesToDownload Include="bindings/userPrompts.json" />
+    <_V2TemplateFilesToDownload Include="resources/Resources.json" />
+  </ItemGroup>
+
+  <!-- Download during restore, after package references are collected. -->
+  <Target Name="_DownloadTemplateAssets" AfterTargets="CollectPackageReferences">
+    <ItemGroup>
+      <_V1TemplateFilesToDownload Include="resources/Resources.%(_TemplateResourceLang.Identity).json" />
+      <_V2TemplateFilesToDownload Include="resources/Resources.%(_TemplateResourceLang.Identity).json" />
+    </ItemGroup>
+
+    <DownloadFile DestinationFolder="$(_TemplatesV1Folder)"
+      SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v1/%(_V1TemplateFilesToDownload.Identity)"
+      SkipUnchangedFiles="true" />
+    
+    <DownloadFile DestinationFolder="$(_TemplatesV2Folder)"
+      SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v2/%(_V2TemplateFilesToDownload.Identity)"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Wire up the downloaded files as AdditionalFiles before build. Each item is gated by its own Exists check. -->
+  <Target Name="_IncludeTemplateAdditionalFile" BeforeTargets="BeforeBuild">
+    <ItemGroup>
+      <AdditionalFiles Include="$(_TemplatesV1Folder)templates.json"
+        TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="templates"
+        Condition="Exists('$(_TemplatesV1Folder)templates.json')" />
+      <AdditionalFiles Include="$(_TemplatesV2Folder)templates.json"
+        TemplateVersion="v2" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="templates"
+        Condition="Exists('$(_TemplatesV2Folder)templates.json')" />
+      <AdditionalFiles Include="$(_TemplatesV1Folder)bindings.json"
+        TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="bindings"
+        Condition="Exists('$(_TemplatesV1Folder)bindings.json')" />
+      <AdditionalFiles Include="$(_TemplatesV2Folder)userPrompts.json"
+        TemplateVersion="v2" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="userPrompts"
+        Condition="Exists('$(_TemplatesV2Folder)userPrompts.json')" />
+      <AdditionalFiles Include="$(_TemplatesV1Folder)Resources*.json"
+        TemplateVersion="v1" TemplateAssetKind="resources" />
+      <AdditionalFiles Include="$(_TemplatesV2Folder)Resources*.json"
+        TemplateVersion="v2" TemplateAssetKind="resources" />
+    </ItemGroup>
+  </Target>
+
+</Project>

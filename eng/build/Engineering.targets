@@ -4,5 +4,6 @@
   <Import Project="$(MSBuildThisFileDirectory)ZipPublish.targets" />
   <Import Project="$(MSBuildThisFileDirectory)Release.targets" />
   <Import Project="$(MSBuildThisFileDirectory)Publish.AllRuntimes.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)Workload.Template.targets" Condition="$(MSBuildProjectName.EndsWith('Templates'))" />
 
 </Project>
