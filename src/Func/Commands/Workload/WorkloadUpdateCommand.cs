@@ -253,23 +253,28 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     private void RenderSingle(WorkloadUpdateResult result)
     {
+        // Prefer the published alias for user-facing messages so the output
+        // matches the token the user typed; fall back to the package id when
+        // no alias is published.
+        string display = result.Entry.Aliases.Count > 0 ? result.Entry.Aliases[0] : result.Entry.PackageId;
+
         if (result.NoCandidateOnSource)
         {
             _interaction.WriteHint(
-                $"No version of '{result.Entry.PackageId}' was found on the configured source. " +
+                $"No version of '{display}' was found on the configured source. " +
                 "Pass --source to point at the feed that publishes it.");
             return;
         }
 
         if (result.NoUpdateAvailable)
         {
-            _interaction.WriteHint(
-                $"Workload '{result.Entry.PackageId}' is already at the latest available version " +
+            _interaction.WriteWarning(
+                $"Workload '{display}' is already at the latest available version " +
                 $"({result.Entry.PackageVersion}).");
             return;
         }
 
         _interaction.WriteSuccess(
-            $"Updated workload '{result.Entry.PackageId}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
+            $"Updated workload '{display}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
     }
 }

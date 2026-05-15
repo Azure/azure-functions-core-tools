@@ -23,6 +23,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
     private readonly IWorkloadStore _store;
+    private readonly WorkloadUpdateCommand _updateCommand;
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
@@ -57,12 +58,14 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     public WorkloadInstallCommand(
         IInteractionService interaction,
         IWorkloadInstaller installer,
-        IWorkloadStore store)
+        IWorkloadStore store,
+        WorkloadUpdateCommand updateCommand)
         : base("install", "Install a workload.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _updateCommand = updateCommand ?? throw new ArgumentNullException(nameof(updateCommand));
 
         WorkloadArgument.AddRequiredIdValidator();
         VersionOption.AddSemVerValidator();
@@ -91,7 +94,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             // prompt entirely. Non-interactive contexts treat the prompt as
             // a decline and exit non-zero with the same hint. Local .nupkg
             // installs bypass the check since the resolver path differs.
-            int? earlyExit = await CheckAlreadyInstalledAsync(workload, exact, cancellationToken);
+            int? earlyExit = await HandleAlreadyInstalledAsync(
+                workload, exact, source, includePrerelease, cancellationToken);
             if (earlyExit is { } code)
             {
                 return code;
@@ -111,7 +115,15 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                     force,
                     cancellationToken);
 
-            _interaction.WriteSuccess(BuildSuccessMessage(result));
+            string message = BuildSuccessMessage(result);
+            if (result.AlreadyInstalled)
+            {
+                _interaction.WriteWarning(message);
+            }
+            else
+            {
+                _interaction.WriteSuccess(message);
+            }
             return 0;
         }
         catch (WorkloadPackageNotFoundException ex)
@@ -148,9 +160,11 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     private static bool LooksLikeLocalPackagePath(string value)
         => value.EndsWith(".nupkg", StringComparison.OrdinalIgnoreCase) && File.Exists(value);
 
-    private async Task<int?> CheckAlreadyInstalledAsync(
+    private async Task<int?> HandleAlreadyInstalledAsync(
         string identifier,
         bool exact,
+        string? source,
+        bool includePrerelease,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
@@ -171,29 +185,53 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        string canonicalId = match.PackageId;
-        string prompt =
-            $"'{canonicalId}' is already installed at {match.PackageVersion}. " +
-            $"Run 'func workload update {canonicalId}' instead?";
+        // Prefer the first alias for user-facing messages; fall back to the
+        // canonical package id when no alias is published.
+        string display = match.Aliases.Count > 0 ? match.Aliases[0] : match.PackageId;
+        string prompt = $"'{display}' is already installed at {match.PackageVersion}. Update instead?";
 
         if (!_interaction.IsInteractive)
         {
             _interaction.WriteHint(
-                $"'{canonicalId}' is already installed at {match.PackageVersion}. " +
-                $"Run 'func workload update {canonicalId}' to upgrade, or pass --force to install side-by-side.");
+                $"'{display}' is already installed at {match.PackageVersion}. " +
+                $"Run 'func workload update {display}' to upgrade, or pass --force to install side-by-side.");
             return 1;
         }
 
-        bool useUpdate = await _interaction.ConfirmAsync(prompt, defaultValue: true, cancellationToken);
-        if (useUpdate)
+        bool runUpdate = await _interaction.ConfirmAsync(prompt, defaultValue: true, cancellationToken);
+        if (!runUpdate)
         {
-            _interaction.WriteHint($"Run 'func workload update {canonicalId}' to upgrade.");
-            return 1;
+            // User declined: fall through to a normal install, which will
+            // go side-by-side or no-op for the same version.
+            return null;
         }
 
-        // User declined the suggestion: fall through to a normal install,
-        // which will go side-by-side or no-op for the same version.
-        return null;
+        return await DispatchToUpdateAsync(match.PackageId, source, includePrerelease, cancellationToken);
+    }
+
+    // Delegate to the `func workload update` command (Parse + InvokeAsync) so
+    // confirm-yes goes through exactly the same flow the user would hit if they
+    // had run `func workload update <id>` themselves: same options, same
+    // validators, same output. Avoids forking the rendering or the underlying
+    // installer call between install and update.
+    private async Task<int> DispatchToUpdateAsync(
+        string packageId,
+        string? source,
+        bool includePrerelease,
+        CancellationToken cancellationToken)
+    {
+        var args = new List<string> { packageId };
+        if (!string.IsNullOrEmpty(source))
+        {
+            args.Add("--source");
+            args.Add(source);
+        }
+        if (includePrerelease)
+        {
+            args.Add("--prerelease");
+        }
+
+        return await _updateCommand.Parse(args.ToArray()).InvokeAsync(configuration: null, cancellationToken);
     }
 
     private static string BuildSuccessMessage(WorkloadInstallResult result)
@@ -205,8 +243,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
         return entry.Kind switch
         {
-            WorkloadKind.Workload when entry.EntryPoint is not null
-                => $"{verb} (entry point: {entry.EntryPoint.Type}).",
+            WorkloadKind.Workload when entry.Aliases.Count > 0
+                => $"{verb} (aliases: {string.Join(", ", entry.Aliases)}).",
             WorkloadKind.Content
                 => $"{verb} (content at '{entry.Source}').",
             _ => $"{verb}.",

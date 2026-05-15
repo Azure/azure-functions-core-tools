@@ -271,7 +271,7 @@ public class WorkloadUpdateCommandTests
             "b.workload", Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
         Assert.Contains(_interaction.Lines, l => l.StartsWith("SUCCESS:") && l.Contains("a.workload"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:") && l.Contains("b.workload"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("b.workload"));
     }
 
     [Fact]

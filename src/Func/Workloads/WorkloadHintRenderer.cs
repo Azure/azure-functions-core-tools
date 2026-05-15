@@ -30,6 +30,9 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
             case WorkloadHintKind.AmbiguousStackChoice:
                 RenderAmbiguousStackChoice(hint);
                 break;
+            case WorkloadHintKind.AutoSelectedSoleWorkload:
+                RenderAutoSelectedSoleWorkload(hint);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(hint), hint.Kind, "Unknown workload hint kind.");
         }
@@ -37,9 +40,9 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
 
     private void RenderNoWorkloadsInstalled(WorkloadHint hint)
     {
-        _interaction.WriteError("No stacks installed.");
+        _interaction.WriteWarning("No stacks installed.");
         _interaction.WriteBlankLine();
-        _interaction.WriteHint($"Install a stack to {hint.ActionDescription}:");
+        _interaction.WriteHint($"Install a stack workload to {hint.ActionDescription}:");
         _interaction.WriteBlankLine();
 
         IEnumerable<DefinitionItem> items = KnownInstallableWorkloads.LanguageMap.Select(static kvp =>
@@ -63,6 +66,26 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
     {
         _interaction.WriteHint("Multiple stacks installed; pass --stack <name> to choose.");
         WriteInstalledStacks(hint.InstalledStacks);
+    }
+
+    private void RenderAutoSelectedSoleWorkload(WorkloadHint hint)
+    {
+        _interaction.WriteHint(
+            $"Auto-selecting '{hint.RequestedStack}' (the only installed workload).");
+
+        IEnumerable<DefinitionItem> others = KnownInstallableWorkloads.LanguageMap
+            .Where(kvp => !string.Equals(kvp.Key, hint.RequestedStack, StringComparison.OrdinalIgnoreCase))
+            .Select(kvp => new DefinitionItem(
+                $"func workload install {kvp.Key}",
+                string.Join(", ", kvp.Value)));
+
+        if (others.Any())
+        {
+            _interaction.WriteBlankLine();
+            _interaction.WriteHint("You can install more workloads via:");
+            _interaction.WriteBlankLine();
+            _interaction.WriteDefinitionList(others);
+        }
     }
 
     private void WriteInstalledStacks(IReadOnlyList<string> stacks)

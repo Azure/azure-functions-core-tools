@@ -18,6 +18,12 @@ internal enum WorkloadHintKind
 
     /// <summary>Multiple stacks are installed and the user did not specify <c>--stack</c>.</summary>
     AmbiguousStackChoice,
+
+    /// <summary>
+    /// Exactly one workload is installed and was auto-picked because the user did
+    /// not specify <c>--stack</c>. Informational; the action proceeds.
+    /// </summary>
+    AutoSelectedSoleWorkload,
 }
 
 /// <summary>
@@ -28,7 +34,7 @@ internal enum WorkloadHintKind
 /// </summary>
 /// <param name="Kind">Which situation is being described; controls layout.</param>
 /// <param name="ActionDescription">What the user was trying to do (e.g. "initialize a project"). Used in the install prompt.</param>
-/// <param name="RequestedStack">The <c>--stack</c> value the user passed, when applicable.</param>
+/// <param name="RequestedStack">The relevant stack id: the <c>--stack</c> value the user passed, or the auto-selected stack for <see cref="WorkloadHintKind.AutoSelectedSoleWorkload"/>.</param>
 /// <param name="InstalledStacks">Stack identifiers currently registered, when applicable.</param>
 internal sealed record WorkloadHint(
     WorkloadHintKind Kind,
