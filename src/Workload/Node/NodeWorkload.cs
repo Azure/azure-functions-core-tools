@@ -14,7 +14,7 @@ public sealed class NodeWorkload : Workloads.Workload
 {
     public override string DisplayName => "Node";
 
-    public override string Description => "Azure Functions CLI tooling for JavaScript and TypeScript projects.";
+    public override string Description => "Azure Functions CLI tooling for Node.js projects.";
 
     public override void Configure(FunctionsCliBuilder builder)
     {
