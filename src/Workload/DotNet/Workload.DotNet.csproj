@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Title>Azure Functions CLI .NET Workload</Title>
-    <Description>Azure Functions CLI .NET workload.</Description>
+    <Description>Azure Functions tooling for .NET (C#, F#) projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:dotnet func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
