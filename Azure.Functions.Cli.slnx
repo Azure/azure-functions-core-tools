@@ -8,6 +8,17 @@
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
   </Folder>
+  <Folder Name="/src/Tools/" />
+  <Folder Name="/src/Tools/TemplateGenerator/">
+    <Project Path="src/Tools/TemplateGenerator/Tools.TemplateGenerator.csproj" />
+  </Folder>
+  <Folder Name="/src/Workload/" />
+  <Folder Name="/src/Workload/CSharpTemplates/">
+    <Project Path="src/Workload/CSharpTemplates/Workload.CSharpTemplates.csproj" />
+  </Folder>
+  <Folder Name="/src/Workload/PythonTemplates/">
+    <Project Path="src/Workload/PythonTemplates/Workload.PythonTemplates.csproj" />
+  </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.Default/Workload.Tests.Fixtures.Default.csproj" />

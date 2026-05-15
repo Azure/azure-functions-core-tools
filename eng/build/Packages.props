@@ -1,6 +1,7 @@
 <Project>
   <!-- abstractions -->
   <ItemGroup>
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
@@ -9,8 +10,10 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
     <PackageVersion Include="NuGet.Packaging" Version="6.13.2" />
     <PackageVersion Include="NuGet.Protocol" Version="6.13.2" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.6" />
+    <PackageVersion Include="PolySharp" Version="1.15.0" />
     <PackageVersion Include="Spectre.Console" Version="0.49.1" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.6" />
+    <PackageVersion Include="System.Text.Json" Version="9.0.5" />
   </ItemGroup>
   <!-- telemetry -->
   <ItemGroup>

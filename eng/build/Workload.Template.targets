@@ -1,0 +1,23 @@
+<Project>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Tools/TemplateGenerator/Tools.TemplateGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="IsTemplatesJson" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateLanguage" />
+  </ItemGroup>
+
+  <Target Name="_DownloadTemplateAssets" BeforeTargets="BeforeBuild">
+    <DownloadFile DestinationFolder="$(BaseIntermediateOutputPath)" 
+      SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v1/templates/templates.json">
+      <Output TaskParameter="DownloadedFile" ItemName="_TemplateFiles" />
+    </DownloadFile>
+
+    <ItemGroup>
+      <AdditionalFiles Include="@(_TemplateFiles)" IsTemplatesJson="true" TemplateLanguage="$(TemplateLanguage)" />
+    </ItemGroup>
+  </Target>
+
+</Project>
