@@ -28,15 +28,16 @@ updates:
       interval: "weekly"
       day: "wednesday"
     open-pull-requests-limit: 10
+    # Worker packages and the host package are pinned to versions that ship
+    # together with the Functions host. They must be bumped manually as a
+    # set, so dependabot should never open PRs for them.
+    ignore:
+      - dependency-name: "Microsoft.Azure.Functions.JavaWorker"
+      - dependency-name: "Microsoft.Azure.Functions.NodeJsWorker"
+      - dependency-name: "Microsoft.Azure.Functions.PowerShellWorker.*"
+      - dependency-name: "Microsoft.Azure.Functions.PythonWorker"
+      - dependency-name: "Microsoft.Azure.WebJobs.Script.WebHost"
     groups:
-      # Workers are bumped together (and tied to host bumps); group all
-      # semver levels here.
-      workers:
-        patterns:
-          - "Microsoft.Azure.Functions.JavaWorker"
-          - "Microsoft.Azure.Functions.NodeJsWorker"
-          - "Microsoft.Azure.Functions.PowerShellWorker.*"
-          - "Microsoft.Azure.Functions.PythonWorker"
       opentelemetry:
         patterns:
           - "OpenTelemetry*"
