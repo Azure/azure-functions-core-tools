@@ -74,6 +74,7 @@ Create the following files:
 
   - Initial scaffold of the <Name> workload (entry point + stub project initializer).
   ```
+- [ ] `README.md` next to the csproj. `Release.props` auto-includes it as `<PackageReadmeFile>` (and the Functions icon as `<PackageIcon>`), so both surface on NuGet feeds. Describe the workload's purpose, supported languages, and any prerequisites.
 - [ ] `workload.json`, the entry-point manifest packed at the package root. `assemblyPath` is relative to `tools/any/` (bare filename; no leading `/`, no `..`); `type` is the FQN of the `Workload` subclass:
   ```json
   {
