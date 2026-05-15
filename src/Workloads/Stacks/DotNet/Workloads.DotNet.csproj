@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Azure Functions CLI .NET Workload</Title>
+    <Title>DotNet</Title>
     <Description>Azure Functions tooling for .NET (C#, F#) projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:dotnet func-workload</PackageTags>
@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.DotNet.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
   <ItemGroup>
