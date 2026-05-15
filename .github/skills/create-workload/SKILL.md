@@ -111,7 +111,7 @@ In `src/Func/Workloads/WorkloadManager.cs`:
   ```
 
 If the workload has unique project files (e.g., `go.mod`, `Cargo.toml`):
-- [ ] Add detection in `src/Func/Commands/ProjectDetector.cs`
+- [ ] Implement `IProjectDetector` and register it in `Workload.Configure` via `builder.RegisterDetector(...)`. Declare project markers (globs) and worker-runtime ids on the detector so the resolver's pre-filter and `FUNCTIONS_WORKER_RUNTIME` lookup can short-circuit to your workload.
 
 ### 6. Documentation
 

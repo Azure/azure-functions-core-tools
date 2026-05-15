@@ -43,12 +43,14 @@ The main tool users install and run. Assembly name is `func`.
 
 | Directory          | Purpose |
 |--------------------|---------|
-| `Commands/`        | Built-in commands (init, new, pack, start, version, help) + `FuncCliCommand`, `FuncRootCommand`, `ProjectDetector`, `SpectreHelpAction`, `WorkloadHints` |
+| `Commands/`        | Built-in commands (init, new, pack, start, version, help) + `FuncCliCommand`, `FuncRootCommand`, `SpectreHelpAction`, `WorkloadHints` |
 | `Commands/Workload/` | `func workload` parent command + `func workload list` |
 | `Console/`         | `IInteractionService` abstraction + Spectre.Console implementation, theme |
 | `Common/`          | Shared utilities — `Constants`, `Stacks` (stack registry), `VersionChecker` |
 | `Hosting/`         | `DefaultFunctionsCliBuilder` (internal `FunctionsCliBuilder` impl), `BuiltInCommands` DI registrations, and `WorkloadRegistration` (workload bootstrap seam) |
-| `Workloads/`       | `ExternalCommand` — internal `FuncCliCommand` adapter that wraps a workload-supplied `FuncCommand` and carries the owning `WorkloadInfo` |
+| `Workloads/`       | `ExternalCommand` — internal `FuncCliCommand` adapter that wraps a workload-supplied `FuncCommand` and carries the owning `WorkloadInfo`. `WorkloadDetectorContribution` mirrors the same pattern for `IProjectDetector` registrations. |
+| `Workloads/Resolution/` | `IWorkloadResolver` + supporting types (`ILocalSettingsReader`, `IDirectoryMarkerMatcher`) implementing the spec §5.2 resolution algorithm |
+| `Workloads/Invocation/` | `IWorkloadInvoker` + `WorkloadProtocolException` implementing the spec §6.3 invocation error contract (id-prefixed messages, "please file an issue" hint for protocol failures) |
 | `Telemetry/`       | `CliTelemetry` (ActivitySource + Meter), Azure Monitor exporter wiring, activity / metric extensions |
 | `Program.cs`       | Entry point — host, telemetry, command tree, error handling |
 | `Parser.cs`        | Command tree composition — resolves every `FuncCliCommand` from DI, partitions into built-ins (`IBuiltInCommand`) and workload-contributed (`ExternalCommand`), wires Spectre help |

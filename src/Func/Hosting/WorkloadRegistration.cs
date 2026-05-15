@@ -5,7 +5,9 @@ using System.Diagnostics;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Invocation;
 using Azure.Functions.Cli.Workloads.Loading;
+using Azure.Functions.Cli.Workloads.Resolution;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -117,6 +119,10 @@ internal static class WorkloadRegistration
         }
 
         services.AddSingleton<IWorkloadProvider, WorkloadProvider>();
+
+        services.AddSingleton<ILocalSettingsReader, LocalSettingsReader>();
+        services.AddSingleton<IWorkloadResolver, WorkloadResolver>();
+        services.AddSingleton<IWorkloadInvoker, WorkloadInvoker>();
 
         foreach (WorkloadInfo workload in workloads)
         {

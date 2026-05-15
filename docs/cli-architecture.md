@@ -124,7 +124,7 @@ AddPathArgument(); // adds optional [path] argument
 A "stack" describes a language/runtime target (`dotnet`, `node`, `python`, `java`, `powershell`, `custom`). The `Stacks` registry in `Common/Stacks.cs` is the single source of truth for stack identifiers and the languages each one supports.
 
 - `--stack` / `-s` is the user-facing option on `func init`.
-- `ProjectDetector.DetectStack(AndLanguage)` infers the stack of an existing project by inspecting files on disk (`*.csproj`, `package.json`, `host.json` `metadata.workerRuntime`, etc.).
+- `IProjectDetector` (registered by a workload through `FunctionsCliBuilder.RegisterDetector`) declares the project markers (e.g. `*.csproj`, `package.json`) and worker-runtime ids the workload claims, and returns a confidence verdict for a given directory. `IWorkloadResolver` runs the spec §5.2 algorithm (selector → `FUNCTIONS_WORKER_RUNTIME` lookup → detector pass) against those contributions to pick the workload that owns a directory.
 
 ## Console / UI Layer
 
@@ -325,7 +325,7 @@ Each registered initializer also contributes options to `func init` via `GetInit
 ### `func new`
 
 ```
-1. Detect stack and language from project files (ProjectDetector)
+1. Resolve the owning workload from the directory (IWorkloadResolver: --stack → FUNCTIONS_WORKER_RUNTIME → IProjectDetector pass)
 2. If no project detected, run func init first (interactive flow)
 3. Select template (--template or prompt)
 4. Get function name (--name or prompt with editable default)

@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting;
@@ -172,6 +173,39 @@ public class DefaultFunctionsCliBuilderTests
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
 
         Assert.Throws<InvalidOperationException>(() => builder.RegisterCommand(typeof(GenericTestCommand)));
+    }
+
+    [Fact]
+    public void RegisterProjectResolver_ProducesContributionWithWorkloadInfo()
+    {
+        var services = new ServiceCollection();
+        var workload = TestWorkloads.CreateInfo("My.Workload");
+        var builder = new DefaultFunctionsCliBuilder(services, workload);
+        var resolver = Substitute.For<IProjectResolver>();
+
+        builder.RegisterProjectResolver(resolver);
+
+        var contribution = Assert.Single(services.BuildServiceProvider().GetServices<WorkloadProjectResolverContribution>());
+        Assert.Same(workload, contribution.Workload);
+        Assert.Same(resolver, contribution.Resolver);
+    }
+
+    [Fact]
+    public void RegisterProjectResolver_NullResolver_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
+
+        Assert.Throws<ArgumentNullException>(() => builder.RegisterProjectResolver(null!));
+    }
+
+    [Fact]
+    public void RegisterProjectResolver_WithoutWorkloadContext_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
+        var resolver = Substitute.For<IProjectResolver>();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.RegisterProjectResolver(resolver));
+        Assert.Contains("workload-scoped builder", ex.Message);
     }
 
     private sealed class GenericTestPayload(string value)
