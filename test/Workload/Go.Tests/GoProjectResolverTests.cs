@@ -83,7 +83,7 @@ public class GoProjectResolverTests : IDisposable
         EvaluationResult result = await new GoProjectResolver().EvaluateAsync(_projectDir, default);
 
         Assert.True(result.IsMatch);
-        Assert.Equal("go", result.WorkerRuntime);
+        Assert.Equal("native", result.WorkerRuntime);
         Assert.NotNull(result.Reason);
     }
 

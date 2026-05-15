@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Workload.Go;
 /// </summary>
 internal sealed class GoProjectResolver : IProjectResolver
 {
-    private const string WorkerRuntime = "go";
+    private const string WorkerRuntime = "native";
 
     public Task<EvaluationResult> EvaluateAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
     {
