@@ -2,9 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Title>Go</Title>
     <Description>Azure Functions CLI Go workload.</Description>
     <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>alias:go func-workload</PackageTags>
+    <PackageTags>kind:workload alias:go func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
