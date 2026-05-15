@@ -3,16 +3,17 @@
 
 using System.Collections.Immutable;
 using System.Text.Json;
-using Azure.Functions.Cli.Tools.TemplateGenerator.V1.Model;
+using Azure.Functions.Cli.Tools.TemplateGenerator.Model;
+using Azure.Functions.Cli.Tools.TemplateGenerator.Model.V1;
 
 namespace Azure.Functions.Cli.Tools.TemplateGenerator.V1;
 
-internal static class TemplateParser
+internal static class TemplateParserV1
 {
-    public static EquatableArray<TemplateModel> Parse(string json, string? language)
+    public static EquatableArray<TemplateModelV1> Parse(string json, string? language)
     {
         using var doc = JsonDocument.Parse(json);
-        ImmutableArray<TemplateModel>.Builder builder = ImmutableArray.CreateBuilder<TemplateModel>(doc.RootElement.GetArrayLength());
+        ImmutableArray<TemplateModelV1>.Builder builder = ImmutableArray.CreateBuilder<TemplateModelV1>(doc.RootElement.GetArrayLength());
 
         string? suffix = string.IsNullOrEmpty(language) ? null : "-" + language;
 
@@ -31,7 +32,7 @@ internal static class TemplateParser
         return builder.ToImmutable();
     }
 
-    private static TemplateModel ParseTemplate(string id, string? suffix, JsonElement element)
+    private static TemplateModelV1 ParseTemplate(string id, string? suffix, JsonElement element)
     {
         string name = suffix is not null && id.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
             ? id.Substring(0, id.Length - suffix.Length)
@@ -41,25 +42,25 @@ internal static class TemplateParser
         {
             Id = id,
             Name = name,
-        Runtime = element.GetProperty("runtime").GetString()!,
-        Files = ParseFiles(element.GetProperty("files")),
-        Function = ParseFunction(element.GetProperty("function")),
-        Metadata = ParseMetadata(element.GetProperty("metadata")),
+            Runtime = element.GetProperty("runtime").GetString()!,
+            Files = ParseFiles(element.GetProperty("files")),
+            Function = ParseFunction(element.GetProperty("function")),
+            Metadata = ParseMetadata(element.GetProperty("metadata")),
         };
     }
 
-    private static EquatableArray<FileModel> ParseFiles(JsonElement element)
+    private static EquatableArray<FileModelV1> ParseFiles(JsonElement element)
     {
-        ImmutableArray<FileModel>.Builder builder = ImmutableArray.CreateBuilder<FileModel>();
+        ImmutableArray<FileModelV1>.Builder builder = ImmutableArray.CreateBuilder<FileModelV1>();
         foreach (JsonProperty prop in element.EnumerateObject())
         {
-            builder.Add(new FileModel(prop.Name, prop.Value.GetString()!));
+            builder.Add(new FileModelV1(prop.Name, prop.Value.GetString()!));
         }
 
         return builder.ToImmutable();
     }
 
-    private static FunctionModel ParseFunction(JsonElement element) => new()
+    private static FunctionModelV1 ParseFunction(JsonElement element) => new()
     {
         Bindings = ParseBindings(element.GetProperty("bindings")),
         ScriptFile = GetOptionalString(element, "scriptFile"),
@@ -67,9 +68,9 @@ internal static class TemplateParser
         EntryPoint = GetOptionalString(element, "entryPoint"),
     };
 
-    private static EquatableArray<BindingModel> ParseBindings(JsonElement element)
+    private static EquatableArray<BindingModelV1> ParseBindings(JsonElement element)
     {
-        ImmutableArray<BindingModel>.Builder builder = ImmutableArray.CreateBuilder<BindingModel>(element.GetArrayLength());
+        ImmutableArray<BindingModelV1>.Builder builder = ImmutableArray.CreateBuilder<BindingModelV1>(element.GetArrayLength());
         foreach (JsonElement binding in element.EnumerateArray())
         {
             builder.Add(ParseBinding(binding));
@@ -78,16 +79,16 @@ internal static class TemplateParser
         return builder.MoveToImmutable();
     }
 
-    private static BindingModel ParseBinding(JsonElement e)
+    private static BindingModelV1 ParseBinding(JsonElement e)
     {
         string name = e.GetProperty("name").GetString()!;
         string type = e.GetProperty("type").GetString()!;
         string directionStr = e.GetProperty("direction").GetString()!;
-        BindingDirectionKind direction = directionStr.Equals("in", StringComparison.OrdinalIgnoreCase)
-            ? BindingDirectionKind.In
-            : BindingDirectionKind.Out;
+        BindingDirectionKindV1 direction = directionStr.Equals("in", StringComparison.OrdinalIgnoreCase)
+            ? BindingDirectionKindV1.In
+            : BindingDirectionKindV1.Out;
 
-        ImmutableArray<BindingExtensionEntry>.Builder extensions = ImmutableArray.CreateBuilder<BindingExtensionEntry>();
+        ImmutableArray<BindingExtensionEntryV1>.Builder extensions = ImmutableArray.CreateBuilder<BindingExtensionEntryV1>();
         foreach (JsonProperty prop in e.EnumerateObject())
         {
             if (prop.Name == "name" || prop.Name == "type" || prop.Name == "direction")
@@ -95,18 +96,18 @@ internal static class TemplateParser
                 continue;
             }
 
-            BindingExtensionValue value = prop.Value.ValueKind switch
+            BindingExtensionValueV1 value = prop.Value.ValueKind switch
             {
-                JsonValueKind.True => new BindingExtensionValue(BindingExtensionValueKind.Bool, null, true, null),
-                JsonValueKind.False => new BindingExtensionValue(BindingExtensionValueKind.Bool, null, false, null),
-                JsonValueKind.Array => new BindingExtensionValue(BindingExtensionValueKind.StringArray, null, null, GetStringArray(prop.Value)),
-                _ => new BindingExtensionValue(BindingExtensionValueKind.String, prop.Value.GetString(), null, null),
+                JsonValueKind.True => new BindingExtensionValueV1(BindingExtensionValueKindV1.Bool, null, true, null),
+                JsonValueKind.False => new BindingExtensionValueV1(BindingExtensionValueKindV1.Bool, null, false, null),
+                JsonValueKind.Array => new BindingExtensionValueV1(BindingExtensionValueKindV1.StringArray, null, null, GetStringArray(prop.Value)),
+                _ => new BindingExtensionValueV1(BindingExtensionValueKindV1.String, prop.Value.GetString(), null, null),
             };
 
-            extensions.Add(new BindingExtensionEntry(prop.Name, value));
+            extensions.Add(new BindingExtensionEntryV1(prop.Name, value));
         }
 
-        return new BindingModel
+        return new BindingModelV1
         {
             Name = name,
             Type = type,
@@ -115,7 +116,7 @@ internal static class TemplateParser
         };
     }
 
-    private static MetadataModel ParseMetadata(JsonElement element) => new()
+    private static MetadataModelV1 ParseMetadata(JsonElement element) => new()
     {
         DefaultFunctionName = element.GetProperty("defaultFunctionName").GetString()!,
         Description = element.GetProperty("description").GetString()!,
