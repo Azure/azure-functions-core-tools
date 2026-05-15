@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>Azure.Functions.Cli.Workload.DotNet.Tests</AssemblyName>
+    <RootNamespace>Azure.Functions.Cli.Workload.DotNet.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Workload/DotNet/Workload.DotNet.csproj" />
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

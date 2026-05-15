@@ -7,12 +7,14 @@
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
+    <Project Path="src/Workload/DotNet/Workload.DotNet.csproj" />
     <Project Path="src/Workload/Go/Workload.Go.csproj" />
     <Project Path="src/Workload/Node/Workload.Node.csproj" />
     <Project Path="src/Workload/Python/Workload.Python.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
+    <Project Path="test/Workload/DotNet.Tests/Workload.DotNet.Tests.csproj" />
     <Project Path="test/Workload/Go.Tests/Workload.Go.Tests.csproj" />
     <Project Path="test/Workload/Node.Tests/Workload.Node.Tests.csproj" />
     <Project Path="test/Workload/Python.Tests/Workload.Python.Tests.csproj" />

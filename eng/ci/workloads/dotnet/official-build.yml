@@ -1,0 +1,69 @@
+parameters:
+- name: sign
+  type: boolean
+  default: false
+
+schedules:
+- cron: "0 8 * * *"
+  displayName: Nightly Build
+  branches:
+    include:
+      - main
+      - vnext
+  always: true
+
+pr: none
+
+trigger:
+  branches:
+    include:
+    - main
+    - vnext
+    - feature/*
+    - release/*
+  paths:
+    include:
+    - src/Abstractions/
+    - src/Workload/DotNet/
+    - test/Workload/DotNet.Tests/
+    - eng/
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+variables:
+- template: /ci/variables/cfs.yml@eng
+- name: sign
+  readonly: true
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/release/') }}:
+    value: true
+  ${{ else }}:
+    value: ${{ parameters.sign }}
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc
+      image: 1es-ubuntu-24.04-min
+      os: linux
+
+    sdl:
+      codeql:
+         runSourceLanguagesInSourceAnalysis: true
+
+    stages:
+      - stage: Build
+        jobs:
+        - template: /eng/ci/templates/jobs/build-workload.yml@self
+          parameters:
+            WorkloadProjectName: DotNet
+            sign: ${{ variables.sign }}
