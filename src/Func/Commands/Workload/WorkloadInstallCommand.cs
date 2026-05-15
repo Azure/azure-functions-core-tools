@@ -5,31 +5,52 @@ using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
-/// <c>func workload install &lt;package&gt;</c>. Installs a workload from a
-/// <c>.nupkg</c> on disk. Feed-based acquisition is not yet supported.
+/// <c>func workload install &lt;package&gt;</c>. Resolves a workload package
+/// id (or alias) through the configured catalog and installs it. Use
+/// <c>--source</c> to point at a local folder or alternate feed.
 /// </summary>
 internal sealed class WorkloadInstallCommand : FuncCliCommand
 {
-    private const string NupkgExtension = ".nupkg";
-
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
-        Description = "Workload to install. Currently must be a path to a .nupkg on disk.",
+        Description = "Workload package id, alias, or path to a local .nupkg.",
+    };
+
+    public Option<string?> VersionOption { get; } = new("--version", "-v")
+    {
+        Description = "Specific semver version to install. Default: the latest stable version in the catalog.",
+    };
+
+    public Option<string?> SourceOption { get; } = new("--source")
+    {
+        Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
+    };
+
+    public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
+    {
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable only.",
     };
 
     public Option<bool> ForceOption { get; } = new("--force", "-f")
     {
         Description = "Overwrite an existing install of the same id and version.",
+    };
+
+    public Option<bool> ExactOption { get; } = new("--exact", "-e")
+    {
+        Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
     public WorkloadInstallCommand(IInteractionService interaction, IWorkloadInstaller installer)
@@ -38,43 +59,55 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
 
-        WorkloadArgument.Validators.Add(result =>
-        {
-            string? value = result.GetValue(WorkloadArgument);
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                result.AddError("A workload id is required.");
-                return;
-            }
-
-            if (!value.EndsWith(NupkgExtension, StringComparison.OrdinalIgnoreCase))
-            {
-                result.AddError(
-                    $"Resolving '{value}' against a NuGet feed is not yet supported. " +
-                    "Pass a path to a .nupkg on disk.");
-            }
-        });
+        WorkloadArgument.AddRequiredIdValidator();
+        VersionOption.AddSemVerValidator();
 
         Arguments.Add(WorkloadArgument);
+        Options.Add(VersionOption);
+        Options.Add(SourceOption);
+        Options.Add(IncludePrereleaseOption);
+        Options.Add(ExactOption);
         Options.Add(ForceOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         string workload = parseResult.GetValue(WorkloadArgument)!;
+        string? versionText = parseResult.GetValue(VersionOption);
+        string? source = parseResult.GetValue(SourceOption);
+        bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
+        bool exact = parseResult.GetValue(ExactOption);
         bool force = parseResult.GetValue(ForceOption);
 
         try
         {
-            WorkloadInstallResult result = await _installer.InstallFromPackageAsync(workload, force, cancellationToken);
+            WorkloadInstallResult result = LooksLikeLocalPackagePath(workload)
+                ? await _installer.InstallFromPackageAsync(workload, force, cancellationToken)
+                : await _installer.InstallFromCatalogAsync(
+                    workload,
+                    string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
+                    source,
+                    includePrerelease,
+                    exact,
+                    force,
+                    cancellationToken);
+
             _interaction.WriteSuccess(BuildSuccessMessage(result));
             return 0;
         }
-        catch (FileNotFoundException ex)
+        catch (WorkloadPackageNotFoundException ex)
+        {
+            throw new GracefulException(ex.Message, isUserError: true);
+        }
+        catch (AmbiguousPackageMatchException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
         catch (InvalidWorkloadException ex)
+        {
+            throw new GracefulException(ex.Message, isUserError: true);
+        }
+        catch (FileNotFoundException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
@@ -85,6 +118,16 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                 isUserError: true);
         }
     }
+
+    /// <summary>
+    /// Returns <c>true</c> when the positional argument looks like a path
+    /// to a <c>.nupkg</c> on disk (i.e. ends in <c>.nupkg</c> and points to
+    /// an existing file). Lets the user install a local package without
+    /// going through the catalog. NuGet package ids cannot legally end in
+    /// <c>.nupkg</c>, so this is unambiguous.
+    /// </summary>
+    private static bool LooksLikeLocalPackagePath(string value)
+        => value.EndsWith(".nupkg", StringComparison.OrdinalIgnoreCase) && File.Exists(value);
 
     private static string BuildSuccessMessage(WorkloadInstallResult result)
     {

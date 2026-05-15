@@ -17,15 +17,21 @@ internal sealed class WorkloadCommand : FuncCliCommand, IBuiltInCommand
     public WorkloadCommand(
         WorkloadListCommand listCommand,
         WorkloadInstallCommand installCommand,
-        WorkloadUninstallCommand uninstallCommand)
+        WorkloadUninstallCommand uninstallCommand,
+        WorkloadUpdateCommand updateCommand,
+        WorkloadSearchCommand searchCommand)
         : base("workload", "Manage Func CLI workloads.")
     {
         ArgumentNullException.ThrowIfNull(listCommand);
         ArgumentNullException.ThrowIfNull(installCommand);
         ArgumentNullException.ThrowIfNull(uninstallCommand);
+        ArgumentNullException.ThrowIfNull(updateCommand);
+        ArgumentNullException.ThrowIfNull(searchCommand);
 
         Subcommands.Add(listCommand);
         Subcommands.Add(installCommand);
         Subcommands.Add(uninstallCommand);
+        Subcommands.Add(updateCommand);
+        Subcommands.Add(searchCommand);
     }
 }

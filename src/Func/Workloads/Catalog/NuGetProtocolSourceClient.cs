@@ -1,7 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Globalization;
+using Azure.Functions.Cli.Workloads.Install;
+using Newtonsoft.Json.Linq;
 using NuGet.Common;
+using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
@@ -9,16 +13,23 @@ using PackageSource = NuGet.Configuration.PackageSource;
 namespace Azure.Functions.Cli.Workloads.Catalog;
 
 /// <summary>
-/// HTTP- or file-backed client built on <c>NuGet.Protocol</c>. Drives
-/// <see cref="PackageSearchResource"/> and <see cref="FindPackageByIdResource"/>
-/// against the v3 service index (remote) or the on-disk feed layout (local)
-/// of the supplied <see cref="SourceRepository"/>, restricting search to the
-/// <c>FuncCliWorkload</c> package type.
+/// V3 NuGet feed client built on <c>NuGet.Protocol</c>. Drives search via
+/// the source's <c>SearchQueryService</c> entry (with the <c>packageType=</c>
+/// filter) and version/download via <see cref="FindPackageByIdResource"/>,
+/// restricting search to the <c>FuncCliWorkload</c> package type.
 /// </summary>
-internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
+internal class NuGetProtocolSourceClient(SourceRepository repository)
 {
-    private const string PackageType = "FuncCliWorkload";
-    private const string AliasTagPrefix = "alias:";
+    private const string FuncCliWorkloadPackageType = "FuncCliWorkload";
+
+    // SearchFilter.PackageTypes is serialised by NuGet.Client as
+    // 'packageTypeFilter=', which nuget.org silently ignores (verified via
+    // probe-nuget-package-type-filter.ps1). The wiki-spec parameter
+    // 'packageType=' (singular, query-string) is the one nuget.org honours,
+    // and no typed NuGet.Client API exposes it. So we hand-build the search
+    // request against the V3 service index and trust the server-side filter.
+    // Wiki: https://github.com/NuGet/Home/wiki/Search-by-Package-Type-and-Query-Language-Surfacing
+    private const string PackageTypeQueryParam = "packageType";
 
     private readonly SourceRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
@@ -30,31 +41,17 @@ internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        PackageSearchResource searchResource = await _repository.GetResourceAsync<PackageSearchResource>(cancellationToken);
-        SearchFilter filter = new(query.IncludePrerelease)
-        {
-            PackageTypes = [PackageType],
-        };
+        int take = query.Take ?? CatalogSearchQuery.DefaultTake;
+        Uri? searchUri = await TryBuildV3SearchUriAsync(query, take, cancellationToken);
 
-        IEnumerable<IPackageSearchMetadata> hits = await searchResource.SearchAsync(
-            query.Filter ?? string.Empty,
-            filter,
-            query.Skip,
-            query.Take ?? CatalogSearchQuery.DefaultTake,
-            NullLogger.Instance,
-            cancellationToken);
-
-        var results = new List<CatalogSearchResult>();
-        foreach (IPackageSearchMetadata hit in hits)
+        if (searchUri is null)
         {
-            CatalogSearchResult? result = ToResult(hit, Source);
-            if (result is not null)
-            {
-                results.Add(result);
-            }
+            throw new InvalidOperationException(
+                $"Source '{Source.Source}' does not advertise a SearchQueryService entry. Workload search requires a V3 NuGet feed.");
         }
 
-        return results;
+        JObject? raw = await FetchSearchResponseAsync(searchUri, cancellationToken);
+        return raw is null ? [] : ParseV3Hits(raw, Source);
     }
 
     public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(
@@ -115,20 +112,121 @@ internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
         }
     }
 
-    internal static CatalogSearchResult? ToResult(IPackageSearchMetadata hit, PackageSource source)
+    /// <summary>
+    /// Issues the V3 search request through NuGet's <see cref="HttpSource"/>
+    /// so credential providers, retries, proxy, and HTTP cache configured
+    /// for the source all apply. Virtual so tests can stub the JSON
+    /// response without standing up an HTTP server.
+    /// </summary>
+    internal virtual async Task<JObject?> FetchSearchResponseAsync(
+        Uri searchUri,
+        CancellationToken cancellationToken)
     {
-        if (hit.Identity?.Id is null || hit.Identity.Version is null)
+        HttpSourceResource httpSourceResource = await _repository.GetResourceAsync<HttpSourceResource>(cancellationToken);
+        return await httpSourceResource.HttpSource.GetJObjectAsync(
+            new HttpSourceRequest(searchUri, NullLogger.Instance),
+            NullLogger.Instance,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves the source's <c>SearchQueryService</c> entry from its V3
+    /// service index and builds a request URL with the
+    /// <c>packageType=FuncCliWorkload</c> filter. Returns null when the
+    /// source has no V3 service index (e.g. local file feeds).
+    /// </summary>
+    private async Task<Uri?> TryBuildV3SearchUriAsync(
+        CatalogSearchQuery query,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        ServiceIndexResourceV3? serviceIndex = await _repository.GetResourceAsync<ServiceIndexResourceV3>(cancellationToken);
+        if (serviceIndex is null)
         {
             return null;
         }
 
-        return new CatalogSearchResult(
-            PackageId: hit.Identity.Id.ToLowerInvariant(),
-            LatestVersion: hit.Identity.Version,
-            Title: hit.Title,
-            Description: hit.Description,
-            Aliases: ParseAliases(hit.Tags),
-            Source: source);
+        // GetServiceEntryUri picks the best match in priority order across
+        // the V3 service index versions; pass the unversioned key first.
+        string? baseUrl = serviceIndex.GetServiceEntryUri(
+            "SearchQueryService",
+            "SearchQueryService/3.5.0",
+            "SearchQueryService/3.0.0-rc",
+            "SearchQueryService/3.0.0-beta")?.AbsoluteUri;
+
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            return null;
+        }
+
+        var qs = new List<string>
+        {
+            "q=" + Uri.EscapeDataString(query.Filter ?? string.Empty),
+            "skip=" + query.Skip.ToString(CultureInfo.InvariantCulture),
+            "take=" + take.ToString(CultureInfo.InvariantCulture),
+            "prerelease=" + query.IncludePrerelease.ToString(CultureInfo.InvariantCulture).ToLowerInvariant(),
+            "semVerLevel=2.0.0",
+            $"{PackageTypeQueryParam}=" + Uri.EscapeDataString(FuncCliWorkloadPackageType),
+        };
+
+        return new Uri(baseUrl + (baseUrl.Contains('?') ? "&" : "?") + string.Join("&", qs));
+    }
+
+    /// <summary>
+    /// Parses the V3 search response and applies a defensive client-side
+    /// filter on each hit's <c>packageTypes</c> array. Feeds that honour
+    /// <c>packageType=</c> server-side return a pre-filtered set; feeds that
+    /// don't (older or non-conforming implementations) get filtered here.
+    /// Hits that omit <c>packageTypes</c> are kept, since the server filter
+    /// already had its chance.
+    /// </summary>
+    internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject response, PackageSource source)
+    {
+        if (response["data"] is not JArray data)
+        {
+            return [];
+        }
+
+        var results = new List<CatalogSearchResult>(data.Count);
+        foreach (JToken hit in data)
+        {
+            string? id = (string?)hit["id"];
+            string? versionString = (string?)hit["version"];
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(versionString) ||
+                !NuGetVersion.TryParse(versionString, out NuGetVersion? version))
+            {
+                continue;
+            }
+
+            results.Add(new CatalogSearchResult(
+                PackageId: id.ToLowerInvariant(),
+                LatestVersion: version,
+                Title: (string?)hit["title"],
+                Description: (string?)hit["description"],
+                Aliases: ParseAliases(GetTagsString(hit["tags"])),
+                Source: source));
+        }
+
+        return results;
+    }
+
+    private static string? GetTagsString(JToken? tags)
+    {
+        // V3 search responses represent tags either as a space-delimited
+        // string or as a JSON array of individual tag strings, depending
+        // on the source implementation. Normalise both to the
+        // space-delimited form ParseAliases expects.
+        if (tags is JArray array)
+        {
+            return string.Join(' ', array.Select(t => (string?)t).Where(t => !string.IsNullOrWhiteSpace(t)));
+        }
+
+        if (tags is JValue { Value: string s })
+        {
+            return s;
+        }
+
+        return null;
     }
 
     private static IReadOnlyList<string> ParseAliases(string? tags)
@@ -141,9 +239,9 @@ internal sealed class NuGetProtocolSourceClient(SourceRepository repository)
         var aliases = new List<string>();
         foreach (string token in tags.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (token.StartsWith(AliasTagPrefix, StringComparison.OrdinalIgnoreCase))
+            if (token.StartsWith(WorkloadInstaller.AliasTagPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                string alias = token[AliasTagPrefix.Length..].Trim();
+                string alias = token[WorkloadInstaller.AliasTagPrefix.Length..].Trim();
                 if (alias.Length > 0)
                 {
                     aliases.Add(alias.ToLowerInvariant());

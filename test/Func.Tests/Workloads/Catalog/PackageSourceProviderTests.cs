@@ -8,12 +8,8 @@ using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 
-public sealed class PackageSourceProviderTests : IDisposable
+public sealed class PackageSourceProviderTests
 {
-    private readonly string _tempRoot = Directory.CreateTempSubdirectory("workload-source-provider-").FullName;
-
-    public void Dispose() => Directory.Delete(_tempRoot, recursive: true);
-
     [Fact]
     public void GetSource_OverrideUrl_ReturnsRemoteSource()
     {
@@ -23,19 +19,6 @@ public sealed class PackageSourceProviderTests : IDisposable
 
         Assert.False(source.IsLocal);
         Assert.Equal("https://example.test/v3/index.json", source.Source);
-    }
-
-    [Fact]
-    public void GetSource_OverrideLocalDir_ReturnsLocalSource()
-    {
-        string folder = Path.Combine(_tempRoot, "feed");
-        Directory.CreateDirectory(folder);
-        PackageSourceProvider provider = NewProvider();
-
-        PackageSource source = provider.GetSource(folder);
-
-        Assert.True(source.IsLocal);
-        Assert.Equal(Path.GetFullPath(folder), source.Source);
     }
 
     [Fact]
@@ -69,18 +52,21 @@ public sealed class PackageSourceProviderTests : IDisposable
         Assert.Equal(PackageSourceProvider.DefaultSourceUrl, source.Source);
     }
 
-    [Fact]
-    public void GetSource_OverrideMissingDirectory_Throws()
+    [Theory]
+    [InlineData("/some/local/folder")]
+    [InlineData("./relative")]
+    [InlineData("file:///tmp/feed")]
+    [InlineData("ftp://unsupported.example/feed")]
+    public void GetSource_NonHttpSource_Throws(string value)
     {
         PackageSourceProvider provider = NewProvider();
 
-        ArgumentException ex = Assert.Throws<ArgumentException>(
-            () => provider.GetSource(Path.Combine(_tempRoot, "does-not-exist")));
-        Assert.Contains("does not exist", ex.Message, StringComparison.OrdinalIgnoreCase);
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => provider.GetSource(value));
+        Assert.Contains("not a supported NuGet feed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void GetSource_ConfiguredInvalidEntry_Throws()
+    public void GetSource_ConfiguredNonHttp_Throws()
     {
         PackageSourceProvider provider = NewProvider("ftp://unsupported.example/feed");
 

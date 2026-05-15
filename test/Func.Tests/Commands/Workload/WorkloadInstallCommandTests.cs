@@ -5,11 +5,13 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using NuGet.Versioning;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
@@ -20,52 +22,147 @@ public class WorkloadInstallCommandTests
     private readonly IWorkloadInstaller _installer = Substitute.For<IWorkloadInstaller>();
 
     [Fact]
-    public void Install_HasWorkloadArgumentAndForceOption()
+    public void Install_HasExpectedArgsAndOptions()
     {
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
         Assert.Single(cmd.Arguments, a => a.Name == "id");
-        Assert.Single(cmd.Options, o => o.Name == "--force");
+        Assert.Contains(cmd.Options, o => o.Name == "--force");
+        Assert.Contains(cmd.Options, o => o.Name == "--version");
+        Assert.Contains(cmd.Options, o => o.Name == "--source");
+        Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
     }
 
     [Fact]
-    public void Install_NonNupkgArgument_FailsValidation()
+    public async Task Install_PackageId_RoutesToCatalogInstaller()
+    {
+        StubCatalogResult();
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        int exit = await InvokeAsync(cmd, "Test.Workload");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "Test.Workload", null, null, false, false, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_AllOptionsForwarded()
+    {
+        StubCatalogResult();
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        int exit = await InvokeAsync(
+            cmd,
+            "Test.Workload",
+            "--version", "2.0.0-beta.1",
+            "--source", "https://example/v3/index.json",
+            "--prerelease",
+            "--exact",
+            "--force");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "Test.Workload",
+            Arg.Is<NuGetVersion>(v => v != null && v.ToNormalizedString() == "2.0.0-beta.1"),
+            "https://example/v3/index.json",
+            true,
+            true,
+            true,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_ShortAliases_VAndF_Forward()
+    {
+        StubCatalogResult();
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        int exit = await InvokeAsync(cmd, "Test.Workload", "-v", "1.2.3", "-f");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "Test.Workload",
+            Arg.Is<NuGetVersion>(v => v != null && v.ToNormalizedString() == "1.2.3"),
+            null,
+            false,
+            false,
+            true,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_ExactShortAlias_E_Forwards()
+    {
+        StubCatalogResult();
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        int exit = await InvokeAsync(cmd, "test.workload", "-e");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "test.workload", null, null, false, true, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_LocalFolderSource_TreatedAsCatalogSource()
+    {
+        // --source can be a folder path; the catalog (LocalFolderSourceClient)
+        // handles it. The CLI does not special-case paths.
+        StubCatalogResult();
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        int exit = await InvokeAsync(cmd, "Test.Workload", "--source", "/tmp/local-feed");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "Test.Workload", null, "/tmp/local-feed", false, false, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void Install_InvalidVersion_FailsValidation()
     {
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
         var root = new RootCommand();
         root.Subcommands.Add(cmd);
 
-        ParseResult parse = root.Parse([cmd.Name, "Test.Workload"]);
+        ParseResult parse = root.Parse([cmd.Name, "Test.Workload", "--version", "not-semver"]);
 
         Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("not yet supported") && e.Message.Contains(".nupkg"));
+        Assert.Contains(parse.Errors, e => e.Message.Contains("not a valid semver"));
     }
 
     [Fact]
-    public async Task Install_NupkgArgument_DelegatesToInstaller_WritesSuccess()
+    public void Install_MissingPackageArg_FailsValidation()
     {
-        StubResult(alreadyInstalled: false);
-
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
-        int exit = await InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg");
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
 
-        Assert.Equal(0, exit);
-        await _installer.Received(1).InstallFromPackageAsync("Test.Workload.1.0.0.nupkg", false, Arg.Any<CancellationToken>());
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.StartsWith("SUCCESS:")
-                && l.Contains("Installed workload")
-                && l.Contains("test.workload")
-                && l.Contains("1.0.0")
-                && l.Contains("entry point: T"));
+        ParseResult parse = root.Parse([cmd.Name]);
+
+        Assert.NotEmpty(parse.Errors);
+    }
+
+    [Fact]
+    public void Install_WhitespaceArg_FailsValidation()
+    {
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
+
+        ParseResult parse = root.Parse([cmd.Name, "   "]);
+
+        Assert.NotEmpty(parse.Errors);
+        Assert.Contains(parse.Errors, e => e.Message.Contains("workload id is required"));
     }
 
     [Fact]
     public async Task Install_AlreadyInstalled_WritesIdempotentMessage()
     {
-        StubResult(alreadyInstalled: true);
+        StubCatalogResult(alreadyInstalled: true);
 
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
-        int exit = await InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg");
+        int exit = await InvokeAsync(cmd, "Test.Workload");
 
         Assert.Equal(0, exit);
         Assert.Contains(
@@ -78,97 +175,143 @@ public class WorkloadInstallCommandTests
     [Fact]
     public async Task Install_ContentKind_MessageMentionsContentPath()
     {
-        _installer.InstallFromPackageAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(
                 new WorkloadEntry
                 {
                     PackageId = "test.content",
                     PackageVersion = "1.0.0",
                     Kind = WorkloadKind.Content,
-                    Source = "/abs/path/to/test.content.1.0.0.nupkg",
+                    Source = "https://api.nuget.org/v3/index.json",
                 },
                 AlreadyInstalled: false));
 
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
-        int exit = await InvokeAsync(cmd, "test.content.1.0.0.nupkg");
+        int exit = await InvokeAsync(cmd, "test.content");
 
         Assert.Equal(0, exit);
         Assert.Contains(
             _interaction.Lines,
             l => l.StartsWith("SUCCESS:")
                 && l.Contains("content at")
-                && l.Contains("/abs/path/to/test.content.1.0.0.nupkg"));
+                && l.Contains("api.nuget.org"));
     }
 
     [Fact]
-    public async Task Install_ForceFlag_PassesForceToInstaller()
+    public async Task Install_AmbiguousAlias_GracefulException()
     {
-        StubResult(alreadyInstalled: false);
-
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
-        int exit = await InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg", "--force");
-
-        Assert.Equal(0, exit);
-        await _installer.Received(1).InstallFromPackageAsync("Test.Workload.1.0.0.nupkg", true, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Install_ForceShortAlias_PassesForceToInstaller()
-    {
-        StubResult(alreadyInstalled: false);
-
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
-        int exit = await InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg", "-f");
-
-        Assert.Equal(0, exit);
-        await _installer.Received(1).InstallFromPackageAsync("Test.Workload.1.0.0.nupkg", true, Arg.Any<CancellationToken>());
-    }
-
-    [Theory]
-    [InlineData(typeof(FileNotFoundException), "missing nupkg")]
-    [InlineData(typeof(InvalidWorkloadException), "bad package")]
-    public async Task Install_InstallerThrowsExpectedFailure_WrappedInGracefulException(Type exceptionType, string message)
-    {
-        var inner = (Exception)Activator.CreateInstance(exceptionType, message)!;
-        _installer.InstallFromPackageAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Throws(inner);
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Throws(new AmbiguousPackageMatchException(
+                "myalias", new[] { "Pkg.A", "Pkg.B" }));
 
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg"));
-        Assert.Equal(message, ex.Message);
+            () => InvokeAsync(cmd, "myalias"));
+        Assert.Contains("myalias", ex.Message);
+        Assert.Contains("--exact", ex.Message);
         Assert.True(ex.IsUserError);
     }
 
     [Fact]
-    public async Task Install_InstallerThrowsBrokenInstall_AppendsForceHint()
+    public async Task Install_PackageNotFound_GracefulException()
     {
-        _installer.InstallFromPackageAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Throws(new InvalidOperationException("Workload 'x' version '1' is already installed at '/p' but is missing from the registry."));
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Throws(new WorkloadPackageNotFoundException("not on any source"));
 
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg"));
+            () => InvokeAsync(cmd, "Test.Workload"));
+        Assert.Contains("not on any source", ex.Message);
+        Assert.True(ex.IsUserError);
+    }
+
+    [Fact]
+    public async Task Install_InvalidWorkload_GracefulException()
+    {
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Throws(new InvalidWorkloadException("bad package"));
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => InvokeAsync(cmd, "Test.Workload"));
+        Assert.Equal("bad package", ex.Message);
+        Assert.True(ex.IsUserError);
+    }
+
+    [Fact]
+    public async Task Install_BrokenInstall_AppendsForceHint()
+    {
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Throws(new InvalidOperationException(
+                "Workload 'x' version '1' is already installed at '/p' but is missing from the registry."));
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => InvokeAsync(cmd, "Test.Workload"));
         Assert.Contains("missing from the registry", ex.Message);
         Assert.Contains("--force", ex.Message);
         Assert.True(ex.IsUserError);
     }
 
     [Fact]
-    public async Task Install_InstallerThrowsUnexpected_PropagatesUnchanged()
+    public async Task Install_UnexpectedException_PropagatesUnchanged()
     {
-        // Anything outside the catch list is treated as a runtime bug and
-        // surfaces unwrapped so Program.cs prints a stack trace.
-        _installer.InstallFromPackageAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Throws(new NullReferenceException("oops"));
 
         var cmd = new WorkloadInstallCommand(_interaction, _installer);
         await Assert.ThrowsAsync<NullReferenceException>(
-            () => InvokeAsync(cmd, "Test.Workload.1.0.0.nupkg"));
+            () => InvokeAsync(cmd, "Test.Workload"));
     }
 
-    private void StubResult(bool alreadyInstalled) =>
-        _installer.InstallFromPackageAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+    [Fact]
+    public async Task Install_LocalNupkgPath_RoutesToLocalInstaller()
+    {
+        string tempPkg = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.nupkg");
+        await File.WriteAllBytesAsync(tempPkg, [0x50, 0x4B]);
+        try
+        {
+            _installer.InstallFromPackageAsync(tempPkg, Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                .Returns(new WorkloadInstallResult(
+                    new WorkloadEntry
+                    {
+                        PackageId = "test.workload",
+                        PackageVersion = "1.0.0",
+                        EntryPoint = new EntryPointSpec { AssemblyPath = "x.dll", Type = "T" },
+                    },
+                    AlreadyInstalled: false));
+
+            var cmd = new WorkloadInstallCommand(_interaction, _installer);
+            int exit = await InvokeAsync(cmd, tempPkg);
+
+            Assert.Equal(0, exit);
+            await _installer.Received(1).InstallFromPackageAsync(
+                tempPkg, false, Arg.Any<CancellationToken>());
+            await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(
+                default!, default, default, default, default, default, default);
+        }
+        finally
+        {
+            File.Delete(tempPkg);
+        }
+    }
+
+    private void StubCatalogResult(bool alreadyInstalled = false) =>
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(
                 new WorkloadEntry
                 {

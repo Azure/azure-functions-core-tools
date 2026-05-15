@@ -39,35 +39,17 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
 
     private static PackageSource Build(string value)
     {
-        // Remote v3 feeds: trust the URL as-is; NuGet validates on first use.
+        // Only http(s) V3 NuGet feeds are supported as workload sources.
+        // To install from a local .nupkg, pass the file path positionally to
+        // 'func workload install' instead of pointing --source at a folder.
         if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
             return new PackageSource(value, value);
         }
 
-        // Local directories: resolve to an absolute path and verify it exists
-        // so misconfigurations surface eagerly rather than as "no results".
-        string fullPath;
-        try
-        {
-            fullPath = Path.GetFullPath(value);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            throw new ArgumentException(
-                $"Source '{value}' is neither an absolute http(s) URL nor a valid local directory path.",
-                nameof(value),
-                ex);
-        }
-
-        if (!Directory.Exists(fullPath))
-        {
-            throw new ArgumentException(
-                $"Local source '{value}' does not exist or is not a directory.",
-                nameof(value));
-        }
-
-        return new PackageSource(fullPath, value);
+        throw new ArgumentException(
+            $"Source '{value}' is not a supported NuGet feed. Workload sources must be an absolute http(s) URL pointing at a V3 service index.",
+            nameof(value));
     }
 }

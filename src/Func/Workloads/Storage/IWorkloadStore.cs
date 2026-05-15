@@ -41,4 +41,17 @@ internal interface IWorkloadStore
         string packageId,
         string version,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically removes the entry for (<paramref name="oldPackageId"/>,
+    /// <paramref name="oldVersion"/>) and inserts <paramref name="newEntry"/>
+    /// in a single registry write. Used by <c>func workload update</c>
+    /// (spec §6.4 step 4) to avoid leaving the registry in a half-swapped
+    /// state if the process dies mid-write.
+    /// </summary>
+    public Task ReplaceWorkloadAsync(
+        string oldPackageId,
+        string oldVersion,
+        WorkloadEntry newEntry,
+        CancellationToken cancellationToken = default);
 }

@@ -2,9 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Catalog;
+using Newtonsoft.Json.Linq;
 using NSubstitute;
 using NuGet.Common;
-using NuGet.Packaging.Core;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using Xunit;
@@ -19,102 +19,68 @@ public sealed class NuGetProtocolSourceClientTests
         "test");
 
     [Fact]
-    public async Task SearchAsync_PassesPackageTypeFilterPrereleaseAndSkipTake()
+    public void ParseV3Hits_ParsesIdVersionAndAliasesFromTagsString()
     {
-        IPackageSearchMetadata[] hits = [Metadata("Workload.Python", "1.2.3", title: "Python", description: "py", tags: "alias:python language:python")];
-        PackageSearchResource search = Substitute.For<PackageSearchResource>();
-        SearchFilter? captured = null;
-        search.SearchAsync(
-                Arg.Any<string>(),
-                Arg.Do<SearchFilter>(f => captured = f),
-                Arg.Any<int>(),
-                Arg.Any<int>(),
-                Arg.Any<ILogger>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IEnumerable<IPackageSearchMetadata>>(hits));
-
-        NuGetProtocolSourceClient client = NewClient(searchResource: search);
-
-        IReadOnlyList<CatalogSearchResult> results = await client.SearchAsync(
-            new CatalogSearchQuery
+        var response = JObject.Parse("""
             {
-                Filter = "python",
-                IncludePrerelease = true,
-                Skip = 10,
-                Take = 20,
-            },
-            CancellationToken.None);
+              "data": [
+                {
+                  "id": "Workload.Python",
+                  "version": "1.2.3",
+                  "tags": "alias:python language:python"
+                }
+              ]
+            }
+            """);
 
-        Assert.NotNull(captured);
-        Assert.True(captured!.IncludePrerelease);
-        Assert.Equal(["FuncCliWorkload"], captured.PackageTypes);
-
-        await search.Received(1).SearchAsync(
-            "python",
-            Arg.Any<SearchFilter>(),
-            10,
-            20,
-            Arg.Any<ILogger>(),
-            Arg.Any<CancellationToken>());
-
-        CatalogSearchResult only = Assert.Single(results);
+        CatalogSearchResult only = Assert.Single(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
         Assert.Equal("workload.python", only.PackageId);
-        Assert.Equal(NuGetVersion.Parse("1.2.3"), only.LatestVersion);
-        Assert.Equal("Python", only.Title);
         Assert.Equal(["python"], only.Aliases);
-        Assert.Same(_source, only.Source);
     }
 
     [Fact]
-    public async Task SearchAsync_DefaultsApplyForNullFilterAndTake()
+    public void ParseV3Hits_ParsesTagsArrayInAdditionToString()
     {
-        PackageSearchResource search = Substitute.For<PackageSearchResource>();
-        search.SearchAsync(Arg.Any<string>(), Arg.Any<SearchFilter>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<ILogger>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IEnumerable<IPackageSearchMetadata>>([]));
+        var response = JObject.Parse("""
+            {
+              "data": [
+                {
+                  "id": "Workload.Node",
+                  "version": "1.0.0",
+                  "tags": [ "alias:node", "language:javascript", "alias:nodejs" ]
+                }
+              ]
+            }
+            """);
 
-        NuGetProtocolSourceClient client = NewClient(searchResource: search);
-        await client.SearchAsync(new CatalogSearchQuery(), CancellationToken.None);
-
-        await search.Received(1).SearchAsync(
-            string.Empty,
-            Arg.Any<SearchFilter>(),
-            0,
-            CatalogSearchQuery.DefaultTake,
-            Arg.Any<ILogger>(),
-            Arg.Any<CancellationToken>());
+        CatalogSearchResult only = Assert.Single(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
+        Assert.Equal(["node", "nodejs"], only.Aliases);
     }
 
     [Fact]
-    public async Task SearchAsync_SkipsEntriesMissingIdentity()
+    public void ParseV3Hits_SkipsEntriesMissingIdOrVersion()
     {
-        IPackageSearchMetadata good = Metadata("Workload.A", "1.0.0");
-        IPackageSearchMetadata bad = Substitute.For<IPackageSearchMetadata>();
-        bad.Identity.Returns((PackageIdentity?)null);
-        IPackageSearchMetadata[] hits = [good, bad];
+        var response = JObject.Parse("""
+            {
+              "data": [
+                { "version": "1.0.0" },
+                { "id": "A" },
+                { "id": "B", "version": "not-a-version" }
+              ]
+            }
+            """);
 
-        PackageSearchResource search = Substitute.For<PackageSearchResource>();
-        search.SearchAsync(Arg.Any<string>(), Arg.Any<SearchFilter>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<ILogger>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IEnumerable<IPackageSearchMetadata>>(hits));
-
-        NuGetProtocolSourceClient client = NewClient(searchResource: search);
-        IReadOnlyList<CatalogSearchResult> results = await client.SearchAsync(new CatalogSearchQuery(), CancellationToken.None);
-
-        Assert.Equal("workload.a", Assert.Single(results).PackageId);
+        Assert.Empty(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
     }
 
     [Fact]
-    public async Task SearchAsync_ParsesAliasesFromTagsString()
+    public void ParseV3Hits_ReturnsEmptyWhenDataMissing()
     {
-        IPackageSearchMetadata[] hits = [Metadata("Workload.Node", "1.0.0", tags: "alias:node language:javascript alias:nodejs")];
-        PackageSearchResource search = Substitute.For<PackageSearchResource>();
-        search.SearchAsync(Arg.Any<string>(), Arg.Any<SearchFilter>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<ILogger>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IEnumerable<IPackageSearchMetadata>>(hits));
+        var response = JObject.Parse("""{ "totalHits": 0 }""");
 
-        NuGetProtocolSourceClient client = NewClient(searchResource: search);
-        IReadOnlyList<CatalogSearchResult> results = await client.SearchAsync(new CatalogSearchQuery(), CancellationToken.None);
-
-        Assert.Equal(["node", "nodejs"], Assert.Single(results).Aliases);
+        Assert.Empty(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
     }
+
 
     [Fact]
     public async Task ListVersionsAsync_ReturnsResolvedVersions()
@@ -202,25 +168,9 @@ public sealed class NuGetProtocolSourceClientTests
     }
 
     private static NuGetProtocolSourceClient NewClient(
-        PackageSearchResource? searchResource = null,
         FindPackageByIdResource? findResource = null)
     {
-        SourceRepository repo = TestRepository.Build(_source, searchResource, findResource);
+        SourceRepository repo = TestRepository.Build(_source, findResource);
         return new NuGetProtocolSourceClient(repo);
-    }
-
-    private static IPackageSearchMetadata Metadata(
-        string id,
-        string version,
-        string? title = null,
-        string? description = null,
-        string? tags = null)
-    {
-        var meta = Substitute.For<IPackageSearchMetadata>();
-        meta.Identity.Returns(new PackageIdentity(id, NuGetVersion.Parse(version)));
-        meta.Title.Returns(title);
-        meta.Description.Returns(description);
-        meta.Tags.Returns(tags);
-        return meta;
     }
 }
