@@ -20,5 +20,6 @@ public sealed class NodeWorkload : Workloads.Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
+        builder.RegisterProjectResolver(new NodeProjectResolver());
     }
 }

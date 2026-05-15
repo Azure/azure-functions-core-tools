@@ -31,4 +31,16 @@ public class GoWorkloadTests
     {
         Assert.Throws<ArgumentNullException>(() => new GoWorkload().Configure(null!));
     }
+
+    [Fact]
+    public void Configure_RegistersProjectResolver()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new GoWorkload().Configure(builder);
+
+        builder.Received(1).RegisterProjectResolver(Arg.Any<GoProjectResolver>());
+    }
 }

@@ -38,3 +38,6 @@ eng/tools/publish-tools/npm/bin/
 
 # MacOS related
 .DS_Store
+
+# Roslyn / C# language server incremental analysis caches
+*.lscache

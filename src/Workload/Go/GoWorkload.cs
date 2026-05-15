@@ -20,5 +20,6 @@ public sealed class GoWorkload : Workloads.Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, GoProjectInitializer>();
+        builder.RegisterProjectResolver(new GoProjectResolver());
     }
 }

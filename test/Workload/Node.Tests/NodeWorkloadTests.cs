@@ -31,4 +31,16 @@ public class NodeWorkloadTests
     {
         Assert.Throws<ArgumentNullException>(() => new NodeWorkload().Configure(null!));
     }
+
+    [Fact]
+    public void Configure_RegistersProjectResolver()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new NodeWorkload().Configure(builder);
+
+        builder.Received(1).RegisterProjectResolver(Arg.Any<NodeProjectResolver>());
+    }
 }
