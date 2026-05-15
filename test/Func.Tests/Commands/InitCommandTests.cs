@@ -430,11 +430,67 @@ public class InitCommandTests
         }
     }
 
-    private sealed class FakeProjectInitializer(string stack) : IProjectInitializer
+    [Fact]
+    public async Task InitCommand_RejectsLanguageNotInSupportedList()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            var initializer = new FakeProjectInitializer("node", ["JavaScript", "TypeScript"]);
+            int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "node");
+
+            Assert.Equal(1, exitCode);
+            Assert.False(initializer.WasInvoked);
+            Assert.Contains(_interaction.Lines, l => l.Contains("not supported", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_AutoSelectsLanguageWhenInitializerHasOnlyOne()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            var initializer = new FakeProjectInitializer("python", ["Python"]);
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
+
+            Assert.Equal(0, exitCode);
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: "python");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_ErrorsWhenMultipleLanguagesAndNonInteractive()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            var initializer = new FakeProjectInitializer("node", ["JavaScript", "TypeScript"]);
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "node");
+
+            Assert.Equal(1, exitCode);
+            Assert.False(initializer.WasInvoked);
+            Assert.Contains(_interaction.Lines, l => l.Contains("--language", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    private sealed class FakeProjectInitializer(string stack, IReadOnlyList<string>? supportedLanguages = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
-        public IReadOnlyList<string> SupportedLanguages { get; } = [];
+        public IReadOnlyList<string> SupportedLanguages { get; } = supportedLanguages ?? [];
 
         public bool WasInvoked { get; private set; }
 
