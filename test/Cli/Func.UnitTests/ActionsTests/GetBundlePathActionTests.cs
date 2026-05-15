@@ -2,10 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Colors.Net;
-using FluentAssertions;
 using NSubstitute;
 using Xunit;
 

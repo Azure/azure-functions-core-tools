@@ -1,9 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
-using FluentAssertions;
 using Moq;
 using Xunit;
 using FuncPackAction = Azure.Functions.Cli.Actions.LocalActions.PackAction.PackAction;

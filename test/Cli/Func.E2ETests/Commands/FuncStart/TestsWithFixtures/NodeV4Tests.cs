@@ -4,13 +4,13 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using AwesomeAssertions;
 using Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core;
 using Azure.Functions.Cli.E2ETests.Fixtures;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 

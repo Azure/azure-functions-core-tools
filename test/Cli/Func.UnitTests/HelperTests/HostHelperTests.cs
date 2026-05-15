@@ -3,9 +3,9 @@
 
 using System.IO.Abstractions;
 using System.Text;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using FluentAssertions;
 using NSubstitute;
 using Xunit;
 

@@ -1,8 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using AwesomeAssertions;
 using Azure.Functions.Cli.Actions.LocalActions;
-using FluentAssertions;
 using Microsoft.Azure.WebJobs.Script;
 using Xunit;
 

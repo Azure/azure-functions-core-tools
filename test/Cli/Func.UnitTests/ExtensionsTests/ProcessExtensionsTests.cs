@@ -3,8 +3,8 @@
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Extensions;
-using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ExtensionsTests
