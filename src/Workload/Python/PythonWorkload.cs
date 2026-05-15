@@ -14,7 +14,7 @@ public sealed class PythonWorkload : Workloads.Workload
 {
     public override string DisplayName => "Python";
 
-    public override string Description => "Azure Functions tooling for Python projects.";
+    public override string Description => "Azure Functions CLI tooling for Python projects.";
 
     public override void Configure(FunctionsCliBuilder builder)
     {
