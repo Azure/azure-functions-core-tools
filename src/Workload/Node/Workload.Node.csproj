@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Description>Azure Functions CLI Node workload.</Description>
     <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>alias:node func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
