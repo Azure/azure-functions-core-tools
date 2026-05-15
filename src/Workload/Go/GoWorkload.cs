@@ -14,7 +14,7 @@ public sealed class GoWorkload : Workloads.Workload
 {
     public override string DisplayName => "Go";
 
-    public override string Description => "Azure Functions tooling for Go projects.";
+    public override string Description => "Azure Functions CLI tooling for Go projects.";
 
     public override void Configure(FunctionsCliBuilder builder)
     {
