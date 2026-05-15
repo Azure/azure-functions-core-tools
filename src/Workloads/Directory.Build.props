@@ -1,0 +1,6 @@
+<Project>
+
+  <!-- Import common workload properties -->
+  <Import Project="Workload.Common.props" />
+  
+</Project>

@@ -5,11 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
-
+  
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
-    <ProjectReference Include="$(SrcRoot)Workload/DotNet/Workload.DotNet/Workload.DotNet.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Workload.DotNet/Workload.DotNet.csproj" />
   </ItemGroup>
 
 </Project>

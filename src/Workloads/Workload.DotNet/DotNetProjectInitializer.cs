@@ -2,9 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using Azure.Functions.Cli.Workloads;
 
-namespace Azure.Functions.Cli.Workload.DotNet;
+namespace Azure.Functions.Cli.Workloads.DotNet;
 
 /// <summary>
 /// Project initializer for .NET (C# and F#) Azure Functions.

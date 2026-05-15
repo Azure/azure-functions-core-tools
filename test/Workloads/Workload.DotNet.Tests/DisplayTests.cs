@@ -1,7 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Workload.DotNet;
+using Azure.Functions.Cli.Workloads.DotNet;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -28,7 +28,7 @@ public class DotNetWorkloadTests
         var workload = new DotNetWorkload();
 
         // Act & Assert
-        Assert.Equal("func init / func new support for C# and F#.", workload.Description);
+        Assert.Equal("func init / func new support for C#", workload.Description);
     }
 
     private sealed class TestBuilder(IServiceCollection services) : FunctionsCliBuilder

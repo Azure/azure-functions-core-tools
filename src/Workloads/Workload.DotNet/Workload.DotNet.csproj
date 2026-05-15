@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Workload-specific metadata -->
+    <Title>.NET Functions</Title>
+    <Description>func init / func new support for .NET C# functions.</Description>
+
+    <!-- Specific tags for this workload -->
+    <AdditionalPackageTags>kind:workload alias:dotnet alias:csharp</AdditionalPackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Workload.DotNet.Tests" />
+  </ItemGroup>
+
+  <!-- Any workload-specific PackageReferences go here -->
+  <!-- Remember: must include <PrivateAssets>all</PrivateAssets> -->
+
+</Project>

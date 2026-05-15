@@ -5,6 +5,12 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <EngRoot>$(RepoRoot)eng/</EngRoot>
+    <EngBuildRoot>$(EngRoot)build/</EngBuildRoot>
+  </PropertyGroup>
+
   <Import Project="$(EngBuildRoot)Packages.props" />
 
 </Project>
