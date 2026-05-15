@@ -23,6 +23,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
     private readonly IWorkloadStore _store;
+    private readonly WorkloadUpdateCommand _updateCommand;
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
@@ -57,12 +58,14 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     public WorkloadInstallCommand(
         IInteractionService interaction,
         IWorkloadInstaller installer,
-        IWorkloadStore store)
+        IWorkloadStore store,
+        WorkloadUpdateCommand updateCommand)
         : base("install", "Install a workload.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _updateCommand = updateCommand ?? throw new ArgumentNullException(nameof(updateCommand));
 
         WorkloadArgument.AddRequiredIdValidator();
         VersionOption.AddSemVerValidator();
@@ -203,55 +206,32 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        return await RunUpdateAsync(match.PackageId, source, includePrerelease, cancellationToken);
+        return await DispatchToUpdateAsync(match.PackageId, source, includePrerelease, cancellationToken);
     }
 
-    private async Task<int> RunUpdateAsync(
+    // Delegate to the `func workload update` command (Parse + InvokeAsync) so
+    // confirm-yes goes through exactly the same flow the user would hit if they
+    // had run `func workload update <id>` themselves: same options, same
+    // validators, same output. Avoids forking the rendering or the underlying
+    // installer call between install and update.
+    private async Task<int> DispatchToUpdateAsync(
         string packageId,
         string? source,
         bool includePrerelease,
         CancellationToken cancellationToken)
     {
-        try
+        var args = new List<string> { packageId };
+        if (!string.IsNullOrEmpty(source))
         {
-            WorkloadUpdateResult result = await _installer.UpdateAsync(
-                packageId,
-                targetInstalledVersion: null,
-                source,
-                includePrerelease,
-                allowMajor: false,
-                cancellationToken);
-
-            if (result.NoCandidateOnSource)
-            {
-                _interaction.WriteHint(
-                    $"No version of '{result.Entry.PackageId}' was found on the configured source. " +
-                    "Pass --source to point at the feed that publishes it.");
-                return 1;
-            }
-
-            if (result.NoUpdateAvailable)
-            {
-                string display = result.Entry.Aliases.Count > 0 ? result.Entry.Aliases[0] : result.Entry.PackageId;
-                _interaction.WriteWarning(
-                    $"Workload '{display}' is already at the latest available version " +
-                    $"({result.Entry.PackageVersion}).");
-                return 0;
-            }
-
-            string displayName = result.Entry.Aliases.Count > 0 ? result.Entry.Aliases[0] : result.Entry.PackageId;
-            _interaction.WriteSuccess(
-                $"Updated workload '{displayName}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
-            return 0;
+            args.Add("--source");
+            args.Add(source);
         }
-        catch (Exception ex) when (
-            ex is WorkloadPackageNotFoundException
-            or FileNotFoundException
-            or InvalidWorkloadException
-            or InvalidOperationException)
+        if (includePrerelease)
         {
-            throw new GracefulException(ex.Message, isUserError: true);
+            args.Add("--prerelease");
         }
+
+        return await _updateCommand.Parse(args.ToArray()).InvokeAsync(configuration: null, cancellationToken);
     }
 
     private static string BuildSuccessMessage(WorkloadInstallResult result)
