@@ -59,6 +59,9 @@
       <AdditionalFiles Include="$(_TemplatesV1Folder)bindings.json"
         TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="bindings"
         Condition="Exists('$(_TemplatesV1Folder)bindings.json')" />
+      <AdditionalFiles Include="$(_TemplatesV2Folder)userPrompts.json"
+        TemplateVersion="v2" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="userPrompts"
+        Condition="Exists('$(_TemplatesV2Folder)userPrompts.json')" />
     </ItemGroup>
   </Target>
 

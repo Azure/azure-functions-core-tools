@@ -41,6 +41,43 @@ internal static class EmitterHelpers
         return new string(chars);
     }
 
+    /// <summary>
+    /// Converts a kebab/camel-cased id (e.g. "httpTrigger-route") into a PascalCase identifier
+    /// (e.g. "HttpTriggerRoute"). Each '-' separated segment is concatenated with its first
+    /// character upper-cased; remaining characters are preserved.
+    /// </summary>
+    public static string KebabToPascal(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        string[] parts = value.Split('-');
+        var sb = new StringBuilder(value.Length);
+        foreach (string part in parts)
+        {
+            if (part.Length == 0)
+            {
+                continue;
+            }
+
+            string sanitized = SanitizeIdentifier(part);
+            if (sanitized.Length == 0)
+            {
+                continue;
+            }
+
+            sb.Append(char.ToUpperInvariant(sanitized[0]));
+            if (sanitized.Length > 1)
+            {
+                sb.Append(sanitized, 1, sanitized.Length - 1);
+            }
+        }
+
+        return sb.ToString();
+    }
+
     public static string Literal(string value) => SymbolDisplay.FormatLiteral(value, quote: true);
 
     public static string Indent(int depth) => new(' ', depth * 4);
