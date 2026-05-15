@@ -119,6 +119,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         await initializer.InitializeAsync(context, parseResult, cancellationToken);
 
+        WriteFuncProjectConfig(workingDirectory.Info, initializer.Stack, context.Language, context.Force);
+
         _interaction.WriteLine(l => l
             .Success("✓ ")
             .Muted("Project initialized for ")
@@ -126,6 +128,48 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             .Muted("."));
 
         return 0;
+    }
+
+    private void WriteFuncProjectConfig(DirectoryInfo workingDirectory, string stack, string? language, bool force)
+    {
+        string folder = Path.Combine(workingDirectory.FullName, ".func");
+        string path = Path.Combine(folder, "config.json");
+
+        // Treat an existing file as user-owned unless --force was passed.
+        if (File.Exists(path) && !force)
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(folder);
+
+            var payload = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["stack"] = stack,
+            };
+            if (!string.IsNullOrWhiteSpace(language))
+            {
+                payload["language"] = language;
+            }
+
+            string json = System.Text.Json.JsonSerializer.Serialize(payload, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+            });
+            File.WriteAllText(path, json + Environment.NewLine);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Project files already scaffolded; only the stack-pinning metadata failed.
+            // Warn the user and let init succeed — they can create .func/config.json by hand.
+            _interaction.WriteLine(l => l
+                .Warning("! ")
+                .Muted("Could not write .func/config.json (")
+                .Code(ex.Message)
+                .Muted(")."));
+        }
     }
 
     private async Task<IProjectInitializer?> SelectInitializerAsync(string? stack, CancellationToken cancellationToken)

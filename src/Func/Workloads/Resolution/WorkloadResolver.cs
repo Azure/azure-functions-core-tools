@@ -11,12 +11,14 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 internal sealed class WorkloadResolver(
     IWorkloadProvider workloads,
     IEnumerable<WorkloadProjectResolverContribution> resolvers,
-    ILocalSettingsReader localSettings) : IWorkloadResolver
+    ILocalSettingsReader localSettings,
+    IFuncProjectConfigReader projectConfig) : IWorkloadResolver
 {
     private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
     private readonly IReadOnlyList<WorkloadProjectResolverContribution> _resolvers =
         (resolvers ?? throw new ArgumentNullException(nameof(resolvers))).ToList();
     private readonly ILocalSettingsReader _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
+    private readonly IFuncProjectConfigReader _projectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
 
     public async Task<WorkloadResolution> ResolveAsync(WorkloadResolutionContext context, CancellationToken cancellationToken)
     {
@@ -27,7 +29,7 @@ internal sealed class WorkloadResolver(
         // 1. Explicit selector wins.
         if (!string.IsNullOrWhiteSpace(context.StackSelector))
         {
-            return ResolveBySelector(installed, context.StackSelector);
+            return ResolveBySelector(installed, context.StackSelector, $"--stack '{context.StackSelector}'");
         }
 
         // No project to inspect (e.g. `func init`).
@@ -37,6 +39,17 @@ internal sealed class WorkloadResolver(
                 "No --stack flag supplied. " +
                 "Pass --stack <id> to choose a workload. " +
                 $"Installed: {FormatInstalled(installed)}.");
+        }
+
+        // 2. .func/config.json is treated as an explicit project-pinned
+        // declaration: it wins over both FUNCTIONS_WORKER_RUNTIME and
+        // resolver auto-detection. It also bypasses the host.json gate
+        // below — if the user has pinned a stack explicitly, we trust
+        // them and don't require host.json to also be present.
+        FuncProjectConfig? config = _projectConfig.Read(context.Directory);
+        if (!string.IsNullOrWhiteSpace(config?.Stack))
+        {
+            return ResolveBySelector(installed, config.Stack, $".func/config.json declares stack '{config.Stack}'");
         }
 
         // CLI-wide invariant: a directory without host.json is not a
@@ -52,7 +65,7 @@ internal sealed class WorkloadResolver(
 
         IReadOnlyList<ResolverClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
 
-        // FUNCTIONS_WORKER_RUNTIME, when set, is treated as an explicit
+        // 3. FUNCTIONS_WORKER_RUNTIME, when set, is treated as an explicit
         // declaration: only claims with a matching WorkerRuntime count.
         string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
         if (!string.IsNullOrWhiteSpace(runtime))
@@ -60,6 +73,7 @@ internal sealed class WorkloadResolver(
             return ResolveByRuntime(installed, claims, runtime);
         }
 
+        // 4. Auto-detection from registered IProjectResolvers.
         return ResolveByClaims(claims);
     }
 
@@ -87,7 +101,7 @@ internal sealed class WorkloadResolver(
         return [.. claimsByWorkload.Values];
     }
 
-    private static WorkloadResolution ResolveBySelector(IReadOnlyList<WorkloadInfo> installed, string selector)
+    private static WorkloadResolution ResolveBySelector(IReadOnlyList<WorkloadInfo> installed, string selector, string source)
     {
         // Match against aliases; mirrors `func workload install <alias>`.
         List<WorkloadInfo> matches = [.. installed.Where(w =>
@@ -95,13 +109,13 @@ internal sealed class WorkloadResolver(
 
         return matches.Count switch
         {
-            1 => new WorkloadResolution.Resolved(matches[0], $"Selected by --stack '{selector}'."),
+            1 => new WorkloadResolution.Resolved(matches[0], $"Selected by {source}."),
             0 => new WorkloadResolution.None(
-                $"No installed workload claims stack '{selector}'. " +
+                $"No installed workload claims stack '{selector}' (from {source}). " +
                 $"Installed: {FormatInstalled(installed)}. " +
                 $"Run 'func workload install <package>' to add a workload."),
             _ => new WorkloadResolution.None(
-                $"Multiple installed workloads claim stack '{selector}': {FormatPackages(matches)}. " +
+                $"Multiple installed workloads claim stack '{selector}' (from {source}): {FormatPackages(matches)}. " +
                 $"Pass --stack with an exact package id to disambiguate."),
         };
     }
