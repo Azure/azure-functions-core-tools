@@ -10,8 +10,8 @@
     <Project Path="src/Workload/Node/Workload.Node.csproj" />
     <Project Path="src/Workload/Python/Workload.Python.csproj" />
   </Folder>
-  <Folder Name="/src/Workloads/">
-    <Project Path="src/Workloads/Workload.DotNet/Azure.Functions.Cli.Workload.DotNet.csproj" Id="b025713a-39f8-433f-b5c7-5b51db28eed5" />
+  <Folder Name="/src/Workload/">
+    <Project Path="src/Workload/DotNet/Azure.Functions.Cli.Workload.DotNet.csproj" Id="b025713a-39f8-433f-b5c7-5b51db28eed5" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
@@ -21,7 +21,7 @@
     <Project Path="test/Workload.Tests.Fixtures.Sdk/Workload.Tests.Fixtures.Sdk.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.WithCommand/Workload.Tests.Fixtures.WithCommand.csproj" />
   </Folder>
-  <Folder Name="/test/Workloads/">
-    <Project Path="test/Workloads/Workload.DotNet.Tests/Dotnet.Tests.csproj" Id="79440645-9cd1-4e74-b2ae-d18933e7a326" />
+  <Folder Name="/test/Workload/">
+    <Project Path="test/Workload/DotNet.Tests/Dotnet.Tests.csproj" Id="79440645-9cd1-4e74-b2ae-d18933e7a326" />
   </Folder>
 </Solution>

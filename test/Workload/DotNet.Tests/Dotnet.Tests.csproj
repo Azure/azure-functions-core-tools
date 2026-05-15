@@ -11,8 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\src\Workloads\Workload.DotNet\Azure.Functions.Cli.Workload.DotNet.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workload/DotNet/Workload.DotNet.csproj" />
   </ItemGroup>
 
 </Project>

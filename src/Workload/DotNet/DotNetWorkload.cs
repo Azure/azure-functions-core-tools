@@ -1,9 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Azure.Functions.Cli.Workloads.DotNet;
+namespace Azure.Functions.Cli.Workload.DotNet;
 
 /// <summary>
 /// Workload for .NET (C#) Azure Functions. Provides tooling and project initialization for .NET Azure Functions projects.
