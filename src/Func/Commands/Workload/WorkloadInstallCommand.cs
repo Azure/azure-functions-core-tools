@@ -91,7 +91,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             // prompt entirely. Non-interactive contexts treat the prompt as
             // a decline and exit non-zero with the same hint. Local .nupkg
             // installs bypass the check since the resolver path differs.
-            int? earlyExit = await CheckAlreadyInstalledAsync(workload, exact, cancellationToken);
+            int? earlyExit = await HandleAlreadyInstalledAsync(
+                workload, exact, source, includePrerelease, cancellationToken);
             if (earlyExit is { } code)
             {
                 return code;
@@ -111,7 +112,15 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                     force,
                     cancellationToken);
 
-            _interaction.WriteSuccess(BuildSuccessMessage(result));
+            string message = BuildSuccessMessage(result);
+            if (result.AlreadyInstalled)
+            {
+                _interaction.WriteWarning(message);
+            }
+            else
+            {
+                _interaction.WriteSuccess(message);
+            }
             return 0;
         }
         catch (WorkloadPackageNotFoundException ex)
@@ -148,9 +157,11 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     private static bool LooksLikeLocalPackagePath(string value)
         => value.EndsWith(".nupkg", StringComparison.OrdinalIgnoreCase) && File.Exists(value);
 
-    private async Task<int?> CheckAlreadyInstalledAsync(
+    private async Task<int?> HandleAlreadyInstalledAsync(
         string identifier,
         bool exact,
+        string? source,
+        bool includePrerelease,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
@@ -171,29 +182,76 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        string canonicalId = match.PackageId;
-        string prompt =
-            $"'{canonicalId}' is already installed at {match.PackageVersion}. " +
-            $"Run 'func workload update {canonicalId}' instead?";
+        // Prefer the first alias for user-facing messages; fall back to the
+        // canonical package id when no alias is published.
+        string display = match.Aliases.Count > 0 ? match.Aliases[0] : match.PackageId;
+        string prompt = $"'{display}' is already installed at {match.PackageVersion}. Update instead?";
 
         if (!_interaction.IsInteractive)
         {
             _interaction.WriteHint(
-                $"'{canonicalId}' is already installed at {match.PackageVersion}. " +
-                $"Run 'func workload update {canonicalId}' to upgrade, or pass --force to install side-by-side.");
+                $"'{display}' is already installed at {match.PackageVersion}. " +
+                $"Run 'func workload update {display}' to upgrade, or pass --force to install side-by-side.");
             return 1;
         }
 
-        bool useUpdate = await _interaction.ConfirmAsync(prompt, defaultValue: true, cancellationToken);
-        if (useUpdate)
+        bool runUpdate = await _interaction.ConfirmAsync(prompt, defaultValue: true, cancellationToken);
+        if (!runUpdate)
         {
-            _interaction.WriteHint($"Run 'func workload update {canonicalId}' to upgrade.");
-            return 1;
+            // User declined: fall through to a normal install, which will
+            // go side-by-side or no-op for the same version.
+            return null;
         }
 
-        // User declined the suggestion: fall through to a normal install,
-        // which will go side-by-side or no-op for the same version.
-        return null;
+        return await RunUpdateAsync(match.PackageId, source, includePrerelease, cancellationToken);
+    }
+
+    private async Task<int> RunUpdateAsync(
+        string packageId,
+        string? source,
+        bool includePrerelease,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            WorkloadUpdateResult result = await _installer.UpdateAsync(
+                packageId,
+                targetInstalledVersion: null,
+                source,
+                includePrerelease,
+                allowMajor: false,
+                cancellationToken);
+
+            if (result.NoCandidateOnSource)
+            {
+                _interaction.WriteHint(
+                    $"No version of '{result.Entry.PackageId}' was found on the configured source. " +
+                    "Pass --source to point at the feed that publishes it.");
+                return 1;
+            }
+
+            if (result.NoUpdateAvailable)
+            {
+                string display = result.Entry.Aliases.Count > 0 ? result.Entry.Aliases[0] : result.Entry.PackageId;
+                _interaction.WriteWarning(
+                    $"Workload '{display}' is already at the latest available version " +
+                    $"({result.Entry.PackageVersion}).");
+                return 0;
+            }
+
+            string displayName = result.Entry.Aliases.Count > 0 ? result.Entry.Aliases[0] : result.Entry.PackageId;
+            _interaction.WriteSuccess(
+                $"Updated workload '{displayName}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
+            return 0;
+        }
+        catch (Exception ex) when (
+            ex is WorkloadPackageNotFoundException
+            or FileNotFoundException
+            or InvalidWorkloadException
+            or InvalidOperationException)
+        {
+            throw new GracefulException(ex.Message, isUserError: true);
+        }
     }
 
     private static string BuildSuccessMessage(WorkloadInstallResult result)
@@ -205,8 +263,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
         return entry.Kind switch
         {
-            WorkloadKind.Workload when entry.EntryPoint is not null
-                => $"{verb} (entry point: {entry.EntryPoint.Type}).",
+            WorkloadKind.Workload when entry.Aliases.Count > 0
+                => $"{verb} (aliases: {string.Join(", ", entry.Aliases)}).",
             WorkloadKind.Content
                 => $"{verb} (content at '{entry.Source}').",
             _ => $"{verb}.",

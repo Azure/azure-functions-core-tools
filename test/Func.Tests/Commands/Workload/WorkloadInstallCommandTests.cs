@@ -168,7 +168,7 @@ public class WorkloadInstallCommandTests
         Assert.Equal(0, exit);
         Assert.Contains(
             _interaction.Lines,
-            l => l.StartsWith("SUCCESS:")
+            l => l.StartsWith("WARNING:")
                 && l.Contains("already installed")
                 && l.Contains("test.workload"));
     }
@@ -330,7 +330,7 @@ public class WorkloadInstallCommandTests
             Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
         Assert.Contains(_interaction.Lines, l =>
-            l.StartsWith("HINT:") && l.Contains("func workload update Test.Workload"));
+            l.StartsWith("HINT:") && l.Contains("func workload update test"));
     }
 
     [Fact]
@@ -348,6 +348,27 @@ public class WorkloadInstallCommandTests
 
         var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "alias1");
+
+        Assert.Equal(1, exit);
+        Assert.Contains(_interaction.Lines, l =>
+            l.StartsWith("HINT:") && l.Contains("alias1") && l.Contains("1.2.3"));
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalled_AliasMatch_NonInteractive_HintsCanonicalIdWhenNoAlias()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload",
+                PackageVersion = "1.2.3",
+                Aliases = [],
+            },
+        });
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
+        int exit = await InvokeAsync(cmd, "Test.Workload");
 
         Assert.Equal(1, exit);
         Assert.Contains(_interaction.Lines, l =>

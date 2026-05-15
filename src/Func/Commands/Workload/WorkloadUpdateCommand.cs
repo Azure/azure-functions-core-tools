@@ -263,7 +263,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
         if (result.NoUpdateAvailable)
         {
-            _interaction.WriteHint(
+            _interaction.WriteWarning(
                 $"Workload '{result.Entry.PackageId}' is already at the latest available version " +
                 $"({result.Entry.PackageVersion}).");
             return;
