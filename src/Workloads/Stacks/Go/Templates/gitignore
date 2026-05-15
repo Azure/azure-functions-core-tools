@@ -1,0 +1,18 @@
+bin
+obj
+.vs
+
+local.settings.json
+.secrets
+
+# Go build artifacts
+*.exe
+*.test
+*.out
+handler
+vendor/
+
+# Azurite artifacts
+__blobstorage__
+__queuestorage__
+__azurite_db*__.json
