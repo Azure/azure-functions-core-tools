@@ -11,7 +11,7 @@
     <Project Path="src/Workload/Python/Workload.Python.csproj" />
   </Folder>
   <Folder Name="/src/Workload/">
-    <Project Path="src/Workload/DotNet/Azure.Functions.Cli.Workload.DotNet.csproj" Id="b025713a-39f8-433f-b5c7-5b51db28eed5" />
+    <Project Path="src/Workload/DotNet/Workload.DotNet.csproj" Id="b025713a-39f8-433f-b5c7-5b51db28eed5" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
