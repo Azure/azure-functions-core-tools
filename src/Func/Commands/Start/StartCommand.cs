@@ -143,7 +143,6 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         string? logFilePath = parseResult.GetValue(LogFileOption);
         IDashboardEventSink? eventSink = CreateLogFileSink(logFilePath);
 
-        var initialRunInfo = new DashboardRunInfo(CliVersion: _versionProvider.Version, ProfileName: "none", StackName: "unknown");
         var initializationContext = new StartInitializationContext(
             workingDirectory,
             _versionProvider.Version,
@@ -156,7 +155,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             DemoAutoExit: ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")));
 
         StartInitializationResult initializationResult;
-        await using (IStartInitializationRenderer initializationRenderer = CreateInitializationRenderer(mode, initialRunInfo))
+        await using (IStartInitializationRenderer initializationRenderer = CreateInitializationRenderer(mode))
         {
             initializationResult = await _initializationRunner.RunAsync(initializationContext, initializationRenderer, cancellationToken);
         }
@@ -262,11 +261,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 
-    private IStartInitializationRenderer CreateInitializationRenderer(OutputMode mode, DashboardRunInfo runInfo) => mode switch
+    private IStartInitializationRenderer CreateInitializationRenderer(OutputMode mode) => mode switch
     {
         OutputMode.Json => new JsonStartInitializationRenderer(),
         OutputMode.Plain => new PlainStartInitializationRenderer(_interaction),
-        OutputMode.Compact => new CompactStartInitializationRenderer(_interaction, runInfo: runInfo),
+        OutputMode.Compact => new CompactStartInitializationRenderer(_interaction),
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 }

@@ -1,11 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Threading.Channels;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
-using Azure.Functions.Cli.Hosting.Dashboard;
-using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Spectre.Console;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
@@ -15,15 +12,13 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 /// </summary>
 internal sealed class CompactStartInitializationRenderer(
     IInteractionService interaction,
-    IAnsiConsole? console = null,
-    DashboardRunInfo? runInfo = null) : IStartInitializationRenderer
+    IAnsiConsole? console = null) : IStartInitializationRenderer
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
     private readonly SemaphoreSlim _stepLock = new(initialCount: 1, maxCount: 1);
-    private DashboardRunInfo _runInfo = runInfo ?? new();
-    private string? _hostVersion;
-    private StepDisplay? _currentDisplay;
+    private readonly List<StepState> _steps = [];
+    private StepState? _activeStep;
     private bool _disposed;
 
     private ITheme Theme => _interaction.Theme;
@@ -39,22 +34,17 @@ internal sealed class CompactStartInitializationRenderer(
             switch (initializationEvent)
             {
                 case StartInitializationStartedEvent:
-                    RenderHeader();
                     break;
                 case StartInitializationStepStartedEvent started:
-                    await StartDisplayAsync(started.Step, cancellationToken);
+                    StartStep(started.Step);
                     break;
                 case StartInitializationProgressEvent progress:
-                    await SendToCurrentDisplayAsync(progress, cancellationToken);
+                    UpdateProgress(progress);
                     break;
                 case StartInitializationStepCompletedEvent completed:
-                    ApplyStepCompletion(completed);
-                    await CompleteCurrentDisplayAsync(completed, cancellationToken);
+                    CompleteStep(completed);
                     break;
-                case StartInitializationCompletedEvent completed:
-                    _runInfo = completed.Result.RunInfo;
-                    _hostVersion = completed.Result.HostVersion;
-                    await StopCurrentDisplayAsync(cancellationToken);
+                case StartInitializationCompletedEvent:
                     ClearIfTerminal();
                     break;
             }
@@ -65,167 +55,122 @@ internal sealed class CompactStartInitializationRenderer(
         }
     }
 
-    private async Task StartDisplayAsync(StartInitializationStep step, CancellationToken cancellationToken)
+    private void StartStep(StartInitializationStep step)
     {
-        await StopCurrentDisplayAsync(cancellationToken);
-        RenderHeader();
-
-        var display = new StepDisplay(step);
-        display.DisplayTask = Task.Run(
-            () => step.DisplayKind == StartInitializationDisplayKind.Progress
-                ? RunProgressDisplayAsync(display)
-                : RunStatusDisplayAsync(display),
-            CancellationToken.None);
-
-        _ = display.DisplayTask.ContinueWith(
-            task =>
-            {
-                if (task.Exception is { } exception)
-                {
-                    display.Ready.TrySetException(exception.GetBaseException());
-                }
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.OnlyOnFaulted,
-            TaskScheduler.Default);
-
-        _currentDisplay = display;
-        await display.Ready.Task.WaitAsync(cancellationToken);
+        var state = new StepState(step);
+        _steps.Add(state);
+        _activeStep = state;
+        WriteStepLine(state, endLine: false);
     }
 
-    private async Task RunStatusDisplayAsync(StepDisplay display)
+    private void UpdateProgress(StartInitializationProgressEvent progress)
     {
-        await _console.Status()
-            .Spinner(Spinner.Known.Dots)
-            .SpinnerStyle(Theme.Active)
-            .StartAsync(display.Step.Title, async status =>
-            {
-                display.Ready.TrySetResult();
-
-                await foreach (StartInitializationEvent initializationEvent in display.Events.Reader.ReadAllAsync(display.CancellationToken))
-                {
-                    if (initializationEvent is StartInitializationProgressEvent progress
-                        && !string.IsNullOrWhiteSpace(progress.Message))
-                    {
-                        status.Status = progress.Message;
-                        status.Refresh();
-                    }
-
-                    if (initializationEvent is StartInitializationStepCompletedEvent completed)
-                    {
-                        status.Status = completed.Message ?? display.Step.Title;
-                        status.Refresh();
-                        return;
-                    }
-                }
-            });
-    }
-
-    private async Task RunProgressDisplayAsync(StepDisplay display)
-    {
-        await _console.Progress()
-            .AutoClear(true)
-            .Columns(
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn
-                {
-                    CompletedStyle = Theme.Success,
-                    FinishedStyle = Theme.Success,
-                    RemainingStyle = Theme.Muted,
-                },
-                new PercentageColumn())
-            .StartAsync(async context =>
-            {
-                ProgressTask task = context.AddTask(display.Step.Title, maxValue: 100);
-                display.Ready.TrySetResult();
-
-                await foreach (StartInitializationEvent initializationEvent in display.Events.Reader.ReadAllAsync(display.CancellationToken))
-                {
-                    if (initializationEvent is StartInitializationProgressEvent progress)
-                    {
-                        task.Value = Math.Clamp(progress.Percent, 0, 100);
-                        if (!string.IsNullOrWhiteSpace(progress.Message))
-                        {
-                            task.Description = progress.Message;
-                        }
-                    }
-
-                    if (initializationEvent is StartInitializationStepCompletedEvent completed)
-                    {
-                        task.Value = 100;
-                        task.Description = completed.Message ?? display.Step.Title;
-                        task.StopTask();
-                        return;
-                    }
-                }
-            });
-    }
-
-    private async Task SendToCurrentDisplayAsync(StartInitializationEvent initializationEvent, CancellationToken cancellationToken)
-    {
-        if (_currentDisplay is null)
+        if (FindStep(progress.StepKind) is not { } step)
         {
             return;
         }
 
-        await _currentDisplay.Events.Writer.WriteAsync(initializationEvent, cancellationToken);
+        step.Percent = Math.Clamp(progress.Percent, 0, 100);
+        if (ReferenceEquals(_activeStep, step))
+        {
+            RewriteStepLine(step, endLine: false);
+        }
     }
 
-    private async Task CompleteCurrentDisplayAsync(StartInitializationStepCompletedEvent completed, CancellationToken cancellationToken)
+    private void CompleteStep(StartInitializationStepCompletedEvent completed)
     {
-        if (_currentDisplay is not { } display || display.Step.Kind != completed.StepKind)
+        if (FindStep(completed.StepKind) is not { } step)
         {
             return;
         }
 
-        await display.Events.Writer.WriteAsync(completed, cancellationToken);
-        display.Events.Writer.TryComplete();
-        await AwaitDisplayAsync(display, cancellationToken);
-        _currentDisplay = null;
+        step.Completed = true;
+        step.Percent = 100;
+        step.Result = completed.Message;
+        if (ReferenceEquals(_activeStep, step))
+        {
+            RewriteStepLine(step, endLine: true);
+            _activeStep = null;
+        }
     }
 
-    private async Task StopCurrentDisplayAsync(CancellationToken cancellationToken)
+    private StepState? FindStep(StartInitializationStepKind kind)
+        => _steps.LastOrDefault(step => step.Step.Kind == kind);
+
+    private void WriteStepLine(StepState step, bool endLine)
     {
-        if (_currentDisplay is not { } display)
+        _console.Write(new Markup(BuildStepMarkup(step)));
+        if (endLine)
         {
-            return;
+            _console.Write(new Text(Environment.NewLine));
         }
-
-        display.Cancel();
-        display.Events.Writer.TryComplete();
-        await AwaitDisplayAsync(display, cancellationToken);
-        _currentDisplay = null;
     }
 
-    private static async Task AwaitDisplayAsync(StepDisplay display, CancellationToken cancellationToken)
+    private void RewriteStepLine(StepState step, bool endLine)
     {
-        try
+        ClearCurrentLine();
+        WriteStepLine(step, endLine);
+    }
+
+    private void ClearCurrentLine()
+    {
+        if (_console.Profile.Out.IsTerminal)
         {
-            await display.DisplayTask.WaitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException) when (display.CancellationToken.IsCancellationRequested)
-        {
-        }
-        finally
-        {
-            display.Dispose();
+            _console.Write(new ControlCode("\r\u001b[2K"));
         }
     }
 
-    private void ApplyStepCompletion(StartInitializationStepCompletedEvent completed)
+    private string BuildStepMarkup(StepState step)
     {
-        if (completed.StepKind == StartInitializationStepKind.ResolveStack
-            && !string.IsNullOrWhiteSpace(completed.Message))
+        string icon = step.Completed
+            ? Styled(CompletedIcon, Theme.Success)
+            : Styled(CurrentSpinnerFrame, Theme.Active);
+
+        string title = Markup.Escape(FormatStepTitle(step));
+
+        string progress = step.Step.DisplayKind == StartInitializationDisplayKind.Progress && !step.Completed
+            ? $" {FormatProgress(step.Percent)}"
+            : string.Empty;
+
+        if (step.Completed)
         {
-            _runInfo = _runInfo with { StackName = completed.Message };
+            string result = step.Result is null
+                ? string.Empty
+                : $": [dim]{Markup.Escape(step.Result)}[/]";
+
+            return $"{icon} {title}{result}";
+        }
+        else
+        {
+            return $"{icon} [dim]{title}[/]{progress}";
         }
     }
 
-    private void RenderHeader()
+    private string FormatProgress(double percent)
     {
-        ClearIfTerminal();
-        _console.Write(new CompactHeaderBuilder(Theme, _runInfo).BuildBanner(_hostVersion, listenUri: null));
+        const int width = 18;
+        double clamped = Math.Clamp(percent, 0, 100);
+        int completed = (int)Math.Round(width * clamped / 100, MidpointRounding.AwayFromZero);
+        string completedText = new(ProgressCompleteCharacter, completed);
+        string remainingText = new(ProgressRemainingCharacter, width - completed);
+
+        return $"{Styled(completedText, Theme.Success)}{Styled(remainingText, Theme.Muted)} {clamped,3:0}%";
     }
+
+    private string CurrentSpinnerFrame
+    {
+        get
+        {
+            Spinner spinner = _console.Profile.Capabilities.Unicode ? Spinner.Known.Dots : Spinner.Known.Line;
+            return spinner.Frames[0];
+        }
+    }
+
+    private string CompletedIcon => _console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
+
+    private char ProgressCompleteCharacter => _console.Profile.Capabilities.Unicode ? '\u2501' : '=';
+
+    private char ProgressRemainingCharacter => _console.Profile.Capabilities.Unicode ? '\u2500' : '-';
 
     private void ClearIfTerminal()
     {
@@ -235,24 +180,15 @@ internal sealed class CompactStartInitializationRenderer(
         }
     }
 
-    private sealed class StepDisplay(StartInitializationStep step) : IDisposable
-    {
-        private readonly CancellationTokenSource _cts = new();
+    private static string Styled(string text, Style style)
+        => string.IsNullOrEmpty(text)
+            ? string.Empty
+            : $"[{style.ToMarkup()}]{Markup.Escape(text)}[/]";
 
-        public StartInitializationStep Step { get; } = step;
-
-        public Channel<StartInitializationEvent> Events { get; } = Channel.CreateUnbounded<StartInitializationEvent>();
-
-        public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task DisplayTask { get; set; } = Task.CompletedTask;
-
-        public CancellationToken CancellationToken => _cts.Token;
-
-        public void Cancel() => _cts.Cancel();
-
-        public void Dispose() => _cts.Dispose();
-    }
+    private static string FormatStepTitle(StepState step)
+        => step.Completed || step.Step.DisplayKind == StartInitializationDisplayKind.Progress
+        ? step.Step.Title
+        : step.Step.Title.EndsWith("...", StringComparison.Ordinal) ? step.Step.Title : $"{step.Step.Title}...";
 
     public async ValueTask DisposeAsync()
     {
@@ -265,7 +201,11 @@ internal sealed class CompactStartInitializationRenderer(
         try
         {
             _disposed = true;
-            await StopCurrentDisplayAsync(CancellationToken.None);
+            if (_activeStep is not null)
+            {
+                _console.Write(new Text(Environment.NewLine));
+                _activeStep = null;
+            }
         }
         finally
         {
@@ -273,5 +213,15 @@ internal sealed class CompactStartInitializationRenderer(
         }
 
         _stepLock.Dispose();
+    }
+
+    private sealed class StepState(StartInitializationStep step)
+    {
+        public StartInitializationStep Step { get; } = step;
+
+        public double Percent { get; set; }
+
+        public bool Completed { get; set; }
+        public string? Result { get; internal set; }
     }
 }

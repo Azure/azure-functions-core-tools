@@ -101,7 +101,7 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
-    public async Task CompactRenderer_RendersStatusAndProgressDisplays()
+    public async Task CompactRenderer_RendersChecklistLines()
     {
         using var writer = new StringWriter();
         IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
@@ -111,7 +111,7 @@ public class StartInitializationTests : IDisposable
             Interactive = InteractionSupport.Yes,
             Out = new TestTerminalOutput(writer),
         });
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), console, new DashboardRunInfo(CliVersion: "5.0.0-test"));
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), console);
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
         await renderer.OnEventAsync(
@@ -148,10 +148,43 @@ public class StartInitializationTests : IDisposable
         await renderer.DisposeAsync();
 
         string output = writer.ToString();
+        string completedIcon = console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
 
-        Assert.Contains("Azure Functions CLI", output);
-        Assert.Contains("Resolve profile", output);
-        Assert.Contains("Preparing download", output);
+        Assert.DoesNotContain("Azure Functions CLI", output);
+        Assert.Contains(completedIcon, output);
+        Assert.Contains("Resolve profile...", output);
+        Assert.Contains("Install host workload", output);
+        Assert.Contains(" 50%", output);
+        Assert.DoesNotContain("Preparing download", output);
+    }
+
+    [Fact]
+    public async Task CompactRenderer_DoesNotClearWhenInitializationStarts()
+    {
+        using var writer = new StringWriter();
+        IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.Yes,
+            ColorSystem = ColorSystemSupport.NoColors,
+            Interactive = InteractionSupport.Yes,
+            Out = new TestTerminalOutput(writer),
+        });
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), console);
+
+        try
+        {
+            await renderer.OnEventAsync(
+                new StartInitializationStepStartedEvent(
+                    DateTimeOffset.UnixEpoch,
+                    new StartInitializationStep(StartInitializationStepKind.ResolveProfile, "Resolve profile")),
+                CancellationToken.None);
+
+            Assert.DoesNotContain("\u001b[2J", writer.ToString());
+        }
+        finally
+        {
+            await renderer.DisposeAsync();
+        }
     }
 
     private sealed class RecordingStartInitializationRenderer : IStartInitializationRenderer
