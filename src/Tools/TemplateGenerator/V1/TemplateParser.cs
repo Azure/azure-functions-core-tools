@@ -3,10 +3,9 @@
 
 using System.Collections.Immutable;
 using System.Text.Json;
+using Azure.Functions.Cli.Tools.TemplateGenerator.V1.Model;
 
-using Azure.Functions.Cli.Tools.TemplateGenerator.Model;
-
-namespace Azure.Functions.Cli.Tools.TemplateGenerator;
+namespace Azure.Functions.Cli.Tools.TemplateGenerator.V1;
 
 internal static class TemplateParser
 {

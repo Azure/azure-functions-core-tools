@@ -5,18 +5,33 @@
   </ItemGroup>
 
   <ItemGroup>
-    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="IsTemplatesJson" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateVersion" />
     <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateLanguage" />
   </ItemGroup>
 
-  <Target Name="_DownloadTemplateAssets" BeforeTargets="BeforeBuild">
-    <DownloadFile DestinationFolder="$(BaseIntermediateOutputPath)" 
-      SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v1/templates/templates.json">
-      <Output TaskParameter="DownloadedFile" ItemName="_TemplateFiles" />
-    </DownloadFile>
+  <PropertyGroup>
+    <_TemplatesV1File>templates.v1.json</_TemplatesV1File>
+    <_TemplatesV2File>templates.v2.json</_TemplatesV2File>
+    <_TemplateV1JsonPath>$(BaseIntermediateOutputPath)$(_TemplatesV1File)</_TemplateV1JsonPath>
+    <_TemplateV2JsonPath>$(BaseIntermediateOutputPath)$(_TemplatesV2File)</_TemplateV2JsonPath>
+  </PropertyGroup>
 
+  <!-- Download during restore, after package references are collected. -->
+  <Target Name="_DownloadTemplateAssets" AfterTargets="CollectPackageReferences">
+    <DownloadFile DestinationFolder="$(BaseIntermediateOutputPath)" DestinationFilename="$(_TemplatesV1File)"
+      SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v1/templates/templates.json"
+      SkipUnchangedFiles="true" />
+    
+    <DownloadFile DestinationFolder="$(BaseIntermediateOutputPath)" DestinationFilename="$(_TemplatesV2File)"
+      SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v2/templates/templates.json"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Wire up the downloaded file as an AdditionalFile before build. -->
+  <Target Name="_IncludeTemplateAdditionalFile" BeforeTargets="BeforeBuild" Condition="Exists('$(_TemplateV1JsonPath)')">
     <ItemGroup>
-      <AdditionalFiles Include="@(_TemplateFiles)" IsTemplatesJson="true" TemplateLanguage="$(TemplateLanguage)" />
+      <AdditionalFiles Include="$(_TemplateV1JsonPath)" TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" />
+      <AdditionalFiles Include="$(_TemplateV2JsonPath)" TemplateVersion="v2" TemplateLanguage="$(TemplateLanguage)" />
     </ItemGroup>
   </Target>
 

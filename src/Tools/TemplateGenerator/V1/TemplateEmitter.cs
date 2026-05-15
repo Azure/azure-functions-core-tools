@@ -1,14 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.Generic;
 using System.Text;
-
-using Azure.Functions.Cli.Tools.TemplateGenerator.Model;
-
+using Azure.Functions.Cli.Tools.TemplateGenerator.V1.Model;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace Azure.Functions.Cli.Tools.TemplateGenerator;
+namespace Azure.Functions.Cli.Tools.TemplateGenerator.V1;
 
 internal static class TemplateEmitter
 {

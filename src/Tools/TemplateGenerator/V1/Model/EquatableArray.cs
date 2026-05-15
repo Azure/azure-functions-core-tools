@@ -4,7 +4,7 @@
 using System.Collections;
 using System.Collections.Immutable;
 
-namespace Azure.Functions.Cli.Tools.TemplateGenerator.Model;
+namespace Azure.Functions.Cli.Tools.TemplateGenerator.V1.Model;
 
 #pragma warning disable IDE0301 // Collection initialization can be simplified
 

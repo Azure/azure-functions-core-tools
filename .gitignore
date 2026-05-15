@@ -32,6 +32,7 @@ publish-env
 *.binlog
 pp.xml
 _*
+*.lscache
 
 # v4 publish tool binaries (should not be checked in)
 eng/tools/publish-tools/npm/bin/

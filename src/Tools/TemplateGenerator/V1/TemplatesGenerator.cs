@@ -1,17 +1,16 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Tools.TemplateGenerator.Model;
-
+using Azure.Functions.Cli.Tools.TemplateGenerator.V1.Model;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace Azure.Functions.Cli.Tools.TemplateGenerator;
+namespace Azure.Functions.Cli.Tools.TemplateGenerator.V1;
 
 [Generator]
 public sealed class TemplatesGenerator : IIncrementalGenerator
 {
-    private const string IsTemplatesJsonKey = "build_metadata.AdditionalFiles.IsTemplatesJson";
+    private const string TemplateVersionKey = "build_metadata.AdditionalFiles.TemplateVersion";
     private const string TemplateLanguageKey = "build_metadata.AdditionalFiles.TemplateLanguage";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -26,15 +25,15 @@ public sealed class TemplatesGenerator : IIncrementalGenerator
             ctx.AddSource("TemplateMetadata.g.cs", TemplateEmitter.EmitTemplateMetadata());
         });
 
-        // Find AdditionalFiles marked with IsTemplatesJson="true", parse, and emit static data.
+        // Find AdditionalFiles marked with TemplateVersion="v1", parse, and emit static data.
         // Optionally filter by TemplateLanguage metadata (matches the "-{Language}" suffix on template ids).
         IncrementalValuesProvider<EquatableArray<TemplateModel>> templates = context.AdditionalTextsProvider
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Where(static pair =>
             {
                 AnalyzerConfigOptions options = pair.Right.GetOptions(pair.Left);
-                return options.TryGetValue(IsTemplatesJsonKey, out string? value)
-                    && value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                return options.TryGetValue(TemplateVersionKey, out string? value)
+                    && value.Equals("v1", StringComparison.OrdinalIgnoreCase);
             })
             .Select(static (pair, ct) =>
             {
