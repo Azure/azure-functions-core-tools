@@ -62,7 +62,8 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 3. Subclass `Workload` and override `DisplayName`, `Description`, and `Configure`
 4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
 5. Add a `workload.json` next to your csproj describing the entry-point assembly and type
-6. Build, package, and install with `func workload install <path-to-nupkg>`
+6. Add a `README.md` next to the csproj — `Release.props` auto-includes it as `<PackageReadmeFile>` so it surfaces on NuGet feeds and in `func workload list`
+7. Build, package, and install with `func workload install <path-to-nupkg>`
 
 ## Step 1: Create the Project
 
@@ -151,6 +152,8 @@ Add a `workload.json` that points at your entry-point type. `assemblyPath` is **
   }
 }
 ```
+
+Add a `README.md` next to the csproj. `Release.props` auto-wires it as `<PackageReadmeFile>` (and the Functions icon as `<PackageIcon>`), so both surface on NuGet feeds without extra packing config. Use it to describe the workload's purpose, the language(s) it supports, and any prerequisites.
 
 ## Step 2: Subclass `Workload`
 
@@ -394,6 +397,7 @@ Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`)
 
 - [ ] New project `src/Workload/<Name>/Workload.<Name>.csproj`, packs as `PackageType=FuncCliWorkload`, references `Abstractions` with `PrivateAssets=all` / `ExcludeAssets=runtime`
 - [ ] `Directory.Version.props` and `release_notes.md` next to the csproj
+- [ ] `README.md` next to the csproj (auto-packed by `Release.props` as `<PackageReadmeFile>`)
 - [ ] `workload.json` next to the csproj, listing the entry-point `assemblyPath` and `type`
 - [ ] Subclass of `Workload` with a parameterless constructor, overriding `DisplayName`, `Description`, and `Configure`
 - [ ] `Configure(FunctionsCliBuilder)` null-checks `builder` and registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
