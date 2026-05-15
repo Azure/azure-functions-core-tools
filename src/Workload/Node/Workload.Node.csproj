@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Title>Node.js</Title>
-    <Description>Azure Functions CLI Node workload.</Description>
+    <Description>Azure Functions CLI tooling for JavaScript and TypeScript projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:node func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
