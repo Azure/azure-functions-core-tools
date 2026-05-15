@@ -20,8 +20,10 @@ public class DotNetProjectInitializerTests
             Language: null,
             Force: false);
 
-        await Assert.ThrowsAsync<NotImplementedException>(
+        NotImplementedException exception = await Assert.ThrowsAsync<NotImplementedException>(
             () => initializer.InitializeAsync(context, new RootCommand().Parse(string.Empty)));
+
+        Assert.Equal(".NET project initialization is not implemented yet.", exception.Message);
     }
 
     [Fact]
@@ -34,5 +36,11 @@ public class DotNetProjectInitializerTests
     public void GetInitOptions_IsEmpty()
     {
         Assert.Empty(new DotNetProjectInitializer().GetInitOptions());
+    }
+
+    [Fact]
+    public void SupportedLanguages_ReturnsExpectedLanguages()
+    {
+        Assert.Equal(["C#", "F#", "csharp", "fsharp"], new DotNetProjectInitializer().SupportedLanguages);
     }
 }
