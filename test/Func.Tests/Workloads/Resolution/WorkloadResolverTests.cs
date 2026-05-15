@@ -8,14 +8,33 @@ using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Resolution;
 
-public sealed class WorkloadResolverTests
+public sealed class WorkloadResolverTests : IDisposable
 {
-    private readonly DirectoryInfo _dir = new(Path.Combine(Path.GetTempPath(), "resolver-tests"));
+    private readonly DirectoryInfo _dir;
     private readonly ILocalSettingsReader _settings = Substitute.For<ILocalSettingsReader>();
 
     public WorkloadResolverTests()
     {
+        _dir = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "func-resolver-tests-" + Guid.NewGuid().ToString("N")));
+        _dir.Create();
+        File.WriteAllText(Path.Combine(_dir.FullName, "host.json"), "{}");
+
         _settings.ReadWorkerRuntime(Arg.Any<DirectoryInfo>()).Returns((string?)null);
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (_dir.Exists)
+            {
+                _dir.Delete(recursive: true);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup; temp dirs are reclaimed by the OS.
+        }
     }
 
     [Fact]
@@ -241,6 +260,40 @@ public sealed class WorkloadResolverTests
             CancellationToken.None);
 
         Assert.IsType<WorkloadResolution.None>(result);
+    }
+
+    [Fact]
+    public async Task NoHostJson_ReturnsNoneWithoutInvokingResolvers()
+    {
+        // CLI-wide invariant: a directory without host.json is not a
+        // Functions project. The host gates this so per-stack resolvers
+        // don't have to repeat the check.
+        var emptyDir = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "func-resolver-no-host-" + Guid.NewGuid().ToString("N")));
+        emptyDir.Create();
+        try
+        {
+            WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
+            IProjectResolver resolverStub = NewProjectResolver(EvaluationResult.Match("would have matched"));
+
+            WorkloadResolver resolver = NewResolver(
+                workloads: [dotnet],
+                resolvers: [(dotnet, resolverStub)]);
+
+            WorkloadResolution result = await resolver.ResolveAsync(
+                new WorkloadResolutionContext(emptyDir, StackSelector: null),
+                CancellationToken.None);
+
+            var none = Assert.IsType<WorkloadResolution.None>(result);
+            Assert.Contains("does not look like an Azure Functions project", none.Message);
+            Assert.Contains("host.json", none.Message);
+            Assert.Contains(emptyDir.FullName, none.Message);
+            Assert.Contains("func init", none.Message);
+            await resolverStub.DidNotReceive().EvaluateAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            try { emptyDir.Delete(recursive: true); } catch { }
+        }
     }
 
     [Fact]
