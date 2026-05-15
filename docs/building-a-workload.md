@@ -79,7 +79,7 @@ Create the `Workload.Node.csproj`. The csproj is the single source of truth for 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Title>Node.js</Title>
-    <Description>Azure Functions CLI Node.js workload.</Description>
+    <Description>Azure Functions CLI tooling for Node.js projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:node alias:javascript alias:typescript func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
@@ -171,7 +171,7 @@ public sealed class NodeWorkload : Workloads.Workload
 {
     public override string DisplayName => "Node.js";
 
-    public override string Description => "Azure Functions tooling for Node.js and TypeScript projects.";
+    public override string Description => "Azure Functions CLI tooling for Node.js projects.";
 
     public override void Configure(FunctionsCliBuilder builder)
     {

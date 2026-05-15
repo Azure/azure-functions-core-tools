@@ -25,7 +25,7 @@ Create the following files:
     <PropertyGroup>
       <TargetFramework>net10.0</TargetFramework>
       <Title><Name></Title>
-      <Description>Azure Functions CLI <Name> workload.</Description>
+      <Description>Azure Functions CLI tooling for <Name> projects.</Description>
       <PackageType>FuncCliWorkload</PackageType>
       <PackageTags>kind:workload alias:<name> func-workload</PackageTags>
       <IncludeBuildOutput>false</IncludeBuildOutput>
@@ -99,7 +99,7 @@ Create the following files:
   {
       public override string DisplayName => "<Name>";
 
-      public override string Description => "Azure Functions tooling for <Name> projects.";
+      public override string Description => "Azure Functions CLI tooling for <Name> projects.";
 
       public override void Configure(FunctionsCliBuilder builder)
       {
