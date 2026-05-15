@@ -4,7 +4,7 @@
 using System.Text;
 using Azure.Functions.Cli.Tools.TemplateGenerator.Common;
 using Azure.Functions.Cli.Tools.TemplateGenerator.Model;
-using Azure.Functions.Cli.Tools.TemplateGenerator.Model.V1;
+using Azure.Functions.Cli.Tools.TemplateGenerator.V1.Model;
 
 namespace Azure.Functions.Cli.Tools.TemplateGenerator.V1;
 
@@ -260,7 +260,13 @@ internal static class TemplateEmitterV1
 
         AppendString(sb, inner, "Name", binding.Name);
         AppendString(sb, inner, "Type", binding.Type);
-        sb.Append(inner).Append("Direction = BindingDirectionV1.").Append(binding.Direction == BindingDirectionKindV1.In ? "In" : "Out").AppendLine(",");
+        sb.Append(inner).Append("Direction = BindingDirectionV1.").Append(binding.Direction switch
+        {
+            BindingDirectionKindV1.In => "In",
+            BindingDirectionKindV1.Out => "Out",
+            // V1 template bindings only use "in"/"out"; Trigger is only valid in bindings.json, not templates.json.
+            _ => throw new global::System.InvalidOperationException($"Unsupported binding direction in template: {binding.Direction}"),
+        }).AppendLine(",");
 
         if (binding.ExtensionData.Length > 0)
         {

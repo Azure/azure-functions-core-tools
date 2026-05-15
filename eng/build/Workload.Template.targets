@@ -7,6 +7,7 @@
   <ItemGroup>
     <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateVersion" />
     <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateLanguage" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="TemplateAssetKind" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -46,11 +47,18 @@
       SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Wire up the downloaded file as an AdditionalFile before build. -->
-  <Target Name="_IncludeTemplateAdditionalFile" BeforeTargets="BeforeBuild" Condition="Exists('$(_TemplateV1JsonPath)')">
+  <!-- Wire up the downloaded files as AdditionalFiles before build. Each item is gated by its own Exists check. -->
+  <Target Name="_IncludeTemplateAdditionalFile" BeforeTargets="BeforeBuild">
     <ItemGroup>
-      <AdditionalFiles Include="$(_TemplatesV1Folder)templates.json" TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" />
-      <AdditionalFiles Include="$(_TemplatesV2Folder)templates.json" TemplateVersion="v2" TemplateLanguage="$(TemplateLanguage)" />
+      <AdditionalFiles Include="$(_TemplatesV1Folder)templates.json"
+        TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="templates"
+        Condition="Exists('$(_TemplatesV1Folder)templates.json')" />
+      <AdditionalFiles Include="$(_TemplatesV2Folder)templates.json"
+        TemplateVersion="v2" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="templates"
+        Condition="Exists('$(_TemplatesV2Folder)templates.json')" />
+      <AdditionalFiles Include="$(_TemplatesV1Folder)bindings.json"
+        TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="bindings"
+        Condition="Exists('$(_TemplatesV1Folder)bindings.json')" />
     </ItemGroup>
   </Target>
 

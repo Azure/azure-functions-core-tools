@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Text;
 using Azure.Functions.Cli.Tools.TemplateGenerator.Common;
 using Azure.Functions.Cli.Tools.TemplateGenerator.Model;
-using Azure.Functions.Cli.Tools.TemplateGenerator.Model.V2;
+using Azure.Functions.Cli.Tools.TemplateGenerator.V2.Model;
 
 namespace Azure.Functions.Cli.Tools.TemplateGenerator.V2;
 

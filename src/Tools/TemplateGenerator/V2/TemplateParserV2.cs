@@ -4,7 +4,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using Azure.Functions.Cli.Tools.TemplateGenerator.Model;
-using Azure.Functions.Cli.Tools.TemplateGenerator.Model.V2;
+using Azure.Functions.Cli.Tools.TemplateGenerator.V2.Model;
 
 namespace Azure.Functions.Cli.Tools.TemplateGenerator.V2;
 
