@@ -16,8 +16,9 @@ This guide walks through building a workload for the Azure Functions Core Tools 
            ▼
 ┌─────────────────────────────────┐
 │  Abstractions                   │
-│  NuGet package with interfaces  │
-│  IWorkload, FunctionsCliBuilder │
+│  NuGet package with the         │
+│  Workload base class,           │
+│  FunctionsCliBuilder,           │
 │  IProjectInitializer, …         │
 └──────────┬──────────────────────┘
            │ referenced by (compile-time)
@@ -40,7 +41,7 @@ The CLI builds a `HostApplicationBuilder` at startup. Each installed workload is
 1. CLI builds the host (HostApplicationBuilder)
 2. For each entry in ~/.azure-functions/workloads.json:
      ├── Load the workload assembly into an isolated AssemblyLoadContext
-     ├── Activate the IWorkload type
+     ├── Activate the Workload type named in the package's workload.json
      └── Call workload.Configure(builder)        ← workload registers services here
 3. CLI builds the root command tree from DI
      ├── Built-in commands resolve workload-contributed services they consume
@@ -50,15 +51,16 @@ The CLI builds a `HostApplicationBuilder` at startup. Each installed workload is
 4. Command dispatch
 ```
 
-The shape mirrors WebJobs' `IWebJobsStartup` — `Configure(FunctionsCliBuilder)` is the workload's only seam, and everything beyond it is plain .NET DI.
+The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` is the workload's only seam, and everything beyond it is plain .NET DI.
 
 ## Quick Start
 
-1. Create a class library project that targets `net10.0`
-2. Reference `Azure.Functions.Cli.Abstractions`
-3. Implement `IWorkload`
+1. Create a class library project under `src/Workload/<Name>/` that targets `net10.0` and packs as `PackageType=FuncCliWorkload`
+2. Reference `Azure.Functions.Cli.Abstractions` (with `PrivateAssets=all` and `ExcludeAssets=runtime` so it isn't shipped inside your package)
+3. Subclass `Workload` and override `DisplayName`, `Description`, and `Configure`
 4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
-5. Build, package, and install with `func workload install <path-to-nupkg>`
+5. Add a `workload.json` next to your csproj describing the entry-point assembly and type
+6. Build, package, and install with `func workload install <path-to-nupkg>`
 
 ## Step 1: Create the Project
 
@@ -67,31 +69,85 @@ mkdir src/Workload/Node
 cd src/Workload/Node
 ```
 
-Create the `Workload.Node.csproj`:
+Create the `Workload.Node.csproj`. The csproj is the single source of truth for packaging; there are no per-folder `Directory.Build.props` for workloads.
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Description>Azure Functions CLI Node.js workload.</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>alias:node alias:javascript alias:typescript func-workload</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="../../Abstractions/Abstractions.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Workload.Node.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="tools/any/" Visible="false" />
+  </ItemGroup>
+
 </Project>
 ```
 
-Add the standard build files (copy from an existing project): `Directory.Version.props`.
+What each piece does:
 
-## Step 2: Implement IWorkload
+- `PackageType=FuncCliWorkload` is how the CLI's catalog discovers workload packages.
+- `IncludeBuildOutput=false` + the explicit `<None Include="$(OutputPath)$(AssemblyName).dll" ... PackagePath="tools/any/" />` puts the workload assembly under `tools/any/` instead of `lib/`, which is where the loader looks.
+- `<None Include="workload.json" ... PackagePath="/" />` ships the manifest at the package root.
+- `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on the `Abstractions` reference keep the workload self-contained: the CLI provides Abstractions at runtime.
+- `NU5128`/`NU5100` are suppressed because we deliberately ship without `lib/` and place files under `tools/any/`.
 
-`IWorkload` is the entry point the CLI activates. **It must have a parameterless constructor.**
+Add a sibling `Directory.Version.props` for the workload version:
+
+```xml
+<Project>
+  <PropertyGroup>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>preview.1</VersionSuffix>
+  </PropertyGroup>
+</Project>
+```
+
+And a `release_notes.md`:
+
+```markdown
+# Azure.Functions.Cli.Workload.Node
+
+## 1.0.0-preview.1
+
+- Initial scaffold of the Node.js workload (entry point + stub project initializer).
+```
+
+Add a `workload.json` that points at your entry-point type:
+
+```json
+{
+  "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+  "kind": "workload",
+  "entryPoint": {
+    "assemblyPath": "Azure.Functions.Cli.Workload.Node.dll",
+    "type": "Azure.Functions.Cli.Workload.Node.NodeWorkload"
+  }
+}
+```
+
+## Step 2: Subclass `Workload`
+
+`Workload` is an abstract class in `Azure.Functions.Cli.Abstractions` (under `Azure.Functions.Cli.Workloads`). The CLI loader instantiates the type named in `workload.json` and calls `Configure`. **It must have a parameterless constructor.**
 
 ```csharp
 // NodeWorkload.cs
@@ -100,23 +156,27 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workload.Node;
 
-public sealed class NodeWorkload : IWorkload
+/// <summary>
+/// Entry-point for the Node.js workload. Registers the project initializer
+/// and any Node-specific services.
+/// </summary>
+public sealed class NodeWorkload : Workloads.Workload
 {
-    public string PackageId      => "Azure.Functions.Cli.Workload.Node";
-    public string PackageVersion => "1.0.0";   // typically read from assembly metadata
-    public string DisplayName    => "Node.js";
-    public string Description    => "func init / func new support for Node.js and TypeScript.";
+    public override string DisplayName => "Node.js";
 
-    public void Configure(FunctionsCliBuilder builder)
+    public override string Description => "Azure Functions tooling for Node.js and TypeScript projects.";
+
+    public override void Configure(FunctionsCliBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
-        // builder.RegisterCommand(new NodeTopLevelCommand());
+        // builder.RegisterCommand<NodeTopLevelCommand>();
         // …any other services your providers depend on
     }
 }
 ```
 
-The properties surface in `func workload list`.
+`DisplayName` and `Description` surface in `func workload list`. Package id and version aren't on the class: they come from the csproj/`Directory.Version.props` (single source of truth) and are persisted in the global registry at install time.
 
 ## Step 3: Implement IProjectInitializer
 
@@ -239,15 +299,16 @@ internal sealed class DurableCommand : FuncCommand
     }
 }
 
-public sealed class DurableWorkload : IWorkload
+public sealed class DurableWorkload : Workloads.Workload
 {
-    public string PackageId      => "Azure.Functions.Cli.Workload.Durable";
-    public string PackageVersion => "1.0.0";
-    public string DisplayName    => "Durable Functions";
-    public string Description    => "Durable Functions management commands.";
+    public override string DisplayName => "Durable Functions";
 
-    public void Configure(FunctionsCliBuilder builder)
+    public override string Description => "Durable Functions management commands.";
+
+    public override void Configure(FunctionsCliBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         // Pick the overload that fits how your command is constructed:
         //   builder.RegisterCommand(new DurableCommand());        // simple instance
         //   builder.RegisterCommand<DurableCommand>();            // DI-constructed (recommended)
@@ -307,16 +368,30 @@ dotnet sln add src/Workload/Node/Workload.Node.csproj
 dotnet sln add test/Workload/Node.Tests/Workload.Node.Tests.csproj
 ```
 
-Add path-scoped public + official CI pipelines in `eng/ci/` (mirror the abstractions pipelines as a starting point — workload-specific templates will land alongside the loader in a follow-up PR).
+Workloads share a single CI job template, `eng/ci/templates/jobs/build-workload.yml`, parameterised by `WorkloadProjectName`. Each workload owns two thin pipeline files that extend the 1ES template and pass that parameter:
+
+- `eng/ci/workloads/<name>/public-build.yml` — 1ES Unofficial template (PR + branch builds).
+- `eng/ci/workloads/<name>/official-build.yml` — 1ES Official template (push + release branches, with the pack stage).
+
+Both should set path filters to scope triggers to:
+
+- `src/Abstractions/**`
+- `src/Workload/<Name>/**`
+- `test/Workload/<Name>.Tests/**`
+- `eng/ci/templates/jobs/build-workload.yml`
+- The pipeline file itself
+
+Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`) as the reference. New workloads should not introduce per-workload job/step templates: `build-workload.yml` already covers build, test, and pack.
 
 ## Checklist
 
-- [ ] New project `src/Workload/<Name>/Workload.<Name>.csproj`, references `Abstractions` only
-- [ ] `IWorkload` with parameterless constructor and the five identity properties (`PackageId`, `PackageVersion`, `Type`, `DisplayName`, `Description`)
-- [ ] `Configure(FunctionsCliBuilder)` registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
-- [ ] `IProjectInitializer.GetInitOptions()` returns any extra options the initializer needs
-- [ ] Test project `test/Workload/<Name>.Tests/Workload.<Name>.Tests.csproj`
-- [ ] `Directory.Version.props` created
-- [ ] Added to the solution
-- [ ] Public + official CI pipelines in `eng/ci/`
+- [ ] New project `src/Workload/<Name>/Workload.<Name>.csproj`, packs as `PackageType=FuncCliWorkload`, references `Abstractions` with `PrivateAssets=all` / `ExcludeAssets=runtime`
+- [ ] `Directory.Version.props` and `release_notes.md` next to the csproj
+- [ ] `workload.json` next to the csproj, listing the entry-point `assemblyPath` and `type`
+- [ ] Subclass of `Workload` with a parameterless constructor, overriding `DisplayName`, `Description`, and `Configure`
+- [ ] `Configure(FunctionsCliBuilder)` null-checks `builder` and registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
+- [ ] `IProjectInitializer.GetInitOptions()` returns any extra options the initializer needs (return `[]` for stubs; only throw from `InitializeAsync`)
+- [ ] Test project `test/Workload/<Name>.Tests/Workload.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workload.<Name>.Tests` (matches the workload's `InternalsVisibleTo`)
+- [ ] Both projects added to `Azure.Functions.Cli.slnx`
+- [ ] `eng/ci/workloads/<name>/{public,official}-build.yml` extending `eng/ci/templates/jobs/build-workload.yml` with `WorkloadProjectName: <Name>`
 - [ ] `dotnet build` and `dotnet test` pass
