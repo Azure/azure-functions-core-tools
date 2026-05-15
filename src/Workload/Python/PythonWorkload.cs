@@ -20,5 +20,6 @@ public sealed class PythonWorkload : Workloads.Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
+        builder.RegisterProjectResolver(new PythonProjectResolver());
     }
 }

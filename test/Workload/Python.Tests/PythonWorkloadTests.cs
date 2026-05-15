@@ -31,4 +31,16 @@ public class PythonWorkloadTests
     {
         Assert.Throws<ArgumentNullException>(() => new PythonWorkload().Configure(null!));
     }
+
+    [Fact]
+    public void Configure_RegistersProjectResolver()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new PythonWorkload().Configure(builder);
+
+        builder.Received(1).RegisterProjectResolver(Arg.Any<PythonProjectResolver>());
+    }
 }
