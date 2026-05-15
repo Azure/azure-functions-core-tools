@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
 using Xunit;
 
@@ -16,7 +17,7 @@ public class WorkloadListCommandTests
     [Fact]
     public async Task EmptyList_WritesNoWorkloadsHint_ReturnsZero()
     {
-        var cmd = new WorkloadListCommand(_interaction, Provider());
+        var cmd = new WorkloadListCommand(_interaction, Provider(), Substitute.For<IWorkloadStore>());
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -36,7 +37,7 @@ public class WorkloadListCommandTests
                 aliases: ["dotnet", "dotnet-isolated"]),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, Provider(workloads));
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -58,7 +59,7 @@ public class WorkloadListCommandTests
                 aliases: []),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, Provider(workloads));
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         await InvokeAsync(cmd);
 
         string rowLine = _interaction.Lines.Single(l => l.StartsWith("  ROW:"));
@@ -76,11 +77,87 @@ public class WorkloadListCommandTests
             NewInfo(new FakeWorkload(), "Pkg.A", "1.1.0", []),
         };
 
-        var cmd = new WorkloadListCommand(_interaction, Provider(workloads));
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         await InvokeAsync(cmd);
 
         var rows = _interaction.Lines.Where(l => l.StartsWith("  ROW:")).ToList();
         Assert.Equal(3, rows.Count);
+    }
+
+    [Fact]
+    public async Task List_Json_EmitsLoadedRowsAsJson()
+    {
+        var workloads = new[]
+        {
+            NewInfo(
+                instance: new FakeWorkload(displayName: ".NET", description: "C#"),
+                packageId: "Azure.Functions.Cli.Workload.Dotnet",
+                packageVersion: "1.0.0",
+                aliases: ["dotnet"]),
+        };
+
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
+        int exit = await InvokeAsync(cmd, "--json");
+
+        Assert.Equal(0, exit);
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
+        Assert.Contains("\"packageId\":\"Azure.Functions.Cli.Workload.Dotnet\"", jsonLine);
+        Assert.Contains("\"packageVersion\":\"1.0.0\"", jsonLine);
+    }
+
+    [Fact]
+    public async Task List_AllVersions_PullsFromStoreAndSortsDescending()
+    {
+        var loaded = new[]
+        {
+            NewInfo(
+                instance: new FakeWorkload(displayName: ".NET", description: "C#"),
+                packageId: "Pkg.A",
+                packageVersion: "2.0.0",
+                aliases: ["a"]),
+        };
+
+        var entries = new[]
+        {
+            new global::Azure.Functions.Cli.Workloads.Storage.WorkloadEntry
+            {
+                PackageId = "Pkg.A",
+                PackageVersion = "1.0.0",
+                Aliases = ["a"],
+            },
+            new global::Azure.Functions.Cli.Workloads.Storage.WorkloadEntry
+            {
+                PackageId = "Pkg.A",
+                PackageVersion = "2.0.0",
+                Aliases = ["a"],
+            },
+        };
+
+        var store = Substitute.For<global::Azure.Functions.Cli.Workloads.Storage.IWorkloadStore>();
+        store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(entries);
+
+        var cmd = new WorkloadListCommand(_interaction, Provider(loaded), store);
+        int exit = await InvokeAsync(cmd, "--all-versions");
+
+        Assert.Equal(0, exit);
+        var rows = _interaction.Lines.Where(l => l.StartsWith("  ROW:")).ToList();
+        Assert.Equal(2, rows.Count);
+        // Highest version first; loaded info populates DisplayName/Description.
+        Assert.Contains("2.0.0", rows[0]);
+        Assert.Contains(".NET", rows[0]);
+        Assert.Contains("1.0.0", rows[1]);
+        // Older side-by-side has no loaded info; placeholder used.
+        Assert.Contains(", -, -, ", rows[1]);
+    }
+
+    [Fact]
+    public async Task List_HasJsonAndAllVersionsOptions()
+    {
+        var cmd = new WorkloadListCommand(_interaction, Provider(), Substitute.For<IWorkloadStore>());
+        Assert.Contains(cmd.Options, o => o.Name == "--json");
+        Assert.Contains(cmd.Options, o => o.Name == "--all-versions");
+        await Task.CompletedTask;
     }
 
     private static IWorkloadProvider Provider(params WorkloadInfo[] workloads)

@@ -151,6 +151,30 @@ public class WorkloadSearchCommandTests
         Assert.DoesNotContain(_interaction.Lines, l => l.Contains(longDesc));
     }
 
+    [Fact]
+    public async Task Search_JsonOption_EmitsJsonAndSkipsTable()
+    {
+        StubSearch(
+            new CatalogSearchResult(
+                "func.workload.python",
+                NuGetVersion.Parse("1.2.3"),
+                Title: "Python",
+                Description: "Python workload",
+                Aliases: ["python"],
+                Source: _stubSource));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        int exit = await InvokeAsync(cmd, "--json");
+
+        Assert.Equal(0, exit);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("JSON:"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
+        Assert.Contains("\"packageId\":\"func.workload.python\"", jsonLine);
+        Assert.Contains("\"latestVersion\":\"1.2.3\"", jsonLine);
+        Assert.Contains("\"aliases\":[\"python\"]", jsonLine);
+    }
+
     private void StubSearch(params CatalogSearchResult[] results)
     {
         _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())

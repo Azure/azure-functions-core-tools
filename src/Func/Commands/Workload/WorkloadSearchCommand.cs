@@ -37,6 +37,11 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         Description = "Include prerelease versions in the results.",
     };
 
+    public Option<bool> JsonOption { get; } = new("--json")
+    {
+        Description = "Emit machine-readable JSON instead of a table.",
+    };
+
     public WorkloadSearchCommand(IInteractionService interaction, IWorkloadCatalog catalog)
         : base("search", "Search the workload catalog.")
     {
@@ -46,6 +51,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         Arguments.Add(QueryArgument);
         Options.Add(SourceOption);
         Options.Add(IncludePrereleaseOption);
+        Options.Add(JsonOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -53,6 +59,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         string? query = parseResult.GetValue(QueryArgument);
         string? source = parseResult.GetValue(SourceOption);
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
+        bool json = parseResult.GetValue(JsonOption);
 
         // TODO: surface --skip and --take for paging once we have a UX
         // story for repeated queries (see workload spec §4.1).
@@ -72,6 +79,19 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         catch (ArgumentException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
+        }
+
+        if (json)
+        {
+            _interaction.WriteJson(results.Select(r => new
+            {
+                packageId = r.PackageId,
+                latestVersion = r.LatestVersion.ToNormalizedString(),
+                title = r.Title,
+                description = r.Description,
+                aliases = r.Aliases,
+            }));
+            return 0;
         }
 
         if (results.Count == 0)

@@ -20,11 +20,12 @@ public class WorkloadInstallCommandTests
 {
     private readonly TestInteractionService _interaction = new();
     private readonly IWorkloadInstaller _installer = Substitute.For<IWorkloadInstaller>();
+    private readonly IWorkloadStore _store = Substitute.For<IWorkloadStore>();
 
     [Fact]
     public void Install_HasExpectedArgsAndOptions()
     {
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         Assert.Single(cmd.Arguments, a => a.Name == "id");
         Assert.Contains(cmd.Options, o => o.Name == "--force");
         Assert.Contains(cmd.Options, o => o.Name == "--version");
@@ -37,7 +38,7 @@ public class WorkloadInstallCommandTests
     {
         StubCatalogResult();
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
         Assert.Equal(0, exit);
@@ -50,7 +51,7 @@ public class WorkloadInstallCommandTests
     {
         StubCatalogResult();
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(
             cmd,
             "Test.Workload",
@@ -76,7 +77,7 @@ public class WorkloadInstallCommandTests
     {
         StubCatalogResult();
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "Test.Workload", "-v", "1.2.3", "-f");
 
         Assert.Equal(0, exit);
@@ -95,7 +96,7 @@ public class WorkloadInstallCommandTests
     {
         StubCatalogResult();
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "test.workload", "-e");
 
         Assert.Equal(0, exit);
@@ -110,7 +111,7 @@ public class WorkloadInstallCommandTests
         // handles it. The CLI does not special-case paths.
         StubCatalogResult();
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "Test.Workload", "--source", "/tmp/local-feed");
 
         Assert.Equal(0, exit);
@@ -121,7 +122,7 @@ public class WorkloadInstallCommandTests
     [Fact]
     public void Install_InvalidVersion_FailsValidation()
     {
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         var root = new RootCommand();
         root.Subcommands.Add(cmd);
 
@@ -134,7 +135,7 @@ public class WorkloadInstallCommandTests
     [Fact]
     public void Install_MissingPackageArg_FailsValidation()
     {
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         var root = new RootCommand();
         root.Subcommands.Add(cmd);
 
@@ -146,7 +147,7 @@ public class WorkloadInstallCommandTests
     [Fact]
     public void Install_WhitespaceArg_FailsValidation()
     {
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         var root = new RootCommand();
         root.Subcommands.Add(cmd);
 
@@ -161,7 +162,7 @@ public class WorkloadInstallCommandTests
     {
         StubCatalogResult(alreadyInstalled: true);
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
         Assert.Equal(0, exit);
@@ -188,7 +189,7 @@ public class WorkloadInstallCommandTests
                 },
                 AlreadyInstalled: false));
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "test.content");
 
         Assert.Equal(0, exit);
@@ -208,7 +209,7 @@ public class WorkloadInstallCommandTests
             .Throws(new AmbiguousPackageMatchException(
                 "myalias", new[] { "Pkg.A", "Pkg.B" }));
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => InvokeAsync(cmd, "myalias"));
         Assert.Contains("myalias", ex.Message);
@@ -224,7 +225,7 @@ public class WorkloadInstallCommandTests
                 Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Throws(new WorkloadPackageNotFoundException("not on any source"));
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => InvokeAsync(cmd, "Test.Workload"));
         Assert.Contains("not on any source", ex.Message);
@@ -239,7 +240,7 @@ public class WorkloadInstallCommandTests
                 Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidWorkloadException("bad package"));
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => InvokeAsync(cmd, "Test.Workload"));
         Assert.Equal("bad package", ex.Message);
@@ -255,7 +256,7 @@ public class WorkloadInstallCommandTests
             .Throws(new InvalidOperationException(
                 "Workload 'x' version '1' is already installed at '/p' but is missing from the registry."));
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => InvokeAsync(cmd, "Test.Workload"));
         Assert.Contains("missing from the registry", ex.Message);
@@ -271,7 +272,7 @@ public class WorkloadInstallCommandTests
                 Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Throws(new NullReferenceException("oops"));
 
-        var cmd = new WorkloadInstallCommand(_interaction, _installer);
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
         await Assert.ThrowsAsync<NullReferenceException>(
             () => InvokeAsync(cmd, "Test.Workload"));
     }
@@ -293,7 +294,7 @@ public class WorkloadInstallCommandTests
                     },
                     AlreadyInstalled: false));
 
-            var cmd = new WorkloadInstallCommand(_interaction, _installer);
+            var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
             int exit = await InvokeAsync(cmd, tempPkg);
 
             Assert.Equal(0, exit);
@@ -306,6 +307,96 @@ public class WorkloadInstallCommandTests
         {
             File.Delete(tempPkg);
         }
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalled_NonInteractive_ReturnsOneAndDoesNotInstall()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload",
+                PackageVersion = "1.0.0",
+                Aliases = ["test"],
+            },
+        });
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
+        int exit = await InvokeAsync(cmd, "Test.Workload");
+
+        Assert.Equal(1, exit);
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        Assert.Contains(_interaction.Lines, l =>
+            l.StartsWith("HINT:") && l.Contains("func workload update Test.Workload"));
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalled_AliasMatch_NonInteractive_HintsCanonicalId()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload",
+                PackageVersion = "1.2.3",
+                Aliases = ["alias1"],
+            },
+        });
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
+        int exit = await InvokeAsync(cmd, "alias1");
+
+        Assert.Equal(1, exit);
+        Assert.Contains(_interaction.Lines, l =>
+            l.StartsWith("HINT:") && l.Contains("Test.Workload") && l.Contains("1.2.3"));
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalled_ExactSkipsAliasMatch_ProceedsToInstall()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload",
+                PackageVersion = "1.0.0",
+                Aliases = ["alias1"],
+            },
+        });
+        StubCatalogResult();
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
+        int exit = await InvokeAsync(cmd, "alias1", "--exact");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "alias1", null, null, false, true, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalled_ForceSkipsPromptAndInstalls()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload",
+                PackageVersion = "1.0.0",
+                Aliases = ["test"],
+            },
+        });
+        StubCatalogResult();
+
+        var cmd = new WorkloadInstallCommand(_interaction, _installer, _store);
+        int exit = await InvokeAsync(cmd, "Test.Workload", "--force");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "Test.Workload", null, null, false, false, true, Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().GetWorkloadsAsync(Arg.Any<CancellationToken>());
     }
 
     private void StubCatalogResult(bool alreadyInstalled = false) =>
