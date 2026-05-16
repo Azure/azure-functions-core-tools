@@ -41,9 +41,14 @@ public class NodeProjectInitializerTests : IDisposable
     }
 
     [Fact]
-    public void GetInitOptions_IsEmpty()
+    public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
-        Assert.Empty(new NodeProjectInitializer().GetInitOptions());
+        IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions();
+        IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
+
+        Assert.Contains("--no-bundle", names);
+        Assert.Contains("--bundles-channel", names);
+        Assert.Contains("--skip-npm-install", names);
     }
 
     [Fact]
@@ -125,14 +130,94 @@ public class NodeProjectInitializerTests : IDisposable
         Assert.Contains("@azure/functions", File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")));
     }
 
-    private Task RunAsync(string? language, bool force, string? projectName = "test")
+    [Fact]
+    public async Task InitializeAsync_NoBundle_SkipsExtensionBundleMerge()
     {
-        NodeProjectInitializer initializer = new();
+        await RunAsync(language: null, force: false, args: ["--no-bundle"]);
+
+        string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
+        Assert.False(File.Exists(hostJsonPath), "host.json should not be touched when --no-bundle is set");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BundlesChannel_Preview_WritesPreviewBundleId()
+    {
+        await RunAsync(language: null, force: false, args: ["--bundles-channel", "Preview"]);
+
+        JsonNode? bundle = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")))!["extensionBundle"];
+        Assert.Equal("Microsoft.Azure.Functions.ExtensionBundle.Preview", bundle!["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_RunsNpmInstallByDefault()
+    {
+        int npmCalls = 0;
+        await RunAsync(language: null, force: false, configure: init =>
+        {
+            init.RunNpmInstall = (_, _) =>
+            {
+                npmCalls++;
+                return Task.FromResult((0, string.Empty));
+            };
+        });
+
+        Assert.Equal(1, npmCalls);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_SkipNpmInstall_DoesNotInvokeNpm()
+    {
+        int npmCalls = 0;
+        await RunAsync(language: null, force: false, args: ["--skip-npm-install"], configure: init =>
+        {
+            init.RunNpmInstall = (_, _) =>
+            {
+                npmCalls++;
+                return Task.FromResult((0, string.Empty));
+            };
+        });
+
+        Assert.Equal(0, npmCalls);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_NpmInstallFailure_DoesNotThrow()
+    {
+        await RunAsync(language: null, force: false, configure: init =>
+        {
+            init.RunNpmInstall = (_, _) => Task.FromResult((1, "npm: command not found"));
+        });
+
+        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "package.json")));
+    }
+
+    private Task RunAsync(
+        string? language,
+        bool force,
+        string? projectName = "test",
+        string[]? args = null,
+        Action<NodeProjectInitializer>? configure = null)
+    {
+        NodeProjectInitializer initializer = new()
+        {
+            // Stub by default so tests don't spawn real npm.
+            RunNpmInstall = (_, _) => Task.FromResult((0, string.Empty)),
+        };
+        configure?.Invoke(initializer);
+
         InitContext context = new(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: projectName,
             Language: language,
             Force: force);
-        return initializer.InitializeAsync(context, new RootCommand().Parse(string.Empty));
+
+        RootCommand root = [];
+        foreach (Option option in initializer.GetInitOptions())
+        {
+            root.Options.Add(option);
+        }
+
+        ParseResult parseResult = root.Parse(args ?? []);
+        return initializer.InitializeAsync(context, parseResult);
     }
 }

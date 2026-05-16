@@ -41,9 +41,13 @@ public class PythonProjectInitializerTests : IDisposable
     }
 
     [Fact]
-    public void GetInitOptions_IsEmpty()
+    public void GetInitOptions_RegistersBundleOptions()
     {
-        Assert.Empty(new PythonProjectInitializer().GetInitOptions());
+        IReadOnlyList<Option> options = new PythonProjectInitializer().GetInitOptions();
+        IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
+
+        Assert.Contains("--no-bundle", names);
+        Assert.Contains("--bundles-channel", names);
     }
 
     [Fact]
@@ -120,7 +124,40 @@ public class PythonProjectInitializerTests : IDisposable
         Assert.Contains("FunctionApp", File.ReadAllText(Path.Combine(_projectDir.FullName, "function_app.py")));
     }
 
-    private Task RunAsync(bool force)
+    [Fact]
+    public async Task InitializeAsync_NoBundle_SkipsExtensionBundleMerge()
+    {
+        await RunAsync(force: false, args: ["--no-bundle"]);
+
+        string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
+        Assert.False(File.Exists(hostJsonPath), "host.json should not be touched when --no-bundle is set");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BundlesChannel_Preview_WritesPreviewBundleId()
+    {
+        await RunAsync(force: false, args: ["--bundles-channel", "Preview"]);
+
+        string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
+        JsonNode? root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
+        Assert.Equal(
+            "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+            root!["extensionBundle"]!["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BundlesChannel_Experimental_WritesExperimentalBundleId()
+    {
+        await RunAsync(force: false, args: ["--bundles-channel", "Experimental"]);
+
+        string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
+        JsonNode? root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
+        Assert.Equal(
+            "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+            root!["extensionBundle"]!["id"]!.GetValue<string>());
+    }
+
+    private Task RunAsync(bool force, string[]? args = null)
     {
         PythonProjectInitializer initializer = new();
         InitContext context = new(
@@ -128,6 +165,14 @@ public class PythonProjectInitializerTests : IDisposable
             ProjectName: "test",
             Language: null,
             Force: force);
-        return initializer.InitializeAsync(context, new RootCommand().Parse(string.Empty));
+
+        RootCommand root = [];
+        foreach (Option option in initializer.GetInitOptions())
+        {
+            root.Options.Add(option);
+        }
+
+        ParseResult parseResult = root.Parse(args ?? []);
+        return initializer.InitializeAsync(context, parseResult);
     }
 }

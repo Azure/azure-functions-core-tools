@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
@@ -10,31 +11,57 @@ namespace Azure.Functions.Cli.Workloads.Node;
 
 /// <summary>
 /// Scaffolds a Node.js (v4 model) Functions project, branching on <c>--language</c>
-/// for JS or TS, and merges the default extension bundle into <c>host.json</c>.
+/// for JS or TS, merges the default extension bundle into <c>host.json</c>,
+/// and optionally runs <c>npm install</c>.
 /// </summary>
 internal sealed class NodeProjectInitializer : IProjectInitializer
 {
-    private const string ExtensionBundleId = "Microsoft.Azure.Functions.ExtensionBundle";
     private const string ExtensionBundleVersion = "[4.*, 5.0.0)";
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
+
+    // Internal seam so tests can stub out the `npm install` invocation
+    // without spawning real processes.
+    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunNpmInstall { get; set; } = DefaultRunNpmInstall;
 
     public string Stack => "node";
 
     public IReadOnlyList<string> SupportedLanguages { get; } = ["JavaScript", "TypeScript"];
 
-    public IReadOnlyList<Option> GetInitOptions() => [];
+    public Option<bool> NoBundleOption { get; } = new("--no-bundle")
+    {
+        Description = "Skip writing the default extensionBundle block in host.json.",
+        DefaultValueFactory = _ => false,
+    };
 
-    public Task InitializeAsync(
+    public Option<BundleChannel> BundlesChannelOption { get; } = new("--bundles-channel", "-c")
+    {
+        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
+        DefaultValueFactory = _ => BundleChannel.GA,
+    };
+
+    public Option<bool> SkipNpmInstallOption { get; } = new("--skip-npm-install")
+    {
+        Description = "Skip running 'npm install' after Node project creation.",
+        DefaultValueFactory = _ => false,
+    };
+
+    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption, BundlesChannelOption, SkipNpmInstallOption];
+
+    public async Task InitializeAsync(
         InitContext context,
         ParseResult parseResult,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(parseResult);
         cancellationToken.ThrowIfCancellationRequested();
 
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
         bool isTypeScript = string.Equals(context.Language, "typescript", StringComparison.OrdinalIgnoreCase);
+        bool noBundle = parseResult.GetValue(NoBundleOption);
+        BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
+        bool skipNpmInstall = parseResult.GetValue(SkipNpmInstallOption);
 
         string projectName = ResolveProjectName(context);
         string packageJsonTemplate = isTypeScript
@@ -71,11 +98,19 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
         Directory.CreateDirectory(Path.Combine(root, "src", "functions"));
 
-        ProjectFiles.MergeHostJson(
-            Path.Combine(root, "host.json"),
-            EnsureExtensionBundle);
+        if (!noBundle)
+        {
+            ProjectFiles.MergeHostJson(
+                Path.Combine(root, "host.json"),
+                host => EnsureExtensionBundle(host, channel));
+        }
 
-        return Task.CompletedTask;
+        if (!skipNpmInstall)
+        {
+            // Best-effort. A failure (e.g. npm not installed) leaves the
+            // scaffold in place; the user can run `npm install` manually.
+            await RunNpmInstall(root, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static string ResolveProjectName(InitContext context)
@@ -91,7 +126,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         return string.IsNullOrEmpty(sanitized) ? "function-app" : sanitized;
     }
 
-    private static void EnsureExtensionBundle(JsonObject host)
+    private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)
     {
         if (host.ContainsKey("extensionBundle"))
         {
@@ -100,8 +135,44 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
         host["extensionBundle"] = new JsonObject
         {
-            ["id"] = ExtensionBundleId,
+            ["id"] = BundleIds.For(channel),
             ["version"] = ExtensionBundleVersion,
         };
+    }
+
+    private static async Task<(int ExitCode, string Stderr)> DefaultRunNpmInstall(string workingDirectory, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Windows resolves `npm` via the `npm.cmd` shim, which only works
+            // when the launcher is shell-spawned. Direct Process.Start of "npm"
+            // fails on Windows otherwise.
+            bool isWindows = OperatingSystem.IsWindows();
+            var psi = new ProcessStartInfo
+            {
+                FileName = isWindows ? "cmd.exe" : "npm",
+                Arguments = isWindows ? "/c npm install" : "install",
+                WorkingDirectory = workingDirectory,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = Process.Start(psi);
+            if (process is null)
+            {
+                return (-1, "Failed to start 'npm' process.");
+            }
+
+            string stderr = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            return (process.ExitCode, stderr);
+        }
+        catch (Exception ex)
+        {
+            // 'npm' may not be installed; the scaffolded files are still valid.
+            return (-1, ex.Message);
+        }
     }
 }
