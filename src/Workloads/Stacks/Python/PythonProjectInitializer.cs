@@ -13,14 +13,25 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// </summary>
 internal sealed class PythonProjectInitializer : IProjectInitializer
 {
-    private const string ExtensionBundleId = "Microsoft.Azure.Functions.ExtensionBundle";
     private const string ExtensionBundleVersion = "[4.*, 5.0.0)";
 
     public string Stack => "python";
 
     public IReadOnlyList<string> SupportedLanguages { get; } = ["Python"];
 
-    public IReadOnlyList<Option> GetInitOptions() => [];
+    public Option<bool> NoBundleOption { get; } = new("--no-bundle")
+    {
+        Description = "Skip writing the default extensionBundle block in host.json.",
+        DefaultValueFactory = _ => false,
+    };
+
+    public Option<BundleChannel> BundlesChannelOption { get; } = new("--bundles-channel", "-c")
+    {
+        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
+        DefaultValueFactory = _ => BundleChannel.GA,
+    };
+
+    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption, BundlesChannelOption];
 
     public Task InitializeAsync(
         InitContext context,
@@ -28,10 +39,13 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(parseResult);
         cancellationToken.ThrowIfCancellationRequested();
 
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
+        bool noBundle = parseResult.GetValue(NoBundleOption);
+        BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "function_app.py"),
@@ -58,14 +72,17 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
             ProjectFiles.ReadTemplate("local.settings.json"),
             force);
 
-        ProjectFiles.MergeHostJson(
-            Path.Combine(root, "host.json"),
-            EnsureExtensionBundle);
+        if (!noBundle)
+        {
+            ProjectFiles.MergeHostJson(
+                Path.Combine(root, "host.json"),
+                host => EnsureExtensionBundle(host, channel));
+        }
 
         return Task.CompletedTask;
     }
 
-    private static void EnsureExtensionBundle(JsonObject host)
+    private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)
     {
         // Only fill in when missing so a user-customised bundle survives `--force`.
         if (host.ContainsKey("extensionBundle"))
@@ -75,7 +92,7 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
 
         host["extensionBundle"] = new JsonObject
         {
-            ["id"] = ExtensionBundleId,
+            ["id"] = BundleIds.For(channel),
             ["version"] = ExtensionBundleVersion,
         };
     }
