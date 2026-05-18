@@ -93,5 +93,64 @@ public sealed class TemplatesGeneratorV1 : IIncrementalGenerator
                 ctx.AddSource(hintName, source);
             }
         });
+
+        // Resources pipeline (per-culture parse, then collect into a single catalog).
+        IncrementalValuesProvider<ResourceCultureModelV1> resourceCultures = context.AdditionalTextsProvider
+            .Combine(context.AnalyzerConfigOptionsProvider)
+            .Where(static pair =>
+            {
+                AnalyzerConfigOptions options = pair.Right.GetOptions(pair.Left);
+                return AdditionalFileMetadata.IsAssetKind(options, AdditionalFileMetadata.AssetKindResources)
+                    && AdditionalFileMetadata.HasTemplateVersion(options, "v1");
+            })
+            .Select(static (pair, ct) =>
+            {
+                string? text = pair.Left.GetText(ct)?.ToString();
+                if (text is null)
+                {
+                    return null;
+                }
+
+                string culture = ExtractCultureFromPath(pair.Left.Path);
+                return ResourcesParserV1.Parse(text, culture);
+            })
+            .Where(static c => c is not null)
+            .Select(static (c, _) => c!);
+
+        IncrementalValueProvider<ResourcesCatalogModelV1> resourcesCatalog = resourceCultures.Collect()
+            .Select(static (cultures, _) => new ResourcesCatalogModelV1 { Cultures = cultures });
+
+        context.RegisterSourceOutput(resourcesCatalog, static (ctx, catalog) =>
+        {
+            if (catalog.Cultures.Length == 0)
+            {
+                return;
+            }
+
+            foreach ((string hintName, string source) in ResourcesEmitterV1.EmitStaticData(catalog))
+            {
+                ctx.AddSource(hintName, source);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Extracts the culture name from a Resources file path. "Resources.json" → "en";
+    /// "Resources.{culture}.json" → "{culture}" (e.g. "Resources.de-DE.json" → "de-DE").
+    /// </summary>
+    private static string ExtractCultureFromPath(string path)
+    {
+        string filename = global::System.IO.Path.GetFileName(path);
+        const string prefix = "Resources.";
+        const string suffix = ".json";
+        if (filename.Length <= prefix.Length + suffix.Length
+            || !filename.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            || !filename.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return "en";
+        }
+
+        string middle = filename.Substring(prefix.Length, filename.Length - prefix.Length - suffix.Length);
+        return string.IsNullOrEmpty(middle) ? "en" : middle;
     }
 }

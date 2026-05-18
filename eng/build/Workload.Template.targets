@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Tools/TemplateGenerator/Tools.TemplateGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,7 +17,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <_TemplateResourceLang Include="cs-CZ;de-DE;en-US;es-ES;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW" />
+    <!-- We do not fetch 'en-US' as it is identical to the default file. -->
+    <_TemplateResourceLang Include="cs-CZ;de-DE;es-ES;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW" />
   </ItemGroup>
 
   <ItemGroup>
@@ -62,6 +64,10 @@
       <AdditionalFiles Include="$(_TemplatesV2Folder)userPrompts.json"
         TemplateVersion="v2" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="userPrompts"
         Condition="Exists('$(_TemplatesV2Folder)userPrompts.json')" />
+      <AdditionalFiles Include="$(_TemplatesV1Folder)Resources*.json"
+        TemplateVersion="v1" TemplateAssetKind="resources" />
+      <AdditionalFiles Include="$(_TemplatesV2Folder)Resources*.json"
+        TemplateVersion="v2" TemplateAssetKind="resources" />
     </ItemGroup>
   </Target>
 

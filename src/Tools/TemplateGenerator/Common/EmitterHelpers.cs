@@ -78,6 +78,93 @@ internal static class EmitterHelpers
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Converts a snake_cased token (e.g. "http_trigger_route") into a PascalCase identifier
+    /// (e.g. "HttpTriggerRoute"). Each '_' separated segment is concatenated with its first
+    /// character upper-cased; remaining characters are preserved.
+    /// </summary>
+    public static string SnakeToPascal(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        string[] parts = value.Split('_');
+        var sb = new System.Text.StringBuilder(value.Length);
+        foreach (string part in parts)
+        {
+            if (part.Length == 0)
+            {
+                continue;
+            }
+
+            string sanitized = SanitizeIdentifier(part);
+            if (sanitized.Length == 0)
+            {
+                continue;
+            }
+
+            sb.Append(char.ToUpperInvariant(sanitized[0]));
+            if (sanitized.Length > 1)
+            {
+                sb.Append(sanitized, 1, sanitized.Length - 1);
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Converts a culture name (e.g. "de-DE", "zh-CN") into a valid PascalCase identifier
+    /// suitable for a static field name. Examples: "en" → "En", "de-DE" → "De_DE".
+    /// </summary>
+    public static string CultureToIdentifier(string culture)
+    {
+        if (string.IsNullOrEmpty(culture))
+        {
+            return culture;
+        }
+
+        string sanitized = SanitizeIdentifier(culture);
+        var sb = new System.Text.StringBuilder(sanitized.Length);
+        bool capitalizeNext = true;
+        foreach (char c in sanitized)
+        {
+            if (c == '_')
+            {
+                sb.Append('_');
+                capitalizeNext = true;
+            }
+            else if (capitalizeNext)
+            {
+                sb.Append(char.ToUpperInvariant(c));
+                capitalizeNext = false;
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Lower-cases the first character of an identifier, leaving the rest unchanged
+    /// (e.g. "De_DE" → "de_DE", "En" → "en"). Used to convert a PascalCase identifier into a
+    /// camelCase backing-field name.
+    /// </summary>
+    public static string ToCamel(string identifier)
+    {
+        if (string.IsNullOrEmpty(identifier) || !char.IsUpper(identifier[0]))
+        {
+            return identifier;
+        }
+
+        return char.ToLowerInvariant(identifier[0]) + identifier.Substring(1);
+    }
+
     public static string Literal(string value) => SymbolDisplay.FormatLiteral(value, quote: true);
 
     public static string Indent(int depth) => new(' ', depth * 4);

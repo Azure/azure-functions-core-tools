@@ -17,6 +17,7 @@ internal static class AdditionalFileMetadata
     public const string AssetKindTemplates = "templates";
     public const string AssetKindBindings = "bindings";
     public const string AssetKindUserPrompts = "userPrompts";
+    public const string AssetKindResources = "resources";
 
     public static bool HasTemplateVersion(AnalyzerConfigOptions options, string expected)
         => options.TryGetValue(TemplateVersionKey, out string? value)
