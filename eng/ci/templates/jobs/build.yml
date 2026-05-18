@@ -42,6 +42,7 @@ jobs:
       artifact: drop_cli
 
   steps:
+    - template: /eng/ci/templates/steps/replace-nuget-feed.yml@self
     - template: /eng/ci/templates/steps/install-dotnet.yml@self
 
     - task: DotNetCoreCLI@2

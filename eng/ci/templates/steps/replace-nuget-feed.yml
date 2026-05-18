@@ -1,0 +1,39 @@
+parameters:
+- name: nugetConfigPath
+  displayName: Path to the NuGet.Config file to patch
+  type: string
+  default: $(Build.SourcesDirectory)/NuGet.Config
+
+steps:
+- pwsh: |
+    $path = '${{ parameters.nugetConfigPath }}'
+    if (-not (Test-Path $path)) {
+      Write-Host "##vso[task.logissue type=error] nuget config not found at: $path"
+      exit 1
+    }
+
+    [xml]$xml = Get-Content -LiteralPath $path
+    $sources = $xml.configuration.packageSources
+    if ($null -eq $sources) {
+      Write-Host "##vso[task.logissue type=error]No <packageSources> element found in $path"
+      exit 1
+    }
+
+    $upstreamUrl = 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/nuget/v3/index.json'
+
+    $nugetOrg = $sources.add | Where-Object { $_.key -eq 'nuget.org' }
+    if ($null -eq $nugetOrg) {
+      Write-Host "##[warning]No <add key='nuget.org' .../> entry found in $path; nothing to replace."
+      exit 0
+    }
+
+    $upstream = $xml.CreateElement('add')
+    $upstream.SetAttribute('key', 'upstream')
+    $upstream.SetAttribute('value', $upstreamUrl)
+    [void]$sources.ReplaceChild($upstream, $nugetOrg)
+
+    $xml.Save($path)
+    Write-Host "Replaced 'nuget.org' with 'upstream' feed in $path"
+    Get-Content -LiteralPath $path
+  displayName: Replace nuget.org with internal upstream feed
+  condition: and(succeeded(), eq(variables['System.TeamProject'], 'internal'))
