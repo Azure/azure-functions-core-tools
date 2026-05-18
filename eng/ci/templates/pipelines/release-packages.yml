@@ -1,0 +1,70 @@
+parameters:
+- name: projects
+  type: string
+- name: folder
+  type: string
+- name: public
+  type: boolean
+  default: false
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc
+      image: 1es-ubuntu-24.04-min
+      os: linux
+
+    sdl:
+      sourceAnalysisPool:
+        name: 1es-pool-azfunc
+        image: 1es-windows-2022
+        os: windows
+      codeql:
+         runSourceLanguagesInSourceAnalysis: true
+
+    stages:
+    - stage: Validate
+      jobs:
+      - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
+
+    - stage: Build
+      dependsOn: Validate
+      variables:
+      - template: /ci/variables/cfs.yml@eng
+
+      jobs:
+      - template: /eng/ci/templates/jobs/build.yml@self
+        parameters:
+          sign: true
+          artifacts: ['pack']
+          projects: ${{ parameters.projects }}
+          build_args: -p:IsReleaseCI=true
+
+    - stage: Release
+      dependsOn: Build
+      jobs:
+      - template: /ci/release-nuget-package.yml@eng
+        parameters:
+          isProduction: true
+          approvers: '[internal]\Azure Functions Core'
+          artifact: drop_packages
+          stagingFeed: public/pre-release
+          packages: |
+            **/*.nupkg
+            !**/*.symbols.nupkg
+          ${{ if eq(parameters.public, true) }}:
+            partnerDrop:
+              serviceConnection: azure-sdk-partner-drops
+              targetFolder: azure-functions/${{ parameters.folder }}/$(Build.BuildNumber)

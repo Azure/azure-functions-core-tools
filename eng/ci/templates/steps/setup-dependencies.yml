@@ -1,0 +1,13 @@
+parameters:
+- name: nugetConfigPath
+  displayName: Path to the NuGet.Config file to patch (forwarded to replace-nuget-feed)
+  type: string
+  default: $(Build.SourcesDirectory)/NuGet.Config
+
+steps:
+- template: /eng/ci/templates/steps/install-dotnet.yml@self
+
+- ${{ if eq(variables['System.TeamProject'], 'internal') }}:
+  - template: /eng/ci/templates/steps/replace-nuget-feed.yml@self
+    parameters:
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}

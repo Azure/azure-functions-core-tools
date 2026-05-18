@@ -52,4 +52,5 @@ extends:
         jobs:
         - template: /eng/ci/templates/jobs/build.yml@self
           parameters:
+            projects: Azure.Functions.Cli.slnx
             sign: false
