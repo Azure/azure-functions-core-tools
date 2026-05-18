@@ -103,19 +103,19 @@ jobs:
           pattern: '*.nupkg'
 
     - ${{ if and(containsValue(parameters.artifacts, 'publish'), eq(parameters.sign, true)) }}:
-      - template: /eng/ci/templates/steps/sign-app.yml@eng
+      - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: windows
           folderPath: $(publish_dir)
           signPatterns: '**/win-*/func'
 
-      - template: /eng/ci/templates/steps/sign-app.yml@eng
+      - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: linux
           folderPath: $(publish_dir)
           signPatterns: '**/linux-*/func'
 
-      - template: /eng/ci/templates/steps/sign-app.yml@eng
+      - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: macos
           folderPath: $(publish_dir)
