@@ -43,5 +43,5 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     private static string DefaultHome()
         => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
+            SharedConstants.FuncHomeDirectoryName);
 }

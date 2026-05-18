@@ -17,7 +17,7 @@ public class WorkloadPathsOptionsTests
 
         var expected = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
+            SharedConstants.FuncHomeDirectoryName);
         Assert.Equal(expected, options.Home);
     }
 
