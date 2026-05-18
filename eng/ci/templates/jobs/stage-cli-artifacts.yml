@@ -20,6 +20,7 @@ jobs:
 
   variables:
     drop_path: $(Pipeline.Workspace)/drop
+    artifact_stage_path: $(Pipeline.Workspace)/stage_artifacts
 
   templateContext:
     type: releaseJob
@@ -33,10 +34,22 @@ jobs:
     outputs:
     - ${{ each runtime in parameters.runtimes }}:
       - output: universalPackages
-        publishDirectory: $(drop_path)/${{ runtime }}
+        publishDirectory: $(artifact_stage_path)/${{ runtime }}
         feedsToUsePublish: internal
         vstsFeedPublish: public/pre-release
         vstsFeedPackagePublish: func-cli-${{ runtime }}
         versionOption: custom
         versionPublish: $(Build.BuildNumber)
         packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'
+
+    # TODO: submit pdbs to symbol server once we have that set up
+
+    steps:
+    - task: CopyFiles@2
+      displayName: Copy CLI Artifacts
+      inputs:
+        SourceFolder: $(drop_path)
+        Contents: |
+          '**'
+          '!**/*.pdb'
+        TargetFolder: $(artifact_stage_path)
