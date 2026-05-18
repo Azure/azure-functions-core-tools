@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
@@ -17,6 +18,7 @@ namespace Azure.Functions.Cli.Workloads.Node;
 internal sealed class NodeProjectInitializer : IProjectInitializer
 {
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
+    private static readonly Assembly _assembly = typeof(NodeProjectInitializer).Assembly;
 
     // Internal seam so tests can stub out the `npm install` invocation
     // without spawning real processes.
@@ -64,8 +66,8 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
         string projectName = ResolveProjectName(context);
         string packageJsonTemplate = isTypeScript
-            ? ProjectFiles.ReadTemplate("package-ts.json")
-            : ProjectFiles.ReadTemplate("package-js.json");
+            ? ProjectFiles.ReadTemplate(_assembly, "package-ts.json")
+            : ProjectFiles.ReadTemplate(_assembly, "package-js.json");
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "package.json"),
@@ -76,23 +78,23 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         {
             ProjectFiles.WriteIfMissing(
                 Path.Combine(root, "tsconfig.json"),
-                ProjectFiles.ReadTemplate("tsconfig.json"),
+                ProjectFiles.ReadTemplate(_assembly, "tsconfig.json"),
                 force);
         }
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, ".funcignore"),
-            ProjectFiles.ReadTemplate("funcignore"),
+            ProjectFiles.ReadTemplate(_assembly, "funcignore"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, ".gitignore"),
-            ProjectFiles.ReadTemplate("gitignore"),
+            ProjectFiles.ReadTemplate(_assembly, "gitignore"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadTemplate("local.settings.json"),
+            ProjectFiles.ReadTemplate(_assembly, "local.settings.json"),
             force);
 
         Directory.CreateDirectory(Path.Combine(root, "src", "functions"));

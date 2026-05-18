@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.Diagnostics;
+using System.Reflection;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
 
@@ -16,6 +17,7 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 {
     private const string ModuleNamePlaceholder = "{ModuleName}";
     private const string DefaultModuleName = "function-app";
+    private static readonly Assembly _assembly = typeof(GoProjectInitializer).Assembly;
 
     // Internal seam so tests can stub out the `go mod tidy` invocation
     // without spawning real processes.
@@ -48,27 +50,27 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "go.mod"),
-            ProjectFiles.ReadTemplate("go.mod").Replace(ModuleNamePlaceholder, moduleName),
+            ProjectFiles.ReadTemplate(_assembly, "go.mod").Replace(ModuleNamePlaceholder, moduleName),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "main.go"),
-            ProjectFiles.ReadTemplate("main.go"),
+            ProjectFiles.ReadTemplate(_assembly, "main.go"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, ".funcignore"),
-            ProjectFiles.ReadTemplate("funcignore"),
+            ProjectFiles.ReadTemplate(_assembly, "funcignore"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, ".gitignore"),
-            ProjectFiles.ReadTemplate("gitignore"),
+            ProjectFiles.ReadTemplate(_assembly, "gitignore"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadTemplate("local.settings.json"),
+            ProjectFiles.ReadTemplate(_assembly, "local.settings.json"),
             force);
 
         if (!parseResult.GetValue(SkipGoModTidyOption))

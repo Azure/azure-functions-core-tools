@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Reflection;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
@@ -13,6 +14,7 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// </summary>
 internal sealed class PythonProjectInitializer : IProjectInitializer
 {
+    private static readonly Assembly _assembly = typeof(PythonProjectInitializer).Assembly;
 
     public string Stack => "python";
 
@@ -48,27 +50,27 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "function_app.py"),
-            ProjectFiles.ReadTemplate("function_app.py"),
+            ProjectFiles.ReadTemplate(_assembly, "function_app.py"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "requirements.txt"),
-            ProjectFiles.ReadTemplate("requirements.txt"),
+            ProjectFiles.ReadTemplate(_assembly, "requirements.txt"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "getting_started.md"),
-            ProjectFiles.ReadTemplate("getting_started.md"),
+            ProjectFiles.ReadTemplate(_assembly, "getting_started.md"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, ".gitignore"),
-            ProjectFiles.ReadTemplate("gitignore"),
+            ProjectFiles.ReadTemplate(_assembly, "gitignore"),
             force);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadTemplate("local.settings.json"),
+            ProjectFiles.ReadTemplate(_assembly, "local.settings.json"),
             force);
 
         if (!noBundle)
