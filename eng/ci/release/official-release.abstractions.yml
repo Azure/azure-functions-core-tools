@@ -1,0 +1,18 @@
+parameters:
+- name: public
+  displayName: Publish to nuget.org?
+  type: boolean
+  default: false
+
+# Release has no triggers outside of pipeline
+trigger: none
+pr: none
+
+extends:
+  template: /eng/ci/templates/pipelines/release-packages.yml@self
+  parameters:
+    public: ${{ parameters.public }}
+    folder: abstractions
+    projects: |
+      $(Build.SourcesDirectory)/src/Abstractions/Abstractions.csproj
+      $(Build.SourcesDirectory)/test/Func.Tests/Func.Tests.csproj

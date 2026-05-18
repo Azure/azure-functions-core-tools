@@ -1,0 +1,42 @@
+parameters:
+- name: dependsOn
+  type: string
+  default: ''
+- name: runtimes
+  type: object
+  default:
+    - linux-arm64
+    - linux-x64
+    - osx-arm64
+    - osx-x64
+    - win-arm64
+    - win-x64
+
+jobs:
+- job: Stage
+  displayName: Stage packages
+  ${{ if ne(parameters.dependsOn, '') }}:
+    dependsOn: ${{ parameters.dependsOn }}
+
+  variables:
+    drop_path: $(Pipeline.Workspace)/drop
+
+  templateContext:
+    type: releaseJob
+    isProduction: true
+
+    inputs:
+    - input: pipelineArtifact
+      targetPath: $(drop_path)
+      artifactName: drop_cli
+
+    outputs:
+    - ${{ each runtime in parameters.runtimes }}:
+      - output: universalPackages
+        publishDirectory: $(drop_path)/${{ runtime }}
+        feedsToUsePublish: internal
+        vstsFeedPublish: public/pre-release
+        vstsFeedPackagePublish: func-cli-${{ runtime }}
+        versionOption: custom
+        versionPublish: $(Build.BuildNumber)
+        packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'

@@ -5,6 +5,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <IsPublishable>false</IsPublishable>
+    <UpdateBuildNumber Condition="'$(IsReleaseCI)' == 'true'">true</UpdateBuildNumber>
   </PropertyGroup>
 
 </Project>

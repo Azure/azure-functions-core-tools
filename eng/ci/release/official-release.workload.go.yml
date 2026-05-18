@@ -1,0 +1,18 @@
+parameters:
+- name: public
+  displayName: Publish to nuget.org?
+  type: boolean
+  default: false
+
+# Release has no triggers outside of pipeline
+trigger: none
+pr: none
+
+extends:
+  template: /eng/ci/templates/pipelines/release-packages.yml@self
+  parameters:
+    public: ${{ parameters.public }}
+    folder: workload/go
+    projects: |
+      $(Build.SourcesDirectory)/src/Workload/Stacks/Go/Workload.Go.csproj
+      $(Build.SourcesDirectory)/test/Workload/Stacks/Go.Tests/Workload.Go.Tests.csproj
