@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
@@ -21,8 +22,8 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
     internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(7);
 
     private static readonly string _hivePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "azure-functions-core-tools",
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        SharedConstants.FuncHomeDirectoryName,
         "dotnet-template-hive");
 
     private static readonly string _timestampPath = Path.Combine(_hivePath, ".installed");

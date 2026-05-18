@@ -129,7 +129,7 @@ internal static class VersionChecker
     {
         string cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
+            SharedConstants.FuncHomeDirectoryName);
         return Path.Combine(cacheDir, Constants.VersionCacheFileName);
     }
 
