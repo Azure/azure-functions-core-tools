@@ -22,9 +22,9 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 /// </summary>
 public sealed class CliHostFactoryTests : IDisposable
 {
-    private const string FixtureAssembly = "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.dll";
-    private const string CommandWorkloadType = "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.StubWorkload";
-    private const string ThrowingWorkloadType = "Azure.Functions.Cli.Workload.Tests.Fixtures.WithCommand.ThrowingWorkload";
+    private const string FixtureAssembly = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.dll";
+    private const string CommandWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.StubWorkload";
+    private const string ThrowingWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.ThrowingWorkload";
 
     private readonly string _home = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
 

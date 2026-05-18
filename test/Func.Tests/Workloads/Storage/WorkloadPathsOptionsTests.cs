@@ -63,7 +63,7 @@ public class WorkloadPathsOptionsTests
         var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
 
         Assert.Equal(
-            Path.Combine("/tmp/funcs", "workloads", "Azure.Functions.Cli.Workload.Dotnet", "1.2.3"),
-            options.GetInstallDirectory("Azure.Functions.Cli.Workload.Dotnet", "1.2.3"));
+            Path.Combine("/tmp/funcs", "workloads", "Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"),
+            options.GetInstallDirectory("Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"));
     }
 }

@@ -25,7 +25,7 @@ public sealed class NuGetProtocolSourceClientTests
             {
               "data": [
                 {
-                  "id": "Workload.Python",
+                  "id": "Workloads.Python",
                   "version": "1.2.3",
                   "tags": "alias:python language:python"
                 }
@@ -34,7 +34,7 @@ public sealed class NuGetProtocolSourceClientTests
             """);
 
         CatalogSearchResult only = Assert.Single(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
-        Assert.Equal("workload.python", only.PackageId);
+        Assert.Equal("workloads.python", only.PackageId);
         Assert.Equal(["python"], only.Aliases);
     }
 
@@ -45,7 +45,7 @@ public sealed class NuGetProtocolSourceClientTests
             {
               "data": [
                 {
-                  "id": "Workload.Node",
+                  "id": "Workloads.Node",
                   "version": "1.0.0",
                   "tags": [ "alias:node", "language:javascript", "alias:nodejs" ]
                 }
@@ -87,7 +87,7 @@ public sealed class NuGetProtocolSourceClientTests
     {
         FindPackageByIdResource find = Substitute.For<FindPackageByIdResource>();
         find.GetAllVersionsAsync(
-                "Workload.Python",
+                "Workloads.Python",
                 Arg.Any<SourceCacheContext>(),
                 Arg.Any<ILogger>(),
                 Arg.Any<CancellationToken>())
@@ -99,7 +99,7 @@ public sealed class NuGetProtocolSourceClientTests
             ]));
 
         NuGetProtocolSourceClient client = NewClient(findResource: find);
-        IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync("Workload.Python", CancellationToken.None);
+        IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync("Workloads.Python", CancellationToken.None);
 
         Assert.Equal(
             [NuGetVersion.Parse("1.0.0"), NuGetVersion.Parse("2.0.0"), NuGetVersion.Parse("2.0.0-beta.1")],
@@ -138,7 +138,7 @@ public sealed class NuGetProtocolSourceClientTests
 
         NuGetProtocolSourceClient client = NewClient(findResource: find);
         await using Stream stream = await client.OpenPackageAsync(
-            "Workload.Python",
+            "Workloads.Python",
             NuGetVersion.Parse("1.2.3"),
             CancellationToken.None);
 

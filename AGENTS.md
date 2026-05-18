@@ -290,11 +290,11 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 ## Project Conventions
 
 - **Folder names**: short name structured from source root, with project name matching the folder segments.
-  - e.g.: `Func/Func.csproj`, `Abstractions/Abstractions.csproj`, `Workload/<Name>/Workload.<Name>.csproj`.
+  - e.g.: `Func/Func.csproj`, `Abstractions/Abstractions.csproj`, `Workloads/<kind>/<Name>/Workloads.<Name>.csproj`.
 - **Assembly/namespace names**: omit by default, will be built from project name with a top-level namespace `Azure.Functions.Cli` prefixed by msbuild props.
-  - e.g.: `Workload.<Name>.csproj` will automatically become `Azure.Functions.Cli.Workload.<Name>.dll` and namespace of `Azure.Functions.Cli.Workload.<Name>`.
+  - e.g.: `Workloads.<Name>.csproj` will automatically become `Azure.Functions.Cli.Workloads.<Name>.dll` and namespace of `Azure.Functions.Cli.Workloads.<Name>`.
   - Manually setting is only done when that convention is not desired. e.g.: `Func.csproj` manually sets `<AssemblyName>func</AssemblyName>` and `<RootNamespace>$(TopLevelNamespace)</RootNamespace>`.
-- **`Func.` prefix is reserved**: only the entry-point binary (`Func/Func.csproj`) and its primary test project (`Func.Tests/Func.Tests.csproj`) may start with `Func.`. All other projects, including test fixtures, should use a folder/csproj name that starts with the structural area (e.g. `Workload.Tests.Fixtures.Default`), so the default `<AssemblyName>` and `<RootNamespace>` from `eng/build/Engineering.props` produce a clean `Azure.Functions.Cli.<name>`.
+- **`Func.` prefix is reserved**: only the entry-point binary (`Func/Func.csproj`) and its primary test project (`Func.Tests/Func.Tests.csproj`) may start with `Func.`. All other projects, including test fixtures, should use a folder/csproj name that starts with the structural area (e.g. `Workloads.Tests.Fixtures.Default`), so the default `<AssemblyName>` and `<RootNamespace>` from `eng/build/Engineering.props` produce a clean `Azure.Functions.Cli.<name>`.
 - **Path separators**: use forward slashes (`/`) in MSBuild paths (csproj/props/targets/slnx), not backslashes. MSBuild normalises both, but `/` is portable across Windows/macOS/Linux and matches the rest of the repo.
 - **Package IDs**: omit by default, will be based on assembly name.
 - **CI pipelines**: `workload-<name>-public-build.yml` and `workload-<name>-official-build.yml`

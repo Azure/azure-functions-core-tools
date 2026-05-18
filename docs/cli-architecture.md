@@ -199,7 +199,7 @@ Abstractions (Azure.Functions.Cli.Abstractions)    ← NuGet package
   │
   │ referenced by
   ▼
-Workload (e.g. Azure.Functions.Cli.Workload.Dotnet) ← NuGet package, loaded at runtime
+Workload (e.g. Azure.Functions.Cli.Workloads.Dotnet) ← NuGet package, loaded at runtime
 ```
 
 The CLI never has a compile-time reference to any workload. Workloads will be loaded dynamically via `AssemblyLoadContext`.

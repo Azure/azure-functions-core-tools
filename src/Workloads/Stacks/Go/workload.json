@@ -1,0 +1,8 @@
+{
+  "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+  "kind": "workload",
+  "entryPoint": {
+    "assemblyPath": "Azure.Functions.Cli.Workloads.Go.dll",
+    "type": "Azure.Functions.Cli.Workloads.Go.GoWorkload"
+  }
+}

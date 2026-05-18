@@ -8,22 +8,22 @@
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
   </Folder>
-  <Folder Name="/src/Workload/Stacks/">
-    <Project Path="src/Workload/Stacks/DotNet/Workload.DotNet.csproj" />
-    <Project Path="src/Workload/Stacks/Go/Workload.Go.csproj" />
-    <Project Path="src/Workload/Stacks/Node/Workload.Node.csproj" />
-    <Project Path="src/Workload/Stacks/Python/Workload.Python.csproj" />
+  <Folder Name="/src/Workloads/Stacks/">
+    <Project Path="src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
+    <Project Path="src/Workloads/Stacks/Go/Workloads.Go.csproj" />
+    <Project Path="src/Workloads/Stacks/Node/Workloads.Node.csproj" />
+    <Project Path="src/Workloads/Stacks/Python/Workloads.Python.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
-    <Project Path="test/Workload.Tests.Fixtures.Default/Workload.Tests.Fixtures.Default.csproj" />
-    <Project Path="test/Workload.Tests.Fixtures.Sdk/Workload.Tests.Fixtures.Sdk.csproj" />
-    <Project Path="test/Workload.Tests.Fixtures.WithCommand/Workload.Tests.Fixtures.WithCommand.csproj" />
+    <Project Path="test/Workloads.Tests.Fixtures.Default/Workloads.Tests.Fixtures.Default.csproj" />
+    <Project Path="test/Workloads.Tests.Fixtures.Sdk/Workloads.Tests.Fixtures.Sdk.csproj" />
+    <Project Path="test/Workloads.Tests.Fixtures.WithCommand/Workloads.Tests.Fixtures.WithCommand.csproj" />
   </Folder>
-  <Folder Name="/test/Workload/Stacks/">
-    <Project Path="test/Workload/Stacks/DotNet.Tests/Workload.DotNet.Tests.csproj" />
-    <Project Path="test/Workload/Stacks/Go.Tests/Workload.Go.Tests.csproj" />
-    <Project Path="test/Workload/Stacks/Node.Tests/Workload.Node.Tests.csproj" />
-    <Project Path="test/Workload/Stacks/Python.Tests/Workload.Python.Tests.csproj" />
+  <Folder Name="/test/Workloads/Stacks/">
+    <Project Path="test/Workloads/Stacks/DotNet.Tests/Workloads.DotNet.Tests.csproj" />
+    <Project Path="test/Workloads/Stacks/Go.Tests/Workloads.Go.Tests.csproj" />
+    <Project Path="test/Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj" />
+    <Project Path="test/Workloads/Stacks/Python.Tests/Workloads.Python.Tests.csproj" />
   </Folder>
 </Solution>
