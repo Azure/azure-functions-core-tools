@@ -168,20 +168,35 @@ namespace Azure.Functions.Cli.Common
 
         private void DrainAsyncOutput()
         {
-            if (!Process.WaitForExit(OutputDrainTimeoutMs))
+            try
             {
+                if (!Process.WaitForExit(OutputDrainTimeoutMs))
+                {
+                    if (GlobalCoreToolsSettings.IsVerbose)
+                    {
+                        Colors.Net.ColoredConsole.WriteLine(VerboseColor(
+                            $"Output drain for '{_exeName}' did not complete within {OutputDrainTimeoutMs}ms; returning exit code with possibly truncated output."));
+                    }
+
+                    return;
+                }
+
+                // Process exited within timeout; the no-arg overload flushes the async
+                // stdout/stderr event handlers that WaitForExit(int) does not drain.
+                Process.WaitForExit();
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
+            {
+                // The drain is a best-effort flush after process exit. If Process has already
+                // been disposed (InvalidOperationException) or the OS handle is no longer
+                // accessible (Win32Exception), swallow and return the captured exit code
+                // rather than masking it with an unrelated exception.
                 if (GlobalCoreToolsSettings.IsVerbose)
                 {
                     Colors.Net.ColoredConsole.WriteLine(VerboseColor(
-                        $"Output drain for '{_exeName}' did not complete within {OutputDrainTimeoutMs}ms; returning exit code with possibly truncated output."));
+                        $"Output drain for '{_exeName}' failed: {ex.Message}. Returning captured exit code."));
                 }
-
-                return;
             }
-
-            // Process exited within timeout; the no-arg overload flushes the async
-            // stdout/stderr event handlers that WaitForExit(int) does not drain.
-            Process.WaitForExit();
         }
 
         public async ValueTask DisposeAsync()

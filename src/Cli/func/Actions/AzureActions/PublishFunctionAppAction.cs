@@ -165,8 +165,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Get the WorkerRuntime
-            WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(_secretsManager);
-            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+            if (workerRuntime != WorkerRuntime.None)
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
+            }
+            else
+            {
+                workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+            }
 
             // Go is cross-compiled to linux/amd64 and currently only supported on Flex Consumption.
             // Reject Windows targets, non-Flex SKUs, and unsupported build modes up front.

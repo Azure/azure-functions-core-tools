@@ -193,8 +193,32 @@ namespace Azure.Functions.Cli.Helpers
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
-            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
-                          ?? secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            string setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+
+            if (string.IsNullOrWhiteSpace(setting))
+            {
+                // SecretsManager.GetSecrets throws CliException when there is no project root
+                // (e.g. 'func pack' invoked from a parent directory before cwd is changed).
+                // Treat that as "no setting found" so callers can decide what to do.
+                try
+                {
+                    setting = secretsManager?.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+                }
+                catch (CliException)
+                {
+                    return WorkerRuntime.None;
+                }
+            }
+
+            // The Functions host registers some workers under the literal "native" language
+            // identifier (see workers/native/worker.config.json). Map "native" back to a
+            // concrete WorkerRuntime using well-known project markers in the current directory.
+            // Throws CliException with an actionable message when the setting is "native" but
+            // no supported marker is found — callers that want a silent None should catch.
+            if (string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
+            {
+                return ResolveNativeFromProjectMarkers();
+            }
 
             try
             {
@@ -227,52 +251,21 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         /// <summary>
-        /// Resolves <c>FUNCTIONS_WORKER_RUNTIME=native</c> to a concrete <see cref="WorkerRuntime"/>
-        /// by inspecting project-marker files in the current directory. If the setting is not
-        /// <c>"native"</c>, this method is a no-op and returns <see cref="WorkerRuntime.None"/>.
+        /// Maps <c>FUNCTIONS_WORKER_RUNTIME=native</c> to a concrete <see cref="WorkerRuntime"/>
+        /// by inspecting well-known project-marker files in the current directory. Throws
+        /// <see cref="CliException"/> when no supported marker is found.
         /// </summary>
         /// <remarks>
-        /// The Functions host registers certain workers under the <c>"native"</c> language
-        /// identifier (see <c>worker.config.json</c>). The CLI writes that value to
-        /// <c>local.settings.json</c> during <c>func init</c>, but needs to map it back to
-        /// the correct <see cref="WorkerRuntime"/> at command time. Resolution is based on
-        /// well-known project files so it stays extensible as new native languages are added.
+        /// Marker -> runtime:
         /// <list type="bullet">
         ///   <item><c>go.mod</c> → <see cref="WorkerRuntime.Go"/></item>
         /// </list>
-        /// Call this early in any command that reads <see cref="GlobalCoreToolsSettings.CurrentWorkerRuntime"/>
-        /// and needs native resolution (e.g. <c>func start</c>, <c>func pack</c>, <c>func publish</c>).
+        /// Add new native languages here as they are introduced. Invoked exclusively from
+        /// <see cref="GetCurrentWorkerRuntimeLanguage"/> so callers never have to special-case
+        /// the "native" literal.
         /// </remarks>
-        /// <returns>
-        /// The resolved <see cref="WorkerRuntime"/> when the setting was <c>"native"</c> and a
-        /// supported project marker was found; otherwise <see cref="WorkerRuntime.None"/>.
-        /// </returns>
-        public static WorkerRuntime ResolveNativeWorkerRuntime(ISecretsManager secretsManager)
+        private static WorkerRuntime ResolveNativeFromProjectMarkers()
         {
-            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
-
-            if (string.IsNullOrWhiteSpace(setting))
-            {
-                // Only fall back to local.settings.json if the env var isn't set.
-                // Guard with try/catch because SecretsManager may throw if there is
-                // no project root (e.g., func pack invoked from a parent directory
-                // before cwd is changed, or during runtime detection for non-Go projects).
-                try
-                {
-                    setting = secretsManager.GetSecrets()?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
-                }
-                catch (CliException)
-                {
-                    return WorkerRuntime.None;
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(setting)
-                || !string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
-            {
-                return WorkerRuntime.None;
-            }
-
             if (FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, GoHelpers.GoModFileName)))
             {
                 if (GlobalCoreToolsSettings.IsVerbose)
@@ -280,7 +273,6 @@ namespace Azure.Functions.Cli.Helpers
                     ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found)."));
                 }
 
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
                 return WorkerRuntime.Go;
             }
 

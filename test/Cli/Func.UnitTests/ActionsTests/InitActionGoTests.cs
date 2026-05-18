@@ -87,7 +87,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData("native")]
         [InlineData("Native")]
         [InlineData("NATIVE")]
-        public void ResolveNativeWorkerRuntime_WithGoMod_ResolvesToGo(string settingValue)
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithGoMod_ResolvesToGo(string settingValue)
         {
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -99,27 +99,25 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             fileSystem.File.Exists(Arg.Is<string>(p => p.EndsWith("go.mod"))).Returns(true);
 
             var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
-            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             try
             {
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
                 using (FileSystemHelpers.Override(fileSystem))
                 {
-                    WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+                    var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
 
-                    GlobalCoreToolsSettings.CurrentWorkerRuntime.Should().Be(WorkerRuntime.Go);
+                    resolved.Should().Be(WorkerRuntime.Go);
                 }
             }
             finally
             {
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
             }
         }
 
         [Fact]
-        public void ResolveNativeWorkerRuntime_WithoutGoMod_Throws()
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithoutGoMod_Throws()
         {
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -137,7 +135,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
                 using (FileSystemHelpers.Override(fileSystem))
                 {
-                    Action act = () => WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+                    Action act = () => WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
 
                     act.Should().Throw<CliException>().WithMessage("*native*");
                 }
@@ -149,7 +147,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Fact]
-        public void ResolveNativeWorkerRuntime_NonNativeSetting_IsNoOp()
+        public void GetCurrentWorkerRuntimeLanguage_NonNativeSetting_NormalizesAndReturns()
         {
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -161,8 +159,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
             try
             {
-                // Should not throw, should not change the runtime
-                WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(secretsManager);
+                var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
+
+                resolved.Should().Be(WorkerRuntime.Node);
             }
             finally
             {

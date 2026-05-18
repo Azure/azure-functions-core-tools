@@ -138,9 +138,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
         public async Task RunAsync_NativeRuntimeWithGoMod_ResolvesToGoAndDoesNotThrowRuntimeError()
         {
             // Regression: FUNCTIONS_WORKER_RUNTIME=native + go.mod should resolve to Go.
-            // Previously, ResolveNativeWorkerRuntime would correctly map this to Go, but the
-            // immediate follow-up call to GetCurrentWorkerRuntimeLanguage re-read "native"
-            // from settings and returned WorkerRuntime.None, masking the resolution.
+            // GetCurrentWorkerRuntimeLanguage handles "native" by inspecting project markers,
+            // so the runtime detection path must NOT surface "Unable to determine the worker
+            // runtime" for a valid Go workspace.
             _mockSecretsManager
                 .Setup(s => s.GetSecrets(It.IsAny<bool>()))
                 .Returns(new Dictionary<string, string>

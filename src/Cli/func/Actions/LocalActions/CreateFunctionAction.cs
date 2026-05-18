@@ -133,7 +133,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 ColoredConsole
                     .Error
-                    .WriteLine(ErrorColor("The 'func new' command is not supported for the Go runtime."))
+                    .WriteLine(ErrorColor("The 'func new' command is not yet supported for the Go runtime."))
                     .WriteLine(ErrorColor("Go uses programmatic registration — add functions by editing 'main.go' (app.HTTP(...), app.Timer(...), etc.)."))
                     .WriteLine(ErrorColor("For more information, visit: https://github.com/Azure/azure-functions-golang-worker"));
                 return;
@@ -364,14 +364,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return _initAction.ResolvedWorkerRuntime;
             }
 
-            // FUNCTIONS_WORKER_RUNTIME=native (Go) does not normalize to a WorkerRuntime via
-            // GetCurrentWorkerRuntimeLanguage. Resolve native -> concrete runtime (e.g. Go via go.mod)
-            // here so callers like 'func new' can short-circuit on unsupported runtimes before
-            // running language/template prompts that would mutate local.settings.json.
-            var nativeResolved = WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(_secretsManager);
-            if (nativeResolved != WorkerRuntime.None)
+            // GetCurrentWorkerRuntimeLanguage handles FUNCTIONS_WORKER_RUNTIME=native
+            // (mapping to Go via go.mod, etc.) so 'func new' can short-circuit on unsupported
+            // runtimes before running language/template prompts that would mutate local.settings.json.
+            var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+            if (resolved != WorkerRuntime.None)
             {
-                return nativeResolved;
+                return resolved;
             }
 
             return GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
