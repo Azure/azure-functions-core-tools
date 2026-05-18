@@ -102,6 +102,13 @@ internal sealed class CompactInputController(
                 MoveFunctionBrowserSelection(functions, state, 1);
                 return Handled();
 
+            case ConsoleKey.UpArrow when !state.HelpOpen:
+                ScrollLogs(state, 1, maxLogScrollOffset);
+                return Handled();
+
+            case ConsoleKey.DownArrow when !state.HelpOpen:
+                return Handled(ScrollLogs(state, -1, maxLogScrollOffset));
+
             case ConsoleKey.PageUp when state.FunctionBrowserOpen:
                 MoveFunctionBrowserSelection(functions, state, -Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functions.Length, viewportHeight)));
                 return Handled();

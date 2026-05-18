@@ -42,7 +42,7 @@ public class CompactRendererFunctionBrowserTests
 
         string output = writer.ToString();
         Assert.Contains("12 functions", output);
-        Assert.Contains("PgUp/PgDn logs", output);
+        Assert.Contains("↑/↓, PgUp/PgDn logs", output);
         Assert.Contains("L:info", output);
         Assert.Contains("q/Ctrl+C", output);
     }
@@ -74,6 +74,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Available compact-mode controls", output);
         Assert.Contains("Toggle this help panel", output);
         Assert.Contains("Search functions by name", output);
+        Assert.Contains("Scroll logs line by line", output);
         Assert.Contains("Clear visible log output", output);
         Assert.Contains("Cycle the active function filter", output);
         Assert.Contains("Toggle errors-only log view", output);

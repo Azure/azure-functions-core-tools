@@ -29,7 +29,7 @@ internal sealed class CompactHelpOverlayBuilder(ITheme theme)
         AddHelpRow(table, "?", "Toggle this help panel.");
         AddHelpRow(table, "t", "Open the function browser.");
         AddHelpRow(table, "/", "Search functions by name, trigger, or route.");
-        AddHelpRow(table, "↑/↓", "Move selection in the function browser.");
+        AddHelpRow(table, "↑/↓", "Scroll logs line by line; in overlays, move selection.");
         AddHelpRow(table, "PgUp/PgDn", "Scroll logs; in the function browser, jump through functions.");
         AddHelpRow(table, "Home/End", "Jump to oldest logs / latest logs, or first / last function in the browser.");
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");

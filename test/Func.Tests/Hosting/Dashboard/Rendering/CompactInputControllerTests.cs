@@ -91,6 +91,33 @@ public class CompactInputControllerTests
         Assert.Equal(LogLevel.Warning, state.MinimumLogLevel);
     }
 
+    [Fact]
+    public void HandleKey_UpAndDownArrows_ScrollLogTailOneLine()
+    {
+        CompactInputController controller = CreateController();
+        var state = new CompactInputState { LogScrollOffset = 2 };
+
+        CompactInputResult upResult = controller.HandleKey(
+            Key('\0', ConsoleKey.UpArrow),
+            [],
+            state,
+            viewportHeight: 24,
+            logScrollStep: 3,
+            maxLogScrollOffset: 200);
+
+        CompactInputResult downResult = controller.HandleKey(
+            Key('\0', ConsoleKey.DownArrow),
+            [],
+            state,
+            viewportHeight: 24,
+            logScrollStep: 3,
+            maxLogScrollOffset: 200);
+
+        Assert.True(upResult.Handled);
+        Assert.True(downResult.Handled);
+        Assert.Equal(2, state.LogScrollOffset);
+    }
+
     private static CompactInputController CreateController()
     {
         var theme = new DefaultTheme();

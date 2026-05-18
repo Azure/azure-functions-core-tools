@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 internal sealed class CompactFooterBuilder(ITheme theme, DashboardRunInfo runInfo)
 {
     private const string HelpCloseControlLabel = "?/Esc close";
-    private const string LogsNavigationControlLabel = "PgUp/PgDn logs";
+    private const string LogsNavigationControlLabel = "↑/↓, PgUp/PgDn logs";
     private const string FunctionBrowserControlLabel = "t functions";
     private const string QuitControlLabel = "q/Ctrl+C quit";
     private const string FunctionFilterToggleControlLabel = "f next";
