@@ -26,10 +26,10 @@ internal sealed class PlainStartInitializationRenderer(IInteractionService inter
                 _interaction.WriteLine($"[init] {step.Step.Title}");
                 break;
             case StartInitializationProgressEvent progress:
-                _interaction.WriteLine($"[init] {FormatStepKind(progress.StepKind)} {progress.Percent:0}% {progress.Message}".TrimEnd());
+                _interaction.WriteLine($"[init] {progress.StepId} {progress.Percent:0}% {progress.Message}".TrimEnd());
                 break;
             case StartInitializationStepCompletedEvent completed:
-                _interaction.WriteLine($"[init] {FormatStepKind(completed.StepKind)} complete{FormatMessage(completed.Message)}");
+                _interaction.WriteLine($"[init] {completed.StepId} complete{FormatMessage(completed.Message)}");
                 break;
             case StartInitializationCompletedEvent completed:
                 _interaction.WriteLine($"Initialization complete. Host {completed.Result.HostVersion} selected.");
@@ -40,9 +40,6 @@ internal sealed class PlainStartInitializationRenderer(IInteractionService inter
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private static string FormatStepKind(StartInitializationStepKind kind)
-        => kind.ToString();
 
     private static string FormatMessage(string? message)
         => string.IsNullOrWhiteSpace(message) ? string.Empty : $": {message}";

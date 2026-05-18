@@ -84,7 +84,7 @@ internal sealed class CompactStartInitializationRenderer(
 
     private void UpdateProgress(StartInitializationProgressEvent progress)
     {
-        if (FindStep(progress.StepKind) is not { } step)
+        if (FindStep(progress.StepId) is not { } step)
         {
             return;
         }
@@ -98,7 +98,7 @@ internal sealed class CompactStartInitializationRenderer(
 
     private void CompleteStep(StartInitializationStepCompletedEvent completed)
     {
-        if (FindStep(completed.StepKind) is not { } step)
+        if (FindStep(completed.StepId) is not { } step)
         {
             return;
         }
@@ -113,8 +113,8 @@ internal sealed class CompactStartInitializationRenderer(
         }
     }
 
-    private StepState? FindStep(StartInitializationStepKind kind)
-        => _steps.LastOrDefault(step => step.Step.Kind == kind);
+    private StepState? FindStep(string id)
+        => _steps.LastOrDefault(step => string.Equals(step.Step.Id, id, StringComparison.Ordinal));
 
     private void WriteStepLine(StepState step, bool endLine)
     {

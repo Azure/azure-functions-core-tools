@@ -52,7 +52,7 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
             case StartInitializationStepStartedEvent step:
                 WriteRecord(CliEventKinds.StartInitializationStepStarted, step.Timestamp, writer =>
                 {
-                    writer.WriteString("step", FormatStepKind(step.Step.Kind));
+                    writer.WriteString("step", step.Step.Id);
                     writer.WriteString("title", step.Step.Title);
                     writer.WriteString("display", FormatDisplayKind(step.Step.DisplayKind));
                     if (!string.IsNullOrWhiteSpace(step.Step.Detail))
@@ -64,7 +64,7 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
             case StartInitializationProgressEvent progress:
                 WriteRecord(CliEventKinds.StartInitializationProgress, progress.Timestamp, writer =>
                 {
-                    writer.WriteString("step", FormatStepKind(progress.StepKind));
+                    writer.WriteString("step", progress.StepId);
                     writer.WriteNumber("percent", Math.Round(progress.Percent, 3));
                     if (!string.IsNullOrWhiteSpace(progress.Message))
                     {
@@ -75,7 +75,7 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
             case StartInitializationStepCompletedEvent completed:
                 WriteRecord(CliEventKinds.StartInitializationStepCompleted, completed.Timestamp, writer =>
                 {
-                    writer.WriteString("step", FormatStepKind(completed.StepKind));
+                    writer.WriteString("step", completed.StepId);
                     if (!string.IsNullOrWhiteSpace(completed.Message))
                     {
                         writer.WriteString("message", completed.Message);
@@ -110,20 +110,6 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
 
         return ValueTask.CompletedTask;
     }
-
-    private static string FormatStepKind(StartInitializationStepKind kind)
-        => kind switch
-        {
-            StartInitializationStepKind.ResolveProfile => "resolve_profile",
-            StartInitializationStepKind.ResolveConstraints => "resolve_constraints",
-            StartInitializationStepKind.ResolveHostWorkload => "resolve_host_workload",
-            StartInitializationStepKind.InstallHostWorkload => "install_host_workload",
-            StartInitializationStepKind.ResolveStack => "resolve_stack",
-            StartInitializationStepKind.ResolveBundle => "resolve_bundle",
-            StartInitializationStepKind.InstallBundle => "install_bundle",
-            StartInitializationStepKind.StartHost => "start_host",
-            _ => kind.ToString().ToLowerInvariant(),
-        };
 
     private static string FormatDisplayKind(StartInitializationDisplayKind kind)
         => kind.ToString().ToLowerInvariant();

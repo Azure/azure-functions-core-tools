@@ -29,10 +29,10 @@ public class StartDashboardEventStreamFactoryTests
         [
             new StartInitializationStepStartedEvent(
                 DateTimeOffset.UnixEpoch,
-                new StartInitializationStep(StartInitializationStepKind.ResolveProfile, "Resolve profile")),
+                new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile")),
             new StartInitializationStepCompletedEvent(
                 DateTimeOffset.UnixEpoch,
-                StartInitializationStepKind.ResolveProfile,
+                ResolveProfileInitializationStep.StepId,
                 "None (no profile applied)"),
         ];
 
@@ -60,7 +60,7 @@ public class StartDashboardEventStreamFactoryTests
         [
             new StartInitializationStepCompletedEvent(
                 DateTimeOffset.UnixEpoch,
-                StartInitializationStepKind.ResolveProfile,
+                ResolveProfileInitializationStep.StepId,
                 "None (no profile applied)"),
         ];
 

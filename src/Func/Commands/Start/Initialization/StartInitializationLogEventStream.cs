@@ -31,7 +31,7 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
     {
         ArgumentNullException.ThrowIfNull(initializationEvents);
 
-        Dictionary<StartInitializationStepKind, StartInitializationStep> stepsByKind = [];
+        Dictionary<string, StartInitializationStep> stepsById = [];
         List<HostLogEntry> entries = [];
 
         foreach (StartInitializationEvent initializationEvent in initializationEvents)
@@ -39,10 +39,10 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
             switch (initializationEvent)
             {
                 case StartInitializationStepStartedEvent started:
-                    stepsByKind[started.Step.Kind] = started.Step;
+                    stepsById[started.Step.Id] = started.Step;
                     break;
                 case StartInitializationStepCompletedEvent completed:
-                    entries.Add(CreateEntry(completed, stepsByKind));
+                    entries.Add(CreateEntry(completed, stepsById));
                     break;
             }
         }
@@ -52,16 +52,16 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
 
     private static HostLogEntry CreateEntry(
         StartInitializationStepCompletedEvent completed,
-        IReadOnlyDictionary<StartInitializationStepKind, StartInitializationStep> stepsByKind)
+        IReadOnlyDictionary<string, StartInitializationStep> stepsById)
     {
-        string title = stepsByKind.TryGetValue(completed.StepKind, out StartInitializationStep? step)
+        string title = stepsById.TryGetValue(completed.StepId, out StartInitializationStep? step)
             ? step.Title
-            : FormatStepKind(completed.StepKind);
+            : completed.StepId;
 
         Dictionary<string, object?> attributes = new()
         {
             [HostLogAttributeKeys.CliEventKind] = CliEventKinds.StartInitializationStepCompleted,
-            ["start.initialization.step"] = FormatStepKind(completed.StepKind),
+            ["start.initialization.step"] = completed.StepId,
         };
 
         return new HostLogEntry(
@@ -79,17 +79,4 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
             ? title
             : string.Create(CultureInfo.InvariantCulture, $"{title}: {message}");
 
-    private static string FormatStepKind(StartInitializationStepKind kind)
-        => kind switch
-        {
-            StartInitializationStepKind.ResolveProfile => "resolve_profile",
-            StartInitializationStepKind.ResolveConstraints => "resolve_constraints",
-            StartInitializationStepKind.ResolveHostWorkload => "resolve_host_workload",
-            StartInitializationStepKind.InstallHostWorkload => "install_host_workload",
-            StartInitializationStepKind.ResolveStack => "resolve_stack",
-            StartInitializationStepKind.ResolveBundle => "resolve_bundle",
-            StartInitializationStepKind.InstallBundle => "install_bundle",
-            StartInitializationStepKind.StartHost => "start_host",
-            _ => kind.ToString().ToLowerInvariant(),
-        };
 }

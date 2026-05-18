@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard;
+using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -115,16 +116,24 @@ public class StartCommandTests : IDisposable
             services.AddSingleton(_initializationRunner);
         });
         var root = Parser.CreateCommand(services);
-        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+        var result = root.Parse($"start \"{_tempDir}\" --output=plain --host-version 4.900.0 --no-build --enable-auth --port 9090 --functions HttpTrigger --cors http://localhost,http://example --cors-credentials");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
         Assert.Equal(0, exitCode);
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context =>
-                context.WorkingDirectory.Info.FullName == new DirectoryInfo(_tempDir).FullName
+                context.Options.WorkingDirectory.Info.FullName == new DirectoryInfo(_tempDir).FullName
                 && context.ProfileName == "none"
-                && context.CliVersion == "5.0.0-test"),
+                && context.CliVersion == "5.0.0-test"
+                && context.Options.OutputMode == OutputMode.Plain
+                && context.Options.RequestedHostVersion == "4.900.0"
+                && context.Options.NoBuild
+                && context.Options.EnableAuth
+                && context.Options.Port == 9090
+                && context.Options.Functions.SequenceEqual(new[] { "HttpTrigger" })
+                && context.Options.Cors.SequenceEqual(new[] { "http://localhost", "http://example" })
+                && context.Options.CorsCredentials),
             Arg.Any<IStartInitializationRenderer>(),
             Arg.Any<CancellationToken>());
     }

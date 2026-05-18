@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.AppStacks;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
+using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using NSubstitute;
 using Spectre.Console;
@@ -42,14 +43,12 @@ public class StartInitializationTests : IDisposable
             .Returns(".NET");
         var renderer = new RecordingStartInitializationRenderer();
         var runner = new DemoStartInitializationRunner(stackProvider);
-        var context = new StartInitializationContext(
+        StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
-            CliVersion: "5.0.0-test",
-            ProfileName: "none",
-            RequestedHostVersion: null,
-            DemoFunctionCount: 12,
-            DemoSpeedMultiplier: 0.001,
-            DemoAutoExit: true);
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
 
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
@@ -62,16 +61,42 @@ public class StartInitializationTests : IDisposable
             {
                 Step:
                 {
-                    Kind: StartInitializationStepKind.InstallHostWorkload,
+                    Id: InstallHostWorkloadInitializationStep.StepId,
                     DisplayKind: StartInitializationDisplayKind.Progress,
                 },
             });
         Assert.Contains(renderer.Events, static ev =>
             ev is StartInitializationProgressEvent
             {
-                StepKind: StartInitializationStepKind.InstallHostWorkload,
+                StepId: InstallHostWorkloadInitializationStep.StepId,
                 Percent: 100,
             });
+    }
+
+    [Fact]
+    public async Task DemoRunner_HostValidationAddsInstallStepBeforeStackResolution()
+    {
+        IAppStackProvider stackProvider = Substitute.For<IAppStackProvider>();
+        stackProvider.GetStackNameAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
+            .Returns(".NET");
+        var renderer = new RecordingStartInitializationRenderer();
+        var runner = new DemoStartInitializationRunner(stackProvider);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        await runner.RunAsync(context, renderer, CancellationToken.None);
+
+        int validationCompletedIndex = FindCompletedStepIndex(renderer.Events, ValidateHostWorkloadInitializationStep.StepId);
+        int installStartedIndex = FindStartedStepIndex(renderer.Events, InstallHostWorkloadInitializationStep.StepId);
+        int stackStartedIndex = FindStartedStepIndex(renderer.Events, ResolveAppStackInitializationStep.StepId);
+
+        Assert.True(validationCompletedIndex >= 0);
+        Assert.True(installStartedIndex > validationCompletedIndex);
+        Assert.True(stackStartedIndex > installStartedIndex);
     }
 
     [Fact]
@@ -79,12 +104,13 @@ public class StartInitializationTests : IDisposable
     {
         using var stream = new MemoryStream();
         var renderer = new JsonStartInitializationRenderer(stream, ownsStream: false);
+        const string customStepId = "custom_step";
 
         await renderer.OnEventAsync(
             new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"),
             CancellationToken.None);
         await renderer.OnEventAsync(
-            new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, StartInitializationStepKind.InstallHostWorkload, 50, "Downloading"),
+            new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, customStepId, 50, "Downloading"),
             CancellationToken.None);
         await renderer.DisposeAsync();
 
@@ -96,7 +122,7 @@ public class StartInitializationTests : IDisposable
         Assert.Equal("none", started.RootElement.GetProperty("profile").GetString());
         using var progress = JsonDocument.Parse(lines[1]);
         Assert.Equal("start_initialization_progress", progress.RootElement.GetProperty("kind").GetString());
-        Assert.Equal("install_host_workload", progress.RootElement.GetProperty("step").GetString());
+        Assert.Equal(customStepId, progress.RootElement.GetProperty("step").GetString());
         Assert.Equal(50, progress.RootElement.GetProperty("percent").GetDouble());
     }
 
@@ -117,26 +143,26 @@ public class StartInitializationTests : IDisposable
         await renderer.OnEventAsync(
             new StartInitializationStepStartedEvent(
                  DateTimeOffset.UnixEpoch,
-                 new StartInitializationStep(StartInitializationStepKind.ResolveProfile, "Resolve profile")),
-             CancellationToken.None);
+                 new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile")),
+              CancellationToken.None);
         await Task.Delay(500);
         await renderer.OnEventAsync(
-            new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, StartInitializationStepKind.ResolveProfile, "none"),
+            new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, ResolveProfileInitializationStep.StepId, "none"),
             CancellationToken.None);
         await renderer.OnEventAsync(
             new StartInitializationStepStartedEvent(
                 DateTimeOffset.UnixEpoch,
                 new StartInitializationStep(
-                    StartInitializationStepKind.InstallHostWorkload,
+                    InstallHostWorkloadInitializationStep.StepId,
                     "Install host workload",
                     DisplayKind: StartInitializationDisplayKind.Progress)),
             CancellationToken.None);
         await renderer.OnEventAsync(
-            new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, StartInitializationStepKind.InstallHostWorkload, 50, "Preparing download"),
+            new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, InstallHostWorkloadInitializationStep.StepId, 50, "Preparing download"),
             CancellationToken.None);
         await Task.Delay(500);
         await renderer.OnEventAsync(
-            new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, StartInitializationStepKind.InstallHostWorkload, "Installed host 4.834.0"),
+            new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, InstallHostWorkloadInitializationStep.StepId, "Installed host 4.834.0"),
             CancellationToken.None);
         var result = new StartInitializationResult(
             new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET"),
@@ -181,7 +207,7 @@ public class StartInitializationTests : IDisposable
             await renderer.OnEventAsync(
                 new StartInitializationStepStartedEvent(
                     DateTimeOffset.UnixEpoch,
-                    new StartInitializationStep(StartInitializationStepKind.ResolveProfile, "Resolve profile")),
+                    new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile")),
                 CancellationToken.None);
 
             Assert.DoesNotContain("\u001b[2J", writer.ToString());
@@ -190,6 +216,66 @@ public class StartInitializationTests : IDisposable
         {
             await renderer.DisposeAsync();
         }
+    }
+
+    private static StartInitializationContext CreateContext(
+        WorkingDirectory workingDirectory,
+        string cliVersion,
+        int demoFunctionCount,
+        double demoSpeedMultiplier,
+        bool demoAutoExit)
+    {
+        var options = new StartCommandOptions(
+            workingDirectory,
+            Port: null,
+            Cors: [],
+            CorsCredentials: false,
+            Functions: [],
+            NoBuild: false,
+            EnableAuth: false,
+            RequestedHostVersion: null,
+            OutputMode.Compact,
+            NoTui: false,
+            LogFilePath: null,
+            demoFunctionCount,
+            demoSpeedMultiplier,
+            demoAutoExit);
+
+        return new StartInitializationContext(
+            options,
+            cliVersion,
+            IsInteractive: true,
+            CanPrompt: true);
+    }
+
+    private static int FindStartedStepIndex(IReadOnlyList<StartInitializationEvent> events, string stepId)
+        => FindStepIndex(events, stepId, static ev => ev is StartInitializationStepStartedEvent);
+
+    private static int FindCompletedStepIndex(IReadOnlyList<StartInitializationEvent> events, string stepId)
+        => FindStepIndex(events, stepId, static ev => ev is StartInitializationStepCompletedEvent);
+
+    private static int FindStepIndex(
+        IReadOnlyList<StartInitializationEvent> events,
+        string stepId,
+        Func<StartInitializationEvent, bool> predicate)
+    {
+        for (int i = 0; i < events.Count; i++)
+        {
+            StartInitializationEvent initializationEvent = events[i];
+            string? currentStepId = initializationEvent switch
+            {
+                StartInitializationStepStartedEvent started => started.Step.Id,
+                StartInitializationStepCompletedEvent completed => completed.StepId,
+                _ => null,
+            };
+
+            if (string.Equals(currentStepId, stepId, StringComparison.Ordinal) && predicate(initializationEvent))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private sealed class RecordingStartInitializationRenderer : IStartInitializationRenderer

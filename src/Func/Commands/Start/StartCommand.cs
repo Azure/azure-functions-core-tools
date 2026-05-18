@@ -144,19 +144,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             System.Console.Error.WriteLine("notice: stdout is not an interactive terminal; falling back to --output=plain.");
         }
 
-        string? logFilePath = parseResult.GetValue(LogFileOption);
-        IDashboardEventSink? eventSink = CreateLogFileSink(logFilePath);
+        StartCommandOptions options = CreateStartOptions(parseResult, workingDirectory, mode);
+        IDashboardEventSink? eventSink = CreateLogFileSink(options.LogFilePath);
 
         var initializationContext = new StartInitializationContext(
-            workingDirectory,
+            options,
             _versionProvider.Version,
-            ProfileName: "none",
-            RequestedHostVersion: parseResult.GetValue(HostVersionOption),
-            DemoFunctionCount: ParseFunctionCount(
-                parseResult.GetValue(DemoFunctionsOption),
-                Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
-            DemoSpeedMultiplier: ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
-            DemoAutoExit: ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")));
+            _interaction.IsInteractive,
+            CanPrompt: _interaction.IsInteractive && mode != OutputMode.Json);
 
         StartInitializationResult initializationResult;
         IReadOnlyList<StartInitializationEvent> initializationEvents;
@@ -201,6 +196,30 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
                 verboseMessage: ex.ToString());
         }
     }
+
+    private StartCommandOptions CreateStartOptions(ParseResult parseResult, WorkingDirectory workingDirectory, OutputMode mode)
+        => new(
+            workingDirectory,
+            parseResult.GetValue(PortOption),
+            ParseCors(parseResult.GetValue(CorsOption)),
+            parseResult.GetValue(CorsCredentialsOption),
+            parseResult.GetValue(FunctionsOption) ?? [],
+            parseResult.GetValue(NoBuildOption),
+            parseResult.GetValue(EnableAuthOption),
+            parseResult.GetValue(HostVersionOption),
+            mode,
+            parseResult.GetValue(NoTuiOption),
+            parseResult.GetValue(LogFileOption),
+            ParseFunctionCount(
+                parseResult.GetValue(DemoFunctionsOption),
+                Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
+            ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
+            ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")));
+
+    private static string[] ParseCors(string? cors)
+        => string.IsNullOrWhiteSpace(cors)
+            ? []
+            : [.. cors.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
     private static double ParseSpeedMultiplier(string? raw)
     {

@@ -4,13 +4,9 @@
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
-/// Inputs required to initialize a host run.
+/// Result produced by an initialization step.
 /// </summary>
-internal sealed record StartInitializationContext(
-    StartCommandOptions Options,
-    string CliVersion,
-    bool IsInteractive,
-    bool CanPrompt)
+internal sealed record StartInitializationStepResult(string? Message)
 {
-    public string ProfileName => "none";
+    public static StartInitializationStepResult Completed(string? message = null) => new(message);
 }

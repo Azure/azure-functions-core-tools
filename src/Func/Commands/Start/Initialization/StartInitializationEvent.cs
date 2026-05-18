@@ -25,7 +25,7 @@ internal sealed record StartInitializationStepStartedEvent(DateTimeOffset Timest
 /// </summary>
 internal sealed record StartInitializationProgressEvent(
     DateTimeOffset Timestamp,
-    StartInitializationStepKind StepKind,
+    string StepId,
     double Percent,
     string? Message = null)
     : StartInitializationEvent(Timestamp);
@@ -35,7 +35,7 @@ internal sealed record StartInitializationProgressEvent(
 /// </summary>
 internal sealed record StartInitializationStepCompletedEvent(
     DateTimeOffset Timestamp,
-    StartInitializationStepKind StepKind,
+    string StepId,
     string? Message = null)
     : StartInitializationEvent(Timestamp);
 

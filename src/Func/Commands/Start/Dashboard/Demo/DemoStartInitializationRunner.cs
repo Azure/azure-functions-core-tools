@@ -3,8 +3,6 @@
 
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Hosting.AppStacks;
-using Azure.Functions.Cli.Hosting.Dashboard;
-using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -15,7 +13,6 @@ internal sealed class DemoStartInitializationRunner(
     IAppStackProvider appStackProvider,
     TimeProvider? timeProvider = null) : IStartInitializationRunner
 {
-    private const string DemoHostVersion = "4.834.0";
     private readonly IAppStackProvider _appStackProvider = appStackProvider ?? throw new ArgumentNullException(nameof(appStackProvider));
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -27,140 +24,70 @@ internal sealed class DemoStartInitializationRunner(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(renderer);
 
-        await EmitAsync(renderer, new StartInitializationStartedEvent(Now(), context.ProfileName), cancellationToken);
+        var state = new StartInitializationState();
+        await EmitAsync(renderer, new StartInitializationStartedEvent(Now(), state.ProfileName), cancellationToken);
 
-        await RunStatusStepAsync(
-            renderer,
-            new StartInitializationStep(StartInitializationStepKind.ResolveProfile, "Resolve profile"),
-            "None (no profile applied)",
-            context,
-            cancellationToken);
+        await RunStepsAsync(CreateSteps(), context, state, renderer, cancellationToken);
 
-        await RunStatusStepAsync(
-            renderer,
-            new StartInitializationStep(StartInitializationStepKind.ResolveConstraints, "Resolve profile version constraints"),
-            "No profile constraints applied",
-            context,
-            cancellationToken);
-
-        await RunStatusStepAsync(
-            renderer,
-            new StartInitializationStep(StartInitializationStepKind.ResolveHostWorkload, "Validate host version"),
-            $"No installed host workload found for {DemoHostVersion}",
-            context,
-            cancellationToken);
-
-        await RunProgressStepAsync(
-            renderer,
-            new StartInitializationStep(
-                StartInitializationStepKind.InstallHostWorkload,
-                "Install host workload",
-                $"Azure Functions host {DemoHostVersion}",
-                StartInitializationDisplayKind.Progress),
-            context,
-            cancellationToken);
-
-        string stackName = await RunResolveStackStepAsync(renderer, context, cancellationToken);
-        bool bundleRequired = RequiresExtensionBundle(stackName);
-        await RunStatusStepAsync(
-            renderer,
-            new StartInitializationStep(StartInitializationStepKind.ResolveBundle, "Validate extension bundle"),
-            bundleRequired
-                ? "Bundle validation is not implemented in the prototype"
-                : $"No extension bundle required for {stackName}",
-            context,
-            cancellationToken);
-
-        await RunStatusStepAsync(
-            renderer,
-            new StartInitializationStep(StartInitializationStepKind.StartHost, "Start host"),
-            "Host process started",
-            context,
-            cancellationToken);
-
-        var runInfo = new DashboardRunInfo(
-            CliVersion: context.CliVersion,
-            ProfileName: context.ProfileName,
-            StackName: stackName);
-        var source = new DemoEventSource(_time)
-        {
-            SpeedMultiplier = context.DemoSpeedMultiplier,
-            AutoExit = context.DemoAutoExit,
-            FunctionCount = context.DemoFunctionCount,
-        };
-
-        var result = new StartInitializationResult(
-            runInfo,
-            source,
-            DemoHostVersion,
-            BundleRequired: bundleRequired,
-            BundleVersion: null);
-
-        //await EmitAsync(renderer, new StartInitializationCompletedEvent(Now(), result), cancellationToken);
-        return result;
+        return state.ToResult(context);
     }
 
-    private async Task RunStatusStepAsync(
-        IStartInitializationRenderer renderer,
-        StartInitializationStep step,
-        string completionMessage,
-        StartInitializationContext context,
-        CancellationToken cancellationToken)
+    private StartInitializationStepCollection CreateSteps()
     {
-        await EmitAsync(renderer, new StartInitializationStepStartedEvent(Now(), step), cancellationToken);
-        await DelayAsync(context, cancellationToken);
-        await EmitAsync(renderer, new StartInitializationStepCompletedEvent(Now(), step.Kind, completionMessage), cancellationToken);
-    }
-
-    private async Task<string> RunResolveStackStepAsync(
-        IStartInitializationRenderer renderer,
-        StartInitializationContext context,
-        CancellationToken cancellationToken)
-    {
-        var step = new StartInitializationStep(StartInitializationStepKind.ResolveStack, "Resolve app stack");
-        await EmitAsync(renderer, new StartInitializationStepStartedEvent(Now(), step), cancellationToken);
-        await DelayAsync(context, cancellationToken);
-        string stackName = await _appStackProvider.GetStackNameAsync(context.WorkingDirectory, cancellationToken);
-        await EmitAsync(renderer, new StartInitializationStepCompletedEvent(Now(), step.Kind, stackName), cancellationToken);
-        return stackName;
-    }
-
-    private async Task RunProgressStepAsync(
-        IStartInitializationRenderer renderer,
-        StartInitializationStep step,
-        StartInitializationContext context,
-        CancellationToken cancellationToken)
-    {
-        await EmitAsync(renderer, new StartInitializationStepStartedEvent(Now(), step), cancellationToken);
-        (double Percent, string Message)[] progress =
+        StartInitializationStepCollection steps =
         [
-            (0, "Preparing download"),
-            (25, "Downloading package"),
-            (55, "Verifying package"),
-            (80, "Installing files"),
-            (100, "Finalizing"),
+            new ResolveProfileInitializationStep(),
+            new ResolveConstraintsInitializationStep(),
+            new ValidateHostWorkloadInitializationStep(),
+            new ResolveAppStackInitializationStep(_appStackProvider),
+            new ValidateExtensionBundleInitializationStep(),
+            new StartHostInitializationStep(_time),
         ];
 
-        foreach ((double percent, string message) in progress)
-        {
-            await DelayAsync(context, cancellationToken);
-            await EmitAsync(
-                renderer,
-                new StartInitializationProgressEvent(Now(), step.Kind, percent, message),
-                cancellationToken);
-        }
-
-        await EmitAsync(renderer, new StartInitializationStepCompletedEvent(Now(), step.Kind, $"Installed host {DemoHostVersion}"), cancellationToken);
+        return steps;
     }
 
-    private static bool RequiresExtensionBundle(string stackName)
-        => !string.Equals(stackName, ".NET", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(stackName, "unknown", StringComparison.OrdinalIgnoreCase);
-
-    private async Task DelayAsync(StartInitializationContext context, CancellationToken cancellationToken)
+    private async Task RunStepsAsync(
+        StartInitializationStepCollection steps,
+        StartInitializationContext context,
+        StartInitializationState state,
+        IStartInitializationRenderer renderer,
+        CancellationToken cancellationToken)
     {
-        double multiplier = context.DemoSpeedMultiplier <= 0 ? 0.25 : context.DemoSpeedMultiplier;
-        await Task.Delay(TimeSpan.FromMilliseconds(2000 * multiplier), _time, cancellationToken);
+        Queue<IStartInitializationStep> pending = new(steps);
+        while (pending.TryDequeue(out IStartInitializationStep? step))
+        {
+            await EmitAsync(renderer, new StartInitializationStepStartedEvent(Now(), new StartInitializationStep(step)), cancellationToken);
+
+            var stepContext = new StartInitializationStepContext(context, state, step, renderer, _time);
+            StartInitializationStepResult result = await step.ExecuteAsync(stepContext, cancellationToken);
+
+            await EmitAsync(renderer, new StartInitializationStepCompletedEvent(Now(), step.Id, result.Message), cancellationToken);
+
+            IReadOnlyList<IStartInitializationStep> nextSteps = stepContext.DrainNextSteps();
+            if (nextSteps.Count > 0)
+            {
+                pending = Prepend(nextSteps, pending);
+            }
+        }
+    }
+
+    private static Queue<IStartInitializationStep> Prepend(
+        IReadOnlyList<IStartInitializationStep> nextSteps,
+        Queue<IStartInitializationStep> pending)
+    {
+        Queue<IStartInitializationStep> updated = new();
+        foreach (IStartInitializationStep nextStep in nextSteps)
+        {
+            updated.Enqueue(nextStep);
+        }
+
+        while (pending.TryDequeue(out IStartInitializationStep? remainingStep))
+        {
+            updated.Enqueue(remainingStep);
+        }
+
+        return updated;
     }
 
     private async Task EmitAsync(
