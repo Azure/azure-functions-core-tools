@@ -14,4 +14,25 @@ internal sealed class WorkloadProvider(IEnumerable<WorkloadInfo> workloads) : IW
         (workloads ?? throw new ArgumentNullException(nameof(workloads))).ToList();
 
     public IReadOnlyList<WorkloadInfo> GetWorkloads() => _workloads;
+
+    public WorkloadInfo? FindByStack(string stack)
+    {
+        if (string.IsNullOrWhiteSpace(stack))
+        {
+            return null;
+        }
+
+        foreach (WorkloadInfo workload in _workloads)
+        {
+            foreach (string alias in workload.Aliases)
+            {
+                if (string.Equals(alias, stack, StringComparison.OrdinalIgnoreCase))
+                {
+                    return workload;
+                }
+            }
+        }
+
+        return null;
+    }
 }
