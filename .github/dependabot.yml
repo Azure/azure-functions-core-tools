@@ -37,6 +37,11 @@ updates:
       - dependency-name: "Microsoft.Azure.Functions.PowerShellWorker.*"
       - dependency-name: "Microsoft.Azure.Functions.PythonWorker"
       - dependency-name: "Microsoft.Azure.WebJobs.Script.WebHost"
+      # We intentionally stay on Microsoft.ApplicationInsights 2.x and do
+      # not plan to move to v3.
+      - dependency-name: "Microsoft.ApplicationInsights"
+        update-types:
+          - "version-update:semver-major"
     groups:
       opentelemetry:
         patterns:
