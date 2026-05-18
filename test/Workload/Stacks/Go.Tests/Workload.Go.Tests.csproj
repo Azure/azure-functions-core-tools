@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Workload/Python/Workload.Python.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workload/Stacks/Go/Workload.Go.csproj" />
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>

@@ -24,8 +24,8 @@ trigger:
   paths:
     include:
     - src/Abstractions/
-    - src/Workload/DotNet/
-    - test/Workload/DotNet.Tests/
+    - src/Workload/Stacks/DotNet/
+    - test/Workload/Stacks/DotNet.Tests/
     - eng/
 
 resources:

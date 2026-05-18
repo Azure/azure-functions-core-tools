@@ -19,8 +19,8 @@ pr:
   paths:
     include:
     - src/Abstractions/
-    - src/Workload/Python/
-    - test/Workload/Python.Tests/
+    - src/Workload/Stacks/Python/
+    - test/Workload/Stacks/Python.Tests/
     - eng/
 
 resources:

@@ -57,7 +57,7 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 
 ## Quick Start
 
-1. Create a class library project under `src/Workload/<Name>/` that targets `net10.0` and packs as `PackageType=FuncCliWorkload`
+1. Create a class library project under `src/Workload/<kind>/<Name>/` that targets `net10.0` and packs as `PackageType=FuncCliWorkload`; omit `<kind>/` for workloads that do not belong to a grouping
 2. Reference `Azure.Functions.Cli.Abstractions` (with `PrivateAssets=all` and `ExcludeAssets=runtime` so it isn't shipped inside your package)
 3. Subclass `Workload` and override `DisplayName`, `Description`, and `Configure`
 4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
@@ -67,10 +67,16 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 
 ## Step 1: Create the Project
 
+Use `src/Workload/<kind>/<Name>/` for grouped workloads. Stack workloads use
+`Stacks` as the kind, while workloads without a grouping can live directly
+under `src/Workload/<Name>/`.
+
 ```bash
-mkdir src/Workload/Node
-cd src/Workload/Node
+mkdir src/Workload/<kind>/Node
+cd src/Workload/<kind>/Node
 ```
+
+For ungrouped workloads, omit the `<kind>/` segment from the commands above.
 
 Create the `Workload.Node.csproj`. The csproj is the single source of truth for packaging; there are no per-folder `Directory.Build.props` for workloads.
 
@@ -374,9 +380,27 @@ Initializers are themselves easy to unit-test: drive them with a temp directory 
 Add the project (and its test project) to the solution:
 
 ```bash
-dotnet sln add src/Workload/Node/Workload.Node.csproj
-dotnet sln add test/Workload/Node.Tests/Workload.Node.Tests.csproj
+dotnet sln add src/Workload/<kind>/Node/Workload.Node.csproj
+dotnet sln add test/Workload/<kind>/Node.Tests/Workload.Node.Tests.csproj
 ```
+
+For ungrouped workloads, omit the `<kind>/` segment from the solution paths.
+
+After adding the projects, ensure `Azure.Functions.Cli.slnx` places them in
+solution folders that mirror the filesystem hierarchy:
+
+```xml
+<Folder Name="/src/Workload/<kind>/">
+  <Project Path="src/Workload/<kind>/Node/Workload.Node.csproj" />
+</Folder>
+<Folder Name="/test/Workload/<kind>/">
+  <Project Path="test/Workload/<kind>/Node.Tests/Workload.Node.Tests.csproj" />
+</Folder>
+```
+
+For ungrouped workloads, use `/src/Workload/` and `/test/Workload/` as the
+solution folders. Do not leave grouped workload projects under only `/src/` or
+`/test/`.
 
 Workloads share a single CI job template, `eng/ci/templates/jobs/build-workload.yml`, parameterised by `WorkloadProjectName`. Each workload owns two thin pipeline files that extend the 1ES template and pass that parameter:
 
@@ -386,23 +410,25 @@ Workloads share a single CI job template, `eng/ci/templates/jobs/build-workload.
 Both should set path filters to scope triggers to:
 
 - `src/Abstractions/**`
-- `src/Workload/<Name>/**`
-- `test/Workload/<Name>.Tests/**`
+- `src/Workload/<kind>/<Name>/**`
+- `test/Workload/<kind>/<Name>.Tests/**`
 - `eng/ci/templates/jobs/build-workload.yml`
 - The pipeline file itself
+
+For ungrouped workloads, omit the `<kind>/` segment from the path filters.
 
 Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`) as the reference. New workloads should not introduce per-workload job/step templates: `build-workload.yml` already covers build, test, and pack.
 
 ## Checklist
 
-- [ ] New project `src/Workload/<Name>/Workload.<Name>.csproj`, packs as `PackageType=FuncCliWorkload`, references `Abstractions` with `PrivateAssets=all` / `ExcludeAssets=runtime`
+- [ ] New project `src/Workload/<kind>/<Name>/Workload.<Name>.csproj`, packs as `PackageType=FuncCliWorkload`, references `Abstractions` with `PrivateAssets=all` / `ExcludeAssets=runtime`
 - [ ] `Directory.Version.props` and `release_notes.md` next to the csproj
 - [ ] `README.md` next to the csproj (auto-packed by `Release.props` as `<PackageReadmeFile>`)
 - [ ] `workload.json` next to the csproj, listing the entry-point `assemblyPath` and `type`
 - [ ] Subclass of `Workload` with a parameterless constructor, overriding `DisplayName`, `Description`, and `Configure`
 - [ ] `Configure(FunctionsCliBuilder)` null-checks `builder` and registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
 - [ ] `IProjectInitializer.GetInitOptions()` returns any extra options the initializer needs (return `[]` for stubs; only throw from `InitializeAsync`)
-- [ ] Test project `test/Workload/<Name>.Tests/Workload.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workload.<Name>.Tests` (matches the workload's `InternalsVisibleTo`)
-- [ ] Both projects added to `Azure.Functions.Cli.slnx`
+- [ ] Test project `test/Workload/<kind>/<Name>.Tests/Workload.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workload.<Name>.Tests` (matches the workload's `InternalsVisibleTo`)
+- [ ] Both projects added to `Azure.Functions.Cli.slnx` under solution folders that mirror their source and test paths
 - [ ] `eng/ci/workloads/<name>/{public,official}-build.yml` extending `eng/ci/templates/jobs/build-workload.yml` with `WorkloadProjectName: <Name>`
 - [ ] `dotnet build` and `dotnet test` pass

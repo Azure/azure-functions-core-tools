@@ -13,10 +13,10 @@ jobs:
   - template: /eng/ci/templates/variables/build.yml@self
   - name: workload_project
     readonly: true
-    value: src/Workload/${{ parameters.WorkloadProjectName }}/Workload.${{ parameters.WorkloadProjectName }}.csproj
+    value: src/Workload/Stacks/${{ parameters.WorkloadProjectName }}/Workload.${{ parameters.WorkloadProjectName }}.csproj
   - name: workload_tests
     readonly: true
-    value: test/Workload/${{ parameters.WorkloadProjectName }}.Tests/Workload.${{ parameters.WorkloadProjectName }}.Tests.csproj
+    value: test/Workload/Stacks/${{ parameters.WorkloadProjectName }}.Tests/Workload.${{ parameters.WorkloadProjectName }}.Tests.csproj
   - name: pack_dir
     readonly: true
     value: $(Build.ArtifactStagingDirectory)/pkg
