@@ -38,6 +38,7 @@ internal sealed class CompactRenderer(
     private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, runInfo ?? new());
     private readonly CompactHelpOverlayBuilder _helpOverlayBuilder = new(interaction.Theme);
     private readonly CompactFunctionSearchBuilder _functionSearchBuilder = new(interaction.Theme, palette);
+    private readonly CompactFunctionBrowserBuilder _functionBrowserBuilder = new(interaction.Theme, palette);
     private readonly Lock _uiLock = new();
     private readonly CompactLogBuffer _logBuffer = new(MaxLogTailLines);
     private readonly CompactLogLineFormatter _logLineFormatter = new(interaction.Theme, palette);
@@ -277,11 +278,11 @@ internal sealed class CompactRenderer(
                     return true;
 
                 case ConsoleKey.PageUp when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, -Math.Max(1, GetFunctionBrowserVisibleRows(functions.Length)));
+                    MoveFunctionBrowserSelection(functions, -Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functions.Length, GetViewportHeight())));
                     return true;
 
                 case ConsoleKey.PageDown when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, Math.Max(1, GetFunctionBrowserVisibleRows(functions.Length)));
+                    MoveFunctionBrowserSelection(functions, Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functions.Length, GetViewportHeight())));
                     return true;
 
                 case ConsoleKey.PageUp when !_helpOpen:
@@ -307,11 +308,11 @@ internal sealed class CompactRenderer(
                     return ResetLogScroll();
 
                 case ConsoleKey.LeftArrow when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, -GetFunctionBrowserTotalRows(functions.Length));
+                    MoveFunctionBrowserSelection(functions, -_functionBrowserBuilder.GetTotalRows(functions.Length));
                     return true;
 
                 case ConsoleKey.RightArrow when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, GetFunctionBrowserTotalRows(functions.Length));
+                    MoveFunctionBrowserSelection(functions, _functionBrowserBuilder.GetTotalRows(functions.Length));
                     return true;
             }
         }
@@ -719,7 +720,7 @@ internal sealed class CompactRenderer(
             ? _functionSearchBuilder.GetVisibleRows(_functionSearchBuilder.GetMatches(GetSortedFunctions(snapshot), searchQuery).Length, GetViewportHeight()) + CompactFunctionSearchBuilder.ChromeLines
             : functionBrowserOpen
             // Panel border (2) + visible grid rows + spacer/footer (2).
-            ? GetFunctionBrowserVisibleRows(snapshot.Functions.Count) + 4
+            ? _functionBrowserBuilder.GetVisibleRows(snapshot.Functions.Count, GetViewportHeight()) + CompactFunctionBrowserBuilder.ChromeLines
             : snapshot.Functions.Count switch
             {
                 0 => 1,
@@ -870,8 +871,8 @@ internal sealed class CompactRenderer(
     private IRenderable BuildFunctionBrowser(DashboardSnapshot snapshot)
     {
         FunctionInfo[] functions = GetSortedFunctions(snapshot);
-        int totalRows = GetFunctionBrowserTotalRows(functions.Length);
-        int visibleRows = GetFunctionBrowserVisibleRows(functions.Length);
+        int totalRows = _functionBrowserBuilder.GetTotalRows(functions.Length);
+        int visibleRows = _functionBrowserBuilder.GetVisibleRows(functions.Length, GetViewportHeight());
         int selectedIndex;
         int rowOffset;
 
@@ -885,7 +886,7 @@ internal sealed class CompactRenderer(
             else
             {
                 _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex, 0, functions.Length - 1);
-                int selectedRow = GetFunctionBrowserRow(_functionBrowserSelectedIndex, totalRows);
+                int selectedRow = _functionBrowserBuilder.GetRow(_functionBrowserSelectedIndex, totalRows);
                 int maxOffset = Math.Max(0, totalRows - visibleRows);
 
                 if (_functionBrowserRowOffset > selectedRow)
@@ -904,75 +905,8 @@ internal sealed class CompactRenderer(
             rowOffset = _functionBrowserRowOffset;
         }
 
-        IRenderable content = functions.Length == 0
-            ? new Markup($"[{MutedTag}]No functions loaded yet…[/]")
-            : BuildFunctionBrowserGrid(functions, totalRows, visibleRows, rowOffset, selectedIndex);
-
-        var footer = new Markup($"[{MutedTag}]Up/Down navigate · Enter filter · / search · f next · a all · t/Esc close · q/Ctrl+C[/]");
-        var panel = new Panel(new Rows(content, new Markup(string.Empty), footer))
-        {
-            Header = new PanelHeader(string.Create(CultureInfo.InvariantCulture, $"Functions ({functions.Length})")),
-            Border = BoxBorder.Rounded,
-            BorderStyle = Theme.Muted,
-            Expand = true,
-        };
-
-        return panel;
+        return _functionBrowserBuilder.Build(functions, totalRows, visibleRows, rowOffset, selectedIndex);
     }
-
-    private IRenderable BuildFunctionBrowserGrid(
-        FunctionInfo[] functions,
-        int totalRows,
-        int visibleRows,
-        int rowOffset,
-        int selectedIndex)
-    {
-        Table table = new Table()
-            .Border(TableBorder.None)
-            .HideHeaders()
-            .Expand()
-            .AddColumn(new TableColumn(string.Empty).PadLeft(1).PadRight(4).NoWrap())
-            .AddColumn(new TableColumn(string.Empty).PadLeft(1).PadRight(0).NoWrap());
-
-        for (int row = 0; row < visibleRows; row++)
-        {
-            int leftIndex = rowOffset + row;
-            int rightIndex = leftIndex + totalRows;
-
-            table.AddRow(
-                new Markup(FormatFunctionBrowserCell(functions, leftIndex, selectedIndex)),
-                new Markup(FormatFunctionBrowserCell(functions, rightIndex, selectedIndex)));
-        }
-
-        return table;
-    }
-
-    private string FormatFunctionBrowserCell(FunctionInfo[] functions, int index, int selectedIndex)
-    {
-        if ((uint)index >= (uint)functions.Length)
-        {
-            return string.Empty;
-        }
-
-        FunctionInfo fn = functions[index];
-        string marker = index == selectedIndex
-            ? $"[{EmphasisTag}]>[/]"
-            : " ";
-        string status = FormatFunctionBrowserStatus(fn);
-        string color = _palette.GetColorFor(fn.Name);
-        string activeCount = fn.Status == FunctionStatus.Active && fn.ActiveInvocations > 1
-            ? string.Create(CultureInfo.InvariantCulture, $" ({fn.ActiveInvocations})")
-            : string.Empty;
-
-        return $"{marker} {status} [{color}]{Markup.Escape(fn.Name)}[/]{activeCount}";
-    }
-
-    private string FormatFunctionBrowserStatus(FunctionInfo fn) => fn.Status switch
-    {
-        FunctionStatus.Active => $"[{ActiveTag}]◉[/]",
-        FunctionStatus.Error => $"[{ErrorTag}]✗[/]",
-        _ => $"[{SuccessTag}]●[/]",
-    };
 
     private IRenderable BuildFunctionsStatusStrip(DashboardSnapshot snapshot)
     {
@@ -1071,25 +1005,6 @@ internal sealed class CompactRenderer(
         _ when function.LastInvocationAt is not null => 2,
         _ => 3,
     };
-
-    private static int GetFunctionBrowserTotalRows(int functionCount)
-        => Math.Max(1, (functionCount + 1) / 2);
-
-    private static int GetFunctionBrowserRow(int index, int totalRows)
-        => totalRows <= 0 ? 0 : index % totalRows;
-
-    private int GetFunctionBrowserVisibleRows(int functionCount)
-    {
-        int totalRows = GetFunctionBrowserTotalRows(functionCount);
-        int viewportHeight = GetViewportHeight();
-
-        // Reserve: logs rule (1), minimum log tail (3), safety pad (2), and
-        // browser panel chrome/spacer/footer (4). On a 24-row terminal this
-        // leaves room for about 14 grid rows, which shows up to 28 functions
-        // in the two-column browser before scrolling is needed.
-        int maxRows = Math.Max(4, viewportHeight - 10);
-        return Math.Min(totalRows, maxRows);
-    }
 
     private int GetViewportHeight()
     {
