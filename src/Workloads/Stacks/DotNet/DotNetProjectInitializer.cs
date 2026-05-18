@@ -18,6 +18,11 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
     internal const string TemplateShortName = "func";
     internal const string DefaultFramework = "net10.0";
 
+    private static readonly string _hivePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "azure-functions-core-tools",
+        "dotnet-template-hive");
+
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
 
     public string Stack => "dotnet";
@@ -47,42 +52,28 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
 
         await EnsureTemplatesInstalledAsync(cancellationToken);
 
-        try
-        {
-            List<string> args =
-            [
-                "new", TemplateShortName,
-                "--name", projectName,
-                "--output", projectPath,
-                "--language", language,
-                "--Framework", framework,
-            ];
+        List<string> args =
+        [
+            "new", TemplateShortName,
+            "--name", projectName,
+            "--output", projectPath,
+            "--language", language,
+            "--Framework", framework,
+            "--debug:custom-hive", _hivePath,
+        ];
 
-            if (context.Force)
-            {
-                args.Add("--force");
-            }
-
-            await _dotnetCli.RunAsync(args, projectPath, cancellationToken);
-        }
-        finally
+        if (context.Force)
         {
-            await UninstallTemplatesAsync(cancellationToken);
+            args.Add("--force");
         }
+
+        await _dotnetCli.RunAsync(args, projectPath, cancellationToken);
     }
 
     internal async Task EnsureTemplatesInstalledAsync(CancellationToken cancellationToken)
     {
         await _dotnetCli.RunAsync(
-            ["new", "install", TemplatesPackageName],
-            workingDirectory: null,
-            cancellationToken);
-    }
-
-    internal async Task UninstallTemplatesAsync(CancellationToken cancellationToken)
-    {
-        await _dotnetCli.RunAsync(
-            ["new", "uninstall", TemplatesPackageName],
+            ["new", "install", TemplatesPackageName, "--debug:custom-hive", _hivePath],
             workingDirectory: null,
             cancellationToken);
     }
