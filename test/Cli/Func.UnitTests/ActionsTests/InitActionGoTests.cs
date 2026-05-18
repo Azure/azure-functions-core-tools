@@ -169,5 +169,26 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
             }
         }
+
+        [Theory]
+        [InlineData("--go")]
+        [InlineData("--golang")]
+        public void GlobalCoreToolsSettings_Init_GoShortcutFlag_SetsCurrentWorkerRuntimeToGo(string flag)
+        {
+            var previousRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+            try
+            {
+                GlobalCoreToolsSettings.Init(secretsManager: null, args: new[] { flag });
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Go);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previousRuntime;
+            }
+        }
     }
 }
