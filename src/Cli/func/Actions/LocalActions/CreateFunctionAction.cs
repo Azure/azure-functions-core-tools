@@ -364,6 +364,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return _initAction.ResolvedWorkerRuntime;
             }
 
+            // FUNCTIONS_WORKER_RUNTIME=native (Go) does not normalize to a WorkerRuntime via
+            // GetCurrentWorkerRuntimeLanguage. Resolve native -> concrete runtime (e.g. Go via go.mod)
+            // here so callers like 'func new' can short-circuit on unsupported runtimes before
+            // running language/template prompts that would mutate local.settings.json.
+            var nativeResolved = WorkerRuntimeLanguageHelper.ResolveNativeWorkerRuntime(_secretsManager);
+            if (nativeResolved != WorkerRuntime.None)
+            {
+                return nativeResolved;
+            }
+
             return GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
         }
 
