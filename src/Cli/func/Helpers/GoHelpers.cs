@@ -160,13 +160,8 @@ namespace Azure.Functions.Cli.Helpers
         /// <see cref="GoBinaryName"/> in <paramref name="workingDirectory"/>. Used
         /// by <c>func pack</c> and <c>func publish</c> — the produced binary is the
         /// one that runs on the Linux Functions host, regardless of the dev OS.
+        /// Targets linux/amd64 only.
         /// </summary>
-        /// <remarks>
-        /// TODO(arm64): Currently hardcoded to linux/amd64. Linux ARM64 Function Apps
-        /// are not yet supported by Core Tools' Go pipeline. When the ARM resource
-        /// model exposes the target instance architecture, this method should accept
-        /// a target arch and the publish path should reject mismatches up front.
-        /// </remarks>
         internal static async Task BuildForLinux(string workingDirectory = null)
         {
             workingDirectory ??= Environment.CurrentDirectory;
