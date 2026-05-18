@@ -31,7 +31,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
 
     public Option<string> FrameworkOption { get; } = new("--target-framework")
     {
-        Description = "The target framework for the project (e.g. net8.0, net10.0).",
+        Description = "The target framework for the project (e.g. net10.0).",
         DefaultValueFactory = _ => DefaultFramework
     };
 
