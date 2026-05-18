@@ -54,6 +54,10 @@ extends:
         - Priority -equals Low
 
     sdl:
+      sourceAnalysisPool:
+        name: 1es-pool-azfunc
+        image: 1es-windows-2022
+        os: windows
       codeql:
          runSourceLanguagesInSourceAnalysis: true
 
