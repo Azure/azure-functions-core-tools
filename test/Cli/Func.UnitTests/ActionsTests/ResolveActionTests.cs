@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions;
 using Autofac;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Actions.DurableActions;
@@ -11,7 +12,6 @@ using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
-using FluentAssertions;
 using NSubstitute;
 using Xunit;
 

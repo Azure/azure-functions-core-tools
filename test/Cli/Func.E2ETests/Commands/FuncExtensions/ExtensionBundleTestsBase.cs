@@ -1,9 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using AwesomeAssertions;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
-using FluentAssertions;
 using Microsoft.Azure.WebJobs.Script;
 using Xunit.Abstractions;
 

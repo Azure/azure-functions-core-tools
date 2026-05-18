@@ -1,10 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
-using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
@@ -229,7 +229,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             if (shouldInclude)
             {
                 // Version should be >= start and < end
-                CompareVersionStrings(version, parsed.Value.Start).Should().BeGreaterOrEqualTo(0);
+                CompareVersionStrings(version, parsed.Value.Start).Should().BeGreaterThanOrEqualTo(0);
                 CompareVersionStrings(version, parsed.Value.End).Should().BeLessThan(0);
             }
             else

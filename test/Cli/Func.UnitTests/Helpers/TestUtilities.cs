@@ -3,7 +3,7 @@
 
 using System.IO.Abstractions;
 using System.Text;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
 

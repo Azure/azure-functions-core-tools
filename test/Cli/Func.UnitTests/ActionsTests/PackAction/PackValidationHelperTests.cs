@@ -1,8 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using AwesomeAssertions;
 using Azure.Functions.Cli.Actions.LocalActions.PackAction;
-using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction

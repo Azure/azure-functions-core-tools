@@ -4,8 +4,8 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Extensions;
-using FluentAssertions;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Newtonsoft.Json;
 using SuaveServerWrapper;
