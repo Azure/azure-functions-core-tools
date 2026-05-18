@@ -17,4 +17,13 @@ internal interface IWorkloadProvider
     /// for the lifetime of the host.
     /// </summary>
     public IReadOnlyList<WorkloadInfo> GetWorkloads();
+
+    /// <summary>
+    /// Looks up the single workload whose <see cref="WorkloadInfo.Aliases"/>
+    /// contains <paramref name="stack"/> (case-insensitive). Returns
+    /// <see langword="null"/> when no installed workload matches. Aliases
+    /// are expected to be globally unique across workloads; the first
+    /// match wins if not.
+    /// </summary>
+    public WorkloadInfo? FindByStack(string stack);
 }

@@ -32,4 +32,34 @@ public class WorkloadProviderTests
     {
         Assert.Throws<ArgumentNullException>(() => new WorkloadProvider(null!));
     }
+
+    [Fact]
+    public void FindByStack_AliasMatch_ReturnsWorkload()
+    {
+        WorkloadInfo dotnet = TestWorkloads.CreateInfo("Pkg.Dotnet") with { Aliases = ["dotnet", "dotnet-isolated"] };
+        WorkloadInfo python = TestWorkloads.CreateInfo("Pkg.Python") with { Aliases = ["python"] };
+        var provider = new WorkloadProvider([dotnet, python]);
+
+        Assert.Same(dotnet, provider.FindByStack("DOTNET-ISOLATED"));
+        Assert.Same(python, provider.FindByStack("python"));
+    }
+
+    [Fact]
+    public void FindByStack_NoMatch_ReturnsNull()
+    {
+        WorkloadInfo dotnet = TestWorkloads.CreateInfo("Pkg.Dotnet") with { Aliases = ["dotnet"] };
+        var provider = new WorkloadProvider([dotnet]);
+
+        Assert.Null(provider.FindByStack("native"));
+    }
+
+    [Fact]
+    public void FindByStack_NullOrWhitespace_ReturnsNull()
+    {
+        WorkloadInfo dotnet = TestWorkloads.CreateInfo("Pkg.Dotnet") with { Aliases = ["dotnet"] };
+        var provider = new WorkloadProvider([dotnet]);
+
+        Assert.Null(provider.FindByStack(null!));
+        Assert.Null(provider.FindByStack("   "));
+    }
 }

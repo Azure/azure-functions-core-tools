@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Workloads.Resolution;
 
@@ -13,159 +14,74 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 internal sealed class WorkloadResolver(
     IWorkloadProvider workloads,
     IEnumerable<WorkloadProjectResolverContribution> resolvers,
-    ILocalSettingsReader localSettings,
-    IFuncProjectConfigReader projectConfig) : IWorkloadResolver
+    IOptions<StackOptions> stackOptions) : IWorkloadResolver
 {
     private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
     private readonly IReadOnlyList<WorkloadProjectResolverContribution> _resolvers =
         (resolvers ?? throw new ArgumentNullException(nameof(resolvers))).ToList();
-    private readonly ILocalSettingsReader _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
-    private readonly IFuncProjectConfigReader _projectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
+    private readonly StackOptions _stackOptions = (stackOptions ?? throw new ArgumentNullException(nameof(stackOptions))).Value;
 
-    public async Task<WorkloadResolution> ResolveAsync(WorkloadResolutionContext context, CancellationToken cancellationToken)
+    public async Task<WorkloadResolution> ResolveAsync(DirectoryInfo directory, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(directory);
 
         IReadOnlyList<WorkloadInfo> installed = _workloads.GetWorkloads();
 
-        // 1. Explicit selector wins.
-        if (!string.IsNullOrWhiteSpace(context.StackSelector))
+        // 1. Honour an explicit stack pin (from local.settings.json,
+        // .func/config.json, etc.). Aliases are the sole identifier.
+        string? stack = _stackOptions.Stack;
+        if (!string.IsNullOrWhiteSpace(stack))
         {
-            return ResolveBySelector(installed, context.StackSelector, $"--stack '{context.StackSelector}'");
+            WorkloadInfo? match = _workloads.FindByStack(stack);
+            if (match is not null)
+            {
+                return new WorkloadResolution.Resolved(match, $"Selected by stack '{stack}'.");
+            }
+
+            // No alias match: fall through to project-based detection.
+            // The pin may be a runtime name (e.g. 'native') that several
+            // installed workloads can claim via their resolvers.
         }
 
-        // No project to inspect (e.g. `func init`).
-        if (context.SkipDirectoryDetection)
-        {
-            return new WorkloadResolution.None(
-                "No --stack flag supplied. " +
-                "Pass --stack <id> to choose a workload. " +
-                $"Installed: {FormatInstalled(installed)}.");
-        }
-
-        // 2. .func/config.json is treated as an explicit project-pinned
-        // declaration: it wins over both FUNCTIONS_WORKER_RUNTIME and
-        // resolver auto-detection. It also bypasses the host.json gate
-        // below — if the user has pinned a stack explicitly, we trust
-        // them and don't require host.json to also be present.
-        FuncProjectConfig? config = _projectConfig.Read(context.Directory);
-        if (!string.IsNullOrWhiteSpace(config?.Stack))
-        {
-            return ResolveBySelector(installed, config.Stack, $".func/config.json declares stack '{config.Stack}'");
-        }
-
-        // CLI-wide invariant: a directory without host.json is not a
-        // Functions project. Gate here so per-stack resolvers can focus
-        // on their fingerprints and we surface one consistent diagnostic.
-        if (!File.Exists(Path.Combine(context.Directory.FullName, "host.json")))
-        {
-            return new WorkloadResolution.None(
-                "This directory does not look like an Azure Functions project. " +
-                $"No 'host.json' was found in '{context.Directory.FullName}'. " +
-                "Run 'func init' to scaffold one, or change to a Functions project directory.");
-        }
-
-        IReadOnlyList<ResolverClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
-
-        // 3. FUNCTIONS_WORKER_RUNTIME, when set, is treated as an explicit
-        // declaration: only claims with a matching WorkerRuntime count.
-        string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
-        if (!string.IsNullOrWhiteSpace(runtime))
-        {
-            return ResolveByRuntime(installed, claims, runtime);
-        }
-
-        // 4. Auto-detection from registered IProjectResolvers.
-        return ResolveByClaims(claims);
-    }
-
-    private async Task<IReadOnlyList<ResolverClaim>> CollectClaimsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
-    {
-        // Track per workload so a workload that ships multiple resolvers
-        // counts once.
-        var claimsByWorkload = new Dictionary<WorkloadInfo, ResolverClaim>();
+        // 2. Project-based detection: unique claimant wins.
+        var claimsByWorkload = new Dictionary<WorkloadInfo, string?>();
         foreach (WorkloadProjectResolverContribution contribution in _resolvers)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             EvaluationResult result = await contribution.Resolver.EvaluateAsync(directory, cancellationToken);
-            if (!result.IsMatch)
+            if (result.IsMatch && !claimsByWorkload.ContainsKey(contribution.Workload))
             {
-                continue;
-            }
-
-            if (!claimsByWorkload.ContainsKey(contribution.Workload))
-            {
-                claimsByWorkload[contribution.Workload] = new ResolverClaim(contribution.Workload, result);
+                claimsByWorkload[contribution.Workload] = result.Reason;
             }
         }
 
-        return [.. claimsByWorkload.Values];
-    }
-
-    private static WorkloadResolution ResolveBySelector(IReadOnlyList<WorkloadInfo> installed, string selector, string source)
-    {
-        // Match against aliases; mirrors `func workload install <alias>`.
-        List<WorkloadInfo> matches = [.. installed.Where(w =>
-            w.Aliases.Any(a => string.Equals(a, selector, StringComparison.OrdinalIgnoreCase)))];
-
-        return matches.Count switch
+        return claimsByWorkload.Count switch
         {
-            1 => new WorkloadResolution.Resolved(matches[0], $"Selected by {source}."),
+            1 => Resolved(claimsByWorkload),
             0 => new WorkloadResolution.None(
-                $"No installed workload claims stack '{selector}' (from {source}). " +
-                $"Installed: {FormatInstalled(installed)}. " +
-                $"Run 'func workload install <package>' to add a workload."),
+                string.IsNullOrWhiteSpace(stack)
+                    ? "No installed workload claims this directory. " +
+                      $"Installed: {FormatInstalled(installed)}. " +
+                      "Set 'FUNCTIONS_WORKER_RUNTIME' in local.settings.json, set 'stack' in .func/config.json, " +
+                      "or run 'func workload install <package>' to add one."
+                    : $"Stack '{stack}' matched no installed alias and no resolver claims this directory. " +
+                      $"Installed: {FormatInstalled(installed)}."),
             _ => new WorkloadResolution.None(
-                $"Multiple installed workloads claim stack '{selector}' (from {source}): {FormatPackages(matches)}. " +
-                $"Pass --stack with an exact package id to disambiguate."),
+                "Multiple installed workloads claim this directory: " +
+                $"{string.Join(", ", claimsByWorkload.Select(kvp => FormatCandidate(kvp.Key, kvp.Value)))}. " +
+                "Set 'stack' in .func/config.json to disambiguate."),
         };
     }
 
-    private static WorkloadResolution ResolveByRuntime(
-        IReadOnlyList<WorkloadInfo> installed,
-        IReadOnlyList<ResolverClaim> claims,
-        string runtime)
+    private static WorkloadResolution Resolved(IReadOnlyDictionary<WorkloadInfo, string?> claims)
     {
-        List<ResolverClaim> matches = [.. claims.Where(c =>
-            c.Result.WorkerRuntime is { Length: > 0 } r &&
-            string.Equals(r, runtime, StringComparison.OrdinalIgnoreCase))];
-
-        return matches.Count switch
-        {
-            1 => new WorkloadResolution.Resolved(
-                matches[0].Workload,
-                $"Selected by FUNCTIONS_WORKER_RUNTIME='{runtime}' in local.settings.json."),
-            0 => new WorkloadResolution.None(
-                $"local.settings.json declares FUNCTIONS_WORKER_RUNTIME='{runtime}' " +
-                $"but no installed workload claims that runtime for this directory. " +
-                $"Installed: {FormatInstalled(installed)}. " +
-                $"Run 'func workload install <package>' to add a workload for '{runtime}', " +
-                $"or pass --stack <id> to override."),
-            _ => new WorkloadResolution.None(
-                $"Multiple installed workloads claim worker runtime '{runtime}': " +
-                $"{FormatPackages(matches.Select(m => m.Workload))}. " +
-                $"Pass --stack <id> to disambiguate."),
-        };
-    }
-
-    private static WorkloadResolution ResolveByClaims(IReadOnlyList<ResolverClaim> claims)
-    {
-        return claims.Count switch
-        {
-            1 => new WorkloadResolution.Resolved(
-                claims[0].Workload,
-                claims[0].Result.Reason is { Length: > 0 } reason
-                    ? $"Selected by '{claims[0].Workload.PackageId}' resolver: {reason}."
-                    : $"Selected by '{claims[0].Workload.PackageId}' resolver."),
-            0 => new WorkloadResolution.None(
-                "No installed workload claims this directory. " +
-                "Pass --stack <id> to select one explicitly, or run 'func workload install <package>' to add one."),
-            _ => new WorkloadResolution.None(
-                $"Multiple installed workloads claim this directory: " +
-                $"{string.Join(", ", claims.Select(c => FormatCandidate(c.Workload, c.Result.Reason)))}. " +
-                $"Pass --stack <id> to disambiguate."),
-        };
+        KeyValuePair<WorkloadInfo, string?> only = claims.First();
+        return new WorkloadResolution.Resolved(
+            only.Key,
+            only.Value is { Length: > 0 } reason
+                ? $"Selected by '{only.Key.PackageId}' resolver: {reason}."
+                : $"Selected by '{only.Key.PackageId}' resolver.");
     }
 
     private static string FormatCandidate(WorkloadInfo workload, string? reason)
@@ -173,11 +89,6 @@ internal sealed class WorkloadResolver(
             ? $"{workload.PackageId} ({reason})"
             : workload.PackageId;
 
-    private static string FormatPackages(IEnumerable<WorkloadInfo> workloads)
-        => string.Join(", ", workloads.Select(w => w.PackageId));
-
     private static string FormatInstalled(IReadOnlyList<WorkloadInfo> installed)
-        => installed.Count == 0 ? "(none)" : FormatPackages(installed);
-
-    private readonly record struct ResolverClaim(WorkloadInfo Workload, EvaluationResult Result);
+        => installed.Count == 0 ? "(none)" : string.Join(", ", installed.Select(w => w.PackageId));
 }

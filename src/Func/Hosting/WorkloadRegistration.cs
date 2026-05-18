@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Workloads.Resolution;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Hosting;
@@ -122,6 +123,9 @@ internal static class WorkloadRegistration
 
         services.AddSingleton<ILocalSettingsReader, LocalSettingsReader>();
         services.AddSingleton<IFuncProjectConfigReader, FuncProjectConfigReader>();
+        services.AddOptions<StackOptions>();
+        services.AddSingleton<IConfigureOptions<StackOptions>, LocalSettingsStackConfigure>();
+        services.AddSingleton<IConfigureOptions<StackOptions>, FuncProjectStackConfigure>();
         services.AddSingleton<IWorkloadResolver, WorkloadResolver>();
         services.AddSingleton<IWorkloadInvoker, WorkloadInvoker>();
 
