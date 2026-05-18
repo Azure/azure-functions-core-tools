@@ -7,8 +7,29 @@
 
 ---
 
+## Command Verb — Decision Required
+
+> **This decision drives the rest of the document.** The verb chosen here determines the command or subcommand name, class names, CLI surface, and whether it collides with the in-flight templates workload.
+
+This design proposes **`templates`** as the subcommand verb (`func new templates`). However, there is a naming conflict: a separate templates workload is in flight that provides templating (engine, parameterization, etc.). Using `templates` for this command risks conceptual and CLI-surface collision with that workload.
+
+| Candidate | Full Command | Subcommands | Pros | Cons |
+| --- | --- | --- | --- | --- |
+| **`templates`** (proposed) | `func new templates` | `list`, `info` | Familiar term; matches industry use for e2e prod ready apps | Collides with templates workload; |
+| **`sample`** | `func new sample` | `list`, `info` | These are sample repos; no overloading of "template" | Might imply "not production-ready" |
+| **`quickstart`** | `func quickstart` | `list`, `info` | Clear intent; aligns with Azure Samples naming (`*-quickstart-*-azd`) | Longer to type; top-level only (not under `func new`) |
+| **`bootstrap`** | `func new bootstrap` | `list`, `info` | Accurate for "set up a project from scratch" | Less discoverable; not a common Azure CLI verb |
+| **`clone`** | `func new clone` | `list`, `info` | Technically accurate (it clones a repo) | Implies git; doesn't convey curation or discovery |
+
+**Recommendation:** `templates` — this is the industry used term for scaffolding a new project, including production-ready starting points. We will need resolve conflict with the in-flight templates workload and establish distinction.
+
+> **Impact of verb change:** The verb is used in the subcommand name, class names (`TemplatesCommand` → `SampleCommand`), service names, and all CLI examples throughout this document. The design is otherwise identical regardless of verb chosen. Swapping the verb is a find-and-replace — no architectural changes.
+
+---
+
 ## Table of Contents
 
+- [Command Verb — Decision Required](#command-verb--decision-required)
 - [Problem Statement](#problem-statement)
 - [Goals / Non-Goals](#goals--non-goals)
 - [Proposed Design](#proposed-design)
@@ -41,15 +62,16 @@
 
 ## Problem Statement
 
-Today's function app templates are scattered across multiple sources — the CLI binary, extension bundle, VS Code extension, and Maven repository — each shipping on its own cadence. Getting a template in front of a developer requires a coordinated release across several of these channels, with a minimum turnaround of 6–8 weeks from merge to broad availability. Templates are also bundled inside the CLI binary itself, meaning every addition or update requires a full CLI release.
+In vnext, workload templates solve the per-function scaffolding story: `func new` adds a single function file to an existing project using templates shipped in workload packages. A complementary scenario is **complete-app scaffolding** — downloading a fully runnable function app (function code, host.json, local.settings.json, IaC configuration, and all dependencies) in a single step so that `func start` works immediately.
 
-This design introduces `func new templates`: a command that downloads **complete, immediately runnable function app templates** directly from GitHub. Templates are discovered via a live manifest hosted on the Azure Functions CDN. Adding a new template is as simple as publishing a GitHub repo and adding an entry to the manifest — no CLI release required. The manifest is versioned independently; the CLI picks up new templates automatically on the next manifest refresh.
+Today, complete app templates live in GitHub repos (e.g. Azure-Samples) and developers discover them through docs, portal links, or search. This design brings that discovery and scaffolding workflow into the CLI itself.
 
-Three pain points this solves:
+This design introduces `func new templates`: a built-in command that downloads **complete, immediately runnable function app templates** directly from GitHub, complementing the workload-driven `func new` experience. Templates are discovered via a live manifest hosted on the Azure Functions CDN. Adding a new template is as simple as publishing a GitHub repo and adding an entry to the manifest — no CLI or workload release required. The manifest is versioned independently; the CLI picks up new templates automatically on the next manifest refresh.
 
-- **Release cycle friction** — new templates are available as soon as the manifest is updated, not after a 6–8 week CLI release cycle
-- **Maintenance burden** — templates live as standalone GitHub repos, not embedded in the CLI binary; they can be updated, PR'd, and iterated on independently
-- **Scaffolding gap in vnext** — the vnext `func new` stub exits with code 1 if no workload is installed; `func new templates` gives developers a working template experience from a clean install, no workload required
+How this complements workload templates:
+
+- **Decoupled template lifecycle** — app templates live as standalone GitHub repos; they can be added, updated, and iterated on independently of both CLI and workload package releases
+- **Built-in discovery** — `func new templates list` and the interactive flow give developers a way to find and filter available app templates without leaving the CLI
 
 ---
 
@@ -61,9 +83,9 @@ Three pain points this solves:
 - Download and create a **complete, runnable function app** from a GitHub template — all function code, config, and dependencies included; `func start` works immediately after scaffolding
 - CDN-backed template manifest with ETag caching (24h TTL)
 - `func new templates list` — non-interactive table of available templates, filterable by `--language`, `--resource`, `--iac`, and keyword (`--search`); `--search` is a **case-insensitive substring match** (not semantic/fuzzy) against `id`, `displayName`, `resource`, `tags`, and `shortDescription`
-- `func new templates` (bare invocation) — interactive flow: worker runtime → (Node sub-prompt: JS/TS) → trigger → scaffold; the runtime prompt matches the existing `func new` UX (`dotnet (isolated worker model)`, `Node`, `Python`, `Java`, `Powershell`); trigger selection supports incremental keyword filtering; powered by the existing `IInteractionService` / Spectre.Console already in vnext
-- **.NET isolated worker model only** — the manifest `CSharp` language maps exclusively to the .NET isolated worker model; the in-process model is not supported and will not be added (it is on a deprecation path)
-- **Agent and CI friendly** — all v4 `func new` flags preserved (`--language`, `--template`); `--language` accepts runtime names (`python`, `node`, `java`, `dotnet-isolated`, `javascript`, `typescript`, `powershell`); `--yes` accepts remaining defaults non-interactively but errors clearly if `--language` is not supplied; non-TTY falls back to numbered list
+- `func new templates` (bare invocation) — interactive flow: worker runtime → (dotnet sub-prompt: C#/F#, Node sub-prompt: JS/TS) → trigger → scaffold; the runtime prompt matches the existing `func new` UX (`dotnet (isolated worker model)`, `Node`, `Python`, `Java`, `Powershell`); trigger selection supports incremental keyword filtering; powered by the existing `IInteractionService` / Spectre.Console already in vnext
+- **.NET isolated worker model only** — the manifest `CSharp` and `FSharp` languages map exclusively to the .NET isolated worker model; the in-process model is not supported and will not be added (it is on a deprecation path). Note: no F# templates exist in the manifest today; the sub-prompt will show F# once templates are available
+- **Agent and CI friendly** — all v4 `func new` flags preserved (`--language`, `--template`); `--language` accepts runtime names (`python`, `node`, `java`, `dotnet-isolated`, `csharp`, `fsharp`, `javascript`, `typescript`, `powershell`); `--yes` accepts remaining defaults non-interactively but errors clearly if `--language` is not supplied; non-TTY falls back to numbered list
 - Template download via git sparse-checkout or GitHub zip API (no bundling in binary)
 - `--path` to specify target directory (absolute or relative); created if absent, accepted if it exists and is empty — error if it exists and is not empty
 
@@ -75,7 +97,7 @@ Three pain points this solves:
 - Automatic environment setup (venv, npm install, dotnet restore) — **deferred to `--env` incremental** (see [Incremental: `--env` Flag](#incremental---env-flag))
 - File conflict handling and `--force` flag — **deferred to next iteration of this command**; v1 requires target directory to be empty
 
-> **Key difference from v4 `func new`:** v4 adds a single function file into an *existing* project. `func new templates` downloads a complete, runnable function app from a GitHub template — function code, host.json, local.settings.json, .gitignore, and all dependencies — into a target directory. `func start` works immediately. This is why `--language` is required with no auto-detect fallback (target is assumed empty before scaffolding).
+> **Why `--language` is required:** Workload-driven `func new` operates on an existing project and can detect the runtime from project files. `func new templates` scaffolds into an empty directory, so there is nothing to detect from — `--language` must be supplied explicitly.
 
 ---
 
@@ -110,6 +132,11 @@ $ func new templates
     Python
     Java
     Powershell
+
+  # User picks dotnet → sub-prompt for language:
+  Use the up/down arrow keys to select a language:
+    C#
+    F#                              # (shown but no templates available yet)
 
   # User picks Node → sub-prompt for language:
   Use the up/down arrow keys to select a language:
@@ -306,13 +333,17 @@ The interactive prompt shows **worker runtimes** (matching `func new` UX), but t
 
 | Prompt Label | `--language` flag value(s) | Manifest `language` | Notes |
 | --- | --- | --- | --- |
-| dotnet (isolated worker model) | `dotnet-isolated`, `dotnet`, `csharp` | `CSharp` | Isolated worker model only — in-process is deprecated and not supported |
+| dotnet (isolated worker model) | `dotnet-isolated`, `dotnet` | — | Sub-prompt: C# or F#; isolated worker model only — in-process is not supported |
+| — | `csharp` | `CSharp` | Direct flag bypasses dotnet sub-prompt |
+| — | `fsharp` | `FSharp` | Direct flag bypasses dotnet sub-prompt; no templates available yet |
 | Node | `node` | — | Sub-prompt: JavaScript or TypeScript |
 | — | `javascript` | `JavaScript` | Direct flag bypasses Node sub-prompt |
 | — | `typescript` | `TypeScript` | Direct flag bypasses Node sub-prompt |
 | Python | `python` | `Python` | |
 | Java | `java` | `Java` | |
 | Powershell | `powershell` | `PowerShell` | |
+
+**Dotnet sub-prompt:** When the user selects "dotnet (isolated worker model)" in the interactive runtime prompt, a follow-up prompt asks for C# or F#. When `--language dotnet-isolated` or `--language dotnet` is supplied non-interactively, the default is C#. Use `--language csharp` or `--language fsharp` to skip the sub-prompt entirely. Note: no F# templates exist in the manifest today; selecting F# will show an empty list until templates are published.
 
 **Node sub-prompt:** When the user selects "Node" in the interactive runtime prompt, a follow-up prompt asks for JavaScript or TypeScript. When `--language node` is supplied non-interactively, the default is TypeScript (matching the modern v4 programming model). Use `--language javascript` or `--language typescript` to skip the sub-prompt entirely.
 
@@ -360,7 +391,12 @@ flowchart TD
     LANG -- "no + --yes" --> LERR(["Error: --language required<br/>cannot auto-detect"])
     LANG -- "no, interactive" --> LPROMPT["Use the up/down arrow keys to select a worker runtime:<br/>──────────────────────────<br/>dotnet (isolated worker model)<br/>Node<br/>Python<br/>Java<br/>Powershell"]
 
-    LPROMPT --> NODECHECK{"Node selected?"}
+    LPROMPT --> DOTNETCHECK{"dotnet selected?"}
+    DOTNETCHECK -- yes --> DOTNETPROMPT["Use the up/down arrow keys to select a language:<br/>C#<br/>F#"]
+    DOTNETCHECK -- no --> NODECHECK
+    DOTNETPROMPT --> TRIG
+
+    NODECHECK{"Node selected?"}
     NODECHECK -- yes --> NODEPROMPT["Use the up/down arrow keys to select a language:<br/>JavaScript<br/>TypeScript"]
     NODECHECK -- no --> TRIG
     NODEPROMPT --> TRIG
@@ -496,7 +532,7 @@ internal sealed class TemplatesCommand : FuncCliCommand
     // Carried forward from v4 func new — preserve agent/CI compatibility
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
-        Description = "Worker runtime or language (e.g. python, node, java, dotnet-isolated, javascript, typescript)"
+        Description = "Worker runtime or language (e.g. python, node, java, dotnet-isolated, csharp, fsharp, javascript, typescript)"
     };
     public Option<string?> TemplateOption { get; } = new("--template", "-t")
     {
@@ -545,10 +581,12 @@ internal sealed class TemplatesCommand : FuncCliCommand
         //   → if --language missing in non-interactive/--yes mode: fail with clear error
         //   → if --language missing in interactive mode: prompt "Use the up/down arrow keys to select a worker runtime:"
         //     showing: dotnet (isolated), dotnet (in-process), Node, Python, Java, Powershell
+        //   → if user selects "dotnet (isolated)": sub-prompt for C# vs F#
         //   → if user selects "Node": sub-prompt for JavaScript vs TypeScript
         //   → map prompt selection to manifest `language` value (see Runtime-to-Language Mapping)
         //   → if --language supplied directly: map flag value to manifest language
-        //     (e.g. "python" → "Python", "node" → sub-prompt or default TypeScript with --yes)
+        //     (e.g. "python" → "Python", "dotnet-isolated" → sub-prompt or default C# with --yes,
+        //      "node" → sub-prompt or default TypeScript with --yes)
         // Directory resolution:
         //   target = --path (absolute or relative) if supplied, else cwd
         //   if target does not exist: create it
@@ -561,6 +599,7 @@ internal sealed class TemplatesCommand : FuncCliCommand
         // 1. Fetch manifest (verbose logging for cache hit/miss/refresh)
         //    manifest automatically excludes IaC-only templates (ARM, Bicep, Terraform)
         // 2. Prompt worker runtime (if not --language) → IInteractionService.PromptSelectionAsync
+        //    If dotnet selected → sub-prompt for C# vs F#
         //    If Node selected → sub-prompt for JavaScript vs TypeScript
         // 3. If --template: resolve by id directly; else filter by language + --search, prompt trigger
         //    In interactive mode: PromptSelectionAsync uses Spectre SearchEnabled=true so
@@ -819,7 +858,6 @@ When `--env` succeeds, the post-scaffold banner drops all install/activate steps
 - [ ] **`--search` empty-result behaviour in interactive mode** — when the in-prompt Spectre filter (not the `--search` flag) narrows to zero results, Spectre renders an empty list. Should the command detect this and show a message, or let the user backspace to widen the filter naturally?
 - [ ] **`func new templates` vs `func new` interactive fallback** — should bare `func new` (when no workloads installed) redirect to `func new templates` interactive flow, rather than showing a hint? Or keep the hint to encourage workload installation?
 - [ ] **`--output json` on `func new templates list`** — useful for tooling. Worth adding now or later?
-- [ ] **Top-level command name** — If/when `TemplatesCommand` is promoted, what is the verb? Candidates: `func scaffold`, `func template`, `func create`. Decide before vNext ships so the subcommand name (`templates`) is chosen with the promotion in mind.
 
 ---
 
@@ -844,7 +882,7 @@ The vnext branch has been rebuilt from scratch on System.CommandLine. Key elemen
 | --- | --- | --- |
 | `FuncCliCommand` | `src/Func/Commands/FuncCliCommand.cs` | Base class for all commands. Subcommands injected via constructor. |
 | `IBuiltInCommand` | `src/Func/Hosting/IBuiltInCommand.cs` | Marker interface — names are reserved, registered in `BuiltInCommands` |
-| `NewCommand` | `src/Func/Commands/NewCommand.cs` | Skeleton `func new` — stub today, workload-driven long term |
+| `NewCommand` | `src/Func/Commands/NewCommand.cs` | `func new` — delegates to workloads for per-function scaffolding |
 | `IInteractionService` | `src/Func/Console/IInteractionService.cs` | Spectre.Console abstraction. Has `IsInteractive`, `WriteTable`, `ShowStatusAsync`, prompt methods. |
 | `BuiltInCommands` | `src/Func/Hosting/BuiltInCommands.cs` | Registers all built-in commands with DI |
 | `WorkloadCommand` | `src/Func/Commands/Workload/WorkloadCommand.cs` | Pattern reference — parent command with subcommands injected via constructor |
