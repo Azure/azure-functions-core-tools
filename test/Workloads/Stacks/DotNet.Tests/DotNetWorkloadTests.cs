@@ -28,7 +28,7 @@ public class DotNetWorkloadTests
         var workload = new DotNetWorkload();
 
         // Act & Assert
-        Assert.Equal("Azure Functions tooling for .NET (C#) projects.", workload.Description);
+        Assert.Equal("Azure Functions CLI tooling for .NET (C#) projects.", workload.Description);
     }
 
     [Fact]
