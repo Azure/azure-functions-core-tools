@@ -1,31 +1,31 @@
 <Project>
   <!-- common -->
   <ItemGroup>
-    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Colors.Net" Version="1.1.0" />
-    <PackageVersion Include="WindowsAzure.Storage" Version="9.3.1" />
+    <PackageVersion Include="WindowsAzure.Storage" Version="9.3.3" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
   </ItemGroup>
   <!-- abstractions-->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5.25306.101" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.16" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.8" />
   </ItemGroup>
   <!-- func -->
   <ItemGroup>
     <PackageVersion Include="Autofac" Version="9.1.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.17.1" />
-    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.11.0" />
     <PackageVersion Include="AccentedCommandLineParser" Version="2.0.1" />
     <PackageVersion Include="Microsoft.ApplicationInsights" Version="2.23.0" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageVersion Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
     <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1048.200" />
-    <PackageVersion Include="Microsoft.Build" Version="17.0.0" />
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.78.0" />
-    <PackageVersion Include="NuGet.Packaging" Version="5.11.6" />
+    <PackageVersion Include="Microsoft.Build" Version="17.11.48" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.0" />
+    <PackageVersion Include="NuGet.Packaging" Version="5.11.7" />
     <PackageVersion Include="System.Formats.Asn1" Version="6.0.1" />
-    <PackageVersion Include="YamlDotNet" Version="6.0.0" />
+    <PackageVersion Include="YamlDotNet" Version="6.1.2" />
     <!-- Transitive dependency -->
     <PackageVersion Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
@@ -41,7 +41,7 @@
   </ItemGroup>
   <!-- host -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.NETCore.DotNetAppHost" Version="8.0.8" />
+    <PackageVersion Include="Microsoft.NETCore.DotNetAppHost" Version="8.0.27" />
   </ItemGroup>
   <!-- test projects -->
   <ItemGroup>
@@ -55,7 +55,7 @@
     <PackageVersion Include="Octokit" Version="0.29.0" />
     <PackageVersion Include="RichardSzalay.MockHttp" Version="5.0.0" />
     <PackageVersion Include="SuaveServerWrapper" Version="0.0.3" />
-    <PackageVersion Include="xunit" Version="2.4.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.0" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.3.6" />
     <!-- sample test projects -->
