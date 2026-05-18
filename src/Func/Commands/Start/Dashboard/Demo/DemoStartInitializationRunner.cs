@@ -32,20 +32,20 @@ internal sealed class DemoStartInitializationRunner(
         await RunStatusStepAsync(
             renderer,
             new StartInitializationStep(StartInitializationStepKind.ResolveProfile, "Resolve profile"),
-            "none (no profile applied)",
+            "None (no profile applied)",
             context,
             cancellationToken);
 
         await RunStatusStepAsync(
             renderer,
-            new StartInitializationStep(StartInitializationStepKind.ResolveConstraints, "Resolve version constraints"),
+            new StartInitializationStep(StartInitializationStepKind.ResolveConstraints, "Resolve profile version constraints"),
             "No profile constraints applied",
             context,
             cancellationToken);
 
         await RunStatusStepAsync(
             renderer,
-            new StartInitializationStep(StartInitializationStepKind.ResolveHostWorkload, "Validate host workload"),
+            new StartInitializationStep(StartInitializationStepKind.ResolveHostWorkload, "Validate host version"),
             $"No installed host workload found for {DemoHostVersion}",
             context,
             cancellationToken);
@@ -96,7 +96,7 @@ internal sealed class DemoStartInitializationRunner(
             BundleRequired: bundleRequired,
             BundleVersion: null);
 
-        await EmitAsync(renderer, new StartInitializationCompletedEvent(Now(), result), cancellationToken);
+        //await EmitAsync(renderer, new StartInitializationCompletedEvent(Now(), result), cancellationToken);
         return result;
     }
 
@@ -160,7 +160,7 @@ internal sealed class DemoStartInitializationRunner(
     private async Task DelayAsync(StartInitializationContext context, CancellationToken cancellationToken)
     {
         double multiplier = context.DemoSpeedMultiplier <= 0 ? 0.25 : context.DemoSpeedMultiplier;
-        await Task.Delay(TimeSpan.FromMilliseconds(1000 * multiplier), _time, cancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(2000 * multiplier), _time, cancellationToken);
     }
 
     private async Task EmitAsync(

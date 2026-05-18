@@ -27,6 +27,7 @@ internal static class BuiltInCommands
         services.AddSingleton<IWorkloadHintRenderer, WorkloadHintRenderer>();
         services.AddSingleton<IAppStackProvider, DefaultAppStackProvider>();
         services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
+        services.AddSingleton<StartDashboardEventStreamFactory>();
 
         // VersionCommand is also resolved by Parser to wire `func` (no args)
         // to detailed-version output, so register the concrete type and

@@ -111,7 +111,7 @@ public class StartInitializationTests : IDisposable
             Interactive = InteractionSupport.Yes,
             Out = new TestTerminalOutput(writer),
         });
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), console);
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
         await renderer.OnEventAsync(
@@ -148,13 +148,18 @@ public class StartInitializationTests : IDisposable
         await renderer.DisposeAsync();
 
         string output = writer.ToString();
+        string normalizedOutput = output.Replace("\r\n", "\n", StringComparison.Ordinal);
         string completedIcon = console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
 
-        Assert.DoesNotContain("Azure Functions CLI", output);
+        Assert.Contains("Azure Functions CLI", output);
+        Assert.Contains("5.0.0-test", output);
+        Assert.Contains("Azure Functions CLI\n5.0.0-test\n\n", normalizedOutput);
         Assert.Contains(completedIcon, output);
         Assert.Contains("Resolve profile...", output);
         Assert.Contains("Install host workload", output);
         Assert.Contains(" 50%", output);
+        Assert.Contains("\u001b[5A\u001b[J", output);
+        Assert.DoesNotContain("\u001b[2J", output);
         Assert.DoesNotContain("Preparing download", output);
     }
 
@@ -169,7 +174,7 @@ public class StartInitializationTests : IDisposable
             Interactive = InteractionSupport.Yes,
             Out = new TestTerminalOutput(writer),
         });
-        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), console);
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
 
         try
         {

@@ -12,13 +12,16 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 /// </summary>
 internal sealed class CompactStartInitializationRenderer(
     IInteractionService interaction,
+    string cliVersion,
     IAnsiConsole? console = null) : IStartInitializationRenderer
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+    private readonly string _cliVersion = string.IsNullOrWhiteSpace(cliVersion) ? throw new ArgumentException("CLI version cannot be empty.", nameof(cliVersion)) : cliVersion;
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
     private readonly SemaphoreSlim _stepLock = new(initialCount: 1, maxCount: 1);
     private readonly List<StepState> _steps = [];
     private StepState? _activeStep;
+    private bool _preambleRendered;
     private bool _disposed;
 
     private ITheme Theme => _interaction.Theme;
@@ -34,6 +37,7 @@ internal sealed class CompactStartInitializationRenderer(
             switch (initializationEvent)
             {
                 case StartInitializationStartedEvent:
+                    RenderPreamble();
                     break;
                 case StartInitializationStepStartedEvent started:
                     StartStep(started.Step);
@@ -45,7 +49,7 @@ internal sealed class CompactStartInitializationRenderer(
                     CompleteStep(completed);
                     break;
                 case StartInitializationCompletedEvent:
-                    ClearIfTerminal();
+                    ClearInitializationBlockIfTerminal();
                     break;
             }
         }
@@ -57,10 +61,25 @@ internal sealed class CompactStartInitializationRenderer(
 
     private void StartStep(StartInitializationStep step)
     {
+        RenderPreamble();
         var state = new StepState(step);
         _steps.Add(state);
         _activeStep = state;
         WriteStepLine(state, endLine: false);
+    }
+
+    private void RenderPreamble()
+    {
+        if (_preambleRendered)
+        {
+            return;
+        }
+
+        TextWriter writer = _console.Profile.Out.Writer;
+        writer.WriteLine("Azure Functions CLI");
+        writer.WriteLine(_cliVersion);
+        writer.WriteLine();
+        _preambleRendered = true;
     }
 
     private void UpdateProgress(StartInitializationProgressEvent progress)
@@ -172,12 +191,24 @@ internal sealed class CompactStartInitializationRenderer(
 
     private char ProgressRemainingCharacter => _console.Profile.Capabilities.Unicode ? '\u2500' : '-';
 
-    private void ClearIfTerminal()
+    private void ClearInitializationBlockIfTerminal()
     {
-        if (_console.Profile.Out.IsTerminal)
+        if (!_console.Profile.Out.IsTerminal || _steps.Count == 0)
         {
-            _console.Clear(home: true);
+            return;
         }
+
+        const int preambleLineCount = 3;
+        int linesToMove = _activeStep is null
+            ? _steps.Count
+            : Math.Max(_steps.Count - 1, 0);
+        linesToMove += _preambleRendered ? preambleLineCount : 0;
+
+        string moveToFirstLine = linesToMove > 0
+            ? $"\r\u001b[{linesToMove}A"
+            : "\r";
+
+        _console.Write(new ControlCode($"{moveToFirstLine}\u001b[J"));
     }
 
     private static string Styled(string text, Style style)

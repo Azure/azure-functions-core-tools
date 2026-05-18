@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
+using Azure.Functions.Cli.Hosting.Events;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -89,12 +90,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     private readonly FunctionPalette _palette;
     private readonly ICliVersionProvider _versionProvider;
     private readonly IStartInitializationRunner _initializationRunner;
+    private readonly StartDashboardEventStreamFactory _eventStreamFactory;
 
     public StartCommand(
         IInteractionService interaction,
         FunctionPalette palette,
         ICliVersionProvider versionProvider,
-        IStartInitializationRunner initializationRunner)
+        IStartInitializationRunner initializationRunner,
+        StartDashboardEventStreamFactory? eventStreamFactory = null)
         : base("start", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -106,6 +109,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         _palette = palette;
         _versionProvider = versionProvider;
         _initializationRunner = initializationRunner;
+        _eventStreamFactory = eventStreamFactory ?? new StartDashboardEventStreamFactory();
 
         AddPathArgument();
         Options.Add(PortOption);
@@ -155,16 +159,26 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             DemoAutoExit: ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")));
 
         StartInitializationResult initializationResult;
-        await using (IStartInitializationRenderer initializationRenderer = CreateInitializationRenderer(mode))
+        IReadOnlyList<StartInitializationEvent> initializationEvents;
+        await using (var initializationRenderer = new RecordingStartInitializationRenderer(CreateInitializationRenderer(mode, initializationContext.CliVersion)))
         {
             initializationResult = await _initializationRunner.RunAsync(initializationContext, initializationRenderer, cancellationToken);
+            if (!initializationRenderer.HasCompleted)
+            {
+                await initializationRenderer.OnEventAsync(
+                    new StartInitializationCompletedEvent(DateTimeOffset.UtcNow, initializationResult),
+                    cancellationToken);
+            }
+
+            initializationEvents = [.. initializationRenderer.Events];
         }
 
         var state = new DashboardState();
 
         IDashboardRenderer renderer = CreateRenderer(mode, initializationResult.RunInfo);
 
-        var pipeline = new DashboardPipeline(state, initializationResult.EventStream, renderer, eventSink);
+        IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, initializationResult.EventStream);
+        var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink);
         return await pipeline.RunAsync(cancellationToken);
     }
 
@@ -261,11 +275,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 
-    private IStartInitializationRenderer CreateInitializationRenderer(OutputMode mode) => mode switch
+    private IStartInitializationRenderer CreateInitializationRenderer(OutputMode mode, string cliVersion) => mode switch
     {
         OutputMode.Json => new JsonStartInitializationRenderer(),
         OutputMode.Plain => new PlainStartInitializationRenderer(_interaction),
-        OutputMode.Compact => new CompactStartInitializationRenderer(_interaction),
+        OutputMode.Compact => new CompactStartInitializationRenderer(_interaction, cliVersion),
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 }

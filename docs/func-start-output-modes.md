@@ -35,10 +35,11 @@ the command downgrades to `plain` and writes a one-line notice to stderr.
 ## `compact`
 
 `compact` is the interactive local-development view. During start
-initialization, it renders the same top header plus status/progress UI for
-profile, workload, and host-launch steps. After initialization completes, it
-switches to the pinned header, adaptive function summary, streaming log tail,
-and pinned footer with compact controls.
+initialization, it renders the Azure Functions CLI name and version, then initialization steps.
+After initialization completes, it replaces those transient lines with the pinned header, adaptive function
+summary, streaming log tail, and pinned footer with compact controls. Completed
+initialization steps are replayed into the dashboard log tail before host logs
+begin.
 
 Use it when:
 
