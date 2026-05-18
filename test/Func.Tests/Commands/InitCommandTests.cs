@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 using Xunit;
 

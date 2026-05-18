@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
