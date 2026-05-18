@@ -73,6 +73,8 @@ internal sealed class CompactRenderer(
     private string WarningTag => field ??= Theme.Warning.ToMarkup();
     private string ActiveTag => field ??= Theme.Active.ToMarkup();
 
+    private CompactInputController InputController => field ??= new(_functionSearchBuilder, _functionBrowserBuilder);
+
     public event Action? ShutdownRequested;
 
     public Task OnStartAsync(DashboardState state, CancellationToken cancellationToken)
@@ -200,281 +202,28 @@ internal sealed class CompactRenderer(
 
         lock (_uiLock)
         {
-            if (_functionSearchOpen)
+            CompactInputState state = CaptureInputState();
+            CompactInputResult result = InputController.HandleKey(
+                key,
+                functions,
+                state,
+                GetViewportHeight(),
+                GetLogScrollStep(snapshot),
+                MaxLogTailLines);
+
+            ApplyInputState(state);
+            if (result.ClearLogsRequested)
             {
-                return HandleFunctionSearchKey(key, functions);
+                _logBuffer.Clear();
             }
 
-            if (key.KeyChar == '?')
+            if (result.ShutdownRequested)
             {
-                ToggleHelpOverlay();
-                return true;
+                ShutdownRequested?.Invoke();
             }
 
-            if (key.KeyChar == '/')
-            {
-                OpenFunctionSearch();
-                return true;
-            }
-
-            switch (key.Key)
-            {
-                case ConsoleKey.T:
-                    ToggleFunctionBrowser(functions);
-                    return true;
-
-                case ConsoleKey.C:
-                    ClearVisibleLogs();
-                    return true;
-
-                case ConsoleKey.E:
-                    _errorsOnly = !_errorsOnly;
-                    ResetLogScroll();
-                    return true;
-
-                case ConsoleKey.F:
-                    CycleFunctionFilter(functions);
-                    return functions.Length > 0 || _activeFunctionFilter is not null;
-
-                case ConsoleKey.D1:
-                case ConsoleKey.NumPad1:
-                    return SetMinimumLogLevel(LogLevel.Information);
-
-                case ConsoleKey.D2:
-                case ConsoleKey.NumPad2:
-                    return SetMinimumLogLevel(LogLevel.Warning);
-
-                case ConsoleKey.D3:
-                case ConsoleKey.NumPad3:
-                    return SetMinimumLogLevel(LogLevel.Error);
-
-                case ConsoleKey.Q:
-                    ShutdownRequested?.Invoke();
-                    return true;
-
-                case ConsoleKey.Escape when _helpOpen || _functionBrowserOpen:
-                    _helpOpen = false;
-                    _functionBrowserOpen = false;
-                    return true;
-
-                case ConsoleKey.A when _activeFunctionFilter is not null:
-                    _activeFunctionFilter = null;
-                    ResetLogScroll();
-                    return true;
-
-                case ConsoleKey.Enter when _functionBrowserOpen && functions.Length > 0:
-                    _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex, 0, functions.Length - 1);
-                    _activeFunctionFilter = functions[_functionBrowserSelectedIndex].Name;
-                    ResetLogScroll();
-                    _functionBrowserOpen = false;
-                    return true;
-
-                case ConsoleKey.UpArrow when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, -1);
-                    return true;
-
-                case ConsoleKey.DownArrow when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, 1);
-                    return true;
-
-                case ConsoleKey.PageUp when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, -Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functions.Length, GetViewportHeight())));
-                    return true;
-
-                case ConsoleKey.PageDown when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functions.Length, GetViewportHeight())));
-                    return true;
-
-                case ConsoleKey.PageUp when !_helpOpen:
-                    ScrollLogs(GetLogScrollStep(snapshot));
-                    return true;
-
-                case ConsoleKey.PageDown when !_helpOpen:
-                    return ScrollLogs(-GetLogScrollStep(snapshot));
-
-                case ConsoleKey.Home when _functionBrowserOpen:
-                    _functionBrowserSelectedIndex = 0;
-                    return functions.Length > 0;
-
-                case ConsoleKey.End when _functionBrowserOpen:
-                    _functionBrowserSelectedIndex = Math.Max(0, functions.Length - 1);
-                    return functions.Length > 0;
-
-                case ConsoleKey.Home when !_helpOpen:
-                    ScrollLogs(MaxLogTailLines);
-                    return true;
-
-                case ConsoleKey.End when !_helpOpen:
-                    return ResetLogScroll();
-
-                case ConsoleKey.LeftArrow when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, -_functionBrowserBuilder.GetTotalRows(functions.Length));
-                    return true;
-
-                case ConsoleKey.RightArrow when _functionBrowserOpen:
-                    MoveFunctionBrowserSelection(functions, _functionBrowserBuilder.GetTotalRows(functions.Length));
-                    return true;
-            }
+            return result.Handled;
         }
-
-        return false;
-    }
-
-    private void ToggleFunctionBrowser(FunctionInfo[] functions)
-    {
-        _functionBrowserOpen = !_functionBrowserOpen;
-        if (!_functionBrowserOpen)
-        {
-            return;
-        }
-
-        _helpOpen = false;
-        _functionSearchOpen = false;
-        _functionBrowserRowOffset = 0;
-        if (_activeFunctionFilter is null)
-        {
-            _functionBrowserSelectedIndex = 0;
-            return;
-        }
-
-        int index = Array.FindIndex(functions, f => string.Equals(f.Name, _activeFunctionFilter, StringComparison.Ordinal));
-        _functionBrowserSelectedIndex = Math.Max(0, index);
-    }
-
-    private void MoveFunctionBrowserSelection(FunctionInfo[] functions, int delta)
-    {
-        if (functions.Length == 0)
-        {
-            _functionBrowserSelectedIndex = 0;
-            _functionBrowserRowOffset = 0;
-            return;
-        }
-
-        _functionBrowserSelectedIndex = Math.Clamp(_functionBrowserSelectedIndex + delta, 0, functions.Length - 1);
-    }
-
-    private void ToggleHelpOverlay()
-    {
-        _helpOpen = !_helpOpen;
-        if (_helpOpen)
-        {
-            _functionBrowserOpen = false;
-            _functionSearchOpen = false;
-        }
-    }
-
-    private void OpenFunctionSearch()
-    {
-        _functionSearchOpen = true;
-        _helpOpen = false;
-        _functionBrowserOpen = false;
-        _functionSearchQuery = string.Empty;
-        _functionSearchSelectedIndex = 0;
-        _functionSearchRowOffset = 0;
-    }
-
-    private bool HandleFunctionSearchKey(ConsoleKeyInfo key, FunctionInfo[] functions)
-    {
-        switch (key.Key)
-        {
-            case ConsoleKey.Escape:
-                _functionSearchOpen = false;
-                return true;
-
-            case ConsoleKey.Enter:
-            {
-                FunctionInfo[] matches = _functionSearchBuilder.GetMatches(functions, _functionSearchQuery);
-                if (matches.Length == 0)
-                {
-                    return false;
-                }
-
-                _functionSearchSelectedIndex = Math.Clamp(_functionSearchSelectedIndex, 0, matches.Length - 1);
-                _activeFunctionFilter = matches[_functionSearchSelectedIndex].Name;
-                ResetLogScroll();
-                _functionSearchOpen = false;
-                return true;
-            }
-
-            case ConsoleKey.UpArrow:
-                MoveFunctionSearchSelection(functions, -1);
-                return true;
-
-            case ConsoleKey.DownArrow:
-                MoveFunctionSearchSelection(functions, 1);
-                return true;
-
-            case ConsoleKey.Backspace when _functionSearchQuery.Length > 0:
-                _functionSearchQuery = _functionSearchQuery[..^1];
-                _functionSearchSelectedIndex = 0;
-                _functionSearchRowOffset = 0;
-                return true;
-        }
-
-        if (!char.IsControl(key.KeyChar))
-        {
-            _functionSearchQuery += key.KeyChar;
-            _functionSearchSelectedIndex = 0;
-            _functionSearchRowOffset = 0;
-            return true;
-        }
-
-        return false;
-    }
-
-    private void MoveFunctionSearchSelection(FunctionInfo[] functions, int delta)
-    {
-        FunctionInfo[] matches = _functionSearchBuilder.GetMatches(functions, _functionSearchQuery);
-        if (matches.Length == 0)
-        {
-            _functionSearchSelectedIndex = 0;
-            _functionSearchRowOffset = 0;
-            return;
-        }
-
-        _functionSearchSelectedIndex = Math.Clamp(_functionSearchSelectedIndex + delta, 0, matches.Length - 1);
-    }
-
-    private void ClearVisibleLogs()
-    {
-        _logBuffer.Clear();
-
-        ResetLogScroll();
-    }
-
-    private void CycleFunctionFilter(FunctionInfo[] functions)
-    {
-        if (functions.Length == 0)
-        {
-            _activeFunctionFilter = null;
-            ResetLogScroll();
-            return;
-        }
-
-        if (_activeFunctionFilter is null)
-        {
-            _activeFunctionFilter = functions[0].Name;
-            ResetLogScroll();
-            return;
-        }
-
-        int index = Array.FindIndex(functions, f => string.Equals(f.Name, _activeFunctionFilter, StringComparison.Ordinal));
-        _activeFunctionFilter = index >= 0 && index < functions.Length - 1
-            ? functions[index + 1].Name
-            : null;
-        ResetLogScroll();
-    }
-
-    private bool SetMinimumLogLevel(LogLevel minimumLogLevel)
-    {
-        if (_minimumLogLevel == minimumLogLevel)
-        {
-            return false;
-        }
-
-        _minimumLogLevel = minimumLogLevel;
-        ResetLogScroll();
-        return true;
     }
 
     private int GetLogScrollStep(DashboardSnapshot snapshot)
@@ -483,22 +232,39 @@ internal sealed class CompactRenderer(
         return Math.Max(1, logBudget - 1);
     }
 
-    private bool ScrollLogs(int delta)
+    private CompactInputState CaptureInputState()
     {
-        int previous = _logScrollOffset;
-        _logScrollOffset = Math.Clamp(_logScrollOffset + delta, 0, MaxLogTailLines);
-        return _logScrollOffset != previous;
+        return new CompactInputState
+        {
+            HelpOpen = _helpOpen,
+            FunctionBrowserOpen = _functionBrowserOpen,
+            FunctionSearchOpen = _functionSearchOpen,
+            FunctionBrowserSelectedIndex = _functionBrowserSelectedIndex,
+            FunctionBrowserRowOffset = _functionBrowserRowOffset,
+            FunctionSearchSelectedIndex = _functionSearchSelectedIndex,
+            FunctionSearchRowOffset = _functionSearchRowOffset,
+            FunctionSearchQuery = _functionSearchQuery,
+            ActiveFunctionFilter = _activeFunctionFilter,
+            LogScrollOffset = _logScrollOffset,
+            ErrorsOnly = _errorsOnly,
+            MinimumLogLevel = _minimumLogLevel,
+        };
     }
 
-    private bool ResetLogScroll()
+    private void ApplyInputState(CompactInputState state)
     {
-        if (_logScrollOffset == 0)
-        {
-            return false;
-        }
-
-        _logScrollOffset = 0;
-        return true;
+        _helpOpen = state.HelpOpen;
+        _functionBrowserOpen = state.FunctionBrowserOpen;
+        _functionSearchOpen = state.FunctionSearchOpen;
+        _functionBrowserSelectedIndex = state.FunctionBrowserSelectedIndex;
+        _functionBrowserRowOffset = state.FunctionBrowserRowOffset;
+        _functionSearchSelectedIndex = state.FunctionSearchSelectedIndex;
+        _functionSearchRowOffset = state.FunctionSearchRowOffset;
+        _functionSearchQuery = state.FunctionSearchQuery;
+        _activeFunctionFilter = state.ActiveFunctionFilter;
+        _logScrollOffset = state.LogScrollOffset;
+        _errorsOnly = state.ErrorsOnly;
+        _minimumLogLevel = state.MinimumLogLevel;
     }
 
     private async Task RunLiveLoopAsync(CancellationToken cancellationToken)
