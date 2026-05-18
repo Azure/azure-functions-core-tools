@@ -16,7 +16,6 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// </summary>
 internal sealed class NodeProjectInitializer : IProjectInitializer
 {
-    private const string ExtensionBundleVersion = "[4.*, 5.0.0)";
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
 
     // Internal seam so tests can stub out the `npm install` invocation
@@ -135,8 +134,8 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
         host["extensionBundle"] = new JsonObject
         {
-            ["id"] = BundleIds.For(channel),
-            ["version"] = ExtensionBundleVersion,
+            ["id"] = ExtensionBundle.IdFor(channel),
+            ["version"] = ExtensionBundle.DefaultVersionRange,
         };
     }
 
