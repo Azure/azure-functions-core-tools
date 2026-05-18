@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
                 .Execute([".", "--template", "HttpTrigger", "--name", "MyFunc"]);
 
             // Assert: friendly error surfaces and local.settings.json is untouched.
-            newResult.Should().HaveStdErrContaining("The 'func new' command is not supported for the Go runtime.");
+            newResult.Should().HaveStdErrContaining("The 'func new' command is not yet supported for the Go runtime.");
             string after = File.ReadAllText(localSettingsPath);
             after.Should().Be(before, "func new must not mutate local.settings.json for unsupported runtimes");
         }
@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
                 .WithWorkingDirectory(workingDir)
                 .Execute([".", "--worker-runtime", "go", "--template", "HttpTrigger", "--name", "MyFunc", "--skip-go-mod-tidy"]);
 
-            result.Should().HaveStdErrContaining("The 'func new' command is not supported for the Go runtime.");
+            result.Should().HaveStdErrContaining("The 'func new' command is not yet supported for the Go runtime.");
             File.Exists(Path.Combine(workingDir, "MyFunc")).Should().BeFalse("no function directory should be created");
         }
     }
