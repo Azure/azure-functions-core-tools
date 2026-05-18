@@ -15,7 +15,6 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IProjectInitializer
 {
     internal const string TemplatesPackageName = "Microsoft.Azure.Functions.Worker.ProjectTemplates";
-    internal const string TemplatesPackageVersion = "4.0.5544";
     internal const string TemplateShortName = "func";
     internal const string DefaultFramework = "net10.0";
 
@@ -48,27 +47,42 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
 
         await EnsureTemplatesInstalledAsync(cancellationToken);
 
-        List<string> args =
-        [
-            "new", TemplateShortName,
-            "--name", projectName,
-            "--output", projectPath,
-            "--language", language,
-            "--Framework", framework,
-        ];
-
-        if (context.Force)
+        try
         {
-            args.Add("--force");
-        }
+            List<string> args =
+            [
+                "new", TemplateShortName,
+                "--name", projectName,
+                "--output", projectPath,
+                "--language", language,
+                "--Framework", framework,
+            ];
 
-        await _dotnetCli.RunAsync(args, projectPath, cancellationToken);
+            if (context.Force)
+            {
+                args.Add("--force");
+            }
+
+            await _dotnetCli.RunAsync(args, projectPath, cancellationToken);
+        }
+        finally
+        {
+            await UninstallTemplatesAsync(cancellationToken);
+        }
     }
 
     internal async Task EnsureTemplatesInstalledAsync(CancellationToken cancellationToken)
     {
         await _dotnetCli.RunAsync(
-            ["new", "install", $"{TemplatesPackageName}@{TemplatesPackageVersion}"],
+            ["new", "install", TemplatesPackageName],
+            workingDirectory: null,
+            cancellationToken);
+    }
+
+    internal async Task UninstallTemplatesAsync(CancellationToken cancellationToken)
+    {
+        await _dotnetCli.RunAsync(
+            ["new", "uninstall", TemplatesPackageName],
             workingDirectory: null,
             cancellationToken);
     }
@@ -77,13 +91,13 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
     {
         if (string.IsNullOrWhiteSpace(language))
         {
-            return "C#";
+            return "c#";
         }
 
-        return language.ToUpperInvariant() switch
+        return language.ToLowerInvariant() switch
         {
-            "CSHARP" or "C#" => "C#",
-            "FSHARP" or "F#" => "F#",
+            "csharp" or "c#" => "c#",
+            "fsharp" or "f#" => "f#",
             _ => language
         };
     }
