@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Workload/Node/Workload.Node.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workload/Stacks/Node/Workload.Node.csproj" />
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>

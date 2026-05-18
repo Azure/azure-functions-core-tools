@@ -24,8 +24,8 @@ trigger:
   paths:
     include:
     - src/Abstractions/
-    - src/Workload/Node/
-    - test/Workload/Node.Tests/
+    - src/Workload/Stacks/Node/
+    - test/Workload/Stacks/Node.Tests/
     - eng/
 
 resources:

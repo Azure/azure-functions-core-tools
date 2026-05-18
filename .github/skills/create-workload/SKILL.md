@@ -8,14 +8,21 @@ description: 'Use when adding a new func CLI workload (e.g. Node, Python, Java).
 See `docs/building-a-workload.md` for the authoring guide and rationale, and
 `docs/proposed/workload-package-layout.md` for the package-layout spec
 (`workload.json` schema, `kind` discriminator, install pipeline). Use the
-Python workload (`src/Workload/Python/`) as the canonical reference.
+Python stack workload (`src/Workload/Stacks/Python/`) as the canonical
+reference for stack workloads.
 
 ## Workload Project Checklist
 
 Replace `<Name>` with the workload name (e.g., `Node`, `Python`, `Java`).
 Replace `<name>` with the lowercase form (e.g., `node`, `python`, `java`).
+Replace `<kind>` with the workload grouping when one applies (e.g. `Stacks`);
+omit the `<kind>/` path segment for ungrouped workloads.
 
-### 1. Source project, `src/Workload/<Name>/`
+### 1. Source project
+
+Place grouped workloads under `src/Workload/<kind>/<Name>/`. Stack workloads
+use `Stacks` as the kind, for example `src/Workload/Stacks/Python/`. Workloads
+without a grouping can live directly under `src/Workload/<Name>/`.
 
 Create the following files:
 
@@ -134,7 +141,11 @@ Create the following files:
   - Initializer must be `internal sealed` (per repo convention; tests reach it via `InternalsVisibleTo`).
   - For stubs, return `[]` from `GetInitOptions()` and only throw from `InitializeAsync`. Throwing from `GetInitOptions` breaks any code path that enumerates options across workloads.
 
-### 2. Test project, `test/Workload/<Name>.Tests/`
+### 2. Test project
+
+Mirror the source path under `test/Workload/`: grouped workloads use
+`test/Workload/<kind>/<Name>.Tests/`, and ungrouped workloads use
+`test/Workload/<Name>.Tests/`.
 
 - [ ] `Workload.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workload.<Name>.Tests`:
   ```xml
@@ -145,21 +156,32 @@ Create the following files:
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="$(SrcRoot)Workload/<Name>/Workload.<Name>.csproj" />
+      <ProjectReference Include="$(SrcRoot)Workload/<kind>/<Name>/Workload.<Name>.csproj" />
     </ItemGroup>
   </Project>
   ```
+  - Omit the `<kind>/` segment in the `ProjectReference` for ungrouped workloads.
   - Don't add a redundant `ProjectReference` to `Abstractions`; it flows through the workload reference.
 - [ ] `<Name>WorkloadTests.cs`, contract tests for the workload (initializer is registered via `Configure`, `DisplayName` / `Description` are set).
 - [ ] `<Name>ProjectInitializerTests.cs`, unit tests for the initializer (`Stack`, `SupportedLanguages`, `InitializeAsync` throws `NotImplementedException` for stubs).
 
 ### 3. Solution file, `Azure.Functions.Cli.slnx`
 
-- [ ] Add both projects to the solution under the `/src/Workload/` and `/test/Workload/` folders:
+- [ ] Add both projects to the solution under the matching `/src/Workload/<kind>/` and `/test/Workload/<kind>/` folders. Omit the `<kind>/` segment for ungrouped workloads.
   ```
-  dotnet sln add src/Workload/<Name>/Workload.<Name>.csproj
-  dotnet sln add test/Workload/<Name>.Tests/Workload.<Name>.Tests.csproj
+  dotnet sln add src/Workload/<kind>/<Name>/Workload.<Name>.csproj
+  dotnet sln add test/Workload/<kind>/<Name>.Tests/Workload.<Name>.Tests.csproj
   ```
+  Verify `Azure.Functions.Cli.slnx` keeps the projects in solution folders that match the filesystem hierarchy; do not leave grouped workload projects under only `/src/` or `/test/`.
+  ```xml
+  <Folder Name="/src/Workload/<kind>/">
+    <Project Path="src/Workload/<kind>/<Name>/Workload.<Name>.csproj" />
+  </Folder>
+  <Folder Name="/test/Workload/<kind>/">
+    <Project Path="test/Workload/<kind>/<Name>.Tests/Workload.<Name>.Tests.csproj" />
+  </Folder>
+  ```
+  For ungrouped workloads, use `/src/Workload/` and `/test/Workload/` as the solution folders.
 
 ### 4. CI pipelines
 
@@ -179,7 +201,7 @@ All workloads share a single job template, `eng/ci/templates/jobs/build-workload
                 parameters:
                   WorkloadProjectName: <Name>
     ```
-  - Path filters scope triggers to `src/Abstractions/**`, `src/Workload/<Name>/**`, `test/Workload/<Name>.Tests/**`, `eng/ci/templates/jobs/build-workload.yml`, and the pipeline file itself.
+  - Path filters scope triggers to `src/Abstractions/**`, `src/Workload/<kind>/<Name>/**`, `test/Workload/<kind>/<Name>.Tests/**`, `eng/ci/templates/jobs/build-workload.yml`, and the pipeline file itself. Omit the `<kind>/` segment for ungrouped workloads.
 - [ ] `eng/ci/workloads/<name>/official-build.yml`, 1ES Official template:
   - Same shape, but extends the Official template, sets `pr: none`, and adds `release/*` to its branch triggers (and to path filters as needed). The shared template handles build + test + pack.
 

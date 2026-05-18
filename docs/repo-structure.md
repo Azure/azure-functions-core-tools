@@ -14,11 +14,15 @@ azure-functions-core-tools/
 │   ├── Func/                          # Main CLI executable (assembly: func)
 │   └── Abstractions/                  # Shared types for workload authors (NuGet)
 |   └── Workload/
-|       └── <Name>/                    # Individual workload projects
+|       ├── <Name>/                    # Ungrouped workload projects
+|       └── <kind>/
+|           └── <Name>/                # Grouped workload projects, e.g. Stacks/Python
 ├── test/
 │   └── Func.Tests/                    # CLI unit tests
 |   └── Workload/
-|       └── <Name>.Tests/              # Individual workload tests
+|       ├── <Name>.Tests/              # Ungrouped workload tests
+|       └── <kind>/
+|           └── <Name>.Tests/          # Grouped workload tests, e.g. Stacks/Python.Tests
 ├── eng/
 │   ├── build/                         # MSBuild props/targets
 │   │   ├── Packages.props             # Central package version pins
@@ -34,6 +38,11 @@ azure-functions-core-tools/
 ├── docs/                              # Developer documentation
 └── out/                               # Build artifacts (gitignored)
 ```
+
+`Azure.Functions.Cli.slnx` solution folders should mirror the source and test
+hierarchy for workload projects. Grouped workloads belong under solution
+folders like `/src/Workload/<kind>/` and `/test/Workload/<kind>/`; ungrouped
+workloads use `/src/Workload/` and `/test/Workload/`.
 
 ## Projects
 

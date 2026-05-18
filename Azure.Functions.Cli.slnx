@@ -7,19 +7,23 @@
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
-    <Project Path="src/Workload/DotNet/Workload.DotNet.csproj" />
-    <Project Path="src/Workload/Go/Workload.Go.csproj" />
-    <Project Path="src/Workload/Node/Workload.Node.csproj" />
-    <Project Path="src/Workload/Python/Workload.Python.csproj" />
+  </Folder>
+  <Folder Name="/src/Workload/Stacks/">
+    <Project Path="src/Workload/Stacks/DotNet/Workload.DotNet.csproj" />
+    <Project Path="src/Workload/Stacks/Go/Workload.Go.csproj" />
+    <Project Path="src/Workload/Stacks/Node/Workload.Node.csproj" />
+    <Project Path="src/Workload/Stacks/Python/Workload.Python.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
-    <Project Path="test/Workload/DotNet.Tests/Workload.DotNet.Tests.csproj" />
-    <Project Path="test/Workload/Go.Tests/Workload.Go.Tests.csproj" />
-    <Project Path="test/Workload/Node.Tests/Workload.Node.Tests.csproj" />
-    <Project Path="test/Workload/Python.Tests/Workload.Python.Tests.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.Default/Workload.Tests.Fixtures.Default.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.Sdk/Workload.Tests.Fixtures.Sdk.csproj" />
     <Project Path="test/Workload.Tests.Fixtures.WithCommand/Workload.Tests.Fixtures.WithCommand.csproj" />
+  </Folder>
+  <Folder Name="/test/Workload/Stacks/">
+    <Project Path="test/Workload/Stacks/DotNet.Tests/Workload.DotNet.Tests.csproj" />
+    <Project Path="test/Workload/Stacks/Go.Tests/Workload.Go.Tests.csproj" />
+    <Project Path="test/Workload/Stacks/Node.Tests/Workload.Node.Tests.csproj" />
+    <Project Path="test/Workload/Stacks/Python.Tests/Workload.Python.Tests.csproj" />
   </Folder>
 </Solution>
