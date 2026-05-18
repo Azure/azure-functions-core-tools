@@ -13,7 +13,6 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// </summary>
 internal sealed class PythonProjectInitializer : IProjectInitializer
 {
-    private const string ExtensionBundleVersion = "[4.*, 5.0.0)";
 
     public string Stack => "python";
 
@@ -92,8 +91,8 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
 
         host["extensionBundle"] = new JsonObject
         {
-            ["id"] = BundleIds.For(channel),
-            ["version"] = ExtensionBundleVersion,
+            ["id"] = ExtensionBundle.IdFor(channel),
+            ["version"] = ExtensionBundle.DefaultVersionRange,
         };
     }
 }
