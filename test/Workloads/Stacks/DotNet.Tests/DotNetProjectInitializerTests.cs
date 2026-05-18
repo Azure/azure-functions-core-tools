@@ -70,4 +70,57 @@ public class DotNetProjectInitializerTests
     {
         Assert.Throws<ArgumentNullException>(() => new DotNetProjectInitializer(null!));
     }
+
+    [Fact]
+    public async Task EnsureTemplatesInstalledAsync_CallsInstallWhenTimestampMissing()
+    {
+        DotNetProjectInitializer initializer = CreateInitializer();
+
+        string hivePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "azure-functions-core-tools",
+            "dotnet-template-hive");
+        string timestampPath = Path.Combine(hivePath, ".installed");
+        if (File.Exists(timestampPath))
+        {
+            File.Delete(timestampPath);
+        }
+
+        await initializer.EnsureTemplatesInstalledAsync(CancellationToken.None);
+
+        await _dotnetCli.Received(1).RunAsync(
+            Arg.Is<IReadOnlyList<string>>(args =>
+                args.Contains(DotNetProjectInitializer.TemplatesPackageName)),
+            null,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureTemplatesInstalledAsync_SkipsInstallWhenTimestampIsFresh()
+    {
+        string hivePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "azure-functions-core-tools",
+            "dotnet-template-hive");
+        string timestampPath = Path.Combine(hivePath, ".installed");
+
+        Directory.CreateDirectory(hivePath);
+        File.WriteAllText(timestampPath, string.Empty);
+
+        try
+        {
+            DotNetProjectInitializer initializer = CreateInitializer();
+
+            await initializer.EnsureTemplatesInstalledAsync(CancellationToken.None);
+
+            await _dotnetCli.DidNotReceive().RunAsync(
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            File.Delete(timestampPath);
+        }
+    }
 }

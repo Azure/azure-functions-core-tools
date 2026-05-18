@@ -18,10 +18,14 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
     internal const string TemplateShortName = "func";
     internal const string DefaultFramework = "net10.0";
 
+    internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(7);
+
     private static readonly string _hivePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "azure-functions-core-tools",
         "dotnet-template-hive");
+
+    private static readonly string _timestampPath = Path.Combine(_hivePath, ".installed");
 
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
 
@@ -60,22 +64,56 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
             "--language", language,
             "--Framework", framework,
             "--debug:custom-hive", _hivePath,
+            "--force", // CLI creates host.json before calling this so we need to pass force for the the template to overwrite it.
         ];
-
-        if (context.Force)
-        {
-            args.Add("--force");
-        }
 
         await _dotnetCli.RunAsync(args, projectPath, cancellationToken);
     }
 
     internal async Task EnsureTemplatesInstalledAsync(CancellationToken cancellationToken)
     {
+        if (IsHiveFresh())
+        {
+            return;
+        }
+
         await _dotnetCli.RunAsync(
             ["new", "install", TemplatesPackageName, "--debug:custom-hive", _hivePath],
             workingDirectory: null,
             cancellationToken);
+
+        WriteTimestamp();
+    }
+
+    private static bool IsHiveFresh()
+    {
+        try
+        {
+            if (!File.Exists(_timestampPath))
+            {
+                return false;
+            }
+
+            DateTime installedUtc = File.GetLastWriteTimeUtc(_timestampPath);
+            return DateTime.UtcNow - installedUtc < HiveTtl;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private static void WriteTimestamp()
+    {
+        try
+        {
+            Directory.CreateDirectory(_hivePath);
+            File.WriteAllText(_timestampPath, string.Empty);
+        }
+        catch (IOException)
+        {
+            // Non-fatal; next run will simply reinstall.
+        }
     }
 
     internal static string NormalizeLanguage(string? language)
