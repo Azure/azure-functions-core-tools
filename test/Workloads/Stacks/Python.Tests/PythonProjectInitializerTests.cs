@@ -139,7 +139,7 @@ public class PythonProjectInitializerTests : IDisposable
         await RunAsync(force: false, args: ["--bundles-channel", "Preview"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        JsonNode? root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
+        var root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
         Assert.Equal(
             "Microsoft.Azure.Functions.ExtensionBundle.Preview",
             root!["extensionBundle"]!["id"]!.GetValue<string>());
@@ -151,7 +151,7 @@ public class PythonProjectInitializerTests : IDisposable
         await RunAsync(force: false, args: ["--bundles-channel", "Experimental"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        JsonNode? root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
+        var root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
         Assert.Equal(
             "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
             root!["extensionBundle"]!["id"]!.GetValue<string>());
