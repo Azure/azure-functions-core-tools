@@ -7,9 +7,7 @@ namespace Azure.Functions.Cli.Common;
 /// The directory a command operates from. Bound from the shared <c>[path]</c>
 /// argument so commands receive a directory explicitly, instead of reading
 /// <see cref="Directory.GetCurrentDirectory"/> after a hidden cwd mutation.
-/// Workloads also receive this on <see cref="Workloads.WorkloadContext"/> so
-/// they can adapt behavior based on whether the user typed a path or fell
-/// back to cwd. Stack-specific concepts (e.g. dotnet's <c>.csproj</c>) are
+/// Stack-specific concepts (e.g. dotnet's <c>.csproj</c>) are
 /// not modelled here — workloads add their own options for those.
 /// </summary>
 /// <param name="Info">The directory.</param>

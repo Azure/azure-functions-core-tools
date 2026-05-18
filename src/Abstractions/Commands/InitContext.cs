@@ -2,14 +2,14 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads;
 
-namespace Azure.Functions.Cli.Workloads;
+namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
 /// Inputs to <see cref="IProjectInitializer.InitializeAsync"/>. Resolved
-/// values for the built-in <c>func init</c> options, layered on top of the
-/// shared <see cref="WorkloadContext"/>. Workload-specific options live on
-/// the <c>ParseResult</c> the initializer also receives.
+/// values for the built-in <c>func init</c> options.
 /// </summary>
 /// <param name="WorkingDirectory">The working directory the command is operating from.</param>
 /// <param name="ProjectName">Project name (from <c>--name</c> or the directory name).</param>
@@ -19,4 +19,4 @@ public sealed record InitContext(
     WorkingDirectory WorkingDirectory,
     string? ProjectName,
     string? Language,
-    bool Force) : WorkloadContext(WorkingDirectory);
+    bool Force);

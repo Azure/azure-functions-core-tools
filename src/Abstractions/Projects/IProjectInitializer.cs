@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Workloads;
 
-namespace Azure.Functions.Cli.Workloads;
+namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
 /// Scaffolds a new Azure Functions project for a specific stack.

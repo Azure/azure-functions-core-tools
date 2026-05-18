@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads;
