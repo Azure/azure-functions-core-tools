@@ -25,7 +25,7 @@ internal sealed class CompactRenderer(
     IAnsiConsole? console = null,
     DashboardRunInfo? runInfo = null) : IDashboardRenderer, IDashboardShutdownRequester
 {
-    private const int MaxLogTailLines = 200;
+    private const int MaxLogTailLines = CompactLogBuffer.DefaultCapacity;
     private const int HelpOverlayCommandRows = 15;
     private const int HelpOverlayLines = HelpOverlayCommandRows + 3;
     private const int SearchOverlayChromeLines = 5;
@@ -44,9 +44,9 @@ internal sealed class CompactRenderer(
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
     private readonly DashboardRunInfo _runInfo = runInfo ?? new();
     private readonly CompactHeaderBuilder _headerBuilder = new(interaction.Theme, runInfo ?? new());
-    private readonly Lock _stateLock = new();
     private readonly Lock _uiLock = new();
-    private readonly Queue<LogLine> _logTail = new();
+    private readonly CompactLogBuffer _logBuffer = new(MaxLogTailLines);
+    private readonly CompactLogLineFormatter _logLineFormatter = new(interaction.Theme, palette);
 
     private DashboardState _state = null!;
     private CancellationTokenSource? _liveCts;
@@ -99,25 +99,13 @@ internal sealed class CompactRenderer(
 
     public Task OnEventAsync(HostLogEntry entry, IReadOnlyList<DashboardEvent> events, CancellationToken cancellationToken)
     {
-        if (ShouldSuppress(entry, events))
+        CompactLogLine? line = _logLineFormatter.Format(entry, events, GetListenUriForLogFormatting(events));
+        if (line is null)
         {
             return Task.CompletedTask;
         }
 
-        bool isError = IsErrorLogLine(entry, events);
-        var line = new LogLine(
-            FormatLogLine(entry, events),
-            GetFunctionName(entry, events),
-            isError,
-            GetEffectiveLogLevel(entry, isError));
-        lock (_stateLock)
-        {
-            _logTail.Enqueue(line);
-            while (_logTail.Count > MaxLogTailLines)
-            {
-                _logTail.Dequeue();
-            }
-        }
+        _logBuffer.Add(line);
 
         lock (_uiLock)
         {
@@ -129,41 +117,6 @@ internal sealed class CompactRenderer(
 
         SignalRedraw();
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Filters out raw log lines that are already covered by a synthetic
-    /// event in this batch, plus the classic Functions <c>Executing '...'</c> /
-    /// <c>Executed '...'</c> envelope which restates information already
-    /// captured by <see cref="InvocationStartedEvent"/> and
-    /// <see cref="InvocationCompletedEvent"/>.
-    /// </summary>
-    private static bool ShouldSuppress(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
-    {
-        if (events.Count > 0)
-        {
-            // Synthetic event(s) already convey the salient info; rendering
-            // the raw line on top of it would just duplicate the row.
-            return false;
-        }
-
-        if (IsFunctionsInvocationEnvelope(entry.Message))
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool IsFunctionsInvocationEnvelope(string message)
-    {
-        if (string.IsNullOrEmpty(message))
-        {
-            return false;
-        }
-
-        return message.StartsWith("Executing '", StringComparison.Ordinal)
-            || message.StartsWith("Executed '", StringComparison.Ordinal);
     }
 
     public async Task OnSummaryAsync(SummaryEvent summary, CancellationToken cancellationToken)
@@ -223,6 +176,11 @@ internal sealed class CompactRenderer(
             // Live loop already torn down.
         }
     }
+
+    private string? GetListenUriForLogFormatting(IReadOnlyList<DashboardEvent> events)
+        => events.Any(static ev => ev is FunctionDiscoveredEvent) && _state is not null
+            ? _state.Snapshot().ListenUri
+            : null;
 
     private async Task RunInputLoopAsync(CancellationToken cancellationToken)
     {
@@ -485,10 +443,7 @@ internal sealed class CompactRenderer(
 
     private void ClearVisibleLogs()
     {
-        lock (_stateLock)
-        {
-            _logTail.Clear();
-        }
+        _logBuffer.Clear();
 
         ResetLogScroll();
     }
@@ -636,11 +591,7 @@ internal sealed class CompactRenderer(
         DashboardSnapshot snapshot = _state.Snapshot();
         IRenderable header = BuildHeader(snapshot);
 
-        LogLine[] tail;
-        lock (_stateLock)
-        {
-            tail = [.. _logTail];
-        }
+        CompactLogLine[] tail = _logBuffer.Snapshot();
 
         string? activeFunctionFilter;
         bool errorsOnly;
@@ -692,7 +643,7 @@ internal sealed class CompactRenderer(
         return rows;
     }
 
-    private IRenderable BuildLogRows(LogLine[] tail, string? activeFunctionFilter, int logBudget)
+    private IRenderable BuildLogRows(CompactLogLine[] tail, string? activeFunctionFilter, int logBudget)
     {
         if (logBudget <= 0)
         {
@@ -1201,73 +1152,6 @@ internal sealed class CompactRenderer(
         _ => $"[{SuccessTag}]● Ready[/]",
     };
 
-    private IRenderable FormatLogLine(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
-    {
-        string ts = entry.Timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-
-        // Synthetic events drive special formatting.
-        foreach (DashboardEvent ev in events)
-        {
-            switch (ev)
-            {
-                case HostStateChangedEvent hs:
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]             {Markup.Escape(DescribeHostState(hs))}"));
-
-                case FunctionDiscoveredEvent fd:
-                {
-                    string color = _palette.GetColorFor(fd.Function.Name);
-                    string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, _state.Snapshot().ListenUri, Theme);
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"));
-                }
-
-                case InvocationStartedEvent inv:
-                {
-                    string color = _palette.GetColorFor(inv.Function);
-                    string detail = string.Empty;
-                    if (inv.Attributes.TryGetValue(HostLogAttributeKeys.HttpMethod, out object? method) &&
-                        inv.Attributes.TryGetValue(HostLogAttributeKeys.HttpTarget, out object? target))
-                    {
-                        detail = $"{method} {target}";
-                    }
-
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  [{SuccessTag}]→[/]  {Markup.Escape(detail)}"));
-                }
-
-                case InvocationCompletedEvent inv:
-                {
-                    string color = _palette.GetColorFor(inv.Function);
-                    bool failed = string.Equals(inv.Result, "failed", StringComparison.OrdinalIgnoreCase);
-                    string arrow = failed ? $"[{ErrorTag}]✗[/]" : $"[{SuccessTag}]←[/]";
-                    string suffix = failed
-                        ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorType ?? string.Empty)}: {Markup.Escape(inv.ErrorMessage ?? string.Empty)}[/]"
-                        : $"[{MutedTag}]{(inv.DurationMs.HasValue ? ((long)inv.DurationMs.Value).ToString(CultureInfo.InvariantCulture) + "ms" : string.Empty)}[/]";
-
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  {arrow}  {suffix}"));
-                }
-            }
-        }
-
-        // Plain log line — color by level; function name (if any) gets palette color.
-        string? functionName = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName);
-        string nameMarkup = functionName is not null
-            ? $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-18}[/]"
-            : $"[{MutedTag}]{Markup.Escape(entry.Category),-18}[/]";
-
-        string levelMarkup = entry.Level switch
-        {
-            LogLevel.Error or LogLevel.Critical => $"[{ErrorTag}]✗[/]",
-            LogLevel.Warning => $"[{WarningTag}]![/]",
-            _ => $"[{MutedTag}]·[/]",
-        };
-
-        return new Markup(string.Create(CultureInfo.InvariantCulture,
-            $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  {Markup.Escape(entry.Message)}"));
-    }
-
     private static FunctionInfo[] GetSortedFunctions(DashboardSnapshot snapshot)
         => [.. snapshot.Functions.OrderBy(f => f.Name, _functionNameComparer)];
 
@@ -1380,59 +1264,13 @@ internal sealed class CompactRenderer(
         return viewportHeight;
     }
 
-    private static string? GetFunctionName(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
-    {
-        foreach (DashboardEvent ev in events)
-        {
-            switch (ev)
-            {
-                case FunctionDiscoveredEvent fd:
-                    return fd.Function.Name;
-                case InvocationStartedEvent started:
-                    return started.Function;
-                case InvocationCompletedEvent completed:
-                    return completed.Function;
-            }
-        }
-
-        return entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName);
-    }
-
     private static string GetEmptyLogMessage(string? activeFunctionFilter)
         => activeFunctionFilter is null
             ? "Waiting for events…"
             : $"No logs for {activeFunctionFilter}…";
 
-    private static string DescribeHostState(HostStateChangedEvent hs) => (hs.From, hs.To) switch
-    {
-        (_, HostLifecycleState.Ready) when hs.DurationMs is { } d => $"Host ready ({(d / 1000.0).ToString("F1", CultureInfo.InvariantCulture)}s)",
-        (_, HostLifecycleState.Ready) => "Host ready",
-        (_, HostLifecycleState.Recycling) when !string.IsNullOrEmpty(hs.Trigger) => $"Recycling (file changed: {hs.Trigger})",
-        (_, HostLifecycleState.Recycling) => "Recycling",
-        (_, HostLifecycleState.Starting) => "Host starting",
-        (_, HostLifecycleState.Stopped) => "Host stopped",
-        _ => $"Host {hs.To.ToString().ToLowerInvariant()}",
-    };
-
-    private static bool IsErrorLogLine(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
-    {
-        if (entry.Level is LogLevel.Error or LogLevel.Critical)
-        {
-            return true;
-        }
-
-        return events.Any(static ev =>
-            ev is InvocationCompletedEvent { Result: var result }
-            && string.Equals(result, "failed", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static LogLevel GetEffectiveLogLevel(HostLogEntry entry, bool isError)
-        => isError && entry.Level < LogLevel.Error
-            ? LogLevel.Error
-            : entry.Level;
-
     private static bool MatchesLogFilters(
-        LogLine line,
+        CompactLogLine line,
         string? activeFunctionFilter,
         bool errorsOnly,
         LogLevel minimumLogLevel)
@@ -1458,8 +1296,6 @@ internal sealed class CompactRenderer(
         LogLevel.Error or LogLevel.Critical => "error",
         _ => "info",
     };
-
-    private sealed record LogLine(IRenderable Renderable, string? FunctionName, bool IsError, LogLevel Level);
 
     private sealed class FunctionNameComparer : IComparer<string>
     {
