@@ -16,7 +16,6 @@
   },
   "devDependencies": {
     "@types/node": "20.x",
-    "azure-functions-core-tools": "^4.x",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0"
   }
