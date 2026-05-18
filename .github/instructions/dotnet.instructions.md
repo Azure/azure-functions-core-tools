@@ -141,6 +141,12 @@ fire:
 - No unused `using` directives.
 - Don't run `dotnet format` across unrelated files; no drive-by reformatting.
 - Don't disable analyzers to silence warnings, fix the underlying issue.
+- **Treat every build warning as a build failure.** CI sets
+  `TreatWarningsAsErrors=true` (`eng/build/Engineering.props`), so a warning
+  that looks harmless locally will fail CI. Before pushing, run a clean
+  release build (`CI=true dotnet build -c Release` reproduces CI strictness)
+  and fix warnings at the source. Don't suppress with `#pragma warning disable`
+  unless there's a justified, commented reason.
 
 ## Code comments
 
