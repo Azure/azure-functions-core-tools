@@ -153,9 +153,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     ColoredConsole.WriteLine($"Template: {TemplateName}");
                 }
 
-                ColoredConsole.Write($"Function name: [{TemplateName}] ");
+                var defaultFunctionName = GetUniqueDefaultFunctionName(
+                    TemplateName,
+                    functionName => DotnetFunctionArtifactExists(functionName, Language));
+                ColoredConsole.Write($"Function name: [{defaultFunctionName}] ");
                 FunctionName = FunctionName ?? Console.ReadLine();
-                FunctionName = string.IsNullOrEmpty(FunctionName) ? TemplateName : FunctionName;
+                FunctionName = string.IsNullOrEmpty(FunctionName) ? defaultFunctionName : FunctionName;
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
                 await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", string.Empty), _workerRuntime, AuthorizationLevel);
@@ -219,9 +222,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
                 var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
+                var templateJobInputs = GetTemplateJobInputsWithUniquePythonV2Default(templateJob.Inputs, FileName);
 
                 var variables = new Dictionary<string, string>();
-                _userInputHandler.RunUserInputActions(providedInputs, templateJob.Inputs, variables);
+                _userInputHandler.RunUserInputActions(providedInputs, templateJobInputs, variables);
 
                 if (string.IsNullOrEmpty(FunctionName))
                 {
@@ -270,9 +274,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         ConfigureAuthorizationLevel(template);
                     }
 
-                    ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
+                    var defaultFunctionName = ShouldUseUniqueDefaultFunctionName(FileName, template)
+                        ? GetUniqueDefaultFunctionName(
+                            template.Metadata.DefaultFunctionName,
+                            functionName => FunctionArtifactExists(functionName, FileName, template))
+                        : template.Metadata.DefaultFunctionName;
+                    ColoredConsole.Write($"Function name: [{defaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
-                    FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
+                    FunctionName = string.IsNullOrEmpty(FunctionName) ? defaultFunctionName : FunctionName;
                     await _templatesManager.Deploy(FunctionName, FileName, template);
                     PerformPostDeployTasks(FunctionName, Language);
                 }
@@ -468,6 +477,104 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var binding = bindings.Where(b => b["type"].ToString().Equals(HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
                 binding["authLevel"] = AuthorizationLevel.ToString().ToLowerInvariant();
             }
+        }
+
+        internal static string GetUniqueDefaultFunctionName(string defaultFunctionName, Func<string, bool> functionExists)
+        {
+            if (!functionExists(defaultFunctionName))
+            {
+                return defaultFunctionName;
+            }
+
+            var index = 1;
+            string candidate;
+            do
+            {
+                candidate = $"{defaultFunctionName}{index}";
+                index++;
+            }
+            while (functionExists(candidate));
+
+            return candidate;
+        }
+
+        internal static bool ShouldUseUniqueDefaultFunctionName(string fileName, Template template)
+        {
+            return !TemplateHelpers.IsNodeV4Template(template) || string.IsNullOrEmpty(fileName);
+        }
+
+        internal static bool DotnetFunctionArtifactExists(string functionName, string language)
+        {
+            var fileExtension = language.Replace("-isolated", string.Empty).Equals(Languages.FSharp, StringComparison.OrdinalIgnoreCase)
+                ? ".fs"
+                : ".cs";
+            var fileName = $"{Utilities.SanitizeClassName(functionName)}{fileExtension}";
+
+            return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, fileName));
+        }
+
+        internal static bool PythonV2FunctionArtifactExists(string functionName, string fileName)
+        {
+            var functionAppPath = Path.Combine(Environment.CurrentDirectory, string.IsNullOrEmpty(fileName) ? PySteinFunctionAppPy : fileName);
+            if (!FileSystemHelpers.FileExists(functionAppPath))
+            {
+                return false;
+            }
+
+            var fileContent = FileSystemHelpers.ReadAllTextFromFile(functionAppPath);
+            return Regex.IsMatch(fileContent, $@"^\s*def\s+{Regex.Escape(functionName)}\s*\(", RegexOptions.Multiline) ||
+                Regex.IsMatch(fileContent, $@"@(?:[\w]+\.)?function_name\(name\s*=\s*[""']{Regex.Escape(functionName)}[""']\)", RegexOptions.Multiline);
+        }
+
+        private IList<TemplateJobInput> GetTemplateJobInputsWithUniquePythonV2Default(IList<TemplateJobInput> inputs, string fileName)
+        {
+            if (!string.IsNullOrEmpty(FunctionName))
+            {
+                return inputs;
+            }
+
+            var functionNameInput = inputs.FirstOrDefault(input => string.Equals(input.ParamId, GetFunctionNameParamId, StringComparison.OrdinalIgnoreCase));
+            if (functionNameInput is null)
+            {
+                return inputs;
+            }
+
+            var defaultFunctionName = functionNameInput.DefaultValue ??
+                _userPrompts.FirstOrDefault(prompt => string.Equals(prompt.Id, GetFunctionNameParamId, StringComparison.OrdinalIgnoreCase))?.DefaultValue;
+            if (string.IsNullOrEmpty(defaultFunctionName))
+            {
+                return inputs;
+            }
+
+            var uniqueDefaultFunctionName = GetUniqueDefaultFunctionName(
+                defaultFunctionName,
+                functionName => PythonV2FunctionArtifactExists(functionName, fileName));
+
+            return inputs
+                .Select(input => string.Equals(input.ParamId, GetFunctionNameParamId, StringComparison.OrdinalIgnoreCase)
+                    ? new TemplateJobInput
+                    {
+                        AssignTo = input.AssignTo,
+                        ParamId = input.ParamId,
+                        DefaultValue = uniqueDefaultFunctionName,
+                        IsRequired = input.IsRequired
+                    }
+                    : input)
+                .ToList();
+        }
+
+        private static bool FunctionArtifactExists(string functionName, string fileName, Template template)
+        {
+            if (TemplateHelpers.IsNodeV4Template(template))
+            {
+                return template.Files
+                    .Where(file => !file.Key.EndsWith(".dat"))
+                    .Select(file => fileName ?? file.Key.Replace("%functionName%", functionName))
+                    .Any(name => FileSystemHelpers.FileExists(
+                        Path.Combine(Environment.CurrentDirectory, "src", "functions", name)));
+            }
+
+            return FileSystemHelpers.DirectoryExists(Path.Combine(Environment.CurrentDirectory, functionName));
         }
 
         private bool InferAndUpdateLanguage(WorkerRuntime workerRuntime)
