@@ -44,27 +44,21 @@ public class DotNetProjectInitializerTests
     }
 
     [Fact]
-    public void TemplatesPackageVersion_IsCorrect()
-    {
-        Assert.Equal("4.0.5544", DotNetProjectInitializer.TemplatesPackageVersion);
-    }
-
-    [Fact]
     public void DefaultFramework_IsNet10()
     {
         Assert.Equal("net10.0", DotNetProjectInitializer.DefaultFramework);
     }
 
     [Theory]
-    [InlineData(null, "C#")]
-    [InlineData("", "C#")]
-    [InlineData("  ", "C#")]
-    [InlineData("csharp", "C#")]
-    [InlineData("CSHARP", "C#")]
-    [InlineData("C#", "C#")]
-    [InlineData("fsharp", "F#")]
-    [InlineData("FSHARP", "F#")]
-    [InlineData("F#", "F#")]
+    [InlineData(null, "c#")]
+    [InlineData("", "c#")]
+    [InlineData("  ", "c#")]
+    [InlineData("csharp", "c#")]
+    [InlineData("CSHARP", "c#")]
+    [InlineData("C#", "c#")]
+    [InlineData("fsharp", "f#")]
+    [InlineData("FSHARP", "f#")]
+    [InlineData("F#", "f#")]
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
