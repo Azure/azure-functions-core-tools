@@ -90,6 +90,11 @@ the full CLI.
   changes.
 - Follow the existing `stylecop.json` / analyzer rules. Don't disable analyzers
   to silence warnings, fix the underlying issue.
+- **Address every build warning before pushing.** CI sets
+  `TreatWarningsAsErrors=true` (`eng/build/Engineering.props`), so any warning
+  that looks harmless locally will fail the CI build. Run a clean release build
+  locally (or `CI=true dotnet build -c Release`) and fix warnings at the source,
+  don't suppress them.
 - Mechanical conventions (`var` discipline, target-typed `new()`, collection
   expressions, method group conversions, file-scoped namespaces, primary
   constructors) are enforced by `.editorconfig`. See the **Modern C#
