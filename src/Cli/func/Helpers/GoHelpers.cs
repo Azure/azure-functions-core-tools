@@ -67,9 +67,10 @@ namespace Azure.Functions.Cli.Helpers
             AssertGoVersion(goVersion);
 
             // Scaffold go.mod, main.go, and .funcignore from embedded templates.
-            // The SDK version is pinned inside go.mod.template so that contributors
-            // bumping the SDK only touch template files (no C# change required) and
-            // `go mod tidy` resolves the pinned version deterministically.
+            // go.mod intentionally omits a require line for azure-functions-golang-worker —
+            // `go mod tidy` resolves the latest available tag from the imports in main.go,
+            // so users always pick up the newest SDK without contributors having to bump
+            // a pinned version here.
             var goModContent = (await StaticResources.GoMod).Replace("{ModuleName}", moduleName);
             await FileSystemHelpers.WriteFileIfNotExists("go.mod", goModContent);
             await FileSystemHelpers.WriteFileIfNotExists("main.go", await StaticResources.MainGo);
