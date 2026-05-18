@@ -36,8 +36,6 @@ steps:
     Write-Host "Replaced 'nuget.org' with 'upstream' feed in $path"
     Get-Content -LiteralPath $path
   displayName: Replace nuget.org with internal upstream feed
-  condition: and(succeeded(), eq(variables['System.TeamProject'], 'internal'))
 
 - task: NuGetAuthenticate@1
   displayName: Authenticate to internal NuGet feeds
-  condition: and(succeeded(), eq(variables['System.TeamProject'], 'internal'))
