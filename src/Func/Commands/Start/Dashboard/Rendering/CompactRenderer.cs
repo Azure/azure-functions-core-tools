@@ -30,20 +30,13 @@ internal sealed class CompactRenderer(
     private const int HelpOverlayLines = HelpOverlayCommandRows + 3;
     private const int SearchOverlayChromeLines = 5;
 
-    private const string HelpCloseControlLabel = "?/Esc close";
-    private const string LogsNavigationControlLabel = "PgUp/PgDn logs";
-    private const string FunctionBrowserControlLabel = "t functions";
-    private const string QuitControlLabel = "q/Ctrl+C quit";
-    private const string FunctionFilterToggleControlLabel = "f next";
-    private const string HelpControlLabel = "? help";
-
     private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
 
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
-    private readonly DashboardRunInfo _runInfo = runInfo ?? new();
     private readonly CompactHeaderBuilder _headerBuilder = new(interaction.Theme, runInfo ?? new());
+    private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, runInfo ?? new());
     private readonly Lock _uiLock = new();
     private readonly CompactLogBuffer _logBuffer = new(MaxLogTailLines);
     private readonly CompactLogLineFormatter _logLineFormatter = new(interaction.Theme, palette);
@@ -1090,15 +1083,6 @@ internal sealed class CompactRenderer(
 
     private IRenderable BuildFooterCore(DashboardSnapshot snapshot, string? activeFunctionFilter, bool errorsOnly, LogLevel minimumLogLevel)
     {
-       string filter = activeFunctionFilter is not null
-            ? $" · Filter {activeFunctionFilter}"
-            : string.Empty;
-
-        string errors = errorsOnly
-            ? " · Errors only"
-            : string.Empty;
-
-        string level = $" · L:{FormatMinimumLogLevel(minimumLogLevel)}";
         int logScrollOffset;
         bool helpOpen;
         bool functionSearchOpen;
@@ -1112,24 +1096,15 @@ internal sealed class CompactRenderer(
             functionBrowserOpen = _functionBrowserOpen;
         }
 
-        string logScroll = logScrollOffset > 0
-            ? $" · Scrollback {logScrollOffset}"
-            : string.Empty;
-
-        string controls = (helpOpen, functionSearchOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
-        {
-            (true, _, _, _) => $"{HelpCloseControlLabel} · {QuitControlLabel}",
-            (_, true, _, _) => "type query · ↑/↓ select · Enter filter · Esc close",
-            (_, _, true, _) => $"↑/↓ navigate · Enter filter · {FunctionFilterToggleControlLabel} · {FunctionBrowserControlLabel}",
-            (_, _, _, true) => $"{LogsNavigationControlLabel} · {FunctionFilterToggleControlLabel} · a all · {HelpControlLabel} · {QuitControlLabel}",
-            _ => $"{LogsNavigationControlLabel} · {FunctionBrowserControlLabel} · {HelpControlLabel} · {QuitControlLabel}",
-        };
-
-        string line = string.Create(
-            CultureInfo.InvariantCulture,
-            $"{_runInfo.CliVersion} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors}{level}{logScroll} │ {controls}");
-
-        return new Markup($"[{MutedTag}]{Markup.Escape(line)}[/]");
+        return _footerBuilder.Build(
+            snapshot,
+            activeFunctionFilter,
+            errorsOnly,
+            minimumLogLevel,
+            logScrollOffset,
+            helpOpen,
+            functionSearchOpen,
+            functionBrowserOpen);
     }
 
     private static string FormatTrigger(string trigger) => trigger switch
@@ -1289,13 +1264,6 @@ internal sealed class CompactRenderer(
 
         return line.Level >= minimumLogLevel;
     }
-
-    private static string FormatMinimumLogLevel(LogLevel minimumLogLevel) => minimumLogLevel switch
-    {
-        LogLevel.Warning => "warn",
-        LogLevel.Error or LogLevel.Critical => "error",
-        _ => "info",
-    };
 
     private sealed class FunctionNameComparer : IComparer<string>
     {
