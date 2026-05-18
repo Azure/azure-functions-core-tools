@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Workloads;
 /// <see cref="Workload"/>; they don't see this type.
 /// </summary>
 /// <param name="Instance">The loaded workload's runtime instance. Use this for behaviour (e.g. <see cref="Workload.Configure"/>); read presentation through <see cref="DisplayName"/> / <see cref="Description"/>.</param>
-/// <param name="PackageId">NuGet package id from the registry entry (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>).</param>
+/// <param name="PackageId">NuGet package id from the registry entry (e.g. <c>"Azure.Functions.Cli.Workloads.Dotnet"</c>).</param>
 /// <param name="PackageVersion">Installed package version from the registry entry.</param>
 /// <param name="Aliases">User-facing tokens accepted by <c>-s</c> (e.g. <c>["dotnet", "dotnet-isolated"]</c>).</param>
 /// <param name="DisplayName">Human-readable name for <c>func workload list</c>; sourced from <see cref="Workload.DisplayName"/>.</param>

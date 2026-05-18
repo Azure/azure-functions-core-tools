@@ -38,7 +38,7 @@ internal sealed class WorkloadRegistry
 internal sealed class WorkloadEntry
 {
     /// <summary>
-    /// NuGet package id (e.g. <c>"Azure.Functions.Cli.Workload.Dotnet"</c>).
+    /// NuGet package id (e.g. <c>"Azure.Functions.Cli.Workloads.Dotnet"</c>).
     /// Matched case-insensitively.
     /// </summary>
     public required string PackageId { get; init; }

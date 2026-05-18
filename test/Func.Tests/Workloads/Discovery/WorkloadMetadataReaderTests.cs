@@ -302,7 +302,7 @@ public class WorkloadMetadataReaderTests : IDisposable
     [Fact]
     public void Read_HydratesShippedFixtureMetadata()
     {
-        // The Workload.Tests.Fixtures.Default project ships a workload.json
+        // The Workloads.Tests.Fixtures.Default project ships a workload.json
         // copied next to its assembly. This test pins the contract that the
         // reader handles a real (not synthesized) fixture manifest, so a
         // breaking change to the on-disk shape (or to the fixture's manifest)
@@ -311,10 +311,10 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         Assert.Equal(WorkloadKind.Workload, metadata.Kind);
         Assert.Equal(
-            "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.dll",
+            "Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.dll",
             metadata.EntryPoint!.AssemblyPath);
         Assert.Equal(
-            "Azure.Functions.Cli.Workload.Tests.Fixtures.Default.StubWorkload",
+            "Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.StubWorkload",
             metadata.EntryPoint.Type);
     }
 

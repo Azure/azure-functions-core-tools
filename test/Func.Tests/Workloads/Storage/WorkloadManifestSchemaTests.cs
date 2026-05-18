@@ -41,7 +41,7 @@ public class WorkloadManifestSchemaTests : IDisposable
     [Fact]
     public async Task SaveWorkload_WritesSchemaUrlAtTopOfDocument()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Stub", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Stub", "1.0.0"));
 
         string json = await File.ReadAllTextAsync(_registryPath);
 

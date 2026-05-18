@@ -12,7 +12,7 @@ extends:
   template: /eng/ci/templates/pipelines/release-packages.yml@self
   parameters:
     public: ${{ parameters.public }}
-    folder: workload/python
+    folder: workloads/python
     projects: |
-      $(Build.SourcesDirectory)/src/Workload/Stacks/Python/Workload.Python.csproj
-      $(Build.SourcesDirectory)/test/Workload/Stacks/Python.Tests/Workload.Python.Tests.csproj
+      $(Build.SourcesDirectory)/src/Workloads/Stacks/Python/Workloads.Python.csproj
+      $(Build.SourcesDirectory)/test/Workloads/Stacks/Python.Tests/Workloads.Python.Tests.csproj

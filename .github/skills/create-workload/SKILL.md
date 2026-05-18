@@ -8,7 +8,7 @@ description: 'Use when adding a new func CLI workload (e.g. Node, Python, Java).
 See `docs/building-a-workload.md` for the authoring guide and rationale, and
 `docs/proposed/workload-package-layout.md` for the package-layout spec
 (`workload.json` schema, `kind` discriminator, install pipeline). Use the
-Python stack workload (`src/Workload/Stacks/Python/`) as the canonical
+Python stack workload (`src/Workloads/Stacks/Python/`) as the canonical
 reference for stack workloads.
 
 ## Workload Project Checklist
@@ -20,13 +20,13 @@ omit the `<kind>/` path segment for ungrouped workloads.
 
 ### 1. Source project
 
-Place grouped workloads under `src/Workload/<kind>/<Name>/`. Stack workloads
-use `Stacks` as the kind, for example `src/Workload/Stacks/Python/`. Workloads
-without a grouping can live directly under `src/Workload/<Name>/`.
+Place grouped workloads under `src/Workloads/<kind>/<Name>/`. Stack workloads
+use `Stacks` as the kind, for example `src/Workloads/Stacks/Python/`. Workloads
+without a grouping can live directly under `src/Workloads/<Name>/`.
 
 Create the following files:
 
-- [ ] `Workload.<Name>.csproj`
+- [ ] `Workloads.<Name>.csproj`
   ```xml
   <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
@@ -41,7 +41,7 @@ Create the following files:
     </PropertyGroup>
 
     <ItemGroup>
-      <InternalsVisibleTo Include="Azure.Functions.Cli.Workload.<Name>.Tests" />
+      <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.<Name>.Tests" />
     </ItemGroup>
 
     <ItemGroup>
@@ -63,7 +63,7 @@ Create the following files:
   - `IncludeBuildOutput=false` plus the explicit `tools/any/` pack item is what makes the loader find the workload assembly.
   - `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on Abstractions keep the workload self-contained: the CLI provides Abstractions (and the other host-shared contract assemblies) at runtime. Apply the same `PrivateAssets=all` rule to **every** future `<PackageReference>`.
   - The csproj above only packs the workload's own assembly. As soon as the workload pulls in transitive managed dependencies, you'll need to pack the `dotnet publish` output (workload `.dll`, `.deps.json`, transitive deps, optional `runtimes/`). The upcoming `Workload.Sdk` package will provide that pack target. See `docs/proposed/workload-package-layout.md` §5 and §9.
-  - Csproj/assembly name must be `Azure.Functions.Cli.Workload.<Name>` (set via the project filename and matched in the package id).
+  - Csproj/assembly name must be `Azure.Functions.Cli.Workloads.<Name>` (set via the project filename and matched in the package id).
 - [ ] `Directory.Version.props`, the workload's version:
   ```xml
   <Project>
@@ -75,7 +75,7 @@ Create the following files:
   ```
 - [ ] `release_notes.md`:
   ```markdown
-  # Azure.Functions.Cli.Workload.<Name>
+  # Azure.Functions.Cli.Workloads.<Name>
 
   ## 1.0.0-preview.1
 
@@ -88,8 +88,8 @@ Create the following files:
     "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
     "kind": "workload",
     "entryPoint": {
-      "assemblyPath": "Azure.Functions.Cli.Workload.<Name>.dll",
-      "type": "Azure.Functions.Cli.Workload.<Name>.<Name>Workload"
+      "assemblyPath": "Azure.Functions.Cli.Workloads.<Name>.dll",
+      "type": "Azure.Functions.Cli.Workloads.<Name>.<Name>Workload"
     }
   }
   ```
@@ -98,7 +98,7 @@ Create the following files:
   using Azure.Functions.Cli.Workloads;
   using Microsoft.Extensions.DependencyInjection;
 
-  namespace Azure.Functions.Cli.Workload.<Name>;
+  namespace Azure.Functions.Cli.Workloads.<Name>;
 
   /// <summary>
   /// Entry-point for the <Name> workload.
@@ -143,20 +143,20 @@ Create the following files:
 
 ### 2. Test project
 
-Mirror the source path under `test/Workload/`: grouped workloads use
-`test/Workload/<kind>/<Name>.Tests/`, and ungrouped workloads use
-`test/Workload/<Name>.Tests/`.
+Mirror the source path under `test/Workloads/`: grouped workloads use
+`test/Workloads/<kind>/<Name>.Tests/`, and ungrouped workloads use
+`test/Workloads/<Name>.Tests/`.
 
-- [ ] `Workload.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workload.<Name>.Tests`:
+- [ ] `Workloads.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workloads.<Name>.Tests`:
   ```xml
   <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
       <TargetFramework>net10.0</TargetFramework>
-      <AssemblyName>Azure.Functions.Cli.Workload.<Name>.Tests</AssemblyName>
+      <AssemblyName>Azure.Functions.Cli.Workloads.<Name>.Tests</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="$(SrcRoot)Workload/<kind>/<Name>/Workload.<Name>.csproj" />
+      <ProjectReference Include="$(SrcRoot)Workloads/<kind>/<Name>/Workloads.<Name>.csproj" />
     </ItemGroup>
   </Project>
   ```
@@ -167,21 +167,21 @@ Mirror the source path under `test/Workload/`: grouped workloads use
 
 ### 3. Solution file, `Azure.Functions.Cli.slnx`
 
-- [ ] Add both projects to the solution under the matching `/src/Workload/<kind>/` and `/test/Workload/<kind>/` folders. Omit the `<kind>/` segment for ungrouped workloads.
+- [ ] Add both projects to the solution under the matching `/src/Workloads/<kind>/` and `/test/Workloads/<kind>/` folders. Omit the `<kind>/` segment for ungrouped workloads.
   ```
-  dotnet sln add src/Workload/<kind>/<Name>/Workload.<Name>.csproj
-  dotnet sln add test/Workload/<kind>/<Name>.Tests/Workload.<Name>.Tests.csproj
+  dotnet sln add src/Workloads/<kind>/<Name>/Workloads.<Name>.csproj
+  dotnet sln add test/Workloads/<kind>/<Name>.Tests/Workloads.<Name>.Tests.csproj
   ```
   Verify `Azure.Functions.Cli.slnx` keeps the projects in solution folders that match the filesystem hierarchy; do not leave grouped workload projects under only `/src/` or `/test/`.
   ```xml
-  <Folder Name="/src/Workload/<kind>/">
-    <Project Path="src/Workload/<kind>/<Name>/Workload.<Name>.csproj" />
+  <Folder Name="/src/Workloads/<kind>/">
+    <Project Path="src/Workloads/<kind>/<Name>/Workloads.<Name>.csproj" />
   </Folder>
-  <Folder Name="/test/Workload/<kind>/">
-    <Project Path="test/Workload/<kind>/<Name>.Tests/Workload.<Name>.Tests.csproj" />
+  <Folder Name="/test/Workloads/<kind>/">
+    <Project Path="test/Workloads/<kind>/<Name>.Tests/Workloads.<Name>.Tests.csproj" />
   </Folder>
   ```
-  For ungrouped workloads, use `/src/Workload/` and `/test/Workload/` as the solution folders.
+  For ungrouped workloads, use `/src/Workloads/` and `/test/Workloads/` as the solution folders.
 
 ### 4. CI pipelines
 
@@ -201,7 +201,7 @@ All workloads share a single job template, `eng/ci/templates/jobs/build-workload
                 parameters:
                   WorkloadProjectName: <Name>
     ```
-  - Path filters scope triggers to `src/Abstractions/**`, `src/Workload/<kind>/<Name>/**`, `test/Workload/<kind>/<Name>.Tests/**`, `eng/ci/templates/jobs/build-workload.yml`, and the pipeline file itself. Omit the `<kind>/` segment for ungrouped workloads.
+  - Path filters scope triggers to `src/Abstractions/**`, `src/Workloads/<kind>/<Name>/**`, `test/Workloads/<kind>/<Name>.Tests/**`, `eng/ci/templates/jobs/build-workload.yml`, and the pipeline file itself. Omit the `<kind>/` segment for ungrouped workloads.
 - [ ] `eng/ci/workloads/<name>/official-build.yml`, 1ES Official template:
   - Same shape, but extends the Official template, sets `pr: none`, and adds `release/*` to its branch triggers (and to path filters as needed). The shared template handles build + test + pack.
 
@@ -222,9 +222,9 @@ dotnet test
 
 A correctly built workload package should:
 
-- Have package id `Azure.Functions.Cli.Workload.<Name>` and `packageType=FuncCliWorkload`.
+- Have package id `Azure.Functions.Cli.Workloads.<Name>` and `packageType=FuncCliWorkload`.
 - Carry tags `kind:workload alias:<name>` (plus optional extra `alias:` entries and `func-workload`).
 - Contain `workload.json` at the package root.
-- Contain the workload assembly at `tools/any/Azure.Functions.Cli.Workload.<Name>.dll`.
+- Contain the workload assembly at `tools/any/Azure.Functions.Cli.Workloads.<Name>.dll`.
 - Have an empty `<dependencies>` element in its `.nuspec`.
 - Not contain Abstractions or any of the other host-shared contract assemblies.

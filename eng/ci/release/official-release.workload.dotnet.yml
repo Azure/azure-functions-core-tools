@@ -12,7 +12,7 @@ extends:
   template: /eng/ci/templates/pipelines/release-packages.yml@self
   parameters:
     public: ${{ parameters.public }}
-    folder: workload/dotnet
+    folder: workloads/dotnet
     projects: |
-      $(Build.SourcesDirectory)/src/Workload/Stacks/DotNet/Workload.DotNet.csproj
-      $(Build.SourcesDirectory)/test/Workload/Stacks/DotNet.Tests/Workload.DotNet.Tests.csproj
+      $(Build.SourcesDirectory)/src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj
+      $(Build.SourcesDirectory)/test/Workloads/Stacks/DotNet.Tests/Workloads.DotNet.Tests.csproj

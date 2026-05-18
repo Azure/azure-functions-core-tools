@@ -32,7 +32,7 @@ public class WorkloadListCommandTests
         {
             NewInfo(
                 instance: new FakeWorkload(displayName: ".NET", description: "C# / F# workload."),
-                packageId: "Azure.Functions.Cli.Workload.Dotnet",
+                packageId: "Azure.Functions.Cli.Workloads.Dotnet",
                 packageVersion: "1.0.0",
                 aliases: ["dotnet", "dotnet-isolated"]),
         };
@@ -43,7 +43,7 @@ public class WorkloadListCommandTests
         Assert.Equal(0, exit);
         Assert.Contains("TABLE: [ID, Aliases, Display Name, Description, Version]", _interaction.Lines);
         Assert.Contains(
-            "  ROW: [Azure.Functions.Cli.Workload.Dotnet, dotnet, dotnet-isolated, .NET, C# / F# workload., 1.0.0]",
+            "  ROW: [Azure.Functions.Cli.Workloads.Dotnet, dotnet, dotnet-isolated, .NET, C# / F# workload., 1.0.0]",
             _interaction.Lines);
     }
 
@@ -54,7 +54,7 @@ public class WorkloadListCommandTests
         {
             NewInfo(
                 instance: new FakeWorkload(),
-                packageId: "Azure.Functions.Cli.Workload.Custom",
+                packageId: "Azure.Functions.Cli.Workloads.Custom",
                 packageVersion: "0.1.0",
                 aliases: []),
         };
@@ -91,7 +91,7 @@ public class WorkloadListCommandTests
         {
             NewInfo(
                 instance: new FakeWorkload(displayName: ".NET", description: "C#"),
-                packageId: "Azure.Functions.Cli.Workload.Dotnet",
+                packageId: "Azure.Functions.Cli.Workloads.Dotnet",
                 packageVersion: "1.0.0",
                 aliases: ["dotnet"]),
         };
@@ -102,7 +102,7 @@ public class WorkloadListCommandTests
         Assert.Equal(0, exit);
         Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"packageId\":\"Azure.Functions.Cli.Workload.Dotnet\"", jsonLine);
+        Assert.Contains("\"packageId\":\"Azure.Functions.Cli.Workloads.Dotnet\"", jsonLine);
         Assert.Contains("\"packageVersion\":\"1.0.0\"", jsonLine);
     }
 

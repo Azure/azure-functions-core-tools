@@ -46,12 +46,14 @@ src/
     Program.cs             # Entry point with DI wiring
     Parser.cs              # Command tree composition
   Abstractions/            # Public abstractions
-  Workload/
-    <Name>/                # An individual workload
+  Workloads/
+    <kind>/<Name>/         # An individual grouped workload
+    <Name>/                # An individual ungrouped workload
 test/
   Func.Tests/              # Unit tests core cli (xUnit + NSubstitute)
-  Workload/
-    <Name>.Tests/          # Unit tests for a workload
+  Workloads/
+    <kind>/<Name>.Tests/   # Unit tests for a grouped workload
+    <Name>.Tests/          # Unit tests for an ungrouped workload
 eng/
   build/                   # MSBuild props and targets
   ci/                      # CI pipeline definitions (Azure DevOps)

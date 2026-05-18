@@ -41,19 +41,19 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task SaveWorkloadAsync_InsertsNewEntry()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));
 
         var workloads = await _store.GetWorkloadsAsync();
         var installed = Assert.Single(workloads);
-        Assert.Equal("Azure.Functions.Cli.Workload.Dotnet", installed.PackageId);
+        Assert.Equal("Azure.Functions.Cli.Workloads.Dotnet", installed.PackageId);
         Assert.Equal("1.0.0", installed.PackageVersion);
     }
 
     [Fact]
     public async Task SaveWorkloadAsync_KeepsBothVersions_WhenSamePackageIdDifferentVersion()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "1.0.0"));
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "2.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "2.0.0"));
 
         var workloads = await _store.GetWorkloadsAsync();
         Assert.Equal(
@@ -75,8 +75,8 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task SaveWorkloadAsync_MatchesPackageId_CaseInsensitively()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "1.0.0", entryAssembly: "first.dll"));
-        await _store.SaveWorkloadAsync(NewEntry("azure.functions.cli.workload.dotnet", "1.0.0", entryAssembly: "lower.dll"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0", entryAssembly: "first.dll"));
+        await _store.SaveWorkloadAsync(NewEntry("azure.functions.cli.workloads.dotnet", "1.0.0", entryAssembly: "lower.dll"));
 
         var workloads = await _store.GetWorkloadsAsync();
         var installed = Assert.Single(workloads);
@@ -110,7 +110,7 @@ public class WorkloadStoreTests : IDisposable
     {
         var entry = new WorkloadEntry
         {
-            PackageId = "Azure.Functions.Cli.Workload.Dotnet",
+            PackageId = "Azure.Functions.Cli.Workloads.Dotnet",
             PackageVersion = "1.0.0",
             Aliases = ["dotnet", "dotnet-isolated"],
             EntryPoint = new EntryPointSpec
@@ -133,9 +133,9 @@ public class WorkloadStoreTests : IDisposable
     [Fact]
     public async Task PersistedJson_UsesFlatArrayShape()
     {
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "1.0.0"));
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Dotnet", "2.0.0"));
-        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workload.Node", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "2.0.0"));
+        await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Node", "1.0.0"));
 
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(_paths.WorkloadRegistryPath));
         var workloads = doc.RootElement.GetProperty("workloads");
