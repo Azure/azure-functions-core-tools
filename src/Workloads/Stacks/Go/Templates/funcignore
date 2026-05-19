@@ -1,0 +1,7 @@
+.git*
+.vscode
+local.settings.json
+test
+getting_started.md
+*_test.go
+vendor/
