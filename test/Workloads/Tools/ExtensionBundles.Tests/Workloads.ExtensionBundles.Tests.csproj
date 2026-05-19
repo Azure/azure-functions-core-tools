@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj" />
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

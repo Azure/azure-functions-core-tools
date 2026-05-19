@@ -1,0 +1,18 @@
+parameters:
+- name: public
+  displayName: Publish to nuget.org?
+  type: boolean
+  default: false
+
+# Release has no triggers outside of pipeline
+trigger: none
+pr: none
+
+extends:
+  template: /eng/ci/templates/pipelines/release-packages.yml@self
+  parameters:
+    public: ${{ parameters.public }}
+    folder: workloads/bundles
+    projects: |
+      $(Build.SourcesDirectory)/src/Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj
+      $(Build.SourcesDirectory)/test/Workloads/Tools/ExtensionBundles.Tests/Workloads.ExtensionBundles.Tests.csproj
