@@ -1,9 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Resolution;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -12,17 +14,13 @@ namespace Azure.Functions.Cli.Tests.Workloads.Resolution;
 public sealed class WorkloadResolverTests : IDisposable
 {
     private readonly DirectoryInfo _dir;
-    private readonly ILocalSettingsReader _settings = Substitute.For<ILocalSettingsReader>();
-    private readonly IFuncProjectConfigReader _projectConfig = Substitute.For<IFuncProjectConfigReader>();
+    private readonly StackOptions _stackOptions = new();
 
     public WorkloadResolverTests()
     {
         _dir = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "func-resolver-tests-" + Guid.NewGuid().ToString("N")));
         _dir.Create();
         File.WriteAllText(Path.Combine(_dir.FullName, "host.json"), "{}");
-
-        _settings.ReadWorkerRuntime(Arg.Any<DirectoryInfo>()).Returns((string?)null);
-        _projectConfig.Read(Arg.Any<DirectoryInfo>()).Returns((FuncProjectConfig?)null);
     }
 
     public void Dispose()
@@ -89,14 +87,14 @@ public sealed class WorkloadResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task Runtime_FromLocalSettings_SingleClaimMatchingRuntime_Resolves()
+    public async Task Runtime_FromConfiguration_SingleClaimMatchingRuntime_Resolves()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         WorkloadInfo python = NewWorkload("Pkg.Python");
         IProjectResolver dotnetResolver = NewProjectResolver(
             EvaluationResult.Match("found .csproj", workerRuntime: "dotnet-isolated"));
         IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.NoMatch());
-        _settings.ReadWorkerRuntime(_dir).Returns("dotnet-isolated");
+        _stackOptions.Runtime = "dotnet-isolated";
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet, python],
@@ -108,20 +106,18 @@ public sealed class WorkloadResolverTests : IDisposable
 
         var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
         Assert.Same(dotnet, resolved.Workload);
-        Assert.Contains("FUNCTIONS_WORKER_RUNTIME='dotnet-isolated'", resolved.Message);
+        Assert.Contains("configured worker runtime 'dotnet-isolated'", resolved.Message);
     }
 
     [Fact]
-    public async Task Runtime_FromLocalSettings_NoClaimWithMatchingRuntime_ReturnsRuntimeMessage()
+    public async Task Runtime_FromConfiguration_NoClaimWithMatchingRuntime_ReturnsRuntimeMessage()
     {
-        // local.settings.json declares a runtime no resolver backs for this
-        // directory (here: resolver matches the dir but reports a different
-        // runtime). Surface a runtime-specific message rather than falling
-        // through to the generic "no claim" path.
+        // Configuration declares a runtime no resolver backs for this directory
+        // (here: resolver matches the dir but reports a different runtime).
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet");
         IProjectResolver resolverStub = NewProjectResolver(
             EvaluationResult.Match("found .csproj", workerRuntime: "dotnet-isolated"));
-        _settings.ReadWorkerRuntime(_dir).Returns("custom-runtime");
+        _stackOptions.Runtime = "custom-runtime";
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet],
@@ -132,7 +128,7 @@ public sealed class WorkloadResolverTests : IDisposable
             CancellationToken.None);
 
         var none = Assert.IsType<WorkloadResolution.None>(result);
-        Assert.Contains("FUNCTIONS_WORKER_RUNTIME='custom-runtime'", none.Message);
+        Assert.Contains("worker runtime 'custom-runtime'", none.Message);
         Assert.Contains("no installed workload claims that runtime", none.Message);
         Assert.Contains("Pkg.Dotnet", none.Message);
     }
@@ -146,7 +142,7 @@ public sealed class WorkloadResolverTests : IDisposable
             EvaluationResult.Match("matched", workerRuntime: "dotnet"));
         IProjectResolver bResolver = NewProjectResolver(
             EvaluationResult.Match("matched", workerRuntime: "dotnet"));
-        _settings.ReadWorkerRuntime(_dir).Returns("dotnet");
+        _stackOptions.Runtime = "dotnet";
 
         WorkloadResolver resolver = NewResolver(
             workloads: [a, b],
@@ -238,8 +234,6 @@ public sealed class WorkloadResolverTests : IDisposable
         WorkloadInfo python = NewWorkload("Pkg.Python");
         IProjectResolver pythonResolver = NewProjectResolver(
             EvaluationResult.Match("found requirements.txt"));
-        _settings.ReadWorkerRuntime(_dir).Returns((string?)null);
-
         WorkloadResolver resolver = NewResolver(
             workloads: [python],
             resolvers: [(python, pythonResolver)]);
@@ -334,13 +328,13 @@ public sealed class WorkloadResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task ProjectConfig_StackBeatsResolverClaims()
+    public async Task ConfiguredRuntime_FiltersResolverClaims()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet", aliases: ["dotnet"]);
         WorkloadInfo python = NewWorkload("Pkg.Python", aliases: ["python"]);
-        IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.Match("found .csproj"));
-        IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.NoMatch());
-        _projectConfig.Read(_dir).Returns(new FuncProjectConfig(Stack: "python", Language: null));
+        IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.Match("found .csproj", workerRuntime: "dotnet-isolated"));
+        IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.Match("found function_app.py", workerRuntime: "python"));
+        _stackOptions.Runtime = "python";
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet, python],
@@ -352,21 +346,21 @@ public sealed class WorkloadResolverTests : IDisposable
 
         var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
         Assert.Same(python, resolved.Workload);
-        Assert.Contains(".func/config.json declares stack 'python'", resolved.Message);
-        // Resolver auto-detection must not run when config provides an explicit pin.
-        await dotnetResolver.DidNotReceive().EvaluateAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
-        await pythonResolver.DidNotReceive().EvaluateAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>());
+        Assert.Contains("configured worker runtime 'python'", resolved.Message);
     }
 
     [Fact]
-    public async Task ProjectConfig_StackBeatsLocalSettingsRuntime()
+    public async Task ConfiguredRuntime_SelectsMatchingRuntime()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet", aliases: ["dotnet"]);
         WorkloadInfo python = NewWorkload("Pkg.Python", aliases: ["python"]);
-        _settings.ReadWorkerRuntime(_dir).Returns("dotnet-isolated");
-        _projectConfig.Read(_dir).Returns(new FuncProjectConfig(Stack: "python", Language: null));
+        IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.Match("found .csproj", workerRuntime: "dotnet-isolated"));
+        IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.Match("found function_app.py", workerRuntime: "python"));
+        _stackOptions.Runtime = "python";
 
-        WorkloadResolver resolver = NewResolver(workloads: [dotnet, python]);
+        WorkloadResolver resolver = NewResolver(
+            workloads: [dotnet, python],
+            resolvers: [(dotnet, dotnetResolver), (python, pythonResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
@@ -374,15 +368,15 @@ public sealed class WorkloadResolverTests : IDisposable
 
         var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
         Assert.Same(python, resolved.Workload);
-        Assert.Contains(".func/config.json declares stack 'python'", resolved.Message);
+        Assert.Contains("configured worker runtime 'python'", resolved.Message);
     }
 
     [Fact]
-    public async Task ProjectConfig_ExplicitStackSelectorBeatsConfig()
+    public async Task ConfiguredRuntime_ExplicitStackSelectorBeatsConfig()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet", aliases: ["dotnet"]);
         WorkloadInfo python = NewWorkload("Pkg.Python", aliases: ["python"]);
-        _projectConfig.Read(Arg.Any<DirectoryInfo>()).Returns(new FuncProjectConfig(Stack: "python", Language: null));
+        _stackOptions.Runtime = "python";
 
         WorkloadResolver resolver = NewResolver(workloads: [dotnet, python]);
 
@@ -393,33 +387,34 @@ public sealed class WorkloadResolverTests : IDisposable
         var resolved = Assert.IsType<WorkloadResolution.Resolved>(result);
         Assert.Same(dotnet, resolved.Workload);
         Assert.Contains("--stack 'dotnet'", resolved.Message);
-        // Config is not consulted when --stack wins outright.
-        _projectConfig.DidNotReceive().Read(Arg.Any<DirectoryInfo>());
     }
 
     [Fact]
-    public async Task ProjectConfig_StackUninstalled_ReturnsNoneWithConfigSource()
+    public async Task ConfiguredRuntime_UnmatchedRuntime_ReturnsNoneWithConfigSource()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet", aliases: ["dotnet"]);
-        _projectConfig.Read(_dir).Returns(new FuncProjectConfig(Stack: "python", Language: null));
+        IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.Match("found .csproj", workerRuntime: "dotnet-isolated"));
+        _stackOptions.Runtime = "python";
 
-        WorkloadResolver resolver = NewResolver(workloads: [dotnet]);
+        WorkloadResolver resolver = NewResolver(
+            workloads: [dotnet],
+            resolvers: [(dotnet, dotnetResolver)]);
 
         WorkloadResolution result = await resolver.ResolveAsync(
             new WorkloadResolutionContext(_dir, StackSelector: null),
             CancellationToken.None);
 
         var none = Assert.IsType<WorkloadResolution.None>(result);
-        Assert.Contains(".func/config.json declares stack 'python'", none.Message);
+        Assert.Contains("worker runtime 'python'", none.Message);
         Assert.Contains("Pkg.Dotnet", none.Message);
     }
 
     [Fact]
-    public async Task ProjectConfig_LanguageOnlyFallsThroughToClaims()
+    public async Task StackLanguageOnlyFallsThroughToClaims()
     {
         WorkloadInfo python = NewWorkload("Pkg.Python", aliases: ["python"]);
         IProjectResolver pythonResolver = NewProjectResolver(EvaluationResult.Match("found requirements.txt"));
-        _projectConfig.Read(_dir).Returns(new FuncProjectConfig(Stack: null, Language: "python"));
+        _stackOptions.Language = "python";
 
         WorkloadResolver resolver = NewResolver(
             workloads: [python],
@@ -435,11 +430,11 @@ public sealed class WorkloadResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task ProjectConfig_WhitespaceStackFallsThroughToClaims()
+    public async Task WhitespaceRuntimeFallsThroughToClaims()
     {
         WorkloadInfo dotnet = NewWorkload("Pkg.Dotnet", aliases: ["dotnet"]);
         IProjectResolver dotnetResolver = NewProjectResolver(EvaluationResult.Match("found .csproj"));
-        _projectConfig.Read(_dir).Returns(new FuncProjectConfig(Stack: "   ", Language: null));
+        _stackOptions.Runtime = "   ";
 
         WorkloadResolver resolver = NewResolver(
             workloads: [dotnet],
@@ -456,11 +451,15 @@ public sealed class WorkloadResolverTests : IDisposable
     private WorkloadResolver NewResolver(
         IReadOnlyList<WorkloadInfo>? workloads = null,
         IReadOnlyList<(WorkloadInfo Workload, IProjectResolver Resolver)>? resolvers = null)
-        => new(
+    {
+        IOptionsMonitor<StackOptions> stackOptions = Substitute.For<IOptionsMonitor<StackOptions>>();
+        stackOptions.CurrentValue.Returns(_stackOptions);
+        stackOptions.Get(Arg.Any<string>()).Returns(_stackOptions);
+        return new WorkloadResolver(
             new StubWorkloadProvider(workloads ?? []),
             (resolvers ?? []).Select(d => new WorkloadProjectResolverContribution(d.Workload, d.Resolver)).ToList(),
-            _settings,
-            _projectConfig);
+            stackOptions);
+    }
 
     private static WorkloadInfo NewWorkload(string packageId, IReadOnlyList<string>? aliases = null)
         => TestWorkloads.CreateInfo(packageId) with { Aliases = aliases ?? [] };

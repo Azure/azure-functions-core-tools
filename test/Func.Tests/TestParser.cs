@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
@@ -61,6 +62,8 @@ internal static class TestParser
     {
         var services = new ServiceCollection();
         services.AddSingleton(interaction);
+        services.AddOptions<StackOptions>();
+        services.AddOptions<HostStartupOptions>();
         services.AddBuiltInCommands();
 
         // Stub the workload subsystem so commands that depend on it (e.g.

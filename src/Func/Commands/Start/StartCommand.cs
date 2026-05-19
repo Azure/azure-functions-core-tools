@@ -5,11 +5,13 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -91,12 +93,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     private readonly ICliVersionProvider _versionProvider;
     private readonly IStartInitializationRunner _initializationRunner;
     private readonly StartDashboardEventStreamFactory _eventStreamFactory;
+    private readonly IOptionsMonitor<HostStartupOptions> _hostStartupOptions;
 
     public StartCommand(
         IInteractionService interaction,
         FunctionPalette palette,
         ICliVersionProvider versionProvider,
         IStartInitializationRunner initializationRunner,
+        IOptionsMonitor<HostStartupOptions> hostStartupOptions,
         StartDashboardEventStreamFactory? eventStreamFactory = null)
         : base("start", "Launch the Azure Functions host runtime.")
     {
@@ -104,12 +108,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(palette);
         ArgumentNullException.ThrowIfNull(versionProvider);
         ArgumentNullException.ThrowIfNull(initializationRunner);
+        ArgumentNullException.ThrowIfNull(hostStartupOptions);
 
         _interaction = interaction;
         _palette = palette;
         _versionProvider = versionProvider;
         _initializationRunner = initializationRunner;
         _eventStreamFactory = eventStreamFactory ?? new StartDashboardEventStreamFactory();
+        _hostStartupOptions = hostStartupOptions;
 
         AddPathArgument();
         Options.Add(PortOption);
@@ -144,7 +150,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             System.Console.Error.WriteLine("notice: stdout is not an interactive terminal; falling back to --output=plain.");
         }
 
-        StartCommandOptions options = CreateStartOptions(parseResult, workingDirectory, mode);
+        HostStartupOptions hostStartupOptions = GetHostStartupOptions(workingDirectory.Info);
+        StartCommandOptions options = CreateStartOptions(parseResult, workingDirectory, mode, hostStartupOptions);
         IDashboardEventSink? eventSink = CreateLogFileSink(options.LogFilePath);
 
         var initializationContext = new StartInitializationContext(
@@ -177,6 +184,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         return await pipeline.RunAsync(cancellationToken);
     }
 
+    private HostStartupOptions GetHostStartupOptions(DirectoryInfo projectDirectory)
+        => ProjectDirectoryResolver.IsProjectDirectory(projectDirectory)
+            ? _hostStartupOptions.CurrentValue
+            : _hostStartupOptions.Get(Path.GetFullPath(projectDirectory.FullName));
+
     private static IDashboardEventSink? CreateLogFileSink(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -197,12 +209,16 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         }
     }
 
-    private StartCommandOptions CreateStartOptions(ParseResult parseResult, WorkingDirectory workingDirectory, OutputMode mode)
+    private StartCommandOptions CreateStartOptions(
+        ParseResult parseResult,
+        WorkingDirectory workingDirectory,
+        OutputMode mode,
+        HostStartupOptions hostStartupOptions)
         => new(
             workingDirectory,
-            parseResult.GetValue(PortOption),
-            ParseCors(parseResult.GetValue(CorsOption)),
-            parseResult.GetValue(CorsCredentialsOption),
+            parseResult.GetValue(PortOption) ?? hostStartupOptions.Port,
+            ParseCors(parseResult.GetValue(CorsOption) ?? hostStartupOptions.Cors),
+            parseResult.GetValue(CorsCredentialsOption) || hostStartupOptions.CorsCredentials is true,
             parseResult.GetValue(FunctionsOption) ?? [],
             parseResult.GetValue(NoBuildOption),
             parseResult.GetValue(EnableAuthOption),

@@ -1,13 +1,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -48,6 +48,12 @@ internal static class CliHostFactory
         HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton(interaction);
 
+        var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
+        ILocalSettingsProvider localSettingsProvider = new LocalSettingsProvider();
+        var configurationSourceBuilder = new CliConfigurationSourceBuilder(localSettingsProvider);
+        builder.Services.AddSingleton(localSettingsProvider);
+        builder.Services.AddSingleton(configurationSourceBuilder);
+
         // Bridge the cli.workload.boot activity to the boot-duration histogram
         // so callers only need to start the activity. Idempotent.
         WorkloadBootMetricListener.EnsureRegistered();
@@ -68,7 +74,9 @@ internal static class CliHostFactory
 
         // FUNC_CLI_ prefix is stripped and "__" maps to section nesting, so
         // FUNC_CLI_Workloads__Home binds to WorkloadPathsOptions.Home.
-        builder.Configuration.AddEnvironmentVariables(prefix: Constants.EnvironmentVariablePrefix);
+        configurationSourceBuilder.AddSources(builder.Configuration, workingDirectory);
+        builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
+        builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();
 
         builder.Services.AddBuiltInCommands();
         builder.Services.AddWorkloadStorage();

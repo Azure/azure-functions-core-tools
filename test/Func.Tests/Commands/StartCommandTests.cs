@@ -7,10 +7,12 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -42,7 +44,10 @@ public class StartCommandTests : IDisposable
     [Fact]
     public void StartCommand_HasExpectedOptions()
     {
-        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner);
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider,
+            _initializationRunner,
+            Substitute.For<IOptionsMonitor<HostStartupOptions>>());
+
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--port", optionNames);
@@ -134,6 +139,92 @@ public class StartCommandTests : IDisposable
                 && context.Options.Functions.SequenceEqual(new[] { "HttpTrigger" })
                 && context.Options.Cors.SequenceEqual(new[] { "http://localhost", "http://example" })
                 && context.Options.CorsCredentials),
+            Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartCommand_UsesConfiguredHostStartupDefaults_WhenOptionsAreNotProvided()
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        var initializationResult = new StartInitializationResult(
+            new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET"),
+            source,
+            HostVersion: "4.834.0",
+            BundleRequired: false,
+            BundleVersion: null);
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(initializationResult);
+        var options = Substitute.For<IOptionsMonitor<HostStartupOptions>>();
+        options.Get(Arg.Any<string>()).Returns(new HostStartupOptions
+        {
+            Port = 9091,
+            Cors = "http://localhost,http://example",
+            CorsCredentials = true,
+        });
+        var cmd = new StartCommand(
+            _interaction,
+            _palette,
+            _cliVersionProvider,
+            _initializationRunner,
+            options);
+        var root = new RootCommand { cmd };
+        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+
+        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        Assert.Equal(0, exitCode);
+        options.Received(1).Get(new DirectoryInfo(_tempDir).FullName);
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context =>
+                context.Options.Port == 9091
+                && context.Options.Cors.SequenceEqual(new[] { "http://localhost", "http://example" })
+                && context.Options.CorsCredentials),
+            Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartCommand_UsesCurrentHostStartupOptions_WhenPathIsProjectDirectory()
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        var initializationResult = new StartInitializationResult(
+            new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET"),
+            source,
+            HostVersion: "4.834.0",
+            BundleRequired: false,
+            BundleVersion: null);
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(initializationResult);
+        var options = Substitute.For<IOptionsMonitor<HostStartupOptions>>();
+        options.CurrentValue.Returns(new HostStartupOptions
+        {
+            Port = 9092,
+        });
+        var cmd = new StartCommand(
+            _interaction,
+            _palette,
+            _cliVersionProvider,
+            _initializationRunner,
+            options);
+        var root = new RootCommand { cmd };
+        string projectDirectory = Environment.CurrentDirectory;
+        var result = root.Parse($"start \"{projectDirectory}\" --output=plain");
+
+        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        Assert.Equal(0, exitCode);
+        options.DidNotReceive().Get(Arg.Any<string>());
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context => context.Options.Port == 9092),
             Arg.Any<IStartInitializationRenderer>(),
             Arg.Any<CancellationToken>());
     }
