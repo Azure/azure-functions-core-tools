@@ -3,7 +3,7 @@
 
 using System.Diagnostics;
 
-namespace Azure.Functions.Cli.Workload.DotNet;
+namespace Azure.Functions.Cli.Workloads.DotNet;
 
 /// <summary>
 /// Executes <c>dotnet</c> CLI commands in a child process.

@@ -1,7 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-namespace Azure.Functions.Cli.Workload.DotNet;
+namespace Azure.Functions.Cli.Workloads.DotNet;
 
 /// <summary>
 /// Runs <c>dotnet</c> CLI commands in a child process.
