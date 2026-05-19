@@ -1,3 +1,9 @@
+parameters:
+- name: force
+  displayName: Force push
+  type: boolean
+  default: false
+
 trigger:
   branches:
     include:
@@ -18,3 +24,6 @@ variables:
 
 extends:
   template: ci/code-mirror.yml@eng
+  parameters:
+    ${{ if parameters.force }}:
+       extraPushArgs: --force-with-lease
