@@ -20,16 +20,19 @@ jobs:
 
   variables:
     drop_path: $(Pipeline.Workspace)/drop
-    artifact_stage_path: $(Pipeline.Workspace)/stage_artifacts
 
   templateContext:
     type: releaseJob
     isProduction: true
 
     inputs:
+    # TODO: fetch pdb's in a separate stage and upload to symbol server
     - input: pipelineArtifact
       targetPath: $(drop_path)
       artifactName: drop_cli
+      itemPattern: |
+        **/*
+        !**/*.pdb
 
     outputs:
     - ${{ each runtime in parameters.runtimes }}:
@@ -41,15 +44,3 @@ jobs:
         versionOption: custom
         versionPublish: $(Build.BuildNumber)
         packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'
-
-    # TODO: submit pdbs to symbol server once we have that set up
-
-    steps:
-    - task: CopyFiles@2
-      displayName: Copy CLI Artifacts
-      inputs:
-        SourceFolder: $(drop_path)
-        Contents: |
-          '**'
-          '!**/*.pdb'
-        TargetFolder: $(artifact_stage_path)
