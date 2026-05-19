@@ -67,8 +67,9 @@ jobs:
         projects: ${{ parameters.projects }}
         arguments: -c ${{ parameters.configuration }} --no-build ${{ parameters.build_args }}
 
-    - ${{ if eq(parameters.sign, true) }}:
-      # We are publishing as single file, don't bother signing func cli yet
+    - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
+      # Only sign the intermediate DLLs if we are packing.
+      # For publishing, we'll sign the final apphost binaries, which is sufficient for code integrity and more performant than signing every DLL.
       - template: ci/sign-files.yml@eng
         parameters:
           displayName: Sign assemblies
@@ -119,8 +120,36 @@ jobs:
           folderPath: $(publish_dir)
           signPatterns: '**/linux-*/func'
 
+      # macOS hardened runtime requires every loaded Mach-O (apphost + native
+      # dylibs) to be signed. ESRP's MacAppDeveloperSign requires the payload
+      # to be a .zip or .dmg, so we zip each osx-* rid folder, sign the zips,
+      # then expand them back over the publish output.
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path '$(publish_dir)' '_macsign'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Get-ChildItem -Path '$(publish_dir)' -Directory -Filter 'osx-*' | ForEach-Object {
+            $zip = Join-Path $stage "$($_.Name).zip"
+            Compress-Archive -Path (Join-Path $_.FullName '*') -DestinationPath $zip -Force
+            Write-Host "Zipped $($_.Name) -> $zip"
+          }
+        displayName: 'Package macOS runtimes for signing'
+
       - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: macos
-          folderPath: $(publish_dir)
-          signPatterns: '**/osx-*/func'
+          folderPath: $(publish_dir)/_macsign
+          signPatterns: 'osx-*.zip'
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path '$(publish_dir)' '_macsign'
+          Get-ChildItem -Path $stage -Filter 'osx-*.zip' | ForEach-Object {
+            $rid = [System.IO.Path]::GetFileNameWithoutExtension($_.Name)
+            $dest = Join-Path '$(publish_dir)' $rid
+            Remove-Item -Recurse -Force -Path $dest -ErrorAction SilentlyContinue
+            Expand-Archive -Path $_.FullName -DestinationPath $dest -Force
+            Write-Host "Restored signed $rid"
+          }
+          Remove-Item -Recurse -Force -Path $stage
+        displayName: 'Restore signed macOS runtimes'
