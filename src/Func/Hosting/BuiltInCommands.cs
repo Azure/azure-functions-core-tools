@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Hosting.AppStacks;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,7 +24,6 @@ internal static class BuiltInCommands
 
         services.AddSingleton<ICliVersionProvider, AssemblyCliVersionProvider>();
         services.AddSingleton<IWorkloadHintRenderer, WorkloadHintRenderer>();
-        services.AddSingleton<IAppStackProvider, DefaultAppStackProvider>();
         services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
         services.AddSingleton<StartDashboardEventStreamFactory>();
 

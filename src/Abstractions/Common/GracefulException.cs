@@ -38,5 +38,5 @@ public class CommandUnknownException(string commandName) : GracefulException($"U
 /// Thrown when command arguments fail to parse.
 /// </summary>
 public class CommandParsingException(string message) : GracefulException(message, isUserError: true)
-    {
+{
 }

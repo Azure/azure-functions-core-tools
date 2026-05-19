@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Go;
@@ -34,5 +35,10 @@ internal sealed class GoProjectResolver : IProjectResolver
         }
 
         return Task.FromResult(EvaluationResult.NoMatch("host.json present but no Go fingerprint file"));
+    }
+
+    public Task<RuntimeStackInfo> GetRuntimeStackInfoAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
     }
 }

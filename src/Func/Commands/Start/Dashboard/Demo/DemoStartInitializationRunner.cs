@@ -2,7 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
-using Azure.Functions.Cli.Hosting.AppStacks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -10,10 +12,10 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// Prototype initialization runner that simulates the host-resolution workflow.
 /// </summary>
 internal sealed class DemoStartInitializationRunner(
-    IAppStackProvider appStackProvider,
+    IEnumerable<IProjectResolver> projectResolvers,
     TimeProvider? timeProvider = null) : IStartInitializationRunner
 {
-    private readonly IAppStackProvider _appStackProvider = appStackProvider ?? throw new ArgumentNullException(nameof(appStackProvider));
+    private readonly IProjectResolver _projectResolver = projectResolvers?.FirstOrDefault() ?? new DemoProjectResolver();
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     public async Task<StartInitializationResult> RunAsync(
@@ -39,7 +41,7 @@ internal sealed class DemoStartInitializationRunner(
             new ResolveProfileInitializationStep(),
             new ResolveConstraintsInitializationStep(),
             new ValidateHostWorkloadInitializationStep(),
-            new ResolveAppStackInitializationStep(_appStackProvider),
+            new ResolveAppStackInitializationStep(_projectResolver),
             new ValidateExtensionBundleInitializationStep(),
             new StartHostInitializationStep(_time),
         ];
@@ -99,4 +101,20 @@ internal sealed class DemoStartInitializationRunner(
     }
 
     private DateTimeOffset Now() => _time.GetUtcNow();
+
+
+    // Create a demo project resolver for the demo runner...
+    private sealed class DemoProjectResolver : IProjectResolver
+    {
+        public Task<EvaluationResult> EvaluateAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new EvaluationResult(true, "Demo"));
+        }
+
+        public Task<RuntimeStackInfo> GetRuntimeStackInfoAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new RuntimeStackInfo(".NET", "dotnet-isolated", "c:\\some\\path\\to\\worker.config", false));
+        }
+    }
+
 }
