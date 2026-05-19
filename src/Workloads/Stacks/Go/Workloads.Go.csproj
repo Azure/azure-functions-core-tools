@@ -27,4 +27,8 @@
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="tools/any/" Visible="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Templates/**" />
+  </ItemGroup>
+
 </Project>

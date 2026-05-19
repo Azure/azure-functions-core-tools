@@ -122,6 +122,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         InitializerSelection selection = await SelectInitializerAsync(requestedStack, cancellationToken);
 
+        if (selection.Initializer is not null)
+        {
+            (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, selection.Initializer, cancellationToken);
+            if (errorCode is int code)
+            {
+                return code;
+            }
+
+            language = resolved;
+        }
+
         // Always lay down the host-owned skeleton so a folder is usable even
         // when no initializer runs. Workload initializers layer their files
         // on top after this point.
@@ -286,6 +297,53 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 .Code(ex.Message)
                 .Muted(")."));
         }
+    }
+
+    private async Task<(string? Language, int? ErrorCode)> ResolveLanguageAsync(
+        string? requested,
+        IProjectInitializer initializer,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> supported = initializer.SupportedLanguages;
+        if (supported.Count == 0)
+        {
+            return (requested, null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(requested))
+        {
+            string? match = supported.FirstOrDefault(l =>
+                string.Equals(l, requested, StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                _interaction.WriteError(
+                    $"Language '{requested}' is not supported by the '{initializer.Stack}' stack. " +
+                    $"Supported values: {string.Join(", ", supported)}.");
+                return (null, 1);
+            }
+
+            return (match.ToLowerInvariant(), null);
+        }
+
+        if (supported.Count == 1)
+        {
+            return (supported[0].ToLowerInvariant(), null);
+        }
+
+        if (!_interaction.IsInteractive)
+        {
+            _interaction.WriteError(
+                $"The '{initializer.Stack}' stack supports multiple languages. " +
+                $"Re-run with --language <{string.Join("|", supported.Select(l => l.ToLowerInvariant()))}>.");
+            return (null, 1);
+        }
+
+        string picked = await _interaction.PromptForSelectionAsync(
+            "Select a language:",
+            supported,
+            cancellationToken);
+
+        return (picked.ToLowerInvariant(), null);
     }
 
     private async Task<InitializerSelection> SelectInitializerAsync(string? requestedStack, CancellationToken cancellationToken)
