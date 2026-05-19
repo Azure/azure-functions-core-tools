@@ -513,7 +513,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Fact]
-        public void ResolveNativeWorkerRuntime_NativeWithGoMod_ResolvesToGo()
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithGoMod_ResolvesToGo()
         {
             string envVar = Constants.FunctionsWorkerRuntime;
             string original = Environment.GetEnvironmentVariable(envVar);
@@ -525,29 +525,23 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             var secretsManager = new Mock<ISecretsManager>();
             secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
 
-            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
-
             try
             {
                 using (FileSystemHelpers.Override(fileSystem))
                 {
-                    GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.None;
-                    var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+                    var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager.Object);
 
-                    action.ResolveNativeWorkerRuntime();
-
-                    GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Go);
+                    resolved.Should().Be(WorkerRuntime.Go);
                 }
             }
             finally
             {
                 Environment.SetEnvironmentVariable(envVar, original);
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
             }
         }
 
         [Fact]
-        public void ResolveNativeWorkerRuntime_NativeWithoutGoMod_Throws()
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithoutGoMod_Throws()
         {
             string envVar = Constants.FunctionsWorkerRuntime;
             string original = Environment.GetEnvironmentVariable(envVar);
@@ -563,12 +557,10 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             {
                 using (FileSystemHelpers.Override(fileSystem))
                 {
-                    var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
-
-                    Action act = () => action.ResolveNativeWorkerRuntime();
+                    Action act = () => WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager.Object);
 
                     act.Should().Throw<CliException>()
-                        .Which.Message.Should().Contain("Run 'func init'");
+                        .Which.Message.Should().Contain("native");
                 }
             }
             finally
@@ -578,7 +570,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Fact]
-        public void ResolveNativeWorkerRuntime_NonNativeRuntime_NoOp()
+        public void GetCurrentWorkerRuntimeLanguage_NonNativeRuntime_ReturnsRuntime()
         {
             string envVar = Constants.FunctionsWorkerRuntime;
             string original = Environment.GetEnvironmentVariable(envVar);
@@ -587,21 +579,15 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             var secretsManager = new Mock<ISecretsManager>();
             secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
 
-            var previous = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
-
             try
             {
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Python;
-                var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+                var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager.Object);
 
-                action.ResolveNativeWorkerRuntime();
-
-                GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Python);
+                resolved.Should().Be(WorkerRuntime.Python);
             }
             finally
             {
                 Environment.SetEnvironmentVariable(envVar, original);
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = previous;
             }
         }
     }

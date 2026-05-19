@@ -85,8 +85,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 Environment.CurrentDirectory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, FolderPath));
             }
 
-            // Detect the runtime from environment variable or local.settings.json
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+            // Detect the runtime from environment variable or local.settings.json.
+            // GetCurrentWorkerRuntimeLanguage transparently maps FUNCTIONS_WORKER_RUNTIME=native
+            // to a concrete runtime (e.g. Go via go.mod), and throws an actionable CliException
+            // when "native" is set without a supported project marker.
+            WorkerRuntime workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
 
             if (workerRuntime == WorkerRuntime.None && NoBuild)
             {
@@ -129,6 +132,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 WorkerRuntime.Node => new NodePackSubcommandAction(_secretsManager).RunAsync(packOptions, Args),
                 WorkerRuntime.Powershell => new PowershellPackSubcommandAction().RunAsync(packOptions),
                 WorkerRuntime.Custom => new CustomPackSubcommandAction().RunAsync(packOptions),
+                WorkerRuntime.Go => new GoPackSubcommandAction().RunAsync(packOptions),
                 _ => throw new CliException($"Unsupported runtime: {runtime}")
             });
     }

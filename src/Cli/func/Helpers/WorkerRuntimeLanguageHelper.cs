@@ -38,10 +38,10 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Dotnet, new[] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.Node, new[] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.Python, new[] { "py" } },
+            { WorkerRuntime.Go, new[] { "golang" } },
             { WorkerRuntime.Java, new string[] { } },
             { WorkerRuntime.Powershell, new[] { "pwsh" } },
             { WorkerRuntime.Custom, new string[] { } },
-            { WorkerRuntime.Go, new[] { "golang" } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
@@ -193,8 +193,32 @@ namespace Azure.Functions.Cli.Helpers
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
-            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
-                          ?? secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            string setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+
+            if (string.IsNullOrWhiteSpace(setting))
+            {
+                // SecretsManager.GetSecrets throws CliException when there is no project root
+                // (e.g. 'func pack' invoked from a parent directory before cwd is changed).
+                // Treat that as "no setting found" so callers can decide what to do.
+                try
+                {
+                    setting = secretsManager?.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+                }
+                catch (CliException)
+                {
+                    return WorkerRuntime.None;
+                }
+            }
+
+            // The Functions host registers some workers under the literal "native" language
+            // identifier (see workers/native/worker.config.json). Map "native" back to a
+            // concrete WorkerRuntime using well-known project markers in the current directory.
+            // Throws CliException with an actionable message when the setting is "native" but
+            // no supported marker is found — callers that want a silent None should catch.
+            if (string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
+            {
+                return ResolveNativeFromProjectMarkers();
+            }
 
             try
             {
@@ -224,6 +248,37 @@ namespace Azure.Functions.Cli.Helpers
                 .WriteLine(WarningColor($"Worker runtime '{runtimeMoniker}' has been set in '{SecretsManager.AppSettingsFilePath}'."));
 
             return workerRuntime;
+        }
+
+        /// <summary>
+        /// Maps <c>FUNCTIONS_WORKER_RUNTIME=native</c> to a concrete <see cref="WorkerRuntime"/>
+        /// by inspecting well-known project-marker files in the current directory. Throws
+        /// <see cref="CliException"/> when no supported marker is found.
+        /// </summary>
+        /// <remarks>
+        /// Marker -> runtime:
+        /// <list type="bullet">
+        ///   <item><c>go.mod</c> → <see cref="WorkerRuntime.Go"/></item>
+        /// </list>
+        /// Add new native languages here as they are introduced. Invoked exclusively from
+        /// <see cref="GetCurrentWorkerRuntimeLanguage"/> so callers never have to special-case
+        /// the "native" literal.
+        /// </remarks>
+        private static WorkerRuntime ResolveNativeFromProjectMarkers()
+        {
+            if (FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, GoHelpers.GoModFileName)))
+            {
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found)."));
+                }
+
+                return WorkerRuntime.Go;
+            }
+
+            throw new CliException(
+                $"FUNCTIONS_WORKER_RUNTIME is set to 'native' but no supported project marker was found in '{Environment.CurrentDirectory}'. " +
+                "Run 'func init' to initialize a supported function app in this directory.");
         }
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)

@@ -21,8 +21,8 @@ jobs:
 
   - task: GoTool@0
     inputs:
-      version: '1.21'
-    displayName: 'Install Go'
+      version: '1.24.2'
+    displayName: 'Install Go 1.24.2'
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
