@@ -133,5 +133,37 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             var ex = await Assert.ThrowsAsync<CliException>(() => action.RunAsync());
             ex.Message.Should().NotContain("Unable to determine the worker runtime");
         }
+
+        [Fact]
+        public async Task RunAsync_NativeRuntimeWithGoMod_ResolvesToGoAndDoesNotThrowRuntimeError()
+        {
+            // Regression: FUNCTIONS_WORKER_RUNTIME=native + go.mod should resolve to Go.
+            // GetCurrentWorkerRuntimeLanguage handles "native" by inspecting project markers,
+            // so the runtime detection path must NOT surface "Unable to determine the worker
+            // runtime" for a valid Go workspace.
+            _mockSecretsManager
+                .Setup(s => s.GetSecrets(It.IsAny<bool>()))
+                .Returns(new Dictionary<string, string>
+                {
+                    [Constants.FunctionsWorkerRuntime] = "native"
+                });
+            File.WriteAllText(Path.Combine(_tempDir, "go.mod"), "module example.com/test\n");
+            Environment.CurrentDirectory = _tempDir;
+            var action = new FuncPackAction(_mockSecretsManager.Object);
+
+            // Act & Assert: must NOT throw the "Unable to determine" CliException.
+            // Packing may still fail later (no Go binary to pack), but that's a different error.
+            Exception thrownException = null;
+            try
+            {
+                await action.RunAsync();
+            }
+            catch (Exception ex)
+            {
+                thrownException = ex;
+            }
+
+            thrownException?.Message.Should().NotContain("Unable to determine the worker runtime");
+        }
     }
 }

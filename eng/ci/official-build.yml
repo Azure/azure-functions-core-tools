@@ -37,6 +37,13 @@ variables:
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
   parameters:
+    # Route 'go' CLI traffic through the centralized internal Go module proxy
+    # so GoZipTool builds can resolve modules in network-isolated CI agents.
+    # See https://aka.ms/goproxy_for_how_to_onboard
+    featureFlags:
+      golang:
+        internalModuleProxy:
+          enabled: true
     pool:
       name: 1es-pool-azfunc
       image: 1es-windows-2022

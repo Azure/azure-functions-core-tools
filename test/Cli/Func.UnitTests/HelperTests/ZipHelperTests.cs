@@ -214,5 +214,45 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         {
             _output.WriteLine(output);
         }
+
+        [Fact]
+        public async Task GetAppZipFile_GoRuntime_ContainsOnlyHostJsonAndApp()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
+
+            var previousRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "host.json"), "{}");
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName), new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F', 2, 1 });
+
+                // Files that must NOT be picked up — Go uses an explicit allowlist, not funcignore.
+                File.WriteAllText(Path.Combine(dir, "main.go"), "package main\nfunc main() {}\n");
+                File.WriteAllText(Path.Combine(dir, "go.mod"), "module example.com/test\n");
+                File.WriteAllText(Path.Combine(dir, "local.settings.json"), "{}");
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
+
+                var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: false);
+
+                Assert.NotNull(stream);
+                using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+                var entries = archive.Entries.Select(e => e.FullName).OrderBy(n => n).ToArray();
+
+                Assert.Equal(new[] { "app", "host.json" }, entries);
+
+                // Verify Unix exec bit on the binary — without this, the Linux Functions
+                // host won't be able to launch the extracted binary.
+                var appEntry = archive.Entries.Single(e => e.FullName == "app");
+                Assert.Equal(0x49, (appEntry.ExternalAttributes >> 16) & 0x49);
+            }
+            finally
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previousRuntime;
+                Directory.Delete(dir, recursive: true);
+            }
+        }
     }
 }
