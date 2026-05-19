@@ -2,8 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Common;
 using NSubstitute;
 using Xunit;
 
@@ -77,8 +75,8 @@ public class DotNetProjectInitializerTests
         DotNetProjectInitializer initializer = CreateInitializer();
 
         string hivePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "azure-functions-core-tools",
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".azure-functions",
             "dotnet-template-hive");
         string timestampPath = Path.Combine(hivePath, ".installed");
         if (File.Exists(timestampPath))
@@ -99,8 +97,8 @@ public class DotNetProjectInitializerTests
     public async Task EnsureTemplatesInstalledAsync_SkipsInstallWhenTimestampIsFresh()
     {
         string hivePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "azure-functions-core-tools",
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".azure-functions",
             "dotnet-template-hive");
         string timestampPath = Path.Combine(hivePath, ".installed");
 

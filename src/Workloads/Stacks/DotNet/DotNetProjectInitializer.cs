@@ -19,7 +19,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
     internal const string TemplateShortName = "func";
     internal const string DefaultFramework = "net10.0";
 
-    internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(7);
+    internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(30);
 
     private static readonly string _hivePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
