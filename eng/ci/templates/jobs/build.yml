@@ -73,7 +73,7 @@ jobs:
         parameters:
           displayName: Sign assemblies
           minimatch: true
-          signType: dll-strong-name
+          signType: dll
           folderPath: out/bin
           pattern: |
             **/Azure.Functions.Cli*.dll
