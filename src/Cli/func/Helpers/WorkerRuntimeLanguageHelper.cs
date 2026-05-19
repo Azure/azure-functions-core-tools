@@ -193,6 +193,19 @@ namespace Azure.Functions.Cli.Helpers
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
+            // Preview opt-in: FUNCTIONS_CLI_GO_PREVIEW lets a project declare itself as Go
+            // without forcing the resolver to scan the working directory for go.mod. Env var
+            // wins; local.settings.json is the secondary source. See TryResolveGoPreviewFlag.
+            if (TryResolveGoPreviewFlag(secretsManager, refreshSecrets))
+            {
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving worker runtime to 'go' ({Constants.FunctionsCliGoPreview} is set)."));
+                }
+
+                return WorkerRuntime.Go;
+            }
+
             string setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
 
             if (string.IsNullOrWhiteSpace(setting))
@@ -258,11 +271,13 @@ namespace Azure.Functions.Cli.Helpers
         /// <remarks>
         /// Marker -> runtime:
         /// <list type="bullet">
-        ///   <item><c>go.mod</c> → <see cref="WorkerRuntime.Go"/></item>
+        ///   <item><c>go.mod</c> -> <see cref="WorkerRuntime.Go"/></item>
         /// </list>
         /// Add new native languages here as they are introduced. Invoked exclusively from
         /// <see cref="GetCurrentWorkerRuntimeLanguage"/> so callers never have to special-case
-        /// the "native" literal.
+        /// the "native" literal. Preferred path is the explicit <see cref="Constants.FunctionsCliGoPreview"/>
+        /// opt-in checked earlier in the resolver; this fallback exists for projects that
+        /// predate the flag.
         /// </remarks>
         private static WorkerRuntime ResolveNativeFromProjectMarkers()
         {
@@ -270,7 +285,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (GlobalCoreToolsSettings.IsVerbose)
                 {
-                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found)."));
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found; consider setting {Constants.FunctionsCliGoPreview}=true in local.settings.json)."));
                 }
 
                 return WorkerRuntime.Go;
@@ -278,7 +293,43 @@ namespace Azure.Functions.Cli.Helpers
 
             throw new CliException(
                 $"FUNCTIONS_WORKER_RUNTIME is set to 'native' but no supported project marker was found in '{Environment.CurrentDirectory}'. " +
-                "Run 'func init' to initialize a supported function app in this directory.");
+                $"Set '{Constants.FunctionsCliGoPreview}=true' in local.settings.json, or run 'func init' to initialize a supported function app in this directory.");
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when the Go preview flag is set to a truthy value either in the
+        /// process environment or in <c>local.settings.json</c>. Env var wins; local.settings.json
+        /// access failures (e.g. command run from outside a project root) are treated as "not set".
+        /// </summary>
+        private static bool TryResolveGoPreviewFlag(ISecretsManager secretsManager, bool refreshSecrets = false)
+        {
+            if (EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCliGoPreview))
+            {
+                return true;
+            }
+
+            if (secretsManager is null)
+            {
+                return false;
+            }
+
+            string fromSettings;
+            try
+            {
+                fromSettings = secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsCliGoPreview, StringComparison.OrdinalIgnoreCase)).Value;
+            }
+            catch (CliException)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(fromSettings))
+            {
+                return false;
+            }
+
+            return fromSettings.Equals("1", StringComparison.Ordinal)
+                || fromSettings.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
