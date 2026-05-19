@@ -26,4 +26,4 @@ extends:
   template: ci/code-mirror.yml@eng
   parameters:
     ${{ if parameters.force }}:
-       extraPushArgs: --force-with-lease
+       extraPushArgs: --force
