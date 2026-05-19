@@ -12,7 +12,7 @@
 
   <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->
   <ItemGroup>
-    <ProjectReference Include="../Workloads.Tests.Fixtures.*/Workloads.Tests.Fixtures.*.csproj">
+    <ProjectReference Include="../Fixtures/Workloads.Tests.Fixtures.*/Workloads.Tests.Fixtures.*.csproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <OutputItemType>Content</OutputItemType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -56,7 +56,7 @@
          The Sdk fixture's workload.json is intentionally not staged here: only one
          can live at the root, and the WorkloadMetadataReader fixture test pins the
          Default values. -->
-    <Copy SourceFiles="$(TestRoot)Workloads.Tests.Fixtures.Default/workload.json"
+    <Copy SourceFiles="$(TestRoot)Fixtures/Workloads.Tests.Fixtures.Default/workload.json"
           DestinationFiles="$(OutDir)workload.json"
           SkipUnchangedFiles="true" />
   </Target>
