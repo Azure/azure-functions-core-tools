@@ -7,7 +7,9 @@ namespace Azure.Functions.Cli.Workloads.ExtensionBundles;
 
 /// <summary>
 /// Entry point for the extension bundles workload. Resolves bundle payloads
-/// for <c>func start</c> and owns the on-disk bundle cache.
+/// for the func CLI and owns the on-disk bundle cache. Today's primary
+/// consumer is <c>func start</c>; the contribution point is open to other
+/// commands.
 /// </summary>
 /// <remarks>
 /// Scaffolding only in this release. <see cref="Configure"/> registers no
@@ -21,7 +23,7 @@ internal sealed class ExtensionBundlesWorkload : Workload
     public override string DisplayName => "Extension Bundles";
 
     public override string Description =>
-        "Resolves and caches Azure Functions extension bundles for func start.";
+        "Resolves and caches Azure Functions extension bundles for the func CLI.";
 
     public override void Configure(FunctionsCliBuilder builder)
     {

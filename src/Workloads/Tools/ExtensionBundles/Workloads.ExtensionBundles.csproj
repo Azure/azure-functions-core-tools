@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Title>Extension Bundles</Title>
-    <Description>Resolves and caches Azure Functions extension bundles for func start.</Description>
+    <Description>Resolves and caches Azure Functions extension bundles for the func CLI.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:bundles func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>

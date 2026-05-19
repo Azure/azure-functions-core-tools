@@ -1,8 +1,10 @@
 # Azure Functions CLI – Extension Bundles workload
 
-This workload resolves Azure Functions extension bundles for `func start` and
-owns the on-disk bundle payload cache. It is the single acquisition mechanism
-for extension bundles in v5.
+This workload resolves Azure Functions extension bundles for the `func` CLI
+and owns the on-disk bundle payload cache. It is the single bundle
+acquisition mechanism in v5. Today's primary consumer is `func start`; the
+contribution point is open to any other command that needs a resolved bundle
+path.
 
 ## Install
 
