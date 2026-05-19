@@ -29,14 +29,16 @@ jobs:
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
-    - output: pipelineArtifact
-      displayName: Publish Packages
-      path: $(pack_dir)
-      artifact: drop_packages
-    - output: pipelineArtifact
-      displayName: Publish CLI
-      path: $(publish_dir)
-      artifact: drop_cli
+    - ${{ if containsValue(parameters.artifacts, 'pack') }}:
+      - output: pipelineArtifact
+        displayName: Publish Packages
+        path: $(pack_dir)
+        artifact: drop_packages
+    - ${{ if containsValue(parameters.artifacts, 'publish') }}:
+      - output: pipelineArtifact
+        displayName: Publish CLI
+        path: $(publish_dir)
+        artifact: drop_cli
 
   steps:
     - template: /eng/ci/templates/steps/setup-dependencies.yml@self

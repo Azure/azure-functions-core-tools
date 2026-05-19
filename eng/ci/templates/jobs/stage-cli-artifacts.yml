@@ -39,7 +39,7 @@ jobs:
       - task: 1ES.PublishUniversalPackages@1
         displayName: Publish CLI (${{ runtime }})
         inputs:
-          publishDirectory: $(artifact_stage_path)/${{ runtime }}
+          publishDirectory: $(drop_path)/${{ runtime }}
           feedsToUsePublish: internal
           vstsFeedPublish: public/pre-release
           vstsFeedPackagePublish: func-cli-${{ runtime }}
