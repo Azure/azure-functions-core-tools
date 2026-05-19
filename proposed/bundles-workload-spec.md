@@ -190,21 +190,43 @@ read with no code changes.
 
 ### 5.3 Payload acquisition
 
-The bundles workload acquires bundle payloads from the bundle CDN in
-two situations:
+The bundles workload acquires bundle payloads from one of three
+sources:
 
-1. **Eagerly**, when the workload subsystem gains a post-install /
-   first-run hook. The Workload Spec does not define one today (see
-   Workload Spec §12 #5, an open question). If/when such a hook is
-   added, the bundles workload uses it to populate the bundles home
-   with a **default payload set** (e.g. the latest stable bundle id +
-   version known to the workload manifest at publish time).
-2. **On demand at `func start`**, used unconditionally in v1 because
-   no post-install hook exists. Also used in the future as a fallback
-   whenever a project requires a version that wasn't in the
-   eagerly-populated default set (e.g. a profile-pinned older
-   version, or a brand-new version published after the workload's
-   default set was curated).
+1. **In-package, at workload build time.** The bundles workload's
+   own `.csproj` uses the MSBuild `DownloadFile` task to fetch a
+   curated set of **stable** bundle payloads from the bundle CDN at
+   workload-build time and packs them into the workload `.nupkg`
+   under e.g. `tools/any/bundles/<bundle-id>/<bundle-version>/`.
+   On workload install, these payloads are copied (or hard-linked)
+   into the bundles home. This is the **preferred** path for stable
+   bundles because it gives every fresh workload install a usable
+   offline-resolvable payload set with no post-install hook required
+   and no first-run network hit. The trade-off is workload package
+   size; the curated set should be small (e.g. the latest stable
+   `Microsoft.Azure.Functions.ExtensionBundle` major + minor).
+2. **Eagerly, via a post-install / first-run hook.** The Workload
+   Spec does not define such a hook today (see Workload Spec §12 #5,
+   an open question). If/when one is added, the bundles workload may
+   use it to grow the default payload set without rebuilding the
+   workload itself.
+3. **On demand at `func start`.** Used whenever a project requires a
+   version that isn't already in the bundles home (e.g. a
+   profile-pinned older version, a brand-new stable version
+   published after the workload was packaged, or any **preview /
+   experimental** bundle id such as
+   `Microsoft.Azure.Functions.ExtensionBundle.Preview`). Preview /
+   experimental payloads are explicitly **not** shipped inside the
+   workload package so that:
+   - workload package size doesn't churn with every preview drop,
+     and
+   - opting into a preview bundle is always an explicit network
+     event with a log line, never a silent "you already had it
+     locally" because the workload happened to ship it.
+
+In other words: the workload package eagerly carries **stable**
+bundle payloads it was built against; **preview / experimental**
+bundles are CDN-on-demand only.
 
 On-demand fetch at `func start`:
 
@@ -285,7 +307,7 @@ single `bundle-resolve` event:
 | `resolvedVersion` | Selected bundle version, or `null` on failure |
 | `profileName` | Active profile name, or `null` if no profile |
 | `succeeded` | `true` if the host was launched with a resolved bundle |
-| `reason` | `ok-cached` \| `ok-downloaded` \| `no-host-json-bundle` \| `workload-missing` \| `empty-intersection` \| `download-failed` |
+| `reason` | `ok-in-package` \| `ok-cached` \| `ok-downloaded` \| `no-host-json-bundle` \| `workload-missing` \| `empty-intersection` \| `download-failed` |
 
 Workload install / update / uninstall telemetry is covered by the
 generic workload subsystem (Workload Spec §11); this spec adds none
@@ -321,10 +343,11 @@ there.
    (`func bundles install <version>`), so users can prefetch
    bundles for offline scenarios without waiting for the on-demand
    path at `func start`?
-2. If the workload subsystem grows a post-install hook (Workload
-   Spec §12 #5), what is the default payload set policy on a fresh
-   install? Latest stable for both `ExtensionBundle` and
-   `ExtensionBundle.Preview`, or only the non-preview id?
+2. **In-package curated set policy.** Which stable bundle versions
+   ship inside the workload `.nupkg` via `DownloadFile` at workload
+   build time? Latest stable major.minor only, or latest two minors,
+   or every minor in a supported range? This trades workload package
+   size against how often a fresh install needs an on-demand fetch.
 3. Should the workload retain old payloads on update, or prune them?
    If prune, what's the retention policy (last N versions, anything
    referenced by an installed profile, etc.)?
