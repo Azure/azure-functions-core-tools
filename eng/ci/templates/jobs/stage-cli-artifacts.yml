@@ -34,13 +34,15 @@ jobs:
         **/*
         !**/*.pdb
 
-    outputs:
+    steps:
     - ${{ each runtime in parameters.runtimes }}:
-      - output: universalPackages
-        publishDirectory: $(artifact_stage_path)/${{ runtime }}
-        feedsToUsePublish: internal
-        vstsFeedPublish: public/pre-release
-        vstsFeedPackagePublish: func-cli-${{ runtime }}
-        versionOption: custom
-        versionPublish: $(Build.BuildNumber)
-        packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'
+      - task: 1ES.PublishUniversalPackages@1
+        displayName: Publish CLI (${{ runtime }})
+        inputs:
+          publishDirectory: $(artifact_stage_path)/${{ runtime }}
+          feedsToUsePublish: internal
+          vstsFeedPublish: public/pre-release
+          vstsFeedPackagePublish: func-cli-${{ runtime }}
+          versionOption: custom
+          versionPublish: $(Build.BuildNumber)
+          packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'
