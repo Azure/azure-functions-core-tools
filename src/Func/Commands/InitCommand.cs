@@ -2,7 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Text.Json;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
@@ -108,7 +110,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         // Refuse to overwrite an existing Functions project. Either host.json
         // or .func/config.json being present is enough to count: both are
-        // host-owned skeleton files we'd otherwise rewrite. --force opts in
+        // Functions project skeleton files we'd otherwise rewrite. --force opts in
         // to a re-init.
         if (!force && IsAlreadyInitialized(workingDirectory.Info, out string existingFile))
         {
@@ -124,7 +126,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // when no initializer runs. Workload initializers layer their files
         // on top after this point.
         WriteHostJson(workingDirectory.Info, force);
-        WriteFuncProjectConfig(workingDirectory.Info, selection.Initializer?.Stack, language, force);
+        WriteCliConfigurationFile(workingDirectory.Info, selection.Initializer?.Stack, language, force);
         _interaction.WriteBlankLine();
 
         if (selection.Initializer is null)
@@ -185,10 +187,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return true;
         }
 
-        string config = Path.Combine(workingDirectory.FullName, ".func", "config.json");
+        string config = Path.Combine(
+            workingDirectory.FullName,
+            CliConfigurationNames.ProjectConfigFolderName,
+            CliConfigurationNames.ConfigFileName);
         if (File.Exists(config))
         {
-            existingFile = Path.Combine(".func", "config.json");
+            existingFile = Path.GetRelativePath(workingDirectory.FullName, config);
             return true;
         }
 
@@ -228,10 +233,10 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
     }
 
-    private void WriteFuncProjectConfig(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
+    private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
     {
-        string folder = Path.Combine(workingDirectory.FullName, ".func");
-        string path = Path.Combine(folder, "config.json");
+        string folder = Path.Combine(workingDirectory.FullName, CliConfigurationNames.ProjectConfigFolderName);
+        string path = Path.Combine(folder, CliConfigurationNames.ConfigFileName);
 
         // Treat an existing file as user-owned unless --force was passed.
         if (File.Exists(path) && !force)
@@ -243,25 +248,32 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         {
             Directory.CreateDirectory(folder);
 
-            var payload = new Dictionary<string, string>(StringComparer.Ordinal);
+            var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
             if (!string.IsNullOrWhiteSpace(stack))
             {
-                payload["stack"] = stack;
+                stackConfig[nameof(StackOptions.Runtime)] = stack;
             }
             if (!string.IsNullOrWhiteSpace(language))
             {
-                payload["language"] = language;
+                stackConfig[nameof(StackOptions.Language)] = language;
             }
 
-            string json = System.Text.Json.JsonSerializer.Serialize(payload, new System.Text.Json.JsonSerializerOptions
+            var payload = new Dictionary<string, object>(StringComparer.Ordinal);
+            if (stackConfig.Count > 0)
+            {
+                payload[StackOptions.SectionName] = stackConfig;
+            }
+
+            string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
             {
                 WriteIndented = true,
             });
+
             File.WriteAllText(path, json + Environment.NewLine);
 
             _interaction.WriteLine(l => l
                 .Muted("· Wrote ")
-                .Code(Path.Combine(".func", "config.json"))
+                .Code(Path.Combine(CliConfigurationNames.ProjectConfigFolderName, CliConfigurationNames.ConfigFileName))
                 .Muted("."));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

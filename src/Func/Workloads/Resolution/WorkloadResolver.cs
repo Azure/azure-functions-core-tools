@@ -1,7 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Workloads.Resolution;
 
@@ -13,14 +16,12 @@ namespace Azure.Functions.Cli.Workloads.Resolution;
 internal sealed class WorkloadResolver(
     IWorkloadProvider workloads,
     IEnumerable<WorkloadProjectResolverContribution> resolvers,
-    ILocalSettingsReader localSettings,
-    IFuncProjectConfigReader projectConfig) : IWorkloadResolver
+    IOptionsMonitor<StackOptions> stackOptions) : IWorkloadResolver
 {
     private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
     private readonly IReadOnlyList<WorkloadProjectResolverContribution> _resolvers =
         (resolvers ?? throw new ArgumentNullException(nameof(resolvers))).ToList();
-    private readonly ILocalSettingsReader _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
-    private readonly IFuncProjectConfigReader _projectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
+    private readonly IOptionsMonitor<StackOptions> _stackOptions = stackOptions ?? throw new ArgumentNullException(nameof(stackOptions));
 
     public async Task<WorkloadResolution> ResolveAsync(WorkloadResolutionContext context, CancellationToken cancellationToken)
     {
@@ -43,17 +44,6 @@ internal sealed class WorkloadResolver(
                 $"Installed: {FormatInstalled(installed)}.");
         }
 
-        // 2. .func/config.json is treated as an explicit project-pinned
-        // declaration: it wins over both FUNCTIONS_WORKER_RUNTIME and
-        // resolver auto-detection. It also bypasses the host.json gate
-        // below — if the user has pinned a stack explicitly, we trust
-        // them and don't require host.json to also be present.
-        FuncProjectConfig? config = _projectConfig.Read(context.Directory);
-        if (!string.IsNullOrWhiteSpace(config?.Stack))
-        {
-            return ResolveBySelector(installed, config.Stack, $".func/config.json declares stack '{config.Stack}'");
-        }
-
         // CLI-wide invariant: a directory without host.json is not a
         // Functions project. Gate here so per-stack resolvers can focus
         // on their fingerprints and we surface one consistent diagnostic.
@@ -67,17 +57,23 @@ internal sealed class WorkloadResolver(
 
         IReadOnlyList<ResolverClaim> claims = await CollectClaimsAsync(context.Directory, cancellationToken);
 
-        // 3. FUNCTIONS_WORKER_RUNTIME, when set, is treated as an explicit
+        // 2. StackOptions.Runtime, including the projection from
+        // FUNCTIONS_WORKER_RUNTIME, is treated as an explicit
         // declaration: only claims with a matching WorkerRuntime count.
-        string? runtime = _localSettings.ReadWorkerRuntime(context.Directory);
+        string? runtime = GetStackOptions(context.Directory).Runtime;
         if (!string.IsNullOrWhiteSpace(runtime))
         {
             return ResolveByRuntime(installed, claims, runtime);
         }
 
-        // 4. Auto-detection from registered IProjectResolvers.
+        // 3. Auto-detection from registered IProjectResolvers.
         return ResolveByClaims(claims);
     }
+
+    private StackOptions GetStackOptions(DirectoryInfo projectDirectory)
+        => ProjectDirectoryResolver.IsProjectDirectory(projectDirectory)
+            ? _stackOptions.CurrentValue
+            : _stackOptions.Get(Path.GetFullPath(projectDirectory.FullName));
 
     private async Task<IReadOnlyList<ResolverClaim>> CollectClaimsAsync(DirectoryInfo directory, CancellationToken cancellationToken)
     {
@@ -135,9 +131,9 @@ internal sealed class WorkloadResolver(
         {
             1 => new WorkloadResolution.Resolved(
                 matches[0].Workload,
-                $"Selected by FUNCTIONS_WORKER_RUNTIME='{runtime}' in local.settings.json."),
+                $"Selected by configured worker runtime '{runtime}'."),
             0 => new WorkloadResolution.None(
-                $"local.settings.json declares FUNCTIONS_WORKER_RUNTIME='{runtime}' " +
+                $"Configuration declares worker runtime '{runtime}' " +
                 $"but no installed workload claims that runtime for this directory. " +
                 $"Installed: {FormatInstalled(installed)}. " +
                 $"Run 'func workload install <package>' to add a workload for '{runtime}', " +

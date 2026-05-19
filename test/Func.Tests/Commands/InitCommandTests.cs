@@ -79,7 +79,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_ScaffoldsFuncProjectConfig_OnSuccess()
+    public async Task InitCommand_ScaffoldsCliConfigurationFile_OnSuccess()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
 
@@ -95,8 +95,9 @@ public class InitCommandTests
             Assert.True(File.Exists(configPath), $"Expected .func/config.json at {configPath}.");
 
             using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
-            Assert.Equal("python", doc.RootElement.GetProperty("stack").GetString());
-            Assert.Equal("python", doc.RootElement.GetProperty("language").GetString());
+            JsonElement stack = doc.RootElement.GetProperty("Stack");
+            Assert.Equal("python", stack.GetProperty("Runtime").GetString());
+            Assert.Equal("python", stack.GetProperty("Language").GetString());
         }
         finally
         {
@@ -108,7 +109,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_DoesNotOverwriteExistingFuncProjectConfig()
+    public async Task InitCommand_DoesNotOverwriteExistingCliConfigurationFile()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
 
@@ -151,8 +152,9 @@ public class InitCommandTests
 
             string configPath = Path.Combine(newDir, ".func", "config.json");
             using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
-            Assert.Equal("dotnet", doc.RootElement.GetProperty("stack").GetString());
-            Assert.False(doc.RootElement.TryGetProperty("language", out _));
+            JsonElement stack = doc.RootElement.GetProperty("Stack");
+            Assert.Equal("dotnet", stack.GetProperty("Runtime").GetString());
+            Assert.False(stack.TryGetProperty("Language", out _));
         }
         finally
         {
@@ -406,19 +408,22 @@ public class InitCommandTests
         using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
         if (expectedStack is null)
         {
-            Assert.False(doc.RootElement.TryGetProperty("stack", out _));
+            Assert.False(doc.RootElement.TryGetProperty("Stack", out _));
         }
         else
         {
-            Assert.Equal(expectedStack, doc.RootElement.GetProperty("stack").GetString());
+            Assert.Equal(expectedStack, doc.RootElement.GetProperty("Stack").GetProperty("Runtime").GetString());
         }
         if (expectedLanguage is null)
         {
-            Assert.False(doc.RootElement.TryGetProperty("language", out _));
+            if (doc.RootElement.TryGetProperty("Stack", out JsonElement stack))
+            {
+                Assert.False(stack.TryGetProperty("Language", out _));
+            }
         }
         else
         {
-            Assert.Equal(expectedLanguage, doc.RootElement.GetProperty("language").GetString());
+            Assert.Equal(expectedLanguage, doc.RootElement.GetProperty("Stack").GetProperty("Language").GetString());
         }
     }
 
