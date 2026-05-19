@@ -2,8 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.ComponentModel.DataAnnotations;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Tests.Common;
 using Azure.Functions.Cli.Workloads.Storage;
 using Xunit;
 
@@ -12,45 +10,14 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 public class WorkloadPathsOptionsTests
 {
     [Fact]
-    public void Home_DefaultsToUserProfileAzureFunctions()
+    public void Home_DefaultsToEmpty()
     {
-        using var _ = new EnvironmentVariableScope(Constants.WorkloadsHomeEnvironmentVariable, null);
-
+        // Setup runs through DI; bare construction leaves Home empty so
+        // ValidateDataAnnotations catches a missing WorkloadPathsOptionsSetup
+        // registration on startup.
         var options = new WorkloadPathsOptions();
 
-        var expected = Path.GetFullPath(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName));
-        Assert.Equal(expected, options.Home);
-    }
-
-    [Fact]
-    public void Home_DefaultsToEnvironmentVariable_WhenExplicitlySet()
-    {
-        var overridden = Path.Combine(Path.GetTempPath(), "func-cli-home-override", Guid.NewGuid().ToString("N"));
-        using var _ = new EnvironmentVariableScope(Constants.WorkloadsHomeEnvironmentVariable, overridden);
-
-        var options = new WorkloadPathsOptions();
-
-        Assert.Equal(Path.GetFullPath(overridden), options.Home);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Home_IgnoresEnvironmentVariable_WhenEmptyOrWhitespace(string value)
-    {
-        // Empty/whitespace is treated as "not explicitly set" so the default
-        // user-profile path still wins; this mirrors how `Environment` exposes
-        // an unset variable.
-        using var _ = new EnvironmentVariableScope(Constants.WorkloadsHomeEnvironmentVariable, value);
-
-        var options = new WorkloadPathsOptions();
-
-        var expected = Path.GetFullPath(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName));
-        Assert.Equal(expected, options.Home);
+        Assert.Equal(string.Empty, options.Home);
     }
 
     [Theory]

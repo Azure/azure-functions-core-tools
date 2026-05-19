@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
@@ -47,6 +48,12 @@ internal static class CliHostFactory
         // OpenTelemetry pipeline) so flush + shutdown happen via host disposal.
         HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton(interaction);
+
+        // Registered as an instance so HostApplicationBuilderExtensions can
+        // resolve it from the descriptor list before the host is built (the
+        // same trick used for IInteractionService). Tests substitute by
+        // adding another instance registration after CreateBuilder.
+        builder.Services.AddSingleton<IEnvironmentVariables>(new SystemEnvironmentVariables());
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
         ILocalSettingsProvider localSettingsProvider = new LocalSettingsProvider();

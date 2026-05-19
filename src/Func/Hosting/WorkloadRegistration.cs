@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using System.Diagnostics;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
@@ -45,14 +46,17 @@ internal static class WorkloadRegistration
     /// <see cref="Workload.Configure"/> on each.
     /// </summary>
     /// <param name="services">The host's service collection. Workload-contributed services are added here.</param>
+    /// <param name="environment">Used to resolve the workload home from <c>FUNC_CLI_WORKLOADS_HOME</c>.</param>
     /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
     /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
     public static async Task RegisterWorkloadsAsync(
         IServiceCollection services,
+        IEnvironmentVariables environment,
         IInteractionService interaction,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(interaction);
 
         // The activity name doubles as the metric scope: WorkloadBootMetricListener
@@ -61,7 +65,7 @@ internal static class WorkloadRegistration
         using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
         try
         {
-            int loadedCount = await RegisterCoreAsync(services, interaction, cancellationToken);
+            int loadedCount = await RegisterCoreAsync(services, environment, interaction, cancellationToken);
             activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
         }
         catch (Exception ex)
@@ -73,14 +77,13 @@ internal static class WorkloadRegistration
 
     private static async Task<int> RegisterCoreAsync(
         IServiceCollection services,
+        IEnvironmentVariables environment,
         IInteractionService interaction,
         CancellationToken cancellationToken)
     {
-        // Home is resolved from the FUNC_CLI_WORKLOADS_HOME env var (when set)
-        // or the user-profile default. Other IConfiguration sources are
-        // intentionally not consulted: the workload root is a process-level
-        // concern, not a per-project setting.
-        var paths = new WorkloadPathsOptions();
+        // Resolve via the same setup the DI pipeline uses so the boot path
+        // and IOptions<WorkloadPathsOptions> agree on Home.
+        var paths = new WorkloadPathsOptions { Home = WorkloadPathsOptionsSetup.Resolve(environment) };
 
         var store = new WorkloadStore(paths);
         var loader = new WorkloadLoader(paths);
