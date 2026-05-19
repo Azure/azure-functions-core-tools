@@ -33,7 +33,7 @@ internal sealed class CliConfigurationSourceBuilder(ILocalSettingsProvider local
     {
         string home = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
+            SharedConstants.FuncHomeDirectoryName);
 
         return Path.Combine(home, CliConfigurationNames.ConfigFileName);
     }
