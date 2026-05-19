@@ -12,25 +12,21 @@ namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
 /// Wires the workload-storage subsystem (paths + manifest store + loader)
-/// into DI. Binds <see cref="WorkloadPathsOptions"/> from the
-/// <c>Workloads</c> configuration section so the
-/// <c>FUNC_CLI_Workloads__Home</c> env var (registered at host build) flows
-/// through, while tests can register their own options without touching
-/// process-global state.
+/// into DI. <see cref="WorkloadPathsOptions"/> is registered without binding
+/// to <see cref="Microsoft.Extensions.Configuration.IConfiguration"/>: the
+/// only supported override for <c>Home</c> is the
+/// <see cref="WorkloadPathsOptions.HomeEnvironmentVariable"/> env var,
+/// applied via the options default. Tests that need a different home call
+/// <see cref="OptionsServiceCollectionExtensions.Configure{TOptions}(IServiceCollection, Action{TOptions})"/>
+/// directly.
 /// </summary>
 internal static class WorkloadStorageRegistration
 {
-    /// <summary>
-    /// Configuration section name workload paths bind from.
-    /// </summary>
-    public const string ConfigurationSection = "Workloads";
-
     public static IServiceCollection AddWorkloadStorage(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddOptions<WorkloadPathsOptions>()
-            .BindConfiguration(ConfigurationSection)
             .ValidateDataAnnotations()
             .ValidateOnStart();
 

@@ -7,9 +7,11 @@ using Azure.Functions.Cli.Common;
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
-/// Configuration + computed filesystem layout for installed workloads.
-/// Bound from the <c>Workloads</c> configuration section at startup; the
-/// corresponding environment variable is <c>FUNC_CLI_Workloads__Home</c>.
+/// Computed filesystem layout for installed workloads. <see cref="Home"/>
+/// defaults to <c>~/.azure-functions</c> and can only be overridden by
+/// explicitly setting the <see cref="HomeEnvironmentVariable"/> environment
+/// variable. Other configuration sources (json files, local.settings, in-memory)
+/// are intentionally not honored so the workload root stays predictable.
 /// </summary>
 /// <remarks>
 /// Only <see cref="Home"/> is settable. Everything else is computed from it
@@ -23,12 +25,19 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     public const string WorkloadRegistryFileName = "workloads.json";
 
     /// <summary>
-    /// Root directory the func CLI persists workloads under. Defaults to
-    /// <c>~/.azure-functions</c>.
+    /// Environment variable that, when explicitly set to a non-empty value,
+    /// overrides the default workload home directory.
+    /// </summary>
+    public const string HomeEnvironmentVariable = "FUNC_CLI_Workloads__Home";
+
+    /// <summary>
+    /// Root directory the func CLI persists workloads under. Defaults to the
+    /// value of <see cref="HomeEnvironmentVariable"/> when explicitly set,
+    /// otherwise <c>~/.azure-functions</c>.
     /// </summary>
     [Required]
     [MinLength(1)]
-    public string Home { get; set; } = DefaultHome();
+    public string Home { get; set; } = ResolveDefaultHome();
 
     /// <inheritdoc />
     public string WorkloadsRoot => Path.Combine(Home, "workloads");
@@ -40,8 +49,22 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     public string GetInstallDirectory(string packageId, string version)
         => Path.Combine(WorkloadsRoot, packageId, version);
 
-    private static string DefaultHome()
-        => Path.Combine(
+    /// <summary>
+    /// Returns the env-var override if explicitly set to a non-empty value,
+    /// otherwise the default user-profile home. Centralised so callers that
+    /// run before DI (e.g. workload boot) resolve Home the same way as the
+    /// options pipeline.
+    /// </summary>
+    internal static string ResolveDefaultHome()
+    {
+        string? fromEnvironment = Environment.GetEnvironmentVariable(HomeEnvironmentVariable);
+        if (!string.IsNullOrEmpty(fromEnvironment))
+        {
+            return fromEnvironment;
+        }
+
+        return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             Constants.FuncHomeDirectoryName);
+    }
 }

@@ -72,8 +72,11 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
         }
 
-        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting, so
-        // FUNC_CLI_Workloads__Home binds to WorkloadPathsOptions.Home.
+        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting.
+        // Note: WorkloadPathsOptions.Home is intentionally NOT bound from here;
+        // it is sourced exclusively from the FUNC_CLI_Workloads__Home env var
+        // (see WorkloadPathsOptions) so the workload root cannot be redirected
+        // by host.json, local.settings.json, or any other config layer.
         configurationSourceBuilder.AddSources(builder.Configuration, workingDirectory);
         builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();

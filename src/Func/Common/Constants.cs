@@ -34,7 +34,10 @@ internal static class Constants
 
     /// <summary>
     /// Prefix for environment variables that bind into <c>IConfiguration</c>.
-    /// e.g. <c>FUNC_CLI_Workloads__Home</c> binds <c>Workloads:Home</c>.
+    /// e.g. <c>FUNC_CLI_Workloads__Catalog__Source</c> binds
+    /// <c>Workloads:Catalog:Source</c>. Note that <c>FUNC_CLI_Workloads__Home</c>
+    /// is read directly by <see cref="Workloads.Storage.WorkloadPathsOptions"/>
+    /// rather than through <c>IConfiguration</c>.
     /// </summary>
     public const string EnvironmentVariablePrefix = "FUNC_CLI_";
 

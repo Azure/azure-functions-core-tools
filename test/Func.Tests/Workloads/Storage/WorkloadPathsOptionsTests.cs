@@ -13,12 +13,62 @@ public class WorkloadPathsOptionsTests
     [Fact]
     public void Home_DefaultsToUserProfileAzureFunctions()
     {
-        var options = new WorkloadPathsOptions();
+        string? previous = Environment.GetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable);
+        Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, null);
+        try
+        {
+            var options = new WorkloadPathsOptions();
 
-        var expected = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
-        Assert.Equal(expected, options.Home);
+            var expected = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Constants.FuncHomeDirectoryName);
+            Assert.Equal(expected, options.Home);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, previous);
+        }
+    }
+
+    [Fact]
+    public void Home_DefaultsToEnvironmentVariable_WhenExplicitlySet()
+    {
+        string? previous = Environment.GetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable);
+        var overridden = Path.Combine(Path.GetTempPath(), "func-cli-home-override", Guid.NewGuid().ToString("N"));
+        Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, overridden);
+        try
+        {
+            var options = new WorkloadPathsOptions();
+
+            Assert.Equal(overridden, options.Home);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, previous);
+        }
+    }
+
+    [Fact]
+    public void Home_IgnoresEnvironmentVariable_WhenSetToEmpty()
+    {
+        // An empty value is treated as "not explicitly set" so the default
+        // user-profile path still wins; this mirrors how `Environment` exposes
+        // an unset variable.
+        string? previous = Environment.GetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable);
+        Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, string.Empty);
+        try
+        {
+            var options = new WorkloadPathsOptions();
+
+            var expected = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Constants.FuncHomeDirectoryName);
+            Assert.Equal(expected, options.Home);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, previous);
+        }
     }
 
     [Theory]

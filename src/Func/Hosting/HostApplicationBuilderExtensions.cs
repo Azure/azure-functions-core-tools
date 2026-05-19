@@ -36,7 +36,6 @@ internal static class HostApplicationBuilderExtensions
         IInteractionService interaction = ResolveInteractionService(builder);
         return WorkloadRegistration.RegisterWorkloadsAsync(
             builder.Services,
-            builder.Configuration,
             interaction,
             cancellationToken);
     }

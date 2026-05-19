@@ -5,7 +5,6 @@ using System.Text.Json;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
@@ -14,10 +13,10 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 
 /// <summary>
 /// Integration tests for the host-startup wiring: build the same host
-/// production uses, point it at a temp <c>Workloads:Home</c>, and assert the
-/// loaded workloads contributed (or failed to contribute) commands as
-/// expected. Each test sets up its own temp directory with the on-disk
-/// layout the loader expects:
+/// production uses, point it at a temp workload home via the
+/// <c>FUNC_CLI_Workloads__Home</c> env var, and assert the loaded workloads
+/// contributed (or failed to contribute) commands as expected. Each test sets
+/// up its own temp directory with the on-disk layout the loader expects:
 /// <c>&lt;Home&gt;/workloads.json</c> + <c>&lt;Home&gt;/workloads/&lt;pkg&gt;/&lt;ver&gt;/tools/any/&lt;asm&gt;.dll</c>.
 /// </summary>
 public sealed class CliHostFactoryTests : IDisposable
@@ -27,9 +26,20 @@ public sealed class CliHostFactoryTests : IDisposable
     private const string ThrowingWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.ThrowingWorkload";
 
     private readonly string _home = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
+    private readonly string? _previousHomeEnvVar;
+
+    public CliHostFactoryTests()
+    {
+        // Workload Home is sourced exclusively from FUNC_CLI_Workloads__Home;
+        // capture and restore the prior value so test runs don't leak.
+        _previousHomeEnvVar = Environment.GetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable);
+        Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, _home);
+    }
 
     public void Dispose()
     {
+        Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, _previousHomeEnvVar);
+
         if (Directory.Exists(_home))
         {
             try
@@ -97,16 +107,12 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     /// <summary>
-    /// Mirrors the production boot sequence in Program.cs: build, point at
-    /// the temp home, register workloads, build, start.
+    /// Mirrors the production boot sequence in Program.cs: build, register
+    /// workloads (which reads the env-var-driven temp home), build, start.
     /// </summary>
     private async Task<IHost> StartHostAsync(TestInteractionService interaction)
     {
         HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Workloads:Home"] = _home,
-        });
 
         await builder.RegisterWorkloadsAsync();
         IHost host = builder.Build();
