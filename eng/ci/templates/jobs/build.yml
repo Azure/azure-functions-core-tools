@@ -4,12 +4,9 @@ parameters:
 - name: configuration
   type: string
   default: release
-- name: pack
-  type: boolean
-  default: true
-- name: publish
-  type: boolean
-  default: true
+- name: artifacts
+  type: object
+  default: ['pack', 'publish']
 - name: sign
   type: boolean
   default: false
@@ -32,14 +29,16 @@ jobs:
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
-    - output: pipelineArtifact
-      displayName: Publish Packages
-      path: $(pack_dir)
-      artifact: drop_packages
-    - output: pipelineArtifact
-      displayName: Publish CLI
-      path: $(publish_dir)
-      artifact: drop_cli
+    - ${{ if containsValue(parameters.artifacts, 'pack') }}:
+      - output: pipelineArtifact
+        displayName: Publish Packages
+        path: $(pack_dir)
+        artifact: drop_packages
+    - ${{ if containsValue(parameters.artifacts, 'publish') }}:
+      - output: pipelineArtifact
+        displayName: Publish CLI
+        path: $(publish_dir)
+        artifact: drop_cli
 
   steps:
     - template: /eng/ci/templates/steps/setup-dependencies.yml@self
@@ -79,7 +78,7 @@ jobs:
             !**/Azure.Functions.Cli*Test.dll
             !**/Azure.Functions.Cli*Tests.dll
 
-    - ${{ if eq(parameters.pack, true) }}:
+    - ${{ if containsValue(parameters.artifacts, 'pack') }}:
       - task: DotNetCoreCLI@2
         displayName: Pack
         inputs:
@@ -88,7 +87,7 @@ jobs:
           projects: ${{ parameters.projects }}
           arguments: -c ${{ parameters.configuration }} -v m -o $(pack_dir) --no-build ${{ parameters.build_args }}
 
-    - ${{ if eq(parameters.publish, true) }}:
+    - ${{ if containsValue(parameters.artifacts, 'publish') }}:
       - task: DotNetCoreCLI@2
         displayName: Publish All Runtimes
         inputs:
@@ -97,7 +96,7 @@ jobs:
           projects: ${{ parameters.projects }}
           arguments: -c ${{ parameters.configuration }} -v m --no-restore -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
 
-    - ${{ if and(eq(parameters.pack, true), eq(parameters.sign, true)) }}:
+    - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       - template: ci/sign-files.yml@eng
         parameters:
           displayName: Sign nuget packages
@@ -105,20 +104,20 @@ jobs:
           folderPath: $(pack_dir)
           pattern: '*.nupkg'
 
-    - ${{ if and(eq(parameters.publish, true), eq(parameters.sign, true)) }}:
-      - template: /eng/ci/templates/steps/sign-app.yml@eng
+    - ${{ if and(containsValue(parameters.artifacts, 'publish'), eq(parameters.sign, true)) }}:
+      - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: windows
           folderPath: $(publish_dir)
           signPatterns: '**/win-*/func'
 
-      - template: /eng/ci/templates/steps/sign-app.yml@eng
+      - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: linux
           folderPath: $(publish_dir)
           signPatterns: '**/linux-*/func'
 
-      - template: /eng/ci/templates/steps/sign-app.yml@eng
+      - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: macos
           folderPath: $(publish_dir)
