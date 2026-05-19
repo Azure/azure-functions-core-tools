@@ -14,6 +14,9 @@
     <Project Path="src/Workloads/Stacks/Node/Workloads.Node.csproj" />
     <Project Path="src/Workloads/Stacks/Python/Workloads.Python.csproj" />
   </Folder>
+  <Folder Name="/src/Workloads/Tools/">
+    <Project Path="src/Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj" />
+  </Folder>
   <Folder Name="/test/">
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
     <Project Path="test/Workloads.Tests.Fixtures.Default/Workloads.Tests.Fixtures.Default.csproj" />
@@ -25,5 +28,8 @@
     <Project Path="test/Workloads/Stacks/Go.Tests/Workloads.Go.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Python.Tests/Workloads.Python.Tests.csproj" />
+  </Folder>
+  <Folder Name="/test/Workloads/Tools/">
+    <Project Path="test/Workloads/Tools/ExtensionBundles.Tests/Workloads.ExtensionBundles.Tests.csproj" />
   </Folder>
 </Solution>
