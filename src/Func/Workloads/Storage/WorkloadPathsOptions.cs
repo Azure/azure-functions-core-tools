@@ -28,7 +28,7 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     /// Environment variable that, when explicitly set to a non-empty value,
     /// overrides the default workload home directory.
     /// </summary>
-    public const string HomeEnvironmentVariable = "FUNC_CLI_Workloads__Home";
+    public const string HomeEnvironmentVariable = "FUNC_CLI_WORKLOADS_HOME";
 
     /// <summary>
     /// Root directory the func CLI persists workloads under. Defaults to the

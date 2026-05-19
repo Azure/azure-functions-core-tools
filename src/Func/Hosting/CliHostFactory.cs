@@ -74,7 +74,7 @@ internal static class CliHostFactory
 
         // FUNC_CLI_ prefix is stripped and "__" maps to section nesting.
         // Note: WorkloadPathsOptions.Home is intentionally NOT bound from here;
-        // it is sourced exclusively from the FUNC_CLI_Workloads__Home env var
+        // it is sourced exclusively from the FUNC_CLI_WORKLOADS_HOME env var
         // (see WorkloadPathsOptions) so the workload root cannot be redirected
         // by host.json, local.settings.json, or any other config layer.
         configurationSourceBuilder.AddSources(builder.Configuration, workingDirectory);

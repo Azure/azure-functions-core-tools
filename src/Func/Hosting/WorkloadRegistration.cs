@@ -76,7 +76,7 @@ internal static class WorkloadRegistration
         IInteractionService interaction,
         CancellationToken cancellationToken)
     {
-        // Home is resolved from the FUNC_CLI_Workloads__Home env var (when set)
+        // Home is resolved from the FUNC_CLI_WORKLOADS_HOME env var (when set)
         // or the user-profile default. Other IConfiguration sources are
         // intentionally not consulted: the workload root is a process-level
         // concern, not a per-project setting.

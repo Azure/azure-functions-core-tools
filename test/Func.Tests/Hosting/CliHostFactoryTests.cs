@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 /// <summary>
 /// Integration tests for the host-startup wiring: build the same host
 /// production uses, point it at a temp workload home via the
-/// <c>FUNC_CLI_Workloads__Home</c> env var, and assert the loaded workloads
+/// <c>FUNC_CLI_WORKLOADS_HOME</c> env var, and assert the loaded workloads
 /// contributed (or failed to contribute) commands as expected. Each test sets
 /// up its own temp directory with the on-disk layout the loader expects:
 /// <c>&lt;Home&gt;/workloads.json</c> + <c>&lt;Home&gt;/workloads/&lt;pkg&gt;/&lt;ver&gt;/tools/any/&lt;asm&gt;.dll</c>.
@@ -30,7 +30,7 @@ public sealed class CliHostFactoryTests : IDisposable
 
     public CliHostFactoryTests()
     {
-        // Workload Home is sourced exclusively from FUNC_CLI_Workloads__Home;
+        // Workload Home is sourced exclusively from FUNC_CLI_WORKLOADS_HOME;
         // capture and restore the prior value so test runs don't leak.
         _previousHomeEnvVar = Environment.GetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable);
         Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, _home);

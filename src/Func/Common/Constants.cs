@@ -35,7 +35,7 @@ internal static class Constants
     /// <summary>
     /// Prefix for environment variables that bind into <c>IConfiguration</c>.
     /// e.g. <c>FUNC_CLI_Workloads__Catalog__Source</c> binds
-    /// <c>Workloads:Catalog:Source</c>. Note that <c>FUNC_CLI_Workloads__Home</c>
+    /// <c>Workloads:Catalog:Source</c>. Note that <c>FUNC_CLI_WORKLOADS_HOME</c>
     /// is read directly by <see cref="Workloads.Storage.WorkloadPathsOptions"/>
     /// rather than through <c>IConfiguration</c>.
     /// </summary>
