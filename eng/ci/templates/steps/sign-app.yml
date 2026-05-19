@@ -22,7 +22,7 @@ steps:
       inlineOperation: |
         [
           {
-            "keyCode": "${{ parameters.keyCode }}",
+            "keyCode": "CP-450779-Pgp",
             "operationSetCode": "LinuxSign",
             "parameters": [],
             "toolName": "sign",

@@ -40,7 +40,9 @@ extends:
         parameters:
           sign: true
           artifacts: ['publish']
-          projects: ${{ parameters.projects }}
+          projects: |
+            src/Func/Func.csproj
+            test/Func.Tests/Func.Tests.csproj
           build_args: -p:IsReleaseCI=true
 
     - stage: Release
