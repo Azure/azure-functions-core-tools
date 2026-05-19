@@ -2,9 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Tests.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
@@ -26,19 +29,19 @@ public sealed class CliHostFactoryTests : IDisposable
     private const string ThrowingWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.ThrowingWorkload";
 
     private readonly string _home = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
-    private readonly string? _previousHomeEnvVar;
+
+    // Workload Home is sourced exclusively from FUNC_CLI_WORKLOADS_HOME;
+    // capture and restore the prior value so test runs don't leak.
+    private readonly EnvironmentVariableScope _homeEnvVarScope;
 
     public CliHostFactoryTests()
     {
-        // Workload Home is sourced exclusively from FUNC_CLI_WORKLOADS_HOME;
-        // capture and restore the prior value so test runs don't leak.
-        _previousHomeEnvVar = Environment.GetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable);
-        Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, _home);
+        _homeEnvVarScope = new EnvironmentVariableScope(Constants.WorkloadsHomeEnvironmentVariable, _home);
     }
 
     public void Dispose()
     {
-        Environment.SetEnvironmentVariable(WorkloadPathsOptions.HomeEnvironmentVariable, _previousHomeEnvVar);
+        _homeEnvVarScope.Dispose();
 
         if (Directory.Exists(_home))
         {
@@ -104,6 +107,57 @@ public sealed class CliHostFactoryTests : IDisposable
         Assert.Empty(workloads);
         Assert.DoesNotContain(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         Assert.DoesNotContain(interaction.Lines, l => l.StartsWith("WARNING:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateHostAsync_IgnoresWorkloadsHomeFromIConfiguration()
+    {
+        // Stage a workload at the env-var-driven home so it should load.
+        StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);
+        WriteRegistry(("withcommand.fixture", "1.0.0", CommandWorkloadType));
+
+        // Point IConfiguration at a *different* directory. If the legacy
+        // Workloads:Home binding were still wired up, the loader would look
+        // here instead and the workload command would be missing.
+        var configHome = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(configHome);
+
+        try
+        {
+            var interaction = new TestInteractionService();
+            HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Workloads:Home"] = configHome,
+            });
+
+            await builder.RegisterWorkloadsAsync();
+            using IHost host = builder.Build();
+            await host.StartAsync();
+
+            var rootCommand = Parser.CreateCommand(host.Services);
+
+            // The env-var home wins: the staged workload's command is present.
+            Assert.Contains(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
+
+            // And the bound IWorkloadPaths reflects the env var, not IConfiguration.
+            var paths = host.Services.GetRequiredService<IWorkloadPaths>();
+            Assert.Equal(Path.GetFullPath(_home), paths.Home);
+        }
+        finally
+        {
+            if (Directory.Exists(configHome))
+            {
+                try
+                {
+                    Directory.Delete(configHome, recursive: true);
+                }
+                catch
+                {
+                    // Best-effort cleanup.
+                }
+            }
+        }
     }
 
     /// <summary>

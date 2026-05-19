@@ -9,9 +9,10 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// <summary>
 /// Computed filesystem layout for installed workloads. <see cref="Home"/>
 /// defaults to <c>~/.azure-functions</c> and can only be overridden by
-/// explicitly setting the <see cref="HomeEnvironmentVariable"/> environment
-/// variable. Other configuration sources (json files, local.settings, in-memory)
-/// are intentionally not honored so the workload root stays predictable.
+/// explicitly setting the <see cref="Constants.WorkloadsHomeEnvironmentVariable"/>
+/// environment variable. Other configuration sources (json files,
+/// local.settings, in-memory) are intentionally not honored so the workload
+/// root stays predictable.
 /// </summary>
 /// <remarks>
 /// Only <see cref="Home"/> is settable. Everything else is computed from it
@@ -25,19 +26,13 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     public const string WorkloadRegistryFileName = "workloads.json";
 
     /// <summary>
-    /// Environment variable that, when explicitly set to a non-empty value,
-    /// overrides the default workload home directory.
-    /// </summary>
-    public const string HomeEnvironmentVariable = "FUNC_CLI_WORKLOADS_HOME";
-
-    /// <summary>
     /// Root directory the func CLI persists workloads under. Defaults to the
-    /// value of <see cref="HomeEnvironmentVariable"/> when explicitly set,
-    /// otherwise <c>~/.azure-functions</c>.
+    /// value of <see cref="Constants.WorkloadsHomeEnvironmentVariable"/> when
+    /// explicitly set, otherwise <c>~/.azure-functions</c>.
     /// </summary>
     [Required]
     [MinLength(1)]
-    public string Home { get; set; } = ResolveDefaultHome();
+    public string Home { get; set; } = ResolveHome();
 
     /// <inheritdoc />
     public string WorkloadsRoot => Path.Combine(Home, "workloads");
@@ -50,21 +45,20 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
         => Path.Combine(WorkloadsRoot, packageId, version);
 
     /// <summary>
-    /// Returns the env-var override if explicitly set to a non-empty value,
-    /// otherwise the default user-profile home. Centralised so callers that
-    /// run before DI (e.g. workload boot) resolve Home the same way as the
-    /// options pipeline.
+    /// Returns the env-var override if explicitly set to a non-whitespace
+    /// value, otherwise the default user-profile home. Centralised so callers
+    /// that run before DI (e.g. workload boot) resolve Home the same way as
+    /// the options pipeline. The result is normalised via
+    /// <see cref="Path.GetFullPath(string)"/> so downstream string comparisons
+    /// are stable regardless of the input form.
     /// </summary>
-    internal static string ResolveDefaultHome()
+    internal static string ResolveHome()
     {
-        string? fromEnvironment = Environment.GetEnvironmentVariable(HomeEnvironmentVariable);
-        if (!string.IsNullOrEmpty(fromEnvironment))
-        {
-            return fromEnvironment;
-        }
+        string? configured = Environment.GetEnvironmentVariable(Constants.WorkloadsHomeEnvironmentVariable);
+        string home = string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Constants.FuncHomeDirectoryName)
+            : configured;
 
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
+        return Path.GetFullPath(home);
     }
 }
