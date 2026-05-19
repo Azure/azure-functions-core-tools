@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Workloads.Go;
 internal sealed class GoProjectInitializer : IProjectInitializer
 {
     private const string ModuleNamePlaceholder = "{ModuleName}";
-    private const string DefaultModuleName = "function-app";
+    private const string DefaultModuleName = "app";
     private static readonly Assembly _assembly = typeof(GoProjectInitializer).Assembly;
 
     // Internal seam so tests can stub out the `go mod tidy` invocation
