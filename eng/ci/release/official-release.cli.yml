@@ -51,7 +51,6 @@ extends:
       - job: Approval
         timeoutInMinutes: 1440
         pool: server
-        dependsOn: Build
 
         steps:
         - task: ManualValidation@1
