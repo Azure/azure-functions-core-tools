@@ -21,6 +21,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public static string ResolveOutputPath(string functionAppRoot, string outputPath)
         {
+            // Default behavior shared by non-Go runtimes: outputPath (when provided) is always
+            // treated as a directory; the produced archive is named after the function app folder.
+            // Go overrides this in GoPackSubcommandAction to also accept an explicit .zip file path.
             string resolvedPath;
             if (string.IsNullOrEmpty(outputPath))
             {
@@ -29,8 +32,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             else
             {
                 resolvedPath = Path.Combine(Environment.CurrentDirectory, outputPath);
-
-                // Create directory if it doesn't exist
                 Directory.CreateDirectory(resolvedPath);
                 resolvedPath = Path.Combine(resolvedPath, $"{Path.GetFileName(functionAppRoot)}");
             }

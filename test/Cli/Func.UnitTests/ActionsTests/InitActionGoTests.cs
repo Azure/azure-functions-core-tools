@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO.Abstractions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ConfigurationProfiles;
@@ -80,6 +81,113 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
             var resolved = ProgrammingModelHelper.ResolveProgrammingModel(null, WorkerRuntime.Go, string.Empty);
             resolved.Should().Be(ProgrammingModel.V1);
+        }
+
+        [Theory]
+        [InlineData("native")]
+        [InlineData("Native")]
+        [InlineData("NATIVE")]
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithGoMod_ResolvesToGo(string settingValue)
+        {
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsWorkerRuntime, settingValue },
+            });
+
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Is<string>(p => p.EndsWith("go.mod"))).Returns(true);
+
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
+
+                    resolved.Should().Be(WorkerRuntime.Go);
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+            }
+        }
+
+        [Fact]
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithoutGoMod_Throws()
+        {
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsWorkerRuntime, "native" },
+            });
+
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(false);
+
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            try
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    Action act = () => WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
+
+                    act.Should().Throw<CliException>().WithMessage("*native*");
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+            }
+        }
+
+        [Fact]
+        public void GetCurrentWorkerRuntimeLanguage_NonNativeSetting_NormalizesAndReturns()
+        {
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { Constants.FunctionsWorkerRuntime, "node" },
+            });
+
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+            try
+            {
+                var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
+
+                resolved.Should().Be(WorkerRuntime.Node);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+            }
+        }
+
+        [Theory]
+        [InlineData("--go")]
+        [InlineData("--golang")]
+        public void GlobalCoreToolsSettings_Init_GoShortcutFlag_SetsCurrentWorkerRuntimeToGo(string flag)
+        {
+            var previousRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            var previousEnv = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
+            try
+            {
+                GlobalCoreToolsSettings.Init(secretsManager: null, args: new[] { flag });
+
+                GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone.Should().Be(WorkerRuntime.Go);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousEnv);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = previousRuntime;
+            }
         }
     }
 }

@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             var packingRoot = await GetPackingRootAsync(functionAppRoot, options);
 
-            var outputPath = PackHelpers.ResolveOutputPath(functionAppRoot, options.OutputPath);
+            var outputPath = ResolveOutputPath(functionAppRoot, options.OutputPath);
             PackHelpers.CleanupExistingPackage(outputPath);
 
             await PerformBuildBeforePackingAsync(packingRoot, functionAppRoot, options);
@@ -50,6 +50,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         // Hook: must return the root folder to package (can trigger build/publish as needed)
         protected abstract Task<string> GetPackingRootAsync(string functionAppRoot, PackOptions options);
+
+        // Hook: resolve the destination archive path. Default delegates to PackHelpers; runtimes
+        // that want different conventions (e.g. Go accepting an explicit .zip path) can override.
+        protected virtual string ResolveOutputPath(string functionAppRoot, string outputPath)
+            => PackHelpers.ResolveOutputPath(functionAppRoot, outputPath);
 
         // Hook: optional step to run right before packaging (e.g., Node build)
         protected virtual Task PerformBuildBeforePackingAsync(string packingRoot, string functionAppRoot, PackOptions options) => Task.CompletedTask;
