@@ -30,10 +30,7 @@ internal class SpectreInteractionService : IInteractionService
 
     public ITheme Theme => _theme;
 
-    public bool IsInteractive =>
-        !System.Console.IsInputRedirected &&
-        !System.Console.IsOutputRedirected &&
-        Environment.GetEnvironmentVariable("CI") is null;
+    public bool IsInteractive => AnsiConsole.Profile.Capabilities.Interactive;
 
     public void WriteLine(string text) => _stdout.WriteLine(text);
 

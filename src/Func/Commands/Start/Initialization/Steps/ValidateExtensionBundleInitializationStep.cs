@@ -20,18 +20,12 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
     {
         await SimulateWorkAsync(context, cancellationToken);
 
-        string stackName = context.State.StackName ?? "unknown";
-        bool bundleRequired = RequiresExtensionBundle(stackName);
-        context.State.BundleRequired = bundleRequired;
-
-        string message = bundleRequired
+        string stackName = context.State.StackInfo?.StackName ?? "unknown";
+        
+        string message = context.State.StackInfo?.SupportsBundles == true
             ? "Bundle validation is not implemented in the prototype"
             : $"No extension bundle required for {stackName}";
 
         return StartInitializationStepResult.Completed(message);
     }
-
-    private static bool RequiresExtensionBundle(string stackName)
-        => !string.Equals(stackName, ".NET", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(stackName, "unknown", StringComparison.OrdinalIgnoreCase);
 }

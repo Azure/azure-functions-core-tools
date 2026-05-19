@@ -1,18 +1,19 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Hosting.AppStacks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
 /// Resolves the function app stack.
 /// </summary>
-internal sealed class ResolveAppStackInitializationStep(IAppStackProvider appStackProvider) : DemoInitializationStep
+internal sealed class ResolveAppStackInitializationStep(IProjectResolver projectResolver) : DemoInitializationStep
 {
     public const string StepId = "resolve_stack";
 
-    private readonly IAppStackProvider _appStackProvider = appStackProvider ?? throw new ArgumentNullException(nameof(appStackProvider));
+    private readonly IProjectResolver _projectResolver = projectResolver ?? throw new ArgumentNullException(nameof(projectResolver));
 
     public override string Id => StepId;
 
@@ -24,9 +25,9 @@ internal sealed class ResolveAppStackInitializationStep(IAppStackProvider appSta
     {
         await SimulateWorkAsync(context, cancellationToken);
 
-        string stackName = await _appStackProvider.GetStackNameAsync(context.Options.WorkingDirectory, cancellationToken);
-        context.State.StackName = stackName;
+        RuntimeStackInfo stackInfo = await _projectResolver.GetRuntimeStackInfoAsync(context.Options.WorkingDirectory, cancellationToken);
+        context.State.StackInfo = stackInfo;
 
-        return StartInitializationStepResult.Completed(stackName);
+        return StartInitializationStepResult.Completed(stackInfo.StackName);
     }
 }

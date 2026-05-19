@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.Node;
@@ -86,5 +87,10 @@ internal sealed class NodeProjectResolver : IProjectResolver
         return root.TryGetProperty(sectionName, out JsonElement section)
             && section.ValueKind == JsonValueKind.Object
             && section.TryGetProperty(FunctionsPackage, out _);
+    }
+
+    public Task<RuntimeStackInfo> GetRuntimeStackInfoAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
     }
 }

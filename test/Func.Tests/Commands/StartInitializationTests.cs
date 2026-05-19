@@ -6,11 +6,11 @@ using System.Text.Json;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Hosting.AppStacks;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using NSubstitute;
 using Spectre.Console;
 using Xunit;
@@ -38,11 +38,12 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task DemoRunner_SimulatesHostInstallAndSkipsBundle_ForDotNet()
     {
-        IAppStackProvider stackProvider = Substitute.For<IAppStackProvider>();
-        stackProvider.GetStackNameAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
-            .Returns(".NET");
+        IProjectResolver projectResolver = Substitute.For<IProjectResolver>();
+        projectResolver.GetRuntimeStackInfoAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
+            .Returns(new RuntimeStackInfo(".NET", "dotnet-isolated", "c:\\some\\path", false));
+
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(stackProvider);
+        var runner = new DemoStartInitializationRunner([projectResolver]);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -52,7 +53,7 @@ public class StartInitializationTests : IDisposable
 
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
-        Assert.Equal(".NET", result.RunInfo.StackName);
+        Assert.Equal("dotnet-isolated", result.RunInfo.StackName);
         Assert.Equal("4.834.0", result.HostVersion);
         Assert.False(result.BundleRequired);
         Assert.IsType<DemoEventSource>(result.EventStream);
@@ -76,11 +77,11 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task DemoRunner_HostValidationAddsInstallStepBeforeStackResolution()
     {
-        IAppStackProvider stackProvider = Substitute.For<IAppStackProvider>();
-        stackProvider.GetStackNameAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
-            .Returns(".NET");
+        IProjectResolver projectResolver = Substitute.For<IProjectResolver>();
+        projectResolver.GetRuntimeStackInfoAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
+            .Returns(new RuntimeStackInfo(".NET", "dotnet-isolated", "c:\\some\\path", false));
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(stackProvider);
+        var runner = new DemoStartInitializationRunner([projectResolver]);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
