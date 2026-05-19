@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Actions.LocalActions.PackAction;
@@ -14,6 +15,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const int MinimumGoMajorVersion = 1;
         private const int MinimumGoMinorVersion = 24;
+        private const int GoVersionTimeoutMs = 5000;
         internal const string GoBinaryName = "app";
         internal const string GoBinDir = "bin";
         internal const string GoModFileName = "go.mod";
@@ -355,18 +357,20 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<WorkerLanguageVersionInfo> GetVersion(string goExe)
+        private static Task<WorkerLanguageVersionInfo> GetVersion(string goExe)
         {
+            // Synchronous Process I/O for reliability — async I/O (ReadToEndAsync /
+            // WaitForExitAsync) intermittently returned null on Linux CI agents for
+            // sub-second commands like 'go version', producing confusing
+            // "Could not find a Go installation" errors. Surface failure reasons to
+            // stderr rather than returning null silently so CI logs are diagnosable.
+            void Warn(string message) => ColoredConsole.Error.WriteLine(WarningColor($"Warning: {message}"));
+
             try
             {
-                // Use Process directly with synchronous stdout capture instead of Executable's
-                // async event-based pipe. For sub-second commands like `go version`, the async
-                // event pump can race past Process.WaitForExit on macOS/Linux agents under load
-                // (observed: GoHelperTests on Linux CI, GoInitTests on macOS E2E). ReadToEnd
-                // blocks until EOF and is what SkipIfGoNonExistFact uses reliably.
-                using var process = new System.Diagnostics.Process
+                using var process = new Process
                 {
-                    StartInfo = new System.Diagnostics.ProcessStartInfo
+                    StartInfo = new ProcessStartInfo
                     {
                         FileName = goExe,
                         Arguments = "version",
@@ -378,28 +382,44 @@ namespace Azure.Functions.Cli.Helpers
                 };
 
                 process.Start();
-                string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                string output = process.StandardOutput.ReadToEnd().Trim();
 
-                if (process.ExitCode == 0)
+                if (!process.WaitForExit(GoVersionTimeoutMs))
                 {
-                    // Parse "go version go1.24.2 linux/amd64" format
-                    var match = Regex.Match(output.Trim(), @"go(\d+\.\d+(?:\.\d+)?)");
-                    if (match.Success)
+                    try
                     {
-                        return new WorkerLanguageVersionInfo(WorkerRuntime.Go, match.Groups[1].Value, goExe);
+                        process.Kill();
                     }
+                    catch (InvalidOperationException)
+                    {
+                        // Process exited between WaitForExit returning and Kill — benign.
+                    }
+
+                    Warn($"'{goExe} version' did not complete within {GoVersionTimeoutMs}ms.");
+                    return Task.FromResult<WorkerLanguageVersionInfo>(null);
                 }
+
+                if (process.ExitCode != 0)
+                {
+                    Warn($"'{goExe} version' exited with code {process.ExitCode}.");
+                    return Task.FromResult<WorkerLanguageVersionInfo>(null);
+                }
+
+                // Parse "go version go1.24.2 linux/amd64" format.
+                var match = Regex.Match(output, @"go(\d+\.\d+(?:\.\d+)?)");
+                if (match.Success)
+                {
+                    return Task.FromResult(new WorkerLanguageVersionInfo(WorkerRuntime.Go, match.Groups[1].Value, goExe));
+                }
+
+                Warn($"'{goExe} version' returned unparseable output: '{output}'.");
             }
             catch (Exception ex)
             {
-                if (GlobalCoreToolsSettings.IsVerbose)
-                {
-                    ColoredConsole.WriteLine(VerboseColor($"Unable to detect Go version: {ex.Message}"));
-                }
+                Warn($"unable to detect Go version: {ex.GetType().Name}: {ex.Message}");
             }
 
-            return null;
+            return Task.FromResult<WorkerLanguageVersionInfo>(null);
         }
     }
 }
