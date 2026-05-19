@@ -50,6 +50,12 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "go.mod"),
+            // TODO: revisit how the Go worker version is pinned. Go modules
+            // don't support relaxed ranges (e.g. `1.x`), so today we hard-pin
+            // a preview version in the template. Once the worker hits GA, we
+            // should explore a "stay current" strategy, e.g. running
+            // `go get github.com/azure/azure-functions-golang-worker@v0`
+            // after scaffold so users always get the newest line.
             ProjectFiles.ReadTemplate(_assembly, "go.mod").Replace(ModuleNamePlaceholder, moduleName),
             force);
 
