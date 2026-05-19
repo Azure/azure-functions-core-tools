@@ -5,3 +5,4 @@ test
 getting_started.md
 *_test.go
 vendor/
+bin/
