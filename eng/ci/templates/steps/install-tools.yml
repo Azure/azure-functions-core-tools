@@ -41,8 +41,7 @@ steps:
 
 - pwsh: |
     $version = '1.24.2'
-    $isWindows = $IsWindows
-    if ($isWindows) {
+    if ($IsWindows) {
       $archive = "go$version.windows-amd64.zip"
       $url = "https://go.dev/dl/$archive"
       $dest = Join-Path $env:AGENT_TOOLSDIRECTORY "go-$version"
