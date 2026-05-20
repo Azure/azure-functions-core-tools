@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Azure.Functions.Cli.Workloads.Workers.Go</AssemblyName>
+    <RootNamespace>Azure.Functions.Cli.Workloads.Workers.Go</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Cli.Workloads.Workers.Go</PackageId>
+    <PackageType>Dependency</PackageType>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="content\**\*" Pack="true" PackagePath="content/" />
+  </ItemGroup>
+
+</Project>

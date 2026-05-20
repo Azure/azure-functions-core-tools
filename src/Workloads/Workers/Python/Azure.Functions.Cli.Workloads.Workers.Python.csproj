@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Azure.Functions.Cli.Workloads.Workers.Python</AssemblyName>
+    <RootNamespace>Azure.Functions.Cli.Workloads.Workers.Python</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Cli.Workloads.Workers.Python</PackageId>
+    <PackageType>Dependency</PackageType>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="content\**\*" Pack="true" PackagePath="content/" />
+  </ItemGroup>
+
+</Project>
