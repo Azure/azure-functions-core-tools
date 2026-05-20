@@ -12,6 +12,11 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 public static class ProjectFiles
 {
+    /// <summary>
+    /// The minimal host.json content written during project initialization.
+    /// </summary>
+    public const string MinimalHostJson = "{\n  \"version\": \"2.0\"\n}\n";
+
     private static readonly JsonSerializerOptions _writeOptions = new()
     {
         WriteIndented = true,

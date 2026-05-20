@@ -72,9 +72,9 @@ public class PythonProjectInitializerTests : IDisposable
     [Fact]
     public async Task InitializeAsync_AppendsExtensionBundle_IntoExistingHostJson()
     {
-        // Mimic what InitCommand wrote before delegating: minimal host.json
-        // with version only. Initializer must add extensionBundle without
-        // dropping version.
+        // Pre-existing host.json with version only. WriteIfMissing won't
+        // overwrite (force=false), and MergeHostJson adds extensionBundle
+        // without dropping version.
         File.WriteAllText(Path.Combine(_projectDir.FullName, "host.json"), "{ \"version\": \"2.0\" }");
 
         await RunAsync(force: false);
@@ -125,12 +125,15 @@ public class PythonProjectInitializerTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeAsync_NoBundle_SkipsExtensionBundleMerge()
+    public async Task InitializeAsync_NoBundle_WritesMinimalHostJsonWithoutExtensionBundle()
     {
         await RunAsync(force: false, args: ["--no-bundle"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.False(File.Exists(hostJsonPath), "host.json should not be touched when --no-bundle is set");
+        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundle");
+        string content = File.ReadAllText(hostJsonPath);
+        Assert.Contains("\"version\"", content);
+        Assert.DoesNotContain("extensionBundle", content);
     }
 
     [Fact]

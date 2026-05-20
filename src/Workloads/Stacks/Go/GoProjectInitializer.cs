@@ -49,6 +49,11 @@ internal sealed class GoProjectInitializer : IProjectInitializer
         string moduleName = ResolveModuleName(context);
 
         ProjectFiles.WriteIfMissing(
+            Path.Combine(root, "host.json"),
+            ProjectFiles.MinimalHostJson,
+            force);
+
+        ProjectFiles.WriteIfMissing(
             Path.Combine(root, "go.mod"),
             // TODO: revisit how the Go worker version is pinned. Go modules
             // don't support relaxed ranges (e.g. `1.x`), so today we hard-pin
