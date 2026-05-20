@@ -92,15 +92,21 @@ You don't have to install these one at a time. The first time you run `func init
 
 ### Currently available workloads
 
-The following workloads are published today. Additional workloads (for example, `host`, `templates`, and per-language workers) ship over time. Run `func workload search` to see the current catalog.
+Run `func workload search` to see the current catalog.
 
 | Alias | Display name | Description |
 | ----- | ----- | ----- |
 | `dotnet` | .NET | Azure Functions tooling for .NET (C#, F#) projects. |
 | `node` | Node.js | Azure Functions CLI tooling for Node.js projects. |
+| `node-worker` | Node.js worker | The Node.js language worker used by the Functions host. |
 | `python` | Python | Azure Functions CLI tooling for Python projects. |
+| `python-worker` | Python worker | The Python language worker used by the Functions host. |
 | `go` | Go | Azure Functions CLI tooling for Go projects. |
+| `go-worker` | Go worker | The Go language worker used by the Functions host. |
 | `bundles` | Extension Bundles | Brings in an Azure Functions extension bundle (workload version maps 1-1 to bundle version). |
+| `host` | Functions Host | The Azure Functions host runtime used by `func start`. |
+| `templates` | Templates | The function templates surfaced by `func new`. |
+| `quickstart` | Quickstart | Adds the `func quickstart` command for scaffolding projects from predefined GitHub repository templates. |
 
 ## `func init`
 
