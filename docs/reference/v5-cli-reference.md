@@ -69,10 +69,10 @@ Match the workloads you install to the stack you're developing in. The recommend
 
 | Stack | Recommended workloads |
 | ----- | ----- |
-| **Python** | `python`, `python-worker`, `bundles`, `host`, `templates` |
-| **Node.js / TypeScript** | `node`, `node-worker`, `bundles`, `host`, `templates` |
-| **.NET (isolated, C# / F#)** | `dotnet`, `host`, `templates` |
-| **Go** | `go`, `go-worker`, `bundles`, `host`, `templates` |
+| **Python** | `python`, `python-worker`, `bundles`, `host`, `templates`, `quickstart` |
+| **Node.js / TypeScript** | `node`, `node-worker`, `bundles`, `host`, `templates`, `quickstart` |
+| **.NET (isolated, C# / F#)** | `dotnet`, `host`, `templates`, `quickstart` |
+| **Go** | `go`, `go-worker`, `bundles`, `host`, `templates`, `quickstart` |
 
 What each role does:
 
@@ -83,6 +83,7 @@ What each role does:
 | **`bundles`** | Resolves and caches Azure Functions extension bundles so triggers and bindings work out of the box. |
 | **`host`** | The Azure Functions host runtime used by `func start`. |
 | **`templates`** | The function templates surfaced by `func new`. |
+| **`quickstart`** | Adds the `func quickstart` command for scaffolding projects from predefined GitHub repository templates. |
 
 > [!NOTE]
 > The `bundles` workload is recommended for any non-.NET stack. .NET projects reference extensions through their project file directly and don't need it. .NET also doesn't require a separate worker workload, because the worker is part of the compiled project itself.
