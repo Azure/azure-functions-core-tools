@@ -160,6 +160,46 @@ The bundles workload contains **only** the bundle payload and the
 build-time `DownloadFile` plumbing that fetched it from the bundle
 CDN (§5.3). It has no runtime code.
 
+#### 4.3.1 Component shape
+
+The CLI-side implementation is factored into three pieces, all
+living in CT (not in the workload):
+
+| Component | Layer | Responsibility |
+|-----------|-------|----------------|
+| `IInstalledBundleWorkloads` | `Func.Cli.Abstractions` | Enumerates installed rows of the bundles content workload from the workload registry. Returns `(version, installDir)` pairs. Implementation wraps the existing workload subsystem (`IWorkloadStore` + `IWorkloadPaths`). |
+| `IExtensionBundleResolver` | `Func.Cli.Abstractions` | Runs the algorithm in §5.1. Pure function over `(ProjectContext, IInstalledBundleWorkloads)`; returns an `ExtensionBundleResolution` discriminated union. |
+| `ValidateExtensionBundleInitializationStep` | `Azure.Functions.Cli` (`func start` pipeline) | Sole consumer in v1. Calls the resolver, sets the env vars on success, prints the hint and exits non-zero on failure. Also unconditionally sets `AzureFunctionsJobHost__extensionBundle__ensureLatest=false` (see §4.4 step 6). |
+
+`ExtensionBundleResolution` is a closed discriminated union with
+four cases matching the outcomes in §5.1: `Resolved`,
+`WorkloadMissing`, `EmptyIntersection`, `NoCompatibleInstall`. Each
+failure case carries enough structured data for the consumer to
+emit the hint copy in §5.4 without re-deriving anything.
+
+The package id constant used by both the CT resolver and the
+workload `.csproj` to agree on the bundles package name lives in
+`Func.Cli.Abstractions` (e.g. on `IInstalledBundleWorkloads`) so
+there is exactly one source of truth.
+
+#### 4.3.2 Why these abstractions live in `Func.Cli.Abstractions`
+
+Even though the bundles workload itself ships no runtime assembly
+(content-only), the **resolver** and the **installed-workloads
+enumerator** are written against `Func.Cli.Abstractions` rather
+than CT's internals. This keeps two doors open:
+
+- A future non-content bundles delivery model could provide its
+  own `IInstalledBundleWorkloads` implementation without touching
+  CT.
+- An alternative consumer (e.g. `func pack` validation) can reuse
+  `IExtensionBundleResolver` without depending on `func start`
+  pipeline internals.
+
+Neither door is exercised in v1; the abstractions cost is small
+and keeps the layering consistent with the rest of the workload
+ecosystem.
+
 ### 4.4 `func start` responsibilities
 
 `func start` is the only v1 consumer. Its responsibilities:
