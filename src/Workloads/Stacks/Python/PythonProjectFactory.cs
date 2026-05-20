@@ -82,12 +82,19 @@ internal sealed class PythonProjectFactory : IFunctionsProjectFactory
         return null;
     }
 
-    private sealed record PythonFunctionsProject(WorkingDirectory WorkingDirectory, IFunctionsWorker Worker) : IFunctionsProject
+    private sealed class PythonFunctionsProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
     {
-        public string StackName => "python";
+        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
+        private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
 
-        public string StackDisplayName => "Python";
+        public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public bool SupportsExtensionBundles => true;
+        public override string StackName => "python";
+
+        public override string StackDisplayName => "Python";
+
+        public override bool SupportsExtensionBundles => true;
+
+        public override IFunctionsWorker Worker => _worker;
     }
 }

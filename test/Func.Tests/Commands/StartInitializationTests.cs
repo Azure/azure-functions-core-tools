@@ -40,7 +40,7 @@ public class StartInitializationTests : IDisposable
     public async Task DemoRunner_SimulatesHostInstallAndSkipsBundle_ForDotNet()
     {
         IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
-        IFunctionsProject project = CreateProject(
+        FunctionsProject project = CreateProject(
             WorkingDirectory.FromExplicit(_tempDir),
             stackName: "dotnet-isolated",
             stackDisplayName: ".NET",
@@ -84,7 +84,7 @@ public class StartInitializationTests : IDisposable
     public async Task DemoRunner_HostValidationAddsInstallStepBeforeStackResolution()
     {
         IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
-        IFunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(_tempDir));
+        FunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(_tempDir));
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
         var renderer = new RecordingStartInitializationRenderer();
@@ -105,6 +105,37 @@ public class StartInitializationTests : IDisposable
         Assert.True(validationCompletedIndex >= 0);
         Assert.True(installStartedIndex > validationCompletedIndex);
         Assert.True(stackStartedIndex > installStartedIndex);
+    }
+
+    [Fact]
+    public async Task DemoRunner_PreparesProjectHostRunBeforeStartingHost()
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(_tempDir));
+        DirectoryInfo startupDirectory = new(Path.Combine(_tempDir, "bin"));
+        project.PrepareAction = context => context.StartupDirectory = startupDirectory;
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
+        var renderer = new RecordingStartInitializationRenderer();
+        var runner = new DemoStartInitializationRunner(projectResolver);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
+
+        int prepareStartedIndex = FindStartedStepIndex(renderer.Events, PrepareProjectHostRunInitializationStep.StepId);
+        int startHostStartedIndex = FindStartedStepIndex(renderer.Events, StartHostInitializationStep.StepId);
+
+        Assert.True(prepareStartedIndex >= 0);
+        Assert.True(startHostStartedIndex > prepareStartedIndex);
+        Assert.Same(project, result.Project);
+        Assert.Same(result.HostRunContext, project.PreparedContexts.Single());
+        Assert.Equal(startupDirectory.FullName, result.HostRunContext.StartupDirectory.FullName);
+        Assert.Equal("dotnet-isolated", result.HostRunContext.WorkerRuntime);
     }
 
     [Fact]
@@ -177,7 +208,9 @@ public class StartInitializationTests : IDisposable
             new InMemoryHostEventStream(),
             HostVersion: "4.834.0",
             BundleRequired: false,
-            BundleVersion: null);
+            BundleVersion: null,
+            CreateProject(WorkingDirectory.FromExplicit(Environment.CurrentDirectory)),
+            CreateHostRunContext(WorkingDirectory.FromExplicit(Environment.CurrentDirectory)));
         await renderer.OnEventAsync(new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, result), CancellationToken.None);
         await renderer.DisposeAsync();
 
@@ -256,7 +289,7 @@ public class StartInitializationTests : IDisposable
             CanPrompt: true);
     }
 
-    private static IFunctionsProject CreateProject(
+    private static TestFunctionsProject CreateProject(
         WorkingDirectory workingDirectory,
         string stackName = "dotnet-isolated",
         string stackDisplayName = ".NET",
@@ -268,14 +301,19 @@ public class StartInitializationTests : IDisposable
         worker.WorkerConfigPath.Returns("c:\\some\\path");
         worker.Version.Returns("1.0.0");
 
-        IFunctionsProject project = Substitute.For<IFunctionsProject>();
-        project.WorkingDirectory.Returns(workingDirectory);
-        project.StackName.Returns(stackName);
-        project.StackDisplayName.Returns(stackDisplayName);
-        project.SupportsExtensionBundles.Returns(supportsExtensionBundles);
-        project.Worker.Returns(worker);
-        return project;
+        return new TestFunctionsProject(
+            workingDirectory,
+            stackName,
+            stackDisplayName,
+            supportsExtensionBundles,
+            worker);
     }
+
+    private static FunctionsProjectHostRunContext CreateHostRunContext(WorkingDirectory workingDirectory)
+        => new(
+            workingDirectory.Info,
+            "dotnet-isolated",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
     private static int FindStartedStepIndex(IReadOnlyList<StartInitializationEvent> events, string stepId)
         => FindStepIndex(events, stepId, static ev => ev is StartInitializationStepStartedEvent);
@@ -318,6 +356,40 @@ public class StartInitializationTests : IDisposable
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class TestFunctionsProject(
+        WorkingDirectory workingDirectory,
+        string stackName,
+        string stackDisplayName,
+        bool supportsExtensionBundles,
+        IFunctionsWorker worker) : FunctionsProject
+    {
+        private readonly WorkingDirectory _workingDirectory = workingDirectory;
+        private readonly IFunctionsWorker _worker = worker;
+
+        public List<FunctionsProjectHostRunContext> PreparedContexts { get; } = [];
+
+        public Action<FunctionsProjectHostRunContext>? PrepareAction { get; set; }
+
+        public override WorkingDirectory WorkingDirectory => _workingDirectory;
+
+        public override string StackName => stackName;
+
+        public override string StackDisplayName => stackDisplayName;
+
+        public override bool SupportsExtensionBundles => supportsExtensionBundles;
+
+        public override IFunctionsWorker Worker => _worker;
+
+        public override Task PrepareForHostRunAsync(
+            FunctionsProjectHostRunContext context,
+            CancellationToken cancellationToken)
+        {
+            PrepareAction?.Invoke(context);
+            PreparedContexts.Add(context);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TestTerminalOutput(TextWriter writer) : IAnsiConsoleOutput

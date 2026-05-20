@@ -108,12 +108,19 @@ internal sealed class NodeProjectFactory : IFunctionsProjectFactory
             && section.TryGetProperty(FunctionsPackage, out _);
     }
 
-    private sealed record NodeFunctionsProject(WorkingDirectory WorkingDirectory, IFunctionsWorker Worker) : IFunctionsProject
+    private sealed class NodeFunctionsProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
     {
-        public string StackName => "node";
+        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
+        private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
 
-        public string StackDisplayName => "Node.js";
+        public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public bool SupportsExtensionBundles => true;
+        public override string StackName => "node";
+
+        public override string StackDisplayName => "Node.js";
+
+        public override bool SupportsExtensionBundles => true;
+
+        public override IFunctionsWorker Worker => _worker;
     }
 }

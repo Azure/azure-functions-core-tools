@@ -17,7 +17,9 @@ internal sealed class StartInitializationState
 
     public string? HostVersion { get; set; }
 
-    public IFunctionsProject? Project { get; set; }
+    public FunctionsProject? Project { get; set; }
+
+    public FunctionsProjectHostRunContext? HostRunContext { get; set; }
 
     public string? BundleVersion { get; set; }
 
@@ -28,7 +30,8 @@ internal sealed class StartInitializationState
         ArgumentNullException.ThrowIfNull(context);
 
         string hostVersion = HostVersion ?? throw new InvalidOperationException("Host version was not resolved.");
-        IFunctionsProject project = Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+        FunctionsProject project = Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+        FunctionsProjectHostRunContext hostRunContext = HostRunContext ?? throw new InvalidOperationException("Host run context was not prepared.");
         IHostEventStream eventStream = EventStream ?? throw new InvalidOperationException("Host event stream was not initialized.");
 
         var runInfo = new DashboardRunInfo(context.CliVersion, ProfileName, project.StackDisplayName);
@@ -38,6 +41,8 @@ internal sealed class StartInitializationState
             eventStream,
             hostVersion,
             project.SupportsExtensionBundles,
-            BundleVersion);
+            BundleVersion,
+            project,
+            hostRunContext);
     }
 }

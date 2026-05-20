@@ -17,15 +17,20 @@ internal sealed class DemoProjectFactory : IFunctionsProjectFactory
         return Task.FromResult(ProjectCreationResults.Created(new DemoFunctionsProject(context.WorkingDirectory), "DemoProject"));
     }
 
-    private sealed record DemoFunctionsProject(WorkingDirectory WorkingDirectory) : IFunctionsProject
+    private sealed class DemoFunctionsProject(WorkingDirectory workingDirectory) : FunctionsProject
     {
-        public string StackName => "dotnet-isolated";
+        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
+        private readonly IFunctionsWorker _worker = new DotnetFunctionWorker();
 
-        public string StackDisplayName => ".NET";
+        public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public bool SupportsExtensionBundles => false;
+        public override string StackName => "dotnet-isolated";
 
-        public IFunctionsWorker Worker => new DotnetFunctionWorker();
+        public override string StackDisplayName => ".NET";
+
+        public override bool SupportsExtensionBundles => false;
+
+        public override IFunctionsWorker Worker => _worker;
     }
 
     private sealed class DotnetFunctionWorker : IFunctionsWorker

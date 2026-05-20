@@ -58,12 +58,19 @@ internal sealed class GoProjectFactory : IFunctionsProjectFactory
         return null;
     }
 
-    private sealed record GoFunctionsProject(WorkingDirectory WorkingDirectory, IFunctionsWorker Worker) : IFunctionsProject
+    private sealed class GoFunctionsProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
     {
-        public string StackName => "go";
+        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
+        private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
 
-        public string StackDisplayName => "Go";
+        public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-        public bool SupportsExtensionBundles => true;
+        public override string StackName => "go";
+
+        public override string StackDisplayName => "Go";
+
+        public override bool SupportsExtensionBundles => true;
+
+        public override IFunctionsWorker Worker => _worker;
     }
 }

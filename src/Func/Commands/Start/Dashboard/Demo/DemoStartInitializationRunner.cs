@@ -40,6 +40,7 @@ internal sealed class DemoStartInitializationRunner(IFunctionsProjectResolver pr
             new ValidateHostWorkloadInitializationStep(),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
             new ValidateExtensionBundleInitializationStep(),
+            new PrepareProjectHostRunInitializationStep(),
             new StartHostInitializationStep(_time),
         ];
 

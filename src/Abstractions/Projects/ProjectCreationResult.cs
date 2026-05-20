@@ -12,7 +12,7 @@ public abstract record ProjectCreationResult
     {
     }
 
-    public sealed record Created(IFunctionsProject Project, string Reason) : ProjectCreationResult;
+    public sealed record Created(FunctionsProject Project, string Reason) : ProjectCreationResult;
 
     public sealed record NotCreated(string Reason) : ProjectCreationResult;
 

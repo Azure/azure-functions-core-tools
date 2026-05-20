@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 public static class ProjectCreationResults
 {
-    public static ProjectCreationResult Created(IFunctionsProject project, string reason)
+    public static ProjectCreationResult Created(FunctionsProject project, string reason)
         => new ProjectCreationResult.Created(project, reason);
 
     public static ProjectCreationResult NotCreated(string reason)

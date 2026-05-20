@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 internal static class ProjectResolutionResults
 {
-    public static ProjectResolutionResult Resolved(IFunctionsProject project, string message)
+    public static ProjectResolutionResult Resolved(FunctionsProject project, string message)
         => new ProjectResolutionResult.Resolved(project, message);
 
     public static ProjectResolutionResult NotResolved(string message, ProjectCreationFailure? failure = null)

@@ -24,6 +24,9 @@ internal sealed class StartHostInitializationStep(TimeProvider? timeProvider = n
     {
         await SimulateWorkAsync(context, cancellationToken);
 
+        _ = context.State.HostRunContext
+            ?? throw new InvalidOperationException("Host run context was not prepared.");
+
         context.State.EventStream = new DemoEventSource(_timeProvider)
         {
             SpeedMultiplier = context.Options.DemoSpeedMultiplier,

@@ -18,7 +18,7 @@ public sealed class FunctionsProjectResolverTests
     [Fact]
     public async Task ResolveProjectAsync_FirstFactoryCreatesProject_ReturnsProject()
     {
-        IFunctionsProject project = Substitute.For<IFunctionsProject>();
+        FunctionsProject project = Substitute.For<FunctionsProject>();
         IFunctionsProjectFactory factory = NewFactory(ProjectCreationResults.Created(project, "matched"));
         FunctionsProjectResolver resolver = NewResolver([factory]);
 
@@ -32,7 +32,7 @@ public sealed class FunctionsProjectResolverTests
     [Fact]
     public async Task ResolveProjectAsync_NotCreated_ContinuesToNextFactory()
     {
-        IFunctionsProject project = Substitute.For<IFunctionsProject>();
+        FunctionsProject project = Substitute.For<FunctionsProject>();
         IFunctionsProjectFactory first = NewFactory(ProjectCreationResults.NotCreated("not mine"));
         IFunctionsProjectFactory second = NewFactory(ProjectCreationResults.Created(project, "matched second"));
         FunctionsProjectResolver resolver = NewResolver([first, second]);
@@ -48,10 +48,10 @@ public sealed class FunctionsProjectResolverTests
     [Fact]
     public async Task ResolveProjectAsync_FirstCreated_Wins()
     {
-        IFunctionsProject firstProject = Substitute.For<IFunctionsProject>();
+        FunctionsProject firstProject = Substitute.For<FunctionsProject>();
         IFunctionsProjectFactory first = NewFactory(ProjectCreationResults.Created(firstProject, "matched first"));
         IFunctionsProjectFactory second = NewFactory(ProjectCreationResults.Created(
-            Substitute.For<IFunctionsProject>(),
+            Substitute.For<FunctionsProject>(),
             "matched second"));
         FunctionsProjectResolver resolver = NewResolver([first, second]);
 
@@ -65,13 +65,13 @@ public sealed class FunctionsProjectResolverTests
     [Fact]
     public async Task ResolveProjectAsync_Failed_StopsResolution()
     {
-        var workerFailure = FunctionsWorkerResolutionFailures.NotInstalled(
+        FunctionsWorkerResolutionFailure workerFailure = FunctionsWorkerResolutionFailures.NotInstalled(
             new FunctionsWorkerId("python"),
             "missing worker");
-        var failure = ProjectCreationFailures.WorkerNotResolved(workerFailure, "missing worker");
+        ProjectCreationFailure failure = ProjectCreationFailures.WorkerNotResolved(workerFailure, "missing worker");
         IFunctionsProjectFactory first = NewFactory(ProjectCreationResults.Failed(failure));
         IFunctionsProjectFactory second = NewFactory(ProjectCreationResults.Created(
-            Substitute.For<IFunctionsProject>(),
+            Substitute.For<FunctionsProject>(),
             "matched second"));
         FunctionsProjectResolver resolver = NewResolver([first, second]);
 
