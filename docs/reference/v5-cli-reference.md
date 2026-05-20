@@ -80,7 +80,7 @@ What each role does:
 | ----- | ----- |
 | **Stack** (`python`, `node`, `dotnet`, `go`) | Project initialization and language-specific tooling for `func init` and `func new`. |
 | **Worker** (`python-worker`, `node-worker`, ...) | The language worker that the Functions host uses to execute your functions at run time. |
-| **`bundles`** | Resolves and caches Azure Functions extension bundles so triggers and bindings work out of the box. |
+| **`bundles`** | Brings in an Azure Functions extension bundle so triggers and bindings work out of the box. The workload version maps one-to-one to the bundle version. |
 | **`host`** | The Azure Functions host runtime used by `func start`. |
 | **`templates`** | The function templates surfaced by `func new`. |
 | **`quickstart`** | Adds the `func quickstart` command for scaffolding projects from predefined GitHub repository templates. |
@@ -100,7 +100,7 @@ The following workloads are published today. Additional workloads (for example, 
 | `node` | Node.js | Azure Functions CLI tooling for Node.js projects. |
 | `python` | Python | Azure Functions CLI tooling for Python projects. |
 | `go` | Go | Azure Functions CLI tooling for Go projects. |
-| `bundles` | Extension Bundles | Resolves and caches Azure Functions extension bundles. |
+| `bundles` | Extension Bundles | Brings in an Azure Functions extension bundle (workload version maps 1-1 to bundle version). |
 
 ## `func init`
 
