@@ -39,25 +39,7 @@ These commands are contributed by workloads. They appear only after the correspo
 
 ## Workloads
 
-The Azure Functions CLI follows a **workload model**. The `func` binary itself is small and language-agnostic. Everything that's stack-specific (Python, Node.js, .NET, Go) or tool-specific (extension bundles) is delivered as a separate **workload** package that you install on demand.
-
-### Why workloads?
-
-* **Install only what you need.** A Python developer doesn't need .NET project scaffolding on their machine, and vice versa.
-* **Independent updates.** A fix to the Node.js workload can ship without re-releasing the whole CLI.
-* **Smaller base install.** The base `func` install stays lean; workloads add capability incrementally.
-* **Extensible.** Third parties can ship their own workloads (custom templates, custom hosts, etc.).
-
-### What's in a workload?
-
-A workload is a package that contributes one or more of:
-
-* **A project initializer.** Enables `func init --stack <name>` for that language.
-* **Templates.** Enables `func new` to scaffold functions in that language.
-* **Commands.** Adds new subcommands under `func` (for example, an extension bundle manager).
-* **Services.** Plugs into shared CLI services (project detection, host startup, and so on).
-
-Workloads are versioned independently from the CLI and are installed side-by-side. Only the highest installed version of each workload is loaded at run time; older versions stay on disk for rollback.
+The Azure Functions CLI is built around a **workload model**. The base `func` install is small and language-agnostic. Stack-specific tooling (Python, Node.js, .NET, Go) and tool-specific features (extension bundles, templates, the Functions host) come from **workloads** that you install on demand, so you only download what you need for the stack you develop on.
 
 ### First-run experience
 
