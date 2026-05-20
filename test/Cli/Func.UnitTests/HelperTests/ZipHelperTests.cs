@@ -36,8 +36,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 if (_isCI)
                 {
-                    // copy the windows-built linux zip so we can include it in ci artifacts for validation on linux
-                    File.Copy(linuxZip, Path.Combine(Directory.GetCurrentDirectory(), "ZippedOnWindows.zip"), true);
+                    // Copy the windows-built linux zip so we can include it in CI artifacts for
+                    // validation on Linux. Use a deterministic repo-relative path because the
+                    // VSTest runner's working directory varies across SDK versions.
+                    File.Copy(linuxZip, Path.Combine(GetUnitTestsOutputDir(), "ZippedOnWindows.zip"), true);
                 }
 
                 VerifyWindowsZip(windowsZip);
@@ -60,6 +62,18 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 throw new Exception("Unsupported OS");
             }
+        }
+
+        private static string GetUnitTestsOutputDir()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Azure.Functions.Cli.sln")))
+            {
+                dir = dir.Parent;
+            }
+
+            Assert.True(dir is not null, "Could not find repo root (Azure.Functions.Cli.sln).");
+            return Path.Combine(dir!.FullName, "out", "bin", "Azure.Functions.Cli.UnitTests", "debug");
         }
 
         private async Task<string> BuildAndCopyFileToZipAsync(string rid)
