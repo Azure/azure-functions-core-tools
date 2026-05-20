@@ -5,6 +5,8 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,8 +26,6 @@ internal static class BuiltInCommands
 
         services.AddSingleton<ICliVersionProvider, AssemblyCliVersionProvider>();
         services.AddSingleton<IWorkloadHintRenderer, WorkloadHintRenderer>();
-        services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
-        services.AddSingleton<StartDashboardEventStreamFactory>();
 
         // VersionCommand is also resolved by Parser to wire `func` (no args)
         // to detailed-version output, so register the concrete type and

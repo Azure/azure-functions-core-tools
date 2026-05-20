@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <Import Project="$(EngBuildRoot)Telemetry.props" />
 
@@ -13,7 +13,10 @@
     <PublishSingleFile>true</PublishSingleFile>
     <IsPackable>false</IsPackable>
     <IsPublishable>true</IsPublishable>
+    <EnableDemoProject>true</EnableDemoProject>
   </PropertyGroup>
+
+  
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />

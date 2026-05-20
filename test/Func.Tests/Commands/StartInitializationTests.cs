@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
 using NSubstitute;
 using Spectre.Console;
 using Xunit;
@@ -38,12 +39,17 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task DemoRunner_SimulatesHostInstallAndSkipsBundle_ForDotNet()
     {
-        IProjectResolver projectResolver = Substitute.For<IProjectResolver>();
-        projectResolver.GetRuntimeStackInfoAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
-            .Returns(new RuntimeStackInfo(".NET", "dotnet-isolated", "c:\\some\\path", false));
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        IFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "dotnet-isolated",
+            stackDisplayName: ".NET",
+            supportsExtensionBundles: false);
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
 
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner([projectResolver]);
+        var runner = new DemoStartInitializationRunner(projectResolver);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -53,7 +59,7 @@ public class StartInitializationTests : IDisposable
 
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
-        Assert.Equal("dotnet-isolated", result.RunInfo.StackName);
+        Assert.Equal(".NET", result.RunInfo.StackName);
         Assert.Equal("4.834.0", result.HostVersion);
         Assert.False(result.BundleRequired);
         Assert.IsType<DemoEventSource>(result.EventStream);
@@ -77,11 +83,12 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task DemoRunner_HostValidationAddsInstallStepBeforeStackResolution()
     {
-        IProjectResolver projectResolver = Substitute.For<IProjectResolver>();
-        projectResolver.GetRuntimeStackInfoAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
-            .Returns(new RuntimeStackInfo(".NET", "dotnet-isolated", "c:\\some\\path", false));
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        IFunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(_tempDir));
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner([projectResolver]);
+        var runner = new DemoStartInitializationRunner(projectResolver);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -93,7 +100,7 @@ public class StartInitializationTests : IDisposable
 
         int validationCompletedIndex = FindCompletedStepIndex(renderer.Events, ValidateHostWorkloadInitializationStep.StepId);
         int installStartedIndex = FindStartedStepIndex(renderer.Events, InstallHostWorkloadInitializationStep.StepId);
-        int stackStartedIndex = FindStartedStepIndex(renderer.Events, ResolveAppStackInitializationStep.StepId);
+        int stackStartedIndex = FindStartedStepIndex(renderer.Events, ResolveFunctionsProjectInitializationStep.StepId);
 
         Assert.True(validationCompletedIndex >= 0);
         Assert.True(installStartedIndex > validationCompletedIndex);
@@ -247,6 +254,27 @@ public class StartInitializationTests : IDisposable
             cliVersion,
             IsInteractive: true,
             CanPrompt: true);
+    }
+
+    private static IFunctionsProject CreateProject(
+        WorkingDirectory workingDirectory,
+        string stackName = "dotnet-isolated",
+        string stackDisplayName = ".NET",
+        bool supportsExtensionBundles = false)
+    {
+        IFunctionsWorker worker = Substitute.For<IFunctionsWorker>();
+        worker.Id.Returns(new FunctionsWorkerId("dotnet"));
+        worker.WorkerRuntime.Returns("dotnet-isolated");
+        worker.WorkerConfigPath.Returns("c:\\some\\path");
+        worker.Version.Returns("1.0.0");
+
+        IFunctionsProject project = Substitute.For<IFunctionsProject>();
+        project.WorkingDirectory.Returns(workingDirectory);
+        project.StackName.Returns(stackName);
+        project.StackDisplayName.Returns(stackDisplayName);
+        project.SupportsExtensionBundles.Returns(supportsExtensionBundles);
+        project.Worker.Returns(worker);
+        return project;
     }
 
     private static int FindStartedStepIndex(IReadOnlyList<StartInitializationEvent> events, string stepId)

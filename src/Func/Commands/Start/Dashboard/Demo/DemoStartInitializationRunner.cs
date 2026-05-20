@@ -4,24 +4,21 @@
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
 /// Prototype initialization runner that simulates the host-resolution workflow.
 /// </summary>
-internal sealed class DemoStartInitializationRunner(
-    IEnumerable<IProjectResolver> projectResolvers,
-    TimeProvider? timeProvider = null) : IStartInitializationRunner
+internal sealed class DemoStartInitializationRunner(IFunctionsProjectResolver projectResolver, TimeProvider? timeProvider = null)
+    : IStartInitializationRunner
 {
-    private readonly IProjectResolver _projectResolver = projectResolvers?.FirstOrDefault() ?? new DemoProjectResolver();
+    private readonly IFunctionsProjectResolver _projectResolver = projectResolver
+        ?? throw new ArgumentNullException(nameof(projectResolver));
+
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
-    public async Task<StartInitializationResult> RunAsync(
-        StartInitializationContext context,
-        IStartInitializationRenderer renderer,
-        CancellationToken cancellationToken)
+    public async Task<StartInitializationResult> RunAsync(StartInitializationContext context, IStartInitializationRenderer renderer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(renderer);
@@ -41,7 +38,7 @@ internal sealed class DemoStartInitializationRunner(
             new ResolveProfileInitializationStep(),
             new ResolveConstraintsInitializationStep(),
             new ValidateHostWorkloadInitializationStep(),
-            new ResolveAppStackInitializationStep(_projectResolver),
+            new ResolveFunctionsProjectInitializationStep(_projectResolver),
             new ValidateExtensionBundleInitializationStep(),
             new StartHostInitializationStep(_time),
         ];
@@ -101,20 +98,4 @@ internal sealed class DemoStartInitializationRunner(
     }
 
     private DateTimeOffset Now() => _time.GetUtcNow();
-
-
-    // Create a demo project resolver for the demo runner...
-    private sealed class DemoProjectResolver : IProjectResolver
-    {
-        public Task<EvaluationResult> EvaluateAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new EvaluationResult(true, "Demo"));
-        }
-
-        public Task<RuntimeStackInfo> GetRuntimeStackInfoAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new RuntimeStackInfo(".NET", "dotnet-isolated", "c:\\some\\path\\to\\worker.config", false));
-        }
-    }
-
 }

@@ -15,8 +15,8 @@ namespace Azure.Functions.Cli.Hosting;
 /// </summary>
 /// <remarks>
 /// A builder constructed without a workload is used during host bootstrap;
-/// calling <c>RegisterCommand</c> or <c>RegisterProjectResolver</c> on it
-/// throws so an untracked contribution can never reach the parser.
+/// calling <c>RegisterCommand</c> or <c>AddProjectFactory</c> on it
+/// throws so an untracked registration can never reach the parser.
 /// </remarks>
 internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, WorkloadInfo? workload) : FunctionsCliBuilder
 {
@@ -68,11 +68,12 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Wo
         RegisterCommandFactory(sp => (FuncCommand)ActivatorUtilities.GetServiceOrCreateInstance(sp, commandType));
     }
 
-    public override void RegisterProjectResolver(IProjectResolver resolver)
+    public override void AddProjectFactory(IFunctionsProjectFactory factory)
     {
-        ArgumentNullException.ThrowIfNull(resolver);
+        ArgumentNullException.ThrowIfNull(factory);
+
         WorkloadInfo workload = RequireWorkload();
-        Services.AddSingleton(new WorkloadProjectResolverContribution(workload, resolver));
+        Services.AddSingleton(new WorkloadProjectFactoryRegistration(workload, factory));
     }
 
     private void RegisterCommandFactory(Func<IServiceProvider, FuncCommand> factory)
@@ -89,6 +90,6 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Wo
 
     private WorkloadInfo RequireWorkload()
         => _workload ?? throw new InvalidOperationException(
-            "Workload contributions can only be registered through a workload-scoped builder. " +
-            "Calling Register* on the host's global builder is a CLI bug.");
+            "Workload services can only be registered through a workload-scoped builder. " +
+            "Calling builder registration methods on the host's global builder is a CLI bug.");
 }

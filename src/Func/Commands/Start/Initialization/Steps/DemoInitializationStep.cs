@@ -23,6 +23,6 @@ internal abstract class DemoInitializationStep : IStartInitializationStep
     protected static async Task SimulateWorkAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
         double multiplier = context.Options.DemoSpeedMultiplier <= 0 ? 0.25 : context.Options.DemoSpeedMultiplier;
-        await Task.Delay(TimeSpan.FromMilliseconds(2000 * multiplier), cancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(5000 * multiplier), cancellationToken);
     }
 }

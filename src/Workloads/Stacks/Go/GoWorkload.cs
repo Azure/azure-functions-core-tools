@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Workloads.Go;
 
 /// <summary>
 /// Entry-point for the Go workload. Registers Go-specific
-/// services (project initializer today; resolver / commands later).
+/// services (project initializer today; project factory / commands later).
 /// </summary>
 public sealed class GoWorkload : Workload
 {
@@ -20,6 +20,6 @@ public sealed class GoWorkload : Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, GoProjectInitializer>();
-        builder.RegisterProjectResolver(new GoProjectResolver());
+        builder.AddProjectFactory(new GoProjectFactory());
     }
 }

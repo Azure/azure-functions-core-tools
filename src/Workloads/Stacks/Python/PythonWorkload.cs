@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Workloads.Python;
 
 /// <summary>
 /// Entry-point for the Python workload. Registers Python-specific
-/// services (project initializer today; resolver / commands later).
+/// services (project initializer today; project factory / commands later).
 /// </summary>
 public sealed class PythonWorkload : Workload
 {
@@ -20,6 +20,6 @@ public sealed class PythonWorkload : Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
-        builder.RegisterProjectResolver(new PythonProjectResolver());
+        builder.AddProjectFactory(new PythonProjectFactory());
     }
 }

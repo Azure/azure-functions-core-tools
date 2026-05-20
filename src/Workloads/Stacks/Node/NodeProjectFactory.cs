@@ -4,54 +4,73 @@
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
+using static Azure.Functions.Cli.Projects.ProjectCreationResults;
 
 namespace Azure.Functions.Cli.Workloads.Node;
 
 /// <summary>
-/// Resolves a directory as a Node Functions project when <c>host.json</c> is present
-/// alongside a <c>package.json</c>, <c>tsconfig.json</c>, or a <c>*.js</c>/<c>*.mjs</c>/<c>*.cjs</c>/<c>*.ts</c>
-/// file at the project root. A <c>package.json</c> declaring <c>@azure/functions</c> is the strongest signal.
+/// Creates Node Functions projects from Node-specific fingerprints.
 /// </summary>
-internal sealed class NodeProjectResolver : IProjectResolver
+internal sealed class NodeProjectFactory : IFunctionsProjectFactory
 {
-    private const string WorkerRuntime = "node";
     private const string FunctionsPackage = "@azure/functions";
 
+    private static readonly FunctionsWorkerId _workerId = new("node");
     private static readonly string[] _sourceFilePatterns = ["*.js", "*.mjs", "*.cjs", "*.ts"];
 
-    public Task<EvaluationResult> EvaluateAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
+    public async Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(workingDirectory);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(context.WorkerResolver);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!workingDirectory.Exists || !File.Exists(Path.Combine(workingDirectory.FullName, "host.json")))
+        DirectoryInfo workingDirectory = context.WorkingDirectory.Info;
+        if (!workingDirectory.Exists)
         {
-            return Task.FromResult(EvaluationResult.NoMatch("no host.json"));
+            return NotCreated("directory does not exist");
         }
 
+        string? reason = TryGetReason(workingDirectory);
+        if (reason is null)
+        {
+            return NotCreated("no Node project fingerprint found");
+        }
+
+        FunctionsWorkerResolutionResult workerResult =
+            await context.WorkerResolver.ResolveWorkerAsync(_workerId, cancellationToken);
+        return workerResult switch
+        {
+            FunctionsWorkerResolutionResult.Resolved resolved => Created(new NodeFunctionsProject(context.WorkingDirectory, resolved.Worker), reason),
+            FunctionsWorkerResolutionResult.NotResolved notResolved => Failed(ProjectCreationFailures.WorkerNotResolved(notResolved.Failure)),
+            _ => throw new InvalidOperationException($"Unsupported worker resolution result: {workerResult.GetType().FullName}"),
+        };
+    }
+
+    private static string? TryGetReason(DirectoryInfo workingDirectory)
+    {
         string packageJsonPath = Path.Combine(workingDirectory.FullName, "package.json");
         if (File.Exists(packageJsonPath))
         {
-            string reason = DeclaresFunctionsPackage(packageJsonPath)
+            return DeclaresFunctionsPackage(packageJsonPath)
                 ? "package.json declares @azure/functions"
                 : "found package.json";
-            return Task.FromResult(EvaluationResult.Match(reason, WorkerRuntime));
         }
 
         if (File.Exists(Path.Combine(workingDirectory.FullName, "tsconfig.json")))
         {
-            return Task.FromResult(EvaluationResult.Match("found tsconfig.json", WorkerRuntime));
+            return "found tsconfig.json";
         }
 
         foreach (string pattern in _sourceFilePatterns)
         {
             if (Directory.EnumerateFiles(workingDirectory.FullName, pattern, SearchOption.TopDirectoryOnly).Any())
             {
-                return Task.FromResult(EvaluationResult.Match($"found {pattern} file", WorkerRuntime));
+                return $"found {pattern} file";
             }
         }
 
-        return Task.FromResult(EvaluationResult.NoMatch("host.json present but no Node fingerprint file"));
+        return null;
     }
 
     private static bool DeclaresFunctionsPackage(string packageJsonPath)
@@ -89,8 +108,12 @@ internal sealed class NodeProjectResolver : IProjectResolver
             && section.TryGetProperty(FunctionsPackage, out _);
     }
 
-    public Task<RuntimeStackInfo> GetRuntimeStackInfoAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+    private sealed record NodeFunctionsProject(WorkingDirectory WorkingDirectory, IFunctionsWorker Worker) : IFunctionsProject
     {
-        throw new NotImplementedException();
+        public string StackName => "node";
+
+        public string StackDisplayName => "Node.js";
+
+        public bool SupportsExtensionBundles => true;
     }
 }

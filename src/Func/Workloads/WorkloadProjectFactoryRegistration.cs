@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Pairs an <see cref="IProjectResolver"/> with the workload that registered
-/// it so the resolver can attribute results back to their owner.
+/// Pairs an <see cref="IFunctionsProjectFactory"/> with the workload that registered it.
 /// </summary>
-internal sealed record WorkloadProjectResolverContribution(WorkloadInfo Workload, IProjectResolver Resolver);
+internal sealed record WorkloadProjectFactoryRegistration(WorkloadInfo Workload, IFunctionsProjectFactory Factory);
