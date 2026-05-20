@@ -200,6 +200,39 @@ Neither door is exercised in v1; the abstractions cost is small
 and keeps the layering consistent with the rest of the workload
 ecosystem.
 
+#### 4.3.3 Folder isolation in CT
+
+All bundles-specific code in `Azure.Functions.Cli` lives under a
+single top-level folder (`Bundles/`), and the abstractions in
+`Func.Cli.Abstractions` live under a matching `Bundles/`
+sub-namespace. Concretely:
+
+```
+src/Cli/func/
+  Bundles/
+    IExtensionBundleResolver.cs       # (abstraction re-exported)
+    ExtensionBundleResolver.cs
+    InstalledBundleWorkloads.cs       # IInstalledBundleWorkloads impl
+    ExtensionBundleResolution.cs      # result union
+    BundleHintBuilder.cs              # §5.4 copy
+    BundleTelemetry.cs                # §7 event shape
+src/Cli/Abstractions/
+  Bundles/
+    IInstalledBundleWorkloads.cs
+    IExtensionBundleResolver.cs
+```
+
+The only file outside `Bundles/` that knows about bundles is
+`ValidateExtensionBundleInitializationStep` in the `func start`
+pipeline, and it talks to the resolver purely through
+`IExtensionBundleResolver`. No other CT subsystem references types
+under `Bundles/` directly.
+
+This isolation is a soft guarantee that the bundles resolver can
+be lifted into a separate assembly (e.g. an
+`Azure.Functions.Cli.Bundles` library, or back into a `kind:
+workload`-style package) later without touching the rest of CT.
+
 ### 4.4 `func start` responsibilities
 
 `func start` is the only v1 consumer. Its responsibilities:
