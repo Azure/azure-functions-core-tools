@@ -35,18 +35,7 @@ steps:
           {
               "KeyCode" : "CP-401337-Apple",
               "OperationCode" : "MacAppDeveloperSign",
-              "Parameters" : {
-                  "Hardening": "--options=runtime"
-              },
-              "ToolName" : "sign",
-              "ToolVersion" : "1.0"
-          },
-          {
-              "KeyCode" : "CP-401337-Apple",
-              "OperationCode" : "MacAppNotarize",
-              "Parameters" : {
-                  "BundleId": "com.microsoft.azure.functions.cli"
-              },
+              "Parameters" : {},
               "ToolName" : "sign",
               "ToolVersion" : "1.0"
           }
