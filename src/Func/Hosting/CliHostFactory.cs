@@ -49,12 +49,6 @@ internal static class CliHostFactory
         HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton(interaction);
 
-        // Registered as an instance so HostApplicationBuilderExtensions can
-        // resolve it from the descriptor list before the host is built (the
-        // same trick used for IInteractionService). Tests substitute by
-        // adding another instance registration after CreateBuilder.
-        builder.Services.AddSingleton(HostConfigurationBuilder.Build());
-
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
         ILocalSettingsProvider localSettingsProvider = new LocalSettingsProvider();
         var configurationSourceBuilder = new CliConfigurationSourceBuilder(localSettingsProvider);

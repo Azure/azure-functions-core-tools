@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -15,10 +14,10 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 
 /// <summary>
 /// Integration tests for the host-startup wiring: build the same host
-/// production uses, substitute <see cref="IHostConfiguration"/> so the
-/// workload home points at a per-test temp directory, and assert the loaded
-/// workloads contributed (or failed to contribute) commands as expected. The
-/// on-disk layout the loader expects is
+/// production uses, register a <see cref="WorkloadPathsOptions"/> pointing
+/// at a per-test temp directory, and assert the loaded workloads contributed
+/// (or failed to contribute) commands as expected. The on-disk layout the
+/// loader expects is
 /// <c>&lt;Home&gt;/workloads.json</c> + <c>&lt;Home&gt;/workloads/&lt;pkg&gt;/&lt;ver&gt;/tools/any/&lt;asm&gt;.dll</c>.
 /// </summary>
 public sealed class CliHostFactoryTests : IDisposable
@@ -100,13 +99,14 @@ public sealed class CliHostFactoryTests : IDisposable
     [Fact]
     public async Task CreateHostAsync_IgnoresWorkloadsHomeFromIConfiguration()
     {
-        // Stage a workload at the env-var-driven home so it should load.
+        // Stage a workload at the override home so it should load.
         StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);
         WriteRegistry(("withcommand.fixture", "1.0.0", CommandWorkloadType));
 
-        // Point IConfiguration at a *different* directory. If the legacy
-        // Workloads:Home binding were still wired up, the loader would look
-        // here instead and the workload command would be missing.
+        // Point IConfiguration at a *different* directory. If a future
+        // change ever rewires WorkloadPathsOptions to honour IConfiguration,
+        // the loader would look here instead and the workload command would
+        // be missing.
         var configHome = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(configHome);
 
@@ -125,10 +125,10 @@ public sealed class CliHostFactoryTests : IDisposable
 
             var rootCommand = Parser.CreateCommand(host.Services);
 
-            // The env-var home wins: the staged workload's command is present.
+            // The registered WorkloadPathsOptions wins: the staged workload's command is present.
             Assert.Contains(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
 
-            // And the bound IWorkloadPaths reflects the substituted env, not IConfiguration.
+            // And the bound IWorkloadPaths reflects the override, not IConfiguration.
             var paths = host.Services.GetRequiredService<IWorkloadPaths>();
             Assert.Equal(Path.GetFullPath(_home), paths.Home);
         }
@@ -149,27 +149,19 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     /// <summary>
-    /// Builds a host whose <see cref="IHostConfiguration"/> returns
-    /// <paramref name="home"/> for <c>FUNC_CLI_WORKLOADS_HOME</c>, so tests
-    /// can redirect the workload root without mutating the real process
-    /// environment (which would leak across parallel xUnit runs).
+    /// Builds a host with a pre-registered <see cref="WorkloadPathsOptions"/>
+    /// pointing at <paramref name="home"/>, so tests can redirect the
+    /// workload root without mutating the real process environment (which
+    /// would leak across parallel xUnit runs).
     /// </summary>
     private static HostApplicationBuilder CreateBuilderWithHome(TestInteractionService interaction, string home)
     {
         HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
 
-        IConfiguration inner = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [Constants.WorkloadsHomeEnvironmentVariable] = home,
-            })
-            .Build();
-        IHostConfiguration hostConfiguration = new HostConfiguration(inner);
-
-        // ResolveSingletonInstance returns the last registered instance, so
-        // appending here wins over the production IHostConfiguration registered
-        // by CliHostFactory.CreateBuilder.
-        builder.Services.AddSingleton(hostConfiguration);
+        // RegisterWorkloadsAsync's descriptor scan picks up this
+        // ImplementationInstance and skips constructing a default
+        // WorkloadPathsOptions (which would read the real env var).
+        builder.Services.AddSingleton(new WorkloadPathsOptions(home));
         return builder;
     }
 
