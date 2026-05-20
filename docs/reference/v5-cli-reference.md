@@ -170,9 +170,6 @@ The `func start` command supports these options:
 
 With the project running, call the function endpoints directly to verify behavior.
 
-> [!NOTE]
-> The v5 `func start` runs against an in-memory event source for demonstration in early builds; full host integration replaces this in subsequent releases.
-
 ## `func workload`
 
 Manages workloads installed for the Azure Functions CLI. Subcommands:
