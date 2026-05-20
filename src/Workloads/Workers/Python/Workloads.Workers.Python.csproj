@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Python worker</Title>
+    <Title>Azure Functions CLI Python Language Worker</Title>
     <Description>Azure Functions CLI content workload that ships the Python language worker.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:python-worker func-workload</PackageTags>
