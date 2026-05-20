@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
@@ -72,8 +73,7 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
         }
 
-        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting, so
-        // FUNC_CLI_Workloads__Home binds to WorkloadPathsOptions.Home.
+        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting.
         configurationSourceBuilder.AddSources(builder.Configuration, workingDirectory);
         builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();

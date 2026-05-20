@@ -9,7 +9,6 @@ using Azure.Functions.Cli.Workloads.Invocation;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Resolution;
 using Azure.Functions.Cli.Workloads.Storage;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NuGet.Versioning;
 
@@ -46,17 +45,17 @@ internal static class WorkloadRegistration
     /// <see cref="Workload.Configure"/> on each.
     /// </summary>
     /// <param name="services">The host's service collection. Workload-contributed services are added here.</param>
-    /// <param name="configuration">The host's configuration. The <c>Workloads</c> section is read to locate the workload home directory.</param>
+    /// <param name="paths">Pre-resolved workload paths, including the workload home. Construct with the default ctor to use the env-var-aware resolver, or with an explicit home in tests.</param>
     /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
     /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
     public static async Task RegisterWorkloadsAsync(
         IServiceCollection services,
-        IConfiguration configuration,
+        WorkloadPathsOptions paths,
         IInteractionService interaction,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(interaction);
 
         // The activity name doubles as the metric scope: WorkloadBootMetricListener
@@ -65,7 +64,7 @@ internal static class WorkloadRegistration
         using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
         try
         {
-            int loadedCount = await RegisterCoreAsync(services, configuration, interaction, cancellationToken);
+            int loadedCount = await RegisterCoreAsync(services, paths, interaction, cancellationToken);
             activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
         }
         catch (Exception ex)
@@ -77,15 +76,10 @@ internal static class WorkloadRegistration
 
     private static async Task<int> RegisterCoreAsync(
         IServiceCollection services,
-        IConfiguration configuration,
+        WorkloadPathsOptions paths,
         IInteractionService interaction,
         CancellationToken cancellationToken)
     {
-        // Bind WorkloadPathsOptions the same way the host's DI binding does,
-        // so FUNC_CLI_Workloads__Home and test overrides flow through.
-        var paths = new WorkloadPathsOptions();
-        configuration.GetSection(WorkloadStorageRegistration.ConfigurationSection).Bind(paths);
-
         var store = new WorkloadStore(paths);
         var loader = new WorkloadLoader(paths);
 

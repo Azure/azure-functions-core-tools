@@ -18,7 +18,7 @@ public class WorkloadStoreTests : IDisposable
     public WorkloadStoreTests()
     {
         _tempHome = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        _paths = new WorkloadPathsOptions { Home = _tempHome };
+        _paths = new WorkloadPathsOptions(_tempHome);
         _store = new WorkloadStore(_paths);
     }
 

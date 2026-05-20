@@ -1,19 +1,22 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.ComponentModel.DataAnnotations;
 using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
-/// Configuration + computed filesystem layout for installed workloads.
-/// Bound from the <c>Workloads</c> configuration section at startup; the
-/// corresponding environment variable is <c>FUNC_CLI_Workloads__Home</c>.
+/// Computed filesystem layout for installed workloads. The default
+/// constructor resolves <see cref="Home"/> via
+/// <see cref="WorkloadHomeResolver.Resolve"/>; the
+/// <see cref="WorkloadPathsOptions(string)"/> overload lets tests inject
+/// an explicit home without touching the real process environment.
 /// </summary>
 /// <remarks>
-/// Only <see cref="Home"/> is settable. Everything else is computed from it
-/// and exposed through <see cref="IWorkloadPaths"/>.
+/// <see cref="Home"/> is assigned at construction (and normalised via
+/// <see cref="Path.GetFullPath(string)"/>), so other configuration sources
+/// (json files, local.settings, in-memory) are not honored. Computed
+/// members surface through <see cref="IWorkloadPaths"/>.
 /// </remarks>
 internal sealed class WorkloadPathsOptions : IWorkloadPaths
 {
@@ -23,12 +26,29 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     public const string WorkloadRegistryFileName = "workloads.json";
 
     /// <summary>
-    /// Root directory the func CLI persists workloads under. Defaults to
-    /// <c>~/.azure-functions</c>.
+    /// Resolves <see cref="Home"/> from
+    /// <see cref="Constants.WorkloadsHomeEnvironmentVariable"/>, falling
+    /// back to the default user-profile path.
     /// </summary>
-    [Required]
-    [MinLength(1)]
-    public string Home { get; set; } = DefaultHome();
+    public WorkloadPathsOptions()
+        : this(WorkloadHomeResolver.Resolve())
+    {
+    }
+
+    /// <summary>
+    /// Test-only seam for supplying <see cref="Home"/> directly so unit and
+    /// integration tests don't have to mutate process-global env vars.
+    /// </summary>
+    internal WorkloadPathsOptions(string home)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(home);
+        Home = Path.GetFullPath(home);
+    }
+
+    /// <summary>
+    /// Root directory the func CLI persists workloads under.
+    /// </summary>
+    public string Home { get; }
 
     /// <inheritdoc />
     public string WorkloadsRoot => Path.Combine(Home, "workloads");
@@ -39,9 +59,4 @@ internal sealed class WorkloadPathsOptions : IWorkloadPaths
     /// <inheritdoc />
     public string GetInstallDirectory(string packageId, string version)
         => Path.Combine(WorkloadsRoot, packageId, version);
-
-    private static string DefaultHome()
-        => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
 }

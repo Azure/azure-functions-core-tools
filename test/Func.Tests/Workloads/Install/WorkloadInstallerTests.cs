@@ -27,7 +27,7 @@ public sealed class WorkloadInstallerTests : IDisposable
 
     public WorkloadInstallerTests()
     {
-        _paths = new WorkloadPathsOptions { Home = Path.Combine(_root, ".azure-functions") };
+        _paths = new WorkloadPathsOptions(Path.Combine(_root, ".azure-functions"));
         _metadataReader.Read(Arg.Any<string>())
             .Returns(new WorkloadMetadata
             {

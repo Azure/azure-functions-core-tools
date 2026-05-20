@@ -19,7 +19,7 @@ public class WorkloadManifestSchemaTests : IDisposable
     public WorkloadManifestSchemaTests()
     {
         _tempHome = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var paths = new WorkloadPathsOptions { Home = _tempHome };
+        var paths = new WorkloadPathsOptions(_tempHome);
         _store = new WorkloadStore(paths);
         _registryPath = paths.WorkloadRegistryPath;
     }

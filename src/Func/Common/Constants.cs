@@ -33,10 +33,18 @@ internal static class Constants
     public const string FuncHomeDirectoryName = ".azure-functions";
 
     /// <summary>
-    /// Prefix for environment variables that bind into <c>IConfiguration</c>.
-    /// e.g. <c>FUNC_CLI_Workloads__Home</c> binds <c>Workloads:Home</c>.
+    /// Prefix for the CLI environment variables, including those that bind into <c>IConfiguration</c>.
     /// </summary>
     public const string EnvironmentVariablePrefix = "FUNC_CLI_";
+
+    /// <summary>
+    /// Environment variable that, when explicitly set to a non-empty value,
+    /// overrides the default workload home directory. Read directly (not
+    /// through <c>IConfiguration</c>) so the workload root cannot be
+    /// redirected by host config, global config, or project
+    /// <c>.func/config.json</c>.
+    /// </summary>
+    public const string WorkloadsHomeEnvironmentVariable = "FUNC_CLI_WORKLOADS_HOME";
 
     /// <summary>
     /// The telemetry instrumentation key, injected at build time via Telemetry.props.
