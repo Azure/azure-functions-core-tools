@@ -9,6 +9,7 @@ schedules:
 trigger: none
 
 pr:
+  autoCancel: true
   branches:
     include:
     - release_4.0
