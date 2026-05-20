@@ -299,15 +299,54 @@ func version
 
 Equivalent to `func --version`. Pass `func --version --verbose` for detailed build, runtime, OS, and architecture information.
 
-## Workload-provided commands
+## Workload contributions
 
-The commands in this section are contributed by workloads. They're available only after the corresponding workload is installed.
+The sections below document what each workload adds to the CLI: new commands, new options on built-in commands, or both. Content-only workloads (`bundles`, `host`, `templates`) aren't listed here because they don't change the command surface.
 
-### `func quickstart`
+### `dotnet` workload
+
+Adds the `dotnet` stack to `func init` and contributes these options:
+
+| Option | Description |
+| ----- | ----- |
+| **`--target-framework`** | The target .NET framework for the project (for example, `net8.0`, `net9.0`). |
+
+### `python` workload
+
+Adds the `python` stack to `func init` and contributes these options:
+
+| Option | Description |
+| ----- | ----- |
+| **`--no-bundle`** | Skip writing the default extension bundle block in *host.json*. |
+| **`--bundles-channel`**, **`-c`** | Extension bundle release channel: `GA` (default), `Preview`, or `Experimental`. |
+
+### `node` workload
+
+Adds the `node` stack to `func init` and contributes these options:
+
+| Option | Description |
+| ----- | ----- |
+| **`--no-bundle`** | Skip writing the default extension bundle block in *host.json*. |
+| **`--bundles-channel`**, **`-c`** | Extension bundle release channel: `GA` (default), `Preview`, or `Experimental`. |
+| **`--skip-npm-install`** | Skip running `npm install` after project creation. |
+
+### `go` workload
+
+Adds the `go` stack to `func init` and contributes these options:
+
+| Option | Description |
+| ----- | ----- |
+| **`--skip-go-mod-tidy`** | Skip running `go mod tidy` after project creation. |
+
+### `quickstart` workload
+
+Adds the `func quickstart` command.
+
+#### `func quickstart`
 
 Scaffolds a new Azure Functions project on your local computer from a predefined GitHub repository template. Use this when you want a ready-to-run sample that demonstrates a specific scenario (for example, an HTTP API, a queue-triggered function, or a Durable Functions app) rather than starting from an empty `func init` skeleton.
 
-Provided by the **`quickstart`** workload. Install it with:
+Install the workload with:
 
 ```command
 func workload install quickstart
