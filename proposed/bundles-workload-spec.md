@@ -43,10 +43,9 @@
   workload never downloads bundles. The bundle payload is part of
   the workload `.nupkg`, fetched from the CDN exactly once at
   workload-build time by the workload's own MSBuild process.
-- **Separate bundles home / `FUNC_CLI_BUNDLES_HOME` override.**
-  Bundle payloads live inside the workload install directory under
-  `<workload-home>`. There is no second on-disk root and no separate
-  override env var.
+- **Custom bundles install root.** Bundle payloads live inside the
+  workload install directory under `<workload-home>`. There is no
+  second on-disk root, no override env var, and no plan to add one.
 - **CT → host transport beyond today's env vars.** If a future
   CT-host workload introduces a different startup transport, that is
   out of scope for this spec.
@@ -91,8 +90,8 @@ Rationale:
   `workloads.json` is the bundle version on disk, full stop.
 - Side-by-side coexistence via `--force` is already part of the
   workload subsystem; bundles don't need a separate cache layer.
-- Eliminating a second on-disk root (the previous "bundles home")
-  removes an entire class of override / migration concerns.
+- Eliminating a second on-disk root removes an entire class of
+  override / migration concerns.
 
 ### 4.2 SemVer prerelease tags for preview / experimental
 
@@ -227,7 +226,7 @@ package. The provider returns the absolute path to that subpath; CT
 treats it as opaque.
 
 No copy or relocation step is performed at install time, and there
-is no separate "bundles home" root.
+is no second on-disk root.
 
 ### 5.3 Packaging (workload build time)
 
