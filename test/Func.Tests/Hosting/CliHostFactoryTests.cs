@@ -9,14 +9,13 @@ using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting;
 
 /// <summary>
 /// Integration tests for the host-startup wiring: build the same host
-/// production uses, substitute <see cref="IEnvironmentVariables"/> so the
+/// production uses, substitute <see cref="IHostConfiguration"/> so the
 /// workload home points at a per-test temp directory, and assert the loaded
 /// workloads contributed (or failed to contribute) commands as expected. The
 /// on-disk layout the loader expects is
@@ -150,7 +149,7 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     /// <summary>
-    /// Builds a host whose <see cref="IEnvironmentVariables"/> returns
+    /// Builds a host whose <see cref="IHostConfiguration"/> returns
     /// <paramref name="home"/> for <c>FUNC_CLI_WORKLOADS_HOME</c>, so tests
     /// can redirect the workload root without mutating the real process
     /// environment (which would leak across parallel xUnit runs).
@@ -159,13 +158,18 @@ public sealed class CliHostFactoryTests : IDisposable
     {
         HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
 
-        IEnvironmentVariables env = Substitute.For<IEnvironmentVariables>();
-        env.Get(Constants.WorkloadsHomeEnvironmentVariable).Returns(home);
+        IConfiguration inner = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [Constants.WorkloadsHomeEnvironmentVariable] = home,
+            })
+            .Build();
+        IHostConfiguration hostConfiguration = new HostConfiguration(inner);
 
         // ResolveSingletonInstance returns the last registered instance, so
-        // appending here wins over the SystemEnvironmentVariables registered
+        // appending here wins over the production IHostConfiguration registered
         // by CliHostFactory.CreateBuilder.
-        builder.Services.AddSingleton(env);
+        builder.Services.AddSingleton(hostConfiguration);
         return builder;
     }
 

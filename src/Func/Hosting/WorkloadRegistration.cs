@@ -46,17 +46,17 @@ internal static class WorkloadRegistration
     /// <see cref="Workload.Configure"/> on each.
     /// </summary>
     /// <param name="services">The host's service collection. Workload-contributed services are added here.</param>
-    /// <param name="environment">Used to resolve the workload home from <c>FUNC_CLI_WORKLOADS_HOME</c>.</param>
+    /// <param name="hostConfiguration">Used to resolve the workload home from <c>FUNC_CLI_WORKLOADS_HOME</c>.</param>
     /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
     /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
     public static async Task RegisterWorkloadsAsync(
         IServiceCollection services,
-        IEnvironmentVariables environment,
+        IHostConfiguration hostConfiguration,
         IInteractionService interaction,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(hostConfiguration);
         ArgumentNullException.ThrowIfNull(interaction);
 
         // The activity name doubles as the metric scope: WorkloadBootMetricListener
@@ -65,7 +65,7 @@ internal static class WorkloadRegistration
         using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
         try
         {
-            int loadedCount = await RegisterCoreAsync(services, environment, interaction, cancellationToken);
+            int loadedCount = await RegisterCoreAsync(services, hostConfiguration, interaction, cancellationToken);
             activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
         }
         catch (Exception ex)
@@ -77,13 +77,13 @@ internal static class WorkloadRegistration
 
     private static async Task<int> RegisterCoreAsync(
         IServiceCollection services,
-        IEnvironmentVariables environment,
+        IHostConfiguration hostConfiguration,
         IInteractionService interaction,
         CancellationToken cancellationToken)
     {
         // Resolve via the same setup the DI pipeline uses so the boot path
         // and IOptions<WorkloadPathsOptions> agree on Home.
-        var paths = new WorkloadPathsOptions { Home = WorkloadPathsOptionsSetup.Resolve(environment) };
+        var paths = new WorkloadPathsOptions { Home = WorkloadPathsOptionsSetup.Resolve(hostConfiguration) };
 
         var store = new WorkloadStore(paths);
         var loader = new WorkloadLoader(paths);

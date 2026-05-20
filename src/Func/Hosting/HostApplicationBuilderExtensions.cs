@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -25,7 +24,7 @@ internal static class HostApplicationBuilderExtensions
     /// Per-workload load and Configure failures are isolated: a single throw
     /// becomes a stderr warning and the remaining workloads still load. The
     /// caller resolves <see cref="IInteractionService"/> and
-    /// <see cref="IEnvironmentVariables"/> from
+    /// <see cref="IHostConfiguration"/> from
     /// <see cref="HostApplicationBuilder.Services"/>; both must already be
     /// registered (they are, by <see cref="CliHostFactory.CreateBuilder"/>).
     /// </remarks>
@@ -36,10 +35,10 @@ internal static class HostApplicationBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
 
         IInteractionService interaction = ResolveSingletonInstance<IInteractionService>(builder);
-        IEnvironmentVariables environment = ResolveSingletonInstance<IEnvironmentVariables>(builder);
+        IHostConfiguration hostConfiguration = ResolveSingletonInstance<IHostConfiguration>(builder);
         return WorkloadRegistration.RegisterWorkloadsAsync(
             builder.Services,
-            environment,
+            hostConfiguration,
             interaction,
             cancellationToken);
     }

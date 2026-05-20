@@ -53,7 +53,7 @@ internal static class CliHostFactory
         // resolve it from the descriptor list before the host is built (the
         // same trick used for IInteractionService). Tests substitute by
         // adding another instance registration after CreateBuilder.
-        builder.Services.AddSingleton<IEnvironmentVariables>(new SystemEnvironmentVariables());
+        builder.Services.AddSingleton(HostConfigurationBuilder.Build());
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
         ILocalSettingsProvider localSettingsProvider = new LocalSettingsProvider();

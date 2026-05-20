@@ -16,10 +16,11 @@ namespace Azure.Functions.Cli.Hosting;
 /// into DI. <see cref="WorkloadPathsOptions"/> is registered without binding
 /// to <see cref="Microsoft.Extensions.Configuration.IConfiguration"/>: the
 /// only supported override for <c>Home</c> is the
-/// <see cref="Constants.WorkloadsHomeEnvironmentVariable"/> env var, applied
-/// via <see cref="WorkloadPathsOptionsSetup"/>. Tests substitute the
-/// <see cref="Common.IEnvironmentVariables"/> singleton to point
-/// the home elsewhere without touching process-global state.
+/// <see cref="Constants.WorkloadsHomeEnvironmentVariable"/> env var, surfaced
+/// through <see cref="IHostConfiguration"/> and applied by
+/// <see cref="WorkloadPathsOptionsSetup"/>. Tests substitute the
+/// <see cref="IHostConfiguration"/> singleton to point the home elsewhere
+/// without touching process-global state.
 /// </summary>
 internal static class WorkloadStorageRegistration
 {
