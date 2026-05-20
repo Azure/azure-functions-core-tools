@@ -90,6 +90,20 @@ Run `func workload search` to see the current catalog.
 | `templates` | Templates | The function templates surfaced by `func new`. |
 | `quickstart` | Quickstart | Adds the `func quickstart` command for scaffolding projects from predefined GitHub repository templates. |
 
+### Coming soon
+
+These workloads are planned and not yet published. Run `func workload search` periodically to check availability.
+
+| Alias | Display name | Description |
+| ----- | ----- | ----- |
+| `java` | Java | Azure Functions CLI tooling for Java projects. |
+| `java-worker` | Java worker | The Java language worker used by the Functions host. |
+| `powershell` | PowerShell | Azure Functions CLI tooling for PowerShell projects. |
+| `powershell-worker` | PowerShell worker | The PowerShell language worker used by the Functions host. |
+| `durable` | Durable Functions | Adds `func durable` commands for managing Durable Functions task hubs and orchestration instances. |
+
+Additional workloads (publishing, container deployments, Kubernetes, and more) ship over time.
+
 ## `func init`
 
 Initializes a new Azure Functions project in the specified folder. The scaffolding itself is contributed by the workload for the chosen stack, so the available options depend on which workloads are installed.
