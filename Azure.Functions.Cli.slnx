@@ -18,6 +18,11 @@
   <Folder Name="/src/Workloads/Tools/">
     <Project Path="src/Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj" />
   </Folder>
+  <Folder Name="/src/Workloads/Workers/">
+    <Project Path="src/Workloads/Workers/Go/Workloads.Workers.Go.csproj" />
+    <Project Path="src/Workloads/Workers/Node/Workloads.Workers.Node.csproj" />
+    <Project Path="src/Workloads/Workers/Python/Workloads.Workers.Python.csproj" />
+  </Folder>
   <Folder Name="/test/">
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.Default/Workloads.Tests.Fixtures.Default.csproj" />
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.Sdk/Workloads.Tests.Fixtures.Sdk.csproj" />

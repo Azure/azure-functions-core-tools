@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>Azure Functions CLI Node.js Language Worker</Title>
+    <Description>Azure Functions CLI content workload that ships the Node.js language worker.</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>kind:content alias:node-worker func-worker func-workload</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+    <Content Include="content/**" Pack="true" PackagePath="content/" />
+  </ItemGroup>
+
+</Project>
