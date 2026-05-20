@@ -10,20 +10,19 @@
 ## 1. Goals
 
 - Move all bundle acquisition, version selection, and on-disk
-  layout out of the `func` CLI binary and into a single first-class
-  workload, so bundles can ship and version independently of Core
-  Tools.
-- Expose a stable contribution point that any CLI command (today:
-  `func start`) can call to obtain a resolved bundle path for a
-  project + active profile.
-- Make `func start` resolution deterministic. When a satisfying
-  bundle payload is already cached locally, `func start` resolves
-  fully offline. When it isn't, the bundles workload may fetch it
-  on demand at start time (see §5.3).
+  layout out of the `func` CLI binary and into a workload, so bundles
+  can ship and version independently of Core Tools.
+- Expose a stable contribution point (`IExtensionBundleProvider`)
+  that any CLI command (today: `func start`) can call to obtain a
+  resolved bundle path for a project + active profile.
+- Make `func start` resolution **deterministic and fully offline**.
+  The bundles workload performs no network I/O. All bundle payloads
+  are obtained at workload **install** time (the payload ships
+  inside the workload `.nupkg`).
 - Eliminate Core Tools' bespoke bundle download path
   (`ExtensionBundleHelper`, `DownloadBundleAction`, `func extensions
   install`). The bundles workload is the only acquisition mechanism
-  in v5.
+  in v5, and acquisition is `func workload install` + nothing else.
 - Require no changes in the Functions runtime host. CT keeps using the
   existing `AzureFunctionsJobHost__extensionBundle__downloadPath` env
   var to point the host at the resolved bundle and to suppress its
@@ -36,9 +35,18 @@
   authoring a custom profile (`cli-profiles.md` §5.2) that sets
   `extensionBundle.version` to an exact range.
 - **Auto-install of the bundles workload on `func start`.** Follows
-  the host-workload rule (Workload Spec §4.5): a missing workload
-  causes `func start` to print an install hint and exit non-zero. CT
-  never installs workloads implicitly.
+  the host-workload rule (Workload Spec §4.5): a missing or
+  unsatisfying installed workload set causes `func start` to print
+  an install hint and exit non-zero. CT never installs workloads
+  implicitly.
+- **Bundle CDN access from the bundles workload at runtime.** The
+  workload never downloads bundles. The bundle payload is part of
+  the workload `.nupkg`, fetched from the CDN exactly once at
+  workload-build time by the workload's own MSBuild process.
+- **Separate bundles home / `FUNC_CLI_BUNDLES_HOME` override.**
+  Bundle payloads live inside the workload install directory under
+  `<workload-home>`. There is no second on-disk root and no separate
+  override env var.
 - **CT → host transport beyond today's env vars.** If a future
   CT-host workload introduces a different startup transport, that is
   out of scope for this spec.
@@ -48,56 +56,82 @@
 | Term | Meaning |
 |------|---------|
 | **Bundle id** | The `host.json` `extensionBundle.id` value, e.g. `Microsoft.Azure.Functions.ExtensionBundle` or `Microsoft.Azure.Functions.ExtensionBundle.Preview`. |
-| **Bundle version** | A SemVer version of an extension bundle payload, e.g. `4.22.0`. |
-| **Bundles workload** | The single workload package `Azure.Functions.Cli.Workloads.ExtensionBundles` (`kind: workload`) that provides bundle resolution and owns the on-disk payload cache. |
-| **Bundles home** | The on-disk root the bundles workload uses for payloads. Defaults to `<workload-home>/bundles` (i.e. `~/.azure-functions/bundles`). Override via `FUNC_CLI_BUNDLES_HOME`. |
-| **Resolved bundle path** | A directory path returned by the bundles workload to a consumer (e.g. `func start`). Its layout matches today's bundle zip layout exactly so the Functions runtime host needs no changes to consume it. |
+| **Bundle version** | A SemVer version of an extension bundle payload, e.g. `4.22.0` (stable) or `4.33.0-experimental.1` (prerelease). Prerelease tags carry preview / experimental builds. |
+| **Bundles workload** | The single workload package id `Azure.Functions.Cli.Workloads.ExtensionBundles` (`kind: workload`). Each installed instance of this workload carries exactly **one** bundle version, packaged at workload-build time. The workload version is **always equal to the bundle version it packages**. |
+| **Bundle workload install dir** | The directory the workload subsystem extracts an installed bundles workload into, per Workload Spec §6.1: `<workload-home>/workloads/azure.functions.cli.workloads.extensionbundles/<bundle-version>/`. |
+| **Resolved bundle path** | The directory the provider returns to a consumer. It is a subdirectory of the bundle workload install dir whose contents match today's extension bundle zip layout exactly, so the Functions runtime host needs no changes to consume it. |
 
 ## 4. Architecture
 
-### 4.1 Single workload, not per-version packages
+### 4.1 One workload package, one bundle version per install
 
-There is **one** workload package:
+There is **one** workload package id:
 
 ```
 Azure.Functions.Cli.Workloads.ExtensionBundles
 ```
 
-Its package id does **not** encode a bundle version. Multiple bundle
-versions and both the stable and preview bundle ids are handled
-inside the workload's payload cache (§5), not as separate workload
-registry rows.
+The workload version equals the bundle version it packages:
+
+| `func workload install …` | Bundle version delivered |
+|---------------------------|--------------------------|
+| `Azure.Functions.Cli.Workloads.ExtensionBundles@4.22.0` | `4.22.0` |
+| `Azure.Functions.Cli.Workloads.ExtensionBundles@4.33.0-experimental.1` | `4.33.0-experimental.1` |
+
+Multiple bundle versions coexist on disk by installing the workload
+multiple times with `func workload install --force` (Workload Spec
+§4.6 already specifies this side-by-side model for the host-runtime
+workload; bundles use the same mechanism). Each install is a
+distinct row in the workload registry.
 
 Rationale:
 
-- The set of bundle versions a developer might need is open-ended; one
-  workload registry row per bundle version would balloon the workload
-  manifest and complicate version selection across the profile +
-  host.json constraint.
-- Bundle payloads have a stable shape the Functions runtime host
-  already understands. There is no per-version CLI-side code; the
-  only CLI-side code is the resolver. One workload assembly with a
-  payload cache is the simplest viable factoring.
+- A 1:1 mapping between workload version and bundle version makes
+  every install reproducible and auditable: the version in
+  `workloads.json` is the bundle version on disk, full stop.
+- Side-by-side coexistence via `--force` is already part of the
+  workload subsystem; bundles don't need a separate cache layer.
+- Eliminating a second on-disk root (the previous "bundles home")
+  removes an entire class of override / migration concerns.
 
-### 4.2 `IExtensionBundleProvider` contribution point
+### 4.2 SemVer prerelease tags for preview / experimental
+
+Preview and experimental bundles do **not** get a separate workload
+package id. They are expressed as SemVer prerelease versions of the
+same package, e.g. `4.33.0-preview.1`, `4.33.0-experimental.2`. This
+matches NuGet's own prerelease convention and lets the workload
+subsystem manage them with no new code paths.
+
+`host.json` continues to support both bundle ids
+(`Microsoft.Azure.Functions.ExtensionBundle` and
+`...ExtensionBundle.Preview`). Both ids map to the **same** workload
+package; the chosen `extensionBundle.id` plus the requested version
+range selects candidates from the installed registry rows. The
+exact mapping rules between an `id=...Preview` host.json and which
+installed workload versions are considered candidates are captured
+as an open question in §9 (the simplest rule is "Preview id selects
+only prerelease-tagged versions; stable id selects only
+stable-tagged versions").
+
+### 4.3 `IExtensionBundleProvider` contribution point
 
 Core Tools adds a new contribution point to `Func.Cli.Abstractions`
 (Workload Spec §5.1):
 
 | Service registered | The workload can... | Used by |
 |--------------------|---------------------|---------|
-| `IExtensionBundleProvider` | Resolve a bundle path for a project + active profile, and manage the on-disk bundle payload cache. | `func start` |
+| `IExtensionBundleProvider` | Resolve a bundle path for a project + active profile from the set of installed bundles workloads. | `func start` |
 
-The contract returns a resolved bundle path (or a structured failure
-with enough information for CT to print an actionable install/update
-hint). The bundles workload is the v1 implementer; the abstraction
-is open to alternative implementations.
+The contract returns a resolved bundle path (or a structured
+failure with enough information for CT to print an actionable
+install hint). The bundles workload is the v1 implementer; the
+abstraction is open to alternative implementations.
 
 Exact interface signature lives in
 [`building-a-workload.md`](./building-a-workload.md). Out of scope
 for this spec.
 
-### 4.3 Consumer responsibilities (`func start`)
+### 4.4 Consumer responsibilities (`func start`)
 
 `func start` is the only v1 consumer. Its responsibilities are
 intentionally minimal:
@@ -105,13 +139,14 @@ intentionally minimal:
 1. Detect whether the project's `host.json` declares an
    `extensionBundle` section. If not, **skip** resolution entirely
    (do not load the bundles workload, do not set any env var).
-2. Resolve the active profile (cli-profiles `§6`).
+2. Resolve the active profile (cli-profiles §6).
 3. Look up an `IExtensionBundleProvider` from the loaded workloads.
-   - If none is registered, print the install hint:
+   - If none is registered (i.e. **no** bundles workload installed
+     at any version), print the install hint:
      ```
      This project requires an extension bundle but no bundles
-     workload is installed. Install it with:
-       func workload install Azure.Functions.Cli.Workloads.ExtensionBundles
+     workload is installed. Install a version with:
+       func workload install Azure.Functions.Cli.Workloads.ExtensionBundles@<version>
      ```
      Exit non-zero.
 4. Invoke the provider, passing the project context (parsed
@@ -124,16 +159,17 @@ intentionally minimal:
    Using extension bundle <id> <version> from <path>
    ```
 6. On failure: surface the provider's structured error message
-   (which includes the install/update hint, see §5.4) and exit
-   non-zero. Do not start the host.
+   (which includes the install hint, see §5.3) and exit non-zero.
+   Do not start the host.
 7. **Always** set `AzureFunctionsJobHost__extensionBundle__ensureLatest=false`
    when launching the host, whether or not a bundle was resolved.
-   In v5 the bundles workload owns freshness; the host runtime
-   must never reach out for a newer bundle behind CT's back.
+   In v5 the bundles workload owns the bundle on disk; the host
+   runtime must never reach out for a newer bundle behind CT's
+   back.
 
-`func start` does **not** know about the bundles home, the bundle
-CDN, or per-version payload layout. That is entirely the workload's
-concern.
+`func start` does **not** know about workload install paths,
+per-version layout, or the bundle CDN. That is entirely the
+workload's concern.
 
 ## 5. Bundles workload behavior
 
@@ -142,120 +178,79 @@ concern.
 Given the consumer-supplied context (host.json `extensionBundle`
 block, worker runtime, active profile), the provider:
 
-1. Computes the **constraint range** as the NuGet-style intersection of:
+1. Computes the **constraint range** as the NuGet-style intersection
+   of:
    - the `host.json` `extensionBundle.version` range, and
    - the active profile's `extensionBundle.version` range (if
      declared; otherwise the constraint equals the host.json range).
-2. Enumerates installed bundle payloads under the bundles home whose
-   bundle id matches `host.json` `extensionBundle.id`.
-3. Selects the **highest installed version** that satisfies the
+2. Enumerates **installed bundle workload versions** by reading the
+   workload registry (`workloads.json`, Workload Spec §6.1) for
+   rows whose `packageId` is `azure.functions.cli.workloads.extensionbundles`.
+3. Filters that set by host.json `extensionBundle.id` per §4.2
+   (stable id → stable-tagged versions; Preview id → prerelease-
+   tagged versions; final rule per §9 open question).
+4. Selects the **highest** filtered version that satisfies the
    constraint range.
-4. If no installed version satisfies the constraint, the provider
-   **may** fetch a satisfying version from the bundle CDN on demand
-   (see §5.3). If the fetch succeeds, the new payload is added to
-   the cache and selected.
 5. Returns either:
-   - **Resolved**: the absolute path
-     `<bundles-home>/<bundle-id>/<version>/`, or
+   - **Resolved**: the absolute path inside that workload's install
+     dir whose layout matches the extension bundle zip (§5.2), or
    - **EmptyIntersection**: the host.json range, the profile range,
-     and the highest version that would satisfy host.json alone (for
-     the install hint), or
-   - **NoCompatiblePayload**: the constraint range, a list of
-     installed versions for the same bundle id, and (if the on-demand
-     fetch was attempted and failed) the failure reason.
+     and the highest version that would satisfy host.json alone
+     (for the install hint), or
+   - **NoCompatibleInstall**: the constraint range and a list of
+     installed bundle workload versions, plus the install hint for
+     a satisfying version.
 6. If the active profile declares `supportedRuntimes` and the
    project's worker runtime is not listed, the provider includes a
    non-fatal warning in its successful result. `func start` logs it
    and proceeds; mismatch is informational for bundles and **must
    not** block start.
 
-### 5.2 On-disk layout (bundles home)
+The provider performs **no** network I/O.
 
-The bundles workload manages payloads under:
+### 5.2 Where bundle content lives
+
+A bundles workload install puts the bundle payload inside its
+standard workload install dir (Workload Spec §6.1 step 6):
 
 ```
-<bundles-home>/<bundle-id>/<bundle-version>/
+<workload-home>/workloads/azure.functions.cli.workloads.extensionbundles/<bundle-version>/
 ```
 
-Default `<bundles-home>` is `<workload-home>/bundles`, i.e.
-`~/.azure-functions/bundles`. Override via the
-`FUNC_CLI_BUNDLES_HOME` environment variable (same convention as
-`FUNC_CLI_WORKLOADS_HOME`, Workload Spec §11). Resolution mirrors
-`WorkloadHomeResolver` exactly: explicit env var wins, otherwise
-nest under the workload home (which itself honors
-`FUNC_CLI_WORKLOADS_HOME`).
+The actual bundle content (the layout the Functions runtime host
+already knows how to read: `bin/`, `extensions.json`, etc.) lives
+under that directory in a fixed subpath chosen by the workload
+package. The provider returns the absolute path to that subpath; CT
+treats it as opaque.
 
-The contents under `<bundle-version>/` mirror today's extension
-bundle zip layout exactly. Returning this directory to a consumer
-gives the Functions runtime host a directory it already knows how to
-read with no code changes.
+No copy or relocation step is performed at install time, and there
+is no separate "bundles home" root.
 
-### 5.3 Payload acquisition
+### 5.3 Packaging (workload build time)
 
-The bundles workload acquires bundle payloads from one of three
-sources:
+The bundles workload `.csproj` uses the MSBuild `DownloadFile` task
+to fetch the bundle payload for the target version from the bundle
+CDN once, at workload-build time, and packs it into the workload
+`.nupkg`. Practical consequences:
 
-1. **In-package, at workload build time.** The bundles workload's
-   own `.csproj` uses the MSBuild `DownloadFile` task to fetch a
-   curated set of **stable** bundle payloads from the bundle CDN at
-   workload-build time and packs them into the workload `.nupkg`
-   under e.g. `tools/any/bundles/<bundle-id>/<bundle-version>/`.
-   On workload install, these payloads are copied (or hard-linked)
-   into the bundles home. This is the **preferred** path for stable
-   bundles because it gives every fresh workload install a usable
-   offline-resolvable payload set with no post-install hook required
-   and no first-run network hit. The trade-off is workload package
-   size; the curated set should be small (e.g. the latest stable
-   `Microsoft.Azure.Functions.ExtensionBundle` major + minor).
-2. **Eagerly, via a post-install / first-run hook.** The Workload
-   Spec does not define such a hook today (see Workload Spec §12 #5,
-   an open question). If/when one is added, the bundles workload may
-   use it to grow the default payload set without rebuilding the
-   workload itself.
-3. **On demand at `func start`.** Used whenever a project requires a
-   version that isn't already in the bundles home (e.g. a
-   profile-pinned older version, a brand-new stable version
-   published after the workload was packaged, or any **preview /
-   experimental** bundle id such as
-   `Microsoft.Azure.Functions.ExtensionBundle.Preview`). Preview /
-   experimental payloads are explicitly **not** shipped inside the
-   workload package so that:
-   - workload package size doesn't churn with every preview drop,
-     and
-   - opting into a preview bundle is always an explicit network
-     event with a log line, never a silent "you already had it
-     locally" because the workload happened to ship it.
+- The CDN is contacted by the **build pipeline that publishes the
+  workload**, not by any user machine running `func`.
+- A user's machine acquires the bundle through the normal
+  `func workload install` flow, which downloads the workload
+  `.nupkg` from its catalog feed (Workload Spec §6.1).
+- Reproducibility: an installed workload version always carries the
+  exact bundle payload that was packed at build time. There is no
+  drift between "what the workload version says" and "what's on
+  disk."
+- Preview / experimental versions are produced the same way; the
+  only difference is the SemVer prerelease tag on the workload
+  version and the corresponding URL the `DownloadFile` task pulls
+  from.
 
-In other words: the workload package eagerly carries **stable**
-bundle payloads it was built against; **preview / experimental**
-bundles are CDN-on-demand only.
-
-On-demand fetch at `func start`:
-
-- The provider **must** print an Information log line before
-  initiating download, e.g. `Downloading extension bundle <id>
-  <version>…`, and a completion line on success.
-- The provider **must** apply a bounded timeout (workload-defined,
-  not specified here) and fail fast with a clear hint if the network
-  is unavailable, the version cannot be located, or integrity
-  verification fails.
-- A successful on-demand fetch is observationally identical to a
-  pre-cached resolution from `func start`'s perspective: same return
-  contract, same env var handling. Telemetry distinguishes the two
-  via the `reason` field (§7).
-
-Whether the workload also surfaces a `func bundles install <version>`
-subcommand (via `IExternalCommand`, Workload Spec §5.1) for ad-hoc
-prefetching is **deferred** (see §9 open questions).
-
-The bundles workload is responsible for verifying download integrity
-(checksum/signature) and for atomic extraction under `<bundles-home>`
-in both acquisition paths.
-
-### 5.4 Install / update hints
+### 5.4 Install hints
 
 When the provider returns `EmptyIntersection` or
-`NoCompatiblePayload`, it includes a fully-formed hint string the
+`NoCompatibleInstall`, it includes a fully-formed hint string the
 consumer prints verbatim. Example hints:
 
 - `EmptyIntersection`:
@@ -265,14 +260,13 @@ consumer prints verbatim. Example hints:
   '<host-range>'. There is no bundle version that satisfies both.
   Either widen host.json or pick a different profile.
   ```
-- `NoCompatiblePayload` (after on-demand fetch was attempted and
-  failed, or was not possible offline):
+- `NoCompatibleInstall`:
   ```
-  No <id> bundle satisfies <constraint-range>.
+  No installed bundles workload satisfies <constraint-range>
+  (id=<bundle-id>).
   Installed versions: <v1>, <v2>, ...
-  On-demand download failed: <reason>.
-  Try again when online, or update bundles with:
-    func workload update Azure.Functions.Cli.Workloads.ExtensionBundles
+  Install a satisfying version with:
+    func workload install Azure.Functions.Cli.Workloads.ExtensionBundles@<suggested-version> --force
   ```
 
 The bundles workload owns the wording; CT does not duplicate this
@@ -290,7 +284,7 @@ copy.
   [bundle-resolve] host.json range = <host-range>
   [bundle-resolve] profile '<profile>' range = <profile-range>
   [bundle-resolve] constraint = <intersection>
-  [bundle-resolve] installed versions = <v1>, <v2>, ...
+  [bundle-resolve] installed versions (filtered) = <v1>, <v2>, ...
   [bundle-resolve] selected = <version>
   [bundle-resolve] path = <resolved-path>
   ```
@@ -309,7 +303,7 @@ single `bundle-resolve` event:
 | `resolvedVersion` | Selected bundle version, or `null` on failure |
 | `profileName` | Active profile name, or `null` if no profile |
 | `succeeded` | `true` if the host was launched with a resolved bundle |
-| `reason` | `ok-in-package` \| `ok-cached` \| `ok-downloaded` \| `no-host-json-bundle` \| `workload-missing` \| `empty-intersection` \| `download-failed` |
+| `reason` | `ok` \| `no-host-json-bundle` \| `workload-missing` \| `empty-intersection` \| `no-compatible-install` |
 
 Workload install / update / uninstall telemetry is covered by the
 generic workload subsystem (Workload Spec §11); this spec adds none
@@ -318,43 +312,38 @@ there.
 ## 8. Compatibility & migration
 
 - **v4 → v5 projects.** Existing projects whose `host.json` declares
-  `extensionBundle` work unchanged in v5, **provided** the bundles
-  workload is installed and has a payload satisfying the project's
-  host.json range and the active profile.
+  `extensionBundle` work unchanged in v5, **provided** an installed
+  bundles workload version satisfies the project's host.json range
+  and the active profile.
 - **`func extensions install`.** Removed in v5. Added to the v4→v5
   migration map (Workload Spec §4.7):
   ```
   'extensions install' is no longer supported. Extension bundles are
-  delivered as a workload. Install it with:
-    func workload install Azure.Functions.Cli.Workloads.ExtensionBundles
+  delivered as a workload. Install a version with:
+    func workload install Azure.Functions.Cli.Workloads.ExtensionBundles@<version>
   ```
 - **In-CLI bundle download code.** `ExtensionBundleHelper`,
   `DownloadBundleAction`, `ExtensionBundleConfigurationBuilder`, and
   the related code paths in `Startup` are removed from the `func`
   binary in v5.
 - **Profiles.** Built-in profiles (cli-profiles §6.1) carry
-  `extensionBundle.version` ranges the bundle CDN is guaranteed to
-  satisfy at publication time. The bundles workload's default payload
-  set is curated so that the workload-installed-by-default scenario
-  works for those ranges out of the box.
+  `extensionBundle.version` ranges the bundles workload catalog is
+  guaranteed to satisfy at publication time.
 
 ## 9. Open questions
 
 1. Does the bundles workload expose a `func bundles ...` subcommand
-   (via `IExternalCommand`) for ad-hoc per-version pulls
-   (`func bundles install <version>`), so users can prefetch
-   bundles for offline scenarios without waiting for the on-demand
-   path at `func start`?
-2. **In-package curated set policy.** Which stable bundle versions
-   ship inside the workload `.nupkg` via `DownloadFile` at workload
-   build time? Latest stable major.minor only, or latest two minors,
-   or every minor in a supported range? This trades workload package
-   size against how often a fresh install needs an on-demand fetch.
-3. Should the workload retain old payloads on update, or prune them?
-   If prune, what's the retention policy (last N versions, anything
-   referenced by an installed profile, etc.)?
-4. Should `bundle-resolve` telemetry include constraint range strings
-   (potentially high cardinality) or just an outcome enum?
-5. Do we want an explicit "offline mode" flag/env var on `func start`
-   that suppresses the on-demand fetch even when network is
-   available (for reproducible CI builds, etc.)?
+   (via `IExternalCommand`) for ergonomic install / list of
+   bundles, or is the bare `func workload install` sufficient?
+2. **Bundle id mapping rule.** When host.json declares
+   `id=Microsoft.Azure.Functions.ExtensionBundle.Preview`, which
+   installed workload versions are candidates? Proposed: only
+   versions carrying a prerelease tag whose label set intersects
+   `{preview, experimental}` (or similar). Confirm the exact rule
+   and whether `.Preview` is still the only "preview-y" id in v5.
+3. Should `bundle-resolve` telemetry include constraint range
+   strings (potentially high cardinality) or just the outcome enum?
+4. Catalog feed: do bundle workload `.nupkg`s ship to the same
+   workload catalog as host-runtime workloads, or a dedicated
+   bundles feed? (Most likely the same feed; verify with the
+   Extension Bundle publishing pipeline owners.)
