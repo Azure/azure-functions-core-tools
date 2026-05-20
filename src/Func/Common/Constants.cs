@@ -28,11 +28,6 @@ internal static class Constants
     public const string VersionCacheFileName = ".version-check";
 
     /// <summary>
-    /// Directory name (under the user profile) the func CLI persists state in.
-    /// </summary>
-    public const string FuncHomeDirectoryName = ".azure-functions";
-
-    /// <summary>
     /// Prefix for the CLI environment variables, including those that bind into <c>IConfiguration</c>.
     /// </summary>
     public const string EnvironmentVariablePrefix = "FUNC_CLI_";

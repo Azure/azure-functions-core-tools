@@ -7,11 +7,28 @@ using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
-public class DotNetProjectInitializerTests
+public class DotNetProjectInitializerTests : IDisposable
 {
     private readonly IDotnetCliRunner _dotnetCli = Substitute.For<IDotnetCliRunner>();
+    private readonly ITemplateHivePathProvider _hivePathProvider = Substitute.For<ITemplateHivePathProvider>();
+    private readonly string _hivePath;
 
-    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli);
+    public DotNetProjectInitializerTests()
+    {
+        _hivePath = Path.Combine(Path.GetTempPath(), "func-test-hive-" + Guid.NewGuid().ToString("N"));
+        _hivePathProvider.HivePath.Returns(_hivePath);
+        _hivePathProvider.TimestampPath.Returns(Path.Combine(_hivePath, ".installed"));
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_hivePath))
+        {
+            Directory.Delete(_hivePath, recursive: true);
+        }
+    }
+
+    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider);
 
     [Fact]
     public void Stack_IsDotNet()
@@ -66,7 +83,7 @@ public class DotNetProjectInitializerTests
     [Fact]
     public void Constructor_ThrowsOnNullRunner()
     {
-        Assert.Throws<ArgumentNullException>(() => new DotNetProjectInitializer(null!));
+        Assert.Throws<ArgumentNullException>(() => new DotNetProjectInitializer(null!, _hivePathProvider));
     }
 
     [Fact]
@@ -74,16 +91,7 @@ public class DotNetProjectInitializerTests
     {
         DotNetProjectInitializer initializer = CreateInitializer();
 
-        string hivePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".azure-functions",
-            "dotnet-template-hive");
-        string timestampPath = Path.Combine(hivePath, ".installed");
-        if (File.Exists(timestampPath))
-        {
-            File.Delete(timestampPath);
-        }
-
+        // Timestamp doesn't exist (temp path with unique GUID), so install should run.
         await initializer.EnsureTemplatesInstalledAsync(CancellationToken.None);
 
         await _dotnetCli.Received(1).RunAsync(
@@ -96,29 +104,17 @@ public class DotNetProjectInitializerTests
     [Fact]
     public async Task EnsureTemplatesInstalledAsync_SkipsInstallWhenTimestampIsFresh()
     {
-        string hivePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".azure-functions",
-            "dotnet-template-hive");
-        string timestampPath = Path.Combine(hivePath, ".installed");
+        Directory.CreateDirectory(_hivePath);
+        File.WriteAllText(_hivePathProvider.TimestampPath, string.Empty);
+        File.WriteAllText(Path.Combine(_hivePath, "dummy-package"), string.Empty);
 
-        Directory.CreateDirectory(hivePath);
-        File.WriteAllText(timestampPath, string.Empty);
+        DotNetProjectInitializer initializer = CreateInitializer();
 
-        try
-        {
-            DotNetProjectInitializer initializer = CreateInitializer();
+        await initializer.EnsureTemplatesInstalledAsync(CancellationToken.None);
 
-            await initializer.EnsureTemplatesInstalledAsync(CancellationToken.None);
-
-            await _dotnetCli.DidNotReceive().RunAsync(
-                Arg.Any<IReadOnlyList<string>>(),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>());
-        }
-        finally
-        {
-            File.Delete(timestampPath);
-        }
+        await _dotnetCli.DidNotReceive().RunAsync(
+            Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
     }
 }

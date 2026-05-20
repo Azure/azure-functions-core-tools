@@ -3,8 +3,8 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Abstractions.Common;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
@@ -13,28 +13,26 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// Uses the <c>Microsoft.Azure.Functions.Worker.ProjectTemplates</c> NuGet
 /// template package to scaffold projects via <c>dotnet new func</c>.
 /// </summary>
-internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IProjectInitializer
+internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemplateHivePathProvider hivePathProvider) : IProjectInitializer
 {
     internal const string TemplatesPackageName = "Microsoft.Azure.Functions.Worker.ProjectTemplates";
     internal const string TemplateShortName = "func";
     internal const string DefaultFramework = "net10.0";
 
+    internal static readonly IReadOnlyList<string> SupportedFrameworks = ["net10.0"];
+
     internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(30);
-
-    private static readonly string _hivePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        Constants.FuncHomeDirectoryName,
-        "dotnet-template-hive");
-
-    private static readonly string _timestampPath = Path.Combine(_hivePath, ".installed");
+    internal static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
+    private readonly string _hivePath = (hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider))).HivePath;
+    private readonly string _timestampPath = (hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider))).TimestampPath;
 
     public string Stack => "dotnet";
 
     public IReadOnlyList<string> SupportedLanguages => ["C#", "F#", "csharp", "fsharp"];
 
-    public Option<string> FrameworkOption { get; } = new("--target-framework")
+    public Option<string> FrameworkOption { get; } = new("--tfm")
     {
         Description = "The target framework for the project (e.g. net10.0).",
         DefaultValueFactory = _ => DefaultFramework
@@ -51,11 +49,25 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
         ArgumentNullException.ThrowIfNull(parseResult);
 
         string projectPath = context.WorkingDirectory.Info.FullName;
-        string? projectName = context.ProjectName ?? Path.GetFileName(projectPath);
+
         string language = NormalizeLanguage(context.Language);
+        if (!SupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException($"Language '{context.Language}' is not supported. Supported languages: {string.Join(", ", SupportedLanguages)}.", nameof(context));
+        }
+
+        string projectName = context.ProjectName ?? Path.GetFileName(projectPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectName, nameof(context.ProjectName));
+
         string framework = parseResult.GetValue(FrameworkOption) ?? DefaultFramework;
+        if (!SupportedFrameworks.Contains(framework, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException($"Framework '{framework}' is not supported. Supported frameworks: {string.Join(", ", SupportedFrameworks)}.", nameof(framework));
+        }
 
         await EnsureTemplatesInstalledAsync(cancellationToken);
+
+        Directory.CreateDirectory(projectPath);
 
         List<string> args =
         [
@@ -63,12 +75,16 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
             "--name", projectName,
             "--output", projectPath,
             "--language", language,
-            "--Framework", framework,
+            "--framework", framework,
             "--debug:custom-hive", _hivePath,
-            "--force", // CLI creates host.json before calling this so we need to pass force for the the template to overwrite it.
         ];
 
-        await _dotnetCli.RunAsync(args, projectPath, cancellationToken);
+        if (context.Force)
+        {
+            args.Add("--force");
+        }
+
+        await RunWithTimeoutAsync(args, projectPath, cancellationToken);
     }
 
     internal async Task EnsureTemplatesInstalledAsync(CancellationToken cancellationToken)
@@ -78,7 +94,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
             return;
         }
 
-        await _dotnetCli.RunAsync(
+        await RunWithTimeoutAsync(
             ["new", "install", TemplatesPackageName, "--debug:custom-hive", _hivePath],
             workingDirectory: null,
             cancellationToken);
@@ -86,12 +102,39 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
         WriteTimestamp();
     }
 
-    private static bool IsHiveFresh()
+    private async Task RunWithTimeoutAsync(
+        IReadOnlyList<string> args,
+        string? workingDirectory,
+        CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource timeoutCts = new(OperationTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, timeoutCts.Token);
+
+        try
+        {
+            await _dotnetCli.RunAsync(args, workingDirectory, linkedCts.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new GracefulException(
+                $"The dotnet CLI operation timed out after {OperationTimeout.TotalMinutes:0} minutes. Check your network connection and try again.",
+                isUserError: true);
+        }
+    }
+
+    private bool IsHiveFresh()
     {
         try
         {
             if (!File.Exists(_timestampPath))
             {
+                return false;
+            }
+
+            if (!Directory.Exists(_hivePath) || !Directory.EnumerateFileSystemEntries(_hivePath).Skip(1).Any())
+            {
+                // Hive directory is missing or effectively empty; force reinstall.
                 return false;
             }
 
@@ -104,7 +147,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli) : IPr
         }
     }
 
-    private static void WriteTimestamp()
+    private void WriteTimestamp()
     {
         try
         {

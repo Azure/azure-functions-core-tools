@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.DotNet.Tests" />
-    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
   <ItemGroup>

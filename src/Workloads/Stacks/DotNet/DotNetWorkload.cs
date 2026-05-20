@@ -19,6 +19,7 @@ public sealed class DotNetWorkload : Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IDotnetCliRunner, DotnetCliRunner>();
+        builder.Services.AddSingleton<ITemplateHivePathProvider, TemplateHivePathProvider>();
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
     }
 }
