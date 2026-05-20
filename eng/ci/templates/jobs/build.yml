@@ -120,18 +120,27 @@ jobs:
           folderPath: $(publish_dir)
           signPatterns: '**/linux-*/func'
 
-      # macOS hardened runtime requires every loaded Mach-O (apphost + native
-      # dylibs) to be signed. ESRP's MacAppDeveloperSign requires the payload
-      # to be a .zip or .dmg, so we zip each osx-* rid folder, sign the zips,
-      # then expand them back over the publish output.
+      # macOS hardened runtime requires every loaded Mach-O to be signed.
+      # ESRP's MacAppDeveloperSign requires the payload to be a .zip or .dmg,
+      # so we zip each osx-* rid folder along with an entitlements.plist
+      # (so codesign can apply the JIT entitlements .NET needs at runtime),
+      # sign the zips, then expand them back over the publish output.
       - pwsh: |
           $ErrorActionPreference = 'Stop'
           $stage = Join-Path '$(publish_dir)' '_macsign'
+          $entitlements = Join-Path '$(Build.SourcesDirectory)' 'eng/res/entitlements.plist'
+          if (-not (Test-Path $entitlements)) {
+            throw "Entitlements file not found: $entitlements"
+          }
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Get-ChildItem -Path '$(publish_dir)' -Directory -Filter 'osx-*' | ForEach-Object {
+            $payload = @(
+              (Join-Path $_.FullName '*'),
+              $entitlements
+            )
             $zip = Join-Path $stage "$($_.Name).zip"
-            Compress-Archive -Path (Join-Path $_.FullName '*') -DestinationPath $zip -Force
-            Write-Host "Zipped $($_.Name) -> $zip"
+            Compress-Archive -Path $payload -DestinationPath $zip -Force
+            Write-Host "Zipped $($_.Name) (+ entitlements) -> $zip"
           }
         displayName: 'Package macOS runtimes for signing'
 
@@ -149,6 +158,9 @@ jobs:
             $dest = Join-Path '$(publish_dir)' $rid
             Remove-Item -Recurse -Force -Path $dest -ErrorAction SilentlyContinue
             Expand-Archive -Path $_.FullName -DestinationPath $dest -Force
+            # Drop the sidecar entitlements file from the published output -
+            # it was only needed inside the signing zip.
+            Remove-Item -Force -Path (Join-Path $dest 'entitlements.plist') -ErrorAction SilentlyContinue
             Write-Host "Restored signed $rid"
           }
           Remove-Item -Recurse -Force -Path $stage

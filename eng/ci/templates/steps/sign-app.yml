@@ -40,6 +40,15 @@ steps:
               },
               "ToolName" : "sign",
               "ToolVersion" : "1.0"
+          },
+          {
+              "KeyCode" : "CP-401337-Apple",
+              "OperationCode" : "MacAppNotarize",
+              "Parameters" : {
+                  "BundleId": "com.microsoft.azure.functions.cli"
+              },
+              "ToolName" : "sign",
+              "ToolVersion" : "1.0"
           }
         ]
     ${{ if eq(parameters.platform, 'windows') }}:
