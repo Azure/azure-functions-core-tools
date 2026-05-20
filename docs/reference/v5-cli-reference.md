@@ -16,6 +16,10 @@ This article provides reference documentation for the **Azure Functions CLI**, t
 
 ## Commands at a glance
 
+### Built-in commands
+
+These commands ship with the base CLI install.
+
 | Command | Description |
 | ----- | ----- |
 | [`func init`](#func-init) | Initialize a new Azure Functions project. |
@@ -24,6 +28,14 @@ This article provides reference documentation for the **Azure Functions CLI**, t
 | [`func workload`](#func-workload) | Manage installed CLI workloads. |
 | [`func help`](#func-help) | Display help for a command. |
 | [`func version`](#func-version) | Display version information. |
+
+### Workload-provided commands
+
+These commands are contributed by workloads. They appear only after the corresponding workload is installed.
+
+| Command | Provided by | Description |
+| ----- | ----- | ----- |
+| [`func quickstart`](#func-quickstart) | `quickstart` workload | Scaffold a new project from a predefined GitHub repository template. |
 
 ## Workloads
 
@@ -286,6 +298,26 @@ func version
 ```
 
 Equivalent to `func --version`. Pass `func --version --verbose` for detailed build, runtime, OS, and architecture information.
+
+## Workload-provided commands
+
+The commands in this section are contributed by workloads. They're available only after the corresponding workload is installed.
+
+### `func quickstart`
+
+Scaffolds a new Azure Functions project on your local computer from a predefined GitHub repository template. Use this when you want a ready-to-run sample that demonstrates a specific scenario (for example, an HTTP API, a queue-triggered function, or a Durable Functions app) rather than starting from an empty `func init` skeleton.
+
+Provided by the **`quickstart`** workload. Install it with:
+
+```command
+func workload install quickstart
+```
+
+```command
+func quickstart [<PATH>] [options]
+```
+
+When you supply `<PATH>`, the project is created in that folder. Otherwise, the current folder is used.
 
 ## Global options
 
