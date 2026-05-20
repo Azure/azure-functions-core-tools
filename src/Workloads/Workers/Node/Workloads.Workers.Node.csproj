@@ -5,7 +5,7 @@
     <Title>Azure Functions CLI Node.js Language Worker</Title>
     <Description>Azure Functions CLI content workload that ships the Node.js language worker.</Description>
     <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:content alias:node-worker func-workload</PackageTags>
+    <PackageTags>kind:content alias:node-worker func-worker func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
