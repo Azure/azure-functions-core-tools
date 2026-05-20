@@ -50,7 +50,7 @@
 | **Bundle id** | The `host.json` `extensionBundle.id` value, e.g. `Microsoft.Azure.Functions.ExtensionBundle` or `Microsoft.Azure.Functions.ExtensionBundle.Preview`. |
 | **Bundle version** | A SemVer version of an extension bundle payload, e.g. `4.22.0`. |
 | **Bundles workload** | The single workload package `Azure.Functions.Cli.Workloads.ExtensionBundles` (`kind: workload`) that provides bundle resolution and owns the on-disk payload cache. |
-| **Bundles home** | The on-disk root the bundles workload uses for payloads. Defaults to `<workload-home>/bundles` (i.e. `~/.azure-functions/bundles`). Override via `FUNC_CLI_Bundles__Home`. |
+| **Bundles home** | The on-disk root the bundles workload uses for payloads. Defaults to `<workload-home>/bundles` (i.e. `~/.azure-functions/bundles`). Override via `FUNC_CLI_BUNDLES_HOME`. |
 | **Resolved bundle path** | A directory path returned by the bundles workload to a consumer (e.g. `func start`). Its layout matches today's bundle zip layout exactly so the Functions runtime host needs no changes to consume it. |
 
 ## 4. Architecture
@@ -179,9 +179,11 @@ The bundles workload manages payloads under:
 
 Default `<bundles-home>` is `<workload-home>/bundles`, i.e.
 `~/.azure-functions/bundles`. Override via the
-`FUNC_CLI_Bundles__Home` environment variable (same convention as
-`FUNC_CLI_Workloads__Home`, Workload Spec §11). The bundles workload
-**must** honor this override.
+`FUNC_CLI_BUNDLES_HOME` environment variable (same convention as
+`FUNC_CLI_WORKLOADS_HOME`, Workload Spec §11). Resolution mirrors
+`WorkloadHomeResolver` exactly: explicit env var wins, otherwise
+nest under the workload home (which itself honors
+`FUNC_CLI_WORKLOADS_HOME`).
 
 The contents under `<bundle-version>/` mirror today's extension
 bundle zip layout exactly. Returning this directory to a consumer
