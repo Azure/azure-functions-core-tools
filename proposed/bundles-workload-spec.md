@@ -56,7 +56,7 @@
 | Term | Meaning |
 |------|---------|
 | **Bundle id** | The `host.json` `extensionBundle.id` value, e.g. `Microsoft.Azure.Functions.ExtensionBundle` or `Microsoft.Azure.Functions.ExtensionBundle.Preview`. |
-| **Bundle version** | A SemVer version of an extension bundle payload, e.g. `4.22.0` (stable) or `4.33.0-experimental.1` (prerelease). Prerelease tags carry preview / experimental builds. |
+| **Bundle version** | A SemVer version of an extension bundle payload, e.g. `4.22.0` (stable) or `4.33.0-experimental` (prerelease). Prerelease tags carry preview / experimental builds. |
 | **Bundles workload** | The single workload package id `Azure.Functions.Cli.Workloads.ExtensionBundles` (`kind: workload`). Each installed instance of this workload carries exactly **one** bundle version, packaged at workload-build time. The workload version is **always equal to the bundle version it packages**. |
 | **Bundle workload install dir** | The directory the workload subsystem extracts an installed bundles workload into, per Workload Spec §6.1: `<workload-home>/workloads/azure.functions.cli.workloads.extensionbundles/<bundle-version>/`. |
 | **Resolved bundle path** | The directory the provider returns to a consumer. It is a subdirectory of the bundle workload install dir whose contents match today's extension bundle zip layout exactly, so the Functions runtime host needs no changes to consume it. |
@@ -76,7 +76,7 @@ The workload version equals the bundle version it packages:
 | `func workload install …` | Bundle version delivered |
 |---------------------------|--------------------------|
 | `Azure.Functions.Cli.Workloads.ExtensionBundles@4.22.0` | `4.22.0` |
-| `Azure.Functions.Cli.Workloads.ExtensionBundles@4.33.0-experimental.1` | `4.33.0-experimental.1` |
+| `Azure.Functions.Cli.Workloads.ExtensionBundles@4.33.0-experimental` | `4.33.0-experimental` |
 
 Multiple bundle versions coexist on disk by installing the workload
 multiple times with `func workload install --force` (Workload Spec
@@ -98,9 +98,12 @@ Rationale:
 
 Preview and experimental bundles do **not** get a separate workload
 package id. They are expressed as SemVer prerelease versions of the
-same package, e.g. `4.33.0-preview.1`, `4.33.0-experimental.2`. This
-matches NuGet's own prerelease convention and lets the workload
-subsystem manage them with no new code paths.
+same package: `4.33.0-preview`, `4.33.0-experimental`. The
+prerelease label is a bare channel name with **no** numeric
+disambiguator; a republished preview/experimental drop for the same
+`<major>.<minor>.<patch>` overwrites its predecessor in the workload
+catalog. This matches NuGet's prerelease convention while keeping
+the version strings short and obvious.
 
 `host.json` continues to support both bundle ids
 (`Microsoft.Azure.Functions.ExtensionBundle` and
