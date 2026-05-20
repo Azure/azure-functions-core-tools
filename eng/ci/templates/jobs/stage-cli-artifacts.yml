@@ -22,9 +22,6 @@ jobs:
     drop_path: $(Pipeline.Workspace)/drop
 
   templateContext:
-    type: releaseJob
-    isProduction: true
-
     inputs:
     # TODO: fetch pdb's in a separate stage and upload to symbol server
     - input: pipelineArtifact
