@@ -46,9 +46,10 @@
   any other content workload) and is out of scope for this spec.
 - **Bundle CDN access from CT at runtime.** Neither the CLI nor the
   bundles workload contacts the bundle CDN at run time. The bundle
-  payload is part of the workload `.nupkg`, fetched from the CDN
-  exactly once at workload-build time by the workload's own MSBuild
-  process.
+  payload is part of the workload `.nupkg`, fetched from the bundle
+  build pipeline's artifacts (or, interim, the CDN) exactly once at
+  workload-build time by the workload's own MSBuild process. See
+  §5.3 for the payload-source pivot.
 - **Custom bundles install root.** Bundle payloads live inside the
   workload install directory under `<workload-home>`. There is no
   second on-disk root, no bundles-specific override env var, and no
@@ -159,8 +160,8 @@ following live in the `func` CLI core (concretely: in
   events (§6, §5.4, §7).
 
 The bundles workload contains **only** the bundle payload and the
-build-time `DownloadFile` plumbing that fetched it from the bundle
-CDN (§5.3). It has no runtime code.
+build-time plumbing that fetched it from the bundle build pipeline
+(or, interim, the CDN: §5.3). It has no runtime code.
 
 #### 4.3.1 Component shape
 
@@ -330,24 +331,75 @@ is no second on-disk root.
 ### 5.3 Packaging (workload build time)
 
 The bundles workload `.csproj` is a packaging-only project (no
-runtime assembly). It uses the MSBuild `DownloadFile` task to
-fetch the bundle payload for the target version from the bundle
-CDN once, at workload-build time, and packs it into the `.nupkg`
-under `tools/any/`. Practical consequences:
+runtime assembly). At workload-build time, MSBuild fetches the
+bundle payload zip for the target version, unpacks the bundle into
+the workload output, and packs the result into the `.nupkg` under
+`tools/any/`.
 
-- The CDN is contacted by the **build pipeline that publishes the
-  workload**, not by any user machine running `func`.
+#### 5.3.1 Payload source: bundle pipeline build artifacts
+
+The canonical payload source is the **bundle build pipeline's
+artifacts feed** in Azure DevOps, not the public bundle CDN.
+
+- The bundles repo publishes a pipeline build per branch. The
+  three branches that matter for this spec are:
+  - `main` → stable bundle versions.
+  - `main-preview` → preview bundle versions.
+  - `main-experimental` → experimental bundle versions.
+- Each successful build publishes an artifact named `zip` that
+  contains, among other things, files of the shape:
+  `Microsoft.Azure.Functions.ExtensionBundle.<version>_any-any.zip`
+  (one per platform; bundles ship a platform-neutral `any-any`
+  variant which is the one this workload uses).
+- The bundles-workload build pipeline downloads exactly that file
+  for the target `<version>` from the build matching the SemVer
+  prerelease channel (stable / preview / experimental).
+
+This gives the bundles workload the same payload that has been
+signed and validated by the bundles release process, with no
+dependency on the public CDN at workload-build time and no
+dependency on the CDN at user-run time.
+
+#### 5.3.2 Interim: temporary CDN fetch
+
+For the first cut, while the workload still lives in
+`Azure/azure-functions-core-tools` and is decoupled from the
+bundles release schedule, MSBuild uses `DownloadFile` against the
+**public bundle CDN** as a quick-setup payload source. This is an
+implementation detail of the workload build and has no effect on
+the on-disk shape or on `func` runtime behavior.
+
+The pivot to build artifacts happens when:
+
+- The bundles workload moves into the bundles repo (or is wired
+  into the bundles release pipeline from this repo), so the
+  workload `.nupkg` and the bundle `.zip` are produced by the same
+  build and the artifact handle is naturally available; or
+- The bundle release process exposes a stable cross-pipeline
+  artifact download URL the workload build can target without
+  manual handling.
+
+Until then, refreshing the pinned bundle payload requires manually
+downloading the artifact zip from the bundle pipeline run and
+updating the `DownloadFile` URL + checksum in the workload csproj.
+Tracking this transition is open question §9.Q5.
+
+#### 5.3.3 Consequences (shared between both payload sources)
+
+- The payload source is contacted by the **build pipeline that
+  publishes the workload**, not by any user machine running
+  `func`.
 - A user's machine acquires the bundle through the normal
   `func workload install` flow, which downloads the workload
   `.nupkg` from its catalog feed (Workload Spec §6.1).
 - Reproducibility: an installed workload version always carries
   the exact bundle payload that was packed at build time. There
-  is no drift between "what the workload version says" and
-  "what's on disk."
+  is no drift between "what the workload version says" and "what's
+  on disk."
 - Preview / experimental versions are produced the same way; the
   only difference is the SemVer prerelease tag on the workload
-  version and the corresponding URL the `DownloadFile` task
-  pulls from.
+  version and the corresponding bundle artifact branch
+  (`main-preview` / `main-experimental`) the build pulls from.
 
 ### 5.4 Install hints
 
@@ -447,3 +499,15 @@ none there.
    workload catalog as host-runtime workloads, or a dedicated
    bundles feed? Most likely the same feed; verify with the
    Extension Bundle publishing pipeline owners.
+5. **Payload-source pivot (CDN → build artifacts).** The first
+   cut pulls the bundle payload from the public bundle CDN via
+   MSBuild `DownloadFile` (§5.3.2) because the bundles workload
+   lives in this repo and not in the bundles repo. The target
+   state is to consume the bundle build pipeline's `zip` artifact
+   per branch (`main` / `main-preview` / `main-experimental`,
+   §5.3.1) so the workload version always packs a payload that
+   was produced and signed by the same pipeline run. Decide:
+   does the bundles workload move into the bundles repo, or
+   stay here and consume the artifact cross-pipeline? Either
+   option resolves this question. Until it is resolved, refreshing
+   the pinned bundle payload is a manual artifact download.
