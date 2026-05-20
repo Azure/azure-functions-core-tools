@@ -39,7 +39,7 @@ extends:
       jobs:
       - template: /eng/ci/templates/jobs/build.yml@self
         parameters:
-          sign: true
+          sign: false
           artifacts: ['publish']
           projects: |
             src/Func/Func.csproj

@@ -24,12 +24,14 @@ jobs:
   templateContext:
     inputs:
     # TODO: fetch pdb's in a separate stage and upload to symbol server
+    # IMPORTANT: DownloadArtifacts itemPattern behaves differently than normal file matching.
+    # Exclude patterns are basically not supported.
     - input: pipelineArtifact
       targetPath: $(drop_path)
       artifactName: drop_cli
       itemPattern: |
-        **/*
-        !**/*.pdb
+        **/func
+        **/func.exe
 
     outputs:
     - ${{ each runtime in parameters.runtimes }}:
@@ -40,3 +42,4 @@ jobs:
         versionOption: custom
         versionPublish: $(Build.BuildNumber)
         packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'
+
