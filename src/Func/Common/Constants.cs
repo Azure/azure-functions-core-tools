@@ -34,7 +34,6 @@ internal static class Constants
 
     /// <summary>
     /// Prefix for the CLI environment variables, including those that bind into <c>IConfiguration</c>.
-    /// e.g. <c>FUNC_CLI_Workloads__Home</c> binds <c>Workloads:Home</c>.
     /// </summary>
     public const string EnvironmentVariablePrefix = "FUNC_CLI_";
 
