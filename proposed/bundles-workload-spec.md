@@ -45,7 +45,10 @@
   workload-build time by the workload's own MSBuild process.
 - **Custom bundles install root.** Bundle payloads live inside the
   workload install directory under `<workload-home>`. There is no
-  second on-disk root, no override env var, and no plan to add one.
+  second on-disk root, no bundles-specific override env var, and no
+  plan to add one. (`<workload-home>` itself is customizable via
+  `FUNC_CLI_WORKLOADS_HOME`, per Workload Spec §11; this naturally
+  relocates bundle installs along with everything else.)
 - **CT → host transport beyond today's env vars.** If a future
   CT-host workload introduces a different startup transport, that is
   out of scope for this spec.
