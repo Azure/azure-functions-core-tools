@@ -39,7 +39,7 @@ These commands are contributed by workloads. They appear only after the correspo
 
 ## Workloads
 
-The Azure Functions CLI follows a **workload model**, similar to the .NET SDK. The `func` binary itself is small and language-agnostic. Everything that's stack-specific (Python, Node.js, .NET, Go) or tool-specific (extension bundles) is delivered as a separate **workload** package that you install on demand.
+The Azure Functions CLI follows a **workload model**. The `func` binary itself is small and language-agnostic. Everything that's stack-specific (Python, Node.js, .NET, Go) or tool-specific (extension bundles) is delivered as a separate **workload** package that you install on demand.
 
 ### Why workloads?
 
@@ -50,14 +50,14 @@ The Azure Functions CLI follows a **workload model**, similar to the .NET SDK. T
 
 ### What's in a workload?
 
-A workload is a NuGet-style package that contributes one or more of:
+A workload is a package that contributes one or more of:
 
 * **A project initializer.** Enables `func init --stack <name>` for that language.
 * **Templates.** Enables `func new` to scaffold functions in that language.
 * **Commands.** Adds new subcommands under `func` (for example, an extension bundle manager).
 * **Services.** Plugs into shared CLI services (project detection, host startup, and so on).
 
-Workloads are versioned independently from the CLI and are installed side-by-side. Only the highest installed semver of each workload is loaded at runtime; older versions stay on disk for rollback.
+Workloads are versioned independently from the CLI and are installed side-by-side. Only the highest installed version of each workload is loaded at run time; older versions stay on disk for rollback.
 
 ### First-run experience
 
@@ -85,7 +85,7 @@ What each role does:
 | **`templates`** | The function templates surfaced by `func new`. |
 
 > [!NOTE]
-> The `bundles` workload is recommended for any non-.NET stack. .NET projects reference extensions through NuGet directly and don't need it. .NET also doesn't require a separate worker workload, because the worker is part of the compiled project itself.
+> The `bundles` workload is recommended for any non-.NET stack. .NET projects reference extensions through their project file directly and don't need it. .NET also doesn't require a separate worker workload, because the worker is part of the compiled project itself.
 
 You don't have to install these one at a time. The first time you run `func init`, `func new`, or `func start`, the CLI prompts you to install the recommended set for your chosen stack.
 
@@ -185,7 +185,7 @@ Manages workloads installed for the Azure Functions CLI. Subcommands:
 
 ### `func workload list`
 
-Lists installed workloads. By default, only the loaded (highest-semver) version of each workload is shown. Pass `--all-versions` to see every side-by-side install.
+Lists installed workloads. By default, only the loaded (highest-version) install of each workload is shown. Pass `--all-versions` to see every side-by-side install.
 
 ```command
 func workload list [options]
@@ -208,7 +208,7 @@ When `<QUERY>` is omitted, all workloads in the catalog are listed.
 
 | Option | Description |
 | ----- | ----- |
-| **`--source`** | NuGet feed URI to search. Defaults to the configured catalog. |
+| **`--source`** | Catalog source URL to search. Defaults to the configured catalog. |
 | **`--prerelease`** | Include prerelease versions in the results. |
 | **`--json`** | Emit machine-readable JSON instead of a table. |
 
@@ -220,11 +220,11 @@ Resolves a workload package id (or alias) through the configured catalog and ins
 func workload install <ID> [options]
 ```
 
-`<ID>` can be a workload package id, an alias (for example, `python`), or a path to a local `.nupkg` file.
+`<ID>` can be a workload package id, an alias (for example, `python`), or a path to a local workload package file.
 
 | Option | Description |
 | ----- | ----- |
-| **`--version`**, **`-v`** | Specific semver version to install. Default: the latest stable version in the catalog. |
+| **`--version`**, **`-v`** | Specific version to install. Default: the latest stable version in the catalog. |
 | **`--source`** | Catalog source URL or local directory to resolve from. Default: the configured catalog. |
 | **`--prerelease`** | Allow prerelease versions when resolving from the catalog. Default: stable only. |
 | **`--force`**, **`-f`** | Overwrite an existing install of the same id and version. Also skips the "use update instead" prompt. |
@@ -244,7 +244,7 @@ Pass an `<ID>` to update a single workload, or `--all` to update every installed
 
 | Option | Description |
 | ----- | ----- |
-| **`--version`**, **`-v`** | Installed version to replace. Default: the highest installed semver. |
+| **`--version`**, **`-v`** | Installed version to replace. Default: the highest installed version. |
 | **`--all`** | Update every installed workload. Mutually exclusive with `<ID>`. |
 | **`--major`** | Allow crossing a major-version boundary. Default: same major only. |
 | **`--source`** | Catalog source URL or local directory to resolve from. Default: the configured catalog. |
