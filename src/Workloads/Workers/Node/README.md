@@ -13,6 +13,6 @@ func workload install node-worker
 
 ## Status
 
-Preview. Worker assets are sourced from the
-`Microsoft.Azure.Functions.NodeJsWorker` NuGet package. The `content/` folder
-is the placeholder where the worker payload is staged before packing.
+Preview. Worker assets are pulled at pack time from the restored
+`Microsoft.Azure.Functions.NodeJsWorker` NuGet package and packed under
+`content/workers/node/` in the resulting workload NuGet.

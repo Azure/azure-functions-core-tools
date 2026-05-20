@@ -13,6 +13,6 @@ func workload install go-worker
 
 ## Status
 
-Preview. Go has no upstream worker NuGet; drop the static worker config and
-related assets into `content/` and they will be packed under `content/` in the
-resulting NuGet.
+Preview. Go has no upstream worker NuGet; the workload ships a static native
+`worker.config.json` from `content/workers/go/` that points the host at a
+user-built Go executable (`bin/app`).

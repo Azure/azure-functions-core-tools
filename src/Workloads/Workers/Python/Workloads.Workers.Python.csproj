@@ -9,19 +9,37 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+    <NoWarn>$(NoWarn);NU5128;NU5100;NU5123</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker">
+    <!--
+      We restore the worker package only to read its payload from disk; we do
+      not want any of its assets imported into this project (the package ships
+      build targets and tools/ files that would otherwise affect output).
+      GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_PythonWorker)
+      pointing at the restored package root.
+    -->
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" GeneratePathProperty="true">
       <PrivateAssets>all</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
+      <IncludeAssets>none</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <None Include="workload.json" Pack="true" PackagePath="/" />
-    <Content Include="content/**" Pack="true" PackagePath="content/" />
   </ItemGroup>
+
+  <Target Name="IncludePythonWorkerContentInPack" BeforeTargets="_GetPackageFiles">
+    <Error Condition="'$(PkgMicrosoft_Azure_Functions_PythonWorker)' == ''"
+           Text="Microsoft.Azure.Functions.PythonWorker package path not resolved. Run 'dotnet restore' first." />
+    <ItemGroup>
+      <_PythonWorkerFile Include="$(PkgMicrosoft_Azure_Functions_PythonWorker)/tools/**/*" />
+      <None Include="@(_PythonWorkerFile)"
+            TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+            Pack="true"
+            PackagePath="content/workers/python/" />
+    </ItemGroup>
+  </Target>
 
 </Project>

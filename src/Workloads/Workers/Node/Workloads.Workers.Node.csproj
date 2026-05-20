@@ -13,15 +13,33 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker">
+    <!--
+      We restore the worker package only to read its payload from disk; we do
+      not want any of its assets imported into this project (the package ships
+      build targets and contentFiles that would otherwise affect output).
+      GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_NodeJsWorker)
+      pointing at the restored package root.
+    -->
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" GeneratePathProperty="true">
       <PrivateAssets>all</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
+      <IncludeAssets>none</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <None Include="workload.json" Pack="true" PackagePath="/" />
-    <Content Include="content/**" Pack="true" PackagePath="content/" />
   </ItemGroup>
+
+  <Target Name="IncludeNodeWorkerContentInPack" BeforeTargets="_GetPackageFiles">
+    <Error Condition="'$(PkgMicrosoft_Azure_Functions_NodeJsWorker)' == ''"
+           Text="Microsoft.Azure.Functions.NodeJsWorker package path not resolved. Run 'dotnet restore' first." />
+    <ItemGroup>
+      <_NodeWorkerFile Include="$(PkgMicrosoft_Azure_Functions_NodeJsWorker)/contentFiles/any/any/workers/node/**/*" />
+      <None Include="@(_NodeWorkerFile)"
+            TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+            Pack="true"
+            PackagePath="content/workers/node/" />
+    </ItemGroup>
+  </Target>
 
 </Project>
