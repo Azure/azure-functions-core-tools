@@ -8,7 +8,9 @@
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
   </Folder>
-  <Folder Name="/src/Workloads/" />
+  <Folder Name="/src/Workloads/">
+    <Project Path="src/Workloads/Host/Workloads.Host.csproj" />
+  </Folder>
   <Folder Name="/src/Workloads/Stacks/">
     <Project Path="src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
     <Project Path="src/Workloads/Stacks/Go/Workloads.Go.csproj" />

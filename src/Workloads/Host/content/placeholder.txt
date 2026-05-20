@@ -1,0 +1,1 @@
+Host payload assets will be staged in this folder before packing.
