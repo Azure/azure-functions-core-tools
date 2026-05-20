@@ -34,7 +34,7 @@ public class GoWorkloadTests
     }
 
     [Fact]
-    public void Configure_RegistersProjectResolver()
+    public void Configure_AddsProjectFactory()
     {
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
@@ -42,6 +42,6 @@ public class GoWorkloadTests
 
         new GoWorkload().Configure(builder);
 
-        builder.Received(1).RegisterProjectResolver(Arg.Any<GoProjectResolver>());
+        builder.Received(1).AddProjectFactory(Arg.Any<GoProjectFactory>());
     }
 }

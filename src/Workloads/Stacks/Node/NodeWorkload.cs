@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Workloads.Node;
 
 /// <summary>
 /// Entry-point for the Node workload. Registers Node-specific
-/// services (project initializer today; resolver / commands later).
+/// services (project initializer today; project factory / commands later).
 /// </summary>
 public sealed class NodeWorkload : Workload
 {
@@ -21,6 +21,6 @@ public sealed class NodeWorkload : Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
-        builder.RegisterProjectResolver(new NodeProjectResolver());
+        builder.AddProjectFactory(new NodeProjectFactory());
     }
 }

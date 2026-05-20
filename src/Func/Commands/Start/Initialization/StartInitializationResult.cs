@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -14,4 +15,6 @@ internal sealed record StartInitializationResult(
     IHostEventStream EventStream,
     string HostVersion,
     bool BundleRequired,
-    string? BundleVersion);
+    string? BundleVersion,
+    FunctionsProject Project,
+    FunctionsProjectHostRunContext HostRunContext);

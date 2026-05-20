@@ -2,13 +2,19 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.DemoProject;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Workers;
+using Azure.Functions.Cli.Workloads;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using static Azure.Functions.Cli.Projects.FunctionsProjectResolver;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -73,7 +79,17 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
         }
 
-        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting.
+        builder.Services.AddSingleton<IFunctionsWorkerResolver, DefaultFunctionsWorkerResolver>();
+        builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
+        builder.Services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
+        builder.Services.AddSingleton(new WorkloadProjectFactoryRegistration(
+            new WorkloadInfo(new DotnetWorkload(), "test", "1.0", [], "test", "description"),
+            new DemoProjectFactory()));
+
+        builder.Services.AddSingleton<StartDashboardEventStreamFactory>();
+
+        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting, so
+        // FUNC_CLI_Workloads__Home binds to WorkloadPathsOptions.Home.
         configurationSourceBuilder.AddSources(builder.Configuration, workingDirectory);
         builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();

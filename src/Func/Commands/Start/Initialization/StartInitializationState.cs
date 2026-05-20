@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -16,7 +17,9 @@ internal sealed class StartInitializationState
 
     public string? HostVersion { get; set; }
 
-    public RuntimeStackInfo? StackInfo { get; set; }
+    public FunctionsProject? Project { get; set; }
+
+    public FunctionsProjectHostRunContext? HostRunContext { get; set; }
 
     public string? BundleVersion { get; set; }
 
@@ -27,19 +30,19 @@ internal sealed class StartInitializationState
         ArgumentNullException.ThrowIfNull(context);
 
         string hostVersion = HostVersion ?? throw new InvalidOperationException("Host version was not resolved.");
-        RuntimeStackInfo stackInfo = StackInfo ?? throw new InvalidOperationException("Application stack was not resolved.");
+        FunctionsProject project = Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+        FunctionsProjectHostRunContext hostRunContext = HostRunContext ?? throw new InvalidOperationException("Host run context was not prepared.");
         IHostEventStream eventStream = EventStream ?? throw new InvalidOperationException("Host event stream was not initialized.");
 
-        var runInfo = new DashboardRunInfo(
-            CliVersion: context.CliVersion,
-            ProfileName: ProfileName,
-            StackName: stackInfo.StackName);
+        var runInfo = new DashboardRunInfo(context.CliVersion, ProfileName, project.StackDisplayName);
 
         return new StartInitializationResult(
             runInfo,
             eventStream,
             hostVersion,
-            stackInfo.SupportsBundles,
-            BundleVersion);
+            project.SupportsExtensionBundles,
+            BundleVersion,
+            project,
+            hostRunContext);
     }
 }

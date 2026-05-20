@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Commands;
@@ -181,7 +182,55 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, initializationResult.EventStream);
         var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink);
-        return await pipeline.RunAsync(cancellationToken);
+        FunctionsProjectHostRunOutcome? outcome = null;
+        try
+        {
+            int exitCode = await pipeline.RunAsync(cancellationToken);
+            outcome = FunctionsProjectHostRunOutcomes.Completed(exitCode);
+            return exitCode;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            outcome = FunctionsProjectHostRunOutcomes.Canceled();
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = FunctionsProjectHostRunOutcomes.Failed(ex);
+            throw;
+        }
+        finally
+        {
+            if (outcome is not null)
+            {
+                await CompleteProjectHostRunAsync(initializationResult, outcome);
+            }
+        }
+    }
+
+    private async Task CompleteProjectHostRunAsync(
+        StartInitializationResult initializationResult,
+        FunctionsProjectHostRunOutcome outcome)
+    {
+        using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var completionContext = new FunctionsProjectHostRunCompletionContext(
+            initializationResult.HostRunContext,
+            outcome);
+
+        try
+        {
+            await initializationResult.Project.CompleteHostRunAsync(completionContext, cleanupCts.Token);
+        }
+        catch (OperationCanceledException) when (cleanupCts.IsCancellationRequested)
+        {
+            _interaction.WriteWarning("Project cleanup did not complete within 5 seconds.");
+        }
+        catch (Exception ex)
+        {
+            // Project cleanup runs after the host outcome is known, so keep the
+            // original host result primary and surface cleanup as a warning.
+            _interaction.WriteWarning($"Project cleanup failed: {ex.Message}");
+        }
     }
 
     private HostStartupOptions GetHostStartupOptions(DirectoryInfo projectDirectory)

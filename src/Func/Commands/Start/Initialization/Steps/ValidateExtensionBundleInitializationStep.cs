@@ -4,7 +4,7 @@
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
-/// Validates extension bundle requirements for the resolved app stack.
+/// Validates extension bundle requirements for the resolved project.
 /// </summary>
 internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializationStep
 {
@@ -20,9 +20,9 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
     {
         await SimulateWorkAsync(context, cancellationToken);
 
-        string stackName = context.State.StackInfo?.StackName ?? "unknown";
-        
-        string message = context.State.StackInfo?.SupportsBundles == true
+        string stackName = context.State.Project?.StackDisplayName ?? "unknown";
+
+        string message = context.State.Project?.SupportsExtensionBundles == true
             ? "Bundle validation is not implemented in the prototype"
             : $"No extension bundle required for {stackName}";
 

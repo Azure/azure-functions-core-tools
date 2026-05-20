@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Func": {
+      "commandName": "Project",
+      "commandLineArgs": "start ."
+    }
+  }
+}

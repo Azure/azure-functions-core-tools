@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
@@ -65,6 +66,7 @@ internal static class TestParser
         services.AddOptions<StackOptions>();
         services.AddOptions<HostStartupOptions>();
         services.AddBuiltInCommands();
+        services.AddSingleton(Substitute.For<IStartInitializationRunner>());
 
         // Stub the workload subsystem so commands that depend on it (e.g.
         // WorkloadListCommand) resolve without booting real storage / loading.
