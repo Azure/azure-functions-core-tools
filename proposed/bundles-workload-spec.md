@@ -41,7 +41,9 @@
   the host-workload rule (Workload Spec §4.5): a missing or
   unsatisfying installed workload set causes `func start` to print
   an install hint and exit non-zero. CT never installs workloads
-  implicitly.
+  implicitly. Auto-install gated on profile opt-in is a separate
+  cross-cutting concern (will apply to host runtime, bundles, and
+  any other content workload) and is out of scope for this spec.
 - **Bundle CDN access from CT at runtime.** Neither the CLI nor the
   bundles workload contacts the bundle CDN at run time. The bundle
   payload is part of the workload `.nupkg`, fetched from the CDN
