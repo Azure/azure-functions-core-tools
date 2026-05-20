@@ -210,23 +210,23 @@ sub-namespace. Concretely:
 ```
 src/Cli/func/
   Bundles/
-    IExtensionBundleResolver.cs       # (abstraction re-exported)
     ExtensionBundleResolver.cs
     InstalledBundleWorkloads.cs       # IInstalledBundleWorkloads impl
     ExtensionBundleResolution.cs      # result union
     BundleHintBuilder.cs              # §5.4 copy
     BundleTelemetry.cs                # §7 event shape
+    ValidateExtensionBundleInitializationStep.cs  # func start consumer
 src/Cli/Abstractions/
   Bundles/
     IInstalledBundleWorkloads.cs
     IExtensionBundleResolver.cs
 ```
 
-The only file outside `Bundles/` that knows about bundles is
-`ValidateExtensionBundleInitializationStep` in the `func start`
-pipeline, and it talks to the resolver purely through
-`IExtensionBundleResolver`. No other CT subsystem references types
-under `Bundles/` directly.
+`ValidateExtensionBundleInitializationStep` is registered into the
+`func start` initialization pipeline from its usual composition
+root, but the type itself lives under `Bundles/` so the whole
+feature is colocated. No other CT subsystem references types under
+`Bundles/` directly.
 
 This isolation is a soft guarantee that the bundles resolver can
 be lifted into a separate assembly (e.g. an
