@@ -75,6 +75,7 @@ The workload version equals the bundle version it packages:
 | `func workload install …` | Bundle version delivered |
 |---------------------------|--------------------------|
 | `Azure.Functions.Cli.Workloads.ExtensionBundles@4.22.0` | `4.22.0` |
+| `Azure.Functions.Cli.Workloads.ExtensionBundles@4.33.0-preview` | `4.33.0-preview` |
 | `Azure.Functions.Cli.Workloads.ExtensionBundles@4.33.0-experimental` | `4.33.0-experimental` |
 
 Multiple bundle versions coexist on disk by installing the workload
