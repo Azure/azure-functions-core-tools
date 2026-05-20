@@ -1,0 +1,55 @@
+<Project>
+
+  <!--
+    Pack-time: download the extension bundle whose version matches the
+    workload's $(VersionPrefix) from the CDN and embed it under tools/any/
+    in the nupkg. The CLI's bundle resolver expects this exact subpath.
+    Runs only when packing so plain `dotnet build` (and CI test runs) do
+    not pay the cost. Set SkipDefaultBundleDownload=true to opt out (e.g.
+    for fully offline pack of a developer build, or a PR build whose
+    $(VersionPrefix) is not yet published to the CDN).
+
+    TODO(spec §5.4): branch on prerelease label so the preview/experimental
+    workload pulls from the matching CDN id. For now hardcoded to stable.
+  -->
+
+  <PropertyGroup>
+    <_BundleCdnId>Microsoft.Azure.Functions.ExtensionBundle</_BundleCdnId>
+  </PropertyGroup>
+
+  <Target Name="DownloadDefaultBundle"
+          Condition="'$(SkipDefaultBundleDownload)' != 'true'"
+          BeforeTargets="GenerateNuspec;_GetPackageFiles"
+          Inputs="$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)bundle\.extracted">
+    <PropertyGroup>
+      <_BundleVersion>$(VersionPrefix)</_BundleVersion>
+      <_BundleCdnZipUrl>https://cdn.functions.azure.com/public/ExtensionBundles/$(_BundleCdnId)/$(_BundleVersion)/$(_BundleCdnId).$(_BundleVersion).zip</_BundleCdnZipUrl>
+      <_BundleStaging>$(IntermediateOutputPath)bundle\</_BundleStaging>
+      <_BundleZipName>$(_BundleCdnId).$(_BundleVersion).zip</_BundleZipName>
+      <_BundleZipPath>$(IntermediateOutputPath)$(_BundleZipName)</_BundleZipPath>
+      <_BundleMarker>$(_BundleStaging).extracted</_BundleMarker>
+    </PropertyGroup>
+    <MakeDir Directories="$(_BundleStaging)" />
+    <DownloadFile SourceUrl="$(_BundleCdnZipUrl)"
+                  DestinationFolder="$(IntermediateOutputPath)"
+                  DestinationFileName="$(_BundleZipName)"
+                  Retries="3" />
+    <Unzip SourceFiles="$(_BundleZipPath)"
+           DestinationFolder="$(_BundleStaging)" />
+    <Touch Files="$(_BundleMarker)" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="_AddDefaultBundleToPack"
+          DependsOnTargets="DownloadDefaultBundle"
+          BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(IntermediateOutputPath)bundle\**\*"
+            Exclude="$(IntermediateOutputPath)bundle\.extracted"
+            Pack="true"
+            PackagePath="tools/any/"
+            Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>

@@ -1,5 +1,6 @@
 # Azure.Functions.Cli.Workloads.ExtensionBundles
 
-## 1.0.0-preview.1
+## 4.35.0
 
-- Initial scaffold of the extension bundles workload (entry point only; resolver and cache land in a follow-up release).
+- Repackage as a content workload (`kind: content`). No entry-point assembly; the bundle payload ships under `tools/any/`.
+- Pins extension bundle 4.35.0.
