@@ -3,9 +3,9 @@
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             WorkerLanguageVersionInfo worker = await GoHelpers.GetEnvironmentGoVersion();
 
             worker.Should().NotBeNull();
-            worker.Major.Should().BeGreaterOrEqualTo(1, "Go major version should be at least 1");
+            worker.Major.Should().BeGreaterThanOrEqualTo(1, "Go major version should be at least 1");
         }
 
         [SkipIfGoNonExistFact]

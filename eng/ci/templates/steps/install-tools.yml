@@ -39,13 +39,31 @@ steps:
     packageType: sdk
     useGlobalJson: true
 
-- task: GoTool@0
-  inputs:
-    version: '1.24.2'
+- pwsh: |
+    $version = '1.24.2'
+    $isWindows = $IsWindows
+    if ($isWindows) {
+      $archive = "go$version.windows-amd64.zip"
+      $url = "https://go.dev/dl/$archive"
+      $dest = Join-Path $env:AGENT_TOOLSDIRECTORY "go-$version"
+      New-Item -ItemType Directory -Force -Path $dest | Out-Null
+      $zipPath = Join-Path $env:AGENT_TEMPDIRECTORY $archive
+      Invoke-WebRequest -Uri $url -OutFile $zipPath
+      Expand-Archive -Path $zipPath -DestinationPath $dest -Force
+      $goBin = Join-Path $dest 'go\bin'
+    } else {
+      $archive = "go$version.linux-amd64.tar.gz"
+      $url = "https://go.dev/dl/$archive"
+      $dest = Join-Path $env:AGENT_TOOLSDIRECTORY "go-$version"
+      New-Item -ItemType Directory -Force -Path $dest | Out-Null
+      $tarPath = Join-Path $env:AGENT_TEMPDIRECTORY $archive
+      Invoke-WebRequest -Uri $url -OutFile $tarPath
+      & tar -C $dest -xzf $tarPath
+      $goBin = Join-Path $dest 'go/bin'
+    }
+    Write-Host "##vso[task.prependpath]$goBin"
+    Write-Host "Installed Go $version to $goBin"
   displayName: 'Install Go 1.24.2'
-  # Skip on macOS: GoTool@0 only ships an amd64 Go binary, which fails to
-  # execute on Apple Silicon agents (macOS-latest is arm64). It also exports
-  # GOROOT pointing at its own toolchain, which conflicts with the brew
-  # Go we install in the macOS E2E job (test-e2e-osx.yml). Mac jobs that
-  # need Go install it via Homebrew themselves.
+  # Skip on macOS: macOS-latest is arm64 (Apple Silicon). Mac jobs that need
+  # Go install it via Homebrew themselves (see test-e2e-osx.yml).
   condition: ne(variables['Agent.OS'], 'Darwin')
