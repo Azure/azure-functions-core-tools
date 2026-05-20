@@ -42,8 +42,7 @@ extends:
           build_args: -p:IsReleaseCI=true
 
     - stage: Release
-      dependsOn: Build
+      dependsOn: ['Build', 'SDLSources']
       jobs:
-
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
 
