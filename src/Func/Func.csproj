@@ -42,4 +42,25 @@
     <PackageReference Include="NuGet.Versioning" />
   </ItemGroup>
 
+  <!--
+    Verifies that a single-file publish actually produced a single file (plus an
+    optional .pdb). Guards against silent regressions when a new dependency or
+    content item starts emitting loose files alongside the apphost, which would
+    break "loose executable" distribution and macOS signing assumptions.
+  -->
+  <Target Name="VerifySingleFilePublish"
+          AfterTargets="Publish"
+          Condition="'$(IsPublishable)' == 'true' AND '$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <_PublishedFile Include="$(PublishDir)*" />
+      <_AllowedPublishedFile Include="$(PublishDir)$(AssemblyName)" />
+      <_AllowedPublishedFile Include="$(PublishDir)$(AssemblyName).exe" />
+      <_AllowedPublishedFile Include="$(PublishDir)*.pdb" />
+      <_UnexpectedPublishedFile Include="@(_PublishedFile)" Exclude="@(_AllowedPublishedFile)" />
+    </ItemGroup>
+
+    <Error Condition="'@(_UnexpectedPublishedFile)' != ''"
+           Text="Single-file publish for '$(RuntimeIdentifier)' produced unexpected files in '$(PublishDir)': @(_UnexpectedPublishedFile->'%(Filename)%(Extension)', ', '). Only '$(AssemblyName)', '$(AssemblyName).exe', and '$(AssemblyName).pdb' are allowed. A new dependency or content item likely broke the single-file assumption; ensure 'IncludeNativeLibrariesForSelfExtract' covers it or remove the extra payload." />
+  </Target>
+
 </Project>
