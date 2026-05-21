@@ -2,6 +2,9 @@ parameters:
 - name: dependsOn
   type: string
   default: ''
+- name: sign
+  type: boolean
+  default: false
 - name: runtimes
   type: object
   default:
@@ -20,6 +23,7 @@ jobs:
 
   variables:
     drop_path: $(Pipeline.Workspace)/drop
+    release_path: $(Build.ArtifactStagingDirectory)/release
 
   templateContext:
     inputs:
@@ -32,7 +36,12 @@ jobs:
       itemPattern: |
         **/func
         **/func.exe
+
     outputs:
+    - output: pipelineArtifact
+      targetPath: $(release_path)
+      artifactName: release
+
     - ${{ each runtime in parameters.runtimes }}:
       - output: universalPackages
         publishDirectory: $(drop_path)/${{ runtime }}
@@ -43,19 +52,69 @@ jobs:
         packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'
 
   steps:
+    - ${{ if eq(parameters.sign, true) }}:
+      - template: /eng/ci/templates/steps/sign-app.yml@self
+        parameters:
+          platform: windows
+          folderPath: $(drop_path)
+          signPatterns: '**/win-*/func.exe'
+
+      - template: /eng/ci/templates/steps/sign-app.yml@self
+        parameters:
+          platform: linux
+          folderPath: $(drop_path)
+          signPatterns: '**/linux-*/func'
+
+      # macOS hardened runtime requires every loaded Mach-O to be signed. ESRP's MacAppDeveloperSign
+      # requires the payload to be a .zip or .dmg, so we zip each osx-* rid folder, sign the zips,
+      # then expand them back over the drop output.
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path '$(drop_path)' '_macsign'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Get-ChildItem -Path '$(drop_path)' -Directory -Filter 'osx-*' | ForEach-Object {
+            $payload = Get-ChildItem -Path $_.FullName -Exclude '*.pdb'
+            $zip = Join-Path $stage "$($_.Name).zip"
+            Compress-Archive -Path $payload -DestinationPath $zip -Force
+            Write-Host "Zipped $($_.Name) -> $zip"
+          }
+        displayName: 'Package macOS runtimes for signing'
+
+      - template: /eng/ci/templates/steps/sign-app.yml@self
+        parameters:
+          platform: macos
+          folderPath: $(drop_path)/_macsign
+          signPatterns: 'osx-*.zip'
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path '$(drop_path)' '_macsign'
+          Get-ChildItem -Path $stage -Filter 'osx-*.zip' | ForEach-Object {
+            $rid = [System.IO.Path]::GetFileNameWithoutExtension($_.Name)
+            $dest = Join-Path '$(drop_path)' $rid
+            Remove-Item -Recurse -Force -Path $dest -ErrorAction SilentlyContinue
+            Expand-Archive -Path $_.FullName -DestinationPath $dest -Force
+            Write-Host "Restored signed $rid"
+          }
+          Remove-Item -Recurse -Force -Path $stage
+        displayName: 'Restore signed macOS runtimes'
+
     - ${{ each runtime in parameters.runtimes }}:
 
       - ${{ if not(startsWith(runtime, 'win')) }}:
-        - bash: |
-            chmod +x '$(drop_path)/${{ runtime }}/func'
-            tar -czf '$(drop_path)/${{ runtime }}/func.tar.gz' -C '$(drop_path)/${{ runtime }}' func
-            rm '$(drop_path)/${{ runtime }}/func'
+        - pwsh: |
+            $dropDir = '$(drop_path)/${{ runtime }}'
+            chmod +x "$dropDir/func"
+            tar -czf "$dropDir/func.tar.gz" -C $dropDir func
+            Remove-Item "$dropDir/func"
+            New-Item -ItemType Directory -Path '$(release_path)' -Force | Out-Null
+            Copy-Item "$dropDir/func.tar.gz" '$(release_path)/func-${{ runtime }}.tar.gz'
           displayName: 'Archive ${{ runtime }}'
 
       - ${{ if startsWith(runtime, 'win') }}:
         - pwsh: |
             Compress-Archive -Path '$(drop_path)/${{ runtime }}/func.exe' -DestinationPath '$(drop_path)/${{ runtime }}/func.zip'
             Remove-Item '$(drop_path)/${{ runtime }}/func.exe'
+            New-Item -ItemType Directory -Path '$(release_path)' -Force | Out-Null
+            Copy-Item '$(drop_path)/${{ runtime }}/func.zip' '$(release_path)/func-${{ runtime }}.zip'
           displayName: 'Archive ${{ runtime }}'
-
-
