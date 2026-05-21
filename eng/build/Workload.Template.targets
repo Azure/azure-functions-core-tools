@@ -34,7 +34,10 @@
   </ItemGroup>
 
   <!-- Download during restore, after package references are collected. -->
-  <Target Name="_DownloadTemplateAssets" AfterTargets="CollectPackageReferences">
+  <Target Name="_DownloadTemplateAssets" AfterTargets="CollectPackageReferences"
+    Inputs="$(MSBuildAllProjects)"
+    Outputs="$(_TemplatesV1Folder).marker;$(_TemplatesV2Folder).marker"
+    Condition="'$(TemplateVersion)' != '' And '$(TemplateLanguage)' != '' And '$(DesignTimeBuild)' != 'true'">
     <ItemGroup>
       <_V1TemplateFilesToDownload Include="resources/Resources.%(_TemplateResourceLang.Identity).json" />
       <_V2TemplateFilesToDownload Include="resources/Resources.%(_TemplateResourceLang.Identity).json" />
@@ -43,14 +46,17 @@
     <DownloadFile DestinationFolder="$(_TemplatesV1Folder)"
       SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v1/%(_V1TemplateFilesToDownload.Identity)"
       SkipUnchangedFiles="true" />
-    
+
     <DownloadFile DestinationFolder="$(_TemplatesV2Folder)"
       SourceUrl="https://functionscdn.azureedge.net/public/ExtensionBundles/Microsoft.Azure.Functions.ExtensionBundle/$(TemplateVersion)/StaticContent/v2/%(_V2TemplateFilesToDownload.Identity)"
       SkipUnchangedFiles="true" />
+
+    <Touch Files="$(_TemplatesV1Folder).marker;$(_TemplatesV2Folder).marker" AlwaysCreate="true" />
   </Target>
 
   <!-- Wire up the downloaded files as AdditionalFiles before build. Each item is gated by its own Exists check. -->
-  <Target Name="_IncludeTemplateAdditionalFile" BeforeTargets="BeforeBuild">
+  <Target Name="_IncludeTemplateAdditionalFile" BeforeTargets="BeforeBuild"
+    Condition="'$(TemplateVersion)' != '' And '$(TemplateLanguage)' != ''">
     <ItemGroup>
       <AdditionalFiles Include="$(_TemplatesV1Folder)templates.json"
         TemplateVersion="v1" TemplateLanguage="$(TemplateLanguage)" TemplateAssetKind="templates"
