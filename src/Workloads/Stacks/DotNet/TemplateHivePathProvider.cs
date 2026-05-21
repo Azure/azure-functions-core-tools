@@ -20,6 +20,9 @@ internal sealed class TemplateHivePathProvider : ITemplateHivePathProvider
 
     public TemplateHivePathProvider()
     {
+        // Read directly from the process environment (not through IConfiguration) so the
+        // template hive cannot be redirected by host config, global config, or project
+        // .func/config.json. Only an explicit env var set by the user should control this.
         string? configured = Environment.GetEnvironmentVariable(HivePathEnvironmentVariable);
 
         string hivePath = string.IsNullOrWhiteSpace(configured)

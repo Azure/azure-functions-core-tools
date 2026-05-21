@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.ComponentModel;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Common;
@@ -25,14 +26,13 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
     internal static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
-    private readonly string _hivePath = (hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider))).HivePath;
-    private readonly string _timestampPath = (hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider))).TimestampPath;
+    private readonly ITemplateHivePathProvider _hivePathProvider = hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider));
 
     public string Stack => "dotnet";
 
     public IReadOnlyList<string> SupportedLanguages => ["C#", "F#", "csharp", "fsharp"];
 
-    public Option<string> FrameworkOption { get; } = new("--tfm", "--target-framework")
+    public Option<string> FrameworkOption { get; } = new("--target-framework", "-tfm")
     {
         Description = "The target framework for the project (e.g. net10.0).",
         DefaultValueFactory = _ => DefaultFramework
@@ -65,7 +65,16 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
             throw new ArgumentException($"Framework '{framework}' is not supported. Supported frameworks: {string.Join(", ", SupportedFrameworks)}.", nameof(framework));
         }
 
-        await EnsureTemplatesInstalledAsync(cancellationToken);
+        try
+        {
+            await EnsureTemplatesInstalledAsync(cancellationToken);
+        }
+        catch (DotnetCliException ex)
+        {
+            throw new GracefulException(
+                $"Failed to install project templates: {ex.Message}",
+                isUserError: true);
+        }
 
         Directory.CreateDirectory(projectPath);
 
@@ -76,7 +85,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
             "--output", projectPath,
             "--language", language,
             "--framework", framework,
-            "--debug:custom-hive", _hivePath,
+            "--debug:custom-hive", _hivePathProvider.HivePath,
         ];
 
         if (context.Force)
@@ -84,7 +93,16 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
             args.Add("--force");
         }
 
-        await RunWithTimeoutAsync(args, projectPath, cancellationToken);
+        try
+        {
+            await RunWithTimeoutAsync(args, projectPath, cancellationToken);
+        }
+        catch (DotnetCliException ex)
+        {
+            throw new GracefulException(
+                $"Failed to scaffold project: {ex.Message}",
+                isUserError: true);
+        }
     }
 
     internal async Task EnsureTemplatesInstalledAsync(CancellationToken cancellationToken)
@@ -95,7 +113,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
         }
 
         await RunWithTimeoutAsync(
-            ["new", "install", TemplatesPackageName, "--debug:custom-hive", _hivePath],
+            ["new", "install", TemplatesPackageName, "--debug:custom-hive", _hivePathProvider.HivePath],
             workingDirectory: null,
             cancellationToken);
 
@@ -121,24 +139,41 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
                 $"The dotnet CLI operation timed out after {OperationTimeout.TotalMinutes:0} minutes. Check your network connection and try again.",
                 isUserError: true);
         }
+        catch (Win32Exception ex)
+        {
+            throw new GracefulException(
+                $"Failed to terminate the dotnet process (Win32Exception: {ex.Message}). You may need to end it manually and retry.",
+                isUserError: true);
+        }
     }
 
     private bool IsHiveFresh()
     {
         try
         {
-            if (!File.Exists(_timestampPath))
+            string hivePath = _hivePathProvider.HivePath;
+            string timestampPath = _hivePathProvider.TimestampPath;
+
+            if (!File.Exists(timestampPath))
             {
                 return false;
             }
 
-            if (!Directory.Exists(_hivePath) || !Directory.EnumerateFileSystemEntries(_hivePath).Skip(1).Any())
+            if (!Directory.Exists(hivePath))
             {
-                // Hive directory is missing or effectively empty; force reinstall.
                 return false;
             }
 
-            DateTime installedUtc = File.GetLastWriteTimeUtc(_timestampPath);
+            bool hasTemplates = Directory
+                .EnumerateFileSystemEntries(hivePath)
+                .Any(e => !string.Equals(Path.GetFileName(e), ".installed", StringComparison.Ordinal));
+
+            if (!hasTemplates)
+            {
+                return false;
+            }
+
+            DateTime installedUtc = File.GetLastWriteTimeUtc(timestampPath);
             return DateTime.UtcNow - installedUtc < HiveTtl;
         }
         catch (IOException)
@@ -151,8 +186,8 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
     {
         try
         {
-            Directory.CreateDirectory(_hivePath);
-            File.WriteAllText(_timestampPath, string.Empty);
+            Directory.CreateDirectory(_hivePathProvider.HivePath);
+            File.WriteAllText(_hivePathProvider.TimestampPath, string.Empty);
         }
         catch (IOException)
         {

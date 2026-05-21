@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
@@ -9,16 +10,29 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// Resolves the full path to the <c>dotnet</c> muxer using well-known environment
 /// variables and conventions, rather than relying on PATH resolution.
 /// </summary>
-internal static class DotnetPathResolver
+internal sealed class DotnetPathResolver : IDotnetPathResolver
 {
     private static readonly string _dotnetExeName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
         ? "dotnet.exe"
         : "dotnet";
 
+    private string? _cachedPath;
+
     /// <summary>
     /// Returns the resolved path to the <c>dotnet</c> executable.
     /// </summary>
-    public static string Resolve()
+    public string Resolve()
+    {
+        if (_cachedPath is not null)
+        {
+            return _cachedPath;
+        }
+
+        _cachedPath = ResolveCore();
+        return _cachedPath;
+    }
+
+    private static string ResolveCore()
     {
         // 1. DOTNET_HOST_PATH – set by the SDK to the absolute path of the running dotnet host.
         string? hostPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
@@ -60,8 +74,9 @@ internal static class DotnetPathResolver
             }
         }
 
-        // 5. Fallback – rely on PATH (best effort).
-        return _dotnetExeName;
+        throw new GracefulException(
+            "Could not locate the dotnet host. Install the .NET SDK or set the DOTNET_HOST_PATH or DOTNET_ROOT environment variable.",
+            isUserError: true);
     }
 
     private static IReadOnlyList<string> GetDotnetRootVariables()
@@ -71,7 +86,7 @@ internal static class DotnetPathResolver
             return RuntimeInformation.OSArchitecture switch
             {
                 Architecture.X86 => ["DOTNET_ROOT(x86)", "DOTNET_ROOT"],
-                Architecture.Arm64 => ["DOTNET_ROOT", "DOTNET_ROOT(ARM64)"],
+                Architecture.Arm64 => ["DOTNET_ROOT_ARM64", "DOTNET_ROOT"],
                 _ => ["DOTNET_ROOT"]
             };
         }

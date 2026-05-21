@@ -87,6 +87,12 @@ public class DotNetProjectInitializerTests : IDisposable
     }
 
     [Fact]
+    public void Constructor_ThrowsOnNullHivePathProvider()
+    {
+        Assert.Throws<ArgumentNullException>(() => new DotNetProjectInitializer(_dotnetCli, null!));
+    }
+
+    [Fact]
     public async Task EnsureTemplatesInstalledAsync_CallsInstallWhenTimestampMissing()
     {
         DotNetProjectInitializer initializer = CreateInitializer();
@@ -106,6 +112,7 @@ public class DotNetProjectInitializerTests : IDisposable
     {
         Directory.CreateDirectory(_hivePath);
         File.WriteAllText(_hivePathProvider.TimestampPath, string.Empty);
+        // Create a real template entry (not just .installed) to satisfy the freshness check.
         File.WriteAllText(Path.Combine(_hivePath, "dummy-package"), string.Empty);
 
         DotNetProjectInitializer initializer = CreateInitializer();

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
@@ -8,9 +9,9 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// <summary>
 /// Executes <c>dotnet</c> CLI commands in a child process.
 /// </summary>
-internal sealed class DotnetCliRunner : IDotnetCliRunner
+internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotnetCliRunner
 {
-    private static readonly Lazy<string> _dotnetPath = new(DotnetPathResolver.Resolve);
+    private readonly IDotnetPathResolver _pathResolver = pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
 
     public async Task RunAsync(
         IReadOnlyList<string> arguments,
@@ -21,7 +22,7 @@ internal sealed class DotnetCliRunner : IDotnetCliRunner
 
         ProcessStartInfo psi = new()
         {
-            FileName = _dotnetPath.Value,
+            FileName = _pathResolver.Resolve(),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -51,25 +52,47 @@ internal sealed class DotnetCliRunner : IDotnetCliRunner
             await Task.WhenAll(stdoutTask, stderrTask);
             await process.WaitForExitAsync(cancellationToken);
 
-            string stdout = stdoutTask.Result;
-            string stderr = stderrTask.Result;
+            string stdout = await stdoutTask;
+            string stderr = await stderrTask;
 
             if (process.ExitCode != 0)
             {
-                throw new InvalidOperationException(
-                    $"'dotnet {string.Join(' ', arguments)}' failed with exit code {process.ExitCode}.{Environment.NewLine}{stderr}{stdout}");
+                throw new DotnetCliException(
+                    process.ExitCode,
+                    stderr,
+                    stdout,
+                    string.Join(' ', arguments));
             }
         }
-        finally
+        catch (OperationCanceledException)
+        {
+            KillProcess(process);
+            throw;
+        }
+        catch (Exception) when (!process.HasExited)
+        {
+            KillProcess(process);
+        }
+    }
+
+    /// <summary>
+    /// Kills the process tree. Swallows <see cref="InvalidOperationException"/>
+    /// (race between HasExited check and kill — process already gone). Lets
+    /// <see cref="Win32Exception"/> propagate so the caller can surface it as
+    /// a user-facing error.
+    /// </summary>
+    private static void KillProcess(Process process)
+    {
+        try
         {
             if (!process.HasExited)
             {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch { }
+                process.Kill(entireProcessTree: true);
             }
+        }
+        catch (InvalidOperationException)
+        {
+            // Process exited between HasExited check and Kill call — nothing to do.
         }
     }
 }
