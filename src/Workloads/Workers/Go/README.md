@@ -14,5 +14,7 @@ func workload install go-worker
 ## Status
 
 Preview. Go has no upstream worker NuGet; the workload ships a static native
-`worker.config.json` from `content/workers/go/` that points the host at a
-user-built Go executable (`bin/app`).
+`worker.config.json` from `content/workers/native/` that points the host at a
+user-built Go executable (`bin/app`). The host discovers the Go worker via
+the `workers/native/` path, which matches the layout used by
+`feature/go-support`.

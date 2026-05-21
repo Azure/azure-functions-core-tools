@@ -14,11 +14,16 @@
 
   <ItemGroup>
     <!--
-      We restore the worker package only to read its payload from disk; we do
-      not want any of its assets imported into this project (the package ships
-      build targets and contentFiles that would otherwise affect output).
+      TODO: Decouple from the upstream worker's precise package layout.
+      The plan is to include the NodeJsWorker package's assets normally (let
+      it wire up its content/None items via its build targets), then have a
+      target here transform those items and repack them under content/. For
+      now we glob the restored package payload directly, which is brittle if
+      the upstream layout changes.
+
       GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_NodeJsWorker)
-      pointing at the restored package root.
+      pointing at the restored package root. IncludeAssets=none keeps the
+      package's build targets and contentFiles from affecting this project.
     -->
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" GeneratePathProperty="true">
       <PrivateAssets>all</PrivateAssets>
