@@ -120,38 +120,23 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return 1;
         }
 
-        InitializerSelection selection = await SelectInitializerAsync(requestedStack, cancellationToken);
+        IProjectInitializer? initializer = await SelectInitializerAsync(requestedStack, cancellationToken);
 
-        if (selection.Initializer is not null)
+        if (initializer is null)
         {
-            (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, selection.Initializer, cancellationToken);
-            if (errorCode is int code)
-            {
-                return code;
-            }
-
-            language = resolved;
+            return 1;
         }
 
-        // Always lay down the host-owned skeleton so a folder is usable even
-        // when no initializer runs. Workload initializers layer their files
-        // on top after this point.
-        WriteHostJson(workingDirectory.Info, force);
-        WriteCliConfigurationFile(workingDirectory.Info, selection.Initializer?.Stack, language, force);
+        (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
+        if (errorCode is int code)
+        {
+            return code;
+        }
+
+        language = resolved;
+
+        WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, language, force);
         _interaction.WriteBlankLine();
-
-        if (selection.Initializer is null)
-        {
-            _hintRenderer.Render(selection.Hint!);
-            return 0;
-        }
-
-        if (selection.Hint is not null)
-        {
-            // Auto-select info line, rendered before initializer output so
-            // the user sees why this stack was chosen.
-            _hintRenderer.Render(selection.Hint);
-        }
 
         var context = new InitContext(
             WorkingDirectory: workingDirectory,
@@ -159,12 +144,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             Language: language,
             Force: force);
 
-        await selection.Initializer.InitializeAsync(context, parseResult, cancellationToken);
+        await initializer.InitializeAsync(context, parseResult, cancellationToken);
 
         _interaction.WriteLine(l => l
             .Success("✓ ")
             .Muted("Project initialized for ")
-            .Code(selection.Initializer.Stack)
+            .Code(initializer.Stack)
             .Muted("."));
 
         return 0;
@@ -210,38 +195,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         existingFile = string.Empty;
         return false;
-    }
-
-    private void WriteHostJson(DirectoryInfo workingDirectory, bool force)
-    {
-        string path = Path.Combine(workingDirectory.FullName, "host.json");
-
-        // Treat an existing file as user-owned unless --force was passed.
-        // Workloads that need extensionBundle / logging defaults will merge
-        // into the file we just wrote (or the user's existing one).
-        if (File.Exists(path) && !force)
-        {
-            return;
-        }
-
-        try
-        {
-            const string MinimalHostJson = "{\n  \"version\": \"2.0\"\n}\n";
-            File.WriteAllText(path, MinimalHostJson);
-
-            _interaction.WriteLine(l => l
-                .Muted("· Wrote ")
-                .Code("host.json")
-                .Muted("."));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            _interaction.WriteLine(l => l
-                .Warning("! ")
-                .Muted("Could not write host.json (")
-                .Code(ex.Message)
-                .Muted(")."));
-        }
     }
 
     private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
@@ -346,48 +299,46 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return (picked.ToLowerInvariant(), null);
     }
 
-    private async Task<InitializerSelection> SelectInitializerAsync(string? requestedStack, CancellationToken cancellationToken)
+    private async Task<IProjectInitializer?> SelectInitializerAsync(string? requestedStack, CancellationToken cancellationToken)
     {
         string[] installed = [.. _initializers.Select(i => i.Stack)];
 
         if (_initializers.Count == 0)
         {
-            return InitializerSelection.MissOnly(new WorkloadHint(
+            _hintRenderer.Render(new WorkloadHint(
                 WorkloadHintKind.NoWorkloadsInstalled, "initialize a project", null, installed));
+            return null;
         }
 
         if (!string.IsNullOrEmpty(requestedStack))
         {
             IProjectInitializer? match = _initializers.FirstOrDefault(i =>
                 string.Equals(i.Stack, requestedStack, StringComparison.OrdinalIgnoreCase));
-            return match is not null
-                ? InitializerSelection.Picked(match)
-                : InitializerSelection.MissOnly(new WorkloadHint(
-                    WorkloadHintKind.NoMatchingStack, "initialize a project", requestedStack, installed));
+            if (match is not null)
+            {
+                return match;
+            }
+
+            _hintRenderer.Render(new WorkloadHint(
+                WorkloadHintKind.NoMatchingStack, "initialize a project", requestedStack, installed));
+            return null;
         }
 
-        // No stack specified: auto-select if there's only one initializer
-        // installed (the common case for engineers using a single language).
-        // Surface an info line so the user knows why this stack was picked.
+        // No --stack specified: auto-select when there's only one initializer.
         if (_initializers.Count == 1)
         {
             IProjectInitializer sole = _initializers[0];
-            return InitializerSelection.PickedWithHint(
-                sole,
-                new WorkloadHint(
-                    WorkloadHintKind.AutoSelectedSoleWorkload,
-                    "initialize a project",
-                    sole.Stack,
-                    installed));
+            _hintRenderer.Render(new WorkloadHint(
+                WorkloadHintKind.AutoSelectedSoleWorkload, "initialize a project", sole.Stack, installed));
+            return sole;
         }
 
-        // Multiple initializers, non-interactive: bootstrap the skeleton and
-        // tell the user to re-run with --stack. Scripts get a clear next-step
-        // hint instead of a silently-picked first option.
+        // Multiple initializers, non-interactive: tell the user to re-run with --stack.
         if (!_interaction.IsInteractive)
         {
-            return InitializerSelection.MissOnly(new WorkloadHint(
+            _hintRenderer.Render(new WorkloadHint(
                 WorkloadHintKind.AmbiguousStackChoice, "initialize a project", null, installed));
+            return null;
         }
 
         // Multiple initializers, interactive: prompt.
@@ -397,19 +348,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             choices,
             cancellationToken);
 
-        IProjectInitializer? promptedMatch = _initializers.FirstOrDefault(i => i.Stack == picked);
-        return promptedMatch is not null
-            ? InitializerSelection.Picked(promptedMatch)
-            : InitializerSelection.MissOnly(new WorkloadHint(
-                WorkloadHintKind.AmbiguousStackChoice, "initialize a project", null, installed));
-    }
-
-    private readonly record struct InitializerSelection(IProjectInitializer? Initializer, WorkloadHint? Hint)
-    {
-        public static InitializerSelection Picked(IProjectInitializer initializer) => new(initializer, null);
-
-        public static InitializerSelection PickedWithHint(IProjectInitializer initializer, WorkloadHint hint) => new(initializer, hint);
-
-        public static InitializerSelection MissOnly(WorkloadHint hint) => new(null, hint);
+        return _initializers.FirstOrDefault(i => i.Stack == picked);
     }
 }

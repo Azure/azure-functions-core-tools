@@ -73,6 +73,13 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
             ProjectFiles.ReadTemplate(_assembly, "local.settings.json"),
             force);
 
+        // Always lay down the base host.json so the project is valid even
+        // with --no-bundle. MergeHostJson below layers extensionBundle on top.
+        ProjectFiles.WriteIfMissing(
+            Path.Combine(root, "host.json"),
+            ProjectFiles.MinimalHostJson,
+            force);
+
         if (!noBundle)
         {
             ProjectFiles.MergeHostJson(
