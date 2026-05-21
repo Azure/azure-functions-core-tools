@@ -6,6 +6,7 @@
     <_LanguageWorkers Include="$(PublishDir)\workers\java" />
     <_LanguageWorkers Include="$(PublishDir)\workers\powershell" />
     <_LanguageWorkers Include="$(PublishDir)\workers\node" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\native" />
   </ItemGroup>
 
   <!-- Remove worker directories from minified builds -->
