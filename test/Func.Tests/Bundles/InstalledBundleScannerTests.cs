@@ -38,46 +38,18 @@ public class InstalledBundleScannerTests
     }
 
     [Fact]
-    public async Task StableId_AcceptsFourPartWorkloadVersion()
-    {
-        ScanResult result = await Build(
-        [
-            Row("4.35.0.1", "/a"),
-            Row("4.35.0.2", "/b"),
-        ]).ScanAsync(StableId);
-
-        Assert.Equal(2, result.FilteredVersions.Count);
-        Assert.Equal(NuGetVersion.Parse("4.35.0.2"), result.FilteredVersions[0].Version);
-    }
-
-    [Fact]
     public async Task PreviewId_FiltersToPreviewLabelOnly()
     {
         ScanResult result = await Build(
         [
             Row("4.22.0", "/a"),
-            Row("4.23.0-preview.1", "/b"),
-            Row("4.24.0-experimental.1", "/c"),
-            Row("4.25.0-beta.1", "/d"),
+            Row("4.23.0-preview", "/b"),
+            Row("4.24.0-experimental", "/c"),
+            Row("4.25.0-beta", "/d"),
         ]).ScanAsync(PreviewId);
 
         Assert.Single(result.FilteredVersions);
-        Assert.Equal(NuGetVersion.Parse("4.23.0-preview.1"), result.FilteredVersions[0].Version);
-    }
-
-    [Fact]
-    public async Task PreviewId_MatchesFourPartWithBareLabel()
-    {
-        ScanResult result = await Build(
-        [
-            Row("4.35.0.1-preview", "/a"),
-            Row("4.35.0.2-preview", "/b"),
-            Row("4.35.0.1", "/c"),
-        ]).ScanAsync(PreviewId);
-
-        Assert.Equal(2, result.FilteredVersions.Count);
-        Assert.Equal(NuGetVersion.Parse("4.35.0.2-preview"), result.FilteredVersions[0].Version);
-        Assert.Equal(NuGetVersion.Parse("4.35.0.1-preview"), result.FilteredVersions[1].Version);
+        Assert.Equal(NuGetVersion.Parse("4.23.0-preview"), result.FilteredVersions[0].Version);
     }
 
     [Fact]

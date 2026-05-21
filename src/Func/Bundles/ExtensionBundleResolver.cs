@@ -137,8 +137,9 @@ internal sealed class ExtensionBundleResolver(
 
     private static string RangeText(VersionRange range) => range.OriginalString ?? range.ToString();
 
-    // Workload pkg version may be 4-part (4.35.0.1) or carry a prerelease label (4.35.0-preview.1);
-    // user-facing bundle version is always the 3-part bundle payload version.
+    // Workload pkg version maps 1:1 to the bundle payload version, optionally with
+    // a channel prerelease label (e.g. 4.35.0-preview); the user-facing bundle
+    // version is always the 3-part bundle payload version.
     private static string ToBundleVersion(NuGetVersion version)
         => $"{version.Major}.{version.Minor}.{version.Patch}";
 
