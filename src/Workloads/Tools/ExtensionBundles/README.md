@@ -12,12 +12,12 @@ workload pkg version layers a per-bundle iteration counter on top:
 | Channel       | Workload pkg version       | host.json `extensionBundle.id`                                      |
 |---------------|----------------------------|---------------------------------------------------------------------|
 | stable        | `4.35.0.1`                 | `Microsoft.Azure.Functions.ExtensionBundle`                         |
-| preview       | `4.35.0-preview.1`         | `Microsoft.Azure.Functions.ExtensionBundle.Preview`                 |
-| experimental  | `4.35.0-experimental.1`    | `Microsoft.Azure.Functions.ExtensionBundle.Experimental`            |
+| preview       | `4.35.0.1-preview`         | `Microsoft.Azure.Functions.ExtensionBundle.Preview`                 |
+| experimental  | `4.35.0.1-experimental`    | `Microsoft.Azure.Functions.ExtensionBundle.Experimental`            |
 
-The 4th segment (stable) and the `.N` suffix after the channel label
-(preview / experimental) are the workload-pkg iteration: bump when
-republishing the same bundle payload with a workload-only fix. `func`
+The 4th segment (`.1`) is the workload-pkg iteration in all channels:
+bump when republishing the same bundle payload with a workload-only
+fix. The prerelease label, when present, names the channel. `func`
 always reports the 3-part bundle version (`4.35.0`) in user-facing logs.
 
 ## Install
