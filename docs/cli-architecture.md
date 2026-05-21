@@ -179,6 +179,9 @@ interaction.WriteLine(l => l
 | `PromptForInput(prompt, defaultValue)` | `string` | Returns `defaultValue` |
 | `ShowStatusAsync<T>(message, action)` | `T` | Runs action, prints status text |
 | `StatusAsync(message, action)` | — | Runs action, prints status text |
+| `RunWithProgressAsync<T>(initialDescription, action)` | `T` | Runs action; prints each description change as a line |
+
+`RunWithProgressAsync` exposes an `IProgressContext` to the action, which long-running operations can use to update the description, set/report numeric progress, or increment. The Spectre implementation renders a live progress bar; in non-interactive mode each description change is written as a separate line so logs remain readable.
 
 ### `IsInteractive` Property
 

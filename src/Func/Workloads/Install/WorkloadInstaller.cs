@@ -45,6 +45,7 @@ internal sealed class WorkloadInstaller(
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(
         string nupkgPath,
         bool force = false,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nupkgPath);
@@ -111,6 +112,10 @@ internal sealed class WorkloadInstaller(
         WorkloadEntry entry;
         try
         {
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Extracting,
+                $"Extracting workload '{packageId}' {version}"));
+
             await ExtractPackageAsync(reader, installPath, cancellationToken);
 
             WorkloadMetadata metadata = _metadataReader.Read(installPath);
@@ -125,6 +130,10 @@ internal sealed class WorkloadInstaller(
                 Source = Path.GetFullPath(nupkgPath),
                 InstallRefCount = 1,
             };
+
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Registering,
+                $"Registering workload '{packageId}' {version}"));
 
             await _store.SaveWorkloadAsync(entry, cancellationToken);
         }
@@ -145,9 +154,14 @@ internal sealed class WorkloadInstaller(
         bool includePrerelease,
         bool exact,
         bool force,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+
+        progress?.Report(new WorkloadInstallProgress(
+            WorkloadInstallPhase.Resolving,
+            $"Resolving workload '{packageId}'"));
 
         string resolvedId = exact
             ? packageId
@@ -162,13 +176,17 @@ internal sealed class WorkloadInstaller(
 
         try
         {
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Downloading,
+                $"Downloading '{resolved.PackageId}' {resolved.Version.ToNormalizedString()}"));
+
             await using (Stream packageStream = await _catalog.DownloadAsync(resolved, cancellationToken))
             await using (FileStream tempStream = File.Create(tempPath))
             {
                 await packageStream.CopyToAsync(tempStream, cancellationToken);
             }
 
-            return await InstallFromPackageAsync(tempPath, force, cancellationToken);
+            return await InstallFromPackageAsync(tempPath, force, progress, cancellationToken);
         }
         finally
         {
@@ -195,9 +213,14 @@ internal sealed class WorkloadInstaller(
         string? source,
         bool includePrerelease,
         bool allowMajor,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+
+        progress?.Report(new WorkloadInstallProgress(
+            WorkloadInstallPhase.Resolving,
+            $"Resolving update for '{packageId}'"));
 
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         List<WorkloadEntry> matches = [.. installed
@@ -235,7 +258,7 @@ internal sealed class WorkloadInstaller(
         }
 
         WorkloadEntry newEntry = await StageAndSwapAsync(
-            currentEntry, resolved, cancellationToken);
+            currentEntry, resolved, progress, cancellationToken);
 
         return new WorkloadUpdateResult(newEntry, currentEntry.PackageVersion, NoUpdateAvailable: false);
     }
@@ -370,6 +393,7 @@ internal sealed class WorkloadInstaller(
     private async Task<WorkloadEntry> StageAndSwapAsync(
         WorkloadEntry currentEntry,
         ResolvedPackage resolved,
+        IProgress<WorkloadInstallProgress>? progress,
         CancellationToken cancellationToken)
     {
         string tempNupkg = Path.Combine(
@@ -382,6 +406,10 @@ internal sealed class WorkloadInstaller(
 
         try
         {
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Downloading,
+                $"Downloading '{resolved.PackageId}' {resolved.Version.ToNormalizedString()}"));
+
             await using (Stream packageStream = await _catalog.DownloadAsync(resolved, cancellationToken))
             await using (FileStream tempStream = File.Create(tempNupkg))
             {
@@ -416,6 +444,10 @@ internal sealed class WorkloadInstaller(
             Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
             Directory.CreateDirectory(stagingPath);
 
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Extracting,
+                $"Extracting workload '{newPackageId}' {newVersion}"));
+
             await ExtractPackageAsync(reader, stagingPath, cancellationToken);
             WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
 
@@ -437,6 +469,10 @@ internal sealed class WorkloadInstaller(
             //      recoverable via `func workload prune`.
             //   3. Delete the previous install directory.
             Directory.Move(stagingPath, finalInstallPath);
+
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Registering,
+                $"Registering workload '{newPackageId}' {newVersion}"));
 
             await _store.ReplaceWorkloadAsync(
                 currentEntry.PackageId,

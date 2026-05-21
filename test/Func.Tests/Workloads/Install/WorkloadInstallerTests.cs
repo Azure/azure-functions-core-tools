@@ -555,6 +555,29 @@ public sealed class WorkloadInstallerTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task InstallFromPackage_ReportsExtractAndRegisterPhases()
+    {
+        string nupkg = BuildNupkg();
+        var reports = new List<WorkloadInstallProgress>();
+        var progress = new RecordingProgress(reports);
+
+        WorkloadInstaller installer = NewInstaller();
+        await installer.InstallFromPackageAsync(nupkg, force: false, progress);
+
+        Assert.Collection(
+            reports,
+            r => Assert.Equal(WorkloadInstallPhase.Extracting, r.Phase),
+            r => Assert.Equal(WorkloadInstallPhase.Registering, r.Phase));
+        Assert.Contains("test.workload", reports[0].Description);
+        Assert.Contains("test.workload", reports[1].Description);
+    }
+
+    private sealed class RecordingProgress(List<WorkloadInstallProgress> sink) : IProgress<WorkloadInstallProgress>
+    {
+        public void Report(WorkloadInstallProgress value) => sink.Add(value);
+    }
+
     private static WorkloadEntry ExistingEntry(string id, string version) => new()
     {
         PackageId = id,
