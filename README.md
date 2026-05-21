@@ -19,7 +19,7 @@ func <command> [path] [options]
 |---------|-------------|
 | `func init [path]` | Initialize a new Azure Functions project |
 | `func new [path]` | Create a new function from a template |
-| `func start [path]` | Start the Functions host locally |
+| `func run [path]` | Start the Functions host locally (alias: `func start`) |
 | `func workload install <id>` | Install a language workload |
 | `func workload list` | List installed workloads |
 | `func version` | Display version information |

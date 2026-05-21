@@ -17,7 +17,8 @@ using Microsoft.Extensions.Options;
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Launches the Azure Functions host runtime via 'func start'.
+/// Launches the Azure Functions host runtime via 'func run' (also aliased
+/// as 'func start' for backward compatibility).
 /// </summary>
 /// <remarks>
 /// v1 prototype: real host integration is not yet implemented, so the
@@ -103,9 +104,15 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         IStartInitializationRunner initializationRunner,
         IOptionsMonitor<HostStartupOptions> hostStartupOptions,
         StartDashboardEventStreamFactory? eventStreamFactory = null)
-        : base("start", "Launch the Azure Functions host runtime.")
+        : base("run", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
+
+        // 'start' is the legacy name from Core Tools v4 and earlier. Kept as
+        // an alias so existing scripts, package.json entries, and muscle
+        // memory continue to work after the canonical rename to 'run'.
+        Aliases.Add("start");
+
         ArgumentNullException.ThrowIfNull(palette);
         ArgumentNullException.ThrowIfNull(versionProvider);
         ArgumentNullException.ThrowIfNull(initializationRunner);
