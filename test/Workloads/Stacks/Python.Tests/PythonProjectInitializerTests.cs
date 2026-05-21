@@ -47,7 +47,7 @@ public class PythonProjectInitializerTests : IDisposable
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         Assert.Contains("--no-bundle", names);
-        Assert.Contains("--bundles-channel", names);
+        Assert.DoesNotContain("--bundles-channel", names);
     }
 
     [Fact]
@@ -134,30 +134,6 @@ public class PythonProjectInitializerTests : IDisposable
         string content = File.ReadAllText(hostJsonPath);
         Assert.Contains("\"version\"", content);
         Assert.DoesNotContain("extensionBundle", content);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_BundlesChannel_Preview_WritesPreviewBundleId()
-    {
-        await RunAsync(force: false, args: ["--bundles-channel", "Preview"]);
-
-        string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        var root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
-        Assert.Equal(
-            "Microsoft.Azure.Functions.ExtensionBundle.Preview",
-            root!["extensionBundle"]!["id"]!.GetValue<string>());
-    }
-
-    [Fact]
-    public async Task InitializeAsync_BundlesChannel_Experimental_WritesExperimentalBundleId()
-    {
-        await RunAsync(force: false, args: ["--bundles-channel", "Experimental"]);
-
-        string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        var root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
-        Assert.Equal(
-            "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
-            root!["extensionBundle"]!["id"]!.GetValue<string>());
     }
 
     private Task RunAsync(bool force, string[]? args = null)
