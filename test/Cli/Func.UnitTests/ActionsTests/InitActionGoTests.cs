@@ -2,12 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
-using FluentAssertions;
 using NSubstitute;
 using Xunit;
 

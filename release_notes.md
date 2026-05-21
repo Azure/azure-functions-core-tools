@@ -1,4 +1,4 @@
-# Azure Functions CLI 4.10.0
+# Azure Functions CLI 4.12.0-preview.1
 
 #### Host Version
 
@@ -9,10 +9,4 @@
 
 #### Changes
 
-- Fix `func pack` throwing cryptic `Unsupported runtime: None` when `local.settings.json` is absent and `FUNCTIONS_WORKER_RUNTIME` is not set (#4829)
-- Mark Node.js 24 as GA in stacks.json (add Flex Consumption SKU) (#4867)
-- Surface SSL/TLS certificate errors clearly when SSL inspection proxies intercept connections (#4857)
-- Fix `func kubernetes deploy` race condition where `kubectl rollout status` ran before the Deployment was registered (#4919)
-- Fix `func kubernetes delete` to honor `--no-docker` instead of failing on registry auth (#4919)
-- Add `McpPromptTrigger` template for dotnet-isolated `func new` (#4891)
-- Fix func azure storage fetch-connection-string failing with "Cannot find storage account" due to ARM eventual consistency (#4884)
+- Add Go language support to `func init`, `func start`, `func pack`, and `func publish` (#4875, #4892, #4943)

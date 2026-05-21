@@ -32,6 +32,16 @@ jobs:
   steps:
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  # The 1es-ubuntu-24.04-min image doesn't ship npm. NodeTool@0 in install-tools.yml
+  # installs Node into the agent user's tool cache, but start-emulators.ps1 runs
+  # `sudo npm install -g azurite` and sudo's PATH doesn't include the tool cache.
+  # Install npm system-wide via apt so azurite can be installed and launched as root.
+  - bash: |
+      sudo apt-get update
+      sudo apt-get install -y npm
+      npm --version
+    displayName: 'Install npm'
+
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
 
