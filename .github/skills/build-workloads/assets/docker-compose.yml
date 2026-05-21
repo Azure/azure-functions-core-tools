@@ -1,0 +1,18 @@
+services:
+  baget:
+    image: loicsharma/baget:latest
+    container_name: func-workloads-feed
+    ports:
+      - "${BAGET_PORT:-5555}:80"
+    environment:
+      ApiKey: ${BAGET_API_KEY:-NUGET-SERVER-API-KEY}
+      Storage__Type: FileSystem
+      Storage__Path: /var/baget/packages
+      Database__Type: Sqlite
+      Database__ConnectionString: Data Source=/var/baget/baget.db
+      Search__Type: Database
+    volumes:
+      - func-workloads-feed-data:/var/baget
+
+volumes:
+  func-workloads-feed-data:

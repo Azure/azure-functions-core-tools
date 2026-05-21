@@ -281,6 +281,8 @@ task matches:
 - **Adding a new CLI command** → `add-command` skill.
 - **Creating a new workload** (Node, Python, Java, ...) → `create-workload`
   skill.
+- **Building all workloads and publishing to a local NuGet feed for testing** →
+  `build-workloads` skill.
 - **Reviewing a design** → `dotnet-design-pattern-review` skill.
 
 ## Build & Test Commands
@@ -331,6 +333,8 @@ via symlinks under `.claude/skills/`. Available skills:
 
 - `add-command` — adding a new CLI command.
 - `create-workload` — scaffolding a new workload (Node, Python, Java, ...).
+- `build-workloads` — pack every workload and publish to a local NuGet feed
+  (Docker) for end-to-end `func workload install` testing.
 - `dotnet-design-pattern-review` — design pattern review checklist.
 
 The **Design Principles**, **CLI Conventions**, and **.NET / C# Practices**
