@@ -23,6 +23,10 @@ internal sealed class StartInitializationState
 
     public string? BundleVersion { get; set; }
 
+    public string? BundleDownloadPath { get; set; }
+
+    public Dictionary<string, string> BundleEnvVarsForHost { get; } = new(StringComparer.Ordinal);
+
     public IHostEventStream? EventStream { get; set; }
 
     public StartInitializationResult ToResult(StartInitializationContext context)

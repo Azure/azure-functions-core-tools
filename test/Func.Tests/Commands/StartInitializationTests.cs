@@ -3,6 +3,7 @@
 
 using System.Text;
 using System.Text.Json;
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
@@ -12,6 +13,7 @@ using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Spectre.Console;
 using Xunit;
@@ -49,7 +51,7 @@ public class StartInitializationTests : IDisposable
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
 
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(projectResolver);
+        var runner = new DemoStartInitializationRunner(projectResolver, Substitute.For<IExtensionBundleResolver>(), NullLoggerFactory.Instance);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -88,7 +90,7 @@ public class StartInitializationTests : IDisposable
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(projectResolver);
+        var runner = new DemoStartInitializationRunner(projectResolver, Substitute.For<IExtensionBundleResolver>(), NullLoggerFactory.Instance);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -117,7 +119,7 @@ public class StartInitializationTests : IDisposable
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(projectResolver);
+        var runner = new DemoStartInitializationRunner(projectResolver, Substitute.For<IExtensionBundleResolver>(), NullLoggerFactory.Instance);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
