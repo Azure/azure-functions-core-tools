@@ -9,6 +9,10 @@
     for fully offline pack of a developer build, or a PR build whose
     $(VersionPrefix) is not yet published to the CDN).
 
+    TODO: switch the pack-time payload source from the public CDN to the
+    bundle CI build artifacts so the workload always ships the exact
+    bundle drop we own, instead of whatever happens to be on the CDN.
+
     TODO(spec §5.4): branch on prerelease label so the preview/experimental
     workload pulls from the matching CDN id. For now hardcoded to stable.
   -->
