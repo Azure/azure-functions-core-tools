@@ -1,4 +1,6 @@
 # Azure Functions CLI 4.11.1
+# Azure Functions CLI 4.11.0
+# Azure Functions CLI 4.12.0-preview.1
 
 #### Host Version
 
@@ -11,3 +13,4 @@
 
 - Fix `HttpsProxyAgent is not a constructor` error in `install.js` when installing behind a proxy (https-proxy-agent v9 requires a named import).
 - Remove `azure-functions-core-tools` from the `devDependencies` of generated function app templates (`package-js.json`, `package-js-v4.json`, `package-ts.json`, `package-ts-v4.json`). Users get the CLI from their system install; pulling it in again via `npm install` doubled disk usage and made every project's install fragile to Core Tools postinstall regressions.
+- Add Go language support to `func init`, `func start`, `func pack`, and `func publish` (#4875, #4892, #4943)

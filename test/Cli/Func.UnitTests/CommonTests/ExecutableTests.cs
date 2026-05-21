@@ -3,8 +3,8 @@
 
 using System.Runtime.InteropServices;
 using System.Text;
+using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
-using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.CommonTests
