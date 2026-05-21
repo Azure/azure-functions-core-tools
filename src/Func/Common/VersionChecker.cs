@@ -4,6 +4,7 @@
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
 
 namespace Azure.Functions.Cli.Common;
 
@@ -129,7 +130,7 @@ internal static class VersionChecker
     {
         string cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
+            AbstractionsConstants.FuncHomeDirectoryName);
         return Path.Combine(cacheDir, Constants.VersionCacheFileName);
     }
 

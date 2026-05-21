@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-
+using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
 namespace Azure.Functions.Cli.Workloads.Storage;
 
 /// <summary>
@@ -27,7 +27,7 @@ internal static class WorkloadHomeResolver
         string home = string.IsNullOrWhiteSpace(configured)
             ? Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                Constants.FuncHomeDirectoryName)
+                AbstractionsConstants.FuncHomeDirectoryName)
             : configured;
 
         return Path.GetFullPath(home);

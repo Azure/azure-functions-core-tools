@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Configuration;
+using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
 
 namespace Azure.Functions.Cli.Configuration;
 
@@ -33,7 +34,7 @@ internal sealed class CliConfigurationSourceBuilder(ILocalSettingsProvider local
     {
         string home = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
+            AbstractionsConstants.FuncHomeDirectoryName);
 
         return Path.Combine(home, CliConfigurationNames.ConfigFileName);
     }
