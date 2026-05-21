@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
@@ -81,6 +82,10 @@ internal static class CliHostFactory
 
         builder.Services.AddSingleton<IFunctionsWorkerResolver, DefaultFunctionsWorkerResolver>();
         builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
+        builder.Services.AddSingleton<IInstalledBundleWorkloads, InstalledBundleWorkloads>();
+        builder.Services.AddSingleton<InstalledBundleScanner>();
+        builder.Services.AddSingleton<IBundleResolveTelemetry>(NullBundleResolveTelemetry.Instance);
+        builder.Services.AddSingleton<IExtensionBundleResolver, ExtensionBundleResolver>();
         builder.Services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
         builder.Services.AddSingleton(new WorkloadProjectFactoryRegistration(
             new WorkloadInfo(new DotnetWorkload(), "test", "1.0", [], "test", "description"),

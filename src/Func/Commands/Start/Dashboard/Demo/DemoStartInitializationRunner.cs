@@ -1,20 +1,32 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
+using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
 /// Prototype initialization runner that simulates the host-resolution workflow.
 /// </summary>
-internal sealed class DemoStartInitializationRunner(IFunctionsProjectResolver projectResolver, TimeProvider? timeProvider = null)
+internal sealed class DemoStartInitializationRunner(
+    IFunctionsProjectResolver projectResolver,
+    IExtensionBundleResolver bundleResolver,
+    ILoggerFactory loggerFactory,
+    TimeProvider? timeProvider = null)
     : IStartInitializationRunner
 {
     private readonly IFunctionsProjectResolver _projectResolver = projectResolver
         ?? throw new ArgumentNullException(nameof(projectResolver));
+
+    private readonly IExtensionBundleResolver _bundleResolver = bundleResolver
+        ?? throw new ArgumentNullException(nameof(bundleResolver));
+
+    private readonly ILoggerFactory _loggerFactory = loggerFactory
+        ?? throw new ArgumentNullException(nameof(loggerFactory));
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -39,7 +51,7 @@ internal sealed class DemoStartInitializationRunner(IFunctionsProjectResolver pr
             new ResolveConstraintsInitializationStep(),
             new ValidateHostWorkloadInitializationStep(),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
-            new ValidateExtensionBundleInitializationStep(),
+            new ValidateExtensionBundleInitializationStep(_bundleResolver, _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
             new PrepareProjectHostRunInitializationStep(),
             new StartHostInitializationStep(_time),
         ];
