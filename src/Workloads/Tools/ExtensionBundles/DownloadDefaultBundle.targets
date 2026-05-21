@@ -22,14 +22,10 @@
     bundle drop we own, instead of whatever happens to be on the CDN.
   -->
 
-  <PropertyGroup Condition="'$(BundleChannel)' == 'stable'">
-    <_BundleCdnId>Microsoft.Azure.Functions.ExtensionBundle</_BundleCdnId>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(BundleChannel)' == 'preview'">
-    <_BundleCdnId>Microsoft.Azure.Functions.ExtensionBundle.Preview</_BundleCdnId>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(BundleChannel)' == 'experimental'">
-    <_BundleCdnId>Microsoft.Azure.Functions.ExtensionBundle.Experimental</_BundleCdnId>
+  <PropertyGroup>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'stable'">Microsoft.Azure.Functions.ExtensionBundle</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_BundleCdnId>
   </PropertyGroup>
 
   <Target Name="DownloadDefaultBundle"
