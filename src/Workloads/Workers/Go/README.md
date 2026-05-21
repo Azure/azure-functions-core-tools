@@ -19,7 +19,9 @@ NuGet, so `$(WorkerVersion)` is maintained manually in
 `Directory.Version.props` alongside any change to the static
 `worker.config.json` payload.
 
-No channel axis: there are no preview/experimental Go worker SKUs.
+Ships as a NuGet prerelease (`1.0.0-preview.1`) via `$(VersionSuffix)`
+while the Go worker integration stabilises. `func workload install` won't
+pick up prereleases without an explicit version pin or `--prerelease`.
 
 ## Status
 
