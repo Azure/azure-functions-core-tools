@@ -17,9 +17,10 @@ internal sealed class InstalledBundleScanner(IInstalledBundleWorkloads installed
 
     public const string StableBundleId = "Microsoft.Azure.Functions.ExtensionBundle";
     public const string PreviewBundleId = "Microsoft.Azure.Functions.ExtensionBundle.Preview";
+    public const string ExperimentalBundleId = "Microsoft.Azure.Functions.ExtensionBundle.Experimental";
 
-    private static readonly HashSet<string> _previewReleaseLabels =
-        new(StringComparer.OrdinalIgnoreCase) { "preview", "experimental" };
+    private const string PreviewLabel = "preview";
+    private const string ExperimentalLabel = "experimental";
 
     private readonly IInstalledBundleWorkloads _installed = installed ?? throw new ArgumentNullException(nameof(installed));
 
@@ -43,8 +44,9 @@ internal sealed class InstalledBundleScanner(IInstalledBundleWorkloads installed
             }
 
             // TODO(spec §9 Q1): confirm/refine prerelease filter rule.
-            // Stable host.json id → only stable workload versions.
-            // Preview host.json id → only preview/experimental prerelease labels.
+            // Stable host.json id → workload versions with no prerelease label.
+            // Preview host.json id → workload versions whose prerelease label is `preview`.
+            // Experimental host.json id → workload versions whose prerelease label is `experimental`.
             if (!MatchesBundleIdFilter(bundleId, version))
             {
                 continue;
@@ -67,23 +69,33 @@ internal sealed class InstalledBundleScanner(IInstalledBundleWorkloads installed
 
         if (string.Equals(bundleId, PreviewBundleId, StringComparison.OrdinalIgnoreCase))
         {
-            if (!version.IsPrerelease)
-            {
-                return false;
-            }
+            return HasReleaseLabel(version, PreviewLabel);
+        }
 
-            foreach (string label in version.ReleaseLabels)
-            {
-                if (_previewReleaseLabels.Contains(label))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+        if (string.Equals(bundleId, ExperimentalBundleId, StringComparison.OrdinalIgnoreCase))
+        {
+            return HasReleaseLabel(version, ExperimentalLabel);
         }
 
         return true;
+    }
+
+    private static bool HasReleaseLabel(NuGetVersion version, string label)
+    {
+        if (!version.IsPrerelease)
+        {
+            return false;
+        }
+
+        foreach (string candidate in version.ReleaseLabels)
+        {
+            if (string.Equals(candidate, label, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

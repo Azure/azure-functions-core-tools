@@ -66,12 +66,13 @@ internal sealed class ExtensionBundleResolver(
         InstalledBundle? best = PickBest(installed, constraint);
         if (best is not null)
         {
+            string bundleVersion = ToBundleVersion(best.Version);
             _logger.LogInformation("Using extension bundle {BundleId} {Version} from {Path}.",
-                context.BundleId, best.Version, best.Path);
+                context.BundleId, bundleVersion, best.Path);
 
             return Record(context, RangeText(constraint),
                 new ExtensionBundleResolution.Resolved(
-                    context.BundleId, best.Version.ToNormalizedString(), best.Path, RuntimeWarning: null),
+                    context.BundleId, bundleVersion, best.Path, RuntimeWarning: null),
                 sw);
         }
 
@@ -135,6 +136,11 @@ internal sealed class ExtensionBundleResolver(
     }
 
     private static string RangeText(VersionRange range) => range.OriginalString ?? range.ToString();
+
+    // Workload pkg version may be 4-part (4.35.0.1) or carry a prerelease label (4.35.0-preview.1);
+    // user-facing bundle version is always the 3-part bundle payload version.
+    private static string ToBundleVersion(NuGetVersion version)
+        => $"{version.Major}.{version.Minor}.{version.Patch}";
 
     private static string FormatIntersection(ExtensionBundleProjectContext context)
         => string.IsNullOrWhiteSpace(context.ProfileBundleVersionRange)
