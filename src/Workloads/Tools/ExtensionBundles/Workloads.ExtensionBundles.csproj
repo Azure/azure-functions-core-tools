@@ -2,29 +2,21 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Extension Bundles</Title>
-    <Description>Resolves and caches Azure Functions extension bundles for the func CLI.</Description>
+    <Title>Azure Functions CLI Extension Bundles</Title>
+    <Description>Azure Functions extension bundle payload, delivered as a content workload for the func CLI.</Description>
     <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:workload alias:bundles func-workload</PackageTags>
+    <PackageTags>kind:content alias:bundles func-workload func-tool</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.ExtensionBundles.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj">
-      <PrivateAssets>all</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
-    </ProjectReference>
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="workload.json" Pack="true" PackagePath="/" />
-    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="tools/any/" Visible="false" />
   </ItemGroup>
+
+  <Import Project="DownloadDefaultBundle.targets" />
 
 </Project>

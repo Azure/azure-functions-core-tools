@@ -36,7 +36,4 @@
     <Project Path="test/Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Python.Tests/Workloads.Python.Tests.csproj" />
   </Folder>
-  <Folder Name="/test/Workloads/Tools/">
-    <Project Path="test/Workloads/Tools/ExtensionBundles.Tests/Workloads.ExtensionBundles.Tests.csproj" />
-  </Folder>
 </Solution>
