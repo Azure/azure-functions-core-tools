@@ -1,5 +1,37 @@
 <Project>
+
+  <!--
+    Workload pkg versioning, two-axis:
+      $(BundleVersion)      - the bundle payload version. Drives the CDN
+                              URL and the user-facing version in func logs.
+                              Bare three-part SemVer.
+      $(BundleChannel)      - stable | preview | experimental. Selects the
+                              CDN bundle id (see DownloadDefaultBundle.targets)
+                              and whether the workload pkg version carries a
+                              prerelease label.
+      $(WorkloadIteration)  - per-bundle-version iteration counter for the
+                              workload pkg itself. Bump when republishing
+                              the same bundle payload with a workload-only
+                              fix.
+
+    Derived $(VersionPrefix):
+      stable        -> 4.35.0.1            (4-part, no prerelease)
+      preview       -> 4.35.0-preview.1
+      experimental  -> 4.35.0-experimental.1
+  -->
+
   <PropertyGroup>
-    <VersionPrefix>4.35.0</VersionPrefix>
+    <BundleVersion>4.35.0</BundleVersion>
+    <BundleChannel>stable</BundleChannel>
+    <WorkloadIteration>1</WorkloadIteration>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BundleChannel)' == 'stable'">
+    <VersionPrefix>$(BundleVersion).$(WorkloadIteration)</VersionPrefix>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BundleChannel)' != 'stable'">
+    <VersionPrefix>$(BundleVersion)-$(BundleChannel).$(WorkloadIteration)</VersionPrefix>
+  </PropertyGroup>
+
 </Project>
