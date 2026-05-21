@@ -3,7 +3,11 @@
 
 namespace Azure.Functions.Cli.Bundles;
 
-/// <summary>Input to <see cref="IExtensionBundleResolver.ResolveAsync"/>.</summary>
+/// <summary>
+
+/// Input to <see cref="IExtensionBundleResolver.ResolveAsync"/>.
+
+/// </summary>
 public sealed record ExtensionBundleProjectContext(
     string BundleId,
     string HostJsonVersionRange,

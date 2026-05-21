@@ -6,7 +6,11 @@ using System.Text;
 
 namespace Azure.Functions.Cli.Bundles;
 
-/// <summary>Builds the user-facing <c>Hint</c> strings surfaced in resolver failures.</summary>
+/// <summary>
+
+/// Builds the user-facing <c>Hint</c> strings surfaced in resolver failures.
+
+/// </summary>
 internal static class BundleHintBuilder
 {
     private const string InstallCommandPrefix =

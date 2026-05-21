@@ -3,7 +3,11 @@
 
 namespace Azure.Functions.Cli.Bundles;
 
-/// <summary>Shape of the <c>bundle.resolve</c> telemetry event (spec §7). Not wired to a sink yet.</summary>
+/// <summary>
+
+/// Shape of the <c>bundle.resolve</c> telemetry event (spec §7). Not wired to a sink yet.
+
+/// </summary>
 internal sealed record BundleResolveEvent(
     string BundleId,
     string ConstraintRange,
@@ -12,7 +16,11 @@ internal sealed record BundleResolveEvent(
     string? ProfileName,
     long DurationMs);
 
-/// <summary>Spec §7 <c>reason</c> values. Lowercased hyphen-form is the wire format.</summary>
+/// <summary>
+
+/// Spec §7 <c>reason</c> values. Lowercased hyphen-form is the wire format.
+
+/// </summary>
 internal static class BundleResolveReason
 {
     public const string Ok = "ok";

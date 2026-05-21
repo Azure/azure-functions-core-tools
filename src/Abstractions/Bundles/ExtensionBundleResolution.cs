@@ -3,7 +3,11 @@
 
 namespace Azure.Functions.Cli.Bundles;
 
-/// <summary>Outcome of <see cref="IExtensionBundleResolver.ResolveAsync"/>.</summary>
+/// <summary>
+
+/// Outcome of <see cref="IExtensionBundleResolver.ResolveAsync"/>.
+
+/// </summary>
 public abstract record ExtensionBundleResolution
 {
     private ExtensionBundleResolution()
@@ -17,11 +21,19 @@ public abstract record ExtensionBundleResolution
         ExtensionBundleSupportedRuntimeWarning? RuntimeWarning)
         : ExtensionBundleResolution;
 
-    /// <summary>No bundle workload is installed at any version.</summary>
+    /// <summary>
+
+    /// No bundle workload is installed at any version.
+
+    /// </summary>
     public sealed record WorkloadMissing(string Hint)
         : ExtensionBundleResolution;
 
-    /// <summary>The host.json range and the profile range have no overlap.</summary>
+    /// <summary>
+
+    /// The host.json range and the profile range have no overlap.
+
+    /// </summary>
     public sealed record EmptyIntersection(
         string HostJsonRange,
         string ProfileRange,
@@ -29,7 +41,11 @@ public abstract record ExtensionBundleResolution
         string Hint)
         : ExtensionBundleResolution;
 
-    /// <summary>Bundle workloads are installed but none satisfy the host.json/profile constraint.</summary>
+    /// <summary>
+
+    /// Bundle workloads are installed but none satisfy the host.json/profile constraint.
+
+    /// </summary>
     public sealed record NoCompatibleInstall(
         string ConstraintRange,
         IReadOnlyList<string> InstalledVersions,

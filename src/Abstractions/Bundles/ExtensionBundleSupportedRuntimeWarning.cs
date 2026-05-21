@@ -3,7 +3,11 @@
 
 namespace Azure.Functions.Cli.Bundles;
 
-/// <summary>Non-fatal warning that the project's worker runtime is not in the profile's <c>supportedRuntimes</c>.</summary>
+/// <summary>
+
+/// Non-fatal warning that the project's worker runtime is not in the profile's <c>supportedRuntimes</c>.
+
+/// </summary>
 public sealed record ExtensionBundleSupportedRuntimeWarning(
     string WorkerRuntime,
     IReadOnlyList<string> SupportedRuntimes,
