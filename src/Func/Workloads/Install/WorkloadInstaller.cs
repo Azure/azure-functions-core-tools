@@ -480,10 +480,19 @@ internal sealed class WorkloadInstaller(
         CancellationToken cancellationToken)
     {
         // PackageArchiveReader already filters OPC metadata and rejects
-        // path-escape entries, so we don't re-filter here.
+        // path-escape entries. We additionally restrict the on-disk layout
+        // to the workload contract: workload.json at the root and the
+        // tools/ payload. Other package-level files (the .nuspec, NuGet's
+        // package icon, etc.) are pack-time artifacts the host never reads
+        // and would just bloat the install directory.
         foreach (string packageFile in await reader.GetFilesAsync(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (!IsInstallablePackageFile(packageFile))
+            {
+                continue;
+            }
 
             string targetPath = Path.Combine(destination, packageFile.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
@@ -492,6 +501,22 @@ internal sealed class WorkloadInstaller(
             using FileStream output = File.Create(targetPath);
             await entryStream.CopyToAsync(output, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Whether a file inside the .nupkg is part of the workload's on-disk
+    /// contract. Only <c>workload.json</c> at the package root and entries
+    /// under <c>tools/</c> are extracted; everything else (.nuspec, package
+    /// icon, etc.) is pack-time metadata and stays inside the .nupkg.
+    /// </summary>
+    private static bool IsInstallablePackageFile(string packageFile)
+    {
+        if (string.Equals(packageFile, WorkloadMetadataReader.MetadataFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return packageFile.StartsWith("tools/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
