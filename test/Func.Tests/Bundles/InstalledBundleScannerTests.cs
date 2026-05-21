@@ -66,6 +66,21 @@ public class InstalledBundleScannerTests
     }
 
     [Fact]
+    public async Task PreviewId_MatchesFourPartWithBareLabel()
+    {
+        ScanResult result = await Build(
+        [
+            Row("4.35.0.1-preview", "/a"),
+            Row("4.35.0.2-preview", "/b"),
+            Row("4.35.0.1", "/c"),
+        ]).ScanAsync(PreviewId);
+
+        Assert.Equal(2, result.FilteredVersions.Count);
+        Assert.Equal(NuGetVersion.Parse("4.35.0.2-preview"), result.FilteredVersions[0].Version);
+        Assert.Equal(NuGetVersion.Parse("4.35.0.1-preview"), result.FilteredVersions[1].Version);
+    }
+
+    [Fact]
     public async Task ExperimentalId_FiltersToExperimentalLabelOnly()
     {
         ScanResult result = await Build(
