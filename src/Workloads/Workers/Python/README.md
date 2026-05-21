@@ -13,6 +13,6 @@ func workload install python-worker
 
 ## Status
 
-Preview. Worker assets are sourced from the
-`Microsoft.Azure.Functions.PythonWorker` NuGet package. The `content/` folder
-is the placeholder where the worker payload is staged before packing.
+Preview. Worker assets are pulled at pack time from the restored
+`Microsoft.Azure.Functions.PythonWorker` NuGet package (its `tools/` payload)
+and packed under `content/workers/python/` in the resulting workload NuGet.

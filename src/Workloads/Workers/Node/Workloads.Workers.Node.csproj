@@ -13,15 +13,38 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker">
+    <!--
+      TODO: Decouple from the upstream worker's precise package layout.
+      The plan is to include the NodeJsWorker package's assets normally (let
+      it wire up its content/None items via its build targets), then have a
+      target here transform those items and repack them under content/. For
+      now we glob the restored package payload directly, which is brittle if
+      the upstream layout changes.
+
+      GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_NodeJsWorker)
+      pointing at the restored package root. IncludeAssets=none keeps the
+      package's build targets and contentFiles from affecting this project.
+    -->
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" GeneratePathProperty="true">
       <PrivateAssets>all</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
+      <IncludeAssets>none</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <None Include="workload.json" Pack="true" PackagePath="/" />
-    <Content Include="content/**" Pack="true" PackagePath="content/" />
   </ItemGroup>
+
+  <Target Name="IncludeNodeWorkerContentInPack" BeforeTargets="_GetPackageFiles">
+    <Error Condition="'$(PkgMicrosoft_Azure_Functions_NodeJsWorker)' == ''"
+           Text="Microsoft.Azure.Functions.NodeJsWorker package path not resolved. Run 'dotnet restore' first." />
+    <ItemGroup>
+      <_NodeWorkerFile Include="$(PkgMicrosoft_Azure_Functions_NodeJsWorker)/contentFiles/any/any/workers/node/**/*" />
+      <None Include="@(_NodeWorkerFile)"
+            TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+            Pack="true"
+            PackagePath="content/workers/node/" />
+    </ItemGroup>
+  </Target>
 
 </Project>
