@@ -64,23 +64,12 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
                     string.Join(' ', arguments));
             }
         }
-        catch (OperationCanceledException)
-        {
-            KillProcess(process);
-            throw;
-        }
-        catch (Exception) when (!process.HasExited)
+        finally
         {
             KillProcess(process);
         }
     }
 
-    /// <summary>
-    /// Kills the process tree. Swallows <see cref="InvalidOperationException"/>
-    /// (race between HasExited check and kill — process already gone). Lets
-    /// <see cref="Win32Exception"/> propagate so the caller can surface it as
-    /// a user-facing error.
-    /// </summary>
     private static void KillProcess(Process process)
     {
         try
@@ -90,9 +79,9 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
                 process.Kill(entireProcessTree: true);
             }
         }
-        catch (InvalidOperationException)
+        catch (Exception)
         {
-            // Process exited between HasExited check and Kill call — nothing to do.
+            // This is best effort and we don't want to mask the original exception if the process has already exited.
         }
     }
 }

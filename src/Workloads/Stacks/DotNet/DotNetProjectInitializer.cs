@@ -139,12 +139,6 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
                 $"The dotnet CLI operation timed out after {OperationTimeout.TotalMinutes:0} minutes. Check your network connection and try again.",
                 isUserError: true);
         }
-        catch (Win32Exception ex)
-        {
-            throw new GracefulException(
-                $"Failed to terminate the dotnet process (Win32Exception: {ex.Message}). You may need to end it manually and retry.",
-                isUserError: true);
-        }
     }
 
     private bool IsHiveFresh()
