@@ -1,37 +1,33 @@
 <Project>
 
   <!--
-    Workload pkg versioning, two-axis:
-      $(BundleVersion)      - the bundle payload version. Drives the CDN
-                              URL and the user-facing version in func logs.
-                              Bare three-part SemVer.
-      $(WorkloadIteration)  - per-bundle-version iteration counter for the
-                              workload pkg itself. Bump when republishing
-                              the same bundle payload with a workload-only
-                              fix. Lives in the 4th segment regardless of
-                              channel.
-      $(BundleChannel)      - stable | preview | experimental. Selects the
-                              CDN bundle id (see DownloadDefaultBundle.targets)
-                              and the workload pkg's prerelease label.
+    Workload pkg versioning. This is a content-only workload (no workload
+    code or assemblies), so the pkg version maps 1:1 to the bundle payload
+    version it carries:
+      $(BundleVersion)  - the bundle payload version. Drives the CDN URL
+                          and the user-facing version in func logs. Bare
+                          three-part SemVer.
+      $(BundleChannel)  - stable | preview | experimental. Selects the CDN
+                          bundle id (see DownloadDefaultBundle.targets) and
+                          the workload pkg's prerelease label.
 
     Derived $(VersionPrefix):
-      stable        -> 4.35.0.1
-      preview       -> 4.35.0.1-preview
-      experimental  -> 4.35.0.1-experimental
+      stable        -> 4.35.0
+      preview       -> 4.35.0-preview
+      experimental  -> 4.35.0-experimental
   -->
 
   <PropertyGroup>
     <BundleVersion>4.35.0</BundleVersion>
-    <WorkloadIteration>1</WorkloadIteration>
     <BundleChannel>stable</BundleChannel>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(BundleChannel)' == 'stable'">
-    <VersionPrefix>$(BundleVersion).$(WorkloadIteration)</VersionPrefix>
+    <VersionPrefix>$(BundleVersion)</VersionPrefix>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(BundleChannel)' != 'stable'">
-    <VersionPrefix>$(BundleVersion).$(WorkloadIteration)-$(BundleChannel)</VersionPrefix>
+    <VersionPrefix>$(BundleVersion)-$(BundleChannel)</VersionPrefix>
   </PropertyGroup>
 
 </Project>
