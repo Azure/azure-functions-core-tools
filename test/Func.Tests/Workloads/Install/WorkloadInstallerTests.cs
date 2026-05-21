@@ -82,6 +82,33 @@ public sealed class WorkloadInstallerTests : IDisposable
     }
 
     [Fact]
+    public async Task InstallFromPackage_OnlyExtractsWorkloadJsonAndTools()
+    {
+        // Real workload packages also carry pack-time metadata (the .nuspec,
+        // icons, docs) that has no business landing in the install dir.
+        string nupkg = BuildNupkg(extraFiles:
+        [
+            (WriteTempFile("workload.json", "{}"), "workload.json"),
+            (WriteTempFile("readme.md", "# readme"), "readme.md"),
+            (WriteTempFile("icon.png", "png"), "icon.png"),
+            (WriteTempFile("notes.txt", "notes"), "docs/notes.txt"),
+        ]);
+
+        WorkloadInstaller installer = NewInstaller();
+        await installer.InstallFromPackageAsync(nupkg);
+
+        string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
+        string[] entries = [.. Directory
+            .EnumerateFileSystemEntries(installDir, "*", SearchOption.AllDirectories)
+            .Select(p => Path.GetRelativePath(installDir, p).Replace(Path.DirectorySeparatorChar, '/'))
+            .OrderBy(p => p, StringComparer.Ordinal)];
+
+        Assert.Equal(
+            new[] { "tools", "tools/any", "tools/any/Test.dll", "workload.json" },
+            entries);
+    }
+
+    [Fact]
     public async Task InstallFromPackage_InvalidWorkloadJson_Throws_RollsBack()
     {
         string nupkg = BuildNupkg();
@@ -473,7 +500,11 @@ public sealed class WorkloadInstallerTests : IDisposable
 
     private WorkloadInstaller NewInstaller() => new(_paths, _store, _metadataReader, _catalog);
 
-    private string BuildNupkg(string? tags = null, bool includeFuncCliWorkloadType = true, string version = "1.0.0")
+    private string BuildNupkg(
+        string? tags = null,
+        bool includeFuncCliWorkloadType = true,
+        string version = "1.0.0",
+        IEnumerable<(string SourcePath, string TargetPath)>? extraFiles = null)
     {
         string stubAssembly = Path.Combine(_root, $"stub-{Guid.NewGuid():N}.dll");
         File.WriteAllBytes(stubAssembly, [0x4D, 0x5A]);
@@ -504,12 +535,27 @@ public sealed class WorkloadInstallerTests : IDisposable
             TargetPath = $"tools/{NuGetFramework.Parse("any").GetShortFolderName()}/Test.dll",
         });
 
+        if (extraFiles is not null)
+        {
+            foreach ((string source, string target) in extraFiles)
+            {
+                builder.Files.Add(new PhysicalPackageFile { SourcePath = source, TargetPath = target });
+            }
+        }
+
         string path = Path.Combine(_root, $"Test.Workload.{Guid.NewGuid():N}.nupkg");
         using (FileStream stream = File.Create(path))
         {
             builder.Save(stream);
         }
 
+        return path;
+    }
+
+    private string WriteTempFile(string name, string contents)
+    {
+        string path = Path.Combine(_root, $"{Guid.NewGuid():N}-{name}");
+        File.WriteAllText(path, contents);
         return path;
     }
 }
