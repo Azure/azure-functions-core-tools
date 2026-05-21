@@ -1,6 +1,21 @@
 <Project>
+
+  <!--
+    Workload pkg versioning. This is a content-only workload (no workload
+    code or assemblies), so the pkg version maps 1:1 to the worker payload
+    version it carries:
+      $(WorkerVersion) - the Node.js worker package version. Mirrors the
+                         Microsoft.Azure.Functions.NodeJsWorker version
+                         pulled in at pack time. Bare three-part SemVer.
+
+    Unlike the bundles workload, there is no channel axis: the upstream
+    NodeJsWorker NuGet doesn't ship preview/experimental SKUs, so the
+    workload pkg version is just $(WorkerVersion).
+  -->
+
   <PropertyGroup>
-    <VersionPrefix>1.0.0</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <WorkerVersion>3.13.0</WorkerVersion>
+    <VersionPrefix>$(WorkerVersion)</VersionPrefix>
   </PropertyGroup>
+
 </Project>

@@ -1,6 +1,20 @@
 <Project>
+
+  <!--
+    Workload pkg versioning. This is a content-only workload (no workload
+    code or assemblies), so the pkg version is driven by the worker payload
+    it carries. Go has no upstream worker NuGet, so $(WorkerVersion) is
+    maintained manually here and tracks the static worker.config.json
+    payload shipped under content/workers/native/.
+      $(WorkerVersion) - Go worker payload version. Bare three-part SemVer.
+
+    No channel axis: there are no preview/experimental Go worker SKUs.
+  -->
+
   <PropertyGroup>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <WorkerVersion>1.0.0</WorkerVersion>
+    <VersionPrefix>$(WorkerVersion)</VersionPrefix>
     <VersionSuffix>preview.1</VersionSuffix>
   </PropertyGroup>
+
 </Project>

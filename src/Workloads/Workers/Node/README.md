@@ -11,6 +11,23 @@ func workload install Azure.Functions.Cli.Workloads.Workers.Node
 func workload install node-worker
 ```
 
+## Version scheme
+
+The workload pkg version maps 1:1 to the Node.js worker payload it carries.
+One prop in `Directory.Version.props` drives `$(VersionPrefix)`:
+
+| Prop               | Meaning                                                                   |
+|--------------------|---------------------------------------------------------------------------|
+| `$(WorkerVersion)` | `Microsoft.Azure.Functions.NodeJsWorker` version. Bare three-part SemVer. |
+
+Bump `$(WorkerVersion)` whenever the upstream worker package is bumped.
+`$(WorkerVersion)` also pins the restored
+`Microsoft.Azure.Functions.NodeJsWorker` pkg via `VersionOverride`, so the
+two versions cannot drift.
+
+Unlike the bundles workload, there is no channel axis: the upstream
+NodeJsWorker NuGet doesn't ship preview/experimental SKUs.
+
 ## Status
 
 Preview. Worker assets are pulled at pack time from the restored
