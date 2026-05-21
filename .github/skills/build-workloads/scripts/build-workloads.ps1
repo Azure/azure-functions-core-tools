@@ -47,7 +47,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $skillRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
-$repoRoot = (Resolve-Path (Join-Path $skillRoot '../..')).Path
+$repoRoot = (Resolve-Path (Join-Path $skillRoot '../../..')).Path
 $composeFile = Join-Path $skillRoot 'assets/docker-compose.yml'
 $slnxFile = Join-Path $repoRoot 'Azure.Functions.Cli.slnx'
 $outputDir = Join-Path $repoRoot 'artifacts/workloads-feed'
@@ -141,13 +141,29 @@ Invoke-Compose -Arguments @('up', '-d')
 Wait-ForFeed
 
 Write-Host "Pushing $($nupkgs.Count) package(s) to $feedUrl" -ForegroundColor Cyan
+
+# dotnet nuget push refuses HTTP sources unless the source is declared with
+# allowInsecureConnections="true". Write a throwaway NuGet.Config alongside the
+# packages so the push uses it without affecting the repo's NuGet.Config.
+$pushConfig = Join-Path $outputDir 'NuGet.Config'
+@"
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$feedUrl" allowInsecureConnections="true" />
+  </packageSources>
+</configuration>
+"@ | Set-Content -Path $pushConfig -Encoding UTF8
+
 foreach ($pkg in $nupkgs) {
     Write-Host "  push $($pkg.Name)" -ForegroundColor DarkCyan
     $pushArgs = @(
         'nuget', 'push', $pkg.FullName,
-        '--source', $feedUrl,
+        '--source', 'local',
         '--api-key', $ApiKey,
-        '--skip-duplicate'
+        '--skip-duplicate',
+        '--configfile', $pushConfig
     )
     Invoke-Native -File 'dotnet' -Arguments $pushArgs
 }
