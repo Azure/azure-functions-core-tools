@@ -25,7 +25,7 @@
       pointing at the restored package root. IncludeAssets=none keeps the
       package's build targets and contentFiles from affecting this project.
     -->
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" GeneratePathProperty="true">
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" GeneratePathProperty="true" VersionOverride="$(WorkerVersion)">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>none</IncludeAssets>
     </PackageReference>

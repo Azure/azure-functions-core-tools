@@ -24,7 +24,12 @@
   <ItemGroup>
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
   </ItemGroup>
-  <!-- language workers -->
+  <!-- language workers
+       Authoritative source for each worker pkg version is the corresponding
+       workload's Directory.Version.props ($(WorkerVersion)), which both pins
+       the restored worker pkg (via VersionOverride) and drives the workload
+       pkg version. Keep these central pins in sync with those props as a
+       documentation aid. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.13.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.43.0" />
