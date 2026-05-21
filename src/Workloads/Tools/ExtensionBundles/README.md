@@ -41,17 +41,20 @@ dotnet pack ... /p:BundleChannel=experimental
 
 ## Layout
 
-The package places the bundle payload under `tools/any/` (Workload Spec
-§5.3). After install:
+The package places the bundle payload under `tools/any/<BundleVersion>/`
+so the on-disk layout matches what the host's `ExtensionBundleManager`
+expects to probe (`<downloadPath>/<version>/...`). After install:
 
 ```
 <workload-home>/workloads/azure.functions.cli.workloads.extensionbundles/<version>/
-  tools/any/                  ← extension bundle root (bin/, extensions.json, ...)
+  tools/any/
+    <BundleVersion>/         ← extension bundle root (bin/, extensions.json, ...)
   workload.json
 ```
 
-`tools/any/` is the canonical content-workload payload path and the
-contract between this package and the CLI's bundle resolver.
+The CLI bundle resolver sets `downloadPath` to `<install>/tools/any/`
+and the host walks the `<BundleVersion>/` child for the requested version.
+`tools/any/` is the canonical content-workload payload path.
 
 ## Links
 

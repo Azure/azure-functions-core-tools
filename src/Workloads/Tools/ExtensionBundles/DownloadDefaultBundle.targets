@@ -2,12 +2,16 @@
 
   <!--
     Pack-time: download the extension bundle whose version matches the
-    workload's $(BundleVersion) from the CDN and embed it under tools/any/
-    in the nupkg. The CLI's bundle resolver expects this exact subpath.
-    Runs only when packing so plain `dotnet build` (and CI test runs) do
-    not pay the cost. Set SkipDefaultBundleDownload=true to opt out (e.g.
-    for fully offline pack of a developer build, or a PR build whose
-    $(BundleVersion) is not yet published to the CDN).
+    workload's $(BundleVersion) from the CDN and embed it under
+    tools/any/$(BundleVersion)/ in the nupkg. The version-nested layout
+    matches what the host's ExtensionBundleManager probes
+    (<downloadPath>/<version>/...): the CLI bundle resolver sets
+    downloadPath to <install>/tools/any/, and the host appends the
+    requested bundle version. Runs only when packing so plain
+    `dotnet build` (and CI test runs) do not pay the cost. Set
+    SkipDefaultBundleDownload=true to opt out (e.g. for fully offline
+    pack of a developer build, or a PR build whose $(BundleVersion) is
+    not yet published to the CDN).
 
     The CDN bundle id is selected from $(BundleChannel):
       stable        -> Microsoft.Azure.Functions.ExtensionBundle
@@ -59,7 +63,7 @@
       <None Include="$(IntermediateOutputPath)bundle\**\*"
             Exclude="$(IntermediateOutputPath)bundle\.extracted"
             Pack="true"
-            PackagePath="tools/any/"
+            PackagePath="tools/any/$(BundleVersion)/"
             Visible="false" />
     </ItemGroup>
   </Target>
