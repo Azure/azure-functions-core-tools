@@ -68,9 +68,22 @@ public class StartCommandTests : IDisposable
     public void StartCommand_RegisteredInParser()
     {
         var root = TestParser.CreateRoot(_interaction);
-        var names = root.Subcommands.Select(c => c.Name).ToList();
+        var runCommand = root.Subcommands.SingleOrDefault(c => c.Name == "run");
 
-        Assert.Contains("start", names);
+        Assert.NotNull(runCommand);
+        Assert.Contains("start", runCommand!.Aliases);
+    }
+
+    [Fact]
+    public async Task StartCommand_InvokableByRunName()
+    {
+        var nonExistent = Path.Combine(_tempDir, "does-not-exist");
+        var root = TestParser.CreateRoot(_interaction);
+        var result = root.Parse($"run \"{nonExistent}\"");
+
+        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+        var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
+        Assert.Contains("does not exist", ex.Message);
     }
 
     [Fact]
