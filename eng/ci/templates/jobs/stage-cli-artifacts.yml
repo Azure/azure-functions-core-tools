@@ -44,11 +44,18 @@ jobs:
 
   steps:
     - ${{ each runtime in parameters.runtimes }}:
+
       - ${{ if not(startsWith(runtime, 'win')) }}:
         - bash: |
             chmod +x '$(drop_path)/${{ runtime }}/func'
             tar -czf '$(drop_path)/${{ runtime }}/func.tar.gz' -C '$(drop_path)/${{ runtime }}' func
             rm '$(drop_path)/${{ runtime }}/func'
+          displayName: 'Archive ${{ runtime }}'
+
+      - ${{ if startsWith(runtime, 'win') }}:
+        - pwsh: |
+            Compress-Archive -Path '$(drop_path)/${{ runtime }}/func.exe' -DestinationPath '$(drop_path)/${{ runtime }}/func.zip'
+            Remove-Item '$(drop_path)/${{ runtime }}/func.exe'
           displayName: 'Archive ${{ runtime }}'
 
 

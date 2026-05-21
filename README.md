@@ -9,6 +9,31 @@
 
 The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
 
+## Installation
+
+### One-line install
+
+**PowerShell** (Windows, macOS, Linux):
+
+```powershell
+irm https://aka.ms/func-cli/install.ps1 | iex
+```
+
+**Bash** (macOS, Linux):
+
+```bash
+curl -sSL https://aka.ms/func-cli/install.sh | bash
+```
+
+Both scripts auto-detect your OS and architecture, download the latest 5.x release from GitHub, and install to `~/.azure-functions`.
+
+### Options
+
+| Option | PowerShell | Bash |
+|--------|-----------|------|
+| Specific version | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Version 5.0.0` | `VERSION=5.0.0 curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
+| Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `INSTALL_DIR=~/my-tools curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
+
 ## Usage
 
 ```bash
