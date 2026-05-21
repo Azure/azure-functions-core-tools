@@ -87,10 +87,11 @@ Azure.Functions.Cli.Workloads.ExtensionBundles
 ```
 
 It is `kind: content` (Workload Spec §3, §5.3): the package ships
-the bundle payload under `tools/any/` with no `entryPoint`. The
-workload subsystem records its registry row but does not load it
-(Workload Spec §6.2 step 3, §5.1 "non-`workload` kinds"). The CLI
-core resolves the install directory by package id and workload pkg
+the bundle payload under `tools/any/<BundleVersion>/` (see §5.2 for
+the version-nest contract) with no `entryPoint`. The workload
+subsystem records its registry row but does not load it (Workload
+Spec §6.2 step 3, §5.1 "non-`workload` kinds"). The CLI core
+resolves the install directory by package id and workload pkg
 version, in the same way `func start` resolves the host-runtime
 workload today (Workload Spec §4.6).
 
@@ -356,25 +357,49 @@ worker runtime, active profile), the CLI core:
 
 The CLI core performs **no** network I/O.
 
-### 5.2 Where bundle content lives
+### 5.2 On-disk layout
 
-The bundles workload `.nupkg` ships its payload under `tools/any/`,
-which the workload subsystem extracts into:
+The bundles workload `.nupkg` ships its payload under
+`tools/any/<BundleVersion>/`, which the workload subsystem extracts
+into:
 
 ```
 <workload-home>/workloads/azure.functions.cli.workloads.extensionbundles/<workload-pkg-version>/
+  tools/any/
+    <bundle-version>/          ← extension bundle root (bin/, extensions.json, ...)
+  workload.json
 ```
 
-The directory is keyed by the workload pkg version (e.g.
-`4.35.0`, `4.35.0-preview`), so stable and preview installs of
-the same bundle payload coexist as distinct directories.
+The install dir is keyed by the workload pkg version (e.g. `4.35.0`,
+`4.35.0-preview`), so stable and preview installs of the same
+bundle payload coexist as distinct directories. Inside, the bundle
+content (the layout the Functions runtime host already knows how
+to read: `bin/`, `extensions.json`, etc.) lives one level deeper
+in a directory named after the 3-part bundle payload version.
 
-The actual bundle content (the layout the Functions runtime host
-already knows how to read: `bin/`, `extensions.json`, etc.) lives
-under that directory at a fixed subpath chosen by the workload
-package. The CLI core knows that subpath (it is part of the
-content-workload contract, documented alongside the package) and
-returns the absolute path to it.
+#### 5.2.1 Resolved path and host probe contract
+
+The CLI core's bundle resolver returns the **parent** of the bundle
+version directory: `<install>/tools/any/`. The `func start` step
+then sets:
+
+```
+AzureFunctionsJobHost__extensionBundle__downloadPath = <install>/tools/any
+AzureFunctionsJobHost__extensionBundle__ensureLatest = false
+```
+
+The Functions runtime host's `ExtensionBundleManager` probes
+`<downloadPath>/<bundle-version>/...` for the bundle root, which
+lands on the version directory we just shipped. The version segment
+in the layout is what makes the host happy without CT having to set
+custom env vars or patch the host probe path.
+
+A practical consequence: a bundles workload `.nupkg` could in
+principle ship more than one bundle version under `tools/any/`
+(e.g. `tools/any/4.35.0/` and `tools/any/4.36.0/`) and the host
+would still probe correctly. Today each workload pkg carries
+exactly one bundle version per the 1:1 rule in §4.1.1, but the
+layout leaves that door open.
 
 No copy or relocation step is performed at install time, and there
 is no second on-disk root.
@@ -385,7 +410,13 @@ The bundles workload `.csproj` is a packaging-only project (no
 runtime assembly). At workload-build time, MSBuild fetches the
 bundle payload zip for the target version, unpacks the bundle into
 the workload output, and packs the result into the `.nupkg` under
-`tools/any/`.
+`tools/any/<BundleVersion>/` (see §5.2 for why the version nest is
+required).
+
+Other `kind: content` workloads can still pack flat at `tools/any/`
+if the consumer doesn't impose a version-probing contract; the
+nested layout is specific to bundles because the consumer is the
+host's `ExtensionBundleManager`.
 
 #### 5.3.1 Payload source: bundle pipeline build artifacts
 
@@ -561,7 +592,10 @@ none there.
   three host.json ids (stable / Preview / Experimental), each
   mapping to workload pkg versions whose prerelease label exactly
   matches the channel. Implemented in PR #5036.
-- **Payload subpath inside `tools/any/`** (previously Q2). The
-  bundle content lives directly under `tools/any/`; the CLI core
-  appends that subpath as part of the content-workload contract.
-  Implemented in PR #5036 (`InstalledBundleScanner`).
+- **Payload subpath inside `tools/any/`** (previously Q2).
+  Resolved by §5.2: the bundle payload lives under
+  `tools/any/<bundle-version>/`, and the CLI core returns the
+  parent (`tools/any/`) so the host's `ExtensionBundleManager`
+  can append the version segment in its probe. Implemented in
+  PR #5055 (packaging) and PR #5036 (resolver
+  `BundlePayloadSubpath = "tools/any"`).
