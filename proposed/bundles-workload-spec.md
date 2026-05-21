@@ -71,7 +71,7 @@
 |------|---------|
 | **Bundle id** | The `host.json` `extensionBundle.id` value. Three ids exist in v5: `Microsoft.Azure.Functions.ExtensionBundle` (stable), `Microsoft.Azure.Functions.ExtensionBundle.Preview`, and `Microsoft.Azure.Functions.ExtensionBundle.Experimental`. Each id is its own channel; experimental is **not** a label on the Preview id. |
 | **Bundle payload version** | The 3-part SemVer version of the extension bundle payload zip (e.g. `4.35.0`). This is the version the Functions runtime knows about and the version the user sees in `func` logs. It carries **no** prerelease label, even for the preview / experimental channels. |
-| **Workload pkg version** | The 4-part version of the bundles workload `.nupkg`, of the form `BundleVersion.WorkloadIteration[-Channel]` (e.g. `4.35.0.1`, `4.35.0.1-preview`, `4.35.0.1-experimental`). See §4.1 for the version scheme. |
+| **Workload pkg version** | The version of the bundles workload `.nupkg`. Maps **1:1** to the bundle payload version: stable channel uses the bare 3-part version (e.g. `4.35.0`); preview / experimental channels use the bare 3-part version with a channel prerelease label (e.g. `4.35.0-preview`, `4.35.0-experimental`). See §4.1.1. |
 | **Bundles workload** | The single `kind: content` workload package id `Azure.Functions.Cli.Workloads.ExtensionBundles`. Each installed instance carries exactly **one** bundle payload, packaged at workload-build time. |
 | **Bundle workload install dir** | The directory the workload subsystem extracts an installed bundles workload into, per Workload Spec §6.1: `<workload-home>/workloads/azure.functions.cli.workloads.extensionbundles/<workload-pkg-version>/`. |
 | **Resolved bundle path** | The directory the CLI core returns to its bundle consumer (today: `func start`). It is a subdirectory of the bundle workload install dir whose contents match today's extension bundle zip layout exactly, so the Functions runtime host needs no changes to consume it. |
@@ -94,54 +94,46 @@ core resolves the install directory by package id and workload pkg
 version, in the same way `func start` resolves the host-runtime
 workload today (Workload Spec §4.6).
 
-#### 4.1.1 Two-axis version scheme
+#### 4.1.1 Version scheme
 
-The workload pkg version is **not** a 1:1 mirror of the bundle
-payload version. It has the form:
+The workload pkg version maps **1:1** to the bundle payload
+version. Because the workload pkg is content-only (no workload
+code), there is no reason to version it independently of the
+payload it carries.
 
-```
-BundleVersion.WorkloadIteration[-Channel]
-```
-
-Three MSBuild props in `Directory.Version.props` drive
+Two MSBuild props in `Directory.Version.props` drive
 `<VersionPrefix>`:
 
 - `$(BundleVersion)` (e.g. `4.35.0`): the 3-part SemVer version of
   the bundle payload. Drives the CDN URL (§5.3.2) and the
   user-facing version in `func` logs.
-- `$(WorkloadIteration)` (e.g. `1`): per-bundle iteration counter
-  for the workload pkg itself, always occupying the 4th segment
-  regardless of channel. Bump when republishing the same bundle
-  payload with a workload-only fix.
 - `$(BundleChannel)` (`stable` | `preview` | `experimental`):
-  selects the CDN bundle id at pack time (§5.3.1) and the
-  prerelease label on the workload pkg version.
+  selects the CDN bundle id at pack time (§5.3.1) and, for
+  non-stable channels, the prerelease label appended to the
+  workload pkg version.
 
 The resulting workload pkg versions per channel:
 
 | Channel | host.json `extensionBundle.id` | Workload pkg version | Bundle payload version |
 |---|---|---|---|
-| stable | `Microsoft.Azure.Functions.ExtensionBundle` | `4.35.0.1` | `4.35.0` |
-| preview | `Microsoft.Azure.Functions.ExtensionBundle.Preview` | `4.35.0.1-preview` | `4.35.0` |
-| experimental | `Microsoft.Azure.Functions.ExtensionBundle.Experimental` | `4.35.0.1-experimental` | `4.35.0` |
+| stable | `Microsoft.Azure.Functions.ExtensionBundle` | `4.35.0` | `4.35.0` |
+| preview | `Microsoft.Azure.Functions.ExtensionBundle.Preview` | `4.35.0-preview` | `4.35.0` |
+| experimental | `Microsoft.Azure.Functions.ExtensionBundle.Experimental` | `4.35.0-experimental` | `4.35.0` |
 
-Each installed workload pkg version still ships **exactly one**
-bundle payload version; the 1:1 contract holds at the user-facing
-surface. The 4th segment and prerelease label are CLI-internal
-plumbing.
+Each installed workload pkg version ships **exactly one** bundle
+payload version; the 1:1 contract holds at every level.
 
-Rationale for splitting the two axes:
+Rationale:
 
-- The workload pkg can be re-released with a fix (catalog metadata,
-  packaging bug, signing, etc.) without bumping the bundle payload
-  version. Workload-only fixes get `.2`, `.3`, ... in the 4th
-  segment.
+- Content-only pkg: no workload code to revision separately, so a
+  4th-segment iteration counter would be cognitive cost with no
+  payoff.
 - The prerelease label is NuGet's built-in "this is preview"
   signal: `func workload install` won't pick up preview /
   experimental rows without an explicit pin or `--prerelease`.
-- The iteration counter is always in the same slot across
-  channels, so `WorkloadIteration` increments cleanly regardless
-  of channel.
+- A workload-only republish (build pipeline change, packaging fix,
+  etc.) bumps the bundle payload's patch version. If that case
+  ever becomes common, we can introduce an iteration knob then.
 
 Multiple bundle versions coexist on disk by installing the workload
 multiple times with `func workload install --force` (Workload Spec
@@ -171,17 +163,19 @@ version's prerelease label against the requested id:
 
 | host.json `extensionBundle.id` | Matching workload pkg versions |
 |---|---|
-| `Microsoft.Azure.Functions.ExtensionBundle` | versions with **no** prerelease label (e.g. `4.35.0.1`) |
-| `Microsoft.Azure.Functions.ExtensionBundle.Preview` | versions whose prerelease label is **exactly `preview`** (e.g. `4.35.0.1-preview`) |
-| `Microsoft.Azure.Functions.ExtensionBundle.Experimental` | versions whose prerelease label is **exactly `experimental`** (e.g. `4.35.0.1-experimental`) |
+| `Microsoft.Azure.Functions.ExtensionBundle` | versions with **no** prerelease label (e.g. `4.35.0`) |
+| `Microsoft.Azure.Functions.ExtensionBundle.Preview` | versions whose prerelease label is **exactly `preview`** (e.g. `4.35.0-preview`) |
+| `Microsoft.Azure.Functions.ExtensionBundle.Experimental` | versions whose prerelease label is **exactly `experimental`** (e.g. `4.35.0-experimental`) |
 
 The match is exact: a workload version's prerelease label is the
 encoded channel. Preview does not match experimental versions and
 vice versa.
 
 The version-range intersection (§5.1) is then evaluated against
-the **bundle payload version** (3-part `$(BundleVersion)`) of each
-matching candidate.
+the **bundle payload version** (3-part `$(BundleVersion)`, which
+for stable channel is the workload pkg version itself, and for
+non-stable channels is the workload pkg version with the
+prerelease label stripped) of each matching candidate.
 
 ### 4.3 CLI core ownership
 
@@ -293,7 +287,7 @@ workload`-style package) later without touching the rest of CT.
      workload is installed. Install a version with:
        func workload install Azure.Functions.Cli.Workloads.ExtensionBundles@<workload-pkg-version>
      ```
-     e.g. `...@4.35.0.1` for stable or `...@4.35.0.1-preview` for
+     e.g. `...@4.35.0` for stable or `...@4.35.0-preview` for
      preview. Exit non-zero.
 4. On `Resolved`: set
    `AzureFunctionsJobHost__extensionBundle__downloadPath` to the
@@ -329,8 +323,8 @@ worker runtime, active profile), the CLI core:
    workload registry (`workloads.json`, Workload Spec §10.1) for
    rows whose `packageId` is
    `azure.functions.cli.workloads.extensionbundles`. Each row's
-   identity is its full workload pkg version (e.g. `4.35.0.1`,
-   `4.35.0.1-preview`).
+   identity is its workload pkg version (e.g. `4.35.0`,
+   `4.35.0-preview`).
 3. Filters those rows by host.json `extensionBundle.id` per the
    §4.2 channel rule (stable id → no prerelease label; Preview id
    → prerelease label exactly `preview`; Experimental id →
@@ -342,7 +336,9 @@ worker runtime, active profile), the CLI core:
    - **Resolved**: the absolute path inside that workload's install
      dir whose layout matches the extension bundle zip (§5.2). The
      resolution carries the **3-part bundle payload version** as
-     its user-facing version, not the full workload pkg version.
+     its user-facing version, not the workload pkg version (the
+     two differ only by the prerelease label on non-stable
+     channels).
    - **WorkloadMissing**: no rows for the bundles package id exist
      at any version.
    - **EmptyIntersection**: the host.json range and the profile
@@ -369,8 +365,8 @@ which the workload subsystem extracts into:
 <workload-home>/workloads/azure.functions.cli.workloads.extensionbundles/<workload-pkg-version>/
 ```
 
-The directory is keyed by the full workload pkg version (e.g.
-`4.35.0.1`, `4.35.0.1-preview`), so stable and preview installs of
+The directory is keyed by the workload pkg version (e.g.
+`4.35.0`, `4.35.0-preview`), so stable and preview installs of
 the same bundle payload coexist as distinct directories.
 
 The actual bundle content (the layout the Functions runtime host
@@ -459,8 +455,8 @@ Tracking this transition is open question §9.Q5.
 ### 5.4 Install hints
 
 The CLI core owns hint copy for the failure variants of §5.1.
-Suggested pin versions in hints use the **full workload pkg
-version** (4-part, with channel label as applicable):
+Suggested pin versions in hints use the **workload pkg version**
+(with channel prerelease label as applicable):
 
 - `EmptyIntersection`:
   ```
@@ -477,7 +473,7 @@ version** (4-part, with channel label as applicable):
   Install a satisfying version with:
     func workload install Azure.Functions.Cli.Workloads.ExtensionBundles@<workload-pkg-version> --force
   ```
-  e.g. `...@4.35.0.1` for stable, `...@4.35.0.1-preview` for
+  e.g. `...@4.35.0` for stable, `...@4.35.0-preview` for
   preview.
 - `WorkloadMissing` hint: see §4.4 step 3.
 
@@ -507,7 +503,7 @@ single `bundle-resolve` event:
 | Field | Value |
 |-------|-------|
 | `bundleId` | `host.json` `extensionBundle.id` |
-| `resolvedVersion` | Selected 3-part **bundle payload version** (e.g. `4.35.0`) on success, or `null` on failure. The full 4-part workload pkg version is CLI-internal and is not emitted. |
+| `resolvedVersion` | Selected 3-part **bundle payload version** (e.g. `4.35.0`) on success, or `null` on failure. The workload pkg version (which adds only a channel prerelease label on non-stable channels) is CLI-internal and is not emitted. |
 | `profileName` | Active profile name, or `null` if no profile |
 | `succeeded` | `true` if the host was launched with a resolved bundle |
 | `reason` | `ok` \| `no-host-json-bundle` \| `workload-missing` \| `empty-intersection` \| `no-compatible-install` |
