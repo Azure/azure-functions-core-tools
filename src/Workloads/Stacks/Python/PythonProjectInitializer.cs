@@ -26,13 +26,7 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
         DefaultValueFactory = _ => false,
     };
 
-    public Option<BundleChannel> BundlesChannelOption { get; } = new("--bundles-channel", "-c")
-    {
-        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
-        DefaultValueFactory = _ => BundleChannel.GA,
-    };
-
-    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption, BundlesChannelOption];
+    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption];
 
     public Task InitializeAsync(
         InitContext context,
@@ -46,7 +40,6 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
         bool noBundle = parseResult.GetValue(NoBundleOption);
-        BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "function_app.py"),
@@ -84,13 +77,13 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
         {
             ProjectFiles.MergeHostJson(
                 Path.Combine(root, "host.json"),
-                host => EnsureExtensionBundle(host, channel));
+                EnsureExtensionBundle);
         }
 
         return Task.CompletedTask;
     }
 
-    private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)
+    private static void EnsureExtensionBundle(JsonObject host)
     {
         // Only fill in when missing so a user-customised bundle survives `--force`.
         if (host.ContainsKey("extensionBundle"))
@@ -100,7 +93,7 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
 
         host["extensionBundle"] = new JsonObject
         {
-            ["id"] = ExtensionBundle.IdFor(channel),
+            ["id"] = ExtensionBundle.DefaultId,
             ["version"] = ExtensionBundle.DefaultVersionRange,
         };
     }

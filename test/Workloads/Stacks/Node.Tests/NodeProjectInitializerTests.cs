@@ -47,8 +47,8 @@ public class NodeProjectInitializerTests : IDisposable
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         Assert.Contains("--no-bundle", names);
-        Assert.Contains("--bundles-channel", names);
         Assert.Contains("--skip-npm-install", names);
+        Assert.DoesNotContain("--bundles-channel", names);
     }
 
     [Fact]
@@ -140,15 +140,6 @@ public class NodeProjectInitializerTests : IDisposable
         string content = File.ReadAllText(hostJsonPath);
         Assert.Contains("\"version\"", content);
         Assert.DoesNotContain("extensionBundle", content);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_BundlesChannel_Preview_WritesPreviewBundleId()
-    {
-        await RunAsync(language: null, force: false, args: ["--bundles-channel", "Preview"]);
-
-        JsonNode? bundle = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")))!["extensionBundle"];
-        Assert.Equal("Microsoft.Azure.Functions.ExtensionBundle.Preview", bundle!["id"]!.GetValue<string>());
     }
 
     [Fact]
