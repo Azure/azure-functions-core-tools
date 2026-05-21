@@ -2,10 +2,9 @@
 
 ## 1.0.0
 
-- Adopt two-axis version scheme: manually maintained `$(WorkerVersion)` (no
-  upstream Go worker NuGet) plus `$(WorkerChannel)` (`stable` | `preview` |
-  `experimental`) drive the workload pkg version. Matches the Node and
-  Python worker workload version layout.
+- Adopt single-axis `$(WorkerVersion)` version scheme. Manually maintained
+  (no upstream Go worker NuGet) and drives the workload pkg version.
+  Matches the Node and Python worker workload version layout.
 
 ## 1.0.0-preview.1
 

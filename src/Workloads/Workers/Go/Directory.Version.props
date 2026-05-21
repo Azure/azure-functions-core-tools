@@ -6,27 +6,14 @@
     it carries. Go has no upstream worker NuGet, so $(WorkerVersion) is
     maintained manually here and tracks the static worker.config.json
     payload shipped under content/workers/native/.
-      $(WorkerVersion)  - Go worker payload version. Bare three-part SemVer.
-      $(WorkerChannel)  - stable | preview | experimental. Selects the
-                          workload pkg's prerelease label.
+      $(WorkerVersion) - Go worker payload version. Bare three-part SemVer.
 
-    Derived $(VersionPrefix):
-      stable        -> 1.0.0
-      preview       -> 1.0.0-preview
-      experimental  -> 1.0.0-experimental
+    No channel axis: there are no preview/experimental Go worker SKUs.
   -->
 
   <PropertyGroup>
     <WorkerVersion>1.0.0</WorkerVersion>
-    <WorkerChannel>stable</WorkerChannel>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(WorkerChannel)' == 'stable'">
     <VersionPrefix>$(WorkerVersion)</VersionPrefix>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(WorkerChannel)' != 'stable'">
-    <VersionPrefix>$(WorkerVersion)-$(WorkerChannel)</VersionPrefix>
   </PropertyGroup>
 
 </Project>

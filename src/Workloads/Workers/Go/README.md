@@ -13,21 +13,13 @@ func workload install go-worker
 
 ## Version scheme
 
-Mirrors the Node and Python worker workloads: `$(WorkerVersion)` (three-part
-SemVer) + `$(WorkerChannel)` (`stable` \| `preview` \| `experimental`) drive
-`$(VersionPrefix)`. Go has no upstream worker NuGet, so `$(WorkerVersion)` is
-maintained manually in `Directory.Version.props` alongside any change to the
-static `worker.config.json` payload.
+Mirrors the Node and Python worker workloads: a single `$(WorkerVersion)`
+(three-part SemVer) drives `$(VersionPrefix)`. Go has no upstream worker
+NuGet, so `$(WorkerVersion)` is maintained manually in
+`Directory.Version.props` alongside any change to the static
+`worker.config.json` payload.
 
-| Channel      | Workload pkg version |
-|--------------|----------------------|
-| stable       | `1.0.0`              |
-| preview      | `1.0.0-preview`      |
-| experimental | `1.0.0-experimental` |
-
-```bash
-dotnet pack ... /p:WorkerChannel=preview
-```
+No channel axis: there are no preview/experimental Go worker SKUs.
 
 ## Status
 

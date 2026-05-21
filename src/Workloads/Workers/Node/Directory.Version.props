@@ -4,29 +4,18 @@
     Workload pkg versioning. This is a content-only workload (no workload
     code or assemblies), so the pkg version maps 1:1 to the worker payload
     version it carries:
-      $(WorkerVersion)  - the Node.js worker package version. Mirrors the
-                          Microsoft.Azure.Functions.NodeJsWorker version
-                          pulled in at pack time. Bare three-part SemVer.
-      $(WorkerChannel)  - stable | preview | experimental. Selects the
-                          workload pkg's prerelease label.
+      $(WorkerVersion) - the Node.js worker package version. Mirrors the
+                         Microsoft.Azure.Functions.NodeJsWorker version
+                         pulled in at pack time. Bare three-part SemVer.
 
-    Derived $(VersionPrefix):
-      stable        -> 3.13.0
-      preview       -> 3.13.0-preview
-      experimental  -> 3.13.0-experimental
+    Unlike the bundles workload, there is no channel axis: the upstream
+    NodeJsWorker NuGet doesn't ship preview/experimental SKUs, so the
+    workload pkg version is just $(WorkerVersion).
   -->
 
   <PropertyGroup>
     <WorkerVersion>3.13.0</WorkerVersion>
-    <WorkerChannel>stable</WorkerChannel>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(WorkerChannel)' == 'stable'">
     <VersionPrefix>$(WorkerVersion)</VersionPrefix>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(WorkerChannel)' != 'stable'">
-    <VersionPrefix>$(WorkerVersion)-$(WorkerChannel)</VersionPrefix>
   </PropertyGroup>
 
 </Project>
