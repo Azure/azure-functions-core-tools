@@ -32,7 +32,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
     public IReadOnlyList<string> SupportedLanguages => ["C#", "F#", "csharp", "fsharp"];
 
-    public Option<string> FrameworkOption { get; } = new("--tfm")
+    public Option<string> FrameworkOption { get; } = new("--tfm", "--target-framework")
     {
         Description = "The target framework for the project (e.g. net10.0).",
         DefaultValueFactory = _ => DefaultFramework
