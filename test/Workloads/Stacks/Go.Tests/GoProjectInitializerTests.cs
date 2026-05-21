@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Go.Tests;
@@ -43,7 +44,8 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public void GetInitOptions_ContainsSkipGoModTidy()
     {
-        IReadOnlyList<Option> options = new GoProjectInitializer().GetInitOptions();
+        RootCommand root = [];
+        IReadOnlyList<Option> options = new GoProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         Assert.Contains("--skip-go-mod-tidy", names);
@@ -190,10 +192,7 @@ public class GoProjectInitializerTests : IDisposable
             Language: null,
             Force: false);
         var root = new RootCommand();
-        foreach (Option opt in initializer.GetInitOptions())
-        {
-            root.Options.Add(opt);
-        }
+        initializer.GetInitOptions(new InitOptionRegistry(root));
 
         await initializer.InitializeAsync(context, root.Parse("--skip-go-mod-tidy"));
         Assert.Equal(0, calls);
@@ -212,10 +211,7 @@ public class GoProjectInitializerTests : IDisposable
             Language: null,
             Force: false);
         var root = new RootCommand();
-        foreach (Option opt in initializer.GetInitOptions())
-        {
-            root.Options.Add(opt);
-        }
+        initializer.GetInitOptions(new InitOptionRegistry(root));
 
         await initializer.InitializeAsync(context, root.Parse(string.Empty));
         Assert.Equal(1, calls);
@@ -232,10 +228,7 @@ public class GoProjectInitializerTests : IDisposable
             Language: null,
             Force: force);
         var root = new RootCommand();
-        foreach (Option opt in initializer.GetInitOptions())
-        {
-            root.Options.Add(opt);
-        }
+        initializer.GetInitOptions(new InitOptionRegistry(root));
 
         return initializer.InitializeAsync(context, root.Parse(args ?? []));
     }

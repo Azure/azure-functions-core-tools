@@ -67,15 +67,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(ForceOption);
 
         // Workload-contributed options are attached after built-ins so they
-        // appear as a clearly-grouped block in --help output.
+        // appear as a clearly-grouped block in --help output. Multiple workloads
+        // may legitimately contribute the same option (e.g. --no-bundle for
+        // every stack that emits an extension bundle). The registry de-dupes
+        // by name and returns a single canonical instance to every workload,
+        // so the option appears once in --help and every workload that reads
+        // it back sees the same parsed value.
+        var registry = new InitOptionRegistry(this);
         foreach (IProjectInitializer initializer in _initializers)
         {
-            foreach (Option option in initializer.GetInitOptions())
-            {
-                // TODO: detect option-name collisions across workloads and surface
-                // a workload-named error.
-                Options.Add(option);
-            }
+            registry.SetActiveStack(initializer.Stack);
+            initializer.GetInitOptions(registry);
         }
     }
 

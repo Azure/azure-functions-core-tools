@@ -28,25 +28,28 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
     public IReadOnlyList<string> SupportedLanguages { get; } = ["JavaScript", "TypeScript"];
 
-    public Option<bool> NoBundleOption { get; } = new("--no-bundle")
-    {
-        Description = "Skip writing the default extensionBundle block in host.json.",
-        DefaultValueFactory = _ => false,
-    };
+    public Option<bool> NoBundleOption { get; private set; } = default!;
 
-    public Option<BundleChannel> BundlesChannelOption { get; } = new("--bundles-channel", "-c")
-    {
-        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
-        DefaultValueFactory = _ => BundleChannel.GA,
-    };
+    public Option<BundleChannel> BundlesChannelOption { get; private set; } = default!;
 
-    public Option<bool> SkipNpmInstallOption { get; } = new("--skip-npm-install")
-    {
-        Description = "Skip running 'npm install' after Node project creation.",
-        DefaultValueFactory = _ => false,
-    };
+    public Option<bool> SkipNpmInstallOption { get; private set; } = default!;
 
-    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption, BundlesChannelOption, SkipNpmInstallOption];
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+
+        NoBundleOption = registry.GetOrAdd(CommonInitOptions.NoBundle());
+
+        BundlesChannelOption = registry.GetOrAdd(CommonInitOptions.BundlesChannel());
+
+        SkipNpmInstallOption = registry.GetOrAdd(new Option<bool>("--skip-npm-install")
+        {
+            Description = "Skip running 'npm install' after Node project creation.",
+            DefaultValueFactory = _ => false,
+        });
+
+        return [NoBundleOption, BundlesChannelOption, SkipNpmInstallOption];
+    }
 
     public async Task InitializeAsync(
         InitContext context,

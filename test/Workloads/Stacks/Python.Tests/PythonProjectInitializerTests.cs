@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Python.Tests;
@@ -43,7 +44,8 @@ public class PythonProjectInitializerTests : IDisposable
     [Fact]
     public void GetInitOptions_RegistersBundleOptions()
     {
-        IReadOnlyList<Option> options = new PythonProjectInitializer().GetInitOptions();
+        RootCommand root = [];
+        IReadOnlyList<Option> options = new PythonProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         Assert.Contains("--no-bundle", names);
@@ -170,10 +172,7 @@ public class PythonProjectInitializerTests : IDisposable
             Force: force);
 
         RootCommand root = [];
-        foreach (Option option in initializer.GetInitOptions())
-        {
-            root.Options.Add(option);
-        }
+        initializer.GetInitOptions(new InitOptionRegistry(root));
 
         ParseResult parseResult = root.Parse(args ?? []);
         return initializer.InitializeAsync(context, parseResult);

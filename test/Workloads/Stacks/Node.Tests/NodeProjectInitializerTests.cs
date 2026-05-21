@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;
@@ -43,7 +44,8 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
-        IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions();
+        RootCommand root = [];
+        IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         Assert.Contains("--no-bundle", names);
@@ -215,10 +217,8 @@ public class NodeProjectInitializerTests : IDisposable
             Force: force);
 
         RootCommand root = [];
-        foreach (Option option in initializer.GetInitOptions())
-        {
-            root.Options.Add(option);
-        }
+        var registry = new InitOptionRegistry(root);
+        initializer.GetInitOptions(registry);
 
         ParseResult parseResult = root.Parse(args ?? []);
         return initializer.InitializeAsync(context, parseResult);

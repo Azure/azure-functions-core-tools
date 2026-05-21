@@ -28,25 +28,28 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
     public IReadOnlyList<string> SupportedLanguages { get; } = ["Go"];
 
-    public Option<bool> SkipGoModTidyOption { get; } = new("--skip-go-mod-tidy")
-    {
-        Description = "Skip running 'go mod tidy' after Go project creation.",
-        DefaultValueFactory = _ => false,
-    };
+    public Option<bool> SkipGoModTidyOption { get; private set; } = default!;
 
-    public Option<bool> NoBundleOption { get; } = new("--no-bundle")
-    {
-        Description = "Skip writing the default extensionBundle block in host.json.",
-        DefaultValueFactory = _ => false,
-    };
+    public Option<bool> NoBundleOption { get; private set; } = default!;
 
-    public Option<BundleChannel> BundlesChannelOption { get; } = new("--bundles-channel", "-c")
-    {
-        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
-        DefaultValueFactory = _ => BundleChannel.GA,
-    };
+    public Option<BundleChannel> BundlesChannelOption { get; private set; } = default!;
 
-    public IReadOnlyList<Option> GetInitOptions() => [SkipGoModTidyOption, NoBundleOption, BundlesChannelOption];
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+
+        SkipGoModTidyOption = registry.GetOrAdd(new Option<bool>("--skip-go-mod-tidy")
+        {
+            Description = "Skip running 'go mod tidy' after Go project creation.",
+            DefaultValueFactory = _ => false,
+        });
+
+        NoBundleOption = registry.GetOrAdd(CommonInitOptions.NoBundle());
+
+        BundlesChannelOption = registry.GetOrAdd(CommonInitOptions.BundlesChannel());
+
+        return [SkipGoModTidyOption, NoBundleOption, BundlesChannelOption];
+    }
 
     public async Task InitializeAsync(
         InitContext context,

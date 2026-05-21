@@ -212,7 +212,8 @@ The abstractions library exposes the surface workload authors program against:
 |------|------|
 | `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
 | `FunctionsCliBuilder` | The DI seam handed to a workload. Exposes `Services` for plain DI registrations and `RegisterCommand(...)` overloads (instance / type / factory) for contributing top-level commands. Abstract base so we can grow the surface without breaking workloads. |
-| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `SupportedLanguages`, contributes init options, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `SupportedLanguages`, registers init options via `IInitOptionRegistry`, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `IInitOptionRegistry` / `CommonInitOptions` | The registry de-dupes options that multiple workloads contribute (e.g. `--no-bundle`) so each option appears once in `--help` and every workload reads the same parsed value. `CommonInitOptions` is a small factory of the shared options themselves (`NoBundle`, `BundlesChannel`). |
 | `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
 | `FuncCommand` | Parser-independent base for workload-contributed top-level commands. Describes `Name`, `Description`, `Options`, `Arguments`, `Subcommands`, and an `ExecuteAsync(FuncCommandInvocationContext, CancellationToken)`. |
 | `FuncCommandOption` / `FuncCommandArgument` | Typed descriptors used by `FuncCommand`. Identity matters — pass the same descriptor instance to `context.GetValue(...)` to read parsed values. |
@@ -243,7 +244,9 @@ Build commands (Parser.CreateCommand):
   ├── Built-in collisions throw (CLI bug); workload commands that collide with
   │   built-ins or with each other are skipped with a warning that names the
   │   workload(s)
-  ├── InitCommand sees IEnumerable<IProjectInitializer>, attaches their options
+  ├── InitCommand sees IEnumerable<IProjectInitializer>, drives each one through an
+  │   IInitOptionRegistry to register init options (shared names — like --no-bundle —
+  │   collapse to a single canonical Option instance)
   ├── WorkloadListCommand depends on IWorkloadProvider
   └── HelpCommand built last with a back-reference to the constructed root
 
@@ -320,7 +323,7 @@ If a newer version is found, a notice is printed after the command completes.
 4. Delegate to IProjectInitializer.InitializeAsync(context, parseResult)
 ```
 
-Each registered initializer also contributes options to `func init` via `GetInitOptions()`; values are read back inside `InitializeAsync` via the `ParseResult`.
+Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundle`) show up once in `--help` and every contributing workload reads the canonical instance.
 
 ### `func new`
 
