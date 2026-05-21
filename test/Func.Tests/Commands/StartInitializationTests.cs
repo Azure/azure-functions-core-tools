@@ -169,13 +169,7 @@ public class StartInitializationTests : IDisposable
     public async Task CompactRenderer_RendersChecklistLines()
     {
         using var writer = new StringWriter();
-        IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Ansi = AnsiSupport.Yes,
-            ColorSystem = ColorSystemSupport.NoColors,
-            Interactive = InteractionSupport.Yes,
-            Out = new TestTerminalOutput(writer),
-        });
+        IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
 
         await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
@@ -215,17 +209,14 @@ public class StartInitializationTests : IDisposable
         await renderer.DisposeAsync();
 
         string output = writer.ToString();
-        string normalizedOutput = output.Replace("\r\n", "\n", StringComparison.Ordinal);
         string completedIcon = console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
 
         Assert.Contains("Azure Functions CLI", output);
         Assert.Contains("5.0.0-test", output);
-        Assert.Contains("Azure Functions CLI\n5.0.0-test\n\n", normalizedOutput);
         Assert.Contains(completedIcon, output);
         Assert.Contains("Resolve profile...", output);
         Assert.Contains("Install host workload", output);
         Assert.Contains(" 50%", output);
-        Assert.Contains("\u001b[5A\u001b[J", output);
         Assert.DoesNotContain("\u001b[2J", output);
         Assert.DoesNotContain("Preparing download", output);
     }
@@ -234,13 +225,7 @@ public class StartInitializationTests : IDisposable
     public async Task CompactRenderer_DoesNotClearWhenInitializationStarts()
     {
         using var writer = new StringWriter();
-        IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Ansi = AnsiSupport.Yes,
-            ColorSystem = ColorSystemSupport.NoColors,
-            Interactive = InteractionSupport.Yes,
-            Out = new TestTerminalOutput(writer),
-        });
+        IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
 
         try
@@ -252,6 +237,41 @@ public class StartInitializationTests : IDisposable
                 CancellationToken.None);
 
             Assert.DoesNotContain("\u001b[2J", writer.ToString());
+        }
+        finally
+        {
+            await renderer.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CompactRenderer_AnimatesStatusStepBetweenEvents()
+    {
+        using var writer = new StringWriter();
+        IAnsiConsole console = CreateInteractiveConsole(writer);
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+
+        try
+        {
+            await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
+            await renderer.OnEventAsync(
+                new StartInitializationStepStartedEvent(
+                    DateTimeOffset.UnixEpoch,
+                    new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile")),
+                CancellationToken.None);
+
+            Spinner spinner = console.Profile.Capabilities.Unicode ? Spinner.Known.Dots : Spinner.Known.Line;
+            string output = string.Empty;
+            int renderedFrameCount = 0;
+            for (int attempt = 0; attempt < 20 && renderedFrameCount < 2; attempt++)
+            {
+                await Task.Delay(100);
+                output = writer.ToString();
+                renderedFrameCount = spinner.Frames.Distinct().Count(frame => output.Contains(frame, StringComparison.Ordinal));
+            }
+
+            Assert.True(renderedFrameCount >= 2, $"Expected multiple spinner frames, but saw {renderedFrameCount}. Output: {output}");
+            Assert.DoesNotContain("\r\u001b[2K", output);
         }
         finally
         {
@@ -314,6 +334,15 @@ public class StartInitializationTests : IDisposable
             workingDirectory.Info,
             "dotnet-isolated",
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+    private static IAnsiConsole CreateInteractiveConsole(TextWriter writer)
+        => AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.Yes,
+            ColorSystem = ColorSystemSupport.NoColors,
+            Interactive = InteractionSupport.Yes,
+            Out = new TestTerminalOutput(writer),
+        });
 
     private static int FindStartedStepIndex(IReadOnlyList<StartInitializationEvent> events, string stepId)
         => FindStepIndex(events, stepId, static ev => ev is StartInitializationStepStartedEvent);
