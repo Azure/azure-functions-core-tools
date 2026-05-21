@@ -1,7 +1,7 @@
 # Azure Functions CLI - Host workload
 
-Content workload that ships the Azure Functions host payload consumed by the
-Azure Functions CLI when running function apps locally.
+Content workload that ships a small Azure Functions host shell and the host
+payload consumed by the Azure Functions CLI when running function apps locally.
 
 ## Install
 
@@ -13,5 +13,28 @@ func workload install host
 
 ## Status
 
-Preview. This package is a placeholder content workload; the host payload will
-be staged under `content/` before packing in a follow-up change.
+Preview. The shell expects the Azure Functions CLI to prepare the process
+environment and command-line arguments before launch. It does not translate
+private CLI configuration into host settings. The workload stages the shell
+build output under `content/` when the package is packed.
+
+## Launch contract
+
+The workload executable is a thin bootstrapper around the packaged Azure
+Functions Host. It supports one shell-specific command-line option; every other
+argument passed to the workload executable is forwarded unchanged to the host.
+
+The Azure Functions CLI is responsible for setting the process working
+directory, environment variables, and any host arguments before launching the
+workload process.
+
+| Argument | Owner | Description |
+| --- | --- | --- |
+| `--enable-auth` | Host workload shell | Enables the host's full authentication pipeline. When omitted, the shell starts the host with local auth bypassed, matching local Core Tools behavior. This argument is consumed by the shell and is not forwarded to the host. |
+| `--urls <value>` | Azure Functions Host / ASP.NET Core | Optional listener URL configuration forwarded to the host. The CLI may use this when it wants command-line URL binding instead of setting `ASPNETCORE_URLS`. |
+| Any other host-supported argument | Azure Functions Host | Forwarded unchanged. The workload shell does not validate, normalize, or translate host arguments. |
+
+The shell does not support private CLI options such as `--script-root`, `--port`,
+`--cors`, `--cors-credentials`, or `--functions`. The CLI should resolve those
+concepts before process launch and express them using the host's expected
+environment/configuration surface.

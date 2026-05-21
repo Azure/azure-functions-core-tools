@@ -15,3 +15,4 @@ extends:
     folder: workloads/host
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Host/Workloads.Host.csproj
+      $(Build.SourcesDirectory)/test/Workloads/Host.Tests/Workloads.Host.Tests.csproj
