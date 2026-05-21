@@ -7,12 +7,12 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 
 /// <summary>
 /// Default implementation that resolves the template hive path, honoring the
-/// <c>FUNC_CLI_WORKLOADS_HOME</c> environment variable when set, and falling
-/// back to <c>~/.azure-functions/dotnet-template-hive</c>.
+/// <c>FUNC_CLI_DOTNET_TEMPLATE_HIVE</c> environment variable when set, and
+/// falling back to <c>~/.azure-functions/dotnet-template-hive</c>.
 /// </summary>
 internal sealed class TemplateHivePathProvider : ITemplateHivePathProvider
 {
-    private const string WorkloadsHomeEnvVar = "FUNC_CLI_WORKLOADS_HOME";
+    internal const string HivePathEnvironmentVariable = "FUNC_CLI_DOTNET_TEMPLATE_HIVE";
     private const string HiveDirectoryName = "dotnet-template-hive";
 
     public string HivePath { get; }
@@ -20,15 +20,16 @@ internal sealed class TemplateHivePathProvider : ITemplateHivePathProvider
 
     public TemplateHivePathProvider()
     {
-        string? workloadsHome = Environment.GetEnvironmentVariable(WorkloadsHomeEnvVar);
+        string? configured = Environment.GetEnvironmentVariable(HivePathEnvironmentVariable);
 
-        string basePath = !string.IsNullOrEmpty(workloadsHome)
-            ? workloadsHome
-            : Path.Combine(
+        string hivePath = string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                Constants.FuncHomeDirectoryName);
+                Constants.FuncHomeDirectoryName,
+                HiveDirectoryName)
+            : configured;
 
-        HivePath = Path.Combine(basePath, HiveDirectoryName);
+        HivePath = Path.GetFullPath(hivePath);
         TimestampPath = Path.Combine(HivePath, ".installed");
     }
 }
