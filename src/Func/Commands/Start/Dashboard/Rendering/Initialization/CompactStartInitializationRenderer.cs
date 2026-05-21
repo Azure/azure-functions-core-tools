@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 
@@ -15,29 +16,36 @@ internal sealed class CompactStartInitializationRenderer(
     string cliVersion,
     IAnsiConsole? console = null) : IStartInitializationRenderer
 {
+    private static readonly TimeSpan _refreshInterval = TimeSpan.FromMilliseconds(100);
+
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly string _cliVersion = string.IsNullOrWhiteSpace(cliVersion) ? throw new ArgumentException("CLI version cannot be empty.", nameof(cliVersion)) : cliVersion;
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
-    private readonly SemaphoreSlim _stepLock = new(initialCount: 1, maxCount: 1);
+    private readonly Lock _stateLock = new();
+    private readonly SemaphoreSlim _redrawSignal = new(initialCount: 0, maxCount: int.MaxValue);
     private readonly List<StepState> _steps = [];
     private StepState? _activeStep;
-    private bool _preambleRendered;
+    private CancellationTokenSource? _liveCts;
+    private Task? _liveTask;
+    private int _spinnerFrameIndex;
     private bool _disposed;
 
     private ITheme Theme => _interaction.Theme;
 
-    public async Task OnEventAsync(StartInitializationEvent initializationEvent, CancellationToken cancellationToken)
+    public Task OnEventAsync(StartInitializationEvent initializationEvent, CancellationToken cancellationToken)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
-        await _stepLock.WaitAsync(cancellationToken);
-        try
+        Task? liveTaskToStop = null;
+        CancellationTokenSource? liveCtsToStop = null;
+        lock (_stateLock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             switch (initializationEvent)
             {
                 case StartInitializationStartedEvent:
-                    RenderPreamble();
+                    EnsureLiveDisplayStarted();
                     break;
                 case StartInitializationStepStartedEvent started:
                     StartStep(started.Step);
@@ -49,37 +57,39 @@ internal sealed class CompactStartInitializationRenderer(
                     CompleteStep(completed);
                     break;
                 case StartInitializationCompletedEvent:
-                    ClearInitializationBlockIfTerminal();
+                    liveTaskToStop = _liveTask;
+                    liveCtsToStop = _liveCts;
+                    _liveTask = null;
+                    _liveCts = null;
                     break;
             }
         }
-        finally
-        {
-            _stepLock.Release();
-        }
+
+        SignalRedraw();
+
+        return liveTaskToStop is null
+            ? Task.CompletedTask
+            : StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, cancellationToken);
     }
 
-    private void StartStep(StartInitializationStep step)
+    private void EnsureLiveDisplayStarted()
     {
-        RenderPreamble();
-        var state = new StepState(step);
-        _steps.Add(state);
-        _activeStep = state;
-        WriteStepLine(state, endLine: false);
-    }
-
-    private void RenderPreamble()
-    {
-        if (_preambleRendered)
+        if (_liveTask is not null)
         {
             return;
         }
 
-        TextWriter writer = _console.Profile.Out.Writer;
-        writer.WriteLine("Azure Functions CLI");
-        writer.WriteLine(_cliVersion);
-        writer.WriteLine();
-        _preambleRendered = true;
+        _liveCts = new CancellationTokenSource();
+        CancellationToken liveToken = _liveCts.Token;
+        _liveTask = Task.Run(() => RunLiveDisplayAsync(liveToken));
+    }
+
+    private void StartStep(StartInitializationStep step)
+    {
+        EnsureLiveDisplayStarted();
+        var state = new StepState(step);
+        _steps.Add(state);
+        _activeStep = state;
     }
 
     private void UpdateProgress(StartInitializationProgressEvent progress)
@@ -90,10 +100,6 @@ internal sealed class CompactStartInitializationRenderer(
         }
 
         step.Percent = Math.Clamp(progress.Percent, 0, 100);
-        if (ReferenceEquals(_activeStep, step))
-        {
-            RewriteStepLine(step, endLine: false);
-        }
     }
 
     private void CompleteStep(StartInitializationStepCompletedEvent completed)
@@ -108,7 +114,6 @@ internal sealed class CompactStartInitializationRenderer(
         step.Result = completed.Message;
         if (ReferenceEquals(_activeStep, step))
         {
-            RewriteStepLine(step, endLine: true);
             _activeStep = null;
         }
     }
@@ -116,34 +121,87 @@ internal sealed class CompactStartInitializationRenderer(
     private StepState? FindStep(string id)
         => _steps.LastOrDefault(step => string.Equals(step.Step.Id, id, StringComparison.Ordinal));
 
-    private void WriteStepLine(StepState step, bool endLine)
+    private async Task RunLiveDisplayAsync(CancellationToken cancellationToken)
     {
-        _console.Write(new Markup(BuildStepMarkup(step)));
-        if (endLine)
+        await _console.Live(BuildLayout())
+            .AutoClear(true)
+            .Overflow(VerticalOverflow.Ellipsis)
+            .Cropping(VerticalOverflowCropping.Top)
+            .StartAsync(async ctx =>
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    ctx.UpdateTarget(BuildLayout(advanceSpinner: true));
+
+                    try
+                    {
+                        await _redrawSignal.WaitAsync(_refreshInterval, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                }
+            });
+    }
+
+    private async Task StopLiveDisplayAsync(Task liveTask, CancellationTokenSource liveCts, CancellationToken cancellationToken)
+    {
+        await liveCts.CancelAsync();
+        SignalRedraw();
+
+        try
         {
-            _console.Write(new Text(Environment.NewLine));
+            await liveTask.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (liveCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // Expected when the live loop observes our shutdown token.
+        }
+        finally
+        {
+            liveCts.Dispose();
         }
     }
 
-    private void RewriteStepLine(StepState step, bool endLine)
+    private IRenderable BuildLayout(bool advanceSpinner = false)
     {
-        ClearCurrentLine();
-        WriteStepLine(step, endLine);
-    }
-
-    private void ClearCurrentLine()
-    {
-        if (_console.Profile.Out.IsTerminal)
+        StepSnapshot[] steps;
+        int spinnerFrameIndex;
+        lock (_stateLock)
         {
-            _console.Write(new ControlCode("\r\u001b[2K"));
+            if (advanceSpinner)
+            {
+                _spinnerFrameIndex++;
+            }
+
+            spinnerFrameIndex = _spinnerFrameIndex;
+            steps =
+            [
+                .. _steps.Select(static step => new StepSnapshot(step.Step, step.Percent, step.Completed, step.Result))
+            ];
         }
+
+        List<IRenderable> rows =
+        [
+            new Markup(Markup.Escape("Azure Functions CLI")),
+            new Markup(Markup.Escape(_cliVersion)),
+            new Text(string.Empty),
+        ];
+
+        foreach (StepSnapshot step in steps)
+        {
+            rows.Add(new Markup(BuildStepMarkup(step, spinnerFrameIndex)));
+        }
+
+        return new Rows(rows);
     }
 
-    private string BuildStepMarkup(StepState step)
+    private string BuildStepMarkup(StepSnapshot step, int spinnerFrameIndex)
     {
         string icon = step.Completed
             ? Styled(CompletedIcon, Theme.Success)
-            : Styled(CurrentSpinnerFrame, Theme.Active);
+            : Styled(GetSpinnerFrame(spinnerFrameIndex), Theme.Active);
 
         string title = Markup.Escape(FormatStepTitle(step));
 
@@ -176,13 +234,10 @@ internal sealed class CompactStartInitializationRenderer(
         return $"{Styled(completedText, Theme.Success)}{Styled(remainingText, Theme.Muted)} {clamped,3:0}%";
     }
 
-    private string CurrentSpinnerFrame
+    private string GetSpinnerFrame(int frameIndex)
     {
-        get
-        {
-            Spinner spinner = _console.Profile.Capabilities.Unicode ? Spinner.Known.Dots : Spinner.Known.Line;
-            return spinner.Frames[0];
-        }
+        Spinner spinner = _console.Profile.Capabilities.Unicode ? Spinner.Known.Dots : Spinner.Known.Line;
+        return spinner.Frames[frameIndex % spinner.Frames.Count];
     }
 
     private string CompletedIcon => _console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
@@ -191,32 +246,12 @@ internal sealed class CompactStartInitializationRenderer(
 
     private char ProgressRemainingCharacter => _console.Profile.Capabilities.Unicode ? '\u2500' : '-';
 
-    private void ClearInitializationBlockIfTerminal()
-    {
-        if (!_console.Profile.Out.IsTerminal || _steps.Count == 0)
-        {
-            return;
-        }
-
-        const int preambleLineCount = 3;
-        int linesToMove = _activeStep is null
-            ? _steps.Count
-            : Math.Max(_steps.Count - 1, 0);
-        linesToMove += _preambleRendered ? preambleLineCount : 0;
-
-        string moveToFirstLine = linesToMove > 0
-            ? $"\r\u001b[{linesToMove}A"
-            : "\r";
-
-        _console.Write(new ControlCode($"{moveToFirstLine}\u001b[J"));
-    }
-
     private static string Styled(string text, Style style)
         => string.IsNullOrEmpty(text)
             ? string.Empty
             : $"[{style.ToMarkup()}]{Markup.Escape(text)}[/]";
 
-    private static string FormatStepTitle(StepState step)
+    private static string FormatStepTitle(StepSnapshot step)
         => step.Completed || step.Step.DisplayKind == StartInitializationDisplayKind.Progress
         ? step.Step.Title
         : step.Step.Title.EndsWith("...", StringComparison.Ordinal) ? step.Step.Title : $"{step.Step.Title}...";
@@ -228,22 +263,39 @@ internal sealed class CompactStartInitializationRenderer(
             return;
         }
 
-        await _stepLock.WaitAsync();
-        try
+        Task? liveTaskToStop;
+        CancellationTokenSource? liveCtsToStop;
+        lock (_stateLock)
         {
             _disposed = true;
-            if (_activeStep is not null)
-            {
-                _console.Write(new Text(Environment.NewLine));
-                _activeStep = null;
-            }
-        }
-        finally
-        {
-            _stepLock.Release();
+            liveTaskToStop = _liveTask;
+            liveCtsToStop = _liveCts;
+            _liveTask = null;
+            _liveCts = null;
         }
 
-        _stepLock.Dispose();
+        if (liveTaskToStop is not null)
+        {
+            await StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, CancellationToken.None);
+        }
+
+        _redrawSignal.Dispose();
+    }
+
+    private void SignalRedraw()
+    {
+        try
+        {
+            _redrawSignal.Release();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The live display has already been torn down.
+        }
+        catch (SemaphoreFullException)
+        {
+            // The live loop coalesces pending redraw requests.
+        }
     }
 
     private sealed class StepState(StartInitializationStep step)
@@ -255,4 +307,10 @@ internal sealed class CompactStartInitializationRenderer(
         public bool Completed { get; set; }
         public string? Result { get; internal set; }
     }
+
+    private sealed record StepSnapshot(
+        StartInitializationStep Step,
+        double Percent,
+        bool Completed,
+        string? Result);
 }
