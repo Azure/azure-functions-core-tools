@@ -212,7 +212,7 @@ The abstractions library exposes the surface workload authors program against:
 |------|------|
 | `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
 | `FunctionsCliBuilder` | The DI seam handed to a workload. Exposes `Services` for plain DI registrations and `RegisterCommand(...)` overloads (instance / type / factory) for contributing top-level commands. Abstract base so we can grow the surface without breaking workloads. |
-| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `SupportedLanguages`, registers init options via `IInitOptionRegistry`, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `DisplayName`, `SupportedLanguages`, registers init options via `IInitOptionRegistry`, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
 | `IInitOptionRegistry` / `CommonInitOptions` | The registry de-dupes options that multiple workloads contribute (e.g. `--no-bundles`) so each option appears once in `--help` and every workload reads the same parsed value. `CommonInitOptions` is a small factory of the shared options themselves (`NoBundle`, `BundlesChannel`). |
 | `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
 | `FuncCommand` | Parser-independent base for workload-contributed top-level commands. Describes `Name`, `Description`, `Options`, `Arguments`, `Subcommands`, and an `ExecuteAsync(FuncCommandInvocationContext, CancellationToken)`. |

@@ -210,6 +210,8 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 {
     public string Stack => "node";
 
+    public string DisplayName => "Node.js";
+
     public IReadOnlyList<string> SupportedLanguages => ["JavaScript", "TypeScript"];
 
     public bool CanHandle(string stack) =>

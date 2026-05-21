@@ -343,13 +343,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return null;
         }
 
-        // Multiple initializers, interactive: prompt.
-        var choices = _initializers.Select(i => i.Stack).ToList();
+        // Multiple initializers, interactive: prompt using display names,
+        // then map the selection back to its initializer.
+        var displayToInitializer = _initializers.ToDictionary(
+            i => i.DisplayName,
+            i => i,
+            StringComparer.Ordinal);
         string picked = await _interaction.PromptForSelectionAsync(
             "Select a stack:",
-            choices,
+            displayToInitializer.Keys,
             cancellationToken);
 
-        return _initializers.FirstOrDefault(i => i.Stack == picked);
+        return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
 }

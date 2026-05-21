@@ -282,11 +282,20 @@ internal sealed class WorkloadInstaller(
         };
 
         IReadOnlyList<CatalogSearchResult> hits = await _catalog.SearchAsync(query, cancellationToken);
+        IReadOnlyList<string> matchedIds = FilterByAlias(hits, aliasOrId);
 
-        IReadOnlyList<string> matchedIds = [.. hits
-            .Where(r => r.Aliases.Any(a => string.Equals(a, aliasOrId, StringComparison.OrdinalIgnoreCase)))
-            .Select(r => r.PackageId)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        // Some feeds (BaGet, older NuGet implementations) tokenize the `q=`
+        // term in ways that drop hyphenated aliases like `node-worker`. When
+        // the targeted query returns nothing, retry with an empty filter:
+        // the `packageType=FuncCliWorkload` constraint keeps the result set
+        // bounded to workload packages, which we then filter client-side.
+        if (matchedIds.Count == 0 && hits.Count == 0)
+        {
+            IReadOnlyList<CatalogSearchResult> all = await _catalog.SearchAsync(
+                query with { Filter = null },
+                cancellationToken);
+            matchedIds = FilterByAlias(all, aliasOrId);
+        }
 
         if (matchedIds.Count > 1)
         {
@@ -295,6 +304,12 @@ internal sealed class WorkloadInstaller(
 
         return matchedIds.Count == 1 ? matchedIds[0] : aliasOrId;
     }
+
+    private static IReadOnlyList<string> FilterByAlias(IReadOnlyList<CatalogSearchResult> hits, string alias) =>
+        [.. hits
+            .Where(r => r.Aliases.Any(a => string.Equals(a, alias, StringComparison.OrdinalIgnoreCase)))
+            .Select(r => r.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private async Task<ResolvedPackage> ResolveCatalogPackageAsync(
         string packageId,

@@ -30,6 +30,8 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
     public string Stack => "dotnet";
 
+    public string DisplayName => ".NET";
+
     public IReadOnlyList<string> SupportedLanguages => ["C#", "F#", "csharp", "fsharp"];
 
     public Option<string> FrameworkOption { get; private set; } = default!;

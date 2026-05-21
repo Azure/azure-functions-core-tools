@@ -483,6 +483,78 @@ public sealed class WorkloadInstallerTests : IDisposable
         Assert.Contains("not installed", ex.Message);
     }
 
+    [Fact]
+    public async Task InstallFromCatalog_AliasResolution_FallsBackToBroadSearchWhenTargetedReturnsZero()
+    {
+        // BaGet and older NuGet feeds tokenize the `q=` term in ways that drop
+        // hyphenated aliases (e.g. `node-worker`). When the targeted alias
+        // search returns nothing, the installer should retry with an empty
+        // filter and match by alias client-side.
+        string nupkg = BuildNupkg();
+        var resolved = NewResolved("real.workload.id", "1.0.0");
+        var source = new PackageSource("https://example/v3/index.json", "test");
+
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "node-worker"),
+                Arg.Any<CancellationToken>())
+            .Returns([]);
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<CatalogSearchResult>
+            {
+                new("other.workload", NuGetVersion.Parse("1.0.0"), Title: null, Description: null, Aliases: ["other"], Source: source),
+                new("real.workload.id", NuGetVersion.Parse("1.0.0"), Title: null, Description: null, Aliases: ["node-worker"], Source: source),
+            });
+        _catalog.ResolveLatestVersionAsync(
+                "real.workload.id", true, null, true, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            "node-worker", version: null, source: null,
+            includePrerelease: true, exact: false, force: false);
+
+        Assert.Equal("test.workload", result.Entry.PackageId);
+        await _catalog.Received(1).SearchAsync(
+            Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_AliasResolution_SkipsFallbackWhenTargetedHasHits()
+    {
+        // If the targeted search returns any results (even non-matching),
+        // we trust the server filter and don't pay for a second broad query.
+        string nupkg = BuildNupkg();
+        var resolved = NewResolved("node.pkg", "1.0.0");
+        var source = new PackageSource("https://example/v3/index.json", "test");
+
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "node"),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<CatalogSearchResult>
+            {
+                new("node.pkg", NuGetVersion.Parse("1.0.0"), Title: null, Description: null, Aliases: ["node"], Source: source),
+            });
+        _catalog.ResolveLatestVersionAsync(
+                "node.pkg", false, null, true, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        _ = await installer.InstallFromCatalogAsync(
+            "node", version: null, source: null,
+            includePrerelease: false, exact: false, force: false);
+
+        await _catalog.DidNotReceive().SearchAsync(
+            Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
+            Arg.Any<CancellationToken>());
+    }
+
     private static WorkloadEntry ExistingEntry(string id, string version) => new()
     {
         PackageId = id,
