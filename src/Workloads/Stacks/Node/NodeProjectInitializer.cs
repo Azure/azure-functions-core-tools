@@ -34,13 +34,19 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         DefaultValueFactory = _ => false,
     };
 
+    public Option<BundleChannel> BundlesChannelOption { get; } = new("--bundles-channel", "-c")
+    {
+        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
+        DefaultValueFactory = _ => BundleChannel.GA,
+    };
+
     public Option<bool> SkipNpmInstallOption { get; } = new("--skip-npm-install")
     {
         Description = "Skip running 'npm install' after Node project creation.",
         DefaultValueFactory = _ => false,
     };
 
-    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption, SkipNpmInstallOption];
+    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption, BundlesChannelOption, SkipNpmInstallOption];
 
     public async Task InitializeAsync(
         InitContext context,
@@ -55,6 +61,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         bool force = context.Force;
         bool isTypeScript = string.Equals(context.Language, "typescript", StringComparison.OrdinalIgnoreCase);
         bool noBundle = parseResult.GetValue(NoBundleOption);
+        BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
         bool skipNpmInstall = parseResult.GetValue(SkipNpmInstallOption);
 
         string projectName = ResolveProjectName(context);
@@ -103,7 +110,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         {
             ProjectFiles.MergeHostJson(
                 Path.Combine(root, "host.json"),
-                EnsureExtensionBundle);
+                host => EnsureExtensionBundle(host, channel));
         }
 
         if (!skipNpmInstall)
@@ -127,7 +134,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         return string.IsNullOrEmpty(sanitized) ? "function-app" : sanitized;
     }
 
-    private static void EnsureExtensionBundle(JsonObject host)
+    private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)
     {
         if (host.ContainsKey("extensionBundle"))
         {
@@ -136,7 +143,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
         host["extensionBundle"] = new JsonObject
         {
-            ["id"] = ExtensionBundle.DefaultId,
+            ["id"] = ExtensionBundle.IdFor(channel),
             ["version"] = ExtensionBundle.DefaultVersionRange,
         };
     }
