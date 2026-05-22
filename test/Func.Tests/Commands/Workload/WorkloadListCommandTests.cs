@@ -48,6 +48,25 @@ public class WorkloadListCommandTests
     }
 
     [Fact]
+    public async Task ContentEntry_WritesTableWithRegistryDisplayMetadata()
+    {
+        WorkloadInfo[] workloads =
+        [
+            TestWorkloads.CreateContentInfo(
+                packageId: "Azure.Functions.Cli.Workloads.Host",
+                version: "4.0.0"),
+        ];
+
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
+        int exit = await InvokeAsync(cmd);
+
+        Assert.Equal(0, exit);
+        Assert.Contains(
+            "  ROW: [Azure.Functions.Cli.Workloads.Host, -, Azure.Functions.Cli.Workloads.Host, -, 4.0.0]",
+            _interaction.Lines);
+    }
+
+    [Fact]
     public async Task MissingAliases_RendersDashPlaceholder()
     {
         var workloads = new[]
@@ -147,8 +166,8 @@ public class WorkloadListCommandTests
         Assert.Contains("2.0.0", rows[0]);
         Assert.Contains(".NET", rows[0]);
         Assert.Contains("1.0.0", rows[1]);
-        // Older side-by-side has no loaded info; placeholder used.
-        Assert.Contains(", -, -, ", rows[1]);
+        // Older side-by-side has no loaded info, so registry display metadata is used.
+        Assert.Equal("  ROW: [Pkg.A, a, Pkg.A, -, 1.0.0]", rows[1]);
     }
 
     [Fact]
@@ -164,15 +183,25 @@ public class WorkloadListCommandTests
     {
         var provider = Substitute.For<IWorkloadProvider>();
         provider.GetWorkloads().Returns(workloads);
+        provider.GetRuntimeWorkloads().Returns([.. workloads.OfType<RuntimeWorkloadInfo>()]);
+        provider.GetContentWorkloads().Returns([.. workloads.OfType<ContentWorkloadInfo>()]);
         return provider;
     }
 
-    private static WorkloadInfo NewInfo(
+    private static RuntimeWorkloadInfo NewInfo(
         FakeWorkload instance,
         string packageId,
         string packageVersion,
         IReadOnlyList<string> aliases)
-        => new(instance, packageId, packageVersion, aliases, instance.DisplayName, instance.Description);
+        => new(
+            instance,
+            packageId,
+            packageVersion,
+            aliases,
+            AppContext.BaseDirectory,
+            AppContext.BaseDirectory,
+            instance.DisplayName,
+            instance.Description);
 
     private static Task<int> InvokeAsync(WorkloadListCommand cmd, params string[] args)
     {

@@ -12,19 +12,33 @@ namespace Azure.Functions.Cli.Tests;
 /// </summary>
 internal static class TestWorkloads
 {
-    public static WorkloadInfo CreateInfo(
+    public static RuntimeWorkloadInfo CreateInfo(
         string packageId = "Test.Workload.A",
         string version = "1.0.0")
     {
         var instance = new TestWorkload(packageId);
-        return new WorkloadInfo(
+        return new RuntimeWorkloadInfo(
             Instance: instance,
             PackageId: packageId,
             PackageVersion: version,
             Aliases: [],
+            InstallDirectory: AppContext.BaseDirectory,
+            ContentRoot: AppContext.BaseDirectory,
             DisplayName: instance.DisplayName,
             Description: instance.Description);
     }
+
+    public static ContentWorkloadInfo CreateContentInfo(
+        string packageId = "Test.Content.A",
+        string version = "1.0.0")
+        => new(
+            PackageId: packageId,
+            PackageVersion: version,
+            Aliases: [],
+            InstallDirectory: AppContext.BaseDirectory,
+            ContentRoot: AppContext.BaseDirectory,
+            DisplayName: packageId,
+            Description: string.Empty);
 
     /// <summary>
     /// Minimal <see cref="Workloads.Workload"/> used by tests that need a

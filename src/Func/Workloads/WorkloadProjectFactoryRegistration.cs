@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Pairs an <see cref="IFunctionsProjectFactory"/> with the workload that registered it.
+/// Pairs an <see cref="IFunctionsProjectFactory"/> with the workload that
+/// registered it.
 /// </summary>
-internal sealed record WorkloadProjectFactoryRegistration(WorkloadInfo Workload, IFunctionsProjectFactory Factory);
+internal sealed record WorkloadProjectFactoryRegistration(RuntimeWorkloadInfo Workload, IFunctionsProjectFactory Factory);

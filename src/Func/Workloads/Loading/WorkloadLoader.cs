@@ -18,11 +18,11 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
         ?? throw new ArgumentNullException(nameof(paths));
 
     /// <inheritdoc />
-    public IReadOnlyList<WorkloadInfo> Load(IReadOnlyList<WorkloadEntry> entries)
+    public IReadOnlyList<RuntimeWorkloadInfo> Load(IReadOnlyList<WorkloadEntry> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        var results = new List<WorkloadInfo>(entries.Count);
+        var results = new List<RuntimeWorkloadInfo>(entries.Count);
         foreach (WorkloadEntry entry in entries)
         {
             results.Add(LoadEntry(entry));
@@ -31,13 +31,18 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
         return results;
     }
 
-    private WorkloadInfo LoadEntry(WorkloadEntry entry)
+    private RuntimeWorkloadInfo LoadEntry(WorkloadEntry entry)
     {
-        // Non-workload entries are filtered upstream; reaching the loader
-        // without an EntryPoint is a CLI bug, not a user error.
+        if (entry.Kind != WorkloadKind.Workload)
+        {
+            throw new InvalidOperationException(
+                $"[{entry.PackageId}] WorkloadLoader was invoked for a non-runtime entry (kind={entry.Kind}). " +
+                "Only kind=workload entries should reach the loader. This is a CLI bug.");
+        }
+
         EntryPointSpec entryPoint = entry.EntryPoint
             ?? throw new InvalidOperationException(
-                $"[{entry.PackageId}] WorkloadLoader was invoked for a non-workload entry (kind={entry.Kind}, no EntryPoint). " +
+                $"[{entry.PackageId}] WorkloadLoader was invoked for a runtime entry without an EntryPoint. " +
                 "Only kind=workload entries should reach the loader. This is a CLI bug.");
 
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
@@ -77,11 +82,13 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
 
         var instance = (Workload)Activator.CreateInstance(type)!;
 
-        return new WorkloadInfo(
+        return new RuntimeWorkloadInfo(
             Instance: instance,
             PackageId: entry.PackageId,
             PackageVersion: entry.PackageVersion,
             Aliases: entry.Aliases,
+            InstallDirectory: installPath,
+            ContentRoot: contentRoot,
             DisplayName: instance.DisplayName,
             Description: instance.Description);
     }

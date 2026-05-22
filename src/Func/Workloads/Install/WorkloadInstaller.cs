@@ -120,6 +120,8 @@ internal sealed class WorkloadInstaller(
                 PackageId = packageId,
                 PackageVersion = version,
                 Aliases = aliases,
+                DisplayName = GetDisplayName(metadata, packageId),
+                Description = metadata.Description ?? string.Empty,
                 EntryPoint = metadata.EntryPoint,
                 Kind = metadata.Kind,
                 Source = Path.GetFullPath(nupkgPath),
@@ -409,6 +411,8 @@ internal sealed class WorkloadInstaller(
                 PackageId = newPackageId,
                 PackageVersion = newVersion,
                 Aliases = aliases,
+                DisplayName = GetDisplayName(metadata, newPackageId),
+                Description = metadata.Description ?? string.Empty,
                 EntryPoint = metadata.EntryPoint,
                 Kind = metadata.Kind,
                 Source = resolved.Source.Source,
@@ -537,4 +541,7 @@ internal sealed class WorkloadInstaller(
             // user can clean up manually.
         }
     }
+
+    private static string GetDisplayName(WorkloadMetadata metadata, string packageId)
+        => string.IsNullOrWhiteSpace(metadata.DisplayName) ? packageId : metadata.DisplayName;
 }

@@ -59,6 +59,26 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateHostAsync_ContentWorkloads_AreIncludedInProviderInventory()
+    {
+        StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);
+        WriteRegistry(
+            ("withcommand.fixture", "1.0.0", CommandWorkloadType, WorkloadKind.Workload),
+            ("host.content", "4.0.0", null, WorkloadKind.Content),
+            ("host.content", "4.1.0", null, WorkloadKind.Content));
+
+        var interaction = new TestInteractionService();
+
+        using IHost host = await StartHostAsync(interaction);
+
+        IWorkloadProvider provider = host.Services.GetRequiredService<IWorkloadProvider>();
+        Assert.Single(provider.GetRuntimeWorkloads());
+        Assert.Equal(2, provider.GetContentWorkloads().Count);
+        Assert.Equal(3, provider.GetWorkloads().Count);
+        Assert.All(provider.GetContentWorkloads(), w => Assert.Equal(w.PackageId, w.DisplayName));
+    }
+
+    [Fact]
     public async Task CreateHostAsync_WhenWorkloadConfigureThrows_WarnsAndContinues()
     {
         StageFixtureWorkload("throwing.fixture", "1.0.0", ThrowingWorkloadType);
@@ -202,33 +222,34 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     private void WriteRegistry(params (string PackageId, string Version, string TypeName)[] entries)
+        => WriteRegistry([.. entries.Select(e => (
+            e.PackageId,
+            e.Version,
+            TypeName: (string?)e.TypeName,
+            Kind: WorkloadKind.Workload))]);
+
+    private void WriteRegistry(params (string PackageId, string Version, string? TypeName, WorkloadKind Kind)[] entries)
     {
-        var registry = new
+        WorkloadRegistry registry = new()
         {
-            Schema = WorkloadManifestSchema.CurrentRegistrySchema,
-            Workloads = entries.Select(e => new
+            Workloads = [.. entries.Select(e => new WorkloadEntry
             {
                 PackageId = e.PackageId,
                 PackageVersion = e.Version,
-                Aliases = Array.Empty<string>(),
-                EntryPoint = new
+                Aliases = [],
+                Kind = e.Kind,
+                EntryPoint = e.TypeName is null
+                    ? null
+                    : new EntryPointSpec
                 {
                     AssemblyPath = FixtureAssembly,
                     Type = e.TypeName,
                 },
-            }).ToArray(),
+            })],
         };
 
         Directory.CreateDirectory(_home);
-        var json = JsonSerializer.Serialize(registry, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        });
-
-        // Match the on-disk shape WorkloadRegistry uses: $schema property name.
-        json = json.Replace("\"schema\":", "\"$schema\":", StringComparison.Ordinal);
-
+        string json = JsonSerializer.Serialize(registry, WorkloadJsonContext.Default.WorkloadRegistry);
         File.WriteAllText(Path.Combine(_home, WorkloadPathsOptions.WorkloadRegistryFileName), json);
     }
 }

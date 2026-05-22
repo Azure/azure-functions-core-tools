@@ -63,6 +63,16 @@ internal sealed class WorkloadEntry
     public IReadOnlyList<string> Aliases { get; init; } = [];
 
     /// <summary>
+    /// Human-readable name captured from the package manifest at install time.
+    /// </summary>
+    public string DisplayName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// One-line description captured from the package manifest at install time.
+    /// </summary>
+    public string Description { get; init; } = string.Empty;
+
+    /// <summary>
     /// Catalog feed URL or local path the package was installed from.
     /// </summary>
     public string Source { get; init; } = string.Empty;

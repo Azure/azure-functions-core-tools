@@ -64,6 +64,8 @@ public sealed class WorkloadInstallerTests : IDisposable
                 e.PackageId == "test.workload" &&
                 e.PackageVersion == "1.0.0" &&
                 e.EntryPoint!.AssemblyPath == "Test.dll" &&
+                e.DisplayName == "test.workload" &&
+                e.Description == string.Empty &&
                 e.Source == Path.GetFullPath(nupkg) &&
                 e.InstallRefCount == 1 &&
                 e.Aliases.SequenceEqual(new[] { "test", "stub" })),
@@ -250,9 +252,15 @@ public sealed class WorkloadInstallerTests : IDisposable
 
         Assert.Equal(WorkloadKind.Content, result.Entry.Kind);
         Assert.Null(result.Entry.EntryPoint);
+        Assert.Equal("test.workload", result.Entry.DisplayName);
+        Assert.Equal(string.Empty, result.Entry.Description);
 
         await _store.Received(1).SaveWorkloadAsync(
-            Arg.Is<WorkloadEntry>(e => e.Kind == WorkloadKind.Content && e.EntryPoint == null),
+            Arg.Is<WorkloadEntry>(e =>
+                e.Kind == WorkloadKind.Content &&
+                e.EntryPoint == null &&
+                e.DisplayName == "test.workload" &&
+                e.Description == string.Empty),
             Arg.Any<CancellationToken>());
     }
 

@@ -35,7 +35,7 @@ internal static class TestParser
     /// </summary>
     public static FuncRootCommand CreateRootWithWorkload(
         IInteractionService interaction,
-        WorkloadInfo workload,
+        RuntimeWorkloadInfo workload,
         Action<FunctionsCliBuilder> configure)
     {
         ServiceCollection services = BuildBaseServices(interaction);
@@ -83,6 +83,8 @@ internal static class TestParser
         // returns no workloads. Tests that need a populated set replace it.
         IWorkloadProvider emptyProvider = Substitute.For<IWorkloadProvider>();
         emptyProvider.GetWorkloads().Returns([]);
+        emptyProvider.GetRuntimeWorkloads().Returns([]);
+        emptyProvider.GetContentWorkloads().Returns([]);
         services.AddSingleton(emptyProvider);
 
         // Workload install pipeline: substitute the installer so commands
