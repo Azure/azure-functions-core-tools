@@ -4,25 +4,64 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// CLI-side view of a loaded workload. Hides the fact that a workload's
-/// metadata comes from two sources: identity (<see cref="PackageId"/>,
-/// <see cref="PackageVersion"/>, <see cref="Aliases"/>) is sourced from the
-/// global registry (recorded at install time from the package's nuspec);
-/// presentation (<see cref="DisplayName"/>, <see cref="Description"/>) is
-/// sourced from the loaded <see cref="Workload"/> instance. Consumers see
-/// one cohesive record. Internal: workload authors implement
-/// <see cref="Workload"/>; they don't see this type.
+/// CLI-side view of an installed workload package.
 /// </summary>
-/// <param name="Instance">The loaded workload's runtime instance. Use this for behaviour (e.g. <see cref="Workload.Configure"/>); read presentation through <see cref="DisplayName"/> / <see cref="Description"/>.</param>
-/// <param name="PackageId">NuGet package id from the registry entry (e.g. <c>"Azure.Functions.Cli.Workloads.Dotnet"</c>).</param>
+/// <param name="Kind">Installed package shape.</param>
+/// <param name="PackageId">NuGet package id from the registry entry.</param>
 /// <param name="PackageVersion">Installed package version from the registry entry.</param>
-/// <param name="Aliases">User-facing tokens accepted by <c>-s</c> (e.g. <c>["dotnet", "dotnet-isolated"]</c>).</param>
-/// <param name="DisplayName">Human-readable name for <c>func workload list</c>; sourced from <see cref="Workload.DisplayName"/>.</param>
-/// <param name="Description">One-line workload description; sourced from <see cref="Workload.Description"/>.</param>
-internal sealed record WorkloadInfo(
+/// <param name="Aliases">User-facing tokens accepted by workload commands.</param>
+/// <param name="InstallDirectory">Package install directory under the workload home.</param>
+/// <param name="ContentRoot">Directory containing package payload files.</param>
+/// <param name="DisplayName">Human-readable name for <c>func workload list</c>.</param>
+/// <param name="Description">One-line workload description.</param>
+internal abstract record WorkloadInfo(
+    WorkloadKind Kind,
+    string PackageId,
+    string PackageVersion,
+    IReadOnlyList<string> Aliases,
+    string InstallDirectory,
+    string ContentRoot,
+    string DisplayName,
+    string Description);
+
+/// <summary>
+/// CLI-side view of a loaded runtime workload.
+/// </summary>
+/// <param name="Instance">The loaded workload's runtime instance.</param>
+/// <param name="PackageId">NuGet package id from the registry entry.</param>
+/// <param name="PackageVersion">Installed package version from the registry entry.</param>
+/// <param name="Aliases">User-facing tokens accepted by workload commands.</param>
+/// <param name="InstallDirectory">Package install directory under the workload home.</param>
+/// <param name="ContentRoot">Directory containing package payload files.</param>
+/// <param name="DisplayName">Human-readable name for <c>func workload list</c>.</param>
+/// <param name="Description">One-line workload description.</param>
+internal sealed record RuntimeWorkloadInfo(
     Workload Instance,
     string PackageId,
     string PackageVersion,
     IReadOnlyList<string> Aliases,
+    string InstallDirectory,
+    string ContentRoot,
     string DisplayName,
-    string Description);
+    string Description)
+    : WorkloadInfo(WorkloadKind.Workload, PackageId, PackageVersion, Aliases, InstallDirectory, ContentRoot, DisplayName, Description);
+
+/// <summary>
+/// CLI-side view of an installed content workload.
+/// </summary>
+/// <param name="PackageId">NuGet package id from the registry entry.</param>
+/// <param name="PackageVersion">Installed package version from the registry entry.</param>
+/// <param name="Aliases">User-facing tokens accepted by workload commands.</param>
+/// <param name="InstallDirectory">Package install directory under the workload home.</param>
+/// <param name="ContentRoot">Directory containing package payload files.</param>
+/// <param name="DisplayName">Human-readable name for <c>func workload list</c>.</param>
+/// <param name="Description">One-line workload description.</param>
+internal sealed record ContentWorkloadInfo(
+    string PackageId,
+    string PackageVersion,
+    IReadOnlyList<string> Aliases,
+    string InstallDirectory,
+    string ContentRoot,
+    string DisplayName,
+    string Description)
+    : WorkloadInfo(WorkloadKind.Content, PackageId, PackageVersion, Aliases, InstallDirectory, ContentRoot, DisplayName, Description);

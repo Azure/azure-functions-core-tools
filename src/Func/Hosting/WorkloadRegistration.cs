@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
 /// Bridges installed workloads into the host. Reads the global manifest at
-/// <c>~/.azure-functions/workloads.json</c>, loads each live workload's
+/// <c>~/.azure-functions/workloads.json</c>, loads each live runtime workload's
 /// entry-point assembly into its own
 /// <see cref="System.Runtime.Loader.AssemblyLoadContext"/>, and invokes
 /// <see cref="Workload.Configure"/> so each workload can contribute
@@ -28,7 +28,8 @@ namespace Azure.Functions.Cli.Hosting;
 /// throw becomes a stderr warning and the remaining workloads still load.
 /// Only the highest installed semver per <c>packageId</c> goes live; older
 /// versions stay in the on-disk registry for rollback but aren't loaded into
-/// the process. Content-only and meta entries are skipped.
+/// the process. Content-only entries are added to the provider inventory;
+/// meta entries are skipped.
 /// <para>
 /// Boot duration is captured by the <c>cli.workload.boot</c> activity opened
 /// here; the <see cref="WorkloadBootMetricListener"/> translates that
@@ -83,17 +84,18 @@ internal static class WorkloadRegistration
         var loader = new WorkloadLoader(paths);
 
         IReadOnlyList<WorkloadEntry> allEntries = await store.GetWorkloadsAsync(cancellationToken);
-        IReadOnlyList<WorkloadEntry> liveEntries = SelectLiveEntries(allEntries);
+        IReadOnlyList<WorkloadEntry> liveEntries = SelectLiveRuntimeEntries(allEntries);
+        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = CreateContentWorkloads(allEntries, paths);
 
-        var workloads = new List<WorkloadInfo>(liveEntries.Count);
+        var runtimeWorkloads = new List<RuntimeWorkloadInfo>(liveEntries.Count);
         foreach (WorkloadEntry entry in liveEntries)
         {
             try
             {
                 // Load per-entry so one failure becomes a warning instead of
                 // aborting discovery for the rest.
-                IReadOnlyList<WorkloadInfo> loaded = loader.Load([entry]);
-                workloads.Add(loaded[0]);
+                IReadOnlyList<RuntimeWorkloadInfo> loaded = loader.Load([entry]);
+                runtimeWorkloads.Add(loaded[0]);
             }
             catch (Exception ex)
             {
@@ -102,20 +104,21 @@ internal static class WorkloadRegistration
             }
         }
 
-        // Register each WorkloadInfo individually so anything can contribute
-        // another via AddSingleton. Consumers depend on IWorkloadProvider,
-        // not IEnumerable<WorkloadInfo>, to name the domain concept and leave
-        // room for lookup behavior later.
-        foreach (WorkloadInfo workload in workloads)
+        foreach (RuntimeWorkloadInfo workload in runtimeWorkloads)
         {
-            services.AddSingleton(workload);
+            services.AddSingleton<WorkloadInfo>(workload);
+        }
+
+        foreach (ContentWorkloadInfo workload in contentWorkloads)
+        {
+            services.AddSingleton<WorkloadInfo>(workload);
         }
 
         services.AddSingleton<IWorkloadProvider, WorkloadProvider>();
 
         services.AddSingleton<IWorkloadInvoker, WorkloadInvoker>();
 
-        foreach (WorkloadInfo workload in workloads)
+        foreach (RuntimeWorkloadInfo workload in runtimeWorkloads)
         {
             // Per-workload builder so RegisterCommand can tag the resulting
             // ExternalCommand with its owning workload.
@@ -135,15 +138,15 @@ internal static class WorkloadRegistration
             }
         }
 
-        return workloads.Count;
+        return runtimeWorkloads.Count;
     }
 
     /// <summary>
-    /// Skips non-workload entries (content-only, meta) and keeps only the
+    /// Skips non-runtime entries and keeps only the
     /// highest installed semver per <c>packageId</c>. Older versions stay on
     /// disk for rollback but don't go live in the process.
     /// </summary>
-    private static IReadOnlyList<WorkloadEntry> SelectLiveEntries(IReadOnlyList<WorkloadEntry> entries)
+    private static IReadOnlyList<WorkloadEntry> SelectLiveRuntimeEntries(IReadOnlyList<WorkloadEntry> entries)
     {
         if (entries.Count == 0)
         {
@@ -157,6 +160,29 @@ internal static class WorkloadRegistration
                 .OrderByDescending(e => ParseVersionOrZero(e.PackageVersion))
                 .First())];
     }
+
+    private static IReadOnlyList<ContentWorkloadInfo> CreateContentWorkloads(
+        IReadOnlyList<WorkloadEntry> entries,
+        IWorkloadPaths paths)
+    {
+        return [.. entries
+            .Where(e => e.Kind == WorkloadKind.Content)
+            .Select(e =>
+            {
+                string installDirectory = paths.GetInstallDirectory(e.PackageId, e.PackageVersion);
+                return new ContentWorkloadInfo(
+                    e.PackageId,
+                    e.PackageVersion,
+                    e.Aliases,
+                    installDirectory,
+                    Path.GetFullPath(Path.Combine(installDirectory, "tools", "any")),
+                    GetDisplayName(e),
+                    e.Description ?? string.Empty);
+            })];
+    }
+
+    private static string GetDisplayName(WorkloadEntry entry)
+        => string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.PackageId : entry.DisplayName;
 
     /// <summary>
     /// Parses a registry version string, falling back to 0.0.0 on failure so

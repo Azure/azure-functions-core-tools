@@ -12,7 +12,7 @@ public class WorkloadProviderTests
     public void GetWorkloads_ReturnsInjectedSet_AsStableList()
     {
         WorkloadInfo a = TestWorkloads.CreateInfo("Pkg.A");
-        WorkloadInfo b = TestWorkloads.CreateInfo("Pkg.B");
+        WorkloadInfo b = TestWorkloads.CreateContentInfo("Pkg.B");
 
         var provider = new WorkloadProvider([a, b]);
 
@@ -25,6 +25,23 @@ public class WorkloadProviderTests
         Assert.Equal(2, first.Count);
         Assert.Same(a, first[0]);
         Assert.Same(b, first[1]);
+    }
+
+    [Fact]
+    public void TypedViews_ReturnMatchingKinds_AsStableLists()
+    {
+        RuntimeWorkloadInfo runtime = TestWorkloads.CreateInfo("Pkg.Runtime");
+        ContentWorkloadInfo content = TestWorkloads.CreateContentInfo("Pkg.Content");
+
+        var provider = new WorkloadProvider([runtime, content]);
+
+        IReadOnlyList<RuntimeWorkloadInfo> runtimeWorkloads = provider.GetRuntimeWorkloads();
+        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = provider.GetContentWorkloads();
+
+        Assert.Same(runtimeWorkloads, provider.GetRuntimeWorkloads());
+        Assert.Same(contentWorkloads, provider.GetContentWorkloads());
+        Assert.Same(runtime, Assert.Single(runtimeWorkloads));
+        Assert.Same(content, Assert.Single(contentWorkloads));
     }
 
     [Fact]

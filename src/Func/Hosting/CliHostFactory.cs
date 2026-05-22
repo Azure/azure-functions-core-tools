@@ -88,7 +88,15 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IExtensionBundleResolver, ExtensionBundleResolver>();
         builder.Services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
         builder.Services.AddSingleton(new WorkloadProjectFactoryRegistration(
-            new WorkloadInfo(new DotnetWorkload(), "test", "1.0", [], "test", "description"),
+            new RuntimeWorkloadInfo(
+                new DotnetWorkload(),
+                "test",
+                "1.0",
+                [],
+                AppContext.BaseDirectory,
+                AppContext.BaseDirectory,
+                "test",
+                "description"),
             new DemoProjectFactory()));
 
         builder.Services.AddSingleton<StartDashboardEventStreamFactory>();
