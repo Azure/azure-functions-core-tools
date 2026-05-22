@@ -72,19 +72,4 @@ internal sealed class DotNetProjectFactory : IFunctionsProjectFactory
         return projectFiles[0].FullName;
     }
 
-    private sealed class DotNetFunctionsProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
-    {
-        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
-
-        public override WorkingDirectory WorkingDirectory => _workingDirectory;
-
-        public override string StackName => "dotnet";
-
-        public override string StackDisplayName => ".NET";
-
-        public override bool SupportsExtensionBundles => false;
-
-        public override IFunctionsWorker Worker => _worker;
-    }
 }
