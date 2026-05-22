@@ -52,4 +52,16 @@ public class DotNetWorkloadTests
     {
         Assert.Throws<ArgumentNullException>(() => new DotNetWorkload().Configure(null!));
     }
+
+    [Fact]
+    public void Configure_AddsProjectFactory()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new DotNetWorkload().Configure(builder);
+
+        builder.Received(1).AddProjectFactory(Arg.Any<DotNetProjectFactory>());
+    }
 }
