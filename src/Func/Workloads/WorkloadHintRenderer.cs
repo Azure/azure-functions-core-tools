@@ -72,20 +72,12 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
     {
         _interaction.WriteHint(
             $"Auto-selecting '{hint.RequestedStack}' (the only installed workload).");
-
-        IEnumerable<DefinitionItem> others = KnownInstallableWorkloads.LanguageMap
-            .Where(kvp => !string.Equals(kvp.Key, hint.RequestedStack, StringComparison.OrdinalIgnoreCase))
-            .Select(kvp => new DefinitionItem(
-                $"func workload install {kvp.Key}",
-                string.Join(", ", kvp.Value)));
-
-        if (others.Any())
-        {
-            _interaction.WriteBlankLine();
-            _interaction.WriteHint("You can install more workloads via:");
-            _interaction.WriteBlankLine();
-            _interaction.WriteDefinitionList(others);
-        }
+        _interaction.WriteLine(l => l
+            .Muted("Install more with ")
+            .Command("func workload install")
+            .Muted(" or run ")
+            .Command("func workload search")
+            .Muted(" to discover available stacks."));
     }
 
     private void WriteInstalledStacks(IReadOnlyList<string> stacks)

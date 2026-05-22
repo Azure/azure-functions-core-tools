@@ -26,6 +26,8 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
     public string Stack => "go";
 
+    public string DisplayName => "Go";
+
     public IReadOnlyList<string> SupportedLanguages { get; } = ["Go"];
 
     public Option<bool> SkipGoModTidyOption { get; private set; } = default!;

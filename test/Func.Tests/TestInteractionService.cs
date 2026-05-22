@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Globalization;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Spectre.Console.Rendering;
@@ -98,6 +99,30 @@ internal class TestInteractionService : IInteractionService
         cancellationToken.ThrowIfCancellationRequested();
         _lines.Add($"STATUS: {statusMessage}");
         await action(cancellationToken);
+    }
+
+    public async Task<T> RunWithProgressAsync<T>(
+        string initialDescription,
+        Func<IProgressContext, CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _lines.Add($"PROGRESS: {initialDescription}");
+        var ctx = new RecordingProgressContext(_lines);
+        return await action(ctx, cancellationToken);
+    }
+
+    private sealed class RecordingProgressContext(List<string> lines) : IProgressContext
+    {
+        private readonly List<string> _lines = lines;
+
+        public void SetDescription(string description) => _lines.Add($"PROGRESS: {description}");
+
+        public void SetTotal(double? total) => _lines.Add(FormattableString.Invariant($"PROGRESS TOTAL: {(total is null ? "indeterminate" : total.Value.ToString("0.##", CultureInfo.InvariantCulture))}"));
+
+        public void Report(double value) => _lines.Add(FormattableString.Invariant($"PROGRESS REPORT: {value:0.##}"));
+
+        public void Increment(double amount) => _lines.Add(FormattableString.Invariant($"PROGRESS INCREMENT: {amount:0.##}"));
     }
 
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)

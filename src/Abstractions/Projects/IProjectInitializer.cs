@@ -20,6 +20,12 @@ public interface IProjectInitializer
     /// <summary>The canonical stack id this initializer owns (e.g. "dotnet").</summary>
     public string Stack { get; }
 
+    /// <summary>
+    /// Human-friendly name for this stack shown in interactive prompts and help text
+    /// (e.g. ".NET", "Node.js"). Defaults to <see cref="Stack"/> when not overridden.
+    /// </summary>
+    public string DisplayName => Stack;
+
     /// <summary>Display labels for the languages this initializer supports (e.g. "C#", "F#").</summary>
     public IReadOnlyList<string> SupportedLanguages { get; }
 

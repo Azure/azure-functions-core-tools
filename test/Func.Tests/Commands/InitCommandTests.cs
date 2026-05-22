@@ -389,6 +389,59 @@ public class InitCommandTests
         }
     }
 
+    [Fact]
+    public async Task InitCommand_Force_ClearsDirectoryButPreservesDotGit()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            // Pre-existing junk from a prior stack.
+            File.WriteAllText(Path.Combine(newDir, "package.json"), "{}");
+            File.WriteAllText(Path.Combine(newDir, "requirements.txt"), "azure-functions");
+            Directory.CreateDirectory(Path.Combine(newDir, "node_modules"));
+            File.WriteAllText(Path.Combine(newDir, "node_modules", "marker"), "x");
+
+            // .git must survive.
+            Directory.CreateDirectory(Path.Combine(newDir, ".git"));
+            File.WriteAllText(Path.Combine(newDir, ".git", "HEAD"), "ref: refs/heads/main");
+
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(Path.Combine(newDir, "package.json")));
+            Assert.False(File.Exists(Path.Combine(newDir, "requirements.txt")));
+            Assert.False(Directory.Exists(Path.Combine(newDir, "node_modules")));
+            Assert.True(File.Exists(Path.Combine(newDir, ".git", "HEAD")));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Force_WritesWarningBeforeClearing()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "leftover.txt"), "x");
+
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("--force will delete"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
     private static void AssertConfigJsonHasShape(string directory, string? expectedStack, string? expectedLanguage)
     {
         string configPath = Path.Combine(directory, ".func", "config.json");

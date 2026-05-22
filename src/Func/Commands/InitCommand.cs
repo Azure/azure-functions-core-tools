@@ -37,7 +37,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool> ForceOption { get; } = new("--force")
     {
-        Description = "Force initialization even if the folder is not empty"
+        Description = "Re-initialize the directory: deletes its contents (except .git) before scaffolding the new project."
     };
 
     private readonly IInteractionService _interaction;
@@ -137,6 +137,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         language = resolved;
 
+        if (force)
+        {
+            if (!await ConfirmClearDirectoryAsync(workingDirectory.Info, cancellationToken))
+            {
+                _interaction.WriteHint("Init cancelled. The directory was not modified.");
+                return 1;
+            }
+
+            ClearDirectory(workingDirectory.Info);
+        }
+
         WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, language, force);
         _interaction.WriteBlankLine();
 
@@ -174,6 +185,53 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return languages.Count == 0
             ? "The programming language. Install a stack workload (`func workload install <id>`) to see supported values."
             : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
+    }
+
+    // Warns about the destructive side of --force and (in interactive mode)
+    // asks for confirmation. Non-interactive callers proceed without
+    // prompting, on the theory that --force is itself an explicit opt-in.
+    // Returns false only when the user declined the interactive prompt.
+    private async Task<bool> ConfirmClearDirectoryAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
+    {
+        bool hasContent = workingDirectory.EnumerateFiles().Any()
+            || workingDirectory.EnumerateDirectories().Any(d => !string.Equals(d.Name, ".git", StringComparison.Ordinal));
+        if (!hasContent)
+        {
+            return true;
+        }
+
+        _interaction.WriteWarning(
+            $"--force will delete all files in '{workingDirectory.FullName}' (except .git) before initializing.");
+
+        if (!_interaction.IsInteractive)
+        {
+            return true;
+        }
+
+        return await _interaction.ConfirmAsync("Continue?", defaultValue: false, cancellationToken);
+    }
+
+    // Wipes everything in the working directory before a --force re-init so
+    // leftover files from the prior stack (node_modules, requirements.txt,
+    // etc.) don't pollute the new project. Preserves .git so the user
+    // doesn't lose history.
+    private static void ClearDirectory(DirectoryInfo workingDirectory)
+    {
+        foreach (FileInfo file in workingDirectory.EnumerateFiles())
+        {
+            file.Attributes = FileAttributes.Normal;
+            file.Delete();
+        }
+
+        foreach (DirectoryInfo dir in workingDirectory.EnumerateDirectories())
+        {
+            if (string.Equals(dir.Name, ".git", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            dir.Delete(recursive: true);
+        }
     }
 
     private static bool IsAlreadyInitialized(DirectoryInfo workingDirectory, out string existingFile)
@@ -343,13 +401,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return null;
         }
 
-        // Multiple initializers, interactive: prompt.
-        var choices = _initializers.Select(i => i.Stack).ToList();
+        // Multiple initializers, interactive: prompt using display names,
+        // then map the selection back to its initializer.
+        var displayToInitializer = _initializers.ToDictionary(
+            i => i.DisplayName,
+            i => i,
+            StringComparer.Ordinal);
         string picked = await _interaction.PromptForSelectionAsync(
             "Select a stack:",
-            choices,
+            displayToInitializer.Keys,
             cancellationToken);
 
-        return _initializers.FirstOrDefault(i => i.Stack == picked);
+        return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
 }

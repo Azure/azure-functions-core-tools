@@ -179,8 +179,13 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
     {
         try
         {
-            WorkloadUpdateResult result = await _installer.UpdateAsync(
-                packageId, targetVersion, source, includePrerelease, allowMajor, cancellationToken);
+            WorkloadUpdateResult result = await _interaction.RunWithProgressAsync(
+                $"Updating workload '{packageId}'",
+                async (ctx, ct) => await _installer.UpdateAsync(
+                    packageId, targetVersion, source, includePrerelease, allowMajor,
+                    new ProgressAdapter(ctx),
+                    ct),
+                cancellationToken);
 
             RenderSingle(result);
             return 0;
@@ -225,12 +230,16 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         {
             try
             {
-                WorkloadUpdateResult result = await _installer.UpdateAsync(
-                    packageId,
-                    targetInstalledVersion: null,
-                    source,
-                    includePrerelease,
-                    allowMajor,
+                WorkloadUpdateResult result = await _interaction.RunWithProgressAsync(
+                    $"Updating workload '{packageId}'",
+                    async (ctx, ct) => await _installer.UpdateAsync(
+                        packageId,
+                        targetInstalledVersion: null,
+                        source,
+                        includePrerelease,
+                        allowMajor,
+                        new ProgressAdapter(ctx),
+                        ct),
                     cancellationToken);
                 RenderSingle(result);
             }
@@ -276,5 +285,20 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
         _interaction.WriteSuccess(
             $"Updated workload '{display}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
+    }
+
+    /// <summary>
+    /// Bridges <see cref="IProgress{T}"/> reports from the installer onto
+    /// the live progress bar.
+    /// </summary>
+    private sealed class ProgressAdapter(IProgressContext context) : IProgress<WorkloadInstallProgress>
+    {
+        private readonly IProgressContext _context = context;
+
+        public void Report(WorkloadInstallProgress value)
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _context.SetDescription(value.Description);
+        }
     }
 }

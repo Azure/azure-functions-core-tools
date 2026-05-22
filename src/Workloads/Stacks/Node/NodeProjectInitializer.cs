@@ -26,6 +26,8 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
     public string Stack => "node";
 
+    public string DisplayName => "Node.js";
+
     public IReadOnlyList<string> SupportedLanguages { get; } = ["JavaScript", "TypeScript"];
 
     public Option<bool> NoBundleOption { get; private set; } = default!;

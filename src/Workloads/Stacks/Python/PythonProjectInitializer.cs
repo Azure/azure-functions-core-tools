@@ -18,6 +18,8 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
 
     public string Stack => "python";
 
+    public string DisplayName => "Python";
+
     public IReadOnlyList<string> SupportedLanguages { get; } = ["Python"];
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
