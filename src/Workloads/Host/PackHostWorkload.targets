@@ -1,0 +1,46 @@
+<Project>
+
+  <PropertyGroup>
+    <_HostWorkloadExplicitRuntimeIdentifier>$(RuntimeIdentifier)</_HostWorkloadExplicitRuntimeIdentifier>
+    <PackRidSpecificHostWorkload>false</PackRidSpecificHostWorkload>
+    <PackageId Condition="'$(PackRidSpecificHostWorkload)' == 'true' And '$(_HostWorkloadExplicitRuntimeIdentifier)' != ''">$(AssemblyName).$(_HostWorkloadExplicitRuntimeIdentifier)</PackageId>
+    <PackageTags Condition="'$(PackRidSpecificHostWorkload)' == 'true' And '$(_HostWorkloadExplicitRuntimeIdentifier)' != ''">$(PackageTags) rid:$(_HostWorkloadExplicitRuntimeIdentifier)</PackageTags>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);StageHostWorkloadPayload</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="ValidateHostRidSpecificPackage" BeforeTargets="ResolvePackageAssets;GenerateNuspec" Condition="'$(PackRidSpecificHostWorkload)' == 'true'">
+    <Error
+      Condition="'$(_HostWorkloadExplicitRuntimeIdentifier)' == ''"
+      Text="PackRidSpecificHostWorkload requires RuntimeIdentifier. Pass -r &lt;rid&gt; when packing the host workload." />
+    <Error
+      Condition="'$(SelfContained)' != 'true'"
+      Text="PackRidSpecificHostWorkload requires SelfContained=true." />
+  </Target>
+
+  <Target Name="StageHostWorkloadPayload">
+    <PropertyGroup>
+      <HostWorkloadPayloadRoot>$(IntermediateOutputPath)workload-payload/</HostWorkloadPayloadRoot>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <HostWorkloadPayloadInput Include="$(OutputPath)**/*" Exclude="$(OutputPath)**/*.pdb" />
+    </ItemGroup>
+
+    <Error
+      Condition="'@(HostWorkloadPayloadInput)' == ''"
+      Text="Host workload build output was not found. Build the project before packing." />
+
+    <RemoveDir Directories="$(HostWorkloadPayloadRoot)" />
+    <Copy
+      SourceFiles="@(HostWorkloadPayloadInput)"
+      DestinationFiles="@(HostWorkloadPayloadInput->'$(HostWorkloadPayloadRoot)%(RecursiveDir)%(Filename)%(Extension)')" />
+
+    <ItemGroup>
+      <TfmSpecificPackageFile
+        Include="$(HostWorkloadPayloadRoot)**/*"
+        PackagePath="tools/any/%(RecursiveDir)%(Filename)%(Extension)"
+        Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>

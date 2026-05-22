@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Azure.Functions.Cli.Workloads.Host.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Workloads/Host/Workloads.Host.csproj" />
+  </ItemGroup>
+
+</Project>

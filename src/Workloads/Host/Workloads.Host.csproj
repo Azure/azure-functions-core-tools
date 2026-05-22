@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Title>Azure Functions Host</Title>
+    <Description>Azure Functions CLI content workload that ships the Azure Functions host.</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>kind:content alias:host func-workload</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- The pinned WebHost package still exposes IWebHost; remove this when the package exposes the IHost-based entry point from dev. -->
+    <NoWarn>$(NoWarn);NU5128;NU5100;ASPDEPR008</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.Host.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="System.Diagnostics.EventLog">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <Import Project="PackHostWorkload.targets" />
+
+</Project>

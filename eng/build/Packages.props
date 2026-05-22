@@ -17,6 +17,7 @@
   <ItemGroup>
     <PackageVersion Include="OpenTelemetry" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
     <PackageVersion Include="NuGet.Versioning" Version="6.13.2" />
   </ItemGroup>
@@ -33,6 +34,11 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.13.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.43.0" />
+  </ItemGroup>
+  <!-- host -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1048.200" />
+    <PackageVersion Include="System.Diagnostics.EventLog" Version="10.0.0" />
   </ItemGroup>
   <!-- test projects -->
   <ItemGroup>

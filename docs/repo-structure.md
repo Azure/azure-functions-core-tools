@@ -14,7 +14,7 @@ azure-functions-core-tools/
 │   ├── Func/                          # Main CLI executable (assembly: func)
 │   └── Abstractions/                  # Shared types for workload authors (NuGet)
 |   └── Workloads/
-|       ├── <Name>/                    # Ungrouped workload projects
+|       ├── <Name>/                    # Ungrouped workload projects, e.g. Host
 |       └── <kind>/
 |           └── <Name>/                # Grouped workload projects, e.g. Stacks/Python
 ├── test/
@@ -34,6 +34,7 @@ azure-functions-core-tools/
 │       ├── abstractions-public-build.yml # Abstractions PR validation
 │       ├── abstractions-official-build.yml # Abstractions release + NuGet pack
 │       ├── code-mirror.yml               # Mirror to engineering repo
+│       ├── release/                      # Release pipelines for CLI, Abstractions, and workloads
 │       └── templates/                    # Shared pipeline templates
 ├── docs/                              # Developer documentation
 └── out/                               # Build artifacts (gitignored)
@@ -120,6 +121,7 @@ Each component has its own CI pipeline with **path-scoped triggers**, enabling i
 | CLI official build | `eng/ci/cli-official-build.yml` | Release branches |
 | Abstractions public | `eng/ci/abstractions-public-build.yml` | PRs touching `src/Abstractions/` |
 | Abstractions official | `eng/ci/abstractions-official-build.yml` | Release builds, NuGet pack |
+| Workload release | `eng/ci/release/official-release.workload.*.yml` | Manual workload package releases |
 | Code mirror | `eng/ci/code-mirror.yml` | Mirror to engineering repo |
 
 ## Test Patterns
