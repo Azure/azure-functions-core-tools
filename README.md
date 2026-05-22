@@ -31,8 +31,30 @@ Both scripts auto-detect your OS and architecture, download the latest 5.x relea
 
 | Option | PowerShell | Bash |
 |--------|-----------|------|
+| Include pre-releases | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Prerelease` | `PRERELEASE=true curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
 | Specific version | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Version 5.0.0` | `VERSION=5.0.0 curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
 | Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `INSTALL_DIR=~/my-tools curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
+
+### Unattended install
+
+To chain commands after the installer (e.g., in CI pipelines or Dockerfiles), source the updated PATH and then run `func` directly:
+
+**PowerShell:**
+
+```powershell
+& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1)))
+func workload install dotnet
+```
+
+**Bash:**
+
+```bash
+curl -sSL https://aka.ms/func-cli/install.sh | bash
+source ~/.bashrc
+func workload install node
+```
+
+The install script adds `~/.azure-functions` to your PATH automatically. In PowerShell, the current session is updated immediately. In Bash, you need to `source` your shell profile to pick up the change before running `func`.
 
 ## Usage
 
