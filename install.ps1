@@ -11,12 +11,13 @@
 .PARAMETER Version
     Specific version to install. Defaults to latest 5.x release.
 
-.PARAMETER InstallDir
-    Installation directory. Defaults to ~/.azure-functions.
+.PARAMETER Prerelease
+    Include pre-release versions when resolving latest.
 #>
 
 param(
     [string] $Version,
+    [switch] $Prerelease,
     [string] $InstallDir = (Join-Path $HOME '.azure-functions')
 )
 
@@ -50,10 +51,11 @@ $assetName = "func-$os-$archStr.$ext"
 # --- Resolve version ---
 
 if (-not $Version) {
-    Write-Host 'Resolving latest 5.x release...'
+    $label = if ($Prerelease) { 'latest 5.x pre-release' } else { 'latest 5.x stable release' }
+    Write-Host "Resolving $label..."
     $releases = Invoke-RestMethod -Uri "$apiBase/releases?per_page=50"
     $release = $releases |
-        Where-Object { -not $_.prerelease -and $_.tag_name -like '5.*' } |
+        Where-Object { $_.tag_name -like '5.*' -and ($Prerelease -or -not $_.prerelease) } |
         Select-Object -First 1
 
     if (-not $release) {
@@ -83,6 +85,9 @@ try {
         Expand-Archive -Path $downloadPath -DestinationPath $InstallDir -Force
     } else {
         tar -xzf $downloadPath -C $InstallDir
+        if ($os -eq 'osx') {
+            xattr -d com.apple.quarantine (Join-Path $InstallDir 'func') 2>$null
+        }
     }
 } finally {
     Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue

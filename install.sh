@@ -8,6 +8,7 @@ REPO="Azure/azure-functions-core-tools"
 API_BASE="https://api.github.com/repos/${REPO}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.azure-functions}"
 VERSION="${VERSION:-}"
+PRERELEASE="${PRERELEASE:-false}"
 
 # --- Detect platform ---
 
@@ -28,11 +29,26 @@ ASSET_NAME="func-${OS}-${ARCH}.tar.gz"
 # --- Resolve version ---
 
 if [ -z "$VERSION" ]; then
-    echo "Resolving latest 5.x release..."
+    if [ "$PRERELEASE" = "true" ]; then
+        echo "Resolving latest 5.x pre-release..."
+    else
+        echo "Resolving latest stable 5.x release..."
+    fi
+
+    # GitHub API returns releases newest-first. Extract tag_name + prerelease pairs, then filter.
     VERSION=$(curl -sSL "${API_BASE}/releases?per_page=50" \
-        | grep -o '"tag_name":"5\.[^"]*"' \
-        | head -1 \
-        | cut -d'"' -f4)
+        | tr ',' '\n' \
+        | grep -E '"tag_name"|"prerelease"' \
+        | sed 's/.*"tag_name":"\([^"]*\)".*/tag:\1/; s/.*"prerelease":\(.*\)/pre:\1/' \
+        | paste - - \
+        | awk -F'\t' -v include_pre="$PRERELEASE" '
+            {
+                split($1, a, ":"); tag = a[2]
+                split($2, b, ":"); pre = b[2]
+                if (tag ~ /^5\./ && (include_pre == "true" || pre == "false")) {
+                    print tag; exit
+                }
+            }')
 
     if [ -z "$VERSION" ]; then
         echo "Error: Could not find a 5.x release." >&2
@@ -51,6 +67,10 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 curl -sSL -o "${TEMP_DIR}/${ASSET_NAME}" "$DOWNLOAD_URL"
 mkdir -p "$INSTALL_DIR"
 tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
+
+if [ "$OS" = "osx" ]; then
+    xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
+fi
 
 # --- Update PATH ---
 
