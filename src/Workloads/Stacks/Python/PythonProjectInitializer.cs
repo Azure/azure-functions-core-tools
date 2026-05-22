@@ -20,19 +20,20 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
 
     public IReadOnlyList<string> SupportedLanguages { get; } = ["Python"];
 
-    public Option<bool> NoBundleOption { get; } = new("--no-bundle")
-    {
-        Description = "Skip writing the default extensionBundle block in host.json.",
-        DefaultValueFactory = _ => false,
-    };
+    public Option<bool> NoBundleOption { get; private set; } = default!;
 
-    public Option<BundleChannel> BundlesChannelOption { get; } = new("--bundles-channel", "-c")
-    {
-        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
-        DefaultValueFactory = _ => BundleChannel.GA,
-    };
+    public Option<BundleChannel> BundlesChannelOption { get; private set; } = default!;
 
-    public IReadOnlyList<Option> GetInitOptions() => [NoBundleOption, BundlesChannelOption];
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+
+        NoBundleOption = registry.GetOrAdd(CommonInitOptions.NoBundle());
+
+        BundlesChannelOption = registry.GetOrAdd(CommonInitOptions.BundlesChannel());
+
+        return [NoBundleOption, BundlesChannelOption];
+    }
 
     public Task InitializeAsync(
         InitContext context,
@@ -74,7 +75,7 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
             force);
 
         // Always lay down the base host.json so the project is valid even
-        // with --no-bundle. MergeHostJson below layers extensionBundle on top.
+        // with --no-bundles. MergeHostJson below layers extensionBundle on top.
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "host.json"),
             ProjectFiles.MinimalHostJson,
@@ -105,4 +106,3 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
         };
     }
 }
-

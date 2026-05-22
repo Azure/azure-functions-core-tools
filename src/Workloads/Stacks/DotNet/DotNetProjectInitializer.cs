@@ -32,13 +32,20 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
     public IReadOnlyList<string> SupportedLanguages => ["C#", "F#", "csharp", "fsharp"];
 
-    public Option<string> FrameworkOption { get; } = new("--target-framework", "-tfm")
-    {
-        Description = "The target framework for the project (e.g. net10.0).",
-        DefaultValueFactory = _ => DefaultFramework
-    };
+    public Option<string> FrameworkOption { get; private set; } = default!;
 
-    public IReadOnlyList<Option> GetInitOptions() => [FrameworkOption];
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+
+        FrameworkOption = registry.GetOrAdd(new Option<string>("--target-framework", "-tfm")
+        {
+            Description = "The target framework for the project (e.g. net10.0).",
+            DefaultValueFactory = _ => DefaultFramework
+        });
+
+        return [FrameworkOption];
+    }
 
     public async Task InitializeAsync(
         InitContext context,

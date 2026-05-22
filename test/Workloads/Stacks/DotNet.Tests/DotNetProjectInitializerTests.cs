@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Projects;
 using NSubstitute;
 using Xunit;
 
@@ -40,7 +41,8 @@ public class DotNetProjectInitializerTests : IDisposable
     public void GetInitOptions_ContainsFrameworkOption()
     {
         DotNetProjectInitializer initializer = CreateInitializer();
-        IReadOnlyList<Option> options = initializer.GetInitOptions();
+        RootCommand root = [];
+        IReadOnlyList<Option> options = initializer.GetInitOptions(new InitOptionRegistry(root));
 
         Assert.Single(options);
         Assert.Same(initializer.FrameworkOption, options[0]);

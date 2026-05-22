@@ -180,7 +180,8 @@ public class InitCommandTests
         IReadOnlyList<IProjectInitializer> initializers,
         string? language = null,
         string? stack = null,
-        bool force = false)
+        bool force = false,
+        IReadOnlyList<string>? extraArgs = null)
     {
         var cmd = new InitCommand(_interaction, _hintRenderer, initializers);
         var root = new RootCommand { cmd };
@@ -198,6 +199,10 @@ public class InitCommandTests
         if (force)
         {
             args.Add("--force");
+        }
+        if (extraArgs is not null)
+        {
+            args.AddRange(extraArgs);
         }
         ParseResult result = root.Parse(args.ToArray());
         return await result.InvokeAsync();
@@ -475,7 +480,104 @@ public class InitCommandTests
         }
     }
 
-    private sealed class FakeProjectInitializer(string stack, IReadOnlyList<string>? supportedLanguages = null) : IProjectInitializer
+    [Fact]
+    public void InitCommand_DedupesContributedOptionsByName()
+    {
+        // Two workloads contributing the same option name (e.g. --no-bundles) must
+        // appear once in --help and resolve to a single canonical Option instance.
+        var first = new FakeProjectInitializer(
+            "node",
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+        var second = new FakeProjectInitializer(
+            "python",
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+
+        var cmd = new InitCommand(_interaction, _hintRenderer, [first, second]);
+
+        int matches = cmd.Options.Count(o => o.Name == "--no-bundles");
+        Assert.Equal(1, matches);
+        Assert.Same(first.ContributedOptions[0], second.ContributedOptions[0]);
+    }
+
+    [Fact]
+    public async Task InitCommand_SharedOption_IsReadCorrectlyByLaterWorkload()
+    {
+        // When `python` is selected but `node` was registered first, python must still see
+        // the user-supplied value for the shared `--no-bundles` option.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            bool? observed = null;
+            var node = new FakeProjectInitializer(
+                "node",
+                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+            var python = new FakeProjectInitializer(
+                "python",
+                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))],
+                onInitialize: (init, parseResult) =>
+                {
+                    var opt = (Option<bool>)init.ContributedOptions[0];
+                    observed = parseResult.GetValue(opt);
+                });
+
+            int exitCode = await RunInitAsync(
+                newDir,
+                [node, python],
+                language: null,
+                stack: "python",
+                extraArgs: ["--no-bundles"]);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(observed);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public void InitCommand_ThrowsWhenWorkloadsContributeSameNameDifferentType()
+    {
+        var first = new FakeProjectInitializer(
+            "node",
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+        var second = new FakeProjectInitializer(
+            "python",
+            optionFactory: r => [r.GetOrAdd(new Option<string>("--no-bundles"))]);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new InitCommand(_interaction, _hintRenderer, [first, second]));
+
+        Assert.Contains("python", ex.Message);
+        Assert.Contains("node", ex.Message);
+        Assert.Contains("--no-bundles", ex.Message);
+    }
+
+    [Fact]
+    public void InitCommand_ThrowsWhenAliasCollidesAcrossWorkloads()
+    {
+        // Two workloads both want -c as an alias, but for different options.
+        var first = new FakeProjectInitializer(
+            "node",
+            optionFactory: r => [r.GetOrAdd(new Option<string>("--bundles-channel", "-c"))]);
+        var second = new FakeProjectInitializer(
+            "go",
+            optionFactory: r => [r.GetOrAdd(new Option<string>("--clean", "-c"))]);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new InitCommand(_interaction, _hintRenderer, [first, second]));
+
+        Assert.Contains("-c", ex.Message);
+        Assert.Contains("--clean", ex.Message);
+        Assert.Contains("--bundles-channel", ex.Message);
+    }
+
+    private sealed class FakeProjectInitializer(
+        string stack,
+        IReadOnlyList<string>? supportedLanguages = null,
+        Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
+        Action<FakeProjectInitializer, ParseResult>? onInitialize = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
@@ -483,11 +585,18 @@ public class InitCommandTests
 
         public bool WasInvoked { get; private set; }
 
-        public IReadOnlyList<Option> GetInitOptions() => [];
+        public IReadOnlyList<Option> ContributedOptions { get; private set; } = [];
+
+        public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+        {
+            ContributedOptions = optionFactory?.Invoke(registry) ?? [];
+            return ContributedOptions;
+        }
 
         public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
         {
             WasInvoked = true;
+            onInitialize?.Invoke(this, parseResult);
             return Task.CompletedTask;
         }
     }
