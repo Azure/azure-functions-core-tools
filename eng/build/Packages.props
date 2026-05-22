@@ -38,6 +38,7 @@
   <!-- host -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1048.200" />
+    <PackageVersion Include="System.Diagnostics.EventLog" Version="10.0.0" />
   </ItemGroup>
   <!-- test projects -->
   <ItemGroup>

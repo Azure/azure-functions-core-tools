@@ -10,13 +10,17 @@ func workload install Azure.Functions.Cli.Workloads.Host
 # or by alias
 func workload install host
 ```
+> Note: the actual package ID is `Microsoft.Azure.Functions.Workloads.Host.<rid>`. The format and workload specs will be updated to detail how this would be handled. The workload also supports installation by the shorter alias `host`.
 
 ## Status
 
 Preview. The shell expects the Azure Functions CLI to prepare the process
 environment and command-line arguments before launch. It does not translate
-private CLI configuration into host settings. The workload stages the shell
-build output under `content/` when the package is packed.
+private CLI configuration into host settings. Local builds are
+framework-dependent by default.
+
+Release packaging should be performed with a RID-specific self-contained payload under `tools/any/` by passing
+`-p:PackRidSpecificHostWorkload=true -r <rid> -p:SelfContained=true`, which also suffixes the package id with the RID.
 
 ## Launch contract
 
