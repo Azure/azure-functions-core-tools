@@ -30,6 +30,11 @@ public interface IProjectInitializer
     public IReadOnlyList<string> SupportedLanguages { get; }
 
     /// <summary>
+    /// Maps each canonical language name to its accepted aliases (e.g. "C#" → ["csharp"]).
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
+
+    /// <summary>
     /// Registers the options this initializer contributes to <c>func init</c> via
     /// <paramref name="registry"/>, and returns the canonical instances to use when reading
     /// values back inside <see cref="InitializeAsync"/>. Options shared across workloads

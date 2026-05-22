@@ -629,12 +629,16 @@ public class InitCommandTests
     private sealed class FakeProjectInitializer(
         string stack,
         IReadOnlyList<string>? supportedLanguages = null,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null,
         Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
         Action<FakeProjectInitializer, ParseResult>? onInitialize = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
         public IReadOnlyList<string> SupportedLanguages { get; } = supportedLanguages ?? [];
+
+        public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
+            aliases ?? new Dictionary<string, IReadOnlyList<string>>();
 
         public bool WasInvoked { get; private set; }
 

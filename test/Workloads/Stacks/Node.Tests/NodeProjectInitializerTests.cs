@@ -41,6 +41,47 @@ public class NodeProjectInitializerTests : IDisposable
         Assert.Equal("node", new NodeProjectInitializer().Stack);
     }
 
+    [Theory]
+    [InlineData(null, "JavaScript")]
+    [InlineData("", "JavaScript")]
+    [InlineData("js", "JavaScript")]
+    [InlineData("JS", "JavaScript")]
+    [InlineData("JavaScript", "JavaScript")]
+    [InlineData("ts", "TypeScript")]
+    [InlineData("TS", "TypeScript")]
+    [InlineData("TypeScript", "TypeScript")]
+    [InlineData("unknown", "unknown")]
+    public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
+    {
+        Assert.Equal(expected, new NodeProjectInitializer().NormalizeLanguage(input));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_UnsupportedLanguage_Throws()
+    {
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => RunAsync(language: "ruby", force: false));
+
+        Assert.Contains("ruby", ex.Message);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_AliasTs_ScaffoldsTypeScript()
+    {
+        await RunAsync(language: "ts", force: false);
+
+        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_AliasJs_ScaffoldsJavaScript()
+    {
+        await RunAsync(language: "js", force: false);
+
+        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "package.json")));
+        Assert.False(File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")));
+    }
+
     [Fact]
     public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
