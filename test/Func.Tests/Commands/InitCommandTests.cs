@@ -483,18 +483,18 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_DedupesContributedOptionsByName()
     {
-        // Two workloads contributing the same option name (e.g. --no-bundle) must
+        // Two workloads contributing the same option name (e.g. --no-bundles) must
         // appear once in --help and resolve to a single canonical Option instance.
         var first = new FakeProjectInitializer(
             "node",
-            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundle"))]);
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
         var second = new FakeProjectInitializer(
             "python",
-            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundle"))]);
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
 
         var cmd = new InitCommand(_interaction, _hintRenderer, [first, second]);
 
-        int matches = cmd.Options.Count(o => o.Name == "--no-bundle");
+        int matches = cmd.Options.Count(o => o.Name == "--no-bundles");
         Assert.Equal(1, matches);
         Assert.Same(first.ContributedOptions[0], second.ContributedOptions[0]);
     }
@@ -503,17 +503,17 @@ public class InitCommandTests
     public async Task InitCommand_SharedOption_IsReadCorrectlyByLaterWorkload()
     {
         // When `python` is selected but `node` was registered first, python must still see
-        // the user-supplied value for the shared `--no-bundle` option.
+        // the user-supplied value for the shared `--no-bundles` option.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
             bool? observed = null;
             var node = new FakeProjectInitializer(
                 "node",
-                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundle"))]);
+                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
             var python = new FakeProjectInitializer(
                 "python",
-                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundle"))],
+                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))],
                 onInitialize: (init, parseResult) =>
                 {
                     var opt = (Option<bool>)init.ContributedOptions[0];
@@ -525,7 +525,7 @@ public class InitCommandTests
                 [node, python],
                 language: null,
                 stack: "python",
-                extraArgs: ["--no-bundle"]);
+                extraArgs: ["--no-bundles"]);
 
             Assert.Equal(0, exitCode);
             Assert.True(observed);
@@ -541,17 +541,17 @@ public class InitCommandTests
     {
         var first = new FakeProjectInitializer(
             "node",
-            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundle"))]);
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
         var second = new FakeProjectInitializer(
             "python",
-            optionFactory: r => [r.GetOrAdd(new Option<string>("--no-bundle"))]);
+            optionFactory: r => [r.GetOrAdd(new Option<string>("--no-bundles"))]);
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
             new InitCommand(_interaction, _hintRenderer, [first, second]));
 
         Assert.Contains("python", ex.Message);
         Assert.Contains("node", ex.Message);
-        Assert.Contains("--no-bundle", ex.Message);
+        Assert.Contains("--no-bundles", ex.Message);
     }
 
     [Fact]

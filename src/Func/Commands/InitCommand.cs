@@ -68,7 +68,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         // Workload-contributed options are attached after built-ins so they
         // appear as a clearly-grouped block in --help output. Multiple workloads
-        // may legitimately contribute the same option (e.g. --no-bundle for
+        // may legitimately contribute the same option (e.g. --no-bundles for
         // every stack that emits an extension bundle). The registry de-dupes
         // by name and returns a single canonical instance to every workload,
         // so the option appears once in --help and every workload that reads

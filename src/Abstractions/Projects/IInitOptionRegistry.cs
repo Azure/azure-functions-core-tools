@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Coordinates the options that <see cref="IProjectInitializer"/> implementations contribute
 /// to <c>func init</c>. Two installed workloads may contribute an option with the same name
-/// (e.g. <c>--no-bundle</c>); the registry returns one shared canonical instance so the option
+/// (e.g. <c>--no-bundles</c>); the registry returns one shared canonical instance so the option
 /// is shown once in <c>--help</c> and every contributing workload reads the same parsed value.
 /// </summary>
 public interface IInitOptionRegistry

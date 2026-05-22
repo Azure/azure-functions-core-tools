@@ -218,7 +218,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         stack.Equals("typescript", StringComparison.OrdinalIgnoreCase);
 
     // Workload-specific options. Registered through the supplied IInitOptionRegistry,
-    // which is what lets options like `--no-bundle` that multiple stacks contribute
+    // which is what lets options like `--no-bundles` that multiple stacks contribute
     // appear once in --help and resolve to the same instance for every workload that
     // reads them back. Stash the canonical instance returned by GetOrAdd and read
     // values from it inside InitializeAsync.

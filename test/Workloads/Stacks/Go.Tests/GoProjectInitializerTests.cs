@@ -49,7 +49,7 @@ public class GoProjectInitializerTests : IDisposable
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         Assert.Contains("--skip-go-mod-tidy", names);
-        Assert.Contains("--no-bundle", names);
+        Assert.Contains("--no-bundles", names);
         Assert.Contains("--bundles-channel", names);
     }
 
@@ -147,10 +147,10 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public async Task InitializeAsync_NoBundle_WritesMinimalHostJsonWithoutExtensionBundle()
     {
-        await RunAsync(projectName: "my-go-app", force: false, args: ["--no-bundle"]);
+        await RunAsync(projectName: "my-go-app", force: false, args: ["--no-bundles"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundle");
+        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
         string content = File.ReadAllText(hostJsonPath);
         Assert.Contains("\"version\"", content);
         Assert.DoesNotContain("extensionBundle", content);

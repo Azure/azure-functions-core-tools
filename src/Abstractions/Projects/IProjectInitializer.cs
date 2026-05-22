@@ -27,7 +27,7 @@ public interface IProjectInitializer
     /// Registers the options this initializer contributes to <c>func init</c> via
     /// <paramref name="registry"/>, and returns the canonical instances to use when reading
     /// values back inside <see cref="InitializeAsync"/>. Options shared across workloads
-    /// (e.g. <c>--no-bundle</c>) appear once in <c>--help</c> and resolve to the same instance
+    /// (e.g. <c>--no-bundles</c>) appear once in <c>--help</c> and resolve to the same instance
     /// for every contributing workload.
     /// </summary>
     public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry);

@@ -48,7 +48,7 @@ public class PythonProjectInitializerTests : IDisposable
         IReadOnlyList<Option> options = new PythonProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
-        Assert.Contains("--no-bundle", names);
+        Assert.Contains("--no-bundles", names);
         Assert.Contains("--bundles-channel", names);
     }
 
@@ -129,10 +129,10 @@ public class PythonProjectInitializerTests : IDisposable
     [Fact]
     public async Task InitializeAsync_NoBundle_WritesMinimalHostJsonWithoutExtensionBundle()
     {
-        await RunAsync(force: false, args: ["--no-bundle"]);
+        await RunAsync(force: false, args: ["--no-bundles"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundle");
+        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
         string content = File.ReadAllText(hostJsonPath);
         Assert.Contains("\"version\"", content);
         Assert.DoesNotContain("extensionBundle", content);

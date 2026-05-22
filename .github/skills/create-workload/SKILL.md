@@ -140,7 +140,7 @@ Create the following files:
   ```
   - Initializer must be `internal sealed` (per repo convention; tests reach it via `InternalsVisibleTo`).
   - For stubs, return `[]` from `GetInitOptions(IInitOptionRegistry)` and only throw from `InitializeAsync`. Throwing from `GetInitOptions` breaks any code path that enumerates options across workloads.
-  - For shared options that other stacks also contribute (`--no-bundle`, `--bundles-channel`), use the factories in `Azure.Functions.Cli.Projects.CommonInitOptions` so wording stays consistent. Register every option via `registry.GetOrAdd(...)` and stash the returned canonical instance for reads inside `InitializeAsync`.
+  - For shared options that other stacks also contribute (`--no-bundles`, `--bundles-channel`), use the factories in `Azure.Functions.Cli.Projects.CommonInitOptions` so wording stays consistent. Register every option via `registry.GetOrAdd(...)` and stash the returned canonical instance for reads inside `InitializeAsync`.
 
 ### 2. Test project
 

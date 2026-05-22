@@ -18,10 +18,10 @@ namespace Azure.Functions.Cli.Projects;
 public static class CommonInitOptions
 {
     /// <summary>
-    /// <c>--no-bundle</c>. Used by every stack that emits a default extension bundle entry
+    /// <c>--no-bundles</c>. Used by every stack that emits a default extension bundle entry
     /// in <c>host.json</c> (Node, Python, Go, ...).
     /// </summary>
-    public static Option<bool> NoBundle() => new("--no-bundle")
+    public static Option<bool> NoBundle() => new("--no-bundles")
     {
         Description = "Skip writing the default extensionBundle block in host.json.",
         DefaultValueFactory = _ => false,

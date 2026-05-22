@@ -48,7 +48,7 @@ public class NodeProjectInitializerTests : IDisposable
         IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
-        Assert.Contains("--no-bundle", names);
+        Assert.Contains("--no-bundles", names);
         Assert.Contains("--bundles-channel", names);
         Assert.Contains("--skip-npm-install", names);
     }
@@ -135,10 +135,10 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public async Task InitializeAsync_NoBundle_WritesMinimalHostJsonWithoutExtensionBundle()
     {
-        await RunAsync(language: null, force: false, args: ["--no-bundle"]);
+        await RunAsync(language: null, force: false, args: ["--no-bundles"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundle");
+        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
         string content = File.ReadAllText(hostJsonPath);
         Assert.Contains("\"version\"", content);
         Assert.DoesNotContain("extensionBundle", content);

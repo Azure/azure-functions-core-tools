@@ -103,7 +103,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         Directory.CreateDirectory(Path.Combine(root, "src", "functions"));
 
         // Always lay down the base host.json so the project is valid even
-        // with --no-bundle. MergeHostJson below layers extensionBundle on top.
+        // with --no-bundles. MergeHostJson below layers extensionBundle on top.
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "host.json"),
             ProjectFiles.MinimalHostJson,
