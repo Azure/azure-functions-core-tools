@@ -84,7 +84,9 @@ internal static class TestParser
         IWorkloadProvider emptyProvider = Substitute.For<IWorkloadProvider>();
         emptyProvider.GetWorkloads().Returns([]);
         emptyProvider.GetRuntimeWorkloads().Returns([]);
+        emptyProvider.GetRuntimeWorkloadsByPackageId(Arg.Any<string>()).Returns([]);
         emptyProvider.GetContentWorkloads().Returns([]);
+        emptyProvider.GetContentWorkloadsByPackageId(Arg.Any<string>()).Returns([]);
         services.AddSingleton(emptyProvider);
 
         // Workload install pipeline: substitute the installer so commands

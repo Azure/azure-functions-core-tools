@@ -21,7 +21,17 @@ internal interface IWorkloadProvider
     public IReadOnlyList<RuntimeWorkloadInfo> GetRuntimeWorkloads();
 
     /// <summary>
+    /// Returns runtime workloads matching <paramref name="packageId"/>.
+    /// </summary>
+    public IReadOnlyList<RuntimeWorkloadInfo> GetRuntimeWorkloadsByPackageId(string packageId);
+
+    /// <summary>
     /// Returns installed content workloads discovered at boot.
     /// </summary>
     public IReadOnlyList<ContentWorkloadInfo> GetContentWorkloads();
+
+    /// <summary>
+    /// Returns installed content workloads matching <paramref name="packageId"/>.
+    /// </summary>
+    public IReadOnlyList<ContentWorkloadInfo> GetContentWorkloadsByPackageId(string packageId);
 }

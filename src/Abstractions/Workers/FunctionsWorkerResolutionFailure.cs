@@ -24,4 +24,12 @@ public abstract record FunctionsWorkerResolutionFailure
 
     public sealed record NotInstalled(FunctionsWorkerId WorkerId, string Message)
         : FunctionsWorkerResolutionFailure(Message);
+
+    public sealed record InvalidInstallation(
+        FunctionsWorkerId WorkerId,
+        string PackageId,
+        string PackageVersion,
+        string WorkerConfigPath,
+        string Message)
+        : FunctionsWorkerResolutionFailure(Message);
 }

@@ -80,6 +80,7 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
         }
 
+        builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerResolver, DefaultFunctionsWorkerResolver>();
         builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         builder.Services.AddSingleton<IInstalledBundleWorkloads, InstalledBundleWorkloads>();
