@@ -81,7 +81,7 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Ru
         RuntimeWorkloadInfo workload = RequireWorkload();
         Services.AddSingleton(sp =>
         {
-            var factory = ActivatorUtilities.GetServiceOrCreateInstance<TFactory>(sp);
+            TFactory factory = ActivatorUtilities.GetServiceOrCreateInstance<TFactory>(sp);
             return new WorkloadProjectFactoryRegistration(workload, factory);
         });
     }
