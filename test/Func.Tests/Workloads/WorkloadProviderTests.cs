@@ -45,6 +45,63 @@ public class WorkloadProviderTests
     }
 
     [Fact]
+    public void GetWorkloadsByPackageId_ReturnsMatchingKindVersions_CaseInsensitive()
+    {
+        RuntimeWorkloadInfo runtimeMatch = TestWorkloads.CreateInfo("Pkg.Shared", "1.0.0");
+        RuntimeWorkloadInfo runtimeOther = TestWorkloads.CreateInfo("Pkg.Other", "1.0.0");
+        ContentWorkloadInfo contentOld = TestWorkloads.CreateContentInfo("Pkg.Shared", "1.0.0");
+        ContentWorkloadInfo contentNew = TestWorkloads.CreateContentInfo("pkg.shared", "2.0.0");
+
+        var provider = new WorkloadProvider([runtimeMatch, runtimeOther, contentOld, contentNew]);
+
+        IReadOnlyList<RuntimeWorkloadInfo> runtimeWorkloads = provider.GetRuntimeWorkloadsByPackageId("pkg.shared");
+        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = provider.GetContentWorkloadsByPackageId("PKG.SHARED");
+
+        Assert.Same(runtimeWorkloads, provider.GetRuntimeWorkloadsByPackageId("Pkg.Shared"));
+        Assert.Same(contentWorkloads, provider.GetContentWorkloadsByPackageId("pkg.shared"));
+        Assert.Same(runtimeMatch, Assert.Single(runtimeWorkloads));
+        Assert.Collection(
+            contentWorkloads,
+            workload => Assert.Same(contentOld, workload),
+            workload => Assert.Same(contentNew, workload));
+    }
+
+    [Fact]
+    public void GetWorkloadsByPackageId_NoMatch_ReturnsEmptyList()
+    {
+        var provider = new WorkloadProvider(
+            [
+                TestWorkloads.CreateInfo("Pkg.Runtime"),
+                TestWorkloads.CreateContentInfo("Pkg.Content"),
+            ]);
+
+        Assert.Empty(provider.GetRuntimeWorkloadsByPackageId("Pkg.Missing"));
+        Assert.Empty(provider.GetContentWorkloadsByPackageId("Pkg.Missing"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void GetRuntimeWorkloadsByPackageId_InvalidPackageId_Throws(string? packageId)
+    {
+        var provider = new WorkloadProvider([]);
+
+        Assert.ThrowsAny<ArgumentException>(() => provider.GetRuntimeWorkloadsByPackageId(packageId!));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void GetContentWorkloadsByPackageId_InvalidPackageId_Throws(string? packageId)
+    {
+        var provider = new WorkloadProvider([]);
+
+        Assert.ThrowsAny<ArgumentException>(() => provider.GetContentWorkloadsByPackageId(packageId!));
+    }
+
+    [Fact]
     public void Ctor_NullWorkloads_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => new WorkloadProvider(null!));

@@ -184,9 +184,21 @@ public class WorkloadListCommandTests
         var provider = Substitute.For<IWorkloadProvider>();
         provider.GetWorkloads().Returns(workloads);
         provider.GetRuntimeWorkloads().Returns([.. workloads.OfType<RuntimeWorkloadInfo>()]);
+        provider.GetRuntimeWorkloadsByPackageId(Arg.Any<string>())
+            .Returns(callInfo => GetWorkloadsByPackageId<RuntimeWorkloadInfo>(workloads, callInfo.Arg<string>()));
         provider.GetContentWorkloads().Returns([.. workloads.OfType<ContentWorkloadInfo>()]);
+        provider.GetContentWorkloadsByPackageId(Arg.Any<string>())
+            .Returns(callInfo => GetWorkloadsByPackageId<ContentWorkloadInfo>(workloads, callInfo.Arg<string>()));
         return provider;
     }
+
+    private static IReadOnlyList<TWorkload> GetWorkloadsByPackageId<TWorkload>(
+        IReadOnlyList<WorkloadInfo> workloads,
+        string packageId)
+        where TWorkload : WorkloadInfo
+        => [.. workloads
+            .OfType<TWorkload>()
+            .Where(w => string.Equals(w.PackageId, packageId, StringComparison.OrdinalIgnoreCase))];
 
     private static RuntimeWorkloadInfo NewInfo(
         FakeWorkload instance,

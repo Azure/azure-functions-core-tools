@@ -16,4 +16,17 @@ public static class FunctionsWorkerResolutionFailures
 
     public static FunctionsWorkerResolutionFailure NotInstalled(FunctionsWorkerId workerId, string message)
         => new FunctionsWorkerResolutionFailure.NotInstalled(workerId, message);
+
+    public static FunctionsWorkerResolutionFailure InvalidInstallation(
+        FunctionsWorkerId workerId,
+        string packageId,
+        string packageVersion,
+        string workerConfigPath,
+        string message)
+        => new FunctionsWorkerResolutionFailure.InvalidInstallation(
+            workerId,
+            packageId,
+            packageVersion,
+            workerConfigPath,
+            message);
 }
