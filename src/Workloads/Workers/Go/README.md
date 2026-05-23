@@ -26,7 +26,5 @@ pick up prereleases without an explicit version pin or `--prerelease`.
 ## Status
 
 Preview. Go has no upstream worker NuGet; the workload ships a static native
-`worker.config.json` from `content/workers/native/` that points the host at a
-user-built Go executable (`bin/app`). The host discovers the Go worker via
-the `workers/native/` path, which matches the layout used by
-`feature/go-support`.
+`worker.config.json` under `tools/any/` that points the host at a user-built Go
+executable (`bin/app`).

@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <None Include="workload.json" Pack="true" PackagePath="/" />
-    <Content Include="content/**/*" Pack="true" PackagePath="content/" />
+    <Content Include="content/workers/native/worker.config.json" Pack="true" PackagePath="tools/any/" />
   </ItemGroup>
 
 </Project>

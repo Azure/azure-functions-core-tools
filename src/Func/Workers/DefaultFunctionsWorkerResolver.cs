@@ -81,11 +81,13 @@ internal sealed class DefaultFunctionsWorkerResolver(
 
     private static string GetWorkerPackageId(FunctionsWorkerId workerId) => WorkerPackageIdPrefix + workerId.Value;
 
+    private static string GetWorkerInstallAlias(FunctionsWorkerId workerId) => workerId.Value + "-worker";
+
     private static FunctionsWorkerResolutionResult NotInstalled(FunctionsWorkerId workerId)
         => NotInstalledResult(
             workerId,
             $"No installed Azure Functions worker was found for '{workerId.Value}'. "
-            + $"Run 'func workload install {workerId.Value}' to install it.");
+            + $"Run 'func workload install {GetWorkerInstallAlias(workerId)}' to install it.");
 
     private static FunctionsWorkerResolutionResult NotInstalledResult(FunctionsWorkerId workerId, string message)
     {
@@ -104,7 +106,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
                     workerId,
                     versionConstraint: null,
                     $"Installed Azure Functions worker workloads for '{workerId.Value}' do not include a valid package version. "
-                    + $"Run 'func workload install {workerId.Value} --force' to repair the install.");
+                    + $"Run 'func workload install {GetWorkerInstallAlias(workerId)} --force' to repair the install.");
 
             return FunctionsWorkerResolutionResults.NotResolved(invalidVersionFailure);
         }
@@ -114,7 +116,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
             workerId,
             rangeText,
             $"Installed Azure Functions worker workloads for '{workerId.Value}' do not satisfy version range '{rangeText}'. "
-            + $"Run 'func workload install {workerId.Value}' to install a compatible worker.");
+            + $"Run 'func workload install {GetWorkerInstallAlias(workerId)}' to install a compatible worker.");
 
         return FunctionsWorkerResolutionResults.NotResolved(failure);
     }
@@ -131,7 +133,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
             workerConfigPath,
             $"Installed Azure Functions worker '{workerId.Value}' package '{selected.Workload.PackageId}' "
             + $"{selected.Version.ToNormalizedString()} is missing '{workerConfigPath}'. "
-            + $"Run 'func workload install {workerId.Value} --force' to repair the install.");
+            + $"Run 'func workload install {GetWorkerInstallAlias(workerId)} --force' to repair the install.");
 
         return FunctionsWorkerResolutionResults.NotResolved(failure);
     }

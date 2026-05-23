@@ -123,8 +123,7 @@ public class DefaultFunctionsWorkerResolverTests
         FunctionsWorkerResolutionFailure.NotInstalled failure =
             Assert.IsType<FunctionsWorkerResolutionFailure.NotInstalled>(notResolved.Failure);
         Assert.Equal("ruby", failure.WorkerId.Value);
-        Assert.Contains("func workload install ruby", failure.Message);
-        Assert.DoesNotContain("ruby-worker", failure.Message);
+        Assert.Contains("func workload install ruby-worker", failure.Message);
     }
 
     [Fact]
@@ -142,6 +141,7 @@ public class DefaultFunctionsWorkerResolverTests
             Assert.IsType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>(notResolved.Failure);
         Assert.Equal("node", failure.WorkerId.Value);
         Assert.Null(failure.VersionConstraint);
+        Assert.Contains("func workload install node-worker --force", failure.Message);
         _fileSystem.DidNotReceive().FileExists(Arg.Any<string>());
     }
 
@@ -181,6 +181,7 @@ public class DefaultFunctionsWorkerResolverTests
         Assert.Equal(PythonWorkerPackageId, failure.PackageId);
         Assert.Equal("4.43.0", failure.PackageVersion);
         Assert.Equal(workerConfigPath, failure.WorkerConfigPath);
+        Assert.Contains("func workload install python-worker --force", failure.Message);
     }
 
     [Fact]

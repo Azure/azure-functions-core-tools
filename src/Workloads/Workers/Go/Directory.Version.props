@@ -5,7 +5,7 @@
     code or assemblies), so the pkg version is driven by the worker payload
     it carries. Go has no upstream worker NuGet, so $(WorkerVersion) is
     maintained manually here and tracks the static worker.config.json
-    payload shipped under content/workers/native/.
+    payload packaged under tools/any/.
       $(WorkerVersion) - Go worker payload version. Bare three-part SemVer.
 
     No channel axis: there are no preview/experimental Go worker SKUs.
