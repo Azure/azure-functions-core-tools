@@ -17,7 +17,7 @@
       TODO: Decouple from the upstream worker's precise package layout.
       The plan is to include the PythonWorker package's assets normally (let
       it wire up its content/None items via its build targets), then have a
-      target here transform those items and repack them under content/. For
+      target here transform those items and repack them under tools/any/. For
       now we glob the restored package payload directly, which is brittle if
       the upstream layout changes.
 
@@ -43,7 +43,7 @@
       <None Include="@(_PythonWorkerFile)"
             TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
             Pack="true"
-            PackagePath="content/workers/python/" />
+            PackagePath="tools/any/" />
     </ItemGroup>
   </Target>
 

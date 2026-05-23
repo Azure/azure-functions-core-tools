@@ -32,4 +32,4 @@ NodeJsWorker NuGet doesn't ship preview/experimental SKUs.
 
 Preview. Worker assets are pulled at pack time from the restored
 `Microsoft.Azure.Functions.NodeJsWorker` NuGet package and packed under
-`content/workers/node/` in the resulting workload NuGet.
+`tools/any/` in the resulting workload NuGet.

@@ -32,4 +32,4 @@ PythonWorker NuGet doesn't ship preview/experimental SKUs.
 
 Preview. Worker assets are pulled at pack time from the restored
 `Microsoft.Azure.Functions.PythonWorker` NuGet package (its `tools/` payload)
-and packed under `content/workers/python/` in the resulting workload NuGet.
+and packed under `tools/any/` in the resulting workload NuGet.
