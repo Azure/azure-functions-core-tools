@@ -76,6 +76,16 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Ru
         Services.AddSingleton(new WorkloadProjectFactoryRegistration(workload, factory));
     }
 
+    public override void AddProjectFactory<TFactory>()
+    {
+        RuntimeWorkloadInfo workload = RequireWorkload();
+        Services.AddSingleton(sp =>
+        {
+            var factory = ActivatorUtilities.GetServiceOrCreateInstance<TFactory>(sp);
+            return new WorkloadProjectFactoryRegistration(workload, factory);
+        });
+    }
+
     private void RegisterCommandFactory(Func<IServiceProvider, FuncCommand> factory)
     {
         RuntimeWorkloadInfo workload = RequireWorkload();

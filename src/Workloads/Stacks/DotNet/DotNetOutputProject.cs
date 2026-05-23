@@ -8,9 +8,10 @@ using Azure.Functions.Cli.Workers;
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
 /// <summary>
-/// Represents a resolved .NET Functions project.
+/// A .NET Functions project detected from build output (has host.json, worker.config.json, and an .exe).
+/// Already compiled; no build step needed before host startup.
 /// </summary>
-internal sealed class DotNetFunctionsProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
+internal sealed class DotNetOutputProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
 {
     private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
     private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));

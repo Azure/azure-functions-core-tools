@@ -18,6 +18,22 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
         string? workingDirectory,
         CancellationToken cancellationToken)
     {
+        await RunCoreAsync(arguments, workingDirectory, cancellationToken);
+    }
+
+    public async Task<string> RunWithOutputAsync(
+        IReadOnlyList<string> arguments,
+        string? workingDirectory,
+        CancellationToken cancellationToken)
+    {
+        return await RunCoreAsync(arguments, workingDirectory, cancellationToken);
+    }
+
+    private async Task<string> RunCoreAsync(
+        IReadOnlyList<string> arguments,
+        string? workingDirectory,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(arguments);
 
         ProcessStartInfo psi = new()
@@ -63,6 +79,8 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
                     stdout,
                     string.Join(' ', arguments));
             }
+
+            return stdout;
         }
         finally
         {

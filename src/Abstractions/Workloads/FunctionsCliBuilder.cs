@@ -54,4 +54,13 @@ public abstract class FunctionsCliBuilder
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="factory"/> is <c>null</c>.</exception>
     public abstract void AddProjectFactory(IFunctionsProjectFactory factory);
+
+    /// <summary>
+    /// Adds an <see cref="IFunctionsProjectFactory"/> by type. The factory is
+    /// constructed through DI at resolution time, so it can take dependencies
+    /// through its constructor.
+    /// </summary>
+    /// <typeparam name="TFactory">A concrete <see cref="IFunctionsProjectFactory"/>.</typeparam>
+    public abstract void AddProjectFactory<TFactory>()
+        where TFactory : class, IFunctionsProjectFactory;
 }

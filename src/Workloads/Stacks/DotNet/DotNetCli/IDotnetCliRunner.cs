@@ -17,4 +17,14 @@ internal interface IDotnetCliRunner
     /// <exception cref="InvalidOperationException">The process could not be started.</exception>
     /// <exception cref="DotnetCliException">The process exited with a non-zero exit code.</exception>
     public Task RunAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Executes <c>dotnet</c> with the supplied arguments and returns captured standard output.
+    /// </summary>
+    /// <param name="arguments">The arguments to pass to <c>dotnet</c>.</param>
+    /// <param name="workingDirectory">Optional working directory for the process.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="InvalidOperationException">The process could not be started.</exception>
+    /// <exception cref="DotnetCliException">The process exited with a non-zero exit code.</exception>
+    public Task<string> RunWithOutputAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken);
 }

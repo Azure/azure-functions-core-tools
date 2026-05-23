@@ -62,6 +62,6 @@ public class DotNetWorkloadTests
 
         new DotNetWorkload().Configure(builder);
 
-        builder.Received(1).AddProjectFactory(Arg.Any<DotNetProjectFactory>());
+        builder.Received(1).AddProjectFactory<DotNetProjectFactory>();
     }
 }
