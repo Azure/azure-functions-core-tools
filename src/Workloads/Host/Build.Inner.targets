@@ -1,20 +1,14 @@
 <Project>
 
-  <PropertyGroup>
-    <_HostWorkloadExplicitRuntimeIdentifier>$(RuntimeIdentifier)</_HostWorkloadExplicitRuntimeIdentifier>
-    <PackRidSpecificHostWorkload>false</PackRidSpecificHostWorkload>
-    <PackageId Condition="'$(PackRidSpecificHostWorkload)' == 'true' And '$(_HostWorkloadExplicitRuntimeIdentifier)' != ''">$(AssemblyName).$(_HostWorkloadExplicitRuntimeIdentifier)</PackageId>
-    <PackageTags Condition="'$(PackRidSpecificHostWorkload)' == 'true' And '$(_HostWorkloadExplicitRuntimeIdentifier)' != ''">$(PackageTags) rid:$(_HostWorkloadExplicitRuntimeIdentifier)</PackageTags>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <PackageId>$(AssemblyName).$(RuntimeIdentifier)</PackageId>
+    <PackageTags>$(PackageTags) rid:$(RuntimeIdentifier)</PackageTags>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);StageHostWorkloadPayload</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
-  <Target Name="ValidateHostRidSpecificPackage" BeforeTargets="ResolvePackageAssets;GenerateNuspec" Condition="'$(PackRidSpecificHostWorkload)' == 'true'">
+  <Target Name="ValidatePackWithRuntimeIdentifier" BeforeTargets="ResolvePackageAssets;GenerateNuspec" Condition="'$(RuntimeIdentifier)' == ''">
     <Error
-      Condition="'$(_HostWorkloadExplicitRuntimeIdentifier)' == ''"
-      Text="PackRidSpecificHostWorkload requires RuntimeIdentifier. Pass -r &lt;rid&gt; when packing the host workload." />
-    <Error
-      Condition="'$(SelfContained)' != 'true'"
-      Text="PackRidSpecificHostWorkload requires SelfContained=true." />
+      Text="RuntimeIdentifier is required when packing the host workload. Pass -r &lt;rid&gt; when packing the host workload." />
   </Target>
 
   <Target Name="StageHostWorkloadPayload">
