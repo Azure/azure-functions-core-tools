@@ -11,27 +11,28 @@ namespace Azure.Functions.Cli.Workers;
 /// </summary>
 internal sealed class DefaultFunctionsWorkerResolver(
     IWorkloadProvider workloadProvider,
-    IWorkerConfigFileSystem workerConfigFileSystem) : IFunctionsWorkerResolver
+    IWorkerConfigFileSystem workerConfigFileSystem,
+    IReadOnlyDictionary<string, VersionRange>? activeWorkerConstraints = null) : IFunctionsWorkerResolver
 {
     private const string WorkerPackageIdPrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string WorkerConfigFileName = "worker.config.json";
 
-    // Profiles will replace this lookup. A missing entry intentionally means "latest installed worker".
-    private static readonly IReadOnlyDictionary<string, WorkerConstraint> _activeWorkerConstraints =
-        new Dictionary<string, WorkerConstraint>(StringComparer.OrdinalIgnoreCase);
-
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
-    private readonly IWorkerConfigFileSystem _workerConfigFileSystem = workerConfigFileSystem ?? throw new ArgumentNullException(nameof(workerConfigFileSystem));
+    private readonly IWorkerConfigFileSystem _workerConfigFileSystem = workerConfigFileSystem
+        ?? throw new ArgumentNullException(nameof(workerConfigFileSystem));
+    private readonly IReadOnlyDictionary<string, VersionRange> _activeWorkerConstraints =
+        activeWorkerConstraints is null
+            ? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, VersionRange>(activeWorkerConstraints, StringComparer.OrdinalIgnoreCase);
 
     public Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(FunctionsWorkerId workerId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workerId);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string packageId = GetWorkerPackageId(workerId);
-        _activeWorkerConstraints.TryGetValue(workerId.Value, out WorkerConstraint? constraint);
+        _activeWorkerConstraints.TryGetValue(workerId.Value, out VersionRange? constraint);
 
-        IReadOnlyList<ContentWorkloadInfo> installedWorkers = _workloadProvider.GetContentWorkloadsByPackageId(packageId);
+        IReadOnlyList<ContentWorkloadInfo> installedWorkers = GetWorkerWorkloads(workerId);
         if (installedWorkers.Count == 0)
         {
             return Task.FromResult(NotInstalled(workerId));
@@ -76,8 +77,36 @@ internal sealed class DefaultFunctionsWorkerResolver(
         return Task.FromResult(FunctionsWorkerResolutionResults.Resolved(resolvedWorker));
     }
 
-    private static bool SatisfiesConstraint(NuGetVersion version, WorkerConstraint? constraint)
-        => constraint is null || constraint.VersionRange.Satisfies(version);
+    private IReadOnlyList<ContentWorkloadInfo> GetWorkerWorkloads(FunctionsWorkerId workerId)
+    {
+        string packageId = GetWorkerPackageId(workerId);
+        string alias = GetWorkerInstallAlias(workerId);
+        List<ContentWorkloadInfo> workloads = [];
+        AddDistinct(workloads, _workloadProvider.GetContentWorkloadsByPackageId(packageId));
+        AddDistinct(
+            workloads,
+            _workloadProvider.GetContentWorkloads()
+                .Where(workload => workload.Aliases.Any(candidate => string.Equals(candidate, alias, StringComparison.OrdinalIgnoreCase))));
+        return workloads;
+    }
+
+    private static void AddDistinct(List<ContentWorkloadInfo> target, IEnumerable<ContentWorkloadInfo> candidates)
+    {
+        foreach (ContentWorkloadInfo candidate in candidates)
+        {
+            if (target.Any(existing =>
+                    string.Equals(existing.PackageId, candidate.PackageId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.PackageVersion, candidate.PackageVersion, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            target.Add(candidate);
+        }
+    }
+
+    private static bool SatisfiesConstraint(NuGetVersion version, VersionRange? constraint)
+        => constraint is null || constraint.Satisfies(version);
 
     private static string GetWorkerPackageId(FunctionsWorkerId workerId) => WorkerPackageIdPrefix + workerId.Value;
 
@@ -97,7 +126,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
 
     private static FunctionsWorkerResolutionResult MissingCompatibleVersion(
         FunctionsWorkerId workerId,
-        WorkerConstraint? constraint)
+        VersionRange? constraint)
     {
         if (constraint is null)
         {
@@ -111,7 +140,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
             return FunctionsWorkerResolutionResults.NotResolved(invalidVersionFailure);
         }
 
-        string rangeText = RangeText(constraint.VersionRange);
+        string rangeText = RangeText(constraint);
         FunctionsWorkerResolutionFailure failure = FunctionsWorkerResolutionFailures.MissingCompatibleVersion(
             workerId,
             rangeText,
@@ -139,8 +168,6 @@ internal sealed class DefaultFunctionsWorkerResolver(
     }
 
     private static string RangeText(VersionRange range) => range.OriginalString ?? range.ToString();
-
-    private sealed record WorkerConstraint(VersionRange VersionRange);
 
     private sealed record InstalledWorkerCandidate(ContentWorkloadInfo Workload, NuGetVersion Version);
 

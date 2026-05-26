@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Globalization;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
@@ -64,9 +65,20 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "The host runtime version to use (e.g., 4.1049.0)"
     };
 
+    public Option<string?> ProfileOption { get; } = new("--profile")
+    {
+        Description = "The Azure Functions profile to apply while resolving host, worker, and bundle versions"
+    };
+
+    public Option<bool> OfflineOption { get; } = new("--offline")
+    {
+        Description = "Use only locally installed workloads and skip network installs"
+    };
+
     public Option<string?> OutputOption { get; } = new("--output")
     {
-        Description = "Output mode: compact (interactive TUI), plain (CI / non-TTY), or json (NDJSON for AI agents). Defaults to auto-detect."
+        Description = "Output mode: compact (interactive TUI), plain (CI / non-TTY), "
+            + "or json (NDJSON for AI agents). Defaults to auto-detect."
     };
 
     public Option<bool> NoTuiOption { get; } = new("--no-tui")
@@ -132,7 +144,9 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(FunctionsOption);
         Options.Add(NoBuildOption);
         Options.Add(EnableAuthOption);
+        Options.Add(ProfileOption);
         Options.Add(HostVersionOption);
+        Options.Add(OfflineOption);
         Options.Add(OutputOption);
         Options.Add(NoTuiOption);
         Options.Add(LogFileOption);
@@ -145,9 +159,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         if (!workingDirectory.Exists)
         {
             string displayPath = workingDirectory.OriginalPath ?? workingDirectory.Info.FullName;
-            throw new GracefulException(
-                $"The specified path does not exist: '{displayPath}'",
-                isUserError: true);
+            throw new GracefulException($"The specified path does not exist: '{displayPath}'", isUserError: true);
         }
 
         OutputMode mode = ResolveOutputMode(parseResult);
@@ -155,7 +167,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         mode = OutputModeResolver.ApplyTerminalSafetyFallback(mode, _interaction, out bool downgraded);
         if (downgraded)
         {
-            System.Console.Error.WriteLine("notice: stdout is not an interactive terminal; falling back to --output=plain.");
+            _interaction.WriteWarning("stdout is not an interactive terminal; falling back to --output=plain.");
         }
 
         HostStartupOptions hostStartupOptions = GetHostStartupOptions(workingDirectory.Info);
@@ -170,14 +182,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         StartInitializationResult initializationResult;
         IReadOnlyList<StartInitializationEvent> initializationEvents;
-        await using (var initializationRenderer = new RecordingStartInitializationRenderer(CreateInitializationRenderer(mode, initializationContext.CliVersion)))
+        IStartInitializationRenderer startInitializationRenderer = CreateInitializationRenderer(mode, initializationContext.CliVersion);
+        await using (var initializationRenderer = new RecordingStartInitializationRenderer(startInitializationRenderer))
         {
             initializationResult = await _initializationRunner.RunAsync(initializationContext, initializationRenderer, cancellationToken);
             if (!initializationRenderer.HasCompleted)
             {
-                await initializationRenderer.OnEventAsync(
-                    new StartInitializationCompletedEvent(DateTimeOffset.UtcNow, initializationResult),
-                    cancellationToken);
+                var completedEvent = new StartInitializationCompletedEvent(DateTimeOffset.UtcNow, initializationResult);
+                await initializationRenderer.OnEventAsync(completedEvent, cancellationToken);
             }
 
             initializationEvents = [.. initializationRenderer.Events];
@@ -258,10 +270,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
         {
-            throw new GracefulException(
-                $"Could not open log file '{path}': {ex.Message}",
-                isUserError: true,
-                verboseMessage: ex.ToString());
+            string message = $"Could not open log file '{path}': {ex.Message}";
+            throw new GracefulException(message, isUserError: true, verboseMessage: ex.ToString());
         }
     }
 
@@ -278,7 +288,9 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             parseResult.GetValue(FunctionsOption) ?? [],
             parseResult.GetValue(NoBuildOption),
             parseResult.GetValue(EnableAuthOption),
+            parseResult.GetValue(ProfileOption),
             parseResult.GetValue(HostVersionOption),
+            parseResult.GetValue(OfflineOption),
             mode,
             parseResult.GetValue(NoTuiOption),
             parseResult.GetValue(LogFileOption),
@@ -301,7 +313,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             return @default;
         }
 
-        return double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value) && value > 0
+        return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value > 0
             ? value
             : @default;
     }
@@ -330,7 +342,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         }
 
         if (!string.IsNullOrWhiteSpace(envRaw)
-            && int.TryParse(envRaw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int parsed))
+            && int.TryParse(envRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
         {
             return Math.Max(Default, parsed);
         }
@@ -346,9 +358,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         {
             if (!OutputModeResolver.TryParse(raw, out OutputMode parsed))
             {
-                throw new GracefulException(
-                    $"--output must be one of: compact, plain, json. Got '{raw}'.",
-                    isUserError: true);
+                throw new GracefulException($"--output must be one of: compact, plain, json. Got '{raw}'.", isUserError: true);
             }
 
             explicitMode = parsed;

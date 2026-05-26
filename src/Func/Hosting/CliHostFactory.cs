@@ -12,6 +12,7 @@ using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -57,10 +58,14 @@ internal static class CliHostFactory
         builder.Services.AddSingleton(interaction);
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
-        ILocalSettingsProvider localSettingsProvider = new LocalSettingsProvider();
-        var configurationSourceBuilder = new CliConfigurationSourceBuilder(localSettingsProvider);
+        var localSettingsProvider = new LocalSettingsProvider();
+        var userConfigurationPaths = new UserConfigurationPathsOptions();
+        var configurationProvider = new CliConfigurationProvider(localSettingsProvider, userConfigurationPaths);
         builder.Services.AddSingleton(localSettingsProvider);
-        builder.Services.AddSingleton(configurationSourceBuilder);
+        builder.Services.AddSingleton<ILocalSettingsProvider>(localSettingsProvider);
+        builder.Services.AddSingleton(userConfigurationPaths);
+        builder.Services.AddSingleton(configurationProvider);
+        builder.Services.AddSingleton<ICliConfigurationProvider>(configurationProvider);
 
         // Bridge the cli.workload.boot activity to the boot-duration histogram
         // so callers only need to start the activity. Idempotent.
@@ -81,12 +86,14 @@ internal static class CliHostFactory
         }
 
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
-        builder.Services.AddSingleton<IFunctionsWorkerResolver, DefaultFunctionsWorkerResolver>();
+        builder.Services.AddSingleton<IFunctionsWorkerResolverFactory, DefaultFunctionsWorkerResolverFactory>();
         builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         builder.Services.AddSingleton<IInstalledBundleWorkloads, InstalledBundleWorkloads>();
         builder.Services.AddSingleton<InstalledBundleScanner>();
+        builder.Services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
         builder.Services.AddSingleton<IBundleResolveTelemetry>(NullBundleResolveTelemetry.Instance);
         builder.Services.AddSingleton<IExtensionBundleResolver, ExtensionBundleResolver>();
+        builder.Services.AddSingleton<IHostWorkloadResolver, DefaultHostWorkloadResolver>();
         builder.Services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
         builder.Services.AddSingleton(new WorkloadProjectFactoryRegistration(
             new RuntimeWorkloadInfo(
@@ -102,14 +109,13 @@ internal static class CliHostFactory
 
         builder.Services.AddSingleton<StartDashboardEventStreamFactory>();
 
-        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting, so
-        // FUNC_CLI_Workloads__Home binds to WorkloadPathsOptions.Home.
-        configurationSourceBuilder.AddSources(builder.Configuration, workingDirectory);
+        builder.Configuration.AddConfiguration(configurationProvider.GetEffectiveConfiguration(workingDirectory));
         builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();
 
         builder.Services.AddBuiltInCommands();
         builder.Services.AddWorkloadStorage();
+        builder.Services.AddProfiles();
         builder.Services.AddWorkloadCatalog();
         builder.Services.AddWorkloadInstaller();
 

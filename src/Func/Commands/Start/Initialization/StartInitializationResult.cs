@@ -17,4 +17,5 @@ internal sealed record StartInitializationResult(
     bool BundleRequired,
     string? BundleVersion,
     FunctionsProject Project,
-    FunctionsProjectHostRunContext HostRunContext);
+    FunctionsProjectHostRunContext HostRunContext,
+    StartInitializationProfileInfo? Profile = null);

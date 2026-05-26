@@ -58,7 +58,9 @@ public class StartCommandTests : IDisposable
         Assert.Contains("--functions", optionNames);
         Assert.Contains("--no-build", optionNames);
         Assert.Contains("--enable-auth", optionNames);
+        Assert.Contains("--profile", optionNames);
         Assert.Contains("--host-version", optionNames);
+        Assert.Contains("--offline", optionNames);
         Assert.Contains("--output", optionNames);
         Assert.Contains("--no-tui", optionNames);
         Assert.Contains("--log-file", optionNames);
@@ -131,7 +133,10 @@ public class StartCommandTests : IDisposable
             services.AddSingleton(_initializationRunner);
         });
         var root = Parser.CreateCommand(services);
-        var result = root.Parse($"start \"{_tempDir}\" --output=plain --host-version 4.900.0 --no-build --enable-auth --port 9090 --functions HttpTrigger --cors http://localhost,http://example --cors-credentials");
+        string commandLine = $"start \"{_tempDir}\" --output=plain --profile flex --host-version 4.900.0 --offline "
+            + "--no-build --enable-auth --port 9090 --functions HttpTrigger "
+            + "--cors http://localhost,http://example --cors-credentials";
+        var result = root.Parse(commandLine);
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
@@ -139,10 +144,12 @@ public class StartCommandTests : IDisposable
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context =>
                 context.Options.WorkingDirectory.Info.FullName == new DirectoryInfo(_tempDir).FullName
-                && context.ProfileName == "none"
+                && context.ProfileName == "flex"
                 && context.CliVersion == "5.0.0-test"
                 && context.Options.OutputMode == OutputMode.Plain
+                && context.Options.RequestedProfileName == "flex"
                 && context.Options.RequestedHostVersion == "4.900.0"
+                && context.Options.Offline
                 && context.Options.NoBuild
                 && context.Options.EnableAuth
                 && context.Options.Port == 9090
@@ -165,12 +172,13 @@ public class StartCommandTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(initializationResult);
         IOptionsMonitor<HostStartupOptions> options = Substitute.For<IOptionsMonitor<HostStartupOptions>>();
-        options.Get(Arg.Any<string>()).Returns(new HostStartupOptions
+        var startupOptions = new HostStartupOptions
         {
             Port = 9091,
             Cors = "http://localhost,http://example",
             CorsCredentials = true,
-        });
+        };
+        options.Get(Arg.Any<string>()).Returns(startupOptions);
         var cmd = new StartCommand(
             _interaction,
             _palette,
@@ -205,10 +213,11 @@ public class StartCommandTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(initializationResult);
         var options = Substitute.For<IOptionsMonitor<HostStartupOptions>>();
-        options.CurrentValue.Returns(new HostStartupOptions
+        var startupOptions = new HostStartupOptions
         {
             Port = 9092,
-        });
+        };
+        options.CurrentValue.Returns(startupOptions);
         var cmd = new StartCommand(
             _interaction,
             _palette,
@@ -300,8 +309,9 @@ public class StartCommandTests : IDisposable
             project.Worker.WorkerRuntime,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
+        var runInfo = new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET");
         return new StartInitializationResult(
-            new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET"),
+            runInfo,
             eventStream,
             HostVersion: "4.834.0",
             BundleRequired: false,
@@ -313,8 +323,9 @@ public class StartCommandTests : IDisposable
     private static IOptionsMonitor<HostStartupOptions> CreateHostStartupOptions()
     {
         var options = Substitute.For<IOptionsMonitor<HostStartupOptions>>();
-        options.Get(Arg.Any<string>()).Returns(new HostStartupOptions());
-        options.CurrentValue.Returns(new HostStartupOptions());
+        var startupOptions = new HostStartupOptions();
+        options.Get(Arg.Any<string>()).Returns(startupOptions);
+        options.CurrentValue.Returns(startupOptions);
         return options;
     }
 

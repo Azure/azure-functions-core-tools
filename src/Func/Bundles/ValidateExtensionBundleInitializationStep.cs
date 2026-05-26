@@ -1,8 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Text.Json;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Bundles;
@@ -18,13 +18,16 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
     private const string EnsureLatestEnvVar = "AzureFunctionsJobHost__extensionBundle__ensureLatest";
 
     private readonly IExtensionBundleResolver _resolver;
+    private readonly IHostJsonBundleSectionReader _bundleSectionReader;
     private readonly ILogger<ValidateExtensionBundleInitializationStep> _logger;
 
     public ValidateExtensionBundleInitializationStep(
         IExtensionBundleResolver resolver,
+        IHostJsonBundleSectionReader bundleSectionReader,
         ILogger<ValidateExtensionBundleInitializationStep> logger)
     {
         _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
+        _bundleSectionReader = bundleSectionReader ?? throw new ArgumentNullException(nameof(bundleSectionReader));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -44,9 +47,15 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
             return StartInitializationStepResult.Completed($"No extension bundle required for {stackName}");
         }
 
-        DirectoryInfo projectDir = context.Options.WorkingDirectory.Info;
-        string hostJsonPath = Path.Combine(projectDir.FullName, "host.json");
-        HostJsonBundleSection? section = TryReadBundleSection(hostJsonPath);
+        HostJsonBundleSection? section;
+        try
+        {
+            section = await _bundleSectionReader.ReadAsync(project.WorkingDirectory.Info, cancellationToken);
+        }
+        catch (ExtensionBundleConfigurationException ex)
+        {
+            throw new GracefulException(ex.Message, isUserError: true, verboseMessage: ex.ToString());
+        }
 
         if (section is null)
         {
@@ -58,10 +67,10 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
             BundleId: section.Id,
             HostJsonVersionRange: section.Version,
             WorkerRuntime: ResolveWorkerRuntime(context),
-            ProfileName: NullIfNone(context.Initialization.ProfileName),
-            ProfileBundleVersionRange: null);
+            ProfileName: NullIfNone(context.State.ProfileName),
+            ProfileBundleVersionRange: RangeText(context.State.ResolvedProfile?.ExtensionBundleVersionRange));
 
-        ExtensionBundleResolution resolution = await _resolver.ResolveAsync(projectContext, cancellationToken).ConfigureAwait(false);
+        ExtensionBundleResolution resolution = await _resolver.ResolveAsync(projectContext, cancellationToken);
 
         switch (resolution)
         {
@@ -81,15 +90,15 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
 
             case ExtensionBundleResolution.WorkloadMissing missing:
                 _logger.LogError("{Hint}", missing.Hint);
-                throw new InvalidOperationException(missing.Hint);
+                throw new GracefulException(missing.Hint, isUserError: true);
 
             case ExtensionBundleResolution.EmptyIntersection empty:
                 _logger.LogError("{Hint}", empty.Hint);
-                throw new InvalidOperationException(empty.Hint);
+                throw new GracefulException(empty.Hint, isUserError: true);
 
             case ExtensionBundleResolution.NoCompatibleInstall none:
                 _logger.LogError("{Hint}", none.Hint);
-                throw new InvalidOperationException(none.Hint);
+                throw new GracefulException(none.Hint, isUserError: true);
 
             default:
                 throw new InvalidOperationException($"Unknown resolution variant: {resolution.GetType().Name}");
@@ -104,46 +113,5 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
             ? null
             : profile;
 
-    private static HostJsonBundleSection? TryReadBundleSection(string hostJsonPath)
-    {
-        if (!File.Exists(hostJsonPath))
-        {
-            return null;
-        }
-
-        try
-        {
-            using FileStream stream = File.OpenRead(hostJsonPath);
-            using var doc = JsonDocument.Parse(stream, new JsonDocumentOptions
-            {
-                AllowTrailingCommas = true,
-                CommentHandling = JsonCommentHandling.Skip,
-            });
-
-            if (!doc.RootElement.TryGetProperty("extensionBundle", out JsonElement bundle))
-            {
-                return null;
-            }
-
-            string id = bundle.TryGetProperty("id", out JsonElement idElem) ? idElem.GetString() ?? string.Empty : string.Empty;
-            string version = bundle.TryGetProperty("version", out JsonElement verElem) ? verElem.GetString() ?? string.Empty : string.Empty;
-
-            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(version))
-            {
-                return null;
-            }
-
-            return new HostJsonBundleSection(id, version);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-        catch (IOException)
-        {
-            return null;
-        }
-    }
-
-    private sealed record HostJsonBundleSection(string Id, string Version);
+    private static string? RangeText(NuGet.Versioning.VersionRange? range) => range?.OriginalString ?? range?.ToString();
 }

@@ -13,7 +13,7 @@ internal sealed class InstalledBundleScanner(IInstalledBundleWorkloads installed
 {
     // Fixed subpath inside the workload install dir that carries the bundle zip layout.
     // Matches the pack location in src/Workloads/Tools/ExtensionBundles/DownloadDefaultBundle.targets.
-    public const string BundlePayloadSubpath = "tools/any";
+    private static readonly string _bundlePayloadSubpath = Path.Combine("tools", "any");
 
     public const string StableBundleId = "Microsoft.Azure.Functions.ExtensionBundle";
     public const string PreviewBundleId = "Microsoft.Azure.Functions.ExtensionBundle.Preview";
@@ -52,7 +52,7 @@ internal sealed class InstalledBundleScanner(IInstalledBundleWorkloads installed
                 continue;
             }
 
-            string payloadPath = Path.Combine(row.InstallDirectory, BundlePayloadSubpath);
+            string payloadPath = Path.Combine(row.InstallDirectory, _bundlePayloadSubpath);
             filtered.Add(new InstalledBundle(version, payloadPath));
         }
 

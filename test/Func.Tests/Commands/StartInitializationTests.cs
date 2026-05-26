@@ -11,10 +11,15 @@ using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
+using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using NuGet.Versioning;
 using Spectre.Console;
 using Xunit;
 
@@ -51,7 +56,7 @@ public class StartInitializationTests : IDisposable
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
 
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(projectResolver, Substitute.For<IExtensionBundleResolver>(), NullLoggerFactory.Instance);
+        var runner = CreateRunner(projectResolver);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -90,7 +95,7 @@ public class StartInitializationTests : IDisposable
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(projectResolver, Substitute.For<IExtensionBundleResolver>(), NullLoggerFactory.Instance);
+        var runner = CreateRunner(projectResolver);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -119,7 +124,7 @@ public class StartInitializationTests : IDisposable
         projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = new DemoStartInitializationRunner(projectResolver, Substitute.For<IExtensionBundleResolver>(), NullLoggerFactory.Instance);
+        var runner = CreateRunner(projectResolver);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -141,18 +146,119 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
+    public async Task DemoRunner_ResolvedProfileFlowsToHostProjectAndRunInfo()
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "node",
+            stackDisplayName: "Node.js",
+            supportsExtensionBundles: false);
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found package.json"));
+        var hostRange = VersionRange.Parse("[1.8.1, 4.1048.200)");
+        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = VersionRange.Parse("[3.13.0]"),
+        };
+        var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
+        var profile = new ResolvedProfile(
+            "flex",
+            profileSource,
+            Sku: "flex",
+            ProfileStatus.Stable,
+            DeprecationUrl: null,
+            hostRange,
+            workerRanges,
+            ExtensionBundleVersionRange: VersionRange.Parse("[3.0.0, 5.0.0)"),
+            SupportedRuntimes: ["node"],
+            Notes: null);
+        var profileResolution = new ProfileResolution.Resolved(profile, []);
+        ContentWorkloadInfo hostWorkload = CreateHostWorkload("4.1000.0");
+        HostWorkloadResolution hostResolution = new HostWorkloadResolution.Installed(
+            hostWorkload,
+            NuGetVersion.Parse("4.1000.0"),
+            ExplicitlyRequested: false);
+        IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+        hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(hostResolution);
+        var renderer = new RecordingStartInitializationRenderer();
+        var runner = CreateRunner(projectResolver, profileResolution, hostWorkloadResolver);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
+
+        Assert.Equal("flex", result.RunInfo.ProfileName);
+        Assert.Equal("4.1000.0", result.HostVersion);
+        await hostWorkloadResolver.Received(1).ResolveAsync(
+            Arg.Is<HostWorkloadResolutionContext>(hostContext =>
+                ReferenceEquals(hostContext.ProfileHostVersionRange, hostRange)),
+            Arg.Any<CancellationToken>());
+        await projectResolver.Received(1).ResolveProjectAsync(
+            Arg.Is<ProjectResolutionContext>(projectContext => HasWorkerRange(projectContext, workerRanges["node"])),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DemoRunner_ProfileRejectsUnsupportedDetectedRuntime()
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "node",
+            stackDisplayName: "Node.js");
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found package.json"));
+        var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
+        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
+        var profile = new ResolvedProfile(
+            "flex",
+            profileSource,
+            Sku: "flex",
+            ProfileStatus.Stable,
+            DeprecationUrl: null,
+            VersionRange.Parse("[1.8.1, 4.1048.200)"),
+            workerRanges,
+            ExtensionBundleVersionRange: null,
+            SupportedRuntimes: ["python"],
+            Notes: null);
+        HostWorkloadResolution hostResolution = new HostWorkloadResolution.Installed(
+            CreateHostWorkload("4.1000.0"),
+            NuGetVersion.Parse("4.1000.0"),
+            ExplicitlyRequested: false);
+        IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+        hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(hostResolution);
+        var runner = CreateRunner(projectResolver, new ProfileResolution.Resolved(profile, []), hostWorkloadResolver);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None));
+
+        Assert.Contains("does not support the detected runtime 'node'", ex.Message);
+    }
+
+    [Fact]
     public async Task JsonRenderer_EmitsInitializationRecords()
     {
         using var stream = new MemoryStream();
         var renderer = new JsonStartInitializationRenderer(stream, ownsStream: false);
         const string customStepId = "custom_step";
+        var startedEvent = new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none");
+        var progressEvent = new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, customStepId, 50, "Downloading");
 
-        await renderer.OnEventAsync(
-            new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"),
-            CancellationToken.None);
-        await renderer.OnEventAsync(
-            new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, customStepId, 50, "Downloading"),
-            CancellationToken.None);
+        await renderer.OnEventAsync(startedEvent, CancellationToken.None);
+        await renderer.OnEventAsync(progressEvent, CancellationToken.None);
         await renderer.DisposeAsync();
 
         string[] lines = Encoding.UTF8.GetString(stream.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -168,46 +274,109 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
+    public async Task JsonRenderer_EmitsProfileDetailsOnCompletion()
+    {
+        using var stream = new MemoryStream();
+        var renderer = new JsonStartInitializationRenderer(stream, ownsStream: false);
+        Dictionary<string, string> workerVersionRanges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = "[3.13.0]",
+        };
+        var diagnostic = new StartInitializationProfileDiagnostic("warning", "Profile warning");
+        var profile = new StartInitializationProfileInfo(
+            "flex",
+            "builtin",
+            "bundled",
+            "[1.8.1, 4.1048.200)",
+            workerVersionRanges,
+            "[3.0.0, 5.0.0)",
+            ["node"],
+            [diagnostic]);
+        var runInfo = new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "flex", StackName: "Node.js");
+        var eventStream = new InMemoryHostEventStream();
+        FunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(Environment.CurrentDirectory),
+            stackName: "node",
+            stackDisplayName: "Node.js");
+        FunctionsProjectHostRunContext hostRunContext = CreateHostRunContext(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
+        var result = new StartInitializationResult(
+            runInfo,
+            eventStream,
+            HostVersion: "4.1000.0",
+            BundleRequired: true,
+            BundleVersion: "4.35.0",
+            project,
+            hostRunContext,
+            profile);
+        var completedEvent = new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, result);
+
+        await renderer.OnEventAsync(completedEvent, CancellationToken.None);
+        await renderer.DisposeAsync();
+
+        string line = Encoding.UTF8.GetString(stream.ToArray()).Trim();
+        using var document = JsonDocument.Parse(line);
+        JsonElement root = document.RootElement;
+        JsonElement profileDetails = root.GetProperty("profile_details");
+
+        Assert.Equal("start_initialization_completed", root.GetProperty("kind").GetString());
+        Assert.Equal("node", root.GetProperty("worker_runtime").GetString());
+        Assert.Equal("flex", profileDetails.GetProperty("name").GetString());
+        Assert.Equal("[1.8.1, 4.1048.200)", profileDetails.GetProperty("host_version_range").GetString());
+        Assert.Equal("[3.13.0]", profileDetails.GetProperty("worker_version_ranges").GetProperty("node").GetString());
+        Assert.Equal("warning", profileDetails.GetProperty("diagnostics")[0].GetProperty("severity").GetString());
+    }
+
+    [Fact]
     public async Task CompactRenderer_RendersChecklistLines()
     {
         using var writer = new StringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        var startedEvent = new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none");
+        var resolveProfileStep = new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile");
+        var resolveStartedEvent = new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, resolveProfileStep);
+        var resolveCompletedEvent = new StartInitializationStepCompletedEvent(
+            DateTimeOffset.UnixEpoch,
+            ResolveProfileInitializationStep.StepId,
+            "none");
+        var installStep = new StartInitializationStep(
+            InstallHostWorkloadInitializationStep.StepId,
+            "Install host workload",
+            DisplayKind: StartInitializationDisplayKind.Progress);
+        var installStartedEvent = new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, installStep);
+        var installProgressEvent = new StartInitializationProgressEvent(
+            DateTimeOffset.UnixEpoch,
+            InstallHostWorkloadInitializationStep.StepId,
+            50,
+            "Preparing download");
+        var installCompletedEvent = new StartInitializationStepCompletedEvent(
+            DateTimeOffset.UnixEpoch,
+            InstallHostWorkloadInitializationStep.StepId,
+            "Installed host 4.834.0");
 
-        await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
-        await renderer.OnEventAsync(
-            new StartInitializationStepStartedEvent(
-                 DateTimeOffset.UnixEpoch,
-                 new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile")),
-              CancellationToken.None);
+        await renderer.OnEventAsync(startedEvent, CancellationToken.None);
+        await renderer.OnEventAsync(resolveStartedEvent, CancellationToken.None);
         await Task.Delay(500);
-        await renderer.OnEventAsync(
-            new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, ResolveProfileInitializationStep.StepId, "none"),
-            CancellationToken.None);
-        await renderer.OnEventAsync(
-            new StartInitializationStepStartedEvent(
-                DateTimeOffset.UnixEpoch,
-                new StartInitializationStep(
-                    InstallHostWorkloadInitializationStep.StepId,
-                    "Install host workload",
-                    DisplayKind: StartInitializationDisplayKind.Progress)),
-            CancellationToken.None);
-        await renderer.OnEventAsync(
-            new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, InstallHostWorkloadInitializationStep.StepId, 50, "Preparing download"),
-            CancellationToken.None);
+        await renderer.OnEventAsync(resolveCompletedEvent, CancellationToken.None);
+        await renderer.OnEventAsync(installStartedEvent, CancellationToken.None);
+        await renderer.OnEventAsync(installProgressEvent, CancellationToken.None);
         await Task.Delay(500);
-        await renderer.OnEventAsync(
-            new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, InstallHostWorkloadInitializationStep.StepId, "Installed host 4.834.0"),
-            CancellationToken.None);
+        await renderer.OnEventAsync(installCompletedEvent, CancellationToken.None);
+        var runInfo = new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET");
+        var eventStream = new InMemoryHostEventStream();
+        FunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
+        FunctionsProjectHostRunContext hostRunContext = CreateHostRunContext(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
         var result = new StartInitializationResult(
-            new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET"),
-            new InMemoryHostEventStream(),
+            runInfo,
+            eventStream,
             HostVersion: "4.834.0",
             BundleRequired: false,
             BundleVersion: null,
-            CreateProject(WorkingDirectory.FromExplicit(Environment.CurrentDirectory)),
-            CreateHostRunContext(WorkingDirectory.FromExplicit(Environment.CurrentDirectory)));
-        await renderer.OnEventAsync(new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, result), CancellationToken.None);
+            project,
+            hostRunContext);
+        var completedEvent = new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, result);
+
+        await renderer.OnEventAsync(completedEvent, CancellationToken.None);
         await renderer.DisposeAsync();
 
         string output = writer.ToString();
@@ -232,11 +401,10 @@ public class StartInitializationTests : IDisposable
 
         try
         {
-            await renderer.OnEventAsync(
-                new StartInitializationStepStartedEvent(
-                    DateTimeOffset.UnixEpoch,
-                    new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile")),
-                CancellationToken.None);
+            var step = new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile");
+            var startedEvent = new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step);
+
+            await renderer.OnEventAsync(startedEvent, CancellationToken.None);
 
             Assert.DoesNotContain("\u001b[2J", writer.ToString());
         }
@@ -255,12 +423,12 @@ public class StartInitializationTests : IDisposable
 
         try
         {
-            await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
-            await renderer.OnEventAsync(
-                new StartInitializationStepStartedEvent(
-                    DateTimeOffset.UnixEpoch,
-                    new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile")),
-                CancellationToken.None);
+            var initializationStartedEvent = new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none");
+            var step = new StartInitializationStep(ResolveProfileInitializationStep.StepId, "Resolve profile");
+            var stepStartedEvent = new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step);
+
+            await renderer.OnEventAsync(initializationStartedEvent, CancellationToken.None);
+            await renderer.OnEventAsync(stepStartedEvent, CancellationToken.None);
 
             Spinner spinner = console.Profile.Capabilities.Unicode ? Spinner.Known.Dots : Spinner.Known.Line;
             string output = string.Empty;
@@ -296,7 +464,9 @@ public class StartInitializationTests : IDisposable
             Functions: [],
             NoBuild: false,
             EnableAuth: false,
+            RequestedProfileName: null,
             RequestedHostVersion: null,
+            Offline: false,
             OutputMode.Compact,
             NoTui: false,
             LogFilePath: null,
@@ -318,8 +488,8 @@ public class StartInitializationTests : IDisposable
         bool supportsExtensionBundles = false)
     {
         IFunctionsWorker worker = Substitute.For<IFunctionsWorker>();
-        worker.Id.Returns(new FunctionsWorkerId("dotnet"));
-        worker.WorkerRuntime.Returns("dotnet-isolated");
+        worker.Id.Returns(new FunctionsWorkerId(stackName));
+        worker.WorkerRuntime.Returns(stackName);
         worker.WorkerConfigPath.Returns("c:\\some\\path");
         worker.Version.Returns("1.0.0");
 
@@ -345,6 +515,86 @@ public class StartInitializationTests : IDisposable
             Interactive = InteractionSupport.Yes,
             Out = new TestTerminalOutput(writer),
         });
+
+    private static DemoStartInitializationRunner CreateRunner(
+        IFunctionsProjectResolver projectResolver,
+        ProfileResolution? profileResolution = null,
+        IHostWorkloadResolver? hostWorkloadResolver = null,
+        IWorkloadInstaller? workloadInstaller = null)
+    {
+        IProfileResolver profileResolver = Substitute.For<IProfileResolver>();
+        profileResolver.ResolveAsync(Arg.Any<ProfileResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => profileResolution ?? new ProfileResolution.None([]));
+
+        if (hostWorkloadResolver is null)
+        {
+            hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+            HostWorkloadResolution defaultHostResolution =
+                new HostWorkloadResolution.InstallRequired("4.834.0", "No installed host workload found for 4.834.0");
+            hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(defaultHostResolution);
+        }
+
+        workloadInstaller ??= CreateSuccessfulHostInstaller();
+        IExtensionBundleResolver bundleResolver = Substitute.For<IExtensionBundleResolver>();
+        var bundleSectionReader = new HostJsonBundleSectionReader();
+
+        return new DemoStartInitializationRunner(
+            projectResolver,
+            bundleResolver,
+            bundleSectionReader,
+            profileResolver,
+            hostWorkloadResolver,
+            workloadInstaller,
+            NullLoggerFactory.Instance);
+    }
+
+    private static IWorkloadInstaller CreateSuccessfulHostInstaller()
+    {
+        IWorkloadInstaller workloadInstaller = Substitute.For<IWorkloadInstaller>();
+        workloadInstaller.InstallFromCatalogAsync(
+                Arg.Any<string>(),
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var version = (NuGetVersion?)callInfo[1];
+                string packageVersion = version?.ToNormalizedString() ?? "4.834.0";
+                return new WorkloadInstallResult(CreateHostEntry(packageVersion), AlreadyInstalled: false);
+            });
+
+        return workloadInstaller;
+    }
+
+    private static WorkloadEntry CreateHostEntry(string packageVersion)
+        => new()
+        {
+            PackageId = "Azure.Functions.Cli.Workloads.Host",
+            PackageVersion = packageVersion,
+            Kind = WorkloadKind.Content,
+            Aliases = ["host"],
+            DisplayName = "Azure Functions host",
+            Description = string.Empty,
+        };
+
+    private static ContentWorkloadInfo CreateHostWorkload(string packageVersion)
+        => new(
+            PackageId: "Azure.Functions.Cli.Workloads.Host",
+            PackageVersion: packageVersion,
+            Aliases: ["host"],
+            InstallDirectory: Path.Combine(Path.GetTempPath(), "workloads", "host", packageVersion),
+            ContentRoot: Path.Combine(Path.GetTempPath(), "workloads", "host", packageVersion, "tools", "any"),
+            DisplayName: "Azure Functions host",
+            Description: string.Empty);
+
+    private static bool HasWorkerRange(ProjectResolutionContext context, VersionRange expectedRange)
+        => context.WorkerVersionRanges.TryGetValue("node", out VersionRange? actualRange)
+           && ReferenceEquals(actualRange, expectedRange);
 
     private static int FindStartedStepIndex(IReadOnlyList<StartInitializationEvent> events, string stepId)
         => FindStepIndex(events, stepId, static ev => ev is StartInitializationStepStartedEvent);

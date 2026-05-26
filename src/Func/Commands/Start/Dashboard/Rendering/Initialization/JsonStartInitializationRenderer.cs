@@ -88,10 +88,21 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
                     writer.WriteString("profile", completed.Result.RunInfo.ProfileName);
                     writer.WriteString("stack", completed.Result.RunInfo.StackName);
                     writer.WriteString("host_version", completed.Result.HostVersion);
+                    writer.WriteString("worker_runtime", completed.Result.Project.Worker.WorkerRuntime);
+                    if (!string.IsNullOrWhiteSpace(completed.Result.Project.Worker.Version))
+                    {
+                        writer.WriteString("worker_version", completed.Result.Project.Worker.Version);
+                    }
+
                     writer.WriteBoolean("bundle_required", completed.Result.BundleRequired);
                     if (!string.IsNullOrWhiteSpace(completed.Result.BundleVersion))
                     {
                         writer.WriteString("bundle_version", completed.Result.BundleVersion);
+                    }
+
+                    if (completed.Result.Profile is { } profile)
+                    {
+                        WriteProfile(writer, profile);
                     }
                 });
                 break;
@@ -113,6 +124,61 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
 
     private static string FormatDisplayKind(StartInitializationDisplayKind kind)
         => kind.ToString().ToLowerInvariant();
+
+    private static void WriteProfile(Utf8JsonWriter writer, StartInitializationProfileInfo profile)
+    {
+        writer.WriteStartObject("profile_details");
+        writer.WriteString("name", profile.Name);
+        writer.WriteString("source_kind", profile.SourceKind);
+        writer.WriteString("source", profile.SourceDisplayName);
+        writer.WriteString("host_version_range", profile.HostVersionRange);
+        if (!string.IsNullOrWhiteSpace(profile.ExtensionBundleVersionRange))
+        {
+            writer.WriteString("extension_bundle_version_range", profile.ExtensionBundleVersionRange);
+        }
+        WriteStringDictionary(writer, "worker_version_ranges", profile.WorkerVersionRanges);
+        WriteStringDictionary(writer, "worker_version_ranges", profile.WorkerVersionRanges);
+        if (profile.SupportedRuntimes is { Count: > 0 })
+        {
+            writer.WriteStartArray("supported_runtimes");
+            foreach (string runtime in profile.SupportedRuntimes)
+            {
+                writer.WriteStringValue(runtime);
+            }
+
+            writer.WriteEndArray();
+        }
+
+        if (profile.Diagnostics.Count > 0)
+        {
+            writer.WriteStartArray("diagnostics");
+            foreach (StartInitializationProfileDiagnostic diagnostic in profile.Diagnostics)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("severity", diagnostic.Severity);
+                writer.WriteString("message", diagnostic.Message);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void WriteStringDictionary(
+        Utf8JsonWriter writer,
+        string propertyName,
+        IReadOnlyDictionary<string, string> values)
+    {
+        writer.WriteStartObject(propertyName);
+        foreach ((string key, string value) in values.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            writer.WriteString(key, value);
+        }
+
+        writer.WriteEndObject();
+    }
 
     private void WriteRecord(string kind, DateTimeOffset timestamp, Action<Utf8JsonWriter> body)
     {

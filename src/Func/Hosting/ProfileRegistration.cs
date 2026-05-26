@@ -1,0 +1,33 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Profiles;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+
+namespace Azure.Functions.Cli.Hosting;
+
+/// <summary>
+/// Registers profile resolution services.
+/// </summary>
+internal static class ProfileRegistration
+{
+    public static IServiceCollection AddProfiles(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<UserConfigurationPathsOptions>();
+        services.AddSingleton<ProfileDocumentParser>();
+        services.AddSingleton<IProfileFileSystem, ProfileFileSystem>();
+        services.AddSingleton<IProfileSource, ProjectProfileSource>();
+        services.AddSingleton<IProfileSource, UserProfileSource>();
+        services.AddSingleton<IProfileSource, BuiltInProfileSource>();
+        services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
+        services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
+        services.AddSingleton<IProfileResolver, ProfileResolver>();
+
+        return services;
+    }
+}
