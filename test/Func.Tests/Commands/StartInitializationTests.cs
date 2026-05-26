@@ -574,7 +574,7 @@ public class StartInitializationTests : IDisposable
     private static WorkloadEntry CreateHostEntry(string packageVersion)
         => new()
         {
-            PackageId = "Azure.Functions.Cli.Workloads.Host",
+            PackageId = HostWorkloadPackage.CurrentPackageId,
             PackageVersion = packageVersion,
             Kind = WorkloadKind.Content,
             Aliases = ["host"],
@@ -584,11 +584,11 @@ public class StartInitializationTests : IDisposable
 
     private static ContentWorkloadInfo CreateHostWorkload(string packageVersion)
         => new(
-            PackageId: "Azure.Functions.Cli.Workloads.Host",
+            PackageId: HostWorkloadPackage.CurrentPackageId,
             PackageVersion: packageVersion,
             Aliases: ["host"],
-            InstallDirectory: Path.Combine(Path.GetTempPath(), "workloads", "host", packageVersion),
-            ContentRoot: Path.Combine(Path.GetTempPath(), "workloads", "host", packageVersion, "tools", "any"),
+            InstallDirectory: Path.Combine(Path.GetTempPath(), "workloads", HostWorkloadPackage.CurrentPackageId, packageVersion),
+            ContentRoot: Path.Combine(Path.GetTempPath(), "workloads", HostWorkloadPackage.CurrentPackageId, packageVersion, "tools", "any"),
             DisplayName: "Azure Functions host",
             Description: string.Empty);
 

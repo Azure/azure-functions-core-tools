@@ -18,6 +18,8 @@ namespace Azure.Functions.Cli.Tests.Commands;
 
 public class HostWorkloadResolverTests
 {
+    private static readonly string _hostPackageId = HostWorkloadPackage.CurrentPackageId;
+
     private readonly IWorkloadProvider _workloadProvider = Substitute.For<IWorkloadProvider>();
     private readonly IWorkloadCatalog _workloadCatalog = Substitute.For<IWorkloadCatalog>();
     private readonly PackageSource _source = new("https://example.test/v3/index.json", "test");
@@ -25,8 +27,6 @@ public class HostWorkloadResolverTests
     public HostWorkloadResolverTests()
     {
         _workloadProvider.GetContentWorkloads().Returns([]);
-        _workloadCatalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
-            .Returns([CreateCatalogResult("Azure.Functions.Cli.Workloads.Host", "5.0.0")]);
     }
 
     [Fact]
@@ -51,17 +51,18 @@ public class HostWorkloadResolverTests
     }
 
     [Fact]
-    public async Task ResolveAsync_UsesHostAliasInsteadOfFixedPackageId()
+    public async Task ResolveAsync_IgnoresHostAliasOnDifferentPackageId()
     {
-        ContentWorkloadInfo host = CreateHostWorkload("4.1000.0", packageId: "custom.host.package");
-        UseContentWorkloads(host);
+        ContentWorkloadInfo wrongRidHost = CreateHostWorkload("4.1000.0", packageId: "custom.host.package");
+        ContentWorkloadInfo selectedHost = CreateHostWorkload("4.900.0", packageId: _hostPackageId);
+        UseContentWorkloads(wrongRidHost, selectedHost);
         DefaultHostWorkloadResolver resolver = NewResolver();
         var context = new HostWorkloadResolutionContext(null, VersionRange.Parse("[4.0.0, 5.0.0)"), Offline: false);
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
         HostWorkloadResolution.Installed installed = Assert.IsType<HostWorkloadResolution.Installed>(result);
-        Assert.Same(host, installed.Workload);
+        Assert.Same(selectedHost, installed.Workload);
     }
 
     [Fact]
@@ -100,9 +101,9 @@ public class HostWorkloadResolverTests
     [Fact]
     public async Task ResolveAsync_NoInstalledHost_ReturnsInstallRequired()
     {
-        ResolvedPackage resolved = CreateResolvedPackage("Azure.Functions.Cli.Workloads.Host", "4.1048.199");
+        ResolvedPackage resolved = CreateResolvedPackage(_hostPackageId, "4.1048.199");
         _workloadCatalog.ResolveLatestVersionInRangeAsync(
-                "Azure.Functions.Cli.Workloads.Host",
+                _hostPackageId,
                 Arg.Any<VersionRange>(),
                 false,
                 null,
@@ -198,11 +199,11 @@ public class HostWorkloadResolverTests
         Assert.Equal("Installed host 4.1000.0", result.Message);
         Assert.Equal("4.1000.0", context.State.HostVersion);
         await installer.Received(1).InstallFromCatalogAsync(
-            packageId: "host",
+            packageId: _hostPackageId,
             version: Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "4.1000.0"),
             source: null,
             includePrerelease: false,
-            exact: false,
+            exact: true,
             force: false,
             progress: null,
             cancellationToken: Arg.Any<CancellationToken>());
@@ -238,14 +239,12 @@ public class HostWorkloadResolverTests
     private DefaultHostWorkloadResolver NewResolver()
         => new(_workloadProvider, _workloadCatalog);
 
-    private CatalogSearchResult CreateCatalogResult(string packageId, string packageVersion)
-        => new(packageId, NuGetVersion.Parse(packageVersion), Title: null, Description: null, Aliases: ["host"], _source);
-
     private ResolvedPackage CreateResolvedPackage(string packageId, string packageVersion)
         => new(packageId, NuGetVersion.Parse(packageVersion), _source);
 
-    private static ContentWorkloadInfo CreateHostWorkload(string packageVersion, string packageId = "Azure.Functions.Cli.Workloads.Host")
+    private static ContentWorkloadInfo CreateHostWorkload(string packageVersion, string? packageId = null)
     {
+        packageId ??= _hostPackageId;
         string installDirectory = Path.Combine(Path.GetTempPath(), "workloads", packageId, packageVersion);
         return new ContentWorkloadInfo(
             packageId,
@@ -260,7 +259,7 @@ public class HostWorkloadResolverTests
     private static WorkloadEntry CreateHostEntry(string packageVersion)
         => new()
         {
-            PackageId = "Azure.Functions.Cli.Workloads.Host",
+            PackageId = _hostPackageId,
             PackageVersion = packageVersion,
             Kind = WorkloadKind.Content,
             Aliases = ["host"],

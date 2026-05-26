@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
@@ -17,8 +18,6 @@ internal sealed class InstallHostWorkloadInitializationStep(
     string hostVersion) : DemoInitializationStep
 {
     public const string StepId = "install_host_workload";
-
-    private const string HostAlias = "host";
 
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
 
@@ -46,11 +45,11 @@ internal sealed class InstallHostWorkloadInitializationStep(
         try
         {
             result = await _installer.InstallFromCatalogAsync(
-                HostAlias,
+                HostWorkloadPackage.CurrentPackageId,
                 _hostVersion,
                 source: null,
                 includePrerelease: false,
-                exact: false,
+                exact: true,
                 force: false,
                 progress: null,
                 cancellationToken);
@@ -73,7 +72,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
         }
         catch (InvalidOperationException ex)
         {
-            string message = $"{ex.Message} Run 'func workload install {HostAlias} --force' to repair the install.";
+            string message = $"{ex.Message} Run 'func workload install {HostWorkloadPackage.CurrentPackageId} --exact --force' to repair the install.";
             throw new GracefulException(message, isUserError: true, verboseMessage: ex.ToString());
         }
 
