@@ -53,9 +53,9 @@ public class HostWorkloadResolverTests
     [Fact]
     public async Task ResolveAsync_IgnoresHostAliasOnDifferentPackageId()
     {
-        ContentWorkloadInfo wrongRidHost = CreateHostWorkload("4.1000.0", packageId: "custom.host.package");
+        ContentWorkloadInfo wrongPackageHost = CreateHostWorkload("4.1000.0", packageId: "custom.host.package");
         ContentWorkloadInfo selectedHost = CreateHostWorkload("4.900.0", packageId: _hostPackageId);
-        UseContentWorkloads(wrongRidHost, selectedHost);
+        UseContentWorkloads(wrongPackageHost, selectedHost);
         DefaultHostWorkloadResolver resolver = NewResolver();
         var context = new HostWorkloadResolutionContext(null, VersionRange.Parse("[4.0.0, 5.0.0)"), Offline: false);
 
@@ -63,6 +63,21 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution.Installed installed = Assert.IsType<HostWorkloadResolution.Installed>(result);
         Assert.Same(selectedHost, installed.Workload);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_IgnoresHostPackagesWithoutCurrentRidPackageId()
+    {
+        ContentWorkloadInfo nonRidHost = CreateHostWorkload("4.1100.0", packageId: "custom.host.package");
+        ContentWorkloadInfo currentRidHost = CreateHostWorkload("4.1000.0");
+        UseContentWorkloads(nonRidHost, currentRidHost);
+        DefaultHostWorkloadResolver resolver = NewResolver();
+        var context = new HostWorkloadResolutionContext(null, VersionRange.Parse("[4.0.0, 5.0.0)"), Offline: false);
+
+        HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
+
+        HostWorkloadResolution.Installed installed = Assert.IsType<HostWorkloadResolution.Installed>(result);
+        Assert.Same(currentRidHost, installed.Workload);
     }
 
     [Fact]
@@ -99,6 +114,22 @@ public class HostWorkloadResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_RequestedHostMissing_ReturnsCurrentRidPackage()
+    {
+        DefaultHostWorkloadResolver resolver = NewResolver();
+        var context = new HostWorkloadResolutionContext(
+            RequestedHostVersion: "4.1000.0",
+            ProfileHostVersionRange: VersionRange.Parse("[1.8.1, 4.1048.200)"),
+            Offline: false);
+
+        HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
+
+        HostWorkloadResolution.InstallRequired installRequired = Assert.IsType<HostWorkloadResolution.InstallRequired>(result);
+        Assert.Equal("4.1000.0", installRequired.HostVersion);
+        Assert.Equal(_hostPackageId, installRequired.PackageId);
+    }
+
+    [Fact]
     public async Task ResolveAsync_NoInstalledHost_ReturnsInstallRequired()
     {
         ResolvedPackage resolved = CreateResolvedPackage(_hostPackageId, "4.1048.199");
@@ -119,6 +150,7 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution.InstallRequired installRequired = Assert.IsType<HostWorkloadResolution.InstallRequired>(result);
         Assert.Equal("4.1048.199", installRequired.HostVersion);
+        Assert.Equal(_hostPackageId, installRequired.PackageId);
     }
 
     [Fact]
@@ -147,10 +179,16 @@ public class HostWorkloadResolverTests
     public async Task ValidateStep_InstallRequiredAndOffline_ThrowsGracefulException()
     {
         IHostWorkloadResolver resolver = Substitute.For<IHostWorkloadResolver>();
-        HostWorkloadResolution resolution = new HostWorkloadResolution.InstallRequired("4.1000.0", "No compatible host installed");
+        HostWorkloadResolution resolution = new HostWorkloadResolution.InstallRequired(
+            "4.1000.0",
+            "No compatible host installed",
+            _hostPackageId);
         resolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(resolution);
-        var step = new ValidateHostWorkloadInitializationStep(resolver, Substitute.For<IWorkloadInstaller>());
+        var step = new ValidateHostWorkloadInitializationStep(
+            resolver,
+            Substitute.For<IWorkloadInstaller>(),
+            CreateWorkloadPaths());
         StartInitializationStepContext context = NewStepContext(step, offline: true);
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -164,10 +202,16 @@ public class HostWorkloadResolverTests
     public async Task ValidateStep_InstallRequiredAndOnline_AddsInstallStep()
     {
         IHostWorkloadResolver resolver = Substitute.For<IHostWorkloadResolver>();
-        HostWorkloadResolution resolution = new HostWorkloadResolution.InstallRequired("4.1000.0", "No compatible host installed");
+        HostWorkloadResolution resolution = new HostWorkloadResolution.InstallRequired(
+            "4.1000.0",
+            "No compatible host installed",
+            _hostPackageId);
         resolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(resolution);
-        var step = new ValidateHostWorkloadInitializationStep(resolver, Substitute.For<IWorkloadInstaller>());
+        var step = new ValidateHostWorkloadInitializationStep(
+            resolver,
+            Substitute.For<IWorkloadInstaller>(),
+            CreateWorkloadPaths());
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
@@ -191,13 +235,15 @@ public class HostWorkloadResolverTests
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(installResult);
-        var step = new InstallHostWorkloadInitializationStep(installer, "4.1000.0");
+        var step = new InstallHostWorkloadInitializationStep(installer, CreateWorkloadPaths(), _hostPackageId, "4.1000.0");
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
         Assert.Equal("Installed host 4.1000.0", result.Message);
         Assert.Equal("4.1000.0", context.State.HostVersion);
+        Assert.NotNull(context.State.HostWorkload);
+        Assert.Equal(_hostPackageId, context.State.HostWorkload.PackageId);
         await installer.Received(1).InstallFromCatalogAsync(
             packageId: _hostPackageId,
             version: Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "4.1000.0"),
@@ -223,7 +269,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<WorkloadInstallResult>(new WorkloadPackageNotFoundException("missing host")));
-        var step = new InstallHostWorkloadInitializationStep(installer, "4.1000.0");
+        var step = new InstallHostWorkloadInitializationStep(installer, CreateWorkloadPaths(), _hostPackageId, "4.1000.0");
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -283,6 +329,7 @@ public class HostWorkloadResolverTests
             OutputMode.Plain,
             NoTui: true,
             LogFilePath: null,
+            DemoMode: false,
             DemoFunctionCount: 0,
             DemoSpeedMultiplier: 1.0,
             DemoAutoExit: true);
@@ -296,5 +343,13 @@ public class HostWorkloadResolverTests
             step,
             renderer,
             TimeProvider.System);
+    }
+
+    private static IWorkloadPaths CreateWorkloadPaths()
+    {
+        IWorkloadPaths workloadPaths = Substitute.For<IWorkloadPaths>();
+        workloadPaths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(callInfo => Path.Combine(Path.GetTempPath(), "workloads", (string)callInfo[0], (string)callInfo[1]));
+        return workloadPaths;
     }
 }

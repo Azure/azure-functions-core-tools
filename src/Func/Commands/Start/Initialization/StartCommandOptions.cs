@@ -23,6 +23,7 @@ internal sealed record StartCommandOptions(
     OutputMode OutputMode,
     bool NoTui,
     string? LogFilePath,
+    bool DemoMode,
     int DemoFunctionCount,
     double DemoSpeedMultiplier,
     bool DemoAutoExit);

@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -15,11 +16,15 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// </summary>
 internal sealed class InstallHostWorkloadInitializationStep(
     IWorkloadInstaller installer,
+    IWorkloadPaths workloadPaths,
+    string? packageId,
     string hostVersion) : DemoInitializationStep
 {
     public const string StepId = "install_host_workload";
 
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
+    private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
+    private readonly string _packageId = string.IsNullOrWhiteSpace(packageId) ? HostWorkloadPackage.CurrentPackageId : packageId;
 
     private readonly NuGetVersion _hostVersion = NuGetVersion.TryParse(hostVersion, out NuGetVersion? parsedHostVersion)
         ? parsedHostVersion
@@ -45,7 +50,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
         try
         {
             result = await _installer.InstallFromCatalogAsync(
-                HostWorkloadPackage.CurrentPackageId,
+                _packageId,
                 _hostVersion,
                 source: null,
                 includePrerelease: true,
@@ -77,6 +82,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
         }
 
         context.State.HostVersion = result.Entry.PackageVersion;
+        context.State.HostWorkload = CreateContentWorkloadInfo(result.Entry);
         string completionMessage = result.AlreadyInstalled
             ? $"Host {result.Entry.PackageVersion} already installed"
             : $"Installed host {result.Entry.PackageVersion}";
@@ -90,4 +96,17 @@ internal sealed class InstallHostWorkloadInitializationStep(
 
     private static GracefulException CreateUserError(Exception exception)
         => new(exception.Message, isUserError: true, verboseMessage: exception.ToString());
+
+    private ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
+    {
+        string installDirectory = _workloadPaths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        return new ContentWorkloadInfo(
+            entry.PackageId,
+            entry.PackageVersion,
+            entry.Aliases,
+            installDirectory,
+            Path.GetFullPath(Path.Combine(installDirectory, "tools", "any")),
+            string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.PackageId : entry.DisplayName,
+            entry.Description ?? string.Empty);
+    }
 }

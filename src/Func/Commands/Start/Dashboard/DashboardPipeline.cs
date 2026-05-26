@@ -25,6 +25,7 @@ internal sealed class DashboardPipeline(
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         string exitReason = "sigint";
+        int exitCode = 0;
         using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Action? shutdownHandler = null;
 
@@ -50,10 +51,18 @@ internal sealed class DashboardPipeline(
             }
 
             exitReason = "source_completed";
+            if (_source is IHostEventStreamLifecycle lifecycle)
+            {
+                exitCode = await lifecycle.WaitForExitAsync(CancellationToken.None);
+            }
         }
         catch (OperationCanceledException) when (pipelineCts.IsCancellationRequested)
         {
             exitReason = "sigint";
+            if (_source is IHostEventStreamLifecycle lifecycle)
+            {
+                await lifecycle.RequestShutdownAsync(CancellationToken.None);
+            }
         }
         finally
         {
@@ -84,6 +93,6 @@ internal sealed class DashboardPipeline(
             }
         }
 
-        return 0;
+        return exitCode;
     }
 }

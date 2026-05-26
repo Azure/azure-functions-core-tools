@@ -17,15 +17,62 @@ internal static class Program
 
         using IHost shellHost = builder.Build();
         await shellHost.StartAsync();
+        using CancellationTokenSource shutdownTokenSource = new();
+        Task standardInputClosedTask = Console.IsInputRedirected
+            ? CancelOnStandardInputClosedAsync(shutdownTokenSource)
+            : Task.CompletedTask;
+        ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            shutdownTokenSource.Cancel();
+        };
+        Console.CancelKeyPress += cancelHandler;
 
         try
         {
             HostShell shell = shellHost.Services.GetRequiredService<HostShell>();
-            return await shell.RunAsync(args);
+            return await shell.RunAsync(args, shutdownTokenSource.Token);
+        }
+        catch (OperationCanceledException) when (shutdownTokenSource.IsCancellationRequested)
+        {
+            return 0;
         }
         finally
         {
+            Console.CancelKeyPress -= cancelHandler;
+            shutdownTokenSource.Cancel();
+            if (standardInputClosedTask.IsCompleted)
+            {
+                await standardInputClosedTask;
+            }
+
             await shellHost.StopAsync();
+        }
+    }
+
+    private static async Task CancelOnStandardInputClosedAsync(CancellationTokenSource shutdownTokenSource)
+    {
+        try
+        {
+            while (!shutdownTokenSource.IsCancellationRequested
+                   && await Console.In.ReadLineAsync() is not null)
+            {
+            }
+
+            if (!shutdownTokenSource.IsCancellationRequested)
+            {
+                shutdownTokenSource.Cancel();
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (IOException)
+        {
+            if (!shutdownTokenSource.IsCancellationRequested)
+            {
+                shutdownTokenSource.Cancel();
+            }
         }
     }
 }

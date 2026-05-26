@@ -8,9 +8,16 @@ namespace Azure.Functions.Cli.Hosting.Events;
 /// <summary>
 /// Reads multiple host event streams sequentially as one stream.
 /// </summary>
-internal sealed class CompositeHostEventStream(IEnumerable<IHostEventStream> sources) : IHostEventStream
+internal sealed class CompositeHostEventStream : IHostEventStream, IHostEventStreamLifecycle
 {
-    private readonly IHostEventStream[] _sources = CopySources(sources);
+    private readonly IHostEventStream[] _sources;
+    private readonly IHostEventStreamLifecycle? _lifecycle;
+
+    public CompositeHostEventStream(IEnumerable<IHostEventStream> sources)
+    {
+        _sources = CopySources(sources);
+        _lifecycle = GetLifecycle(_sources);
+    }
 
     public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -22,6 +29,12 @@ internal sealed class CompositeHostEventStream(IEnumerable<IHostEventStream> sou
             }
         }
     }
+
+    public Task RequestShutdownAsync(CancellationToken cancellationToken)
+        => _lifecycle?.RequestShutdownAsync(cancellationToken) ?? Task.CompletedTask;
+
+    public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
+        => _lifecycle?.WaitForExitAsync(cancellationToken) ?? Task.FromResult(0);
 
     private static IHostEventStream[] CopySources(IEnumerable<IHostEventStream> sources)
     {
@@ -39,5 +52,19 @@ internal sealed class CompositeHostEventStream(IEnumerable<IHostEventStream> sou
         }
 
         return [.. copied];
+    }
+
+    private static IHostEventStreamLifecycle? GetLifecycle(IEnumerable<IHostEventStream> sources)
+    {
+        IHostEventStreamLifecycle? lifecycle = null;
+        foreach (IHostEventStream source in sources)
+        {
+            if (source is IHostEventStreamLifecycle candidate)
+            {
+                lifecycle = candidate;
+            }
+        }
+
+        return lifecycle;
     }
 }

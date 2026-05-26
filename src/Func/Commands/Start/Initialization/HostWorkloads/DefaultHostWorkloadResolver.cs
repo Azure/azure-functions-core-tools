@@ -8,9 +8,7 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
-/// Resolves installed host workloads and validates explicit host pins.
-/// TODO: Logic here must be reviewed when we plug the host workload resolver into the real initialization workflow,
-/// as some of the information we have in the demo runner may not be available at the time this resolver runs in the real workflow.
+/// Resolves installed host workloads and validates explicit host pins for the current runtime RID.
 /// </summary>
 internal sealed class DefaultHostWorkloadResolver(
     IWorkloadProvider workloadProvider,
@@ -57,7 +55,7 @@ internal sealed class DefaultHostWorkloadResolver(
             ? $"No installed host workload found. Host {installVersion} will be installed."
             : $"No installed host workload found in profile range {RangeText(context.ProfileHostVersionRange)}";
 
-        return new HostWorkloadResolution.InstallRequired(installVersion, message);
+        return new HostWorkloadResolution.InstallRequired(installVersion, message, package.PackageId);
     }
 
     private HostWorkloadResolution ResolveRequestedHost(
@@ -83,7 +81,15 @@ internal sealed class DefaultHostWorkloadResolver(
         }
 
         string version = requestedVersion.ToNormalizedString();
-        return new HostWorkloadResolution.InstallRequired(version, $"No installed host workload found for {version}");
+        if (context.Offline)
+        {
+            return new HostWorkloadResolution.InstallRequired(version, $"No installed host workload found for {version}");
+        }
+
+        return new HostWorkloadResolution.InstallRequired(
+            version,
+            $"No installed host workload found for {version}",
+            HostWorkloadPackage.CurrentPackageId);
     }
 
     private IReadOnlyList<InstalledHostCandidate> GetInstalledHostCandidates()

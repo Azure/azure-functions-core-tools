@@ -60,6 +60,8 @@ internal static class HostLogAttributeKeys
 
     public const string HostStartupDurationMs = "host.startup_duration_ms";
 
+    public const string Stream = "stream";
+
     public const string HttpMethod = "http.method";
 
     public const string HttpTarget = "http.target";

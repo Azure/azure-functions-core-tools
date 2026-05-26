@@ -69,6 +69,21 @@ public class StartDashboardEventStreamFactoryTests
         Assert.Same(hostStream, stream);
     }
 
+    [Fact]
+    public async Task Create_WhenCompact_ForwardsLifecycleToHostStream()
+    {
+        var factory = new StartDashboardEventStreamFactory();
+        var hostStream = new LifecycleHostEventStream(exitCode: 13);
+        hostStream.Complete();
+
+        IHostEventStream stream = factory.Create(OutputMode.Compact, [], hostStream);
+
+        var lifecycle = Assert.IsAssignableFrom<IHostEventStreamLifecycle>(stream);
+        Assert.Equal(13, await lifecycle.WaitForExitAsync(CancellationToken.None));
+        await lifecycle.RequestShutdownAsync(CancellationToken.None);
+        Assert.True(hostStream.ShutdownRequested);
+    }
+
     private static async Task<HostLogEntry[]> ReadAllAsync(IHostEventStream stream)
     {
         List<HostLogEntry> entries = [];
@@ -78,5 +93,26 @@ public class StartDashboardEventStreamFactoryTests
         }
 
         return [.. entries];
+    }
+
+    private sealed class LifecycleHostEventStream(int exitCode) : IHostEventStream, IHostEventStreamLifecycle
+    {
+        private readonly InMemoryHostEventStream _inner = new();
+
+        public bool ShutdownRequested { get; private set; }
+
+        public void Complete() => _inner.Complete();
+
+        public IAsyncEnumerable<HostLogEntry> ReadAsync(CancellationToken cancellationToken)
+            => _inner.ReadAsync(cancellationToken);
+
+        public Task RequestShutdownAsync(CancellationToken cancellationToken)
+        {
+            ShutdownRequested = true;
+            return Task.CompletedTask;
+        }
+
+        public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
+            => Task.FromResult(exitCode);
     }
 }

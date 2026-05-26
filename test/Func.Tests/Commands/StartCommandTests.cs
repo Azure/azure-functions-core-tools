@@ -64,6 +64,7 @@ public class StartCommandTests : IDisposable
         Assert.Contains("--output", optionNames);
         Assert.Contains("--no-tui", optionNames);
         Assert.Contains("--log-file", optionNames);
+        Assert.Contains("--demo", optionNames);
     }
 
     [Fact]
@@ -152,10 +153,40 @@ public class StartCommandTests : IDisposable
                 && context.Options.Offline
                 && context.Options.NoBuild
                 && context.Options.EnableAuth
+                && !context.Options.DemoMode
                 && context.Options.Port == 9090
                 && context.Options.Functions.SequenceEqual(new[] { "HttpTrigger" })
                 && context.Options.Cors.SequenceEqual(new[] { "http://localhost", "http://example" })
                 && context.Options.CorsCredentials),
+            Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartCommand_DemoSwitch_SetsDemoMode()
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        StartInitializationResult initializationResult = CreateInitializationResult(source);
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(initializationResult);
+        var cmd = new StartCommand(
+            _interaction,
+            _palette,
+            _cliVersionProvider,
+            _initializationRunner,
+            CreateHostStartupOptions());
+        var root = new RootCommand { cmd };
+        var result = root.Parse($"start \"{_tempDir}\" --output=plain --demo");
+
+        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        Assert.Equal(0, exitCode);
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context => context.Options.DemoMode),
             Arg.Any<IStartInitializationRenderer>(),
             Arg.Any<CancellationToken>());
     }
@@ -270,6 +301,35 @@ public class StartCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task StartCommand_ReturnsHostLifecycleExitCode()
+    {
+        var source = new CompletedLifecycleEventStream(exitCode: 11);
+        StartInitializationResult initializationResult = CreateInitializationResult(source);
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(initializationResult);
+        var cmd = new StartCommand(
+            _interaction,
+            _palette,
+            _cliVersionProvider,
+            _initializationRunner,
+            CreateHostStartupOptions());
+        var root = new RootCommand { cmd };
+        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+
+        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        Assert.Equal(11, exitCode);
+        TestFunctionsProject project = Assert.IsType<TestFunctionsProject>(initializationResult.Project);
+        FunctionsProjectHostRunCompletionContext completion = Assert.Single(project.CompletionContexts);
+        FunctionsProjectHostRunOutcome.Completed completed =
+            Assert.IsType<FunctionsProjectHostRunOutcome.Completed>(completion.Outcome);
+        Assert.Equal(11, completed.ExitCode);
+    }
+
+    [Fact]
     public async Task StartCommand_ProjectCleanupFailure_DoesNotReplaceExitCode()
     {
         var source = new InMemoryHostEventStream();
@@ -374,5 +434,21 @@ public class StartCommandTests : IDisposable
         public string WorkerConfigPath => "worker.config.json";
 
         public string Version => "1.0.0";
+    }
+
+    private sealed class CompletedLifecycleEventStream(int exitCode) : IHostEventStream, IHostEventStreamLifecycle
+    {
+        public async IAsyncEnumerable<HostLogEntry> ReadAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public Task RequestShutdownAsync(CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
+            => Task.FromResult(exitCode);
     }
 }

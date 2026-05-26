@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
+using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
@@ -11,12 +12,13 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
-/// Prototype initialization runner that simulates the host-resolution workflow.
+/// Runs the start initialization workflow for real host launch and hidden demo mode.
 /// </summary>
 internal sealed class DemoStartInitializationRunner(
     IFunctionsProjectResolver projectResolver,
@@ -29,6 +31,8 @@ internal sealed class DemoStartInitializationRunner(
     IWorkloadInstaller workloadInstaller,
     IInteractionService interaction,
     ILocalSettingsProvider localSettingsProvider,
+    IWorkloadPaths workloadPaths,
+    IHostProcessRunner hostProcessRunner,
     ILoggerFactory loggerFactory,
     TimeProvider? timeProvider = null)
     : IStartInitializationRunner
@@ -61,6 +65,12 @@ internal sealed class DemoStartInitializationRunner(
     private readonly ILocalSettingsProvider _localSettingsProvider = localSettingsProvider
         ?? throw new ArgumentNullException(nameof(localSettingsProvider));
 
+    private readonly IWorkloadPaths _workloadPaths = workloadPaths
+        ?? throw new ArgumentNullException(nameof(workloadPaths));
+
+    private readonly IHostProcessRunner _hostProcessRunner = hostProcessRunner
+        ?? throw new ArgumentNullException(nameof(hostProcessRunner));
+
     private readonly ILoggerFactory _loggerFactory = loggerFactory
         ?? throw new ArgumentNullException(nameof(loggerFactory));
 
@@ -88,7 +98,7 @@ internal sealed class DemoStartInitializationRunner(
         [
             new ResolveProfileInitializationStep(_profileResolver),
             new ResolveConstraintsInitializationStep(),
-            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller),
+            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller, _workloadPaths),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
             new ResolveFunctionsWorkerInitializationStep(_workerResolverFactory, _workloadCatalog, _workloadInstaller, _interaction),
             new ValidateExtensionBundleInitializationStep(
@@ -96,7 +106,7 @@ internal sealed class DemoStartInitializationRunner(
                 _bundleSectionReader,
                 _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
             new PrepareProjectHostRunInitializationStep(_localSettingsProvider),
-            new StartHostInitializationStep(_time),
+            new StartHostInitializationStep(_hostProcessRunner, _time),
         ];
 
         return steps;

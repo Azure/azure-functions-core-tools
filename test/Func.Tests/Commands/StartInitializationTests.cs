@@ -4,6 +4,7 @@
 using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
+using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
@@ -193,6 +194,54 @@ public class StartInitializationTests : IDisposable
         Assert.Equal("yes", env["FROM_LOCAL"]);
         Assert.Equal("node", env["FUNCTIONS_WORKER_RUNTIME"]);
         Assert.Equal(workerDir, env["languageWorkers:node:workerDirectory"]);
+    }
+
+    [Fact]
+    public async Task Runner_RealMode_StartsHostProcessRunnerWithPreparedContext()
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(_tempDir));
+        DirectoryInfo startupDirectory = new(Path.Combine(_tempDir, "bin"));
+        project.PrepareAction = context =>
+        {
+            context.StartupDirectory = startupDirectory;
+            context.EnvironmentVariables["CUSTOM_ENV"] = "custom";
+        };
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
+        ContentWorkloadInfo hostWorkload = CreateHostWorkload("4.1000.0");
+        IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+        hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(new HostWorkloadResolution.Installed(
+                hostWorkload,
+                NuGetVersion.Parse("4.1000.0"),
+                ExplicitlyRequested: false));
+        IHostProcessRunner hostProcessRunner = Substitute.For<IHostProcessRunner>();
+        var eventStream = new InMemoryHostEventStream();
+        eventStream.Complete();
+        hostProcessRunner.StartAsync(Arg.Any<HostProcessStartContext>(), Arg.Any<CancellationToken>())
+            .Returns(eventStream);
+        var renderer = new RecordingStartInitializationRenderer();
+        var runner = CreateRunner(projectResolver, hostWorkloadResolver: hostWorkloadResolver, hostProcessRunner: hostProcessRunner);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true,
+            demoMode: false);
+
+        StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
+
+        Assert.Same(eventStream, result.EventStream);
+        await hostProcessRunner.Received(1).StartAsync(
+            Arg.Is<HostProcessStartContext>(startContext =>
+                ReferenceEquals(startContext.HostWorkload, hostWorkload)
+                && ReferenceEquals(startContext.HostRunContext, result.HostRunContext)
+                && startContext.HostRunContext.StartupDirectory.FullName == startupDirectory.FullName
+                && startContext.HostRunContext.EnvironmentVariables["CUSTOM_ENV"] == "custom"
+                && !startContext.Options.DemoMode),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -627,7 +676,8 @@ public class StartInitializationTests : IDisposable
         double demoSpeedMultiplier,
         bool demoAutoExit,
         bool offline = false,
-        bool canPrompt = true)
+        bool canPrompt = true,
+        bool demoMode = true)
     {
         var options = new StartCommandOptions(
             workingDirectory,
@@ -643,6 +693,7 @@ public class StartInitializationTests : IDisposable
             OutputMode.Compact,
             NoTui: false,
             LogFilePath: null,
+            DemoMode: demoMode,
             demoFunctionCount,
             demoSpeedMultiplier,
             demoAutoExit);
@@ -690,7 +741,8 @@ public class StartInitializationTests : IDisposable
         IWorkloadInstaller? workloadInstaller = null,
         IFunctionsWorkerResolverFactory? workerResolverFactory = null,
         IWorkloadCatalog? workloadCatalog = null,
-        IInteractionService? interaction = null)
+        IInteractionService? interaction = null,
+        IHostProcessRunner? hostProcessRunner = null)
     {
         IProfileResolver profileResolver = Substitute.For<IProfileResolver>();
         profileResolver.ResolveAsync(Arg.Any<ProfileResolutionContext>(), Arg.Any<CancellationToken>())
@@ -711,6 +763,8 @@ public class StartInitializationTests : IDisposable
         interaction ??= Substitute.For<IInteractionService>();
         interaction.ConfirmAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(true);
+        hostProcessRunner ??= CreateSuccessfulHostProcessRunner();
+        IWorkloadPaths workloadPaths = CreateWorkloadPaths();
         IExtensionBundleResolver bundleResolver = Substitute.For<IExtensionBundleResolver>();
         var bundleSectionReader = new HostJsonBundleSectionReader();
 
@@ -725,6 +779,8 @@ public class StartInitializationTests : IDisposable
             workloadInstaller,
             interaction,
             new LocalSettingsProvider(),
+            workloadPaths,
+            hostProcessRunner,
             NullLoggerFactory.Instance);
     }
 
@@ -753,6 +809,24 @@ public class StartInitializationTests : IDisposable
         string version = "1.0.0")
         => new TestFunctionsWorker(new FunctionsWorkerId(workerId), workerRuntime, "worker.config.json", version);
 
+    private static IHostProcessRunner CreateSuccessfulHostProcessRunner()
+    {
+        IHostProcessRunner runner = Substitute.For<IHostProcessRunner>();
+        var eventStream = new InMemoryHostEventStream();
+        eventStream.Complete();
+        runner.StartAsync(Arg.Any<HostProcessStartContext>(), Arg.Any<CancellationToken>())
+            .Returns(eventStream);
+        return runner;
+    }
+
+    private static IWorkloadPaths CreateWorkloadPaths()
+    {
+        IWorkloadPaths workloadPaths = Substitute.For<IWorkloadPaths>();
+        workloadPaths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(callInfo => Path.Combine(Path.GetTempPath(), "workloads", (string)callInfo[0], (string)callInfo[1]));
+        return workloadPaths;
+    }
+
     private static IWorkloadInstaller CreateSuccessfulInstaller()
     {
         IWorkloadInstaller workloadInstaller = Substitute.For<IWorkloadInstaller>();
@@ -770,7 +844,7 @@ public class StartInitializationTests : IDisposable
                 string packageId = callInfo.ArgAt<string>(0);
                 var version = (NuGetVersion?)callInfo[1];
                 string packageVersion = version?.ToNormalizedString() ?? DefaultInstallVersion(packageId);
-                WorkloadEntry entry = string.Equals(packageId, "host", StringComparison.OrdinalIgnoreCase)
+                WorkloadEntry entry = string.Equals(packageId, HostWorkloadPackage.CurrentPackageId, StringComparison.OrdinalIgnoreCase)
                     ? CreateHostEntry(packageVersion)
                     : CreateWorkerEntry(packageId, packageVersion);
                 return new WorkloadInstallResult(entry, AlreadyInstalled: false);

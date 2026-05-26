@@ -33,6 +33,42 @@ public class DashboardPipelineTests
     }
 
     [Fact]
+    public async Task RunAsync_WhenSourceCompletes_ReturnsLifecycleExitCode()
+    {
+        var state = new DashboardState();
+        var source = new CompletedLifecycleEventStream(exitCode: 42);
+        var renderer = new ShutdownRequestingRenderer();
+        var pipeline = new DashboardPipeline(state, source, renderer);
+
+        int exitCode = await pipeline.RunAsync(CancellationToken.None);
+
+        Assert.Equal(42, exitCode);
+        Assert.True(source.WaitForExitCalled);
+        Assert.NotNull(renderer.Summary);
+        Assert.Equal("source_completed", renderer.Summary.ExitReason);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenRendererRequestsShutdown_RequestsLifecycleShutdownAndReturnsZero()
+    {
+        var state = new DashboardState();
+        var source = new NeverEndingLifecycleEventStream();
+        var renderer = new ShutdownRequestingRenderer();
+        var pipeline = new DashboardPipeline(state, source, renderer);
+
+        Task<int> runTask = pipeline.RunAsync(CancellationToken.None);
+        await renderer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        renderer.RequestShutdown();
+
+        int exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(0, exitCode);
+        Assert.True(source.ShutdownRequested);
+        Assert.NotNull(renderer.Summary);
+        Assert.Equal("sigint", renderer.Summary.ExitReason);
+    }
+
+    [Fact]
     public async Task RunAsync_WithEventSink_MirrorsRawAndDerivedEvents()
     {
         var state = new DashboardState();
@@ -72,6 +108,46 @@ public class DashboardPipelineTests
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             yield break;
         }
+    }
+
+    private sealed class CompletedLifecycleEventStream(int exitCode) : IHostEventStream, IHostEventStreamLifecycle
+    {
+        public bool WaitForExitCalled { get; private set; }
+
+        public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public Task RequestShutdownAsync(CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
+        {
+            WaitForExitCalled = true;
+            return Task.FromResult(exitCode);
+        }
+    }
+
+    private sealed class NeverEndingLifecycleEventStream : IHostEventStream, IHostEventStreamLifecycle
+    {
+        public bool ShutdownRequested { get; private set; }
+
+        public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            yield break;
+        }
+
+        public Task RequestShutdownAsync(CancellationToken cancellationToken)
+        {
+            ShutdownRequested = true;
+            return Task.CompletedTask;
+        }
+
+        public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
+            => Task.FromResult(99);
     }
 
     private sealed class ShutdownRequestingRenderer : IDashboardRenderer, IDashboardShutdownRequester

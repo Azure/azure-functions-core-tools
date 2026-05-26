@@ -239,7 +239,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
             Port: null, Cors: [], CorsCredentials: false, Functions: [],
             NoBuild: false, EnableAuth: false, RequestedProfileName: null, RequestedHostVersion: null,
             Offline: false, OutputMode: OutputMode.Plain, NoTui: true, LogFilePath: null,
-            DemoFunctionCount: 0, DemoSpeedMultiplier: 1.0, DemoAutoExit: true);
+            DemoMode: false, DemoFunctionCount: 0, DemoSpeedMultiplier: 1.0, DemoAutoExit: true);
 
         var init = new StartInitializationContext(options, "5.0.0-test", IsInteractive: false, CanPrompt: false);
         var state = new StartInitializationState
