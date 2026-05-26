@@ -7,37 +7,37 @@
 
 ---
 
-## Command Verb — Decision Required
+## Command Verb — Under Discussion
 
-> **This decision drives the rest of the document.** The verb chosen here determines the command or subcommand name, class names, CLI surface, and whether it collides with the in-flight templates workload.
+> **This decision drives the rest of the document.** The verb chosen here determines the command name, class names, CLI surface, and whether it collides with the in-flight templates workload.
 
-This design proposes **`templates`** as the subcommand verb (`func new templates`). However, there is a naming conflict: a separate templates workload is in flight that provides templating (engine, parameterization, etc.). Using `templates` for this command risks conceptual and CLI-surface collision with that workload.
+Development is proceeding with **`quickstart`** as the working name. This is a **top-level command** (`func quickstart`) delivered as a workload — not a subcommand of `func new`. The final verb is still under discussion.
 
 | Candidate | Full Command | Subcommands | Pros | Cons |
 | --- | --- | --- | --- | --- |
-| **`templates`** (proposed) | `func new templates` | `list`, `info` | Familiar term; matches industry use for e2e prod ready apps | Collides with templates workload; |
-| **`sample`** | `func new sample` | `list`, `info` | These are sample repos; no overloading of "template" | Might imply "not production-ready" |
-| **`quickstart`** | `func quickstart` | `list`, `info` | Clear intent; aligns with Azure Samples naming (`*-quickstart-*-azd`) | Longer to type; top-level only (not under `func new`) |
-| **`bootstrap`** | `func new bootstrap` | `list`, `info` | Accurate for "set up a project from scratch" | Less discoverable; not a common Azure CLI verb |
-| **`clone`** | `func new clone` | `list`, `info` | Technically accurate (it clones a repo) | Implies git; doesn't convey curation or discovery |
+| **`quickstart`** (working name) | `func quickstart` | `list`, `info` | Clear intent; aligns with Azure Samples naming (`*-quickstart-*-azd`); top-level; no collision with templates workload | Longer to type; may imply "beginner-only" and limit room for advanced samples |
+| **`templates`** | `func templates` | `list`, `info` | Industry standard (Vercel, bolt.new, AZD Templates, AI Template Gallery all use "templates"); VS Code extension already calls it "Template Gallery"; doesn't limit scope to quickstarts | Collides conceptually with in-flight templates workload that provides parameterized per-function scaffolding |
+| **`sample`** | `func sample` | `list`, `info` | These are sample repos; no overloading of "template" | Might imply "not production-ready" |
+| **`bootstrap`** | `func bootstrap` | `list`, `info` | Accurate for "set up a project from scratch" | Less discoverable; not a common Azure CLI verb |
 
-**Recommendation:** `templates` — this is the industry used term for scaffolding a new project, including production-ready starting points. We will need resolve conflict with the in-flight templates workload and establish distinction.
-
-> **Impact of verb change:** The verb is used in the subcommand name, class names (`TemplatesCommand` → `SampleCommand`), service names, and all CLI examples throughout this document. The design is otherwise identical regardless of verb chosen. Swapping the verb is a find-and-replace — no architectural changes.
+> **Impact of verb change:** The verb is used in the command name, class names (`QuickstartCommand` → `TemplatesCommand`), service names, and all CLI examples throughout this document. The design is otherwise identical regardless of verb chosen. Swapping the verb is a find-and-replace — no architectural changes.
 
 ---
 
 ## Table of Contents
 
-- [Command Verb — Decision Required](#command-verb--decision-required)
+- [Command Verb — Under Discussion](#command-verb--under-discussion)
 - [Problem Statement](#problem-statement)
 - [Goals / Non-Goals](#goals--non-goals)
 - [Proposed Design](#proposed-design)
   - [Command Tree](#command-tree)
   - [New Services](#new-services)
     - [ITemplateManifestService](#itemplatemanifestservice)
+    - [Release & Compliance Model](#release--compliance-model)
     - [Runtime-to-Language Mapping](#runtime-to-language-mapping)
     - [ITemplateFunctionScaffolder](#itemplatefunctionscaffolder)
+    - [Download Strategy](#download-strategy---fetch-githttp)
+    - [Git Process Requirements](#git-process-requirements)
   - [User Experience Flow](#user-experience-flow)
   - [Execution Flow](#execution-flow)
     - [Manifest Cache Flow](#manifest-cache-flow)
