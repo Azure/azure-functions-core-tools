@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.ComponentModel.DataAnnotations;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Storage;
 using Xunit;
 
@@ -11,59 +9,50 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 public class WorkloadPathsOptionsTests
 {
     [Fact]
-    public void Home_DefaultsToUserProfileAzureFunctions()
+    public void Constructor_NormalisesHomeWithGetFullPath()
     {
-        var options = new WorkloadPathsOptions();
+        // Relative paths get resolved against the current working directory;
+        // the surface area of WorkloadPathsOptions is "Home is always a full
+        // path," so callers don't have to normalise themselves.
+        var options = new WorkloadPathsOptions("relative/path");
 
-        var expected = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName);
-        Assert.Equal(expected, options.Home);
+        Assert.Equal(Path.GetFullPath("relative/path"), options.Home);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    public void Home_FailsValidation_WhenMissingOrEmpty(string? home)
+    [InlineData("   ")]
+    public void Constructor_ThrowsForMissingHome(string? home)
     {
-        var options = new WorkloadPathsOptions { Home = home! };
-
-        var results = new List<ValidationResult>();
-        var valid = Validator.TryValidateObject(
-            options,
-            new ValidationContext(options),
-            results,
-            validateAllProperties: true);
-
-        Assert.False(valid);
-        Assert.Contains(results, r => r.MemberNames.Contains(nameof(WorkloadPathsOptions.Home)));
+        Assert.ThrowsAny<ArgumentException>(() => new WorkloadPathsOptions(home!));
     }
 
     [Fact]
     public void WorkloadsRoot_IsHomeJoinedWithWorkloads()
     {
-        var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
+        var options = new WorkloadPathsOptions(Path.Combine(Path.GetTempPath(), "funcs"));
 
-        Assert.Equal(Path.Combine("/tmp/funcs", "workloads"), options.WorkloadsRoot);
+        Assert.Equal(Path.Combine(options.Home, "workloads"), options.WorkloadsRoot);
     }
 
     [Fact]
     public void WorkloadRegistryPath_IsHomeJoinedWithRegistryFileName()
     {
-        var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
+        var options = new WorkloadPathsOptions(Path.Combine(Path.GetTempPath(), "funcs"));
 
         Assert.Equal(
-            Path.Combine("/tmp/funcs", WorkloadPathsOptions.WorkloadRegistryFileName),
+            Path.Combine(options.Home, WorkloadPathsOptions.WorkloadRegistryFileName),
             options.WorkloadRegistryPath);
     }
 
     [Fact]
     public void GetInstallDirectory_LayoutIsPackageIdThenVersion()
     {
-        var options = new WorkloadPathsOptions { Home = "/tmp/funcs" };
+        var options = new WorkloadPathsOptions(Path.Combine(Path.GetTempPath(), "funcs"));
 
         Assert.Equal(
-            Path.Combine("/tmp/funcs", "workloads", "Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"),
+            Path.Combine(options.Home, "workloads", "Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"),
             options.GetInstallDirectory("Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"));
     }
 }

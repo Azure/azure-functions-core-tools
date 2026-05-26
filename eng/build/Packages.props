@@ -18,12 +18,28 @@
   <ItemGroup>
     <PackageVersion Include="OpenTelemetry" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
     <PackageVersion Include="NuGet.Versioning" Version="6.13.2" />
   </ItemGroup>
   <!-- analyzers -->
   <ItemGroup>
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
+  </ItemGroup>
+  <!-- language workers
+       Authoritative source for each worker pkg version is the corresponding
+       workload's Directory.Version.props ($(WorkerVersion)), which both pins
+       the restored worker pkg (via VersionOverride) and drives the workload
+       pkg version. Keep these central pins in sync with those props as a
+       documentation aid. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.13.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.43.0" />
+  </ItemGroup>
+  <!-- host -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1048.200" />
+    <PackageVersion Include="System.Diagnostics.EventLog" Version="10.0.0" />
   </ItemGroup>
   <!-- test projects -->
   <ItemGroup>

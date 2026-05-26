@@ -210,6 +210,8 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 {
     public string Stack => "node";
 
+    public string DisplayName => "Node.js";
+
     public IReadOnlyList<string> SupportedLanguages => ["JavaScript", "TypeScript"];
 
     public bool CanHandle(string stack) =>
@@ -217,15 +219,23 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         stack.Equals("javascript", StringComparison.OrdinalIgnoreCase) ||
         stack.Equals("typescript", StringComparison.OrdinalIgnoreCase);
 
-    // Workload-specific options. Attached to `func init` during command construction
-    // and visible in --help. Read back inside InitializeAsync via the ParseResult.
-    public Option<string> PackageManagerOption { get; } = new("--package-manager")
-    {
-        Description = "The package manager to use (npm, yarn, pnpm)",
-        DefaultValueFactory = _ => "npm"
-    };
+    // Workload-specific options. Registered through the supplied IInitOptionRegistry,
+    // which is what lets options like `--no-bundles` that multiple stacks contribute
+    // appear once in --help and resolve to the same instance for every workload that
+    // reads them back. Stash the canonical instance returned by GetOrAdd and read
+    // values from it inside InitializeAsync.
+    public Option<string> PackageManagerOption { get; private set; } = default!;
 
-    public IReadOnlyList<Option> GetInitOptions() => [PackageManagerOption];
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+    {
+        PackageManagerOption = registry.GetOrAdd(new Option<string>("--package-manager")
+        {
+            Description = "The package manager to use (npm, yarn, pnpm)",
+            DefaultValueFactory = _ => "npm"
+        });
+
+        return [PackageManagerOption];
+    }
 
     public async Task InitializeAsync(
         InitContext context,
@@ -427,7 +437,7 @@ Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`)
 - [ ] `workload.json` next to the csproj, listing the entry-point `assemblyPath` and `type`
 - [ ] Subclass of `Workload` with a parameterless constructor, overriding `DisplayName`, `Description`, and `Configure`
 - [ ] `Configure(FunctionsCliBuilder)` null-checks `builder` and registers an `IProjectInitializer` and/or top-level commands via `builder.RegisterCommand(...)`
-- [ ] `IProjectInitializer.GetInitOptions()` returns any extra options the initializer needs (return `[]` for stubs; only throw from `InitializeAsync`)
+- [ ] `IProjectInitializer.GetInitOptions(IInitOptionRegistry registry)` registers any extra options the initializer needs via `registry.GetOrAdd(...)` and returns the canonical instances (return `[]` for stubs; only throw from `InitializeAsync`)
 - [ ] Test project `test/Workloads/<kind>/<Name>.Tests/Workloads.<Name>.Tests.csproj`, assembly name `Azure.Functions.Cli.Workloads.<Name>.Tests` (matches the workload's `InternalsVisibleTo`)
 - [ ] Both projects added to `Azure.Functions.Cli.slnx` under solution folders that mirror their source and test paths
 - [ ] `eng/ci/workloads/<name>/{public,official}-build.yml` extending `eng/ci/templates/jobs/build-workload.yml` with `WorkloadProjectName: <Name>`

@@ -72,7 +72,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_WorkloadRegisteredCommand_AppearsAsRootSubcommand()
     {
-        WorkloadInfo workload = TestWorkloads.CreateInfo("My.Workload");
+        RuntimeWorkloadInfo workload = TestWorkloads.CreateInfo("My.Workload");
         FuncRootCommand root = TestParser.CreateRootWithWorkload(
             _interaction,
             workload,
@@ -87,7 +87,7 @@ public class ParserTests
     [Fact]
     public void CreateCommand_WorkloadCommandCollidesWithBuiltIn_IsSkippedWithNamedWarning()
     {
-        WorkloadInfo workload = TestWorkloads.CreateInfo("Wl.Bar");
+        RuntimeWorkloadInfo workload = TestWorkloads.CreateInfo("Wl.Bar");
         FuncRootCommand root = TestParser.CreateRootWithWorkload(
             _interaction,
             workload,
@@ -104,8 +104,8 @@ public class ParserTests
     [Fact]
     public void CreateCommand_TwoWorkloadCommandsSameName_BothSkippedWithNamedWarning()
     {
-        WorkloadInfo workloadA = TestWorkloads.CreateInfo("Wl.A");
-        WorkloadInfo workloadB = TestWorkloads.CreateInfo("Wl.B");
+        RuntimeWorkloadInfo workloadA = TestWorkloads.CreateInfo("Wl.A");
+        RuntimeWorkloadInfo workloadB = TestWorkloads.CreateInfo("Wl.B");
 
         IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, s =>
         {

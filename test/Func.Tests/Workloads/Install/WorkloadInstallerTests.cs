@@ -27,7 +27,7 @@ public sealed class WorkloadInstallerTests : IDisposable
 
     public WorkloadInstallerTests()
     {
-        _paths = new WorkloadPathsOptions { Home = Path.Combine(_root, ".azure-functions") };
+        _paths = new WorkloadPathsOptions(Path.Combine(_root, ".azure-functions"));
         _metadataReader.Read(Arg.Any<string>())
             .Returns(new WorkloadMetadata
             {
@@ -64,6 +64,8 @@ public sealed class WorkloadInstallerTests : IDisposable
                 e.PackageId == "test.workload" &&
                 e.PackageVersion == "1.0.0" &&
                 e.EntryPoint!.AssemblyPath == "Test.dll" &&
+                e.DisplayName == "test.workload" &&
+                e.Description == string.Empty &&
                 e.Source == Path.GetFullPath(nupkg) &&
                 e.InstallRefCount == 1 &&
                 e.Aliases.SequenceEqual(new[] { "test", "stub" })),
@@ -79,6 +81,33 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
         Assert.Empty(result.Entry.Aliases);
+    }
+
+    [Fact]
+    public async Task InstallFromPackage_OnlyExtractsWorkloadJsonAndTools()
+    {
+        // Real workload packages also carry pack-time metadata (the .nuspec,
+        // icons, docs) that has no business landing in the install dir.
+        string nupkg = BuildNupkg(extraFiles:
+        [
+            (WriteTempFile("workload.json", "{}"), "workload.json"),
+            (WriteTempFile("readme.md", "# readme"), "readme.md"),
+            (WriteTempFile("icon.png", "png"), "icon.png"),
+            (WriteTempFile("notes.txt", "notes"), "docs/notes.txt"),
+        ]);
+
+        WorkloadInstaller installer = NewInstaller();
+        await installer.InstallFromPackageAsync(nupkg);
+
+        string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
+        string[] entries = [.. Directory
+            .EnumerateFileSystemEntries(installDir, "*", SearchOption.AllDirectories)
+            .Select(p => Path.GetRelativePath(installDir, p).Replace(Path.DirectorySeparatorChar, '/'))
+            .OrderBy(p => p, StringComparer.Ordinal)];
+
+        Assert.Equal(
+            new[] { "tools", "tools/any", "tools/any/Test.dll", "workload.json" },
+            entries);
     }
 
     [Fact]
@@ -250,9 +279,15 @@ public sealed class WorkloadInstallerTests : IDisposable
 
         Assert.Equal(WorkloadKind.Content, result.Entry.Kind);
         Assert.Null(result.Entry.EntryPoint);
+        Assert.Equal("test.workload", result.Entry.DisplayName);
+        Assert.Equal(string.Empty, result.Entry.Description);
 
         await _store.Received(1).SaveWorkloadAsync(
-            Arg.Is<WorkloadEntry>(e => e.Kind == WorkloadKind.Content && e.EntryPoint == null),
+            Arg.Is<WorkloadEntry>(e =>
+                e.Kind == WorkloadKind.Content &&
+                e.EntryPoint == null &&
+                e.DisplayName == "test.workload" &&
+                e.Description == string.Empty),
             Arg.Any<CancellationToken>());
     }
 
@@ -456,6 +491,101 @@ public sealed class WorkloadInstallerTests : IDisposable
         Assert.Contains("not installed", ex.Message);
     }
 
+    [Fact]
+    public async Task InstallFromCatalog_AliasResolution_FallsBackToBroadSearchWhenTargetedReturnsZero()
+    {
+        // BaGet and older NuGet feeds tokenize the `q=` term in ways that drop
+        // hyphenated aliases (e.g. `node-worker`). When the targeted alias
+        // search returns nothing, the installer should retry with an empty
+        // filter and match by alias client-side.
+        string nupkg = BuildNupkg();
+        var resolved = NewResolved("real.workload.id", "1.0.0");
+        var source = new PackageSource("https://example/v3/index.json", "test");
+
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "node-worker"),
+                Arg.Any<CancellationToken>())
+            .Returns([]);
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<CatalogSearchResult>
+            {
+                new("other.workload", NuGetVersion.Parse("1.0.0"), Title: null, Description: null, Aliases: ["other"], Source: source),
+                new("real.workload.id", NuGetVersion.Parse("1.0.0"), Title: null, Description: null, Aliases: ["node-worker"], Source: source),
+            });
+        _catalog.ResolveLatestVersionAsync(
+                "real.workload.id", true, null, true, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            "node-worker", version: null, source: null,
+            includePrerelease: true, exact: false, force: false);
+
+        Assert.Equal("test.workload", result.Entry.PackageId);
+        await _catalog.Received(1).SearchAsync(
+            Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_AliasResolution_SkipsFallbackWhenTargetedHasHits()
+    {
+        // If the targeted search returns any results (even non-matching),
+        // we trust the server filter and don't pay for a second broad query.
+        string nupkg = BuildNupkg();
+        var resolved = NewResolved("node.pkg", "1.0.0");
+        var source = new PackageSource("https://example/v3/index.json", "test");
+
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "node"),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<CatalogSearchResult>
+            {
+                new("node.pkg", NuGetVersion.Parse("1.0.0"), Title: null, Description: null, Aliases: ["node"], Source: source),
+            });
+        _catalog.ResolveLatestVersionAsync(
+                "node.pkg", false, null, true, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        _ = await installer.InstallFromCatalogAsync(
+            "node", version: null, source: null,
+            includePrerelease: false, exact: false, force: false);
+
+        await _catalog.DidNotReceive().SearchAsync(
+            Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromPackage_ReportsExtractAndRegisterPhases()
+    {
+        string nupkg = BuildNupkg();
+        var reports = new List<WorkloadInstallProgress>();
+        var progress = new RecordingProgress(reports);
+
+        WorkloadInstaller installer = NewInstaller();
+        await installer.InstallFromPackageAsync(nupkg, force: false, progress);
+
+        Assert.Collection(
+            reports,
+            r => Assert.Equal(WorkloadInstallPhase.Extracting, r.Phase),
+            r => Assert.Equal(WorkloadInstallPhase.Registering, r.Phase));
+        Assert.Contains("test.workload", reports[0].Description);
+        Assert.Contains("test.workload", reports[1].Description);
+    }
+
+    private sealed class RecordingProgress(List<WorkloadInstallProgress> sink) : IProgress<WorkloadInstallProgress>
+    {
+        public void Report(WorkloadInstallProgress value) => sink.Add(value);
+    }
+
     private static WorkloadEntry ExistingEntry(string id, string version) => new()
     {
         PackageId = id,
@@ -473,7 +603,11 @@ public sealed class WorkloadInstallerTests : IDisposable
 
     private WorkloadInstaller NewInstaller() => new(_paths, _store, _metadataReader, _catalog);
 
-    private string BuildNupkg(string? tags = null, bool includeFuncCliWorkloadType = true, string version = "1.0.0")
+    private string BuildNupkg(
+        string? tags = null,
+        bool includeFuncCliWorkloadType = true,
+        string version = "1.0.0",
+        IEnumerable<(string SourcePath, string TargetPath)>? extraFiles = null)
     {
         string stubAssembly = Path.Combine(_root, $"stub-{Guid.NewGuid():N}.dll");
         File.WriteAllBytes(stubAssembly, [0x4D, 0x5A]);
@@ -504,12 +638,27 @@ public sealed class WorkloadInstallerTests : IDisposable
             TargetPath = $"tools/{NuGetFramework.Parse("any").GetShortFolderName()}/Test.dll",
         });
 
+        if (extraFiles is not null)
+        {
+            foreach ((string source, string target) in extraFiles)
+            {
+                builder.Files.Add(new PhysicalPackageFile { SourcePath = source, TargetPath = target });
+            }
+        }
+
         string path = Path.Combine(_root, $"Test.Workload.{Guid.NewGuid():N}.nupkg");
         using (FileStream stream = File.Create(path))
         {
             builder.Save(stream);
         }
 
+        return path;
+    }
+
+    private string WriteTempFile(string name, string contents)
+    {
+        string path = Path.Combine(_root, $"{Guid.NewGuid():N}-{name}");
+        File.WriteAllText(path, contents);
         return path;
     }
 }

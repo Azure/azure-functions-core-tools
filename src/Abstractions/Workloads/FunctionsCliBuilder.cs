@@ -9,8 +9,8 @@ namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
 /// Bootstrap surface passed to <see cref="Workload.Configure"/>. Workloads
-/// register services, project initializers, commands, and project resolvers through
-/// <see cref="Services"/> and the <c>Register*</c> methods.
+/// register services, project initializers, commands, and project factories through
+/// <see cref="Services"/> and the builder methods.
 /// </summary>
 /// <remarks>
 /// Modeled after WebJobs' <c>IWebJobsBuilder</c>. Abstract class rather than
@@ -48,10 +48,10 @@ public abstract class FunctionsCliBuilder
     public abstract void RegisterCommand(Type commandType);
 
     /// <summary>
-    /// Registers an <see cref="IProjectResolver"/> that participates in
-    /// workload resolution. The host tags the registration with the calling
+    /// Adds an <see cref="IFunctionsProjectFactory"/> that participates in
+    /// project resolution. The host tags the registration with the calling
     /// workload.
     /// </summary>
-    /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <c>null</c>.</exception>
-    public abstract void RegisterProjectResolver(IProjectResolver resolver);
+    /// <exception cref="ArgumentNullException"><paramref name="factory"/> is <c>null</c>.</exception>
+    public abstract void AddProjectFactory(IFunctionsProjectFactory factory);
 }

@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>Azure Functions CLI Python Language Worker</Title>
+    <Description>Azure Functions CLI content workload that ships the Python language worker.</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>kind:content alias:python-worker func-worker func-workload</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);NU5128;NU5100;NU5123</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      TODO: Decouple from the upstream worker's precise package layout.
+      The plan is to include the PythonWorker package's assets normally (let
+      it wire up its content/None items via its build targets), then have a
+      target here transform those items and repack them under tools/any/. For
+      now we glob the restored package payload directly, which is brittle if
+      the upstream layout changes.
+
+      GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_PythonWorker)
+      pointing at the restored package root. IncludeAssets=none keeps the
+      package's build targets and tools/ files from affecting this project.
+    -->
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" GeneratePathProperty="true" VersionOverride="$(WorkerVersion)">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>none</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <Target Name="IncludePythonWorkerContentInPack" BeforeTargets="_GetPackageFiles">
+    <Error Condition="'$(PkgMicrosoft_Azure_Functions_PythonWorker)' == ''"
+           Text="Microsoft.Azure.Functions.PythonWorker package path not resolved. Run 'dotnet restore' first." />
+    <ItemGroup>
+      <_PythonWorkerFile Include="$(PkgMicrosoft_Azure_Functions_PythonWorker)/tools/**/*" />
+      <None Include="@(_PythonWorkerFile)"
+            TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+            Pack="true"
+            PackagePath="tools/any/" />
+    </ItemGroup>
+  </Target>
+
+</Project>

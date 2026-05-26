@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>Azure Functions CLI Go Language Worker</Title>
+    <Description>Azure Functions CLI content workload that ships the Go worker assets (static worker config).</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>kind:content alias:go-worker func-worker func-workload</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+    <Content Include="content/workers/native/worker.config.json" Pack="true" PackagePath="tools/any/" />
+  </ItemGroup>
+
+</Project>

@@ -53,9 +53,8 @@ public class InitCommandTests
     [Fact]
     public async Task InitCommand_CreatesMissingDirectoryBeforeDispatch()
     {
-        // No workloads installed: InitCommand bootstraps the host skeleton and
-        // renders a NoWorkloadsInstalled hint. It must still have created the
-        // [path] directory by then.
+        // Even when --stack is missing, InitCommand creates the target
+        // directory before validating (directory creation is unconditional).
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         Assert.False(Directory.Exists(newDir));
 
@@ -66,7 +65,8 @@ public class InitCommandTests
 
             var exitCode = await result.InvokeAsync();
 
-            Assert.Equal(0, exitCode);
+            // No --stack provided → exit 1, but directory was still created.
+            Assert.Equal(1, exitCode);
             Assert.True(Directory.Exists(newDir));
         }
         finally
@@ -86,7 +86,7 @@ public class InitCommandTests
         try
         {
             var initializer = new FakeProjectInitializer("python");
-            int exitCode = await RunInitAsync(newDir, initializer, language: "python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
 
             Assert.Equal(0, exitCode);
             Assert.True(initializer.WasInvoked);
@@ -121,7 +121,7 @@ public class InitCommandTests
             File.WriteAllText(configPath, existingContent);
 
             var initializer = new FakeProjectInitializer("python");
-            int exitCode = await RunInitAsync(newDir, initializer, language: "python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
 
             // Folder is already a Functions project (.func/config.json present);
             // command refuses without --force, initializer never runs.
@@ -146,7 +146,7 @@ public class InitCommandTests
         try
         {
             var initializer = new FakeProjectInitializer("dotnet");
-            int exitCode = await RunInitAsync(newDir, initializer, language: null);
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "dotnet");
 
             Assert.Equal(0, exitCode);
 
@@ -180,7 +180,8 @@ public class InitCommandTests
         IReadOnlyList<IProjectInitializer> initializers,
         string? language = null,
         string? stack = null,
-        bool force = false)
+        bool force = false,
+        IReadOnlyList<string>? extraArgs = null)
     {
         var cmd = new InitCommand(_interaction, _hintRenderer, initializers);
         var root = new RootCommand { cmd };
@@ -199,21 +200,23 @@ public class InitCommandTests
         {
             args.Add("--force");
         }
+        if (extraArgs is not null)
+        {
+            args.AddRange(extraArgs);
+        }
         ParseResult result = root.Parse(args.ToArray());
         return await result.InvokeAsync();
     }
 
     [Fact]
-    public async Task InitCommand_NoWorkloadsInstalled_BootstrapsSkeletonAndExitsZero()
+    public async Task InitCommand_NoWorkloadsInstalled_ExitsWithHint()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
             int exitCode = await RunInitAsync(newDir, initializers: []);
 
-            Assert.Equal(0, exitCode);
-            AssertHostJsonWritten(newDir);
-            AssertConfigJsonHasShape(newDir, expectedStack: null, expectedLanguage: null);
+            Assert.Equal(1, exitCode);
 
             WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
             Assert.Equal(WorkloadHintKind.NoWorkloadsInstalled, hint.Kind);
@@ -225,7 +228,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_StackProvidedButNoMatch_BootstrapsSkeletonAndExitsZero()
+    public async Task InitCommand_StackProvidedButNoMatch_ExitsWithHint()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -233,10 +236,8 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "ruby");
 
-            Assert.Equal(0, exitCode);
+            Assert.Equal(1, exitCode);
             Assert.False(initializer.WasInvoked);
-            AssertHostJsonWritten(newDir);
-            AssertConfigJsonHasShape(newDir, expectedStack: null, expectedLanguage: null);
 
             WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
             Assert.Equal(WorkloadHintKind.NoMatchingStack, hint.Kind);
@@ -249,7 +250,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_MultipleWorkloads_NonInteractive_BootstrapsSkeletonAndExitsZero()
+    public async Task InitCommand_MultipleWorkloads_NoStack_NonInteractive_ExitsWithHint()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -258,11 +259,9 @@ public class InitCommandTests
             var node = new FakeProjectInitializer("node");
             int exitCode = await RunInitAsync(newDir, [python, node]);
 
-            Assert.Equal(0, exitCode);
+            Assert.Equal(1, exitCode);
             Assert.False(python.WasInvoked);
             Assert.False(node.WasInvoked);
-            AssertHostJsonWritten(newDir);
-            AssertConfigJsonHasShape(newDir, expectedStack: null, expectedLanguage: null);
 
             WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
             Assert.Equal(WorkloadHintKind.AmbiguousStackChoice, hint.Kind);
@@ -274,7 +273,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_SingleWorkload_AutoSelectsAndRendersInfoHint()
+    public async Task InitCommand_SingleWorkload_NoStack_AutoSelectsAndRuns()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -284,7 +283,6 @@ public class InitCommandTests
 
             Assert.Equal(0, exitCode);
             Assert.True(initializer.WasInvoked);
-            AssertHostJsonWritten(newDir);
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
 
             WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
@@ -298,7 +296,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_StackProvided_WritesHostJsonAndConfig()
+    public async Task InitCommand_StackProvided_WritesConfigAndInvokesInitializer()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -308,10 +306,9 @@ public class InitCommandTests
 
             Assert.Equal(0, exitCode);
             Assert.True(initializer.WasInvoked);
-            AssertHostJsonWritten(newDir);
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: "python");
 
-            // --stack matched directly, no hint.
+            // No hint rendered when --stack matched directly.
             Assert.Empty(_hintRenderer.Hints);
         }
         finally
@@ -347,21 +344,21 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_RefusesEarly_BeforeWorkloadSelection_WhenAlreadyInitialized()
+    public async Task InitCommand_RefusesEarly_WhenAlreadyInitialized()
     {
-        // Even with zero workloads installed, a directory that already has a
-        // host.json is treated as initialized: no skeleton write, no hint, exit 1.
+        // A directory that already has a host.json is treated as initialized:
+        // no config write, exit 1.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{\"version\":\"2.0\"}");
 
-            int exitCode = await RunInitAsync(newDir, initializers: []);
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
             Assert.Equal(1, exitCode);
-            Assert.Empty(_hintRenderer.Hints);
-            // No .func/config.json written either.
+            Assert.False(initializer.WasInvoked);
             Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
         }
         finally
@@ -371,7 +368,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_OverwritesExistingHostJson_WhenForceIsSet()
+    public async Task InitCommand_OverwritesExistingProject_WhenForceIsSet()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -384,7 +381,7 @@ public class InitCommandTests
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
 
             Assert.Equal(0, exitCode);
-            AssertHostJsonWritten(newDir);
+            Assert.True(initializer.WasInvoked);
         }
         finally
         {
@@ -392,12 +389,57 @@ public class InitCommandTests
         }
     }
 
-    private static void AssertHostJsonWritten(string directory)
+    [Fact]
+    public async Task InitCommand_Force_ClearsDirectoryButPreservesDotGit()
     {
-        string path = Path.Combine(directory, "host.json");
-        Assert.True(File.Exists(path), $"Expected host.json at {path}.");
-        using var doc = JsonDocument.Parse(File.ReadAllText(path));
-        Assert.Equal("2.0", doc.RootElement.GetProperty("version").GetString());
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            // Pre-existing junk from a prior stack.
+            File.WriteAllText(Path.Combine(newDir, "package.json"), "{}");
+            File.WriteAllText(Path.Combine(newDir, "requirements.txt"), "azure-functions");
+            Directory.CreateDirectory(Path.Combine(newDir, "node_modules"));
+            File.WriteAllText(Path.Combine(newDir, "node_modules", "marker"), "x");
+
+            // .git must survive.
+            Directory.CreateDirectory(Path.Combine(newDir, ".git"));
+            File.WriteAllText(Path.Combine(newDir, ".git", "HEAD"), "ref: refs/heads/main");
+
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(File.Exists(Path.Combine(newDir, "package.json")));
+            Assert.False(File.Exists(Path.Combine(newDir, "requirements.txt")));
+            Assert.False(Directory.Exists(Path.Combine(newDir, "node_modules")));
+            Assert.True(File.Exists(Path.Combine(newDir, ".git", "HEAD")));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Force_WritesWarningBeforeClearing()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "leftover.txt"), "x");
+
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("--force will delete"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
     }
 
     private static void AssertConfigJsonHasShape(string directory, string? expectedStack, string? expectedLanguage)
@@ -491,7 +533,104 @@ public class InitCommandTests
         }
     }
 
-    private sealed class FakeProjectInitializer(string stack, IReadOnlyList<string>? supportedLanguages = null) : IProjectInitializer
+    [Fact]
+    public void InitCommand_DedupesContributedOptionsByName()
+    {
+        // Two workloads contributing the same option name (e.g. --no-bundles) must
+        // appear once in --help and resolve to a single canonical Option instance.
+        var first = new FakeProjectInitializer(
+            "node",
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+        var second = new FakeProjectInitializer(
+            "python",
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+
+        var cmd = new InitCommand(_interaction, _hintRenderer, [first, second]);
+
+        int matches = cmd.Options.Count(o => o.Name == "--no-bundles");
+        Assert.Equal(1, matches);
+        Assert.Same(first.ContributedOptions[0], second.ContributedOptions[0]);
+    }
+
+    [Fact]
+    public async Task InitCommand_SharedOption_IsReadCorrectlyByLaterWorkload()
+    {
+        // When `python` is selected but `node` was registered first, python must still see
+        // the user-supplied value for the shared `--no-bundles` option.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            bool? observed = null;
+            var node = new FakeProjectInitializer(
+                "node",
+                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+            var python = new FakeProjectInitializer(
+                "python",
+                optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))],
+                onInitialize: (init, parseResult) =>
+                {
+                    var opt = (Option<bool>)init.ContributedOptions[0];
+                    observed = parseResult.GetValue(opt);
+                });
+
+            int exitCode = await RunInitAsync(
+                newDir,
+                [node, python],
+                language: null,
+                stack: "python",
+                extraArgs: ["--no-bundles"]);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(observed);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public void InitCommand_ThrowsWhenWorkloadsContributeSameNameDifferentType()
+    {
+        var first = new FakeProjectInitializer(
+            "node",
+            optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
+        var second = new FakeProjectInitializer(
+            "python",
+            optionFactory: r => [r.GetOrAdd(new Option<string>("--no-bundles"))]);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new InitCommand(_interaction, _hintRenderer, [first, second]));
+
+        Assert.Contains("python", ex.Message);
+        Assert.Contains("node", ex.Message);
+        Assert.Contains("--no-bundles", ex.Message);
+    }
+
+    [Fact]
+    public void InitCommand_ThrowsWhenAliasCollidesAcrossWorkloads()
+    {
+        // Two workloads both want -c as an alias, but for different options.
+        var first = new FakeProjectInitializer(
+            "node",
+            optionFactory: r => [r.GetOrAdd(new Option<string>("--bundles-channel", "-c"))]);
+        var second = new FakeProjectInitializer(
+            "go",
+            optionFactory: r => [r.GetOrAdd(new Option<string>("--clean", "-c"))]);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new InitCommand(_interaction, _hintRenderer, [first, second]));
+
+        Assert.Contains("-c", ex.Message);
+        Assert.Contains("--clean", ex.Message);
+        Assert.Contains("--bundles-channel", ex.Message);
+    }
+
+    private sealed class FakeProjectInitializer(
+        string stack,
+        IReadOnlyList<string>? supportedLanguages = null,
+        Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
+        Action<FakeProjectInitializer, ParseResult>? onInitialize = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
@@ -499,11 +638,18 @@ public class InitCommandTests
 
         public bool WasInvoked { get; private set; }
 
-        public IReadOnlyList<Option> GetInitOptions() => [];
+        public IReadOnlyList<Option> ContributedOptions { get; private set; } = [];
+
+        public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+        {
+            ContributedOptions = optionFactory?.Invoke(registry) ?? [];
+            return ContributedOptions;
+        }
 
         public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
         {
             WasInvoked = true;
+            onInitialize?.Invoke(this, parseResult);
             return Task.CompletedTask;
         }
     }

@@ -10,17 +10,17 @@ namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
 /// Default <see cref="FunctionsCliBuilder"/> implementation. Each workload
-/// gets its own instance scoped to its <see cref="WorkloadInfo"/>; the
+/// gets its own instance scoped to its <see cref="RuntimeWorkloadInfo"/>; the
 /// underlying <see cref="IServiceCollection"/> is the global container.
 /// </summary>
 /// <remarks>
 /// A builder constructed without a workload is used during host bootstrap;
-/// calling <c>RegisterCommand</c> or <c>RegisterProjectResolver</c> on it
-/// throws so an untracked contribution can never reach the parser.
+/// calling <c>RegisterCommand</c> or <c>AddProjectFactory</c> on it
+/// throws so an untracked registration can never reach the parser.
 /// </remarks>
-internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, WorkloadInfo? workload) : FunctionsCliBuilder
+internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, RuntimeWorkloadInfo? workload) : FunctionsCliBuilder
 {
-    private readonly WorkloadInfo? _workload = workload;
+    private readonly RuntimeWorkloadInfo? _workload = workload;
 
     public DefaultFunctionsCliBuilder(IServiceCollection services)
         : this(services, workload: null)
@@ -68,16 +68,17 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Wo
         RegisterCommandFactory(sp => (FuncCommand)ActivatorUtilities.GetServiceOrCreateInstance(sp, commandType));
     }
 
-    public override void RegisterProjectResolver(IProjectResolver resolver)
+    public override void AddProjectFactory(IFunctionsProjectFactory factory)
     {
-        ArgumentNullException.ThrowIfNull(resolver);
-        WorkloadInfo workload = RequireWorkload();
-        Services.AddSingleton(new WorkloadProjectResolverContribution(workload, resolver));
+        ArgumentNullException.ThrowIfNull(factory);
+
+        RuntimeWorkloadInfo workload = RequireWorkload();
+        Services.AddSingleton(new WorkloadProjectFactoryRegistration(workload, factory));
     }
 
     private void RegisterCommandFactory(Func<IServiceProvider, FuncCommand> factory)
     {
-        WorkloadInfo workload = RequireWorkload();
+        RuntimeWorkloadInfo workload = RequireWorkload();
         Services.AddSingleton<FuncCliCommand>(sp =>
         {
             FuncCommand command = factory(sp)
@@ -87,8 +88,8 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Wo
         });
     }
 
-    private WorkloadInfo RequireWorkload()
+    private RuntimeWorkloadInfo RequireWorkload()
         => _workload ?? throw new InvalidOperationException(
-            "Workload contributions can only be registered through a workload-scoped builder. " +
-            "Calling Register* on the host's global builder is a CLI bug.");
+            "Workload services can only be registered through a workload-scoped builder. " +
+            "Calling builder registration methods on the host's global builder is a CLI bug.");
 }

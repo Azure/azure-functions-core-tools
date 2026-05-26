@@ -1,6 +1,33 @@
 <Project>
+
+  <!--
+    Workload pkg versioning. This is a content-only workload (no workload
+    code or assemblies), so the pkg version maps 1:1 to the bundle payload
+    version it carries:
+      $(BundleVersion)  - the bundle payload version. Drives the CDN URL
+                          and the user-facing version in func logs. Bare
+                          three-part SemVer.
+      $(BundleChannel)  - stable | preview | experimental. Selects the CDN
+                          bundle id (see DownloadDefaultBundle.targets) and
+                          the workload pkg's prerelease label.
+
+    Derived $(VersionPrefix):
+      stable        -> 4.35.0
+      preview       -> 4.35.0-preview
+      experimental  -> 4.35.0-experimental
+  -->
+
   <PropertyGroup>
-    <VersionPrefix>1.0.0</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <BundleVersion>4.35.0</BundleVersion>
+    <BundleChannel>stable</BundleChannel>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BundleChannel)' == 'stable'">
+    <VersionPrefix>$(BundleVersion)</VersionPrefix>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BundleChannel)' != 'stable'">
+    <VersionPrefix>$(BundleVersion)-$(BundleChannel)</VersionPrefix>
+  </PropertyGroup>
+
 </Project>

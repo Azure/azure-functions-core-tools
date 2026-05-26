@@ -40,6 +40,7 @@ internal interface IWorkloadInstaller
     public Task<WorkloadInstallResult> InstallFromPackageAsync(
         string nupkgPath,
         bool force = false,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -81,6 +82,7 @@ internal interface IWorkloadInstaller
         bool includePrerelease,
         bool exact,
         bool force,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -111,6 +113,7 @@ internal interface IWorkloadInstaller
         string? source,
         bool includePrerelease,
         bool allowMajor,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

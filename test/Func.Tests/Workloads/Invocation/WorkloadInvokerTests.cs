@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Tests.Workloads.Invocation;
 public sealed class WorkloadInvokerTests
 {
     private readonly WorkloadInvoker _invoker = new();
-    private readonly WorkloadInfo _workload = TestWorkloads.CreateInfo("Pkg.Acme");
+    private readonly RuntimeWorkloadInfo _workload = TestWorkloads.CreateInfo("Pkg.Acme");
 
     [Fact]
     public async Task InvokeAsync_Success_RunsAndReturns()

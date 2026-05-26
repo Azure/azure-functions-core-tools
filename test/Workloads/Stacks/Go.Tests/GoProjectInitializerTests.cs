@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Go.Tests;
@@ -43,9 +44,13 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public void GetInitOptions_ContainsSkipGoModTidy()
     {
-        IReadOnlyList<Option> options = new GoProjectInitializer().GetInitOptions();
-        Assert.Single(options);
-        Assert.Equal("--skip-go-mod-tidy", options[0].Name);
+        RootCommand root = [];
+        IReadOnlyList<Option> options = new GoProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
+
+        Assert.Contains("--skip-go-mod-tidy", names);
+        Assert.Contains("--no-bundles", names);
+        Assert.Contains("--bundles-channel", names);
     }
 
     [Fact]
@@ -79,18 +84,76 @@ public class GoProjectInitializerTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeAsync_DoesNotTouchHostJson()
+    public async Task InitializeAsync_AppendsExtensionBundle_IntoExistingHostJson()
     {
-        const string baseHost = "{\n  \"version\": \"2.0\"\n}";
-        File.WriteAllText(Path.Combine(_projectDir.FullName, "host.json"), baseHost);
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "host.json"), "{ \"version\": \"2.0\" }");
 
         await RunAsync(projectName: "my-go-app", force: false);
 
-        string after = File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json"));
-        Assert.Equal(baseHost, after);
-        var root = JsonNode.Parse(after) as JsonObject;
+        var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
         Assert.NotNull(root);
-        Assert.False(root!.ContainsKey("customHandler"));
+        Assert.Equal("2.0", root!["version"]!.GetValue<string>());
+        JsonNode? bundle = root["extensionBundle"];
+        Assert.NotNull(bundle);
+        Assert.Equal("Microsoft.Azure.Functions.ExtensionBundle", bundle!["id"]!.GetValue<string>());
+        Assert.Equal("[4.*, 5.0.0)", bundle["version"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LeavesExistingExtensionBundleUntouched()
+    {
+        const string custom = "{\"version\":\"2.0\",\"extensionBundle\":{\"id\":\"custom\",\"version\":\"1.0.0\"}}";
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "host.json"), custom);
+
+        await RunAsync(projectName: "my-go-app", force: false);
+
+        JsonNode? bundle = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")))!["extensionBundle"];
+        Assert.Equal("custom", bundle!["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BundlesChannel_Default_WritesDefaultBundleId()
+    {
+        await RunAsync(projectName: "my-go-app", force: false);
+
+        var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
+        Assert.Equal(
+            "Microsoft.Azure.Functions.ExtensionBundle",
+            root!["extensionBundle"]!["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BundlesChannel_Preview_WritesPreviewBundleId()
+    {
+        await RunAsync(projectName: "my-go-app", force: false, args: ["--bundles-channel", "Preview"]);
+
+        var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
+        Assert.Equal(
+            "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+            root!["extensionBundle"]!["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BundlesChannel_Experimental_WritesExperimentalBundleId()
+    {
+        await RunAsync(projectName: "my-go-app", force: false, args: ["--bundles-channel", "Experimental"]);
+
+        var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
+        Assert.Equal(
+            "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+            root!["extensionBundle"]!["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_NoBundle_WritesMinimalHostJsonWithoutExtensionBundle()
+    {
+        await RunAsync(projectName: "my-go-app", force: false, args: ["--no-bundles"]);
+
+        string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
+        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
+        string content = File.ReadAllText(hostJsonPath);
+        Assert.Contains("\"version\"", content);
+        Assert.DoesNotContain("extensionBundle", content);
     }
 
     [Fact]
@@ -129,10 +192,7 @@ public class GoProjectInitializerTests : IDisposable
             Language: null,
             Force: false);
         var root = new RootCommand();
-        foreach (Option opt in initializer.GetInitOptions())
-        {
-            root.Options.Add(opt);
-        }
+        initializer.GetInitOptions(new InitOptionRegistry(root));
 
         await initializer.InitializeAsync(context, root.Parse("--skip-go-mod-tidy"));
         Assert.Equal(0, calls);
@@ -151,16 +211,13 @@ public class GoProjectInitializerTests : IDisposable
             Language: null,
             Force: false);
         var root = new RootCommand();
-        foreach (Option opt in initializer.GetInitOptions())
-        {
-            root.Options.Add(opt);
-        }
+        initializer.GetInitOptions(new InitOptionRegistry(root));
 
         await initializer.InitializeAsync(context, root.Parse(string.Empty));
         Assert.Equal(1, calls);
     }
 
-    private Task RunAsync(string? projectName, bool force)
+    private Task RunAsync(string? projectName, bool force, string[]? args = null)
     {
         var initializer = new GoProjectInitializer();
         // Skip the real `go mod tidy` invocation in tests by stubbing the seam.
@@ -170,6 +227,9 @@ public class GoProjectInitializerTests : IDisposable
             ProjectName: projectName,
             Language: null,
             Force: force);
-        return initializer.InitializeAsync(context, new RootCommand().Parse(string.Empty));
+        var root = new RootCommand();
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+
+        return initializer.InitializeAsync(context, root.Parse(args ?? []));
     }
 }

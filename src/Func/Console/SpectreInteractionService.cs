@@ -159,6 +159,139 @@ internal class SpectreInteractionService : IInteractionService
         }, cancellationToken);
     }
 
+    public async Task<T> RunWithProgressAsync<T>(
+        string initialDescription,
+        Func<IProgressContext, CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(initialDescription);
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (!IsInteractive)
+        {
+            // No live region in non-interactive output. Log the initial
+            // description plus every subsequent SetDescription so the user
+            // still sees phase transitions in CI logs.
+            _stderr.Write(new Paragraph($"{initialDescription}...", _theme.Muted).Append(Environment.NewLine));
+            var logging = new LoggingProgressContext(_stderr, _theme, initialDescription);
+            return await action(logging, cancellationToken);
+        }
+
+        T result = default!;
+        await _stderr.Progress()
+            .AutoRefresh(true)
+            .HideCompleted(false)
+            .Columns(
+                new TaskDescriptionColumn { Alignment = Justify.Left },
+                new ProgressBarColumn(),
+                new PercentageColumn(),
+                new SpinnerColumn(Spinner.Known.Dots))
+            .StartAsync(async ctx =>
+            {
+                ProgressTask task = ctx.AddTask(initialDescription, autoStart: true, maxValue: 1d);
+                task.IsIndeterminate = true;
+
+                var live = new SpectreProgressContext(task);
+                result = await action(live, cancellationToken);
+
+                // Snap to 100% on success so the bar doesn't linger as a
+                // half-filled fragment when the action finishes without
+                // having called Report.
+                if (task.IsIndeterminate)
+                {
+                    task.IsIndeterminate = false;
+                    task.MaxValue = 1d;
+                    task.Value = 1d;
+                }
+                else if (task.MaxValue > 0)
+                {
+                    task.Value = task.MaxValue;
+                }
+
+                task.StopTask();
+            });
+
+        return result;
+    }
+
+    private sealed class SpectreProgressContext(ProgressTask task) : IProgressContext
+    {
+        private readonly ProgressTask _task = task;
+
+        public void SetDescription(string description)
+        {
+            ArgumentNullException.ThrowIfNull(description);
+            _task.Description = description;
+        }
+
+        public void SetTotal(double? total)
+        {
+            if (total is null)
+            {
+                _task.IsIndeterminate = true;
+                return;
+            }
+
+            _task.IsIndeterminate = false;
+            _task.MaxValue = total.Value;
+            if (_task.Value > total.Value)
+            {
+                _task.Value = total.Value;
+            }
+        }
+
+        public void Report(double value)
+        {
+            if (_task.IsIndeterminate)
+            {
+                return;
+            }
+
+            _task.Value = value;
+        }
+
+        public void Increment(double amount)
+        {
+            if (_task.IsIndeterminate)
+            {
+                return;
+            }
+
+            _task.Increment(amount);
+        }
+    }
+
+    private sealed class LoggingProgressContext(IAnsiConsole console, ITheme theme, string initialDescription) : IProgressContext
+    {
+        private readonly IAnsiConsole _console = console;
+        private readonly ITheme _theme = theme;
+        private string _description = initialDescription;
+
+        public void SetDescription(string description)
+        {
+            ArgumentNullException.ThrowIfNull(description);
+            if (string.Equals(description, _description, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _description = description;
+            _console.Write(new Paragraph($"{description}...", _theme.Muted).Append(Environment.NewLine));
+        }
+
+        public void SetTotal(double? total)
+        {
+        }
+
+        public void Report(double value)
+        {
+        }
+
+        public void Increment(double amount)
+        {
+        }
+    }
+
     public async Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
     {
         if (!IsInteractive)

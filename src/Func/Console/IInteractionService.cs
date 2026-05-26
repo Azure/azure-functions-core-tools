@@ -90,6 +90,23 @@ internal interface IInteractionService
     public Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Displays a progress indicator (a bar in interactive contexts, plain
+    /// log lines elsewhere) and passes a mutable <see cref="IProgressContext"/>
+    /// to <paramref name="action"/> so the running operation can update its
+    /// description and report completion.
+    /// </summary>
+    /// <remarks>
+    /// Prefer this over <see cref="ShowStatusAsync{T}"/> when the operation
+    /// has distinct phases the user benefits from seeing (e.g. resolve →
+    /// download → extract). Phases with a known total surface as a real
+    /// percentage; phases without one render as indeterminate motion.
+    /// </remarks>
+    public Task<T> RunWithProgressAsync<T>(
+        string initialDescription,
+        Func<IProgressContext, CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Prompts the user with a yes/no confirmation. Returns <paramref name="defaultValue"/>
     /// in non-interactive mode. Throws <see cref="OperationCanceledException"/> on Ctrl+C.
     /// </summary>

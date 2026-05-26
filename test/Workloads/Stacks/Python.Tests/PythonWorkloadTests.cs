@@ -34,7 +34,7 @@ public class PythonWorkloadTests
     }
 
     [Fact]
-    public void Configure_RegistersProjectResolver()
+    public void Configure_AddsProjectFactory()
     {
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
@@ -42,6 +42,6 @@ public class PythonWorkloadTests
 
         new PythonWorkload().Configure(builder);
 
-        builder.Received(1).RegisterProjectResolver(Arg.Any<PythonProjectResolver>());
+        builder.Received(1).AddProjectFactory(Arg.Any<PythonProjectFactory>());
     }
 }

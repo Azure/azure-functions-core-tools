@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -22,10 +23,12 @@ internal static class HostApplicationBuilderExtensions
     /// </summary>
     /// <remarks>
     /// Per-workload load and Configure failures are isolated: a single throw
-    /// becomes a stderr warning and the remaining workloads still load. The
-    /// caller resolves <see cref="IInteractionService"/> from
-    /// <see cref="HostApplicationBuilder.Services"/>; it must already be
-    /// registered (it is, by <see cref="CliHost.CreateBuilder"/>).
+    /// becomes a stderr warning and the remaining workloads still load.
+    /// Workload home defaults to whatever
+    /// <see cref="WorkloadHomeResolver.Resolve"/> returns; integration tests
+    /// override by registering a <see cref="WorkloadPathsOptions"/> instance
+    /// on <see cref="HostApplicationBuilder.Services"/> after
+    /// <see cref="CliHostFactory.CreateBuilder"/>.
     /// </remarks>
     public static Task RegisterWorkloadsAsync(
         this HostApplicationBuilder builder,
@@ -33,30 +36,56 @@ internal static class HostApplicationBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        IInteractionService interaction = ResolveInteractionService(builder);
+        IInteractionService interaction = ResolveSingletonInstance<IInteractionService>(builder);
+        WorkloadPathsOptions paths = TryResolveSingletonInstance<WorkloadPathsOptions>(builder)
+            ?? new WorkloadPathsOptions();
         return WorkloadRegistration.RegisterWorkloadsAsync(
             builder.Services,
-            builder.Configuration,
+            paths,
             interaction,
             cancellationToken);
     }
 
-    private static IInteractionService ResolveInteractionService(HostApplicationBuilder builder)
+    /// <summary>
+    /// Pulls a singleton instance back out of the service descriptors without
+    /// building the full provider, so we don't capture descriptors workloads
+    /// will add a moment later. Returns the last registered instance, matching
+    /// the lifetime semantics tests rely on when they replace a default.
+    /// </summary>
+    private static T ResolveSingletonInstance<T>(HostApplicationBuilder builder)
+        where T : class
     {
-        // The singleton instance was added by CliHost.CreateBuilder; pull it
-        // back out without building the full provider so we don't capture
-        // descriptors that workloads will add a moment later.
-        foreach (ServiceDescriptor descriptor in builder.Services)
+        T? instance = TryResolveSingletonInstance<T>(builder);
+        if (instance is not null)
         {
-            if (descriptor.ServiceType == typeof(IInteractionService)
-                && descriptor.ImplementationInstance is IInteractionService instance)
-            {
-                return instance;
-            }
+            return instance;
         }
 
         throw new InvalidOperationException(
-            $"{nameof(IInteractionService)} singleton is not registered. " +
+            $"{typeof(T).Name} singleton is not registered. " +
             $"Use {nameof(CliHostFactory)}.{nameof(CliHostFactory.CreateBuilder)} to build the host.");
+    }
+
+    /// <summary>
+    /// Same descriptor scan as <see cref="ResolveSingletonInstance{T}"/>, but
+    /// returns <see langword="null"/> when no instance descriptor is found.
+    /// Used for optional overrides (e.g. tests substituting
+    /// <see cref="WorkloadPathsOptions"/>); a missing registration is not an
+    /// error, the caller constructs a default.
+    /// </summary>
+    private static T? TryResolveSingletonInstance<T>(HostApplicationBuilder builder)
+        where T : class
+    {
+        T? instance = null;
+        foreach (ServiceDescriptor descriptor in builder.Services)
+        {
+            if (descriptor.ServiceType == typeof(T)
+                && descriptor.ImplementationInstance is T candidate)
+            {
+                instance = candidate;
+            }
+        }
+
+        return instance;
     }
 }

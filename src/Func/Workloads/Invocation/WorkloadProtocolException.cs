@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Workloads.Invocation;
 /// </summary>
 internal sealed class WorkloadProtocolException : GracefulException
 {
-    public WorkloadProtocolException(WorkloadInfo workload, string message, Exception innerException)
+    public WorkloadProtocolException(RuntimeWorkloadInfo workload, string message, Exception innerException)
         : base(message, isUserError: false, verboseMessage: innerException?.ToString())
     {
         ArgumentNullException.ThrowIfNull(workload);
@@ -20,7 +20,7 @@ internal sealed class WorkloadProtocolException : GracefulException
         OriginalException = innerException ?? throw new ArgumentNullException(nameof(innerException));
     }
 
-    public WorkloadInfo Workload { get; }
+    public RuntimeWorkloadInfo Workload { get; }
 
     public Exception OriginalException { get; }
 }

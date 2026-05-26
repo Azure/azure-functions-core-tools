@@ -13,11 +13,14 @@ public sealed class DotNetWorkload : Workload
 {
     public override string DisplayName => ".NET";
 
-    public override string Description => "Azure Functions tooling for .NET (C#) projects.";
+    public override string Description => "Azure Functions CLI tooling for .NET (C#) projects.";
 
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton<IDotnetPathResolver, DotnetPathResolver>();
+        builder.Services.AddSingleton<IDotnetCliRunner, DotnetCliRunner>();
+        builder.Services.AddSingleton<ITemplateHivePathProvider, TemplateHivePathProvider>();
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
     }
 }

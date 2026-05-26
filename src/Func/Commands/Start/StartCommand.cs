@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Globalization;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
@@ -11,12 +12,14 @@ using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Launches the Azure Functions host runtime via 'func start'.
+/// Launches the Azure Functions host runtime via 'func run' (also aliased
+/// as 'func start' for backward compatibility).
 /// </summary>
 /// <remarks>
 /// v1 prototype: real host integration is not yet implemented, so the
@@ -62,9 +65,20 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "The host runtime version to use (e.g., 4.1049.0)"
     };
 
+    public Option<string?> ProfileOption { get; } = new("--profile")
+    {
+        Description = "The Azure Functions profile to apply while resolving host, worker, and bundle versions"
+    };
+
+    public Option<bool> OfflineOption { get; } = new("--offline")
+    {
+        Description = "Use only locally installed workloads and skip network installs"
+    };
+
     public Option<string?> OutputOption { get; } = new("--output")
     {
-        Description = "Output mode: compact (interactive TUI), plain (CI / non-TTY), or json (NDJSON for AI agents). Defaults to auto-detect."
+        Description = "Output mode: compact (interactive TUI), plain (CI / non-TTY), "
+            + "or json (NDJSON for AI agents). Defaults to auto-detect."
     };
 
     public Option<bool> NoTuiOption { get; } = new("--no-tui")
@@ -102,9 +116,15 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         IStartInitializationRunner initializationRunner,
         IOptionsMonitor<HostStartupOptions> hostStartupOptions,
         StartDashboardEventStreamFactory? eventStreamFactory = null)
-        : base("start", "Launch the Azure Functions host runtime.")
+        : base("run", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
+
+        // 'start' is the legacy name from Core Tools v4 and earlier. Kept as
+        // an alias so existing scripts, package.json entries, and muscle
+        // memory continue to work after the canonical rename to 'run'.
+        Aliases.Add("start");
+
         ArgumentNullException.ThrowIfNull(palette);
         ArgumentNullException.ThrowIfNull(versionProvider);
         ArgumentNullException.ThrowIfNull(initializationRunner);
@@ -124,7 +144,9 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(FunctionsOption);
         Options.Add(NoBuildOption);
         Options.Add(EnableAuthOption);
+        Options.Add(ProfileOption);
         Options.Add(HostVersionOption);
+        Options.Add(OfflineOption);
         Options.Add(OutputOption);
         Options.Add(NoTuiOption);
         Options.Add(LogFileOption);
@@ -137,9 +159,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         if (!workingDirectory.Exists)
         {
             string displayPath = workingDirectory.OriginalPath ?? workingDirectory.Info.FullName;
-            throw new GracefulException(
-                $"The specified path does not exist: '{displayPath}'",
-                isUserError: true);
+            throw new GracefulException($"The specified path does not exist: '{displayPath}'", isUserError: true);
         }
 
         OutputMode mode = ResolveOutputMode(parseResult);
@@ -147,7 +167,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         mode = OutputModeResolver.ApplyTerminalSafetyFallback(mode, _interaction, out bool downgraded);
         if (downgraded)
         {
-            System.Console.Error.WriteLine("notice: stdout is not an interactive terminal; falling back to --output=plain.");
+            _interaction.WriteWarning("stdout is not an interactive terminal; falling back to --output=plain.");
         }
 
         HostStartupOptions hostStartupOptions = GetHostStartupOptions(workingDirectory.Info);
@@ -162,14 +182,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         StartInitializationResult initializationResult;
         IReadOnlyList<StartInitializationEvent> initializationEvents;
-        await using (var initializationRenderer = new RecordingStartInitializationRenderer(CreateInitializationRenderer(mode, initializationContext.CliVersion)))
+        IStartInitializationRenderer startInitializationRenderer = CreateInitializationRenderer(mode, initializationContext.CliVersion);
+        await using (var initializationRenderer = new RecordingStartInitializationRenderer(startInitializationRenderer))
         {
             initializationResult = await _initializationRunner.RunAsync(initializationContext, initializationRenderer, cancellationToken);
             if (!initializationRenderer.HasCompleted)
             {
-                await initializationRenderer.OnEventAsync(
-                    new StartInitializationCompletedEvent(DateTimeOffset.UtcNow, initializationResult),
-                    cancellationToken);
+                var completedEvent = new StartInitializationCompletedEvent(DateTimeOffset.UtcNow, initializationResult);
+                await initializationRenderer.OnEventAsync(completedEvent, cancellationToken);
             }
 
             initializationEvents = [.. initializationRenderer.Events];
@@ -181,7 +201,55 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, initializationResult.EventStream);
         var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink);
-        return await pipeline.RunAsync(cancellationToken);
+        FunctionsProjectHostRunOutcome? outcome = null;
+        try
+        {
+            int exitCode = await pipeline.RunAsync(cancellationToken);
+            outcome = FunctionsProjectHostRunOutcomes.Completed(exitCode);
+            return exitCode;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            outcome = FunctionsProjectHostRunOutcomes.Canceled();
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = FunctionsProjectHostRunOutcomes.Failed(ex);
+            throw;
+        }
+        finally
+        {
+            if (outcome is not null)
+            {
+                await CompleteProjectHostRunAsync(initializationResult, outcome);
+            }
+        }
+    }
+
+    private async Task CompleteProjectHostRunAsync(
+        StartInitializationResult initializationResult,
+        FunctionsProjectHostRunOutcome outcome)
+    {
+        using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var completionContext = new FunctionsProjectHostRunCompletionContext(
+            initializationResult.HostRunContext,
+            outcome);
+
+        try
+        {
+            await initializationResult.Project.CompleteHostRunAsync(completionContext, cleanupCts.Token);
+        }
+        catch (OperationCanceledException) when (cleanupCts.IsCancellationRequested)
+        {
+            _interaction.WriteWarning("Project cleanup did not complete within 5 seconds.");
+        }
+        catch (Exception ex)
+        {
+            // Project cleanup runs after the host outcome is known, so keep the
+            // original host result primary and surface cleanup as a warning.
+            _interaction.WriteWarning($"Project cleanup failed: {ex.Message}");
+        }
     }
 
     private HostStartupOptions GetHostStartupOptions(DirectoryInfo projectDirectory)
@@ -202,10 +270,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
         {
-            throw new GracefulException(
-                $"Could not open log file '{path}': {ex.Message}",
-                isUserError: true,
-                verboseMessage: ex.ToString());
+            string message = $"Could not open log file '{path}': {ex.Message}";
+            throw new GracefulException(message, isUserError: true, verboseMessage: ex.ToString());
         }
     }
 
@@ -222,7 +288,9 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             parseResult.GetValue(FunctionsOption) ?? [],
             parseResult.GetValue(NoBuildOption),
             parseResult.GetValue(EnableAuthOption),
+            parseResult.GetValue(ProfileOption),
             parseResult.GetValue(HostVersionOption),
+            parseResult.GetValue(OfflineOption),
             mode,
             parseResult.GetValue(NoTuiOption),
             parseResult.GetValue(LogFileOption),
@@ -245,7 +313,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             return @default;
         }
 
-        return double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value) && value > 0
+        return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value > 0
             ? value
             : @default;
     }
@@ -274,7 +342,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         }
 
         if (!string.IsNullOrWhiteSpace(envRaw)
-            && int.TryParse(envRaw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int parsed))
+            && int.TryParse(envRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
         {
             return Math.Max(Default, parsed);
         }
@@ -290,9 +358,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         {
             if (!OutputModeResolver.TryParse(raw, out OutputMode parsed))
             {
-                throw new GracefulException(
-                    $"--output must be one of: compact, plain, json. Got '{raw}'.",
-                    isUserError: true);
+                throw new GracefulException($"--output must be one of: compact, plain, json. Got '{raw}'.", isUserError: true);
             }
 
             explicitMode = parsed;

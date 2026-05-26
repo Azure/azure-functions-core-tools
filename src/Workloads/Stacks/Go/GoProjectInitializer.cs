@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.Diagnostics;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
 
@@ -25,15 +26,32 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
     public string Stack => "go";
 
+    public string DisplayName => "Go";
+
     public IReadOnlyList<string> SupportedLanguages { get; } = ["Go"];
 
-    public Option<bool> SkipGoModTidyOption { get; } = new("--skip-go-mod-tidy")
-    {
-        Description = "Skip running 'go mod tidy' after Go project creation.",
-        DefaultValueFactory = _ => false,
-    };
+    public Option<bool> SkipGoModTidyOption { get; private set; } = default!;
 
-    public IReadOnlyList<Option> GetInitOptions() => [SkipGoModTidyOption];
+    public Option<bool> NoBundleOption { get; private set; } = default!;
+
+    public Option<BundleChannel> BundlesChannelOption { get; private set; } = default!;
+
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+
+        SkipGoModTidyOption = registry.GetOrAdd(new Option<bool>("--skip-go-mod-tidy")
+        {
+            Description = "Skip running 'go mod tidy' after Go project creation.",
+            DefaultValueFactory = _ => false,
+        });
+
+        NoBundleOption = registry.GetOrAdd(CommonInitOptions.NoBundle());
+
+        BundlesChannelOption = registry.GetOrAdd(CommonInitOptions.BundlesChannel());
+
+        return [SkipGoModTidyOption, NoBundleOption, BundlesChannelOption];
+    }
 
     public async Task InitializeAsync(
         InitContext context,
@@ -46,7 +64,21 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
+        bool noBundle = parseResult.GetValue(NoBundleOption);
+        BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
         string moduleName = ResolveModuleName(context);
+
+        ProjectFiles.WriteIfMissing(
+            Path.Combine(root, "host.json"),
+            ProjectFiles.MinimalHostJson,
+            force);
+
+        if (!noBundle)
+        {
+            ProjectFiles.MergeHostJson(
+                Path.Combine(root, "host.json"),
+                host => EnsureExtensionBundle(host, channel));
+        }
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "go.mod"),
@@ -95,6 +127,21 @@ internal sealed class GoProjectInitializer : IProjectInitializer
             .Where(c => char.IsLetterOrDigit(c) || c is '-' or '_');
         string sanitized = new([.. chars]);
         return string.IsNullOrEmpty(sanitized) ? DefaultModuleName : sanitized;
+    }
+
+    private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)
+    {
+        // Only fill in when missing so a user-customised bundle survives `--force`.
+        if (host.ContainsKey("extensionBundle"))
+        {
+            return;
+        }
+
+        host["extensionBundle"] = new JsonObject
+        {
+            ["id"] = ExtensionBundle.IdFor(channel),
+            ["version"] = ExtensionBundle.DefaultVersionRange,
+        };
     }
 
     private static async Task<(int ExitCode, string Stderr)> DefaultRunGoModTidy(string workingDirectory, CancellationToken cancellationToken)

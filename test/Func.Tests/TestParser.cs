@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Quickstart;
+using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
@@ -10,6 +11,7 @@ using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -36,7 +38,7 @@ internal static class TestParser
     /// </summary>
     public static FuncRootCommand CreateRootWithWorkload(
         IInteractionService interaction,
-        WorkloadInfo workload,
+        RuntimeWorkloadInfo workload,
         Action<FunctionsCliBuilder> configure)
     {
         ServiceCollection services = BuildBaseServices(interaction);
@@ -64,9 +66,12 @@ internal static class TestParser
     {
         var services = new ServiceCollection();
         services.AddSingleton(interaction);
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddOptions<StackOptions>();
         services.AddOptions<HostStartupOptions>();
         services.AddBuiltInCommands();
+        services.AddProfiles();
+        services.AddSingleton(Substitute.For<IStartInitializationRunner>());
 
         // Stub the workload subsystem so commands that depend on it (e.g.
         // WorkloadListCommand) resolve without booting real storage / loading.
@@ -83,6 +88,10 @@ internal static class TestParser
         // returns no workloads. Tests that need a populated set replace it.
         IWorkloadProvider emptyProvider = Substitute.For<IWorkloadProvider>();
         emptyProvider.GetWorkloads().Returns([]);
+        emptyProvider.GetRuntimeWorkloads().Returns([]);
+        emptyProvider.GetRuntimeWorkloadsByPackageId(Arg.Any<string>()).Returns([]);
+        emptyProvider.GetContentWorkloads().Returns([]);
+        emptyProvider.GetContentWorkloadsByPackageId(Arg.Any<string>()).Returns([]);
         services.AddSingleton(emptyProvider);
 
         // Workload install pipeline: substitute the installer so commands

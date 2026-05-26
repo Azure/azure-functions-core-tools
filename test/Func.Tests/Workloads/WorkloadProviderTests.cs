@@ -12,7 +12,7 @@ public class WorkloadProviderTests
     public void GetWorkloads_ReturnsInjectedSet_AsStableList()
     {
         WorkloadInfo a = TestWorkloads.CreateInfo("Pkg.A");
-        WorkloadInfo b = TestWorkloads.CreateInfo("Pkg.B");
+        WorkloadInfo b = TestWorkloads.CreateContentInfo("Pkg.B");
 
         var provider = new WorkloadProvider([a, b]);
 
@@ -25,6 +25,80 @@ public class WorkloadProviderTests
         Assert.Equal(2, first.Count);
         Assert.Same(a, first[0]);
         Assert.Same(b, first[1]);
+    }
+
+    [Fact]
+    public void TypedViews_ReturnMatchingKinds_AsStableLists()
+    {
+        RuntimeWorkloadInfo runtime = TestWorkloads.CreateInfo("Pkg.Runtime");
+        ContentWorkloadInfo content = TestWorkloads.CreateContentInfo("Pkg.Content");
+
+        var provider = new WorkloadProvider([runtime, content]);
+
+        IReadOnlyList<RuntimeWorkloadInfo> runtimeWorkloads = provider.GetRuntimeWorkloads();
+        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = provider.GetContentWorkloads();
+
+        Assert.Same(runtimeWorkloads, provider.GetRuntimeWorkloads());
+        Assert.Same(contentWorkloads, provider.GetContentWorkloads());
+        Assert.Same(runtime, Assert.Single(runtimeWorkloads));
+        Assert.Same(content, Assert.Single(contentWorkloads));
+    }
+
+    [Fact]
+    public void GetWorkloadsByPackageId_ReturnsMatchingKindVersions_CaseInsensitive()
+    {
+        RuntimeWorkloadInfo runtimeMatch = TestWorkloads.CreateInfo("Pkg.Shared", "1.0.0");
+        RuntimeWorkloadInfo runtimeOther = TestWorkloads.CreateInfo("Pkg.Other", "1.0.0");
+        ContentWorkloadInfo contentOld = TestWorkloads.CreateContentInfo("Pkg.Shared", "1.0.0");
+        ContentWorkloadInfo contentNew = TestWorkloads.CreateContentInfo("pkg.shared", "2.0.0");
+
+        var provider = new WorkloadProvider([runtimeMatch, runtimeOther, contentOld, contentNew]);
+
+        IReadOnlyList<RuntimeWorkloadInfo> runtimeWorkloads = provider.GetRuntimeWorkloadsByPackageId("pkg.shared");
+        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = provider.GetContentWorkloadsByPackageId("PKG.SHARED");
+
+        Assert.Same(runtimeWorkloads, provider.GetRuntimeWorkloadsByPackageId("Pkg.Shared"));
+        Assert.Same(contentWorkloads, provider.GetContentWorkloadsByPackageId("pkg.shared"));
+        Assert.Same(runtimeMatch, Assert.Single(runtimeWorkloads));
+        Assert.Collection(
+            contentWorkloads,
+            workload => Assert.Same(contentOld, workload),
+            workload => Assert.Same(contentNew, workload));
+    }
+
+    [Fact]
+    public void GetWorkloadsByPackageId_NoMatch_ReturnsEmptyList()
+    {
+        var provider = new WorkloadProvider(
+            [
+                TestWorkloads.CreateInfo("Pkg.Runtime"),
+                TestWorkloads.CreateContentInfo("Pkg.Content"),
+            ]);
+
+        Assert.Empty(provider.GetRuntimeWorkloadsByPackageId("Pkg.Missing"));
+        Assert.Empty(provider.GetContentWorkloadsByPackageId("Pkg.Missing"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void GetRuntimeWorkloadsByPackageId_InvalidPackageId_Throws(string? packageId)
+    {
+        var provider = new WorkloadProvider([]);
+
+        Assert.ThrowsAny<ArgumentException>(() => provider.GetRuntimeWorkloadsByPackageId(packageId!));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void GetContentWorkloadsByPackageId_InvalidPackageId_Throws(string? packageId)
+    {
+        var provider = new WorkloadProvider([]);
+
+        Assert.ThrowsAny<ArgumentException>(() => provider.GetContentWorkloadsByPackageId(packageId!));
     }
 
     [Fact]

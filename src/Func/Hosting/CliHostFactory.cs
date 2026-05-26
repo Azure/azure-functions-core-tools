@@ -1,14 +1,23 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Bundles;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.DemoProject;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Workers;
+using Azure.Functions.Cli.Workloads;
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using static Azure.Functions.Cli.Projects.FunctionsProjectResolver;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -50,10 +59,14 @@ internal static class CliHostFactory
         builder.Services.AddSingleton(interaction);
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
-        ILocalSettingsProvider localSettingsProvider = new LocalSettingsProvider();
-        var configurationSourceBuilder = new CliConfigurationSourceBuilder(localSettingsProvider);
+        var localSettingsProvider = new LocalSettingsProvider();
+        var configurationPaths = new CliConfigurationPathsOptions();
+        var configurationProvider = new CliConfigurationProvider(localSettingsProvider, configurationPaths);
         builder.Services.AddSingleton(localSettingsProvider);
-        builder.Services.AddSingleton(configurationSourceBuilder);
+        builder.Services.AddSingleton<ILocalSettingsProvider>(localSettingsProvider);
+        builder.Services.AddSingleton(configurationPaths);
+        builder.Services.AddSingleton(configurationProvider);
+        builder.Services.AddSingleton<ICliConfigurationProvider>(configurationProvider);
 
         // Bridge the cli.workload.boot activity to the boot-duration histogram
         // so callers only need to start the activity. Idempotent.
@@ -73,14 +86,37 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
         }
 
-        // FUNC_CLI_ prefix is stripped and "__" maps to section nesting, so
-        // FUNC_CLI_Workloads__Home binds to WorkloadPathsOptions.Home.
-        configurationSourceBuilder.AddSources(builder.Configuration, workingDirectory);
+        builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
+        builder.Services.AddSingleton<IFunctionsWorkerResolverFactory, DefaultFunctionsWorkerResolverFactory>();
+        builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
+        builder.Services.AddSingleton<IInstalledBundleWorkloads, InstalledBundleWorkloads>();
+        builder.Services.AddSingleton<InstalledBundleScanner>();
+        builder.Services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
+        builder.Services.AddSingleton<IBundleResolveTelemetry>(NullBundleResolveTelemetry.Instance);
+        builder.Services.AddSingleton<IExtensionBundleResolver, ExtensionBundleResolver>();
+        builder.Services.AddSingleton<IHostWorkloadResolver, DefaultHostWorkloadResolver>();
+        builder.Services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
+        builder.Services.AddSingleton(new WorkloadProjectFactoryRegistration(
+            new RuntimeWorkloadInfo(
+                new DotnetWorkload(),
+                "test",
+                "1.0",
+                [],
+                AppContext.BaseDirectory,
+                AppContext.BaseDirectory,
+                "test",
+                "description"),
+            new DemoProjectFactory()));
+
+        builder.Services.AddSingleton<StartDashboardEventStreamFactory>();
+
+        builder.Configuration.AddConfiguration(configurationProvider.GetEffectiveConfiguration(workingDirectory));
         builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();
 
         builder.Services.AddBuiltInCommands();
         builder.Services.AddWorkloadStorage();
+        builder.Services.AddProfiles();
         builder.Services.AddWorkloadCatalog();
         builder.Services.AddWorkloadInstaller();
         builder.Services.AddQuickstart();

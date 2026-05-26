@@ -2,10 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,8 +28,6 @@ internal static class BuiltInCommands
 
         services.AddSingleton<ICliVersionProvider, AssemblyCliVersionProvider>();
         services.AddSingleton<IWorkloadHintRenderer, WorkloadHintRenderer>();
-        services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
-        services.AddSingleton<StartDashboardEventStreamFactory>();
 
         // VersionCommand is also resolved by Parser to wire `func` (no args)
         // to detailed-version output, so register the concrete type and
@@ -37,6 +38,10 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, InitCommand>();
         services.AddSingleton<FuncCliCommand, NewCommand>();
         services.AddSingleton<FuncCliCommand, StartCommand>();
+        services.AddSingleton<ProfileListCommand>();
+        services.AddSingleton<ProfileShowCommand>();
+        services.AddSingleton<ProfileSetCommand>();
+        services.AddSingleton<FuncCliCommand, ProfileCommand>();
 
         // Shared dashboard primitives (renderers and per-invocation pipeline
         // are constructed inline by StartCommand so cancellation flows
@@ -61,4 +66,3 @@ internal static class BuiltInCommands
         return services;
     }
 }
-

@@ -29,4 +29,14 @@ internal sealed class WorkloadMetadata
     /// <see cref="WorkloadKind.Workload"/>; otherwise null.
     /// </summary>
     public EntryPointSpec? EntryPoint { get; init; }
+
+    /// <summary>
+    /// Human-readable name for inventory and list output.
+    /// </summary>
+    public string DisplayName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// One-line workload description for inventory and list output.
+    /// </summary>
+    public string Description { get; init; } = string.Empty;
 }

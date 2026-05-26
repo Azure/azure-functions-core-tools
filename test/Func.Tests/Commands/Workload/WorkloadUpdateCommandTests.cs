@@ -116,7 +116,7 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "Test.Workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 Entry: new WorkloadEntry { PackageId = "test.workload", PackageVersion = "1.1.0" },
                 PreviousVersion: "1.0.0",
@@ -140,7 +140,7 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "Test.Workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 Entry: new WorkloadEntry { PackageId = "test.workload", PackageVersion = "1.0.0" },
                 PreviousVersion: "1.0.0",
@@ -162,7 +162,7 @@ public class WorkloadUpdateCommandTests
     {
         _installer.UpdateAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 Entry: new WorkloadEntry { PackageId = "test.workload", PackageVersion = "2.0.0" },
                 PreviousVersion: "1.0.0",
@@ -184,6 +184,7 @@ public class WorkloadUpdateCommandTests
             "https://example/v3/index.json",
             true,
             true,
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -192,7 +193,7 @@ public class WorkloadUpdateCommandTests
     {
         _installer.UpdateAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidOperationException("Workload 'test.workload' is not installed."));
 
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store);
@@ -208,7 +209,7 @@ public class WorkloadUpdateCommandTests
     {
         _installer.UpdateAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Throws(new WorkloadPackageNotFoundException("nope"));
 
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store);
@@ -231,7 +232,7 @@ public class WorkloadUpdateCommandTests
         Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:") && l.Contains("No workloads installed"));
         await _installer.DidNotReceive().UpdateAsync(
             Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -246,7 +247,7 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "a.workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 new WorkloadEntry { PackageId = "a.workload", PackageVersion = "1.2.0" },
                 "1.1.0",
@@ -254,7 +255,7 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "b.workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 new WorkloadEntry { PackageId = "b.workload", PackageVersion = "2.0.0" },
                 "2.0.0",
@@ -266,10 +267,10 @@ public class WorkloadUpdateCommandTests
         Assert.Equal(0, exit);
         await _installer.Received(1).UpdateAsync(
             "a.workload", Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
         await _installer.Received(1).UpdateAsync(
             "b.workload", Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
         Assert.Contains(_interaction.Lines, l => l.StartsWith("SUCCESS:") && l.Contains("a.workload"));
         Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("b.workload"));
     }
@@ -285,12 +286,12 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "a.workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Throws(new WorkloadPackageNotFoundException("not on feed"));
         _installer.UpdateAsync(
                 "b.workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 new WorkloadEntry { PackageId = "b.workload", PackageVersion = "2.1.0" },
                 "2.0.0",
@@ -310,7 +311,7 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "Test.Workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 Entry: new WorkloadEntry { PackageId = "test.workload", PackageVersion = "1.0.0" },
                 PreviousVersion: "1.0.0",
@@ -343,7 +344,7 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "test.workload",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadUpdateResult(
                 new WorkloadEntry { PackageId = "test.workload", PackageVersion = "1.1.0" },
                 "1.0.0",
@@ -356,7 +357,7 @@ public class WorkloadUpdateCommandTests
         await _installer.Received(1).UpdateAsync(
             "test.workload",
             Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -374,7 +375,7 @@ public class WorkloadUpdateCommandTests
         _installer.UpdateAsync(
                 "demo",
                 Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidOperationException("Workload 'demo' is not installed."));
 
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store);
@@ -385,7 +386,7 @@ public class WorkloadUpdateCommandTests
         await _installer.DidNotReceive().UpdateAsync(
             "test.workload",
             Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -407,7 +408,7 @@ public class WorkloadUpdateCommandTests
         Assert.True(ex.IsUserError);
         await _installer.DidNotReceive().UpdateAsync(
             Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
-            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     private static Task<int> InvokeAsync(WorkloadUpdateCommand cmd, params string[] args)

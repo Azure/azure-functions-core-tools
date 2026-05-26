@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -29,6 +30,30 @@ public class VersionCheckerTests
         if (result is not null)
         {
             Assert.True(Version.TryParse(result, out _), $"Expected valid version, got: {result}");
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_UsesUserConfigurationPathsForCache()
+    {
+        string userHome = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
+        var paths = new CliConfigurationPathsOptions(userHome);
+
+        try
+        {
+            Directory.CreateDirectory(paths.Home);
+            File.WriteAllText(paths.VersionCachePath, "9999.0.0");
+
+            string? result = await VersionChecker.CheckForUpdateAsync(paths, CancellationToken.None);
+
+            Assert.Equal("9999.0.0", result);
+        }
+        finally
+        {
+            if (Directory.Exists(userHome))
+            {
+                Directory.Delete(userHome, recursive: true);
+            }
         }
     }
 }

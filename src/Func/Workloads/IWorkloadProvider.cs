@@ -4,17 +4,34 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Hands out the set of installed, hydrated workloads. The list is
-/// materialized once at host startup by
-/// <see cref="Hosting.WorkloadRegistration"/> and exposed through this
-/// abstraction so consumers depend on a named domain concept rather than a
-/// raw <see cref="IEnumerable{T}"/> of <see cref="WorkloadInfo"/>.
+/// Hands out the workload inventory materialized once at host startup by
+/// <see cref="Hosting.WorkloadRegistration"/>.
 /// </summary>
 internal interface IWorkloadProvider
 {
     /// <summary>
-    /// Returns the workloads that were loaded at boot. The result is stable
-    /// for the lifetime of the host.
+    /// Returns runtime and content workloads discovered at boot. The result
+    /// is stable for the lifetime of the host.
     /// </summary>
     public IReadOnlyList<WorkloadInfo> GetWorkloads();
+
+    /// <summary>
+    /// Returns runtime workloads that were loaded and configured at boot.
+    /// </summary>
+    public IReadOnlyList<RuntimeWorkloadInfo> GetRuntimeWorkloads();
+
+    /// <summary>
+    /// Returns runtime workloads matching <paramref name="packageId"/>.
+    /// </summary>
+    public IReadOnlyList<RuntimeWorkloadInfo> GetRuntimeWorkloadsByPackageId(string packageId);
+
+    /// <summary>
+    /// Returns installed content workloads discovered at boot.
+    /// </summary>
+    public IReadOnlyList<ContentWorkloadInfo> GetContentWorkloads();
+
+    /// <summary>
+    /// Returns installed content workloads matching <paramref name="packageId"/>.
+    /// </summary>
+    public IReadOnlyList<ContentWorkloadInfo> GetContentWorkloadsByPackageId(string packageId);
 }

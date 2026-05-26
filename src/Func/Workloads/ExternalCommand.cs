@@ -34,7 +34,7 @@ internal sealed class ExternalCommand : FuncCliCommand
     private readonly Dictionary<FuncCommandOption, Option> _optionLookup;
     private readonly Dictionary<FuncCommandArgument, Argument> _argumentLookup;
 
-    public ExternalCommand(WorkloadInfo workload, FuncCommand source)
+    public ExternalCommand(RuntimeWorkloadInfo workload, FuncCommand source)
         : base(ValidateName(source), ValidateDescription(source))
     {
         ArgumentNullException.ThrowIfNull(workload);
@@ -50,10 +50,14 @@ internal sealed class ExternalCommand : FuncCliCommand
         AddSubcommands(source.Subcommands);
     }
 
-    /// <summary>The workload that registered the underlying <see cref="FuncCommand"/>.</summary>
-    public WorkloadInfo Workload { get; }
+    /// <summary>
+    /// The workload that registered the underlying <see cref="FuncCommand"/>.
+    /// </summary>
+    public RuntimeWorkloadInfo Workload { get; }
 
-    /// <summary>The workload-supplied command this adapter is wrapping.</summary>
+    /// <summary>
+    /// The workload-supplied command this adapter is wrapping.
+    /// </summary>
     public FuncCommand Source { get; }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)

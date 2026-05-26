@@ -10,8 +10,13 @@ namespace Azure.Functions.Cli.Tests.Configuration;
 public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 {
     private readonly DirectoryInfo _dir = Directory.CreateTempSubdirectory("local-settings-configuration-");
+    private readonly DirectoryInfo _userDir = Directory.CreateTempSubdirectory("user-settings-configuration-");
 
-    public void Dispose() => _dir.Delete(recursive: true);
+    public void Dispose()
+    {
+        _dir.Delete(recursive: true);
+        _userDir.Delete(recursive: true);
+    }
 
     [Fact]
     public void Build_ProjectsOnlyCliRelevantLocalSettings()
@@ -116,8 +121,8 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
     {
         WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"custom-runtime"}}""");
         IConfigurationRoot defaultConfiguration = new ConfigurationBuilder().Build();
-        var sourceBuilder = new CliConfigurationSourceBuilder(new LocalSettingsProvider());
-        var setup = new StackOptionsSetup(defaultConfiguration, sourceBuilder);
+        var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
+        var setup = new StackOptionsSetup(defaultConfiguration, configurationProvider);
         StackOptions options = new();
 
         setup.Configure(_dir.FullName, options);
@@ -130,8 +135,8 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
     {
         WriteSettings("""{"Host":{"LocalHttpPort":7074}}""");
         IConfigurationRoot defaultConfiguration = new ConfigurationBuilder().Build();
-        var sourceBuilder = new CliConfigurationSourceBuilder(new LocalSettingsProvider());
-        var setup = new HostStartupOptionsSetup(defaultConfiguration, sourceBuilder);
+        var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
+        var setup = new HostStartupOptionsSetup(defaultConfiguration, configurationProvider);
         HostStartupOptions options = new();
 
         setup.Configure(_dir.FullName, options);
@@ -139,6 +144,60 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         Assert.Equal(7074, options.Port);
     }
 
+    [Fact]
+    public void CliConfigurationProvider_ProjectConfigurationIncludesProjectSourcesOnly()
+    {
+        WriteUserConfig("""{"defaultProfile":"user-default","profiles":["user-profile"]}""");
+        WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"node"}}""");
+        WriteProjectConfig("""{"profiles":["project-profile"]}""");
+        var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
+
+        IConfiguration configuration = configurationProvider.GetProjectConfiguration(_dir);
+
+        Assert.Equal("project-profile", configuration["profiles:0"]);
+        Assert.Null(configuration["defaultProfile"]);
+        Assert.Equal("node", configuration["Stack:Runtime"]);
+    }
+
+    [Fact]
+    public void CliConfigurationProvider_EffectiveConfigurationPreservesSourcePrecedence()
+    {
+        WriteUserConfig("""{"Stack":{"Runtime":"user"}}""");
+        WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"local"}}""");
+        WriteProjectConfig("""{"Stack":{"Runtime":"project"}}""");
+        var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
+
+        IConfiguration configuration = configurationProvider.GetEffectiveConfiguration(_dir);
+
+        Assert.Equal("project", configuration["Stack:Runtime"]);
+    }
+
+    [Fact]
+    public void CliConfigurationProvider_ReusesCachedProjectConfiguration()
+    {
+        WriteProjectConfig("""{"defaultProfile":"flex"}""");
+        var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
+        IConfiguration firstConfiguration = configurationProvider.GetProjectConfiguration(_dir);
+
+        WriteProjectConfig("""{"defaultProfile":"linux-premium"}""");
+        IConfiguration secondConfiguration = configurationProvider.GetProjectConfiguration(_dir);
+
+        Assert.Same(firstConfiguration, secondConfiguration);
+        Assert.Equal("flex", secondConfiguration["defaultProfile"]);
+    }
+
     private void WriteSettings(string contents)
         => File.WriteAllText(Path.Combine(_dir.FullName, CliConfigurationNames.LocalSettingsFileName), contents);
+
+    private void WriteUserConfig(string contents)
+        => File.WriteAllText(Path.Combine(_userDir.FullName, CliConfigurationNames.ConfigFileName), contents);
+
+    private void WriteProjectConfig(string contents)
+    {
+        string folder = Path.Combine(_dir.FullName, CliConfigurationNames.ProjectConfigFolderName);
+        Directory.CreateDirectory(folder);
+
+        string path = Path.Combine(folder, CliConfigurationNames.ConfigFileName);
+        File.WriteAllText(path, contents);
+    }
 }

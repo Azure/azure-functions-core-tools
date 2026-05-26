@@ -8,7 +8,9 @@
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
   </Folder>
-  <Folder Name="/src/Workloads/" />
+  <Folder Name="/src/Workloads/">
+    <Project Path="src/Workloads/Host/Workloads.Host.csproj" />
+  </Folder>
   <Folder Name="/src/Workloads/Stacks/">
     <Project Path="src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
     <Project Path="src/Workloads/Stacks/Go/Workloads.Go.csproj" />
@@ -18,20 +20,24 @@
   <Folder Name="/src/Workloads/Tools/">
     <Project Path="src/Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj" />
   </Folder>
+  <Folder Name="/src/Workloads/Workers/">
+    <Project Path="src/Workloads/Workers/Go/Workloads.Workers.Go.csproj" />
+    <Project Path="src/Workloads/Workers/Node/Workloads.Workers.Node.csproj" />
+    <Project Path="src/Workloads/Workers/Python/Workloads.Workers.Python.csproj" />
+  </Folder>
   <Folder Name="/test/">
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.Default/Workloads.Tests.Fixtures.Default.csproj" />
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.Sdk/Workloads.Tests.Fixtures.Sdk.csproj" />
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.WithCommand/Workloads.Tests.Fixtures.WithCommand.csproj" />
     <Project Path="test/Func.Tests/Func.Tests.csproj" />
   </Folder>
-  <Folder Name="/test/Workloads/" />
+  <Folder Name="/test/Workloads/">
+    <Project Path="test/Workloads/Host.Tests/Workloads.Host.Tests.csproj" />
+  </Folder>
   <Folder Name="/test/Workloads/Stacks/">
     <Project Path="test/Workloads/Stacks/DotNet.Tests/Workloads.DotNet.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Go.Tests/Workloads.Go.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Python.Tests/Workloads.Python.Tests.csproj" />
-  </Folder>
-  <Folder Name="/test/Workloads/Tools/">
-    <Project Path="test/Workloads/Tools/ExtensionBundles.Tests/Workloads.ExtensionBundles.Tests.csproj" />
   </Folder>
 </Solution>

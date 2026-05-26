@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;
@@ -43,10 +44,11 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
-        IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions();
+        RootCommand root = [];
+        IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
-        Assert.Contains("--no-bundle", names);
+        Assert.Contains("--no-bundles", names);
         Assert.Contains("--bundles-channel", names);
         Assert.Contains("--skip-npm-install", names);
     }
@@ -131,12 +133,15 @@ public class NodeProjectInitializerTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeAsync_NoBundle_SkipsExtensionBundleMerge()
+    public async Task InitializeAsync_NoBundle_WritesMinimalHostJsonWithoutExtensionBundle()
     {
-        await RunAsync(language: null, force: false, args: ["--no-bundle"]);
+        await RunAsync(language: null, force: false, args: ["--no-bundles"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.False(File.Exists(hostJsonPath), "host.json should not be touched when --no-bundle is set");
+        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
+        string content = File.ReadAllText(hostJsonPath);
+        Assert.Contains("\"version\"", content);
+        Assert.DoesNotContain("extensionBundle", content);
     }
 
     [Fact]
@@ -212,10 +217,8 @@ public class NodeProjectInitializerTests : IDisposable
             Force: force);
 
         RootCommand root = [];
-        foreach (Option option in initializer.GetInitOptions())
-        {
-            root.Options.Add(option);
-        }
+        var registry = new InitOptionRegistry(root);
+        initializer.GetInitOptions(registry);
 
         ParseResult parseResult = root.Parse(args ?? []);
         return initializer.InitializeAsync(context, parseResult);

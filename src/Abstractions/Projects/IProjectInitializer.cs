@@ -20,14 +20,23 @@ public interface IProjectInitializer
     /// <summary>The canonical stack id this initializer owns (e.g. "dotnet").</summary>
     public string Stack { get; }
 
+    /// <summary>
+    /// Human-friendly name for this stack shown in interactive prompts and help text
+    /// (e.g. ".NET", "Node.js"). Defaults to <see cref="Stack"/> when not overridden.
+    /// </summary>
+    public string DisplayName => Stack;
+
     /// <summary>Display labels for the languages this initializer supports (e.g. "C#", "F#").</summary>
     public IReadOnlyList<string> SupportedLanguages { get; }
 
     /// <summary>
-    /// Options this initializer contributes to the <c>func init</c> command.
-    /// Attached during command construction and visible in <c>--help</c>.
+    /// Registers the options this initializer contributes to <c>func init</c> via
+    /// <paramref name="registry"/>, and returns the canonical instances to use when reading
+    /// values back inside <see cref="InitializeAsync"/>. Options shared across workloads
+    /// (e.g. <c>--no-bundles</c>) appear once in <c>--help</c> and resolve to the same instance
+    /// for every contributing workload.
     /// </summary>
-    public IReadOnlyList<Option> GetInitOptions();
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry);
 
     /// <summary>
     /// Scaffolds a new project at <see cref="WorkloadContext.WorkingDirectory"/>.

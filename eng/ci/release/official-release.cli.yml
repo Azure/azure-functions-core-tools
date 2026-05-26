@@ -9,6 +9,9 @@ resources:
     name: engineering
     ref: refs/tags/release
 
+variables:
+- template: /ci/variables/cfs.yml@eng
+
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
   parameters:
@@ -29,16 +32,14 @@ extends:
     - stage: Validate
       jobs:
       - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
-
+  
     - stage: Build
       dependsOn: Validate
-      variables:
-      - template: /ci/variables/cfs.yml@eng
 
       jobs:
       - template: /eng/ci/templates/jobs/build.yml@self
         parameters:
-          sign: true
+          sign: false
           artifacts: ['publish']
           projects: |
             src/Func/Func.csproj
@@ -46,12 +47,11 @@ extends:
           build_args: -p:IsReleaseCI=true
 
     - stage: Release
-      dependsOn: Build
+      dependsOn: ['Build', 'SDLSources']
       jobs:
       - job: Approval
         timeoutInMinutes: 1440
         pool: server
-        dependsOn: Build
 
         steps:
         - task: ManualValidation@1
@@ -66,4 +66,3 @@ extends:
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
         parameters:
           dependsOn: Approval
-

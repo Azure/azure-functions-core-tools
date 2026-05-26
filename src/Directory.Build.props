@@ -8,4 +8,8 @@
     <UpdateBuildNumber Condition="'$(IsReleaseCI)' == 'true'">true</UpdateBuildNumber>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
 </Project>

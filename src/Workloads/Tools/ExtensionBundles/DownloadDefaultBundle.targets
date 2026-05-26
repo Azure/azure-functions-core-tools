@@ -1,0 +1,71 @@
+<Project>
+
+  <!--
+    Pack-time: download the extension bundle whose version matches the
+    workload's $(BundleVersion) from the CDN and embed it under
+    tools/any/$(BundleVersion)/ in the nupkg. The version-nested layout
+    matches what the host's ExtensionBundleManager probes
+    (<downloadPath>/<version>/...): the CLI bundle resolver sets
+    downloadPath to <install>/tools/any/, and the host appends the
+    requested bundle version. Runs only when packing so plain
+    `dotnet build` (and CI test runs) do not pay the cost. Set
+    SkipDefaultBundleDownload=true to opt out (e.g. for fully offline
+    pack of a developer build, or a PR build whose $(BundleVersion) is
+    not yet published to the CDN).
+
+    The CDN bundle id is selected from $(BundleChannel):
+      stable        -> Microsoft.Azure.Functions.ExtensionBundle
+      preview       -> Microsoft.Azure.Functions.ExtensionBundle.Preview
+      experimental  -> Microsoft.Azure.Functions.ExtensionBundle.Experimental
+
+    The CDN URL always carries the bare $(BundleVersion); the workload pkg's
+    own prerelease label (preview/experimental.N) is not part of the URL.
+
+    TODO: switch the pack-time payload source from the public CDN to the
+    bundle CI build artifacts so the workload always ships the exact
+    bundle drop we own, instead of whatever happens to be on the CDN.
+  -->
+
+  <PropertyGroup>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'stable'">Microsoft.Azure.Functions.ExtensionBundle</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_BundleCdnId>
+  </PropertyGroup>
+
+  <Target Name="DownloadDefaultBundle"
+          Condition="'$(SkipDefaultBundleDownload)' != 'true'"
+          BeforeTargets="GenerateNuspec;_GetPackageFiles"
+          Inputs="$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)bundle\.extracted">
+    <Error Condition="'$(_BundleCdnId)' == ''"
+           Text="BundleChannel '$(BundleChannel)' is not one of stable|preview|experimental." />
+    <PropertyGroup>
+      <_BundleCdnZipUrl>https://cdn.functions.azure.com/public/ExtensionBundles/$(_BundleCdnId)/$(BundleVersion)/$(_BundleCdnId).$(BundleVersion).zip</_BundleCdnZipUrl>
+      <_BundleStaging>$(IntermediateOutputPath)bundle\</_BundleStaging>
+      <_BundleZipName>$(_BundleCdnId).$(BundleVersion).zip</_BundleZipName>
+      <_BundleZipPath>$(IntermediateOutputPath)$(_BundleZipName)</_BundleZipPath>
+      <_BundleMarker>$(_BundleStaging).extracted</_BundleMarker>
+    </PropertyGroup>
+    <MakeDir Directories="$(_BundleStaging)" />
+    <DownloadFile SourceUrl="$(_BundleCdnZipUrl)"
+                  DestinationFolder="$(IntermediateOutputPath)"
+                  DestinationFileName="$(_BundleZipName)"
+                  Retries="3" />
+    <Unzip SourceFiles="$(_BundleZipPath)"
+           DestinationFolder="$(_BundleStaging)" />
+    <Touch Files="$(_BundleMarker)" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="_AddDefaultBundleToPack"
+          DependsOnTargets="DownloadDefaultBundle"
+          BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(IntermediateOutputPath)bundle\**\*"
+            Exclude="$(IntermediateOutputPath)bundle\.extracted"
+            Pack="true"
+            PackagePath="tools/any/$(BundleVersion)/"
+            Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>

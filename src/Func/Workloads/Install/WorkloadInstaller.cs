@@ -45,6 +45,7 @@ internal sealed class WorkloadInstaller(
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(
         string nupkgPath,
         bool force = false,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nupkgPath);
@@ -111,6 +112,10 @@ internal sealed class WorkloadInstaller(
         WorkloadEntry entry;
         try
         {
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Extracting,
+                $"Extracting workload '{packageId}' {version}"));
+
             await ExtractPackageAsync(reader, installPath, cancellationToken);
 
             WorkloadMetadata metadata = _metadataReader.Read(installPath);
@@ -120,11 +125,17 @@ internal sealed class WorkloadInstaller(
                 PackageId = packageId,
                 PackageVersion = version,
                 Aliases = aliases,
+                DisplayName = GetDisplayName(metadata, packageId),
+                Description = metadata.Description ?? string.Empty,
                 EntryPoint = metadata.EntryPoint,
                 Kind = metadata.Kind,
                 Source = Path.GetFullPath(nupkgPath),
                 InstallRefCount = 1,
             };
+
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Registering,
+                $"Registering workload '{packageId}' {version}"));
 
             await _store.SaveWorkloadAsync(entry, cancellationToken);
         }
@@ -145,9 +156,14 @@ internal sealed class WorkloadInstaller(
         bool includePrerelease,
         bool exact,
         bool force,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+
+        progress?.Report(new WorkloadInstallProgress(
+            WorkloadInstallPhase.Resolving,
+            $"Resolving workload '{packageId}'"));
 
         string resolvedId = exact
             ? packageId
@@ -162,13 +178,17 @@ internal sealed class WorkloadInstaller(
 
         try
         {
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Downloading,
+                $"Downloading '{resolved.PackageId}' {resolved.Version.ToNormalizedString()}"));
+
             await using (Stream packageStream = await _catalog.DownloadAsync(resolved, cancellationToken))
             await using (FileStream tempStream = File.Create(tempPath))
             {
                 await packageStream.CopyToAsync(tempStream, cancellationToken);
             }
 
-            return await InstallFromPackageAsync(tempPath, force, cancellationToken);
+            return await InstallFromPackageAsync(tempPath, force, progress, cancellationToken);
         }
         finally
         {
@@ -195,9 +215,14 @@ internal sealed class WorkloadInstaller(
         string? source,
         bool includePrerelease,
         bool allowMajor,
+        IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+
+        progress?.Report(new WorkloadInstallProgress(
+            WorkloadInstallPhase.Resolving,
+            $"Resolving update for '{packageId}'"));
 
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         List<WorkloadEntry> matches = [.. installed
@@ -235,7 +260,7 @@ internal sealed class WorkloadInstaller(
         }
 
         WorkloadEntry newEntry = await StageAndSwapAsync(
-            currentEntry, resolved, cancellationToken);
+            currentEntry, resolved, progress, cancellationToken);
 
         return new WorkloadUpdateResult(newEntry, currentEntry.PackageVersion, NoUpdateAvailable: false);
     }
@@ -282,11 +307,20 @@ internal sealed class WorkloadInstaller(
         };
 
         IReadOnlyList<CatalogSearchResult> hits = await _catalog.SearchAsync(query, cancellationToken);
+        IReadOnlyList<string> matchedIds = FilterByAlias(hits, aliasOrId);
 
-        IReadOnlyList<string> matchedIds = [.. hits
-            .Where(r => r.Aliases.Any(a => string.Equals(a, aliasOrId, StringComparison.OrdinalIgnoreCase)))
-            .Select(r => r.PackageId)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        // Some feeds (BaGet, older NuGet implementations) tokenize the `q=`
+        // term in ways that drop hyphenated aliases like `node-worker`. When
+        // the targeted query returns nothing, retry with an empty filter:
+        // the `packageType=FuncCliWorkload` constraint keeps the result set
+        // bounded to workload packages, which we then filter client-side.
+        if (matchedIds.Count == 0 && hits.Count == 0)
+        {
+            IReadOnlyList<CatalogSearchResult> all = await _catalog.SearchAsync(
+                query with { Filter = null },
+                cancellationToken);
+            matchedIds = FilterByAlias(all, aliasOrId);
+        }
 
         if (matchedIds.Count > 1)
         {
@@ -295,6 +329,12 @@ internal sealed class WorkloadInstaller(
 
         return matchedIds.Count == 1 ? matchedIds[0] : aliasOrId;
     }
+
+    private static IReadOnlyList<string> FilterByAlias(IReadOnlyList<CatalogSearchResult> hits, string alias) =>
+        [.. hits
+            .Where(r => r.Aliases.Any(a => string.Equals(a, alias, StringComparison.OrdinalIgnoreCase)))
+            .Select(r => r.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private async Task<ResolvedPackage> ResolveCatalogPackageAsync(
         string packageId,
@@ -355,6 +395,7 @@ internal sealed class WorkloadInstaller(
     private async Task<WorkloadEntry> StageAndSwapAsync(
         WorkloadEntry currentEntry,
         ResolvedPackage resolved,
+        IProgress<WorkloadInstallProgress>? progress,
         CancellationToken cancellationToken)
     {
         string tempNupkg = Path.Combine(
@@ -367,6 +408,10 @@ internal sealed class WorkloadInstaller(
 
         try
         {
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Downloading,
+                $"Downloading '{resolved.PackageId}' {resolved.Version.ToNormalizedString()}"));
+
             await using (Stream packageStream = await _catalog.DownloadAsync(resolved, cancellationToken))
             await using (FileStream tempStream = File.Create(tempNupkg))
             {
@@ -401,6 +446,10 @@ internal sealed class WorkloadInstaller(
             Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
             Directory.CreateDirectory(stagingPath);
 
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Extracting,
+                $"Extracting workload '{newPackageId}' {newVersion}"));
+
             await ExtractPackageAsync(reader, stagingPath, cancellationToken);
             WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
 
@@ -409,6 +458,8 @@ internal sealed class WorkloadInstaller(
                 PackageId = newPackageId,
                 PackageVersion = newVersion,
                 Aliases = aliases,
+                DisplayName = GetDisplayName(metadata, newPackageId),
+                Description = metadata.Description ?? string.Empty,
                 EntryPoint = metadata.EntryPoint,
                 Kind = metadata.Kind,
                 Source = resolved.Source.Source,
@@ -422,6 +473,10 @@ internal sealed class WorkloadInstaller(
             //      recoverable via `func workload prune`.
             //   3. Delete the previous install directory.
             Directory.Move(stagingPath, finalInstallPath);
+
+            progress?.Report(new WorkloadInstallProgress(
+                WorkloadInstallPhase.Registering,
+                $"Registering workload '{newPackageId}' {newVersion}"));
 
             await _store.ReplaceWorkloadAsync(
                 currentEntry.PackageId,
@@ -480,10 +535,19 @@ internal sealed class WorkloadInstaller(
         CancellationToken cancellationToken)
     {
         // PackageArchiveReader already filters OPC metadata and rejects
-        // path-escape entries, so we don't re-filter here.
+        // path-escape entries. We additionally restrict the on-disk layout
+        // to the workload contract: workload.json at the root and the
+        // tools/ payload. Other package-level files (the .nuspec, NuGet's
+        // package icon, etc.) are pack-time artifacts the host never reads
+        // and would just bloat the install directory.
         foreach (string packageFile in await reader.GetFilesAsync(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (!IsInstallablePackageFile(packageFile))
+            {
+                continue;
+            }
 
             string targetPath = Path.Combine(destination, packageFile.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
@@ -492,6 +556,22 @@ internal sealed class WorkloadInstaller(
             using FileStream output = File.Create(targetPath);
             await entryStream.CopyToAsync(output, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Whether a file inside the .nupkg is part of the workload's on-disk
+    /// contract. Only <c>workload.json</c> at the package root and entries
+    /// under <c>tools/</c> are extracted; everything else (.nuspec, package
+    /// icon, etc.) is pack-time metadata and stays inside the .nupkg.
+    /// </summary>
+    private static bool IsInstallablePackageFile(string packageFile)
+    {
+        if (string.Equals(packageFile, WorkloadMetadataReader.MetadataFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return packageFile.StartsWith("tools/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -537,4 +617,7 @@ internal sealed class WorkloadInstaller(
             // user can clean up manually.
         }
     }
+
+    private static string GetDisplayName(WorkloadMetadata metadata, string packageId)
+        => string.IsNullOrWhiteSpace(metadata.DisplayName) ? packageId : metadata.DisplayName;
 }

@@ -39,29 +39,29 @@ internal sealed class WorkloadCatalog(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
-        NuGetProtocolSourceClient client = ResolveClient(source);
-        IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync(packageId, cancellationToken);
+        return await ResolveMatchingVersionAsync(
+            packageId,
+            source,
+            cancellationToken,
+            versions => SelectLatest(
+                versions,
+                candidate => (includePrerelease || !candidate.IsPrerelease)
+                    && (allowMajor || currentVersion is null || candidate.Major == currentVersion.Major)));
+    }
 
-        NuGetVersion? best = null;
-        foreach (NuGetVersion candidate in versions)
-        {
-            if (!includePrerelease && candidate.IsPrerelease)
-            {
-                continue;
-            }
+    /// <inheritdoc />
+    public async Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(
+        string packageId,
+        VersionRange versionRange,
+        bool includePrerelease,
+        string? source = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentNullException.ThrowIfNull(versionRange);
 
-            if (!allowMajor && currentVersion is not null && candidate.Major != currentVersion.Major)
-            {
-                continue;
-            }
-
-            if (best is null || candidate > best)
-            {
-                best = candidate;
-            }
-        }
-
-        return best is null ? null : new ResolvedPackage(packageId.ToLowerInvariant(), best, client.Source);
+        return await ResolveMatchingVersionAsync(packageId, source, cancellationToken,
+            versions => SelectLatest(versions, candidate => (includePrerelease || !candidate.IsPrerelease) && versionRange.Satisfies(candidate)));
     }
 
     /// <inheritdoc />
@@ -74,12 +74,8 @@ internal sealed class WorkloadCatalog(
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentNullException.ThrowIfNull(version);
 
-        NuGetProtocolSourceClient client = ResolveClient(source);
-        IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync(packageId, cancellationToken);
-
-        return versions.Any(v => v.Equals(version))
-            ? new ResolvedPackage(packageId.ToLowerInvariant(), version, client.Source)
-            : null;
+        return await ResolveMatchingVersionAsync(packageId, source, cancellationToken,
+            versions => versions.Any(candidate => candidate.Equals(version)) ? version : null);
     }
 
     /// <inheritdoc />
@@ -91,4 +87,38 @@ internal sealed class WorkloadCatalog(
 
     private NuGetProtocolSourceClient ResolveClient(string? source)
         => _clientFactory(_sourceProvider.GetSource(source));
+
+    private async Task<ResolvedPackage?> ResolveMatchingVersionAsync(
+        string packageId,
+        string? source,
+        CancellationToken cancellationToken,
+        Func<IReadOnlyList<NuGetVersion>, NuGetVersion?> selectVersion)
+    {
+        NuGetProtocolSourceClient client = ResolveClient(source);
+        IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync(packageId, cancellationToken);
+        NuGetVersion? selected = selectVersion(versions);
+
+        return selected is null ? null : new ResolvedPackage(packageId.ToLowerInvariant(), selected, client.Source);
+    }
+
+    private static NuGetVersion? SelectLatest(
+        IEnumerable<NuGetVersion> versions,
+        Func<NuGetVersion, bool> predicate)
+    {
+        NuGetVersion? best = null;
+        foreach (NuGetVersion candidate in versions)
+        {
+            if (!predicate(candidate))
+            {
+                continue;
+            }
+
+            if (best is null || candidate > best)
+            {
+                best = candidate;
+            }
+        }
+
+        return best;
+    }
 }

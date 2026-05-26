@@ -93,6 +93,25 @@ public class WorkloadMetadataReaderTests : IDisposable
     }
 
     [Fact]
+    public void Read_ReturnsDisplayMetadata()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "content",
+              "displayName": "Functions Host",
+              "description": "Azure Functions host payload."
+            }
+            """);
+
+        WorkloadMetadata metadata = _reader.Read(_tempDir);
+
+        Assert.Equal("Functions Host", metadata.DisplayName);
+        Assert.Equal("Azure Functions host payload.", metadata.Description);
+    }
+
+    [Fact]
     public void Read_ReturnsMetaMetadata_WhenKindIsMeta()
     {
         WriteMetadata(

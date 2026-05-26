@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Workloads.Invocation;
 /// </summary>
 internal sealed class WorkloadInvoker : IWorkloadInvoker
 {
-    public async Task InvokeAsync(WorkloadInfo workload, Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+    public async Task InvokeAsync(RuntimeWorkloadInfo workload, Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workload);
         ArgumentNullException.ThrowIfNull(operation);
@@ -35,7 +35,7 @@ internal sealed class WorkloadInvoker : IWorkloadInvoker
         }
     }
 
-    public async Task<TResult> InvokeAsync<TResult>(WorkloadInfo workload, Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
+    public async Task<TResult> InvokeAsync<TResult>(RuntimeWorkloadInfo workload, Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workload);
         ArgumentNullException.ThrowIfNull(operation);
@@ -58,13 +58,13 @@ internal sealed class WorkloadInvoker : IWorkloadInvoker
         }
     }
 
-    private static GracefulException RewrapGraceful(WorkloadInfo workload, GracefulException original)
+    private static GracefulException RewrapGraceful(RuntimeWorkloadInfo workload, GracefulException original)
         => new(
             message: $"[{workload.PackageId}] {original.Message}",
             isUserError: original.IsUserError,
             verboseMessage: original.VerboseMessage);
 
-    private static WorkloadProtocolException WrapProtocol(WorkloadInfo workload, Exception original)
+    private static WorkloadProtocolException WrapProtocol(RuntimeWorkloadInfo workload, Exception original)
         => new(
             workload,
             message: $"[{workload.PackageId}] error: {original.Message} " +

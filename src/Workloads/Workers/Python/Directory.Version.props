@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    Workload pkg versioning. This is a content-only workload (no workload
+    code or assemblies), so the pkg version maps 1:1 to the worker payload
+    version it carries:
+      $(WorkerVersion) - the Python worker package version. Mirrors the
+                         Microsoft.Azure.Functions.PythonWorker version
+                         pulled in at pack time. Bare three-part SemVer.
+
+    Unlike the bundles workload, there is no channel axis: the upstream
+    PythonWorker NuGet doesn't ship preview/experimental SKUs, so the
+    workload pkg version is just $(WorkerVersion).
+  -->
+
+  <PropertyGroup>
+    <WorkerVersion>4.43.0</WorkerVersion>
+    <VersionPrefix>$(WorkerVersion)</VersionPrefix>
+  </PropertyGroup>
+
+</Project>

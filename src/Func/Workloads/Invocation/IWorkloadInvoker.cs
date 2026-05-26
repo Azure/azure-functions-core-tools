@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Workloads.Invocation;
 /// </summary>
 internal interface IWorkloadInvoker
 {
-    public Task InvokeAsync(WorkloadInfo workload, Func<CancellationToken, Task> operation, CancellationToken cancellationToken);
+    public Task InvokeAsync(RuntimeWorkloadInfo workload, Func<CancellationToken, Task> operation, CancellationToken cancellationToken);
 
-    public Task<TResult> InvokeAsync<TResult>(WorkloadInfo workload, Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken);
+    public Task<TResult> InvokeAsync<TResult>(RuntimeWorkloadInfo workload, Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken);
 }

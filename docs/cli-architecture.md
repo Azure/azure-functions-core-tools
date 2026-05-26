@@ -2,7 +2,7 @@
 
 This document explains the runtime architecture of the Azure Functions Core Tools v5 CLI — how commands are composed, how telemetry is wired, and how the console layer works.
 
-> **Status**: v5 is in active development. As of this PR, the workload abstractions, the DI host that loads workloads, and the `func workload install` / `uninstall` commands are wired into the CLI. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up. Built-in commands that depend on workload contributions (e.g. `func init`) report "no workloads installed" and exit cleanly until at least one workload is installed.
+> **Status**: v5 is in active development. As of this PR, the workload abstractions, the DI host that loads workloads, profile inspection, and the `func workload install` / `uninstall` commands are wired into the CLI. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up. Built-in commands that depend on workload contributions (e.g. `func init`) report "no workloads installed" and exit cleanly until at least one workload is installed.
 
 ## Startup Flow
 
@@ -27,7 +27,7 @@ Program.cs
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
   │   ├── Resolve every FuncCliCommand from DI:
-  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, version, help, workload
+  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, version, help, profile, workload
   │   │     └── ExternalCommand wrappers (each carries the WorkloadInfo for the
   │   │         workload that called RegisterCommand)
   │   ├── Skip workload commands that collide with built-ins or with each
@@ -63,6 +63,10 @@ func
 │   ├── list              List available templates
 │   └── info <id>         Show template details
 ├── start [path]          Start the Functions host (placeholder)
+├── profile
+│   ├── list [path]       List available profiles
+│   ├── show <name> [path]  Show profile details
+│   └── set <name> [path]   Set the project default profile
 ├── workload
 │   └── list              List installed workloads
 ├── version (hidden)      Print version info
@@ -182,6 +186,9 @@ interaction.WriteLine(l => l
 | `PromptForInput(prompt, defaultValue)` | `string` | Returns `defaultValue` |
 | `ShowStatusAsync<T>(message, action)` | `T` | Runs action, prints status text |
 | `StatusAsync(message, action)` | — | Runs action, prints status text |
+| `RunWithProgressAsync<T>(initialDescription, action)` | `T` | Runs action; prints each description change as a line |
+
+`RunWithProgressAsync` exposes an `IProgressContext` to the action, which long-running operations can use to update the description, set/report numeric progress, or increment. The Spectre implementation renders a live progress bar; in non-interactive mode each description change is written as a separate line so logs remain readable.
 
 ### `IsInteractive` Property
 
@@ -215,7 +222,8 @@ The abstractions library exposes the surface workload authors program against:
 |------|------|
 | `IWorkload` | Entry point. Identity (`PackageId`, `PackageVersion`, `DisplayName`, `Description`) plus `Configure(FunctionsCliBuilder)`. |
 | `FunctionsCliBuilder` | The DI seam handed to a workload. Exposes `Services` for plain DI registrations and `RegisterCommand(...)` overloads (instance / type / factory) for contributing top-level commands. Abstract base so we can grow the surface without breaking workloads. |
-| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `SupportedLanguages`, contributes init options, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `IProjectInitializer` | Owns `func init` for a stack. Declares `Stack`, `DisplayName`, `SupportedLanguages`, registers init options via `IInitOptionRegistry`, and runs `InitializeAsync(InitContext, ParseResult, CancellationToken)`. |
+| `IInitOptionRegistry` / `CommonInitOptions` | The registry de-dupes options that multiple workloads contribute (e.g. `--no-bundles`) so each option appears once in `--help` and every workload reads the same parsed value. `CommonInitOptions` is a small factory of the shared options themselves (`NoBundle`, `BundlesChannel`). |
 | `WorkloadContext` / `InitContext` | Records carrying common + command-specific inputs to providers. |
 | `FuncCommand` | Parser-independent base for workload-contributed top-level commands. Describes `Name`, `Description`, `Options`, `Arguments`, `Subcommands`, and an `ExecuteAsync(FuncCommandInvocationContext, CancellationToken)`. |
 | `FuncCommandOption` / `FuncCommandArgument` | Typed descriptors used by `FuncCommand`. Identity matters — pass the same descriptor instance to `context.GetValue(...)` to read parsed values. |
@@ -246,7 +254,9 @@ Build commands (Parser.CreateCommand):
   ├── Built-in collisions throw (CLI bug); workload commands that collide with
   │   built-ins or with each other are skipped with a warning that names the
   │   workload(s)
-  ├── InitCommand sees IEnumerable<IProjectInitializer>, attaches their options
+  ├── InitCommand sees IEnumerable<IProjectInitializer>, drives each one through an
+  │   IInitOptionRegistry to register init options (shared names — like --no-bundles —
+  │   collapse to a single canonical Option instance)
   ├── WorkloadListCommand depends on IWorkloadProvider
   └── HelpCommand built last with a back-reference to the constructed root
 
@@ -323,7 +333,7 @@ If a newer version is found, a notice is printed after the command completes.
 4. Delegate to IProjectInitializer.InitializeAsync(context, parseResult)
 ```
 
-Each registered initializer also contributes options to `func init` via `GetInitOptions()`; values are read back inside `InitializeAsync` via the `ParseResult`.
+Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
 ### `func new`
 

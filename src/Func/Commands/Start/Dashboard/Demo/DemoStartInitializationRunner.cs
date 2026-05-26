@@ -1,10 +1,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
-using NuGet.Versioning;
+using Azure.Functions.Cli.Workloads.Install;
+using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -12,10 +15,37 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// Prototype initialization runner that simulates the host-resolution workflow.
 /// </summary>
 internal sealed class DemoStartInitializationRunner(
-    IEnumerable<IProjectResolver> projectResolvers,
-    TimeProvider? timeProvider = null) : IStartInitializationRunner
+    IFunctionsProjectResolver projectResolver,
+    IExtensionBundleResolver bundleResolver,
+    IHostJsonBundleSectionReader bundleSectionReader,
+    IProfileResolver profileResolver,
+    IHostWorkloadResolver hostWorkloadResolver,
+    IWorkloadInstaller workloadInstaller,
+    ILoggerFactory loggerFactory,
+    TimeProvider? timeProvider = null)
+    : IStartInitializationRunner
 {
-    private readonly IProjectResolver _projectResolver = projectResolvers?.FirstOrDefault() ?? new DemoProjectResolver();
+    private readonly IFunctionsProjectResolver _projectResolver = projectResolver
+        ?? throw new ArgumentNullException(nameof(projectResolver));
+
+    private readonly IExtensionBundleResolver _bundleResolver = bundleResolver
+        ?? throw new ArgumentNullException(nameof(bundleResolver));
+
+    private readonly IHostJsonBundleSectionReader _bundleSectionReader = bundleSectionReader
+        ?? throw new ArgumentNullException(nameof(bundleSectionReader));
+
+    private readonly IProfileResolver _profileResolver = profileResolver
+        ?? throw new ArgumentNullException(nameof(profileResolver));
+
+    private readonly IHostWorkloadResolver _hostWorkloadResolver = hostWorkloadResolver
+        ?? throw new ArgumentNullException(nameof(hostWorkloadResolver));
+
+    private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller
+        ?? throw new ArgumentNullException(nameof(workloadInstaller));
+
+    private readonly ILoggerFactory _loggerFactory = loggerFactory
+        ?? throw new ArgumentNullException(nameof(loggerFactory));
+
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     public async Task<StartInitializationResult> RunAsync(
@@ -26,7 +56,10 @@ internal sealed class DemoStartInitializationRunner(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(renderer);
 
-        var state = new StartInitializationState();
+        var state = new StartInitializationState
+        {
+            ProfileName = context.ProfileName,
+        };
         await EmitAsync(renderer, new StartInitializationStartedEvent(Now(), state.ProfileName), cancellationToken);
 
         await RunStepsAsync(CreateSteps(), context, state, renderer, cancellationToken);
@@ -38,11 +71,15 @@ internal sealed class DemoStartInitializationRunner(
     {
         StartInitializationStepCollection steps =
         [
-            new ResolveProfileInitializationStep(),
+            new ResolveProfileInitializationStep(_profileResolver),
             new ResolveConstraintsInitializationStep(),
-            new ValidateHostWorkloadInitializationStep(),
-            new ResolveAppStackInitializationStep(_projectResolver),
-            new ValidateExtensionBundleInitializationStep(),
+            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller),
+            new ResolveFunctionsProjectInitializationStep(_projectResolver),
+            new ValidateExtensionBundleInitializationStep(
+                _bundleResolver,
+                _bundleSectionReader,
+                _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
+            new PrepareProjectHostRunInitializationStep(),
             new StartHostInitializationStep(_time),
         ];
 
@@ -101,20 +138,4 @@ internal sealed class DemoStartInitializationRunner(
     }
 
     private DateTimeOffset Now() => _time.GetUtcNow();
-
-
-    // Create a demo project resolver for the demo runner...
-    private sealed class DemoProjectResolver : IProjectResolver
-    {
-        public Task<EvaluationResult> EvaluateAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new EvaluationResult(true, "Demo"));
-        }
-
-        public Task<RuntimeStackInfo> GetRuntimeStackInfoAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new RuntimeStackInfo(".NET", "dotnet-isolated", "c:\\some\\path\\to\\worker.config", false));
-        }
-    }
-
 }

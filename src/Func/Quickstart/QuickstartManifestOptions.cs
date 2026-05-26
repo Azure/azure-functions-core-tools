@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
 
 namespace Azure.Functions.Cli.Quickstart;
 
@@ -35,7 +36,7 @@ internal sealed class QuickstartManifestOptions
     private static string DefaultCacheDirectory() =>
         Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Constants.FuncHomeDirectoryName,
+            AbstractionsConstants.FuncHomeDirectoryName,
             "cache",
             "quickstart");
 }

@@ -96,12 +96,10 @@ internal sealed class WorkloadListCommand : FuncCliCommand
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
 
-        // Cross-reference loaded info so we can surface DisplayName /
-        // Description for the version that's currently live; older
-        // side-by-side versions have no loaded instance, so we fall back
-        // to the placeholder in the table renderer.
-        Dictionary<(string PackageId, string Version), WorkloadInfo> loadedByKey = _workloads
-            .GetWorkloads()
+        // Cross-reference runtime info so loaded versions use presentation
+        // from their instances; older and content entries use registry data.
+        Dictionary<(string PackageId, string Version), RuntimeWorkloadInfo> loadedByKey = _workloads
+            .GetRuntimeWorkloads()
             .ToDictionary(
                 w => (w.PackageId, w.PackageVersion),
                 w => w,
@@ -112,15 +110,18 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             .ThenByDescending(e => ParseVersion(e.PackageVersion))
             .Select(e =>
             {
-                loadedByKey.TryGetValue((e.PackageId, e.PackageVersion), out WorkloadInfo? info);
+                loadedByKey.TryGetValue((e.PackageId, e.PackageVersion), out RuntimeWorkloadInfo? info);
                 return new ListRow(
                     e.PackageId,
                     e.PackageVersion,
                     e.Aliases ?? [],
-                    info?.DisplayName ?? string.Empty,
-                    info?.Description ?? string.Empty);
+                    info?.DisplayName ?? GetDisplayName(e),
+                    info?.Description ?? (e.Description ?? string.Empty));
             })];
     }
+
+    private static string GetDisplayName(WorkloadEntry entry)
+        => string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.PackageId : entry.DisplayName;
 
     private static NuGetVersion ParseVersion(string raw) =>
         NuGetVersion.TryParse(raw, out NuGetVersion? v) ? v : new NuGetVersion(0, 0, 0);
