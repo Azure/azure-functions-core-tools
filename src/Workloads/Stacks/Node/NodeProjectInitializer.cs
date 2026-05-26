@@ -20,6 +20,12 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
     private static readonly Assembly _assembly = typeof(NodeProjectInitializer).Assembly;
 
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
+    {
+        { "JavaScript", ["js"] },
+        { "TypeScript", ["ts"] }
+    };
+
     // Internal seam so tests can stub out the `npm install` invocation
     // without spawning real processes.
     internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunNpmInstall { get; set; } = DefaultRunNpmInstall;
@@ -28,7 +34,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
     public string DisplayName => "Node.js";
 
-    public IReadOnlyList<string> SupportedLanguages { get; } = ["JavaScript", "TypeScript"];
+    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
@@ -64,7 +70,14 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
-        bool isTypeScript = string.Equals(context.Language, "typescript", StringComparison.OrdinalIgnoreCase);
+
+        string language = NormalizeLanguage(context.Language);
+        if (!SupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException($"Language '{context.Language}' is not supported. Supported languages: {string.Join(", ", SupportedLanguages)}.", nameof(context));
+        }
+
+        bool isTypeScript = string.Equals(language, "TypeScript", StringComparison.OrdinalIgnoreCase);
         bool noBundle = parseResult.GetValue(NoBundleOption);
         BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
         bool skipNpmInstall = parseResult.GetValue(SkipNpmInstallOption);
@@ -187,5 +200,28 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
             // 'npm' may not be installed; the scaffolded files are still valid.
             return (-1, ex.Message);
         }
+    }
+
+    internal string NormalizeLanguage(string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+        {
+            return "JavaScript";
+        }
+
+        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in SupportedLanguageAliases)
+        {
+            if (string.Equals(entry.Key, language, StringComparison.OrdinalIgnoreCase))
+            {
+                return entry.Key;
+            }
+
+            if (entry.Value.Contains(language, StringComparer.OrdinalIgnoreCase))
+            {
+                return entry.Key;
+            }
+        }
+
+        return language;
     }
 }

@@ -51,7 +51,7 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void SupportedLanguages_ReturnsExpectedLanguages()
     {
-        Assert.Equal(["C#", "F#", "csharp", "fsharp"], CreateInitializer().SupportedLanguages);
+        Assert.Equal(["C#", "F#"], CreateInitializer().SupportedLanguages);
     }
 
     [Fact]
@@ -67,19 +67,19 @@ public class DotNetProjectInitializerTests : IDisposable
     }
 
     [Theory]
-    [InlineData(null, "c#")]
-    [InlineData("", "c#")]
-    [InlineData("  ", "c#")]
-    [InlineData("csharp", "c#")]
-    [InlineData("CSHARP", "c#")]
-    [InlineData("C#", "c#")]
-    [InlineData("fsharp", "f#")]
-    [InlineData("FSHARP", "f#")]
-    [InlineData("F#", "f#")]
+    [InlineData(null, "C#")]
+    [InlineData("", "C#")]
+    [InlineData("  ", "C#")]
+    [InlineData("csharp", "C#")]
+    [InlineData("CSHARP", "C#")]
+    [InlineData("C#", "C#")]
+    [InlineData("fsharp", "F#")]
+    [InlineData("FSHARP", "F#")]
+    [InlineData("F#", "F#")]
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
-        Assert.Equal(expected, DotNetProjectInitializer.NormalizeLanguage(input));
+        Assert.Equal(expected, CreateInitializer().NormalizeLanguage(input));
     }
 
     [Fact]

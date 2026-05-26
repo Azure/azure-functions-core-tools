@@ -28,7 +28,13 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
     public string DisplayName => "Go";
 
-    public IReadOnlyList<string> SupportedLanguages { get; } = ["Go"];
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
+        new Dictionary<string, IReadOnlyList<string>>()
+        {
+            { "Go", ["golang"] }
+        };
+
+    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
 
     public Option<bool> SkipGoModTidyOption { get; private set; } = default!;
 

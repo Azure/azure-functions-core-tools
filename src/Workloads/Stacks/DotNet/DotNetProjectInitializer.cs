@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.ComponentModel;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Common;
@@ -32,7 +31,13 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
     public string DisplayName => ".NET";
 
-    public IReadOnlyList<string> SupportedLanguages => ["C#", "F#", "csharp", "fsharp"];
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
+    {
+        { "C#", ["csharp"] },
+        { "F#", ["fsharp"] }
+    };
+
+    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
 
     public Option<string> FrameworkOption { get; private set; } = default!;
 
@@ -198,18 +203,28 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
         }
     }
 
-    internal static string NormalizeLanguage(string? language)
+    internal string NormalizeLanguage(string? language)
     {
         if (string.IsNullOrWhiteSpace(language))
         {
-            return "c#";
+            return "C#";
         }
 
-        return language.ToLowerInvariant() switch
+        // Check if it matches a canonical language name (case-insensitive).
+        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in SupportedLanguageAliases)
         {
-            "csharp" or "c#" => "c#",
-            "fsharp" or "f#" => "f#",
-            _ => language
-        };
+            if (string.Equals(entry.Key, language, StringComparison.OrdinalIgnoreCase))
+            {
+                return entry.Key;
+            }
+
+            if (entry.Value.Contains(language, StringComparer.OrdinalIgnoreCase))
+            {
+                return entry.Key;
+            }
+        }
+
+        return language;
     }
+
 }

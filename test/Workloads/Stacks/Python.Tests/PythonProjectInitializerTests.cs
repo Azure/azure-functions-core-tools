@@ -41,6 +41,36 @@ public class PythonProjectInitializerTests : IDisposable
         Assert.Equal("python", new PythonProjectInitializer().Stack);
     }
 
+    [Theory]
+    [InlineData(null, "Python")]
+    [InlineData("", "Python")]
+    [InlineData("py", "Python")]
+    [InlineData("PY", "Python")]
+    [InlineData("Python", "Python")]
+    [InlineData("PYTHON", "Python")]
+    [InlineData("unknown", "unknown")]
+    public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
+    {
+        Assert.Equal(expected, new PythonProjectInitializer().NormalizeLanguage(input));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_UnsupportedLanguage_Throws()
+    {
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => RunAsync(force: false, language: "ruby"));
+
+        Assert.Contains("ruby", ex.Message);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_AliasPy_Succeeds()
+    {
+        await RunAsync(force: false, language: "py");
+
+        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "function_app.py")));
+    }
+
     [Fact]
     public void GetInitOptions_RegistersBundleOptions()
     {
@@ -162,13 +192,13 @@ public class PythonProjectInitializerTests : IDisposable
             root!["extensionBundle"]!["id"]!.GetValue<string>());
     }
 
-    private Task RunAsync(bool force, string[]? args = null)
+    private Task RunAsync(bool force, string[]? args = null, string? language = null)
     {
         PythonProjectInitializer initializer = new();
         InitContext context = new(
             WorkingDirectory.FromExplicit(_projectDir.FullName),
             ProjectName: "test",
-            Language: null,
+            Language: language,
             Force: force);
 
         RootCommand root = [];

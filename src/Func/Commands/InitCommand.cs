@@ -322,13 +322,23 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         if (!string.IsNullOrWhiteSpace(requested))
         {
+            // First try direct match against canonical language names.
             string? match = supported.FirstOrDefault(l =>
                 string.Equals(l, requested, StringComparison.OrdinalIgnoreCase));
+
+            // If no direct match, try resolving as an alias.
             if (match is null)
             {
+                match = ResolveAlias(requested, initializer.SupportedLanguageAliases);
+            }
+
+            if (match is null)
+            {
+                IEnumerable<string> allAliases = initializer.SupportedLanguageAliases.Values.SelectMany(v => v);
                 _interaction.WriteError(
                     $"Language '{requested}' is not supported by the '{initializer.Stack}' stack. " +
-                    $"Supported values: {string.Join(", ", supported)}.");
+                    $"Supported values: {string.Join(", ", supported)}. " +
+                    $"Also accepted: {string.Join(", ", allAliases)}.");
                 return (null, 1);
             }
 
@@ -354,6 +364,19 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             cancellationToken);
 
         return (picked.ToLowerInvariant(), null);
+    }
+
+    private static string? ResolveAlias(string requested, IReadOnlyDictionary<string, IReadOnlyList<string>> aliases)
+    {
+        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in aliases)
+        {
+            if (entry.Value.Contains(requested, StringComparer.OrdinalIgnoreCase))
+            {
+                return entry.Key;
+            }
+        }
+
+        return null;
     }
 
     private async Task<IProjectInitializer?> SelectInitializerAsync(string? requestedStack, CancellationToken cancellationToken)

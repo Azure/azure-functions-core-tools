@@ -44,7 +44,7 @@ public class DotNetWorkloadTests
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
         Assert.IsType<DotNetProjectInitializer>(initializer);
         Assert.Equal("dotnet", initializer.Stack);
-        Assert.Equal(["C#", "F#", "csharp", "fsharp"], initializer.SupportedLanguages);
+        Assert.Equal(["C#", "F#"], initializer.SupportedLanguages);
     }
 
     [Fact]

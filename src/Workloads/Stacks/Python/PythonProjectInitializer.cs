@@ -16,11 +16,16 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
 {
     private static readonly Assembly _assembly = typeof(PythonProjectInitializer).Assembly;
 
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
+    {
+        { "Python", ["py"] }
+    };
+
     public string Stack => "python";
 
     public string DisplayName => "Python";
 
-    public IReadOnlyList<string> SupportedLanguages { get; } = ["Python"];
+    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
@@ -45,6 +50,12 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);
         cancellationToken.ThrowIfCancellationRequested();
+
+        string language = NormalizeLanguage(context.Language);
+        if (!SupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException($"Language '{context.Language}' is not supported. Supported languages: {string.Join(", ", SupportedLanguages)}.", nameof(context));
+        }
 
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
@@ -106,5 +117,28 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
             ["id"] = ExtensionBundle.IdFor(channel),
             ["version"] = ExtensionBundle.DefaultVersionRange,
         };
+    }
+
+    internal string NormalizeLanguage(string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+        {
+            return "Python";
+        }
+
+        foreach (KeyValuePair<string, IReadOnlyList<string>> entry in SupportedLanguageAliases)
+        {
+            if (string.Equals(entry.Key, language, StringComparison.OrdinalIgnoreCase))
+            {
+                return entry.Key;
+            }
+
+            if (entry.Value.Contains(language, StringComparer.OrdinalIgnoreCase))
+            {
+                return entry.Key;
+            }
+        }
+
+        return language;
     }
 }
