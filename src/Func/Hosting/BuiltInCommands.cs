@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
@@ -36,6 +37,9 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, InitCommand>();
         services.AddSingleton<FuncCliCommand, NewCommand>();
         services.AddSingleton<FuncCliCommand, StartCommand>();
+        services.AddSingleton<ProfileListCommand>();
+        services.AddSingleton<ProfileShowCommand>();
+        services.AddSingleton<FuncCliCommand, ProfileCommand>();
 
         // Shared dashboard primitives (renderers and per-invocation pipeline
         // are constructed inline by StartCommand so cancellation flows
@@ -56,4 +60,3 @@ internal static class BuiltInCommands
         return services;
     }
 }
-

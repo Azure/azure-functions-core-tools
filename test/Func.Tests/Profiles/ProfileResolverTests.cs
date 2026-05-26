@@ -278,9 +278,10 @@ public class ProfileResolverTests
 
     private ProfileResolver CreateResolver(params IProfileSource[] sources)
     {
+        var catalog = new ProfileCatalog(sources);
         var projectOptionsMonitor = new TestOptionsMonitor<ProjectProfileOptions>(_projectProfileOptions);
         var userOptionsMonitor = new TestOptionsMonitor<UserProfilePreferenceOptions>(_userProfilePreferenceOptions);
-        return new ProfileResolver(sources, projectOptionsMonitor, userOptionsMonitor, _interaction);
+        return new ProfileResolver(catalog, projectOptionsMonitor, userOptionsMonitor, _interaction);
     }
 
     private async Task<ProfileResolution.Resolved> ResolveProfileAsync(
