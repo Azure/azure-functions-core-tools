@@ -74,20 +74,4 @@ internal sealed class PythonProjectFactory : IFunctionsProjectFactory
 
         return null;
     }
-
-    private sealed class PythonFunctionsProject(WorkingDirectory workingDirectory) : FunctionsProject
-    {
-        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(_workerId);
-
-        public override WorkingDirectory WorkingDirectory => _workingDirectory;
-
-        public override string StackName => "python";
-
-        public override string StackDisplayName => "Python";
-
-        public override bool SupportsExtensionBundles => true;
-
-        public override FunctionsWorkerReference WorkerReference => _workerReference;
-    }
 }

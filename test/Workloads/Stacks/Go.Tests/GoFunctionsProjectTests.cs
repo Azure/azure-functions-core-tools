@@ -1,0 +1,95 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using Xunit;
+
+namespace Azure.Functions.Cli.Workloads.Go.Tests;
+
+public class GoFunctionsProjectTests : IDisposable
+{
+    private readonly DirectoryInfo _projectDir;
+
+    public GoFunctionsProjectTests()
+    {
+        _projectDir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "func-go-project-" + Guid.NewGuid().ToString("N")));
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (_projectDir.Exists)
+            {
+                _projectDir.Delete(recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_invokes_go_build_to_module_bin()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n\ngo 1.24\n");
+
+        string? observedRoot = null;
+        string? observedOutput = null;
+        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunGoBuild = (root, output, _) =>
+            {
+                observedRoot = root;
+                observedOutput = output;
+                return Task.FromResult((0, string.Empty));
+            },
+        };
+
+        await project.PrepareForHostRunAsync(CreateContext(), default);
+
+        Assert.Equal(_projectDir.FullName, observedRoot);
+        Assert.Equal(Path.Combine(_projectDir.FullName, "bin", "myapp"), observedOutput);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_falls_back_to_default_executable_when_no_go_mod()
+    {
+        string? observedOutput = null;
+        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunGoBuild = (_, output, _) =>
+            {
+                observedOutput = output;
+                return Task.FromResult((0, string.Empty));
+            },
+        };
+
+        await project.PrepareForHostRunAsync(CreateContext(), default);
+
+        Assert.Equal(Path.Combine(_projectDir.FullName, "bin", GoFunctionsProject.DefaultExecutableName), observedOutput);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_throws_graceful_on_nonzero_exit()
+    {
+        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunGoBuild = (_, _, _) => Task.FromResult((1, "compile error")),
+        };
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => project.PrepareForHostRunAsync(CreateContext(), default));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("go build", ex.Message);
+        Assert.Contains("compile error", ex.Message);
+    }
+
+    private FunctionsProjectHostRunContext CreateContext()
+        => new(_projectDir, "go", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["FUNCTIONS_WORKER_RUNTIME"] = "go",
+        });
+}

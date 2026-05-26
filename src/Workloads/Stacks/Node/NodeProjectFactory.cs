@@ -100,20 +100,4 @@ internal sealed class NodeProjectFactory : IFunctionsProjectFactory
             && section.ValueKind == JsonValueKind.Object
             && section.TryGetProperty(FunctionsPackage, out _);
     }
-
-    private sealed class NodeFunctionsProject(WorkingDirectory workingDirectory) : FunctionsProject
-    {
-        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(_workerId);
-
-        public override WorkingDirectory WorkingDirectory => _workingDirectory;
-
-        public override string StackName => "node";
-
-        public override string StackDisplayName => "Node.js";
-
-        public override bool SupportsExtensionBundles => true;
-
-        public override FunctionsWorkerReference WorkerReference => _workerReference;
-    }
 }
