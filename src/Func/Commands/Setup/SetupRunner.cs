@@ -295,10 +295,9 @@ internal sealed class SetupRunner(
             HashSet<string> addedStacks = new(StringComparer.OrdinalIgnoreCase);
             foreach (string runtime in runtimes)
             {
-                if (StackWorkloadPackage.TryGetPackageId(runtime, out string? stackPackageId)
-                    && addedStacks.Add(stackPackageId))
+                if (SetupDependency.SupportsStack(runtime) && addedStacks.Add(runtime))
                 {
-                    dependencies.Add(SetupDependency.Stack(runtime, stackPackageId));
+                    dependencies.Add(SetupDependency.Stack(runtime));
                 }
             }
         }
@@ -621,6 +620,20 @@ internal sealed record SetupDependency(
     string? ResolvedPackageId)
 {
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
+    private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
+
+    // Maps a profile `supportedRuntimes` entry to the suffix of the matching stack
+    // workload package. Runtimes that don't have a corresponding stack workload
+    // (java, powershell, custom, dotnet in-proc) are intentionally absent and
+    // callers skip them silently.
+    private static readonly IReadOnlyDictionary<string, string> _runtimeToStackSuffix =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = "Node",
+            ["python"] = "Python",
+            ["go"] = "Go",
+            ["dotnet-isolated"] = "DotNet",
+        };
 
     public static SetupDependency Host(VersionRange? versionRange)
         => new(
@@ -652,15 +665,18 @@ internal sealed record SetupDependency(
             rangeText,
             ResolvedPackageId: null);
 
-    public static SetupDependency Stack(string runtime, string packageId)
+    public static SetupDependency Stack(string runtime)
         => new(
             SetupDependencyKind.Stack,
             runtime,
             $"{runtime} stack",
-            packageId,
+            StackPackagePrefix + _runtimeToStackSuffix[runtime],
             VersionRange: null,
             RangeText: null,
             ResolvedPackageId: null);
+
+    public static bool SupportsStack(string runtime)
+        => !string.IsNullOrWhiteSpace(runtime) && _runtimeToStackSuffix.ContainsKey(runtime.Trim());
 
     private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
 
