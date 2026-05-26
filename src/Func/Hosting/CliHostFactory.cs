@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Quickstart;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -82,6 +83,7 @@ internal static class CliHostFactory
         builder.Services.AddWorkloadStorage();
         builder.Services.AddWorkloadCatalog();
         builder.Services.AddWorkloadInstaller();
+        builder.Services.AddQuickstart();
 
         return builder;
     }

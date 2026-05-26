@@ -2,6 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Templates;
+using Azure.Functions.Cli.Templates;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -20,8 +23,8 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasExpectedOptions()
     {
-        var cmd = new NewCommand(_hintRenderer);
-        var optionNames = cmd.Options.Select(o => o.Name).ToList();
+        NewCommand cmd = MakeNewCommand();
+        List<string> optionNames = [..cmd.Options.Select(o => o.Name)];
 
         Assert.Contains("--name", optionNames);
         Assert.Contains("--template", optionNames);
@@ -31,8 +34,8 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_RegisteredInParser()
     {
-        var root = TestParser.CreateRoot(_interaction);
-        var names = root.Subcommands.Select(c => c.Name).ToList();
+        FuncRootCommand root = TestParser.CreateRoot(_interaction);
+        List<string> names = [..root.Subcommands.Select(c => c.Name)];
 
         Assert.Contains("new", names);
     }
@@ -40,8 +43,29 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasPathArgument()
     {
-        var cmd = new NewCommand(_hintRenderer);
+        NewCommand cmd = MakeNewCommand();
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
+    }
+
+    [Fact]
+    public void NewCommand_HasTemplatesSubcommand()
+    {
+        NewCommand cmd = MakeNewCommand();
+        Assert.Contains(cmd.Subcommands, s => s.Name == "templates");
+    }
+
+    private static NewCommand MakeNewCommand()
+    {
+        TestInteractionService interaction = new();
+        TemplatesListCommand listCmd = new(interaction, Substitute.For<ITemplateManifestClient>());
+        TemplatesInfoCommand infoCmd = new(interaction, Substitute.For<ITemplateManifestClient>());
+        TemplatesCommand templatesCmd = new(
+            listCmd,
+            infoCmd,
+            interaction,
+            Substitute.For<ITemplateManifestClient>(),
+            Substitute.For<ITemplateFunctionScaffolder>());
+        return new NewCommand(new RecordingWorkloadHintRenderer(), templatesCmd);
     }
 }

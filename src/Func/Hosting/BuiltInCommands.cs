@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
@@ -52,6 +53,10 @@ internal static class BuiltInCommands
         services.AddSingleton<WorkloadSearchCommand>();
         services.AddSingleton<WorkloadPruneCommand>();
         services.AddSingleton<FuncCliCommand, WorkloadCommand>();
+
+        // QuickstartCommand is `func quickstart` — a top-level command with list and info subcommands.
+        // Sub-commands (QuickstartListCommand, QuickstartInfoCommand) are registered via AddQuickstart().
+        services.AddSingleton<FuncCliCommand, QuickstartCommand>();
 
         return services;
     }

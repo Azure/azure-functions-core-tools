@@ -59,6 +59,9 @@ Program.cs
 func
 ├── init [path]           Initialize a new Functions project
 ├── new [path]            Create a new function from a template
+├── quickstart [path]     Browse and scaffold complete app templates
+│   ├── list              List available templates
+│   └── info <id>         Show template details
 ├── start [path]          Start the Functions host (placeholder)
 ├── workload
 │   └── list              List installed workloads

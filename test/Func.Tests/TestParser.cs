@@ -2,9 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -87,6 +89,13 @@ internal static class TestParser
         // resolve without standing up the real install/uninstall side effects.
         services.AddSingleton(Substitute.For<Cli.Workloads.Install.IWorkloadInstaller>());
         services.AddSingleton(Substitute.For<Cli.Workloads.Catalog.IWorkloadCatalog>());
+
+        // Template services: register stubs so QuickstartCommand (which requires sub-commands)
+        // resolves without a real HTTP client or CDN connection.
+        services.AddSingleton(Substitute.For<ITemplateManifestClient>());
+        services.AddSingleton(Substitute.For<ITemplateFunctionScaffolder>());
+        services.AddSingleton<QuickstartListCommand>();
+        services.AddSingleton<QuickstartInfoCommand>();
 
         return services;
     }
