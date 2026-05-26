@@ -475,7 +475,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // for go.mod on every command. See WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage.
             if (workerRuntime == Helpers.WorkerRuntime.Go)
             {
-                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsCliGoPreview, "true");
+                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsCliNativeLanguage, "go");
             }
 
             if (workerRuntime == Helpers.WorkerRuntime.Powershell)

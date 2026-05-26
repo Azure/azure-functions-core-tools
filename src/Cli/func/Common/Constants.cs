@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.Common
         // (Values). Never sent to the host or to Azure (the CLI strips local.settings on publish).
         // Intentionally Go-specific and short-lived: when the platform exposes a first-class
         // mapping for "native" → concrete language, this flag and its consumers should be removed.
-        public const string FunctionsCliGoPreview = "FUNCTIONS_CLI_GO_PREVIEW";
+        public const string FunctionsCliNativeLanguage = "FUNCTIONS_CLI_NATIVE_LANGUAGE";
         public const string RequirementsTxt = "requirements.txt";
         public const string PythonGettingStarted = "getting_started.md";
         public const string PySteinFunctionAppPy = "function_app.py";

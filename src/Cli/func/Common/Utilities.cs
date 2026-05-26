@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli
             }
 
             ColoredConsole
-                .WriteLine("The Go worker runtime is currently in preview. Features and behavior may change in future releases.".DarkYellow());
+                .WriteLine("Go support is in preview. The build/publish behavior and deployment layout may change before GA.".DarkYellow());
 
             ColoredConsole.WriteLine();
         }

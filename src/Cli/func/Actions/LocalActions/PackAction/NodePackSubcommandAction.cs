@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override Task PackFunctionAsync(string packingRoot, string outputPath, PackOptions options)
         {
-            return PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, TelemetryCommandEvents);
+            return PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, WorkerRuntime.Node, TelemetryCommandEvents);
         }
 
         private async Task RunNodeJsBuildProcess(string functionAppRoot)

@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
         Powershell,
         [DisplayString("custom")]
         Custom,
-        [DisplayString("go")]
+        [DisplayString("go (preview)")]
         Go
     }
 
@@ -193,14 +193,14 @@ namespace Azure.Functions.Cli.Helpers
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
-            // Preview opt-in: FUNCTIONS_CLI_GO_PREVIEW lets a project declare itself as Go
+            // Preview opt-in: FUNCTIONS_CLI_NATIVE_LANGUAGE lets a project declare its native language
             // without forcing the resolver to scan the working directory for go.mod. Env var
             // wins; local.settings.json is the secondary source. See TryResolveGoPreviewFlag.
             if (TryResolveGoPreviewFlag(secretsManager, refreshSecrets))
             {
                 if (GlobalCoreToolsSettings.IsVerbose)
                 {
-                    ColoredConsole.WriteLine(VerboseColor($"Resolving worker runtime to 'go' ({Constants.FunctionsCliGoPreview} is set)."));
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving worker runtime to 'go' ({Constants.FunctionsCliNativeLanguage} is set)."));
                 }
 
                 return WorkerRuntime.Go;
@@ -210,17 +210,11 @@ namespace Azure.Functions.Cli.Helpers
 
             if (string.IsNullOrWhiteSpace(setting))
             {
-                // SecretsManager.GetSecrets throws CliException when there is no project root
-                // (e.g. 'func pack' invoked from a parent directory before cwd is changed).
-                // Treat that as "no setting found" so callers can decide what to do.
-                try
-                {
-                    setting = secretsManager?.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
-                }
-                catch (CliException)
-                {
-                    return WorkerRuntime.None;
-                }
+                // When FUNCTIONS_WORKER_RUNTIME isn't in the environment, check local.settings.json.
+                // If secrets cannot be loaded (e.g. 'func pack' invoked from a parent directory
+                // before cwd is changed), the GetSecrets exceptions will propagate to the caller.
+                // Callers that want a silent None on missing secrets should catch CliException.
+                setting = secretsManager?.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
             }
 
             // The Functions host registers some workers under the literal "native" language
@@ -275,7 +269,7 @@ namespace Azure.Functions.Cli.Helpers
         /// </list>
         /// Add new native languages here as they are introduced. Invoked exclusively from
         /// <see cref="GetCurrentWorkerRuntimeLanguage"/> so callers never have to special-case
-        /// the "native" literal. Preferred path is the explicit <see cref="Constants.FunctionsCliGoPreview"/>
+        /// the "native" literal. Preferred path is the explicit <see cref="Constants.FunctionsCliNativeLanguage"/>
         /// opt-in checked earlier in the resolver; this fallback exists for projects that
         /// predate the flag.
         /// </remarks>
@@ -285,7 +279,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (GlobalCoreToolsSettings.IsVerbose)
                 {
-                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found; consider setting {Constants.FunctionsCliGoPreview}=true in local.settings.json)."));
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found; consider setting {Constants.FunctionsCliNativeLanguage}=go in local.settings.json)."));
                 }
 
                 return WorkerRuntime.Go;
@@ -293,17 +287,18 @@ namespace Azure.Functions.Cli.Helpers
 
             throw new CliException(
                 $"FUNCTIONS_WORKER_RUNTIME is set to 'native' but no supported project marker was found in '{Environment.CurrentDirectory}'. " +
-                $"Set '{Constants.FunctionsCliGoPreview}=true' in local.settings.json, or run 'func init' to initialize a supported function app in this directory.");
+                $"Set '{Constants.FunctionsCliNativeLanguage}=go' in local.settings.json, or run 'func init' to initialize a supported function app in this directory.");
         }
 
         /// <summary>
-        /// Returns <c>true</c> when the Go preview flag is set to a truthy value either in the
+        /// Returns <c>true</c> when FUNCTIONS_CLI_NATIVE_LANGUAGE is set to "go" either in the
         /// process environment or in <c>local.settings.json</c>. Env var wins; local.settings.json
         /// access failures (e.g. command run from outside a project root) are treated as "not set".
         /// </summary>
         private static bool TryResolveGoPreviewFlag(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
-            if (EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.FunctionsCliGoPreview))
+            var envValue = Environment.GetEnvironmentVariable(Constants.FunctionsCliNativeLanguage);
+            if (!string.IsNullOrEmpty(envValue) && envValue.Equals("go", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -316,7 +311,7 @@ namespace Azure.Functions.Cli.Helpers
             string fromSettings;
             try
             {
-                fromSettings = secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsCliGoPreview, StringComparison.OrdinalIgnoreCase)).Value;
+                fromSettings = secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsCliNativeLanguage, StringComparison.OrdinalIgnoreCase)).Value;
             }
             catch (CliException)
             {
@@ -328,8 +323,7 @@ namespace Azure.Functions.Cli.Helpers
                 return false;
             }
 
-            return fromSettings.Equals("1", StringComparison.Ordinal)
-                || fromSettings.Equals("true", StringComparison.OrdinalIgnoreCase);
+            return fromSettings.Equals("go", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)

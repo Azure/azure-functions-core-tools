@@ -249,7 +249,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
                 GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
 
-                var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: false);
+                var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: false, WorkerRuntime.Go);
 
                 Assert.NotNull(stream);
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Read);

@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Common
         // Cap the post-exit drain (see RunAsync) so a stuck async output handler can never
         // hold up the caller indefinitely. The drain only flushes already-buffered stdout/stderr
         // bytes, which normally completes in milliseconds; 5s is a defensive safety net.
-        private const int OutputDrainTimeoutMs = 5000;
+        private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromMilliseconds(5000);
 
         private readonly string _arguments;
         private readonly string _exeName;
@@ -135,10 +135,10 @@ namespace Azure.Functions.Cli.Common
                         // Process exit and async output delivery are independent: the Exited event
                         // can fire before OutputDataReceived/ErrorDataReceived have drained the OS
                         // pipe buffers. For short-lived commands (e.g. `go version`) this leaves
-                        // callers reading an empty StringBuilder. WaitForExit(int) flushes the async
+                        // callers reading an empty StringBuilder. WaitForExitAsync drains the async
                         // event pump after the process has already exited, bounded so a hung handler
                         // can never block forever.
-                        DrainAsyncOutput();
+                        await DrainAsyncOutputAsync().ConfigureAwait(false);
                     }
 
                     return exitCode;
@@ -150,7 +150,7 @@ namespace Azure.Functions.Cli.Common
                     if (_streamOutput)
                     {
                         // See comment above: drain async output handlers before returning.
-                        DrainAsyncOutput();
+                        await DrainAsyncOutputAsync().ConfigureAwait(false);
                     }
 
                     return exitCode;
@@ -166,24 +166,20 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        private void DrainAsyncOutput()
+        private async Task DrainAsyncOutputAsync()
         {
             try
             {
-                if (!Process.WaitForExit(OutputDrainTimeoutMs))
+                using var cts = new CancellationTokenSource(OutputDrainTimeout);
+                await Process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                if (GlobalCoreToolsSettings.IsVerbose)
                 {
-                    if (GlobalCoreToolsSettings.IsVerbose)
-                    {
-                        Colors.Net.ColoredConsole.WriteLine(VerboseColor(
-                            $"Output drain for '{_exeName}' did not complete within {OutputDrainTimeoutMs}ms; returning exit code with possibly truncated output."));
-                    }
-
-                    return;
+                    Colors.Net.ColoredConsole.WriteLine(VerboseColor(
+                        $"Output drain for '{_exeName}' did not complete within {OutputDrainTimeout.TotalMilliseconds}ms; returning exit code with possibly truncated output."));
                 }
-
-                // Process exited within timeout; the no-arg overload flushes the async
-                // stdout/stderr event handlers that WaitForExit(int) does not drain.
-                Process.WaitForExit();
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
             {

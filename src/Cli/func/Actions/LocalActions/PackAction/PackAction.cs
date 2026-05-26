@@ -91,6 +91,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             // when "native" is set without a supported project marker.
             WorkerRuntime workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
 
+            Utilities.WarnIfGoWorkerRuntime(workerRuntime);
+
             if (workerRuntime == WorkerRuntime.None && NoBuild)
             {
                 // Narrow to top-level only to avoid false positives in node_modules/, venvs, etc.

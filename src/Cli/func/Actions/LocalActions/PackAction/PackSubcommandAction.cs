@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Helpers;
+
 using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
@@ -61,7 +63,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         // Hook: actual packaging operation (default zip from packingRoot)
         protected virtual Task PackFunctionAsync(string packingRoot, string outputPath, PackOptions options)
-            => PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, TelemetryCommandEvents);
+            => PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, GlobalCoreToolsSettings.CurrentWorkerRuntime, TelemetryCommandEvents);
 
         // Hook: optional cleanup after packaging
         protected virtual Task PerformCleanupAfterPackingAsync(string packingRoot, string functionAppRoot, PackOptions options) => Task.CompletedTask;
