@@ -236,7 +236,7 @@ public sealed class ProfileCommandTests : IDisposable
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => InvokeAsync(command, "flex", _tempDir));
 
-        Assert.Contains("Project config '.func", ex.Message);
+        Assert.Contains("Project not initialized.", ex.Message);
         Assert.Contains("Run 'func init'", ex.Message);
         Assert.False(_fileSystem.Exists(ProjectConfigPath()));
     }
