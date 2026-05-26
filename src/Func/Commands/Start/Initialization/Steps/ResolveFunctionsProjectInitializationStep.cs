@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -13,21 +14,22 @@ internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjec
 {
     public const string StepId = "resolve_project";
 
-    private readonly IFunctionsProjectResolver _projectResolver = projectResolver ?? throw new ArgumentNullException(nameof(projectResolver));
+    private readonly IFunctionsProjectResolver _projectResolver = projectResolver
+        ?? throw new ArgumentNullException(nameof(projectResolver));
 
     public override string Id => StepId;
 
     public override string Title => "Resolve project";
 
-    public override async Task<StartInitializationStepResult> ExecuteAsync(
-        StartInitializationStepContext context,
-        CancellationToken cancellationToken)
+    public override async Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
         await SimulateWorkAsync(context, cancellationToken);
 
-        ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
-            new ProjectResolutionContext(context.Options.WorkingDirectory),
-            cancellationToken);
+        IReadOnlyDictionary<string, VersionRange> workerVersionRanges =
+            context.State.ResolvedProfile?.WorkerVersionRanges
+            ?? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase);
+        var projectResolutionContext = new ProjectResolutionContext(context.Options.WorkingDirectory, workerVersionRanges);
+        ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(projectResolutionContext, cancellationToken);
 
         if (resolution is ProjectResolutionResult.NotResolved notResolved)
         {
@@ -35,8 +37,26 @@ internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjec
         }
 
         var resolved = (ProjectResolutionResult.Resolved)resolution;
+        ValidateSupportedRuntime(context, resolved.Project);
         context.State.Project = resolved.Project;
 
         return StartInitializationStepResult.Completed(resolved.Project.StackDisplayName);
+    }
+
+    private static void ValidateSupportedRuntime(StartInitializationStepContext context, FunctionsProject project)
+    {
+        if (context.State.ResolvedProfile is not { SupportedRuntimes: { } supportedRuntimes } profile)
+        {
+            return;
+        }
+
+        if (supportedRuntimes.Any(runtime => string.Equals(runtime, project.Worker.WorkerRuntime, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        string message = $"Profile '{profile.Name}' does not support the detected runtime '{project.Worker.WorkerRuntime}'. "
+            + $"Supported runtimes: {string.Join(", ", supportedRuntimes)}.";
+        throw new GracefulException(message, isUserError: true);
     }
 }

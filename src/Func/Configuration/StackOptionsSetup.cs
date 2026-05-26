@@ -8,10 +8,10 @@ namespace Azure.Functions.Cli.Configuration;
 
 internal sealed class StackOptionsSetup(
     IConfiguration configuration,
-    CliConfigurationSourceBuilder? configurationSourceBuilder = null) : IConfigureNamedOptions<StackOptions>
+    ICliConfigurationProvider? configurationProvider = null) : IConfigureNamedOptions<StackOptions>
 {
     private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-    private readonly CliConfigurationSourceBuilder? _configurationSourceBuilder = configurationSourceBuilder;
+    private readonly ICliConfigurationProvider? _configurationProvider = configurationProvider;
 
     public void Configure(StackOptions options)
         => Configure(Options.DefaultName, options);
@@ -27,9 +27,9 @@ internal sealed class StackOptionsSetup(
     }
 
     private IConfiguration GetConfiguration(string? name)
-        => string.IsNullOrEmpty(name) || _configurationSourceBuilder is null
+        => string.IsNullOrEmpty(name) || _configurationProvider is null
             ? _configuration
-            : _configurationSourceBuilder.Build(new DirectoryInfo(name));
+            : _configurationProvider.GetEffectiveConfiguration(new DirectoryInfo(name));
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

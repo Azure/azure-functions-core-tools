@@ -97,6 +97,22 @@ public sealed class WorkloadCatalogTests
     }
 
     [Fact]
+    public async Task ResolveLatestVersionInRangeAsync_PicksHighestStableInsideRange()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("4.900.0"), V("4.1048.199"), V("4.1048.200"), V("4.1100.0")])));
+
+        var range = VersionRange.Parse("[1.8.1, 4.1048.200)");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync(
+            "alpha", range, includePrerelease: false);
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("4.1048.199"), resolved!.Version);
+        Assert.Equal(_defaultSource.Name, resolved.Source.Name);
+    }
+
+    [Fact]
     public async Task ResolveVersionAsync_ReturnsResolvedPackage_WhenSourceHasVersion()
     {
         WorkloadCatalog catalog = NewCatalog(

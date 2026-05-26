@@ -8,10 +8,10 @@ namespace Azure.Functions.Cli.Configuration;
 
 internal sealed class HostStartupOptionsSetup(
     IConfiguration configuration,
-    CliConfigurationSourceBuilder? configurationSourceBuilder = null) : IConfigureNamedOptions<HostStartupOptions>
+    ICliConfigurationProvider? configurationProvider = null) : IConfigureNamedOptions<HostStartupOptions>
 {
     private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-    private readonly CliConfigurationSourceBuilder? _configurationSourceBuilder = configurationSourceBuilder;
+    private readonly ICliConfigurationProvider? _configurationProvider = configurationProvider;
 
     public void Configure(HostStartupOptions options)
         => Configure(Options.DefaultName, options);
@@ -24,7 +24,7 @@ internal sealed class HostStartupOptionsSetup(
     }
 
     private IConfiguration GetConfiguration(string? name)
-        => string.IsNullOrEmpty(name) || _configurationSourceBuilder is null
+        => string.IsNullOrEmpty(name) || _configurationProvider is null
             ? _configuration
-            : _configurationSourceBuilder.Build(new DirectoryInfo(name));
+            : _configurationProvider.GetEffectiveConfiguration(new DirectoryInfo(name));
 }

@@ -4,7 +4,9 @@
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads.Install;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -15,6 +17,10 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 internal sealed class DemoStartInitializationRunner(
     IFunctionsProjectResolver projectResolver,
     IExtensionBundleResolver bundleResolver,
+    IHostJsonBundleSectionReader bundleSectionReader,
+    IProfileResolver profileResolver,
+    IHostWorkloadResolver hostWorkloadResolver,
+    IWorkloadInstaller workloadInstaller,
     ILoggerFactory loggerFactory,
     TimeProvider? timeProvider = null)
     : IStartInitializationRunner
@@ -25,17 +31,35 @@ internal sealed class DemoStartInitializationRunner(
     private readonly IExtensionBundleResolver _bundleResolver = bundleResolver
         ?? throw new ArgumentNullException(nameof(bundleResolver));
 
+    private readonly IHostJsonBundleSectionReader _bundleSectionReader = bundleSectionReader
+        ?? throw new ArgumentNullException(nameof(bundleSectionReader));
+
+    private readonly IProfileResolver _profileResolver = profileResolver
+        ?? throw new ArgumentNullException(nameof(profileResolver));
+
+    private readonly IHostWorkloadResolver _hostWorkloadResolver = hostWorkloadResolver
+        ?? throw new ArgumentNullException(nameof(hostWorkloadResolver));
+
+    private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller
+        ?? throw new ArgumentNullException(nameof(workloadInstaller));
+
     private readonly ILoggerFactory _loggerFactory = loggerFactory
         ?? throw new ArgumentNullException(nameof(loggerFactory));
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
-    public async Task<StartInitializationResult> RunAsync(StartInitializationContext context, IStartInitializationRenderer renderer, CancellationToken cancellationToken)
+    public async Task<StartInitializationResult> RunAsync(
+        StartInitializationContext context,
+        IStartInitializationRenderer renderer,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(renderer);
 
-        var state = new StartInitializationState();
+        var state = new StartInitializationState
+        {
+            ProfileName = context.ProfileName,
+        };
         await EmitAsync(renderer, new StartInitializationStartedEvent(Now(), state.ProfileName), cancellationToken);
 
         await RunStepsAsync(CreateSteps(), context, state, renderer, cancellationToken);
@@ -47,11 +71,14 @@ internal sealed class DemoStartInitializationRunner(
     {
         StartInitializationStepCollection steps =
         [
-            new ResolveProfileInitializationStep(),
+            new ResolveProfileInitializationStep(_profileResolver),
             new ResolveConstraintsInitializationStep(),
-            new ValidateHostWorkloadInitializationStep(),
+            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
-            new ValidateExtensionBundleInitializationStep(_bundleResolver, _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
+            new ValidateExtensionBundleInitializationStep(
+                _bundleResolver,
+                _bundleSectionReader,
+                _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
             new PrepareProjectHostRunInitializationStep(),
             new StartHostInitializationStep(_time),
         ];

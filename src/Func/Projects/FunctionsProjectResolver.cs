@@ -9,18 +9,23 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Default aggregate project resolver.
 /// </summary>
-internal sealed class FunctionsProjectResolver(IEnumerable<WorkloadProjectFactoryRegistration> factories, IFunctionsWorkerResolver workerResolver)
+internal sealed class FunctionsProjectResolver(
+    IEnumerable<WorkloadProjectFactoryRegistration> factories,
+    IFunctionsWorkerResolverFactory workerResolverFactory)
     : IFunctionsProjectResolver
 {
     private readonly IReadOnlyList<WorkloadProjectFactoryRegistration> _factories =
         (factories ?? throw new ArgumentNullException(nameof(factories))).ToList();
-    private readonly IFunctionsWorkerResolver _workerResolver = workerResolver ?? throw new ArgumentNullException(nameof(workerResolver));
+
+    private readonly IFunctionsWorkerResolverFactory _workerResolverFactory = workerResolverFactory
+        ?? throw new ArgumentNullException(nameof(workerResolverFactory));
 
     public async Task<ProjectResolutionResult> ResolveProjectAsync(ProjectResolutionContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var creationContext = new ProjectCreationContext(context.WorkingDirectory, _workerResolver);
+        IFunctionsWorkerResolver workerResolver = _workerResolverFactory.Create(context.WorkerVersionRanges);
+        var creationContext = new ProjectCreationContext(context.WorkingDirectory, workerResolver);
         foreach (WorkloadProjectFactoryRegistration registration in _factories)
         {
             cancellationToken.ThrowIfCancellationRequested();

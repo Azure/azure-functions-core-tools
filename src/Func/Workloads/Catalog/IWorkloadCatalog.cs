@@ -53,6 +53,22 @@ internal interface IWorkloadCatalog
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns the highest installable version of <paramref name="packageId"/>
+    /// satisfying <paramref name="versionRange"/>, or <c>null</c> when no version matches.
+    /// </summary>
+    /// <param name="packageId">NuGet package id; case-insensitive.</param>
+    /// <param name="versionRange">Allowed package version range.</param>
+    /// <param name="includePrerelease"><c>true</c> to allow prerelease versions in the result.</param>
+    /// <param name="source">Optional <c>--source</c> override.</param>
+    /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
+    public Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(
+        string packageId,
+        VersionRange versionRange,
+        bool includePrerelease,
+        string? source = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Resolves an exact <paramref name="version"/> of <paramref name="packageId"/>
     /// against the configured source. Returns <c>null</c> when the source does
     /// not advertise that version. Used by <c>install --version</c>.

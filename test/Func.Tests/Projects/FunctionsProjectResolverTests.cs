@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
+using NuGet.Versioning;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Projects;
@@ -14,6 +15,13 @@ public sealed class FunctionsProjectResolverTests
 {
     private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
     private readonly IFunctionsWorkerResolver _workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+    private readonly IFunctionsWorkerResolverFactory _workerResolverFactory = Substitute.For<IFunctionsWorkerResolverFactory>();
+
+    public FunctionsProjectResolverTests()
+    {
+        _workerResolverFactory.Create(Arg.Any<IReadOnlyDictionary<string, VersionRange>>())
+            .Returns(_workerResolver);
+    }
 
     [Fact]
     public async Task ResolveProjectAsync_FirstFactoryCreatesProject_ReturnsProject()
@@ -110,6 +118,22 @@ public sealed class FunctionsProjectResolverTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ResolveProjectAsync_PassesWorkerConstraintsToResolverFactory()
+    {
+        IFunctionsProjectFactory factory = NewFactory(ProjectCreationResults.NotCreated("not mine"));
+        FunctionsProjectResolver resolver = NewResolver([factory]);
+        Dictionary<string, VersionRange> ranges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = VersionRange.Parse("[3.13.0]"),
+        };
+        var context = new ProjectResolutionContext(_workingDirectory, ranges);
+
+        await resolver.ResolveProjectAsync(context, CancellationToken.None);
+
+        _workerResolverFactory.Received(1).Create(ranges);
+    }
+
     private ProjectResolutionContext CreateContext() => new(_workingDirectory);
 
     private FunctionsProjectResolver NewResolver(IReadOnlyList<IFunctionsProjectFactory> factories)
@@ -117,7 +141,7 @@ public sealed class FunctionsProjectResolverTests
             factories.Select((factory, index) => new WorkloadProjectFactoryRegistration(
                 TestWorkloads.CreateInfo($"Test.Workload.{index}"),
                 factory)),
-            _workerResolver);
+            _workerResolverFactory);
 
     private static IFunctionsProjectFactory NewFactory(ProjectCreationResult result)
     {

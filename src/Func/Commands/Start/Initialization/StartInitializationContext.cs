@@ -12,5 +12,7 @@ internal sealed record StartInitializationContext(
     bool IsInteractive,
     bool CanPrompt)
 {
-    public string ProfileName => "none";
+    public string ProfileName => string.IsNullOrWhiteSpace(Options.RequestedProfileName)
+        ? "none"
+        : Options.RequestedProfileName;
 }

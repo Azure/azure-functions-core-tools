@@ -27,7 +27,12 @@ internal sealed class PrepareProjectHostRunInitializationStep : DemoInitializati
         FunctionsProject project = context.State.Project
             ?? throw new InvalidOperationException("Functions project was not resolved.");
 
-        Dictionary<string, string> environmentVariables = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> environmentVariables = new(context.State.HostEnvironmentVariables, StringComparer.OrdinalIgnoreCase);
+        foreach ((string name, string value) in context.State.BundleEnvVarsForHost)
+        {
+            environmentVariables[name] = value;
+        }
+
         var hostRunContext = new FunctionsProjectHostRunContext(
             project.WorkingDirectory.Info,
             project.Worker.WorkerRuntime,

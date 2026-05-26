@@ -32,7 +32,8 @@ internal sealed class PlainStartInitializationRenderer(IInteractionService inter
                 _interaction.WriteLine($"[init] {completed.StepId} complete{FormatMessage(completed.Message)}");
                 break;
             case StartInitializationCompletedEvent completed:
-                _interaction.WriteLine($"Initialization complete. Host {completed.Result.HostVersion} selected.");
+                _interaction.WriteLine(
+                    $"Initialization complete. Host {completed.Result.HostVersion} selected.{FormatProfile(completed.Result.Profile)}");
                 break;
         }
 
@@ -43,4 +44,9 @@ internal sealed class PlainStartInitializationRenderer(IInteractionService inter
 
     private static string FormatMessage(string? message)
         => string.IsNullOrWhiteSpace(message) ? string.Empty : $": {message}";
+
+    private static string FormatProfile(StartInitializationProfileInfo? profile)
+        => profile is null
+            ? string.Empty
+            : $" Profile {profile.Name} from {profile.SourceDisplayName}.";
 }

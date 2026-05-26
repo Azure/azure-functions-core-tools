@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
+using NuGet.Versioning;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workers;
@@ -19,6 +20,7 @@ public class DefaultFunctionsWorkerResolverTests
 
     public DefaultFunctionsWorkerResolverTests()
     {
+        _workloads.GetContentWorkloads().Returns([]);
         _workloads.GetContentWorkloadsByPackageId(Arg.Any<string>()).Returns([]);
         _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
     }
@@ -59,7 +61,7 @@ public class DefaultFunctionsWorkerResolverTests
     }
 
     [Fact]
-    public async Task ResolveWorkerAsync_WorkloadAliasOnlyDoesNotMatch_ReturnsNotInstalled()
+    public async Task ResolveWorkerAsync_WorkloadAlias_ReturnsResolvedWorker()
     {
         ContentWorkloadInfo workload = CreateContentWorkload("custom.node.worker", "3.13.0", ["node-worker"]);
         UseContentWorkloads(workload);
@@ -69,10 +71,10 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
-        FunctionsWorkerResolutionFailure.NotInstalled failure =
-            Assert.IsType<FunctionsWorkerResolutionFailure.NotInstalled>(notResolved.Failure);
-        Assert.Equal("node", failure.WorkerId.Value);
+        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        Assert.Equal("node", resolved.Worker.Id.Value);
+        Assert.Equal("3.13.0", resolved.Worker.Version);
+        Assert.Equal(Path.Combine(workload.ContentRoot, "worker.config.json"), resolved.Worker.WorkerConfigPath);
     }
 
     [Fact]
@@ -162,6 +164,48 @@ public class DefaultFunctionsWorkerResolverTests
     }
 
     [Fact]
+    public async Task ResolveWorkerAsync_ProfileConstraint_SelectsHighestCompatibleVersion()
+    {
+        ContentWorkloadInfo older = CreateContentWorkload(NodeWorkerPackageId, "3.12.0");
+        ContentWorkloadInfo compatible = CreateContentWorkload(NodeWorkerPackageId, "3.13.0");
+        ContentWorkloadInfo tooNew = CreateContentWorkload(NodeWorkerPackageId, "3.14.0");
+        UseContentWorkloads(older, compatible, tooNew);
+        Dictionary<string, VersionRange> workerVersionRanges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = VersionRange.Parse("[3.13.0]"),
+        };
+        DefaultFunctionsWorkerResolver resolver = CreateResolver(workerVersionRanges);
+
+        FunctionsWorkerResolutionResult result = await resolver.ResolveWorkerAsync(
+            new FunctionsWorkerId("node"),
+            CancellationToken.None);
+
+        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        Assert.Equal("3.13.0", resolved.Worker.Version);
+    }
+
+    [Fact]
+    public async Task ResolveWorkerAsync_ProfileConstraintWithoutCompatibleInstall_ReturnsMissingCompatibleVersion()
+    {
+        UseContentWorkloads(CreateContentWorkload(NodeWorkerPackageId, "3.12.0"));
+        Dictionary<string, VersionRange> workerVersionRanges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = VersionRange.Parse("[3.13.0]"),
+        };
+        DefaultFunctionsWorkerResolver resolver = CreateResolver(workerVersionRanges);
+
+        FunctionsWorkerResolutionResult result = await resolver.ResolveWorkerAsync(
+            new FunctionsWorkerId("node"),
+            CancellationToken.None);
+
+        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
+        FunctionsWorkerResolutionFailure.MissingCompatibleVersion failure =
+            Assert.IsType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>(notResolved.Failure);
+        Assert.Equal("[3.13.0]", failure.VersionConstraint);
+        Assert.Contains("func workload install node-worker", failure.Message);
+    }
+
+    [Fact]
     public async Task ResolveWorkerAsync_MissingWorkerConfig_ReturnsInvalidInstallation()
     {
         ContentWorkloadInfo workload = CreateContentWorkload(PythonWorkerPackageId, "4.43.0");
@@ -218,7 +262,9 @@ public class DefaultFunctionsWorkerResolverTests
     }
 
     private void UseContentWorkloads(params ContentWorkloadInfo[] workloads)
-        => _workloads.GetContentWorkloadsByPackageId(Arg.Any<string>())
+    {
+        _workloads.GetContentWorkloads().Returns(workloads);
+        _workloads.GetContentWorkloadsByPackageId(Arg.Any<string>())
             .Returns(callInfo =>
             {
                 string packageId = callInfo.Arg<string>();
@@ -226,9 +272,10 @@ public class DefaultFunctionsWorkerResolverTests
                     [.. workloads.Where(w => string.Equals(w.PackageId, packageId, StringComparison.OrdinalIgnoreCase))];
                 return matching;
             });
+    }
 
-    private DefaultFunctionsWorkerResolver CreateResolver()
-        => new(_workloads, _fileSystem);
+    private DefaultFunctionsWorkerResolver CreateResolver(IReadOnlyDictionary<string, VersionRange>? workerVersionRanges = null)
+        => new(_workloads, _fileSystem, workerVersionRanges);
 
     private static ContentWorkloadInfo CreateContentWorkload(
         string packageId,
