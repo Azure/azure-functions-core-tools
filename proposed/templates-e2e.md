@@ -1,4 +1,4 @@
-# Core Tools vNext: `func new templates` — CDN-Backed Template Discovery
+# Core Tools vNext: `func quickstart` — CDN-Backed Template Discovery
 
 **Author:** manvkaur
 **Date:** 2026-05-18
@@ -20,7 +20,7 @@ Development is proceeding with **`quickstart`** as the working name. This is a *
 | **`sample`** | `func sample` | `list`, `info` | These are sample repos; no overloading of "template" | Might imply "not production-ready" |
 | **`bootstrap`** | `func bootstrap` | `list`, `info` | Accurate for "set up a project from scratch" | Less discoverable; not a common Azure CLI verb |
 
-> **Impact of verb change:** The verb is used in the command name, class names (`QuickstartCommand` → `TemplatesCommand`), service names, and all CLI examples throughout this document. The design is otherwise identical regardless of verb chosen. Swapping the verb is a find-and-replace — no architectural changes.
+> **Impact of verb change:** The verb is used in the command name, class names, service names, and all CLI examples throughout this document. The design is otherwise identical regardless of verb chosen. Swapping the verb is a find-and-replace — no architectural changes.
 
 ---
 
@@ -36,21 +36,25 @@ Development is proceeding with **`quickstart`** as the working name. This is a *
     - [Release & Compliance Model](#release--compliance-model)
     - [Runtime-to-Language Mapping](#runtime-to-language-mapping)
     - [ITemplateFunctionScaffolder](#itemplatefunctionscaffolder)
-    - [Download Strategy](#download-strategy---fetch-githttp)
+    - [Download Strategy](#download-strategy---fetch-autogithttp)
     - [Git Process Requirements](#git-process-requirements)
+    - [Repository Metadata Cleanup](#repository-metadata-cleanup)
   - [User Experience Flow](#user-experience-flow)
   - [Execution Flow](#execution-flow)
     - [Manifest Cache Flow](#manifest-cache-flow)
     - [Template Download Strategy](#template-download-strategy)
   - [New Commands](#new-commands)
-    - [TemplatesCommand](#templatescommand)
-    - [TemplatesListCommand](#templateslistcommand)
-    - [TemplatesInfoCommand](#templatesinfocommand)
-  - [NewCommand Change](#newcommand-change)
+    - [QuickstartCommand](#quickstartcommand)
+    - [QuickstartListCommand](#quickstartlistcommand)
+    - [QuickstartInfoCommand](#quickstartinfocommand)
   - [BuiltInCommands Change](#builtincommands-change)
   - [File Layout](#file-layout)
 - [IInteractionService Prompt Gap](#iinteractionservice-prompt-gap)
 - [Error Messaging](#error-messaging)
+- [Security Envelope](#security-envelope)
+- [Manifest Source](#manifest-source)
+- [Exit Codes](#exit-codes)
+- [Future Work](#future-work)
 - [Open Questions](#open-questions)
 - [Appendix](#appendix)
   - [References](#references)
@@ -65,12 +69,12 @@ In vnext, workload templates solve the per-function scaffolding story: `func new
 
 Today, complete app templates live in GitHub repos (e.g. Azure-Samples) and developers discover them through docs, portal links, or search. This design brings that discovery and scaffolding workflow into the CLI itself.
 
-This design introduces `func new templates`: a built-in command that downloads **complete, immediately runnable function app templates** directly from GitHub, complementing the workload-driven `func new` experience. Templates are discovered via a live manifest hosted on the Azure Functions CDN. Adding a new template is as simple as publishing a GitHub repo and adding an entry to the manifest — no CLI or workload release required. The manifest is versioned independently; the CLI picks up new templates automatically on the next manifest refresh.
+This design introduces `func quickstart`: a built-in command that downloads **complete, immediately runnable function app templates** directly from GitHub, complementing the workload-driven `func new` experience. Templates are discovered via a live manifest hosted on the Azure Functions CDN. Adding a new template is as simple as publishing a GitHub repo and adding an entry to the manifest — no CLI or workload release required. The manifest is versioned independently; the CLI picks up new templates automatically on the next manifest refresh.
 
 How this complements workload templates:
 
 - **Decoupled template lifecycle** — app templates live as standalone GitHub repos; they can be added, updated, and iterated on independently of both CLI and workload package releases
-- **Built-in discovery** — `func new templates list` and the interactive flow give developers a way to find and filter available app templates without leaving the CLI
+- **Built-in discovery** — `func quickstart list` and the interactive flow give developers a way to find and filter available app templates without leaving the CLI
 
 ---
 
@@ -78,11 +82,11 @@ How this complements workload templates:
 
 ### Goals
 
-- Add `func new templates` as a built-in subcommand of `NewCommand` on the vnext branch
+- Add `func quickstart` as a top-level command on the vnext branch
 - Download and create a **complete function app** from a GitHub template — all function code, config, and dependencies included
 - CDN-backed template manifest with ETag caching (24h TTL)
-- `func new templates list` — non-interactive table of available templates, filterable by `--language`, `--resource`, `--iac`, and keyword (`--search`); `--search` is a **case-insensitive substring match** (not semantic/fuzzy) against `id`, `displayName`, `resource`, `tags`, and `shortDescription`
-- `func new templates` (bare invocation) — interactive flow: worker runtime → (dotnet sub-prompt: C#/F#, Node sub-prompt: JS/TS) → trigger → scaffold; the runtime prompt matches the existing `func new` UX (`.NET`, `Node`, `Python`, `Java`, `Powershell`); trigger selection supports incremental keyword filtering; powered by the existing `IInteractionService` / Spectre.Console already in vnext
+- `func quickstart list` — non-interactive table of available templates, filterable by `--language`, `--resource`, `--iac`, and keyword (`--search`); `--search` is a **case-insensitive substring match** (not semantic/fuzzy) against `id`, `displayName`, `resource`, `tags`, and `shortDescription`
+- `func quickstart` (bare invocation) — interactive flow: worker runtime → (dotnet sub-prompt: C#/F#, Node sub-prompt: JS/TS) → trigger → scaffold; the runtime prompt matches the existing `func new` UX (`.NET`, `Node`, `Python`, `Java`, `Powershell`); trigger selection supports incremental keyword filtering; powered by the existing `IInteractionService` / Spectre.Console already in vnext
 - **.NET isolated worker model only** — the manifest `CSharp` and `FSharp` languages map exclusively to the .NET isolated worker model; the in-process model is not supported and will not be added (it is on a deprecation path). Note: no F# templates exist in the manifest today; the sub-prompt will show F# once templates are available
 - **Agent and CI friendly** — all v4 `func new` flags preserved (`--language`, `--template`); `--language` accepts runtime names (`python`, `node`, `java`, `dotnet`, `csharp`, `fsharp`, `javascript`, `typescript`, `powershell`); non-TTY falls back to numbered list; `--template` skips all prompts for fully non-interactive use
 - Template download via git sparse-checkout or GitHub zip API (no bundling in binary)
@@ -96,34 +100,51 @@ How this complements workload templates:
 - Automatic environment setup (venv, npm install, dotnet restore) — out of scope; belongs in `func start` workflow
 - File conflict handling and `--force` flag — **deferred to next iteration of this command**; v1 requires target directory to be empty
 
-> **Why `--language` is required:** Workload-driven `func new` operates on an existing project and can detect the runtime from project files. `func new templates` scaffolds into an empty directory, so there is nothing to detect from — `--language` must be supplied explicitly.
+> **Why `--language` is required:** Workload-driven `func new` operates on an existing project and can detect the runtime from project files. `func quickstart` scaffolds into an empty directory, so there is nothing to detect from — `--language` must be supplied explicitly.
 
 ---
 
 ## Proposed Design
 
-> **Command keyword note:** `templates` is the current choice for the subcommand name (`func new templates`). If the command is later promoted to top-level, this name becomes the top-level verb — the right name should be confirmed during design review before vNext ships.
+> **Command keyword note:** `quickstart` is the working name for this top-level command (`func quickstart`). The final verb is still under discussion (see Command Verb section above).
 
 ### Command Tree
 
 ```bash
-func new                                    # NewCommand (existing)
-  func new templates                        # TemplatesCommand (new — interactive flow when bare)
-    func new templates list                 # TemplatesListCommand (new — table output)
-    func new templates info <id>            # TemplatesInfoCommand (new — detailed template info)
+func quickstart [<path>] [options]          # QuickstartCommand (new — interactive flow when bare)
+  func quickstart list [options]            # QuickstartListCommand (new — table output)
+  func quickstart info <id>                 # QuickstartInfoCommand (new — detailed template info)
 ```
 
-> **Promotion path** — `TemplatesCommand` is designed to be re-parented as a top-level command (`func <newcommand>`) with zero logic changes. All business logic lives in `ITemplateManifestService` and `ITemplateFunctionScaffolder`; the command is a thin shell. When/if promoted:
->
-> - Change registration in `BuiltInCommands` from `services.AddSingleton<TemplatesCommand>()` to `services.AddSingleton<FuncCliCommand, TemplatesCommand>()`  
-> - Remove `Subcommands.Add(templatesCommand)` from `NewCommand`  
-> - No changes to services, scaffolding, prompts, or tests
+#### Synopsis
+
+```bash
+func quickstart [<path>] [--language|-l <lang>] [--template|-t <id>]
+                [--resource|-r <name>] [--iac <name>] [--search|-s <text>]
+                [--fetch auto|git|http]
+
+Subcommands:
+  list  [--language] [--resource] [--iac] [--search]
+  info  <id>
+```
+
+| Option | Description |
+| --- | --- |
+| `<path>` | Positional argument: target directory (consistent with `func init`, `func new`, `func start`). Defaults to current directory |
+| `--language`, `-l` | Worker runtime or language (`python`, `node`, `java`, `dotnet`, `csharp`, `fsharp`, `javascript`, `typescript`, `powershell`) |
+| `--template`, `-t` | Template id from manifest -- skips all prompts |
+| `--resource`, `-r` | Filter by trigger/binding resource (`http`, `timer`, `blob`, `eventhub`, `servicebus`, `cosmos`, `sql`, `mcp`, `durable`) |
+| `--iac` | Filter by infrastructure-as-code type (`bicep`, `terraform`, `none`) |
+| `--search`, `-s` | Case-insensitive substring filter applied to IDs, display names, resources, tags, descriptions. Empty result -> exit 1 with guidance |
+| `--fetch` | Controls how template payload is fetched: `auto` (default), `git`, `http`. See [Download Strategy](#download-strategy---fetch-autogithttp) |
+
+> **Thin-command design** — `QuickstartCommand` is a thin shell. All business logic lives in `ITemplateManifestService` and `ITemplateFunctionScaffolder`; no scaffolding, manifest, or prompt logic in the command itself.
 
 **User experience:**
 
 ```bash
 # Interactive scaffold — arrow keys to navigate, type to live-filter
-$ func new templates
+$ func quickstart
 
   Use the up/down arrow keys to select a worker runtime:
     .NET
@@ -161,7 +182,7 @@ $ func new templates
     3. func start
 
 # Interactive scaffold into a named folder (created if it doesn't exist)
-$ func new templates --path ./my-new-api
+$ func quickstart --path ./my-new-api
 
   Use the up/down arrow keys to select a worker runtime: ...
 
@@ -174,26 +195,26 @@ $ func new templates --path ./my-new-api
     3. func start
 
 # Scaffold into a specific folder (created if absent; also accepted if it exists and is empty)
-$ func new templates --template blob-eventgrid-trigger-python-azd --path ./my-fn
-$ func new templates --template blob-eventgrid-trigger-python-azd --path /home/user/projects/my-fn
+$ func quickstart --template blob-eventgrid-trigger-python-azd --path ./my-fn
+$ func quickstart --template blob-eventgrid-trigger-python-azd --path /home/user/projects/my-fn
 
 # Directory is not empty → error
-$ func new templates --template http-trigger-python-azd --path ./existing-dir
+$ func quickstart --template http-trigger-python-azd --path ./existing-dir
   Error: Target directory './existing-dir' is not empty.
   Use an empty directory or a new --path.
 
 # Network failure — CDN unreachable (manifest fetch)
-$ func new templates
+$ func quickstart
   Error: This feature requires a network connection to fetch the template catalog.
   Please check your connection and try again.
 
 # Network failure — GitHub unreachable (template download)
-$ func new templates --template http-trigger-python-azd
+$ func quickstart --template http-trigger-python-azd
   Error: Unable to reach GitHub to download the template.
   Please check your network connection and try again.
 
 # Fully non-interactive: --template skips all prompts
-$ func new templates --language python --template http-trigger-python-azd
+$ func quickstart --language python --template http-trigger-python-azd
   Created http-trigger-python-azd in current directory
 
   Next steps:
@@ -218,7 +239,7 @@ Every successful scaffold prints a success line followed by runtime-specific nex
 
 ```bash
 # Filter by language — Language column omitted (redundant)
-$ func new templates list --language python
+$ func quickstart list --language python
 
   Id                                        Resource    IaC
   ────────────────────────────────────────────────────────
@@ -230,7 +251,7 @@ $ func new templates list --language python
   ...
 
 # Filter by resource — Resource column omitted (redundant)
-$ func new templates list --resource http
+$ func quickstart list --resource http
 
   Id                                        Language    IaC
   ────────────────────────────────────────────────────────
@@ -241,7 +262,7 @@ $ func new templates list --resource http
   ...
 
 # Filter by iac — IaC column omitted (redundant)
-$ func new templates list --iac bicep
+$ func quickstart list --iac bicep
 
   Id                                        Resource    Language
   ────────────────────────────────────────────────────────────
@@ -250,7 +271,7 @@ $ func new templates list --iac bicep
   ...
 
 # Keyword search — all columns shown (no filter to omit)
-$ func new templates list --search blob
+$ func quickstart list --search blob
 
   Id                                          Resource    Language    IaC
   ────────────────────────────────────────────────────────────────────────
@@ -260,19 +281,19 @@ $ func new templates list --search blob
   ...
 
 # Combined — Language and Resource columns omitted
-$ func new templates list --language python --resource blob
+$ func quickstart list --language python --resource blob
 
 # Non-interactive scaffold with language + resource
-$ func new templates --language python --resource http
+$ func quickstart --language python --resource http
 
 # Non-interactive scaffold with language + resource + iac
-$ func new templates --language python --resource http --iac bicep
+$ func quickstart --language python --resource http --iac bicep
 
 # Non-interactive scaffold by exact template id (skips language + trigger prompts)
-$ func new templates --template http-trigger-python-azd
+$ func quickstart --template http-trigger-python-azd
 
 # Show detailed info about a specific template
-$ func new templates info http-trigger-python-azd
+$ func quickstart info http-trigger-python-azd
 
   HTTP Trigger (Python + AZD + Bicep)
 
@@ -320,7 +341,7 @@ internal interface ITemplateManifestService
 | 304 Not Modified | Update TTL timestamp, return cached manifest |
 | Network failure | Log warning via `IInteractionService.WriteWarning`; fall back to bundled embedded manifest |
 | Trusted-org filter | Strip any template whose `repositoryUrl` owner is not in `{"azure", "azure-samples", "microsoft"}` |
-| IaC-only filter | Exclude templates where `language` is `ARM`, `Bicep`, or `Terraform` — these are infrastructure-as-code templates, not function app code. The manifest has 4 such entries (e.g. `iac-flex-consumption-bicep`); they are irrelevant to `func new templates`. |
+| IaC-only filter | Exclude templates where `language` is `ARM`, `Bicep`, or `Terraform` — these are infrastructure-as-code templates, not function app code. The manifest has 4 such entries (e.g. `iac-flex-consumption-bicep`); they are irrelevant to `func quickstart`. |
 | Manifest validation | Non-null `templates` array; each entry has `id`, `language`, `resource`, `repositoryUrl`, `folderPath`, `gitRef` |
 | `gitRef` resolution | Each template entry **must** include `"gitRef": "<tag-or-sha>"`. The CLI uses `gitRef` as the checkout/download target. This ensures templates are pinned to an immutable, reviewed release — no implicit default-branch resolution |
 | URL override | `FUNC_TEMPLATE_MANIFEST_URL` environment variable overrides the primary URL. Used for testing against staging CDN or local dev manifests. Same schema expected |
@@ -373,12 +394,13 @@ internal interface ITemplateFunctionScaffolder
 
 `TemplateFunctionScaffolder` implementation (ported from `fnx/lib/init/scaffold.js`):
 
-#### Download Strategy (`--fetch git|http`)
+#### Download Strategy (`--fetch auto|git|http`)
 
 | Value | Behaviour | Best for |
 | --- | --- | --- |
-| `git` **(default)** | Uses git sparse-checkout. If `git` is not on PATH, falls back to `http` with a warning: `git not found on PATH — using HTTP to download template.` | Developers with git on PATH (vast majority) |
-| `http` | Uses GitHub REST API (zip for whole-repo, tree API + raw downloads for subfolders) | Environments without git, CI containers, air-gapped with proxy |
+| `auto` **(default)** | Probe `git --version`. If git >= 2.25 is available, use `git`; otherwise fall back to `http` silently | Most users (auto-selects the best available strategy) |
+| `git` | Force git. Fails with exit 1 if git is unavailable: `git 2.25 or later was not found on PATH. Install a recent git or use '--fetch http'.` | When you want to guarantee git-based fetch |
+| `http` | Force the GitHub archive zip endpoint. Never invokes git | Environments without git, CI containers, air-gapped with proxy |
 
 The `--fetch` flag allows explicit override regardless of git availability.
 
@@ -387,12 +409,22 @@ The `--fetch` flag allows explicit override regardless of git availability.
 | Strategy | Condition | Detail |
 | ---------- | ----------- | -------- |
 | git sparse-checkout | `--fetch git` + `folderPath` is subfolder | `git clone --filter=blob:none --sparse --branch <gitRef> <repoUrl> <tempDir>` then `git sparse-checkout set <folderPath>` |
-| git clone (whole repo) | `--fetch git` + `folderPath` is `"."` | `git clone --depth 1 --branch <gitRef> <repoUrl> <tempDir>` |
+| git clone (whole repo) | `--fetch git` + `folderPath` is `"."` | `git clone --depth 1 --branch <gitRef> --single-branch --config core.autocrlf=false -- <repoUrl> <tempDir>` |
 | Tree API + raw URLs | `--fetch http` + `folderPath` is subfolder | `GET /repos/{owner}/{repo}/git/trees/<gitRef>?recursive=1` to enumerate, then download each file via `raw.githubusercontent.com/<owner>/<repo>/<gitRef>/<path>`. Rate limit: 60 tree req/hr (unauthenticated), ~5,000 raw req/hr |
-| GitHub zip API | `--fetch http` + `folderPath` is `"."` | `GET https://api.github.com/repos/<owner>/<repo>/zipball/<gitRef>` → extract and strip root prefix |
+| GitHub zip API | `--fetch http` + `folderPath` is `"."` | `GET https://api.github.com/repos/<owner>/<repo>/zipball/<gitRef>` -> extract and strip root prefix |
 | Path traversal prevention | Always | Resolve each extracted path and assert it starts with `targetDirectory + Path.DirectorySeparatorChar` |
 | Trusted org | Always | Validate `owner` from `repositoryUrl` before any network call |
 | URL scheme | Always | Only `https://github.com/` allowed as repository base |
+
+**Git clone notes:**
+
+- `--branch` is omitted when `gitRef` is null/empty/`"HEAD"`, so git uses the remote's default branch (handles both `main` and `master` repos)
+- `--sparse` added only when the manifest entry has a non-root `folderPath`
+- Requires git 2.25+ for `--sparse` cone mode (released January 2020)
+
+**Subfolder promotion:**
+
+After sparse-checkout, content lives at `<target>/<folderPath>/`. The scaffolder promotes it to `<target>/` (deletes siblings, moves content up) so the final layout matches the http path.
 
 #### Git Process Requirements
 
@@ -400,12 +432,24 @@ All git child-process invocations must satisfy:
 
 | Requirement | Implementation |
 | --- | --- |
-| **Process abstraction** | Wrap behind `IGitRunner` interface — no direct `Process.Start` in business logic. Testable via `FakeGitRunner` in tests |
+| **Process abstraction** | Wrap behind `IGitRunner` interface -- no direct `Process.Start` in business logic. Testable via `FakeGitRunner` in tests |
 | **Argument-array invocation** | Pass arguments via `ProcessStartInfo.ArgumentList` (string array), never as a shell-concatenated string. Prevents injection if a URL or path contains special characters |
-| **Non-interactive** | Set `GIT_TERMINAL_PROMPT=0` environment variable on the child process — git must never prompt for credentials. Private/inaccessible repos fail cleanly with an error message |
-| **Timeout** | Configurable timeout (default 120s). Kill the process and report `Template download timed out. Try again or use --fetch http.` |
+| **`--` end-of-options sentinel** | Always place `--` before positional args (URL, target path) -- blocks flag-injection via manifest values |
+| **gitRef validation** | Reject if it starts with `-` (belt-and-braces over the `--` sentinel) |
+| **folderPath validation** | Reject if it starts with `-` or contains `..` |
+| **Non-interactive** | Set environment variables on the child process: `GIT_TERMINAL_PROMPT=0`, `GIT_ASKPASS=echo`, `SSH_ASKPASS=echo`, `GCM_INTERACTIVE=Never` -- git must never prompt for credentials |
+| **Timeout** | 60-second timeout with linked `CancellationTokenSource`; user cancellation distinguished from timeout; process tree killed on timeout |
 | **Cancellation** | `CancellationToken` from the command handler kills the git child process on Ctrl+C. Use `Process.Kill(entireProcessTree: true)` |
 | **Temp directory cleanup** | Clone into a temp directory; move files to target on success. On failure or cancellation, delete the temp directory in a `finally` block |
+
+#### Repository Metadata Cleanup
+
+After any successful fetch (both git and http paths), the scaffolder removes:
+
+- `<target>/.git/` -- never useful for a fresh quickstart
+- `<target>/.github/` -- CI workflows belong to the source repo, not the user's project
+
+Read-only attributes (set by git on Windows for pack files) are cleared before deletion.
 
 ---
 
@@ -415,7 +459,7 @@ What the user sees in the terminal across every path.
 
 ```mermaid
 flowchart TD
-    START(["$ func new templates [flags]"])
+    START(["$ func quickstart [flags]"])
     START --> FETCH["Fetching template catalog..."]
 
     FETCH --> DIR_ERR{"Target dir empty?"}
@@ -457,7 +501,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A(["func new templates invoked"]) --> B["Fetch manifest<br/>CDN - ETag cache - bundled fallback"]
+    A(["func quickstart invoked"]) --> B["Fetch manifest<br/>CDN - ETag cache - bundled fallback"]
     B --> C{"--path supplied?"}
     C -- yes --> D["Resolve target = --path"]
     C -- no --> E["Resolve target = cwd"]
@@ -556,13 +600,13 @@ flowchart TD
 
 ### New Commands
 
-#### `TemplatesCommand`
+#### `QuickstartCommand`
 
-> **Thin-command principle** — `TemplatesCommand` must not contain any manifest, scaffolding, or prompt logic itself. All of that lives in `ITemplateManifestService` and `ITemplateFunctionScaffolder`. This keeps the command re-parentable: it can live under `func new` today and be promoted to `func <newcommand>` later by changing one DI registration, not the implementation.
+> **Thin-command principle** — `QuickstartCommand` must not contain any manifest, scaffolding, or prompt logic itself. All of that lives in `ITemplateManifestService` and `ITemplateFunctionScaffolder`.
 
 ```csharp
-// src/Func/Commands/New/TemplatesCommand.cs
-internal sealed class TemplatesCommand : FuncCliCommand
+// src/Func/Commands/Quickstart/QuickstartCommand.cs
+internal sealed class QuickstartCommand : FuncCliCommand
 {
     // Carried forward from v4 func new — preserve agent/CI compatibility
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
@@ -593,13 +637,13 @@ internal sealed class TemplatesCommand : FuncCliCommand
         Description = "Case-insensitive substring filter applied to trigger names and descriptions before prompting (not semantic/fuzzy search)"
     };
 
-    public TemplatesCommand(
-        TemplatesListCommand listCommand,
-        TemplatesInfoCommand infoCommand,
+    public QuickstartCommand(
+        QuickstartListCommand listCommand,
+        QuickstartInfoCommand infoCommand,
         ITemplateManifestService manifestService,
         ITemplateFunctionScaffolder scaffolder,
         IInteractionService interaction)
-        : base("templates", "Browse and scaffold functions from the Azure Functions template catalog.")
+        : base("quickstart", "Browse and scaffold functions from the Azure Functions template catalog.")
     {
         Subcommands.Add(listCommand);
         Subcommands.Add(infoCommand);
@@ -640,11 +684,11 @@ internal sealed class TemplatesCommand : FuncCliCommand
 }
 ```
 
-#### `TemplatesListCommand`
+#### `QuickstartListCommand`
 
 ```csharp
-// src/Func/Commands/New/TemplatesListCommand.cs
-internal sealed class TemplatesListCommand : FuncCliCommand
+// src/Func/Commands/Quickstart/QuickstartListCommand.cs
+internal sealed class QuickstartListCommand : FuncCliCommand
 {
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
@@ -680,22 +724,22 @@ internal sealed class TemplatesListCommand : FuncCliCommand
 }
 ```
 
-#### `TemplatesInfoCommand`
+#### `QuickstartInfoCommand`
 
 ```csharp
-// src/Func/Commands/New/TemplatesInfoCommand.cs
-internal sealed class TemplatesInfoCommand : FuncCliCommand
+// src/Func/Commands/Quickstart/QuickstartInfoCommand.cs
+internal sealed class QuickstartInfoCommand : FuncCliCommand
 {
     public Argument<string> TemplateIdArgument { get; } = new("id")
     {
-        Description = "Template id from the manifest (e.g. http-trigger-python-azd). Use 'func new templates list' to see available ids."
+        Description = "Template id from the manifest (e.g. http-trigger-python-azd). Use 'func quickstart list' to see available ids."
     };
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         // 1. Fetch manifest
         // 2. Find template by id (case-insensitive match)
-        // 3. If not found: error with suggestion to run 'func new templates list'
+        // 3. If not found: error with suggestion to run 'func quickstart list'
         // 4. Display detailed info:
         //    - displayName
         //    - longDescription (or shortDescription fallback)
@@ -703,25 +747,6 @@ internal sealed class TemplatesInfoCommand : FuncCliCommand
         //    - repositoryUrl
         //    - whatsIncluded (bulleted list)
     }
-}
-```
-
----
-
-### `NewCommand` Change
-
-`NewCommand` gains `TemplatesCommand` as a constructor-injected subcommand:
-
-```csharp
-// BEFORE
-public NewCommand(IWorkloadHintRenderer hintRenderer) : base("new", "...") { ... }
-
-// AFTER
-public NewCommand(IWorkloadHintRenderer hintRenderer, TemplatesCommand templatesCommand)
-    : base("new", "Create a new function from a template.")
-{
-    Subcommands.Add(templatesCommand);
-    // existing options unchanged
 }
 ```
 
@@ -736,13 +761,12 @@ services.AddSingleton<WorkloadInstallCommand>();
 services.AddSingleton<WorkloadUninstallCommand>();
 services.AddSingleton<FuncCliCommand, WorkloadCommand>();
 
-// New (TemplatesCommand, same pattern):
-services.AddSingleton<TemplatesListCommand>();
-services.AddSingleton<TemplatesInfoCommand>();
-services.AddSingleton<TemplatesCommand>();          // not as FuncCliCommand — it's a subcommand
+// New (QuickstartCommand, same pattern — top-level command):
+services.AddSingleton<QuickstartListCommand>();
+services.AddSingleton<QuickstartInfoCommand>();
+services.AddSingleton<FuncCliCommand, QuickstartCommand>();  // top-level command
 services.AddSingleton<ITemplateManifestService, TemplateManifestService>();
 services.AddSingleton<ITemplateFunctionScaffolder, TemplateFunctionScaffolder>();
-// NewCommand's registration already exists; it now also resolves TemplatesCommand via DI
 ```
 
 ---
@@ -752,11 +776,11 @@ services.AddSingleton<ITemplateFunctionScaffolder, TemplateFunctionScaffolder>()
 ```text
 src/Func/
   Commands/
-    New/
-      TemplatesCommand.cs         ← new
-      TemplatesListCommand.cs     ← new
-      TemplatesInfoCommand.cs     ← new
-    NewCommand.cs                 ← modified (add TemplatesCommand subcommand)
+    Quickstart/
+      QuickstartCommand.cs         ← new
+      QuickstartListCommand.cs     ← new
+      QuickstartInfoCommand.cs     ← new
+    NewCommand.cs                 ← unchanged (quickstart is top-level, not a subcommand)
   Templates/
     ITemplateManifestService.cs   ← new
     TemplateManifestService.cs    ← new
@@ -769,10 +793,10 @@ src/Func/
     BuiltInCommands.cs            ← modified (register new services + commands)
 
 test/Func.Tests/
-  Commands/New/
-    TemplatesCommandTests.cs      ← new
-    TemplatesListCommandTests.cs  ← new
-    TemplatesInfoCommandTests.cs  ← new
+  Commands/Quickstart/
+    QuickstartCommandTests.cs      ← new
+    QuickstartListCommandTests.cs  ← new
+    QuickstartInfoCommandTests.cs  ← new
   Templates/
     TemplateManifestServiceTests.cs ← new
     TemplateFunctionScaffolderTests.cs ← new
@@ -782,7 +806,7 @@ test/Func.Tests/
 
 ## `IInteractionService` Prompt Gap
 
-The current `IInteractionService` in vnext (`src/Func/Console/IInteractionService.cs`) does not yet have a selection-prompt method. `TemplatesCommand`'s interactive path needs one. Two options:
+The current `IInteractionService` in vnext (`src/Func/Console/IInteractionService.cs`) does not yet have a selection-prompt method. `QuickstartCommand`'s interactive path needs one. Two options:
 
 1. **Extend `IInteractionService`** — add `Task<T> PromptSelectionAsync<T>(string title, IEnumerable<(T value, string label)> options, CancellationToken ct)`. Backed by `Spectre.Console.SelectionPrompt<T>` with `SearchEnabled = true` in `SpectreInteractionService`, which gives the user:
    - **Arrow keys** (↑↓) to move through the list
@@ -794,11 +818,11 @@ The current `IInteractionService` in vnext (`src/Func/Console/IInteractionServic
 
    **Why this matters vs. v4 `func new`:** The current stable CLI uses raw `Console.ReadKey()` arrow navigation which hangs or crashes in agent, CI, and piped contexts because there is no TTY. The `IInteractionService.IsInteractive` check ensures the new design degrades gracefully: in a non-TTY context the prompt renders as a numbered list that accepts stdin, and when all flags are supplied no prompt is shown at all.
 
-2. **Use `IAnsiConsole` directly in `TemplatesCommand`** — inject `Spectre.Console.IAnsiConsole` alongside `IInteractionService` as an escape hatch.
+2. **Use `IAnsiConsole` directly in `QuickstartCommand`** — inject `Spectre.Console.IAnsiConsole` alongside `IInteractionService` as an escape hatch.
 
-**Preferred: Option 1** — keeps all TUI calls behind `IInteractionService`. This makes `TemplatesCommand` fully testable with a substituted `IInteractionService` (NSubstitute). `SearchEnabled = true` on `SelectionPrompt<T>` is a one-liner in the Spectre implementation and directly serves the in-prompt filter UX.
+**Preferred: Option 1** — keeps all TUI calls behind `IInteractionService`. This makes `QuickstartCommand` fully testable with a substituted `IInteractionService` (NSubstitute). `SearchEnabled = true` on `SelectionPrompt<T>` is a one-liner in the Spectre implementation and directly serves the in-prompt filter UX.
 
-> **Note on `--search` vs. in-prompt search:** These are complementary. `--search blob` on `func new templates` pre-filters the list *before* the prompt is shown (useful for scripting or reducing noise when you already know the keyword). The `SearchEnabled` interactive filter lets users type to narrow down after the prompt appears. Both apply the same case-insensitive substring match on template id, trigger name, and description.
+> **Note on `--search` vs. in-prompt search:** These are complementary. `--search blob` on `func quickstart` pre-filters the list *before* the prompt is shown (useful for scripting or reducing noise when you already know the keyword). The `SearchEnabled` interactive filter lets users type to narrow down after the prompt appears. Both apply the same case-insensitive substring match on template id, trigger name, and description.
 
 ---
 
@@ -812,11 +836,11 @@ All user-facing errors are surfaced as `GracefulException` (caught by `Program.M
 | **Network — manifest (degraded)** | CDN fails but a cached or bundled manifest exists | *(warning, not error)* `Unable to refresh the template catalog — using cached data.` | Same as above, but a stale manifest was found; command continues with stale data |
 | **Network — download** | GitHub returns non-2xx, times out, or `git clone` fails with network error | `Unable to reach GitHub to download the template. Please check your network connection and try again.` | `templates` (scaffold) after template selection, when the download step fails |
 | **GitHub rate limit** | Tree API returns 403 with `X-RateLimit-Remaining: 0`, or 429 | `GitHub API rate limit exceeded. Rate limit resets at <HH:mm:ss UTC>. Try again later.` | `templates` (scaffold) during Tree API call for subfolder templates |
-| **Template not found** | `--template <id>` does not match any entry in the manifest | `Template '<id>' not found. Run 'func new templates list' to see available templates.` | `templates --template <id>` or `info <id>` |
+| **Template not found** | `--template <id>` does not match any entry in the manifest | `Template '<id>' not found. Run 'func quickstart list' to see available templates.` | `templates --template <id>` or `info <id>` |
 | **Language required** | Non-TTY mode without `--language` | `--language is required. Target directory is empty; cannot auto-detect language.` | `templates` in non-interactive/CI environment without --language |
 | **No templates for language** | `--language` value is valid but no manifest templates match | `No templates found for language '<lang>'.` | `templates --language <lang>` or `list --language <lang>` |
 | **Invalid language** | `--language` value doesn't map to any known runtime | `Unknown language '<value>'. Valid values: dotnet, node, javascript, typescript, python, java, powershell.` | Any command that accepts `--language` |
-| **No search results** | `--search` filter (or combined `--language`/`--resource`/`--iac` filters) produces zero matching templates | `No templates found matching '<query>'. Run 'func new templates list' to see all available templates.` | `templates` and `templates list` after filtering |
+| **No search results** | `--search` filter (or combined `--language`/`--resource`/`--iac` filters) produces zero matching templates | `No templates found matching '<query>'. Run 'func quickstart list' to see all available templates.` | `templates` and `templates list` after filtering |
 | **Directory not empty** | Target directory contains any files or subdirectories | `Target directory '<path>' is not empty. Use an empty directory or a new --path.` | `templates` (scaffold) before download, during directory validation |
 | **Untrusted org** | Template's `repositoryUrl` owner is not in the trusted-org allowlist (`azure`, `azure-samples`, `microsoft`) | `Template references an untrusted repository (<owner>/<repo>). This template cannot be downloaded.` | `templates` (scaffold) before any network call to GitHub |
 | **Path traversal** | An extracted file resolves outside the target directory | `Path traversal detected in template archive: <filename>. The template may be corrupted or malicious.` | `templates` (scaffold) during file extraction from staging to target |
@@ -836,11 +860,57 @@ Following the Core Tools vnext error handling convention:
   - `InvalidOperationException` — untrusted org in manifest, path traversal, parse errors
   - `KeyNotFoundException` — template id not found
 
-- **Commands** (`TemplatesCommand`, `TemplatesListCommand`, `TemplatesInfoCommand`) are the boundary. Each catches the specific exceptions it expects from its direct service calls and wraps them in `GracefulException(message, isUserError: true)`, preserving the inner exception. The `try` is narrow — one service call per `try` block.
+- **Commands** (`QuickstartCommand`, `QuickstartListCommand`, `QuickstartInfoCommand`) are the boundary. Each catches the specific exceptions it expects from its direct service calls and wraps them in `GracefulException(message, isUserError: true)`, preserving the inner exception. The `try` is narrow — one service call per `try` block.
 
 - **Anything unexpected** is not caught by the command — it surfaces as an unhandled exception with a stack trace (runtime bug).
 
 ---
+
+## Security Envelope
+
+| Concern | Mitigation |
+| --- | --- |
+| Malicious manifest entry pointing to attacker repo | URL allow-list: HTTPS scheme + `github.com` host + trusted org (`azure`, `azure-samples`, `microsoft`). Filtered in manifest client, re-checked in scaffolder |
+| Zip slip / path traversal in archive | Every entry's resolved absolute path must start with `Path.GetFullPath(targetPath)` + `DirectorySeparator`. Mismatch -> `InvalidOperationException` |
+| Flag injection via manifest values | Argv-array invocation + `--` end-of-options sentinel + reject `gitRef`/`folderPath` starting with `-` |
+| Command-line injection via folderPath | `..` segments rejected |
+| Interactive git credential prompts hanging the CLI | Four env vars set to disable every prompt path (see Git Process Requirements) |
+| Runaway git process | 60s timeout with process-tree kill |
+
+**Trusted GitHub organizations** -- hard-coded allow-list in `QuickstartUrlValidator`:
+
+- `azure`
+- `azure-samples`
+- `microsoft`
+
+---
+
+## Manifest Source
+
+| Aspect | Detail |
+| --- | --- |
+| Primary | `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` |
+| Fallback | Raw GitHub URL (`Azure/azure-functions-templates` main branch) |
+| Override | `FUNC_TEMPLATE_MANIFEST_URL` env var -- accepts an `https://` URL or a `file://` path. Used for staging validation and local manifest authoring against unpublished entries |
+| Caching | ETag-based; reduces CDN round-trips on repeat invocations within a session |
+
+The current CDN manifest does not yet pin `gitRef` per entry; entries without `gitRef` clone the remote's default branch (git path) or download `archive/HEAD.zip` (http path). Once the manifest moves to `gitRef`-pinned entries with signed tags, the security envelope tightens further (see Future Work).
+
+---
+
+## Exit Codes
+
+| Code | Condition |
+| --- | --- |
+| 0 | Successful scaffold / list / info |
+| 1 | User error (graceful): unknown template, non-empty target, empty filter result, manifest fetch failure, `--fetch git` with git missing, git/http fetch failure |
+| Non-zero (uncaught) | Unexpected runtime bug -- stack trace surfaces |
+
+---
+
+## Future Work
+
+- **GPG tag verification** -- when the manifest moves to `gitRef`-pinned entries and Azure-Samples/trusted orgs begin GPG-signing release tags, add an optional `git verify-tag` step. Default-on once signing is reliable; needs UX for unsigned/invalid, GPG-not-installed handling, public-key bundling or trust-on-first-use. Both `gitRef` enforcement and GPG verification become active together -- one without the other provides no guarantee.
 
 ---
 
@@ -853,8 +923,8 @@ Following the Core Tools vnext error handling convention:
   - **Keep required** — simplest; interactive prompt is low friction anyway; scripts always supply it
   - Consider: does a persisted or detected default interact badly with non-TTY/CI (wrong language silently used)? Detection from files is safer than persistence — it's scoped to the target dir, not global state.
 - [ ] **`--search` empty-result behaviour in interactive mode** — when the in-prompt Spectre filter (not the `--search` flag) narrows to zero results, Spectre renders an empty list. Should the command detect this and show a message, or let the user backspace to widen the filter naturally?
-- [ ] **`func new templates` vs `func new` interactive fallback** — should bare `func new` (when no workloads installed) redirect to `func new templates` interactive flow, rather than showing a hint? Or keep the hint to encourage workload installation?
-- [ ] **`--output json` on `func new templates list`** — useful for tooling. Worth adding now or later?
+- [ ] **`func quickstart` vs `func new` interactive fallback** — should bare `func new` (when no workloads installed) redirect to `func quickstart` interactive flow, rather than showing a hint? Or keep the hint to encourage workload installation?
+- [ ] **`--output json` on `func quickstart list`** — useful for tooling. Worth adding now or later?
 
 ---
 
@@ -862,14 +932,14 @@ Following the Core Tools vnext error handling convention:
 
 ### References
 
-- `fnx init` orchestration: [func-emulate/fnx/lib/init.js](../../../repos/func-emulate/fnx/lib/init.js)
-- Manifest fetch + cache: [func-emulate/fnx/lib/init/manifest.js](../../../repos/func-emulate/fnx/lib/init/manifest.js)
-- Scaffold (git + zip): [func-emulate/fnx/lib/init/scaffold.js](../../../repos/func-emulate/fnx/lib/init/scaffold.js)
-- Interactive prompts: [func-emulate/fnx/lib/init/prompts.js](../../../repos/func-emulate/fnx/lib/init/prompts.js)
-- Runtime + trigger constants: [func-emulate/fnx/templates-mcp/src/templates.ts](../../../repos/func-emulate/fnx/templates-mcp/src/templates.ts)
-- vnext `NewCommand`: [azure-functions-core-tools/src/Func/Commands/NewCommand.cs](../../../repos/azure-functions-core-tools/src/Func/Commands/NewCommand.cs)
-- vnext `WorkloadCommand` (pattern): [azure-functions-core-tools/src/Func/Commands/Workload/WorkloadCommand.cs](../../../repos/azure-functions-core-tools/src/Func/Commands/Workload/WorkloadCommand.cs)
-- vnext `IInteractionService`: [azure-functions-core-tools/src/Func/Console/IInteractionService.cs](../../../repos/azure-functions-core-tools/src/Func/Console/IInteractionService.cs)
+- `fnx init` orchestration: `func-emulate/fnx/lib/init.js` (internal)
+- Manifest fetch + cache: `func-emulate/fnx/lib/init/manifest.js` (internal)
+- Scaffold (git + zip): `func-emulate/fnx/lib/init/scaffold.js` (internal)
+- Interactive prompts: `func-emulate/fnx/lib/init/prompts.js` (internal)
+- Runtime + trigger constants: `func-emulate/fnx/templates-mcp/src/templates.ts` (internal)
+- vnext `NewCommand`: `src/Func/Commands/NewCommand.cs`
+- vnext `WorkloadCommand` (pattern): `src/Func/Commands/Workload/WorkloadCommand.cs`
+- vnext `IInteractionService`: `src/Func/Console/IInteractionService.cs`
 
 ### vnext Architecture (What Already Exists)
 
