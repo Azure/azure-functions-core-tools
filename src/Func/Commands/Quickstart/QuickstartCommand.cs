@@ -16,14 +16,19 @@ namespace Azure.Functions.Cli.Commands.Quickstart;
 /// </summary>
 internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
 {
+    public Option<string?> StackOption { get; } = new("--stack", "-s")
+    {
+        Description = "The stack to use. Run `func workload list` to see what's installed."
+    };
+
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
-        Description = "Worker runtime or language (e.g. python, node, java, dotnet, csharp, fsharp, javascript, typescript, powershell)"
+        Description = "The programming language"
     };
 
     public Option<string?> TemplateOption { get; } = new("--template", "-t")
     {
-        Description = "Template id from the manifest (e.g. http-trigger-python-azd) — skips all prompts"
+        Description = "Template ID from the manifest (e.g. http-trigger-python-azd) — skips all prompts"
     };
 
     public Option<string?> ResourceOption { get; } = new("--resource", "-r")
@@ -36,7 +41,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Filter by infrastructure-as-code type (e.g. bicep, terraform, none)"
     };
 
-    public Option<string?> SearchOption { get; } = new("--search", "-s")
+    public Option<string?> SearchOption { get; } = new("--search")
     {
         Description = "Case-insensitive substring filter applied to template names and descriptions"
     };
@@ -65,7 +70,10 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         _interaction = interaction;
         _providers = providers.ToList();
 
+        LanguageOption.Description = BuildLanguageOptionDescription(_providers);
+
         AddPathArgument();
+        Options.Add(StackOption);
         Options.Add(LanguageOption);
         Options.Add(TemplateOption);
         Options.Add(ResourceOption);
@@ -88,11 +96,26 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
 
         // Implementation will be added in a follow-up PR:
         // 1. Fetch manifest via IQuickstartManifestService
-        // 2. Resolve language (prompt if interactive, error if non-TTY without --language)
+        // 2. Resolve stack/language (prompt if interactive, error if non-TTY without --language)
         // 3. Resolve template (--template skips prompts, otherwise filter + prompt)
         // 4. Scaffold via IQuickstartScaffolder
         _interaction.WriteWarning(
             "The quickstart command is not yet implemented. This is a placeholder for the upcoming scaffold flow.");
         return Task.FromResult(1);
+    }
+
+    private static string BuildLanguageOptionDescription(IReadOnlyList<IQuickstartProvider> providers)
+    {
+        var languages = providers
+            .SelectMany(p => p.SupportedLanguages)
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Select(l => l.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(l => l, StringComparer.Ordinal)
+            .ToList();
+
+        return languages.Count == 0
+            ? "The programming language. Install a stack workload (`func workload install <id>`) to see supported values."
+            : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
     }
 }

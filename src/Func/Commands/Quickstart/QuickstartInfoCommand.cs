@@ -14,7 +14,7 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
 {
     public Argument<string> TemplateIdArgument { get; } = new("id")
     {
-        Description = "Template id from the manifest (e.g. http-trigger-python-azd). Use 'func quickstart list' to see available ids."
+        Description = "Template ID from the manifest (e.g. http-trigger-python-azd). Use 'func quickstart list' to see available IDs."
     };
 
     private readonly IInteractionService _interaction;

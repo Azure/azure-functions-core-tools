@@ -30,7 +30,7 @@ internal sealed class QuickstartListCommand : FuncCliCommand
 
     public Option<string?> SearchOption { get; } = new("--search", "-s")
     {
-        Description = "Case-insensitive substring match against template names, ids, resources, tags, and descriptions"
+        Description = "Case-insensitive substring match against template names, IDs, resources, tags, and descriptions"
     };
 
     private readonly IInteractionService _interaction;

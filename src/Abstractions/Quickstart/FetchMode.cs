@@ -14,12 +14,12 @@ public enum FetchMode
     Auto,
 
     /// <summary>
-    /// Force git clone. Fails if git is not available.
+    /// Use git clone. Fails if git is not available.
     /// </summary>
     Git,
 
     /// <summary>
-    /// Force HTTP zip download. Never invokes git.
+    /// Use HTTP zip download. Never invokes git.
     /// </summary>
     Http
 }

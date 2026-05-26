@@ -21,6 +21,7 @@ public class QuickstartCommandTests
 
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
+        Assert.Contains("--stack", optionNames);
         Assert.Contains("--language", optionNames);
         Assert.Contains("--template", optionNames);
         Assert.Contains("--resource", optionNames);
