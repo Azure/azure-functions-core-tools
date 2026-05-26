@@ -3,19 +3,24 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
 /// <summary>
 /// Validates that the requested host workload is available.
 /// </summary>
-internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolver resolver, IWorkloadInstaller installer)
+internal sealed class ValidateHostWorkloadInitializationStep(
+    IHostWorkloadResolver resolver,
+    IWorkloadInstaller installer,
+    IWorkloadPaths workloadPaths)
     : DemoInitializationStep
 {
     public const string StepId = "resolve_host_workload";
 
     private readonly IHostWorkloadResolver _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
+    private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
 
     public override string Id => StepId;
 
@@ -49,6 +54,7 @@ internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolv
         switch (resolution)
         {
             case HostWorkloadResolution.Installed installed:
+                context.State.HostWorkload = installed.Workload;
                 string explicitText = installed.ExplicitlyRequested ? "requested " : string.Empty;
                 return StartInitializationStepResult.Completed($"Using {explicitText}host {installed.HostVersion}");
 
@@ -59,7 +65,11 @@ internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolv
                     throw new GracefulException(message, isUserError: true);
                 }
 
-                var installStep = new InstallHostWorkloadInitializationStep(_installer, installRequired.HostVersion);
+                var installStep = new InstallHostWorkloadInitializationStep(
+                    _installer,
+                    _workloadPaths,
+                    installRequired.PackageId,
+                    installRequired.HostVersion);
                 context.AddNext(installStep);
                 return StartInitializationStepResult.Completed(installRequired.Message);
 

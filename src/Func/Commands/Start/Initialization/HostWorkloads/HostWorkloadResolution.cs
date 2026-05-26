@@ -14,6 +14,6 @@ internal abstract record HostWorkloadResolution(string HostVersion)
     public sealed record Installed(ContentWorkloadInfo Workload, NuGetVersion Version, bool ExplicitlyRequested)
         : HostWorkloadResolution(Version.ToNormalizedString());
 
-    public sealed record InstallRequired(string Version, string Message)
+    public sealed record InstallRequired(string Version, string Message, string? PackageId = null)
         : HostWorkloadResolution(Version);
 }

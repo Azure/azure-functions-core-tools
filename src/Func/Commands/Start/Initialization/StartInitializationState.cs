@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
+using Azure.Functions.Cli.Workloads;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -23,6 +24,8 @@ internal sealed class StartInitializationState
     public ResolvedProfile? ResolvedProfile { get; set; }
 
     public string? HostVersion { get; set; }
+
+    public ContentWorkloadInfo? HostWorkload { get; set; }
 
     public FunctionsProject? Project { get; set; }
 

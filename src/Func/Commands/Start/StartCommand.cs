@@ -21,12 +21,6 @@ namespace Azure.Functions.Cli.Commands;
 /// Launches the Azure Functions host runtime via 'func run' (also aliased
 /// as 'func start' for backward compatibility).
 /// </summary>
-/// <remarks>
-/// v1 prototype: real host integration is not yet implemented, so the
-/// command runs against <see cref="DemoEventSource"/> by default. This
-/// produces a runnable demonstration of all three output modes (compact,
-/// plain, JSON) against the canonical scenario from the design plan.
-/// </remarks>
 internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<int?> PortOption { get; } = new("--port", "-p")
@@ -91,11 +85,16 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Mirror all host events to the specified log file."
     };
 
-    // Prototype-only knob: scales the number of functions DemoEventSource
+    public Option<bool> DemoOption { get; } = new("--demo")
+    {
+        Description = "Demo: use the synthetic host event stream instead of launching the host workload.",
+        Hidden = true,
+    };
+
+    // Demo-only knob: scales the number of functions DemoEventSource
     // generates so layout variants (full-table ≤8 vs. status-strip >8) can
     // be demoed without code changes. Hidden from --help; intended for
-    // demos and screenshots until real host integration replaces the
-    // synthetic event source. Also overridable via FUNC_DEMO_FUNCTIONS.
+    // demos and screenshots. Also overridable via FUNC_DEMO_FUNCTIONS.
     public Option<int?> DemoFunctionsOption { get; } = new("--demo-functions")
     {
         Description = "Demo: number of functions to load (clamped to a minimum of 5).",
@@ -150,6 +149,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(OutputOption);
         Options.Add(NoTuiOption);
         Options.Add(LogFileOption);
+        Options.Add(DemoOption);
         Options.Add(DemoFunctionsOption);
     }
 
@@ -294,6 +294,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             mode,
             parseResult.GetValue(NoTuiOption),
             parseResult.GetValue(LogFileOption),
+            parseResult.GetValue(DemoOption) || ParseBooleanEnvironmentVariable("FUNC_START_DEMO"),
             ParseFunctionCount(
                 parseResult.GetValue(DemoFunctionsOption),
                 Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
@@ -316,6 +317,19 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value > 0
             ? value
             : @default;
+    }
+
+    private static bool ParseBooleanEnvironmentVariable(string name)
+    {
+        string? raw = Environment.GetEnvironmentVariable(name);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        return raw.Equals("1", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("yes", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ParseAutoExit(string? raw)

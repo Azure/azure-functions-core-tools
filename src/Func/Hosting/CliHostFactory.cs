@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
@@ -93,6 +94,11 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IBundleResolveTelemetry>(NullBundleResolveTelemetry.Instance);
         builder.Services.AddSingleton<IExtensionBundleResolver, ExtensionBundleResolver>();
         builder.Services.AddSingleton<IHostWorkloadResolver, DefaultHostWorkloadResolver>();
+        builder.Services.AddSingleton<HostProcessStartInfoFactory>();
+        builder.Services.AddSingleton<IHostPortAvailability, TcpHostPortAvailability>();
+        builder.Services.AddSingleton<IHostProcessFactory, DefaultHostProcessFactory>();
+        builder.Services.AddSingleton<IHostProcessOutputParser, LineHostProcessOutputParser>();
+        builder.Services.AddSingleton<IHostProcessRunner, DefaultHostProcessRunner>();
         builder.Services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
 
         builder.Services.AddSingleton<StartDashboardEventStreamFactory>();
