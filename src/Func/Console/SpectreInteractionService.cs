@@ -50,7 +50,7 @@ internal class SpectreInteractionService : IInteractionService
         _stdout.Write(new Paragraph(text, _theme.Title).Append(Environment.NewLine));
 
     public void WriteSectionHeader(string title) =>
-        _stdout.Write(new Rule(title).LeftJustified().RuleStyle(_theme.Heading));
+        _stdout.Write(title, _theme.Heading);
 
     public void WriteHint(string message) =>
         _stdout.Write(new Paragraph(message, _theme.Muted).Append(Environment.NewLine));
