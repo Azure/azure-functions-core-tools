@@ -8,30 +8,33 @@ namespace Azure.Functions.Cli.Quickstart;
 /// </summary>
 internal static class LanguageMapper
 {
+    // `csharp`, `fsharp` etc. map directly. `dotnet` and `node` are runtime
+    // aliases that map to a default language for non-interactive use
+    // (matching `func init` behaviour): `--language dotnet` resolves to CSharp,
+    // `--language node` to TypeScript, with no sub-prompt. Interactive mode
+    // (no --language flag) lets the user pick from any manifest language.
     private static readonly Dictionary<string, string> _flagToManifestLanguage =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["csharp"]     = "CSharp",
-            ["fsharp"]     = "FSharp",
+            ["csharp"] = "CSharp",
+            ["fsharp"] = "FSharp",
             ["javascript"] = "JavaScript",
             ["typescript"] = "TypeScript",
-            ["python"]     = "Python",
-            ["java"]       = "Java",
+            ["python"] = "Python",
+            ["java"] = "Java",
             ["powershell"] = "PowerShell",
-            // Aliases that require sub-prompts:
-            ["dotnet"]     = "CSharp",
-            ["node"]       = "TypeScript",
+            ["dotnet"] = "CSharp",
+            ["node"] = "TypeScript",
         };
 
     private static readonly Dictionary<string, string> _runtimeToDefaultLanguage =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["dotnet"]          = "CSharp",
-            ["dotnet-isolated"] = "CSharp",
-            ["node"]            = "TypeScript",
-            ["python"]          = "Python",
-            ["java"]            = "Java",
-            ["powershell"]      = "PowerShell",
+            ["dotnet"] = "CSharp",
+            ["node"] = "TypeScript",
+            ["python"] = "Python",
+            ["java"] = "Java",
+            ["powershell"] = "PowerShell",
         };
 
     /// <summary>
@@ -49,12 +52,12 @@ internal static class LanguageMapper
     public static IReadOnlyList<string> GetLanguagesForRuntime(string runtime) =>
         runtime.ToLowerInvariant() switch
         {
-            "dotnet" or "dotnet-isolated" => ["CSharp", "FSharp"],
-            "node"                        => ["TypeScript", "JavaScript"],
-            "python"                      => ["Python"],
-            "java"                        => ["Java"],
-            "powershell"                  => ["PowerShell"],
-            _                             => [],
+            "dotnet" => ["CSharp", "FSharp"],
+            "node" => ["TypeScript", "JavaScript"],
+            "python" => ["Python"],
+            "java" => ["Java"],
+            "powershell" => ["PowerShell"],
+            _ => [],
         };
 
     /// <summary>
