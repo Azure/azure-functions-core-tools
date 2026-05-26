@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git fetch *)",
+      "Bash(gh pr *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git ls-tree *)",
+      "Bash(grep -i -E \"\\(NewAction|CreateFunction|Template\\).*\\\\.cs$\")",
+      "Bash([ -d \".claude/skills/$d\" ])",
+      "Bash([ -d \".github/skills/$d\" ])"
+    ]
+  }
+}
