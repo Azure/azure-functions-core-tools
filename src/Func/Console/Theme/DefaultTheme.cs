@@ -10,19 +10,21 @@ namespace Azure.Functions.Cli.Console.Theme;
 /// </summary>
 internal sealed class DefaultTheme : ITheme
 {
-    public Style Title { get; } = new(Color.Blue, decoration: Decoration.Bold);
+    public Style Title { get; } = new(Color.DarkGoldenrod, decoration: Decoration.Bold);
 
     public Style Heading { get; } = new(Color.Blue);
 
     public Style Command { get; } = new(Color.White);
 
-    public Style Placeholder { get; } = new(Color.Green);
+    public Style Placeholder { get; } = new(Color.Cyan1);
 
     public Style OptionalArg { get; } = new(Color.Cyan1);
 
     public Style Path { get; } = new(Color.Cyan1);
 
-    public Style Muted { get; } = new(Color.Grey);
+    public Style Muted { get; } = new(Color.Grey58);
+
+    public Style OptionsPlaceholder { get; } = new(Color.Grey66);
 
     public Style Code { get; } = new(Color.White);
 

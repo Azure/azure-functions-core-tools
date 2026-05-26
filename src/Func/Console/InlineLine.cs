@@ -49,6 +49,8 @@ internal sealed class InlineLine
 
     public InlineLine Muted(string text) => Add(text, _theme.Muted);
 
+    public InlineLine OptionsPlaceholder(string text) => Add(text, _theme.OptionsPlaceholder);
+
     public InlineLine Code(string text) => Add(text, _theme.Code);
 
     public InlineLine Emphasis(string text) => Add(text, _theme.Emphasis);

@@ -51,10 +51,8 @@ internal class HelpCommand : FuncCliCommand
         string version = _versionProvider.Version;
 
         _interaction.WriteBlankLine();
-        _interaction.WriteLine(l => l
-            .Title(Constants.ProductName)
-            .Plain(" ")
-            .Muted($"({version})"));
+        _interaction.WriteTitle(Constants.ProductName);
+        _interaction.WriteLine(l=>l.Muted(version));
         _interaction.WriteBlankLine();
         _interaction.WriteHint("Create, develop, test, and deploy Azure Functions from the command line.");
         _interaction.WriteBlankLine();
@@ -66,7 +64,7 @@ internal class HelpCommand : FuncCliCommand
             .Command("func ")
             .Placeholder("<command> ")
             .OptionalArg("[path] ")
-            .Muted("[options]"));
+            .OptionsPlaceholder("[options]"));
         _interaction.WriteBlankLine();
 
         var commands = _rootCommand.Subcommands

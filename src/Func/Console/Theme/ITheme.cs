@@ -34,6 +34,9 @@ internal interface ITheme
     /// <summary>Descriptions, hints, and secondary text.</summary>
     public Style Muted { get; }
 
+    /// <summary>Options placeholder in command usage.</summary>
+    public Style OptionsPlaceholder { get; }
+
     /// <summary>Inline code, literal values, and URLs in prose.</summary>
     public Style Code { get; }
 

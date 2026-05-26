@@ -65,4 +65,5 @@ extends:
 
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
         parameters:
+          sign: true
           dependsOn: Approval

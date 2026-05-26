@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Quickstart;
+using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
@@ -72,6 +73,10 @@ internal static class TestParser
         services.AddBuiltInCommands();
         services.AddProfiles();
         services.AddSingleton(Substitute.For<IStartInitializationRunner>());
+        ISetupRunner setupRunner = Substitute.For<ISetupRunner>();
+        setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupRunResult(0));
+        services.AddSingleton(setupRunner);
 
         // Stub the workload subsystem so commands that depend on it (e.g.
         // WorkloadListCommand) resolve without booting real storage / loading.

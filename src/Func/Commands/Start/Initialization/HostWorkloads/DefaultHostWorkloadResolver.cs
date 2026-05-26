@@ -16,9 +16,6 @@ internal sealed class DefaultHostWorkloadResolver(
     IWorkloadProvider workloadProvider,
     IWorkloadCatalog workloadCatalog) : IHostWorkloadResolver
 {
-    private const string HostAlias = "host";
-    private const int AliasSearchTake = 50;
-
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
 
@@ -94,7 +91,7 @@ internal sealed class DefaultHostWorkloadResolver(
         List<InstalledHostCandidate> candidates = [];
         foreach (ContentWorkloadInfo workload in _workloadProvider.GetContentWorkloads())
         {
-            if (!workload.Aliases.Any(static alias => string.Equals(alias, HostAlias, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(workload.PackageId, HostWorkloadPackage.CurrentPackageId, StringComparison.OrdinalIgnoreCase)
                 || !NuGetVersion.TryParse(workload.PackageVersion, out NuGetVersion? version))
             {
                 continue;
@@ -115,7 +112,7 @@ internal sealed class DefaultHostWorkloadResolver(
         VersionRange? range,
         CancellationToken cancellationToken)
     {
-        string packageId = await ResolveHostPackageIdAsync(cancellationToken);
+        string packageId = HostWorkloadPackage.CurrentPackageId;
         ResolvedPackage? package = range is null
             ? await _workloadCatalog.ResolveLatestVersionAsync(
                 packageId, includePrerelease: false, currentVersion: null, allowMajor: true, source: null, cancellationToken)
@@ -133,38 +130,6 @@ internal sealed class DefaultHostWorkloadResolver(
         throw new HostWorkloadResolutionException(message);
     }
 
-    private async Task<string> ResolveHostPackageIdAsync(CancellationToken cancellationToken)
-    {
-        var query = new CatalogSearchQuery
-        {
-            Filter = HostAlias,
-            IncludePrerelease = false,
-            Take = AliasSearchTake,
-        };
-
-        IReadOnlyList<CatalogSearchResult> hits = await _workloadCatalog.SearchAsync(query, cancellationToken);
-        IReadOnlyList<string> matchedIds = FilterByAlias(hits, HostAlias);
-
-        if (matchedIds.Count == 0)
-        {
-            IReadOnlyList<CatalogSearchResult> all = await _workloadCatalog.SearchAsync(query with { Filter = null }, cancellationToken);
-            matchedIds = FilterByAlias(all, HostAlias);
-        }
-
-        if (matchedIds.Count == 0)
-        {
-            throw new HostWorkloadResolutionException("No host workload package was found in the configured workload catalog.");
-        }
-
-        if (matchedIds.Count > 1)
-        {
-            string matches = string.Join(", ", matchedIds);
-            throw new HostWorkloadResolutionException($"Multiple host workload packages were found: {matches}.");
-        }
-
-        return matchedIds[0];
-    }
-
     private static HostWorkloadResolution CreateOfflineInstallRequired(VersionRange? range)
     {
         string version = range is null ? "latest" : RangeText(range);
@@ -174,12 +139,6 @@ internal sealed class DefaultHostWorkloadResolver(
 
         return new HostWorkloadResolution.InstallRequired(version, message);
     }
-
-    private static IReadOnlyList<string> FilterByAlias(IReadOnlyList<CatalogSearchResult> hits, string alias)
-        => [.. hits
-            .Where(result => result.Aliases.Any(candidate => string.Equals(candidate, alias, StringComparison.OrdinalIgnoreCase)))
-            .Select(result => result.PackageId)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private static bool VersionEquals(NuGetVersion left, NuGetVersion right)
         => left.Equals(right);
