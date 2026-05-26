@@ -4,11 +4,12 @@ set -euo pipefail
 # Azure Functions Core Tools CLI installer
 # Usage: curl -sSL https://aka.ms/func-cli/install.sh | bash
 
-REPO="Azure/azure-functions-core-tools"
+REPO="${SOURCE:-Azure/azure-functions-core-tools}"
 API_BASE="https://api.github.com/repos/${REPO}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.azure-functions}"
 VERSION="${VERSION:-}"
 PRERELEASE="${PRERELEASE:-false}"
+FORCE="${FORCE:-false}"
 
 # --- Detect platform ---
 
@@ -36,7 +37,8 @@ if [ -z "$VERSION" ]; then
     fi
 
     # GitHub API returns releases newest-first. Extract tag_name + prerelease pairs, then filter.
-    VERSION=$(curl -sSL "${API_BASE}/releases?per_page=50" \
+    RELEASES_JSON=$(curl -sSL "${API_BASE}/releases?per_page=50")
+    VERSION=$(echo "$RELEASES_JSON" \
         | tr ',' '\n' \
         | grep -E '"tag_name"|"prerelease"' \
         | sed 's/.*"tag_name":"\([^"]*\)".*/tag:\1/; s/.*"prerelease":\(.*\)/pre:\1/' \
@@ -51,12 +53,41 @@ if [ -z "$VERSION" ]; then
             }')
 
     if [ -z "$VERSION" ]; then
-        echo "Error: Could not find a 5.x release." >&2
+        if [ "$PRERELEASE" != "true" ]; then
+            PRE_VERSIONS=$(echo "$RELEASES_JSON" \
+                | tr ',' '\n' \
+                | grep -E '"tag_name"|"prerelease"' \
+                | sed 's/.*"tag_name":"\([^"]*\)".*/tag:\1/; s/.*"prerelease":\(.*\)/pre:\1/' \
+                | paste - - \
+                | awk -F'\t' '
+                    {
+                        split($1, a, ":"); tag = a[2]
+                        split($2, b, ":"); pre = b[2]
+                        if (tag ~ /^5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
+                    }')
+
+            if [ -n "$PRE_VERSIONS" ]; then
+                echo -e "\033[31mNo stable 5.x release found. Available pre-releases:\033[0m" >&2
+                echo "$PRE_VERSIONS" | sed 's/^/  /' | while IFS= read -r line; do echo -e "\033[31m${line}\033[0m"; done >&2
+                echo "" >&2
+                echo -e "\033[31mTo install a pre-release, re-run with PRERELEASE=true\033[0m" >&2
+                exit 1
+            fi
+        fi
+        echo "Error: Could not find a 5.x release."
         exit 1
     fi
 fi
 
 echo "Installing func CLI ${VERSION} (${OS}-${ARCH})..."
+
+# --- Check existing install ---
+
+if [ -f "${INSTALL_DIR}/func" ] && [ "$FORCE" != "true" ]; then
+    echo -e "\033[31mfunc CLI is already installed at ${INSTALL_DIR}.\033[0m"
+    echo -e "\033[31mTo overwrite, re-run with FORCE=true.\033[0m"
+    exit 0
+fi
 
 # --- Download and extract ---
 

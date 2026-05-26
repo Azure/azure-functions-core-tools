@@ -1,3 +1,9 @@
+parameters:
+- name: skipBranchValidation
+  displayName: Allow non-release source
+  type: boolean
+  default: false
+
 jobs:
 - job: Validate
   templateContext:
@@ -6,6 +12,12 @@ jobs:
   steps:
   - pwsh: |
       $source = "$(Build.SourceBranch)"
+      if ('${{ parameters.skipBranchValidation }}' -eq 'True')
+      {
+        Write-Host "##vso[task.logissue type=warning]Source branch release validation was skipped (skipBranchValidation enabled)."
+        return
+      }
+
       if (!($source -like "refs/tags/*-v*" || $source -like "refs/tags/v*" || $source -like "refs/heads/release/*" || $source -like "refs/heads/internal/release/*"))
       {
         Write-Host "##vso[task.logissue type=error]Invalid release branch. Branch must be a tag (v* or *-v*) or a release branch (release/*, internal/release/*)."
