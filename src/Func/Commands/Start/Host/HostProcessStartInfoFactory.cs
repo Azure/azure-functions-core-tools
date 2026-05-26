@@ -12,6 +12,10 @@ internal sealed class HostProcessStartInfoFactory
     public const int DefaultPort = 7071;
     public const string ExecutableBaseName = "Azure.Functions.Cli.Workloads.Host";
     public const string ScriptRootEnvironmentVariable = "AzureWebJobsScriptRoot";
+    public const string AzureFunctionsEnvironmentVariable = "AZURE_FUNCTIONS_ENVIRONMENT";
+    public const string WebsiteHostnameEnvironmentVariable = "WEBSITE_HOSTNAME";
+    public const string AspNetCoreSuppressStatusMessagesEnvironmentVariable = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
+    public const string HostingLifetimeLogLevelEnvironmentVariable = "Logging__LogLevel__Microsoft.Hosting.Lifetime";
 
     public HostProcessLaunchInfo Create(HostProcessStartContext context)
     {
@@ -58,6 +62,10 @@ internal sealed class HostProcessStartInfoFactory
         }
 
         startInfo.Environment[ScriptRootEnvironmentVariable] = context.HostRunContext.StartupDirectory.FullName;
+        startInfo.Environment[AzureFunctionsEnvironmentVariable] = "Development";
+        startInfo.Environment[WebsiteHostnameEnvironmentVariable] = new Uri(localBaseUriText).Authority;
+        startInfo.Environment.TryAdd(AspNetCoreSuppressStatusMessagesEnvironmentVariable, "true");
+        startInfo.Environment[HostingLifetimeLogLevelEnvironmentVariable] = "None";
 
         return new HostProcessLaunchInfo(startInfo, port, new Uri(listenUriText),
             new Uri(localBaseUriText), context.HostWorkload.PackageVersion);
