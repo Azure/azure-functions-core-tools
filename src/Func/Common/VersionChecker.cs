@@ -4,7 +4,7 @@
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
+using Azure.Functions.Cli.Configuration;
 
 namespace Azure.Functions.Cli.Common;
 
@@ -22,8 +22,16 @@ internal static class VersionChecker
     /// Checks if a newer v5 release is available. Returns the latest version string
     /// if an update is available, or null if current/offline/error.
     /// </summary>
-    public static async Task<string?> CheckForUpdateAsync(CancellationToken cancellationToken = default)
+    public static Task<string?> CheckForUpdateAsync(CancellationToken cancellationToken = default)
     {
+        UserConfigurationPathsOptions userConfigurationPaths = new();
+        return CheckForUpdateAsync(userConfigurationPaths, cancellationToken);
+    }
+
+    internal static async Task<string?> CheckForUpdateAsync(UserConfigurationPathsOptions userConfigurationPaths, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(userConfigurationPaths);
+
         try
         {
             Version? currentVersion = GetCurrentVersion();
@@ -33,7 +41,7 @@ internal static class VersionChecker
             }
 
             // Check cache first
-            Version? cached = ReadCache();
+            Version? cached = ReadCache(userConfigurationPaths);
             if (cached is not null)
             {
                 return IsNewer(cached, currentVersion) ? cached.ToString() : null;
@@ -47,7 +55,7 @@ internal static class VersionChecker
             }
 
             // Cache the result
-            WriteCache(latestVersion);
+            WriteCache(userConfigurationPaths, latestVersion);
 
             return IsNewer(latestVersion, currentVersion) ? latestVersion.ToString() : null;
         }
@@ -126,19 +134,11 @@ internal static class VersionChecker
     private static bool IsNewer(Version latest, Version current)
         => latest > current;
 
-    private static string GetCachePath()
-    {
-        string cacheDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            AbstractionsConstants.FuncHomeDirectoryName);
-        return Path.Combine(cacheDir, Constants.VersionCacheFileName);
-    }
-
-    private static Version? ReadCache()
+    private static Version? ReadCache(UserConfigurationPathsOptions userConfigurationPaths)
     {
         try
         {
-            string cachePath = GetCachePath();
+            string cachePath = userConfigurationPaths.VersionCachePath;
             if (!File.Exists(cachePath))
             {
                 return null;
@@ -159,11 +159,11 @@ internal static class VersionChecker
         }
     }
 
-    private static void WriteCache(Version version)
+    private static void WriteCache(UserConfigurationPathsOptions userConfigurationPaths, Version version)
     {
         try
         {
-            string cachePath = GetCachePath();
+            string cachePath = userConfigurationPaths.VersionCachePath;
             Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
             File.WriteAllText(cachePath, version.ToString());
         }

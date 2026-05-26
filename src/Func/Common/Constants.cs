@@ -25,8 +25,6 @@ internal static class Constants
     /// silently re-opted in after upgrading.
     /// </summary>
     public const string LegacyTelemetryOptOutEnvVar = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
-    public const string VersionCacheFileName = ".version-check";
-
     /// <summary>
     /// Prefix for the CLI environment variables, including those that bind into <c>IConfiguration</c>.
     /// </summary>
