@@ -2,7 +2,7 @@
 
 This document explains the runtime architecture of the Azure Functions Core Tools v5 CLI — how commands are composed, how telemetry is wired, and how the console layer works.
 
-> **Status**: v5 is in active development. As of this PR, the workload abstractions, the DI host that loads workloads, and the `func workload install` / `uninstall` commands are wired into the CLI. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up. Built-in commands that depend on workload contributions (e.g. `func init`) report "no workloads installed" and exit cleanly until at least one workload is installed.
+> **Status**: v5 is in active development. As of this PR, the workload abstractions, the DI host that loads workloads, profile inspection, and the `func workload install` / `uninstall` commands are wired into the CLI. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up. Built-in commands that depend on workload contributions (e.g. `func init`) report "no workloads installed" and exit cleanly until at least one workload is installed.
 
 ## Startup Flow
 
@@ -27,7 +27,7 @@ Program.cs
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
   │   ├── Resolve every FuncCliCommand from DI:
-  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, version, help, workload
+  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, version, help, profile, workload
   │   │     └── ExternalCommand wrappers (each carries the WorkloadInfo for the
   │   │         workload that called RegisterCommand)
   │   ├── Skip workload commands that collide with built-ins or with each
@@ -60,6 +60,9 @@ func
 ├── init [path]           Initialize a new Functions project
 ├── new [path]            Create a new function from a template
 ├── start [path]          Start the Functions host (placeholder)
+├── profile
+│   ├── list [path]       List available profiles
+│   └── show <name> [path]  Show profile details
 ├── workload
 │   └── list              List installed workloads
 ├── version (hidden)      Print version info

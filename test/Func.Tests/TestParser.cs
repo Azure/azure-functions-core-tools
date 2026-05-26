@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -63,9 +64,11 @@ internal static class TestParser
     {
         var services = new ServiceCollection();
         services.AddSingleton(interaction);
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddOptions<StackOptions>();
         services.AddOptions<HostStartupOptions>();
         services.AddBuiltInCommands();
+        services.AddProfiles();
         services.AddSingleton(Substitute.For<IStartInitializationRunner>());
 
         // Stub the workload subsystem so commands that depend on it (e.g.

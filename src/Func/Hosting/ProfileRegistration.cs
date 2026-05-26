@@ -26,6 +26,7 @@ internal static class ProfileRegistration
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
         services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
         services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
+        services.AddSingleton<IProfileCatalog, ProfileCatalog>();
         services.AddSingleton<IProfileResolver, ProfileResolver>();
 
         return services;
