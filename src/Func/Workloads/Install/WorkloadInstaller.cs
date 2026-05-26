@@ -65,6 +65,8 @@ internal sealed class WorkloadInstaller(
         string packageId = nuspec.GetId().ToLowerInvariant();
         string version = nuspec.GetVersion().ToNormalizedString();
         IReadOnlyList<string> aliases = ParseAliases(nuspec.GetTags());
+        string nuspecTitle = nuspec.GetTitle();
+        string nuspecDescription = nuspec.GetDescription();
 
         if (!nuspec.GetPackageTypes().Any(t => string.Equals(t.Name, FuncCliWorkloadPackageType, StringComparison.OrdinalIgnoreCase)))
         {
@@ -125,8 +127,8 @@ internal sealed class WorkloadInstaller(
                 PackageId = packageId,
                 PackageVersion = version,
                 Aliases = aliases,
-                DisplayName = GetDisplayName(metadata, packageId),
-                Description = metadata.Description ?? string.Empty,
+                DisplayName = GetDisplayName(metadata, nuspecTitle, packageId),
+                Description = GetDescription(metadata, nuspecDescription),
                 EntryPoint = metadata.EntryPoint,
                 Kind = metadata.Kind,
                 Source = Path.GetFullPath(nupkgPath),
@@ -424,6 +426,8 @@ internal sealed class WorkloadInstaller(
             string newPackageId = nuspec.GetId().ToLowerInvariant();
             string newVersion = nuspec.GetVersion().ToNormalizedString();
             IReadOnlyList<string> aliases = ParseAliases(nuspec.GetTags());
+            string nuspecTitle = nuspec.GetTitle();
+            string nuspecDescription = nuspec.GetDescription();
 
             if (!nuspec.GetPackageTypes().Any(t => string.Equals(t.Name, FuncCliWorkloadPackageType, StringComparison.OrdinalIgnoreCase)))
             {
@@ -458,8 +462,8 @@ internal sealed class WorkloadInstaller(
                 PackageId = newPackageId,
                 PackageVersion = newVersion,
                 Aliases = aliases,
-                DisplayName = GetDisplayName(metadata, newPackageId),
-                Description = metadata.Description ?? string.Empty,
+                DisplayName = GetDisplayName(metadata, nuspecTitle, newPackageId),
+                Description = GetDescription(metadata, nuspecDescription),
                 EntryPoint = metadata.EntryPoint,
                 Kind = metadata.Kind,
                 Source = resolved.Source.Source,
@@ -618,6 +622,27 @@ internal sealed class WorkloadInstaller(
         }
     }
 
-    private static string GetDisplayName(WorkloadMetadata metadata, string packageId)
-        => string.IsNullOrWhiteSpace(metadata.DisplayName) ? packageId : metadata.DisplayName;
+    // Display name priority: workload.json (forward-compat), then nuspec
+    // <title>, then the package id so the column is never blank.
+    private static string GetDisplayName(WorkloadMetadata metadata, string? nuspecTitle, string packageId)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.DisplayName))
+        {
+            return metadata.DisplayName;
+        }
+
+        return string.IsNullOrWhiteSpace(nuspecTitle) ? packageId : nuspecTitle!;
+    }
+
+    // Description priority: workload.json (forward-compat), then the nuspec
+    // <description> NuGet already requires. Empty string when neither is set.
+    private static string GetDescription(WorkloadMetadata metadata, string? nuspecDescription)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.Description))
+        {
+            return metadata.Description;
+        }
+
+        return string.IsNullOrWhiteSpace(nuspecDescription) ? string.Empty : nuspecDescription!;
+    }
 }

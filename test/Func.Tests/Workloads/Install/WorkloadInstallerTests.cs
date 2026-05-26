@@ -65,7 +65,7 @@ public sealed class WorkloadInstallerTests : IDisposable
                 e.PackageVersion == "1.0.0" &&
                 e.EntryPoint!.AssemblyPath == "Test.dll" &&
                 e.DisplayName == "test.workload" &&
-                e.Description == string.Empty &&
+                e.Description == "For tests." &&
                 e.Source == Path.GetFullPath(nupkg) &&
                 e.InstallRefCount == 1 &&
                 e.Aliases.SequenceEqual(new[] { "test", "stub" })),
@@ -280,14 +280,14 @@ public sealed class WorkloadInstallerTests : IDisposable
         Assert.Equal(WorkloadKind.Content, result.Entry.Kind);
         Assert.Null(result.Entry.EntryPoint);
         Assert.Equal("test.workload", result.Entry.DisplayName);
-        Assert.Equal(string.Empty, result.Entry.Description);
+        Assert.Equal("For tests.", result.Entry.Description);
 
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(e =>
                 e.Kind == WorkloadKind.Content &&
                 e.EntryPoint == null &&
                 e.DisplayName == "test.workload" &&
-                e.Description == string.Empty),
+                e.Description == "For tests."),
             Arg.Any<CancellationToken>());
     }
 
@@ -581,6 +581,44 @@ public sealed class WorkloadInstallerTests : IDisposable
         Assert.Contains("test.workload", reports[1].Description);
     }
 
+    [Fact]
+    public async Task InstallFromPackage_PersistsNuspecTitleAndDescriptionWhenMetadataIsBlank()
+    {
+        string nupkg = BuildNupkg(title: "Functions Host", description: "Azure Functions host workload.");
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+
+        Assert.Equal("Functions Host", result.Entry.DisplayName);
+        Assert.Equal("Azure Functions host workload.", result.Entry.Description);
+
+        await _store.Received(1).SaveWorkloadAsync(
+            Arg.Is<WorkloadEntry>(e =>
+                e.DisplayName == "Functions Host" &&
+                e.Description == "Azure Functions host workload."),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromPackage_WorkloadJsonMetadataWinsOverNuspec()
+    {
+        string nupkg = BuildNupkg(title: "Nuspec Title", description: "Nuspec description.");
+        _metadataReader.Read(Arg.Any<string>())
+            .Returns(new WorkloadMetadata
+            {
+                Schema = "https://example/workload.schema.json",
+                EntryPoint = new EntryPointSpec { AssemblyPath = "Test.dll", Type = "Test.Type" },
+                DisplayName = "Manifest Name",
+                Description = "Manifest description.",
+            });
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+
+        Assert.Equal("Manifest Name", result.Entry.DisplayName);
+        Assert.Equal("Manifest description.", result.Entry.Description);
+    }
+
     private sealed class RecordingProgress(List<WorkloadInstallProgress> sink) : IProgress<WorkloadInstallProgress>
     {
         public void Report(WorkloadInstallProgress value) => sink.Add(value);
@@ -607,6 +645,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         string? tags = null,
         bool includeFuncCliWorkloadType = true,
         string version = "1.0.0",
+        string? title = null,
+        string description = "For tests.",
         IEnumerable<(string SourcePath, string TargetPath)>? extraFiles = null)
     {
         string stubAssembly = Path.Combine(_root, $"stub-{Guid.NewGuid():N}.dll");
@@ -616,9 +656,13 @@ public sealed class WorkloadInstallerTests : IDisposable
         {
             Id = "Test.Workload",
             Version = NuGetVersion.Parse(version),
-            Description = "For tests.",
+            Description = description,
         };
         builder.Authors.Add("test");
+        if (title is not null)
+        {
+            builder.Title = title;
+        }
         if (tags is not null)
         {
             foreach (string tag in tags.Split(' ', StringSplitOptions.RemoveEmptyEntries))
