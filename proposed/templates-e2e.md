@@ -84,7 +84,7 @@ How this complements workload templates:
 - `func new templates list` — non-interactive table of available templates, filterable by `--language`, `--resource`, `--iac`, and keyword (`--search`); `--search` is a **case-insensitive substring match** (not semantic/fuzzy) against `id`, `displayName`, `resource`, `tags`, and `shortDescription`
 - `func new templates` (bare invocation) — interactive flow: worker runtime → (dotnet sub-prompt: C#/F#, Node sub-prompt: JS/TS) → trigger → scaffold; the runtime prompt matches the existing `func new` UX (`.NET`, `Node`, `Python`, `Java`, `Powershell`); trigger selection supports incremental keyword filtering; powered by the existing `IInteractionService` / Spectre.Console already in vnext
 - **.NET isolated worker model only** — the manifest `CSharp` and `FSharp` languages map exclusively to the .NET isolated worker model; the in-process model is not supported and will not be added (it is on a deprecation path). Note: no F# templates exist in the manifest today; the sub-prompt will show F# once templates are available
-- **Agent and CI friendly** — all v4 `func new` flags preserved (`--language`, `--template`); `--language` accepts runtime names (`python`, `node`, `java`, `dotnet`, `csharp`, `fsharp`, `javascript`, `typescript`, `powershell`); `--yes` accepts remaining defaults non-interactively but errors clearly if `--language` is not supplied; non-TTY falls back to numbered list
+- **Agent and CI friendly** — all v4 `func new` flags preserved (`--language`, `--template`); `--language` accepts runtime names (`python`, `node`, `java`, `dotnet`, `csharp`, `fsharp`, `javascript`, `typescript`, `powershell`); non-TTY falls back to numbered list; `--template` skips all prompts for fully non-interactive use
 - Template download via git sparse-checkout or GitHub zip API (no bundling in binary)
 - `--path` to specify target directory (absolute or relative); created if absent, accepted if it exists and is empty — error if it exists and is not empty
 
@@ -192,8 +192,8 @@ $ func new templates --template http-trigger-python-azd
   Error: Unable to reach GitHub to download the template.
   Please check your network connection and try again.
 
-# --yes requires --language (target is empty — nothing to detect from)
-$ func new templates --language python --yes
+# Fully non-interactive: --template skips all prompts
+$ func new templates --language python --template http-trigger-python-azd
   Created http-trigger-python-azd in current directory
 
   Next steps:
@@ -201,9 +201,6 @@ $ func new templates --language python --yes
     2. .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
     3. pip install -r requirements.txt
     4. func start
-
-# --yes without --language → clear error:
-# Error: --language is required. Target directory is empty; cannot auto-detect language.
 ```
 
 **Post-scaffold success banner:**
@@ -427,7 +424,7 @@ flowchart TD
 
     LANG{"--language<br/>supplied?"}
     LANG -- yes --> TRIG
-    LANG -- "no + --yes" --> LERR(["Error: --language required<br/>cannot auto-detect"])
+    LANG -- "no, non-TTY" --> LERR(["Error: --language required<br/>cannot auto-detect"])
     LANG -- "no, interactive" --> LPROMPT["Use the up/down arrow keys to select a worker runtime:<br/>──────────────────────────<br/>.NET<br/>Node<br/>Python<br/>Java<br/>Powershell"]
 
     LPROMPT --> DOTNETCHECK{"dotnet selected?"}
@@ -468,12 +465,11 @@ flowchart TD
     F -- no --> G["Create directory"]
     F -- yes --> EMPTY{"Dir empty?"}
     EMPTY -- no --> ERR0(["Error: Target directory is not empty"])
-    EMPTY -- yes --> H{"--yes and<br/>no --language?"}
+    EMPTY -- yes --> H{"--language supplied?"}
     G --> H
-    H -- yes --> ERR1(["Error: --language required<br/>target is empty, cannot auto-detect"])
-    H -- no --> I{"--language supplied?"}
-    I -- "no, interactive" --> J["Prompt: select language<br/>arrow keys + live type-to-filter"]
-    I -- yes --> K["Use --language value"]
+    H -- "no, non-TTY" --> ERR1(["Error: --language required<br/>target is empty, cannot auto-detect"])
+    H -- "no, interactive" --> J["Prompt: select language<br/>arrow keys + live type-to-filter"]
+    H -- yes --> K["Use --language value"]
     J --> K
     K --> L{"--template supplied?"}
     L -- yes --> M["Resolve template directly"]
@@ -482,7 +478,7 @@ flowchart TD
     N -- no --> P["Filter templates by language<br/>apply --search if present"]
     O & P --> Q{"Interactive?"}
     Q -- yes --> R["Prompt: select trigger<br/>arrow keys + live type-to-filter"]
-    Q -- "no or --yes" --> S["Use first match or default template"]
+    Q -- "no, non-TTY" --> S["Use first match or default template"]
     R --> M
     S --> M
     M --> Z["Download and write all files"]
@@ -596,10 +592,6 @@ internal sealed class TemplatesCommand : FuncCliCommand
     {
         Description = "Case-insensitive substring filter applied to trigger names and descriptions before prompting (not semantic/fuzzy search)"
     };
-    public Option<bool> YesOption { get; } = new("--yes", "-y")
-    {
-        Description = "Accept all defaults non-interactively. Requires --language (no auto-detect; target folder is empty)."
-    };
 
     public TemplatesCommand(
         TemplatesListCommand listCommand,
@@ -617,15 +609,15 @@ internal sealed class TemplatesCommand : FuncCliCommand
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         // Runtime/language resolution:
-        //   → if --language missing in non-interactive/--yes mode: fail with clear error
+        //   → if --language missing in non-TTY mode: fail with clear error
         //   → if --language missing in interactive mode: prompt "Use the up/down arrow keys to select a worker runtime:"
         //     showing: .NET, Node, Python, Java, Powershell
         //   → if user selects ".NET": sub-prompt for C# vs F#
         //   → if user selects "Node": sub-prompt for JavaScript vs TypeScript
         //   → map prompt selection to manifest `language` value (see Runtime-to-Language Mapping)
         //   → if --language supplied directly: map flag value to manifest language
-        //     (e.g. "python" → "Python", "dotnet" → sub-prompt or default C# with --yes,
-        //      "node" → sub-prompt or default TypeScript with --yes)
+        //     (e.g. "python" → "Python", "dotnet" → sub-prompt for C#/F#,
+        //      "node" → sub-prompt for JS/TS)
         // Directory resolution:
         //   target = --path (absolute or relative) if supplied, else cwd
         //   if target does not exist: create it
@@ -633,7 +625,7 @@ internal sealed class TemplatesCommand : FuncCliCommand
         //   if target exists and is not empty: error (v1 — --force deferred to future iteration)
         // Non-interactive path: --template supplied → resolve by id, scaffold directly
         // --template supplied → skip both language and trigger selection
-        // --yes path: skip trigger prompt; errors if --language not supplied
+        // --template path: skip both language and trigger prompts entirely
         // Interactive path: prompt via IInteractionService for missing runtime/trigger
         // 1. Fetch manifest (verbose logging for cache hit/miss/refresh)
         //    manifest automatically excludes IaC-only templates (ARM, Bicep, Terraform)
@@ -821,7 +813,7 @@ All user-facing errors are surfaced as `GracefulException` (caught by `Program.M
 | **Network — download** | GitHub returns non-2xx, times out, or `git clone` fails with network error | `Unable to reach GitHub to download the template. Please check your network connection and try again.` | `templates` (scaffold) after template selection, when the download step fails |
 | **GitHub rate limit** | Tree API returns 403 with `X-RateLimit-Remaining: 0`, or 429 | `GitHub API rate limit exceeded. Rate limit resets at <HH:mm:ss UTC>. Try again later.` | `templates` (scaffold) during Tree API call for subfolder templates |
 | **Template not found** | `--template <id>` does not match any entry in the manifest | `Template '<id>' not found. Run 'func new templates list' to see available templates.` | `templates --template <id>` or `info <id>` |
-| **Language required** | `--yes` supplied without `--language` | `--language is required. Target directory is empty; cannot auto-detect language.` | `templates --yes` (non-interactive mode with no language) |
+| **Language required** | Non-TTY mode without `--language` | `--language is required. Target directory is empty; cannot auto-detect language.` | `templates` in non-interactive/CI environment without --language |
 | **No templates for language** | `--language` value is valid but no manifest templates match | `No templates found for language '<lang>'.` | `templates --language <lang>` or `list --language <lang>` |
 | **Invalid language** | `--language` value doesn't map to any known runtime | `Unknown language '<value>'. Valid values: dotnet, node, javascript, typescript, python, java, powershell.` | Any command that accepts `--language` |
 | **No search results** | `--search` filter (or combined `--language`/`--resource`/`--iac` filters) produces zero matching templates | `No templates found matching '<query>'. Run 'func new templates list' to see all available templates.` | `templates` and `templates list` after filtering |
@@ -859,7 +851,7 @@ Following the Core Tools vnext error handling convention:
   - **Persist last-used language** — store in `~/.azure-functions/<verb>/preferences.json` after first scaffold; use as default on next run
   - **Explicit `func config set default-language <lang>`** — user opts in deliberately; no implicit magic
   - **Keep required** — simplest; interactive prompt is low friction anyway; scripts always supply it
-  - Consider: does a persisted or detected default interact badly with `--yes` in CI (wrong language silently used)? Detection from files is safer than persistence — it's scoped to the target dir, not global state.
+  - Consider: does a persisted or detected default interact badly with non-TTY/CI (wrong language silently used)? Detection from files is safer than persistence — it's scoped to the target dir, not global state.
 - [ ] **`--search` empty-result behaviour in interactive mode** — when the in-prompt Spectre filter (not the `--search` flag) narrows to zero results, Spectre renders an empty list. Should the command detect this and show a message, or let the user backspace to widen the filter naturally?
 - [ ] **`func new templates` vs `func new` interactive fallback** — should bare `func new` (when no workloads installed) redirect to `func new templates` interactive flow, rather than showing a hint? Or keep the hint to encourage workload installation?
 - [ ] **`--output json` on `func new templates list`** — useful for tooling. Worth adding now or later?
