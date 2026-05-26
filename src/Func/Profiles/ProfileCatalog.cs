@@ -15,9 +15,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
     private readonly IReadOnlyList<IProfileSource> _sources =
         (sources ?? throw new ArgumentNullException(nameof(sources))).ToList();
 
-    public async Task<IReadOnlyList<ProfileSourceSnapshot>> LoadAsync(
-        ProfileSourceContext context,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ProfileSourceSnapshot>> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -31,9 +29,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
         return snapshots;
     }
 
-    public IReadOnlyList<ProfileDefinitionEntry> ListEffectiveProfiles(
-        IReadOnlyList<ProfileSourceSnapshot> snapshots,
-        IReadOnlySet<ProfileSourceKind>? sourceKinds = null)
+    public IReadOnlyList<ProfileDefinitionEntry> ListEffectiveProfiles(IReadOnlyList<ProfileSourceSnapshot> snapshots, IReadOnlySet<ProfileSourceKind>? sourceKinds = null)
     {
         ArgumentNullException.ThrowIfNull(snapshots);
 
@@ -78,18 +74,14 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
         return ResolveProfile(entry, snapshots);
     }
 
-    public ResolvedProfile ResolveProfile(
-        ProfileDefinitionEntry entry,
-        IReadOnlyList<ProfileSourceSnapshot> snapshots)
+    public ResolvedProfile ResolveProfile(ProfileDefinitionEntry entry, IReadOnlyList<ProfileSourceSnapshot> snapshots)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(snapshots);
 
         ProfileDefinitionEntry resolvedEntry = ResolveDefinitionEntry(entry, snapshots, []);
-        VersionRange hostVersionRange = ParseRequiredRange(
-            resolvedEntry.Definition.Host?.Version,
-            resolvedEntry.Name,
-            "host.version");
+        VersionRange hostVersionRange = ParseRequiredRange(resolvedEntry.Definition.Host?.Version, resolvedEntry.Name, "host.version");
+
         Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
         if (resolvedEntry.Definition.Workers is { } workers)
         {
@@ -113,10 +105,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
 
         ProfileStatus status = resolvedEntry.Definition.Status is null
             ? ProfileStatus.Stable
-            : ProfileDocumentParser.ParseStatus(
-                resolvedEntry.Definition.Status,
-                resolvedEntry.Name,
-                resolvedEntry.Source.DisplayName);
+            : ProfileDocumentParser.ParseStatus(resolvedEntry.Definition.Status, resolvedEntry.Name, resolvedEntry.Source.DisplayName);
 
         return new ResolvedProfile(
             resolvedEntry.Name,
@@ -131,10 +120,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
             resolvedEntry.Definition.Notes);
     }
 
-    private ProfileDefinitionEntry ResolveDefinitionEntry(
-        ProfileDefinitionEntry entry,
-        IReadOnlyList<ProfileSourceSnapshot> snapshots,
-        IReadOnlyList<string> chain)
+    private ProfileDefinitionEntry ResolveDefinitionEntry(ProfileDefinitionEntry entry, IReadOnlyList<ProfileSourceSnapshot> snapshots, IReadOnlyList<string> chain)
     {
         if (chain.Count > MaxInheritanceDepth)
         {
@@ -157,6 +143,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
             ?? throw new ProfileConfigurationException($"Profile '{parentName}' was not found.");
         ProfileDefinitionEntry resolvedParent = ResolveDefinitionEntry(parent, snapshots, [.. chain, entry.Name]);
         ProfileDefinition merged = Merge(resolvedParent.Definition, entry.Definition);
+
         return entry with { Definition = merged };
     }
 
@@ -186,9 +173,7 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
             Notes = child.Notes ?? parent.Notes,
         };
 
-    private static Dictionary<string, ProfileWorkerConstraint?>? MergeWorkers(
-        Dictionary<string, ProfileWorkerConstraint?>? parent,
-        Dictionary<string, ProfileWorkerConstraint?>? child)
+    private static Dictionary<string, ProfileWorkerConstraint?>? MergeWorkers(Dictionary<string, ProfileWorkerConstraint?>? parent, Dictionary<string, ProfileWorkerConstraint?>? child)
     {
         if (parent is null && child is null)
         {

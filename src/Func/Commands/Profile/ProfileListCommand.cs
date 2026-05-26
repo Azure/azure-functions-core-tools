@@ -29,10 +29,7 @@ internal sealed class ProfileListCommand : FuncCliCommand
     private readonly IProfileCatalog _catalog;
     private readonly IOptionsMonitor<ProjectProfileOptions> _projectProfileOptions;
 
-    public ProfileListCommand(
-        IInteractionService interaction,
-        IProfileCatalog catalog,
-        IOptionsMonitor<ProjectProfileOptions> projectProfileOptions)
+    public ProfileListCommand(IInteractionService interaction, IProfileCatalog catalog, IOptionsMonitor<ProjectProfileOptions> projectProfileOptions)
         : base("list", "List available Azure Functions profiles.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
@@ -74,15 +71,14 @@ internal sealed class ProfileListCommand : FuncCliCommand
     /// <exception cref="ProfileConfigurationException">
     /// Thrown when profile documents or inheritance are invalid.
     /// </exception>
-    private async Task<ProfileListResult> GetProfilesAsync(
-        DirectoryInfo workingDirectory,
-        string? sourceValue,
-        CancellationToken cancellationToken)
+    private async Task<ProfileListResult> GetProfilesAsync(DirectoryInfo workingDirectory, string? sourceValue, CancellationToken cancellationToken)
     {
         IReadOnlySet<ProfileSourceKind>? sourceKinds = ParseSourceFilter(sourceValue);
         var sourceContext = new ProfileSourceContext(workingDirectory);
+
         IReadOnlyList<ProfileSourceSnapshot> snapshots = await _catalog.LoadAsync(sourceContext, cancellationToken);
         IReadOnlyList<ProfileDefinitionEntry> entries = _catalog.ListEffectiveProfiles(snapshots, sourceKinds);
+
         List<ProfileListRow> rows = [];
         foreach (ProfileDefinitionEntry entry in entries)
         {
@@ -141,6 +137,7 @@ internal sealed class ProfileListCommand : FuncCliCommand
             },
             profiles = result.Profiles,
         };
+
         _interaction.WriteJson(value);
     }
 
@@ -190,10 +187,5 @@ internal sealed class ProfileListCommand : FuncCliCommand
 
     private sealed record ProfileListProject(IReadOnlyList<string> Profiles, string? DefaultProfile);
 
-    private sealed record ProfileListRow(
-        string Name,
-        string Source,
-        string HostVersion,
-        string ExtensionBundleVersion,
-        string Status);
+    private sealed record ProfileListRow(string Name, string Source, string HostVersion, string ExtensionBundleVersion, string Status);
 }

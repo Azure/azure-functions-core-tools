@@ -11,16 +11,12 @@ internal interface IProfileCatalog
     /// <summary>
     /// Loads all configured profile sources for a working directory.
     /// </summary>
-    public Task<IReadOnlyList<ProfileSourceSnapshot>> LoadAsync(
-        ProfileSourceContext context,
-        CancellationToken cancellationToken);
+    public Task<IReadOnlyList<ProfileSourceSnapshot>> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken);
 
     /// <summary>
     /// Returns the first visible definition for each profile name from the supplied snapshots.
     /// </summary>
-    public IReadOnlyList<ProfileDefinitionEntry> ListEffectiveProfiles(
-        IReadOnlyList<ProfileSourceSnapshot> snapshots,
-        IReadOnlySet<ProfileSourceKind>? sourceKinds = null);
+    public IReadOnlyList<ProfileDefinitionEntry> ListEffectiveProfiles(IReadOnlyList<ProfileSourceSnapshot> snapshots, IReadOnlySet<ProfileSourceKind>? sourceKinds = null);
 
     /// <summary>
     /// Finds the first profile definition matching the supplied name.
@@ -41,7 +37,5 @@ internal interface IProfileCatalog
     /// <exception cref="ProfileConfigurationException">
     /// Thrown when the profile's inherited definition is invalid.
     /// </exception>
-    public ResolvedProfile ResolveProfile(
-        ProfileDefinitionEntry entry,
-        IReadOnlyList<ProfileSourceSnapshot> snapshots);
+    public ResolvedProfile ResolveProfile(ProfileDefinitionEntry entry, IReadOnlyList<ProfileSourceSnapshot> snapshots);
 }

@@ -6,10 +6,7 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Profiles loaded from one source.
 /// </summary>
-internal sealed record ProfileSourceSnapshot(
-    ProfileSourceInfo Source,
-    IReadOnlyDictionary<string, ProfileDefinition> Profiles,
-    DateTimeOffset? GeneratedAt = null)
+internal sealed record ProfileSourceSnapshot(ProfileSourceInfo Source, IReadOnlyDictionary<string, ProfileDefinition> Profiles, DateTimeOffset? GeneratedAt = null)
 {
     public static ProfileSourceSnapshot Empty(ProfileSourceInfo source) =>
         new(source, new Dictionary<string, ProfileDefinition>(StringComparer.OrdinalIgnoreCase));
