@@ -2,7 +2,7 @@
 
 const extract = require('extract-zip');
 const url = require('url');
-const HttpsProxyAgent = require('https-proxy-agent');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const https = require('https');
 const version = require('../package.json').version;
 const consolidatedBuildId = "4.0." + require('../package.json').consolidatedBuildId;
