@@ -1,6 +1,4 @@
-# Azure Functions CLI 4.11.1
-# Azure Functions CLI 4.11.0
-# Azure Functions CLI 4.12.0-preview.1
+# Azure Functions CLI 4.12.0
 
 #### Host Version
 
