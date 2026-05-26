@@ -1,34 +1,44 @@
-# Note that this file should be used with YAML steps directly when the consolidated pipeline is migrated over to YAML
 param (
     [string]$StagingDirectory
 )
 
-# Define paths using the provided StagingDirectory
 $stagingCoreToolsCli = Join-Path $StagingDirectory "func-cli"
 $stagingCoreToolsVisualStudio = Join-Path $StagingDirectory "func-cli-visualstudio"
 
-# Matches the entire version, with or without -ci.xxx
-$versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-ci\.[\d\.]+)?)\.zip$'
+# Matches semantic versions in artifact names, including prerelease/build metadata:
+#   Azure.Functions.Cli.win-x64.4.2.2.zip
+#   Azure.Functions.Cli.win-x64.4.2.2-ci.25429.0.zip
+#   Azure.Functions.Cli.win-x64.4.2.2-preview1.zip
+#   Azure.Functions.Cli.win-x64.4.2.2-preview.1+build.5.zip
+$versionPattern = '^Azure\.Functions\.Cli\..*?\.(\d+\.\d+\.\d+(?:-[0-9A-Za-z\-\.]+)?(?:\+[0-9A-Za-z\-\.]+)?)\.zip$'
 
-# OOP
-$oopVersion = Get-ChildItem $stagingCoreToolsCli -Filter '*.zip' |
-    Where-Object { $_.Name -match $versionPattern } |
-    Select-Object -First 1 -ExpandProperty Name |
-    ForEach-Object { $_ -replace $versionPattern, '$1' }
+function Get-CoreToolsVersionFromZip {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
 
-# inProc
-$inProcVersion = Get-ChildItem $stagingCoreToolsVisualStudio -Filter '*.zip' |
-    Where-Object { $_.Name -match $versionPattern } |
-    Select-Object -First 1 -ExpandProperty Name |
-    ForEach-Object { $_ -replace $versionPattern, '$1' }
+        [Parameter(Mandatory = $true)]
+        [string]$ArtifactDescription
+    )
 
-# Get the current release number from ADO
+    $version = Get-ChildItem $Path -Filter '*.zip' |
+        Where-Object { $_.Name -match $versionPattern } |
+        Select-Object -First 1 -ExpandProperty Name |
+        ForEach-Object { $_ -replace $versionPattern, '$1' }
+
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        throw "Could not determine $ArtifactDescription version from zip files in '$Path'. Expected artifact names matching '$versionPattern'."
+    }
+
+    return $version
+}
+
+$oopVersion = Get-CoreToolsVersionFromZip -Path $stagingCoreToolsCli -ArtifactDescription "default artifact"
+$inProcVersion = Get-CoreToolsVersionFromZip -Path $stagingCoreToolsVisualStudio -ArtifactDescription "in-proc artifact"
+
 $releaseNumber = $env:BUILD_BUILDID
-
-# Get commit id
 $commitId = $env:BUILD_SOURCEVERSION
 
-# Create the JSON file
 $metadata = @{
     defaultArtifactVersion = $oopVersion
     inProcArtifactVersion = $inProcVersion
@@ -36,15 +46,12 @@ $metadata = @{
     commitId = $commitId
 }
 
-# Set the output path for the JSON file in the StagingDirectory
 $jsonOutputPath = Join-Path $StagingDirectory "metadata.json"
 
-# Convert to JSON and save to file
 $metadata | ConvertTo-Json | Set-Content -Path $jsonOutputPath
 
 Write-Host "Metadata file generated successfully at $jsonOutputPath"
 
-# Read and print the JSON content
 $jsonContent = Get-Content -Path $jsonOutputPath
 Write-Host "Contents of metadata.json:"
 Write-Host $jsonContent
