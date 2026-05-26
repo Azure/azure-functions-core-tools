@@ -167,7 +167,7 @@ internal sealed class WorkloadInstaller(
 
         string resolvedId = exact
             ? packageId
-            : await ResolveAliasOrIdAsync(packageId, source, includePrerelease, cancellationToken);
+            : await ResolveAliasAsync(packageId, source, includePrerelease, cancellationToken);
 
         ResolvedPackage resolved = await ResolveCatalogPackageAsync(
             resolvedId, version, source, includePrerelease, cancellationToken);
@@ -285,29 +285,30 @@ internal sealed class WorkloadInstaller(
         return true;
     }
 
-    private async Task<string> ResolveAliasOrIdAsync(
-        string aliasOrId,
+    private async Task<string> ResolveAliasAsync(
+        string alias,
         string? source,
         bool includePrerelease,
         CancellationToken cancellationToken)
     {
-        // Spec §6.1 step 2 (default flow): query the catalog for packages
-        // declaring `alias:<aliasOrId>` and pick the unique match. Zero
-        // matches falls back to treating the input as a literal package id.
-        // Multiple distinct package ids is an error; the user must re-run
-        // with --exact <packageId>.
+        // Default flow: query the catalog for packages declaring
+        // `alias:<alias>` and pick the unique match. We never fall back to
+        // treating the input as a literal package id: an attacker who
+        // publishes `node` to a configured source must not be able to
+        // satisfy `func workload install node`. Users who genuinely want to
+        // install by package id must opt in with `--exact <packageId>`.
         const int aliasSearchTake = 50;
 
         var query = new CatalogSearchQuery
         {
-            Filter = aliasOrId,
+            Filter = alias,
             IncludePrerelease = includePrerelease,
             Take = aliasSearchTake,
             Source = source,
         };
 
         IReadOnlyList<CatalogSearchResult> hits = await _catalog.SearchAsync(query, cancellationToken);
-        IReadOnlyList<string> matchedIds = FilterByAlias(hits, aliasOrId);
+        IReadOnlyList<string> matchedIds = FilterByAlias(hits, alias);
 
         // Some feeds (BaGet, older NuGet implementations) tokenize the `q=`
         // term in ways that drop hyphenated aliases like `node-worker`. When
@@ -319,15 +320,22 @@ internal sealed class WorkloadInstaller(
             IReadOnlyList<CatalogSearchResult> all = await _catalog.SearchAsync(
                 query with { Filter = null },
                 cancellationToken);
-            matchedIds = FilterByAlias(all, aliasOrId);
+            matchedIds = FilterByAlias(all, alias);
         }
 
         if (matchedIds.Count > 1)
         {
-            throw new AmbiguousPackageMatchException(aliasOrId, matchedIds);
+            throw new AmbiguousPackageMatchException(alias, matchedIds);
         }
 
-        return matchedIds.Count == 1 ? matchedIds[0] : aliasOrId;
+        if (matchedIds.Count == 0)
+        {
+            throw new Catalog.WorkloadPackageNotFoundException(
+                $"No workload with alias '{alias}' was found in the catalog. " +
+                $"To install by package id instead, pass --exact <packageId>.");
+        }
+
+        return matchedIds[0];
     }
 
     private static IReadOnlyList<string> FilterByAlias(IReadOnlyList<CatalogSearchResult> hits, string alias) =>

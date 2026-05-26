@@ -492,6 +492,39 @@ public sealed class WorkloadInstallerTests : IDisposable
     }
 
     [Fact]
+    public async Task InstallFromCatalog_AliasResolution_NoMatch_Throws()
+    {
+        // Without --exact the input is an alias only. If neither the
+        // targeted nor the broad search returns a package declaring the
+        // alias, the installer must not silently treat the input as a
+        // literal package id (security: an attacker who publishes `node`
+        // to a configured source could otherwise satisfy
+        // `func workload install node`). The user has to opt in with
+        // --exact <packageId>.
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "ghost"),
+                Arg.Any<CancellationToken>())
+            .Returns([]);
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
+                Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
+            () => installer.InstallFromCatalogAsync(
+                "ghost", version: null, source: null,
+                includePrerelease: false, exact: false, force: false));
+
+        Assert.Contains("ghost", ex.Message);
+        Assert.Contains("--exact", ex.Message);
+        await _catalog.DidNotReceive().ResolveLatestVersionAsync(
+            Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<NuGetVersion?>(),
+            Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _catalog.DidNotReceive().DownloadAsync(Arg.Any<ResolvedPackage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task InstallFromCatalog_AliasResolution_FallsBackToBroadSearchWhenTargetedReturnsZero()
     {
         // BaGet and older NuGet feeds tokenize the `q=` term in ways that drop

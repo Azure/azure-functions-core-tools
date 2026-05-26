@@ -27,7 +27,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
-        Description = "Workload package id, alias, or path to a local .nupkg.",
+        Description = "Workload alias (default) or path to a local .nupkg. Pass --exact to install by literal package id.",
     };
 
     public Option<string?> VersionOption { get; } = new("--version", "-v")
@@ -52,7 +52,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
     public Option<bool> ExactOption { get; } = new("--exact", "-e")
     {
-        Description = "Disable alias matching. <id> must be the literal package id.",
+        Description = "Treat <id> as a literal package id. Without this flag, <id> is resolved as an alias only.",
     };
 
     public WorkloadInstallCommand(
