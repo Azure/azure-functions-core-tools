@@ -51,7 +51,6 @@ This design proposes **`templates`** as the subcommand verb (`func new templates
   - [File Layout](#file-layout)
 - [IInteractionService Prompt Gap](#iinteractionservice-prompt-gap)
 - [Error Messaging](#error-messaging)
-- [Incremental: `--env` Flag](#incremental---env-flag)
 - [Open Questions](#open-questions)
 - [Appendix](#appendix)
   - [References](#references)
@@ -62,7 +61,7 @@ This design proposes **`templates`** as the subcommand verb (`func new templates
 
 ## Problem Statement
 
-In vnext, workload templates solve the per-function scaffolding story: `func new` adds a single function file to an existing project using templates shipped in workload packages. A complementary scenario is **complete-app scaffolding** — downloading a fully runnable function app (function code, host.json, local.settings.json, IaC configuration, and all dependencies) in a single step so that `func start` works immediately.
+In vnext, workload templates solve the per-function scaffolding story: `func new` adds a single function file to an existing project using templates shipped in workload packages. A complementary scenario is **complete-app scaffolding** — downloading a fully runnable function app (function code, host.json, local.settings.json, IaC configuration, and all dependencies) in a single step. Runtime-specific setup (venv, npm install, dotnet restore) is handled separately by the developer or by `func start`.
 
 Today, complete app templates live in GitHub repos (e.g. Azure-Samples) and developers discover them through docs, portal links, or search. This design brings that discovery and scaffolding workflow into the CLI itself.
 
@@ -80,12 +79,12 @@ How this complements workload templates:
 ### Goals
 
 - Add `func new templates` as a built-in subcommand of `NewCommand` on the vnext branch
-- Download and create a **complete, runnable function app** from a GitHub template — all function code, config, and dependencies included; `func start` works immediately after scaffolding
+- Download and create a **complete function app** from a GitHub template — all function code, config, and dependencies included
 - CDN-backed template manifest with ETag caching (24h TTL)
 - `func new templates list` — non-interactive table of available templates, filterable by `--language`, `--resource`, `--iac`, and keyword (`--search`); `--search` is a **case-insensitive substring match** (not semantic/fuzzy) against `id`, `displayName`, `resource`, `tags`, and `shortDescription`
-- `func new templates` (bare invocation) — interactive flow: worker runtime → (dotnet sub-prompt: C#/F#, Node sub-prompt: JS/TS) → trigger → scaffold; the runtime prompt matches the existing `func new` UX (`dotnet (isolated worker model)`, `Node`, `Python`, `Java`, `Powershell`); trigger selection supports incremental keyword filtering; powered by the existing `IInteractionService` / Spectre.Console already in vnext
+- `func new templates` (bare invocation) — interactive flow: worker runtime → (dotnet sub-prompt: C#/F#, Node sub-prompt: JS/TS) → trigger → scaffold; the runtime prompt matches the existing `func new` UX (`.NET`, `Node`, `Python`, `Java`, `Powershell`); trigger selection supports incremental keyword filtering; powered by the existing `IInteractionService` / Spectre.Console already in vnext
 - **.NET isolated worker model only** — the manifest `CSharp` and `FSharp` languages map exclusively to the .NET isolated worker model; the in-process model is not supported and will not be added (it is on a deprecation path). Note: no F# templates exist in the manifest today; the sub-prompt will show F# once templates are available
-- **Agent and CI friendly** — all v4 `func new` flags preserved (`--language`, `--template`); `--language` accepts runtime names (`python`, `node`, `java`, `dotnet-isolated`, `csharp`, `fsharp`, `javascript`, `typescript`, `powershell`); `--yes` accepts remaining defaults non-interactively but errors clearly if `--language` is not supplied; non-TTY falls back to numbered list
+- **Agent and CI friendly** — all v4 `func new` flags preserved (`--language`, `--template`); `--language` accepts runtime names (`python`, `node`, `java`, `dotnet`, `csharp`, `fsharp`, `javascript`, `typescript`, `powershell`); `--yes` accepts remaining defaults non-interactively but errors clearly if `--language` is not supplied; non-TTY falls back to numbered list
 - Template download via git sparse-checkout or GitHub zip API (no bundling in binary)
 - `--path` to specify target directory (absolute or relative); created if absent, accepted if it exists and is empty — error if it exists and is not empty
 
@@ -94,7 +93,7 @@ How this complements workload templates:
 - Adding a single function file to an existing project (that is v4 `func new` behaviour — out of scope here)
 - Replacing or changing `func init` (separate command, workload-driven)
 - Changing the workload model or `IProjectInitializer` interface
-- Automatic environment setup (venv, npm install, dotnet restore) — **deferred to `--env` incremental** (see [Incremental: `--env` Flag](#incremental---env-flag))
+- Automatic environment setup (venv, npm install, dotnet restore) — out of scope; belongs in `func start` workflow
 - File conflict handling and `--force` flag — **deferred to next iteration of this command**; v1 requires target directory to be empty
 
 > **Why `--language` is required:** Workload-driven `func new` operates on an existing project and can detect the runtime from project files. `func new templates` scaffolds into an empty directory, so there is nothing to detect from — `--language` must be supplied explicitly.
@@ -127,7 +126,7 @@ func new                                    # NewCommand (existing)
 $ func new templates
 
   Use the up/down arrow keys to select a worker runtime:
-    dotnet (isolated worker model)
+    .NET
     Node
     Python
     Java
@@ -318,14 +317,29 @@ internal interface ITemplateManifestService
 | ----------- | -------- |
 | Primary URL | `https://cdn.functions.azure.com/public/templates-manifest/manifest.json` |
 | Backup URL | `https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json` |
-| Cache location | `~/.azure-functions-core-tools/cache/manifest.json` + `manifest-meta.json` |
+| Cache location | `~/.azure-functions/<verb>/manifest.json` + `<verb>/manifest-meta.json` (where `<verb>` matches the chosen command name, e.g. `quickstart`) |
 | Cache key | ETag from CDN response |
 | TTL | 24 hours (refresh ETag check on expiry) |
 | 304 Not Modified | Update TTL timestamp, return cached manifest |
 | Network failure | Log warning via `IInteractionService.WriteWarning`; fall back to bundled embedded manifest |
 | Trusted-org filter | Strip any template whose `repositoryUrl` owner is not in `{"azure", "azure-samples", "microsoft"}` |
 | IaC-only filter | Exclude templates where `language` is `ARM`, `Bicep`, or `Terraform` — these are infrastructure-as-code templates, not function app code. The manifest has 4 such entries (e.g. `iac-flex-consumption-bicep`); they are irrelevant to `func new templates`. |
-| Manifest validation | Non-null `templates` array; each entry has `id`, `language`, `resource`, `repositoryUrl`, `folderPath` |
+| Manifest validation | Non-null `templates` array; each entry has `id`, `language`, `resource`, `repositoryUrl`, `folderPath`, `gitRef` |
+| `gitRef` resolution | Each template entry **must** include `"gitRef": "<tag-or-sha>"`. The CLI uses `gitRef` as the checkout/download target. This ensures templates are pinned to an immutable, reviewed release — no implicit default-branch resolution |
+| URL override | `FUNC_TEMPLATE_MANIFEST_URL` environment variable overrides the primary URL. Used for testing against staging CDN or local dev manifests. Same schema expected |
+
+#### Release & Compliance Model
+
+The manifest source of truth lives in the [`Azure/azure-functions-templates`](https://github.com/Azure/azure-functions-templates) repository under `Functions.Templates/Template-Manifest/`.
+
+| Aspect | Detail |
+| --- | --- |
+| Source repo | `Azure/azure-functions-templates` — manifest changes require a PR and team approval |
+| Immutability | Every template entry pins a `gitRef` (tag or commit SHA). No branch references allowed — content is frozen at a reviewed point-in-time |
+| Staging | Staging CDN at `https://cdn-staging.functions.azure.com/staging/templates-manifest/manifest.json`. Used for pre-release validation. CLI can target it via `FUNC_TEMPLATE_MANIFEST_URL` |
+| Production | Production CDN at `https://cdn.functions.azure.com/public/templates-manifest/manifest.json`. Updated only after staging validation passes |
+| Promotion flow | PR merged → CI validates schema + smoke-tests each template's `gitRef` is resolvable → published to staging → manual promotion to production |
+| Testing locally | Set `FUNC_TEMPLATE_MANIFEST_URL=file:///path/to/local/manifest.json` or point to staging CDN, schema must match |
 
 #### Runtime-to-Language Mapping
 
@@ -333,7 +347,7 @@ The interactive prompt shows **worker runtimes** (matching `func new` UX), but t
 
 | Prompt Label | `--language` flag value(s) | Manifest `language` | Notes |
 | --- | --- | --- | --- |
-| dotnet (isolated worker model) | `dotnet-isolated`, `dotnet` | — | Sub-prompt: C# or F#; isolated worker model only — in-process is not supported |
+| .NET | `dotnet` | `csharp`, `fsharp` | Sub-prompt: C# or F#. Always isolated worker model — in-process is not supported in v5 |
 | — | `csharp` | `CSharp` | Direct flag bypasses dotnet sub-prompt |
 | — | `fsharp` | `FSharp` | Direct flag bypasses dotnet sub-prompt; no templates available yet |
 | Node | `node` | — | Sub-prompt: JavaScript or TypeScript |
@@ -343,7 +357,7 @@ The interactive prompt shows **worker runtimes** (matching `func new` UX), but t
 | Java | `java` | `Java` | |
 | Powershell | `powershell` | `PowerShell` | |
 
-**Dotnet sub-prompt:** When the user selects "dotnet (isolated worker model)" in the interactive runtime prompt, a follow-up prompt asks for C# or F#. When `--language dotnet-isolated` or `--language dotnet` is supplied non-interactively, the default is C#. Use `--language csharp` or `--language fsharp` to skip the sub-prompt entirely. Note: no F# templates exist in the manifest today; selecting F# will show an empty list until templates are published.
+**Dotnet sub-prompt:** When the user selects ".NET" in the interactive runtime prompt, a follow-up prompt asks for C# or F#. When `--language dotnet` is supplied non-interactively, the default is C#. Use `--language csharp` or `--language fsharp` to skip the sub-prompt entirely. Note: no F# templates exist in the manifest today; selecting F# will show an empty list until templates are published.
 
 **Node sub-prompt:** When the user selects "Node" in the interactive runtime prompt, a follow-up prompt asks for JavaScript or TypeScript. When `--language node` is supplied non-interactively, the default is TypeScript (matching the modern v4 programming model). Use `--language javascript` or `--language typescript` to skip the sub-prompt entirely.
 
@@ -362,14 +376,39 @@ internal interface ITemplateFunctionScaffolder
 
 `TemplateFunctionScaffolder` implementation (ported from `fnx/lib/init/scaffold.js`):
 
+#### Download Strategy (`--fetch git|http`)
+
+| Value | Behaviour | Best for |
+| --- | --- | --- |
+| `git` **(default)** | Uses git sparse-checkout. If `git` is not on PATH, falls back to `http` with a warning: `git not found on PATH — using HTTP to download template.` | Developers with git on PATH (vast majority) |
+| `http` | Uses GitHub REST API (zip for whole-repo, tree API + raw downloads for subfolders) | Environments without git, CI containers, air-gapped with proxy |
+
+The `--fetch` flag allows explicit override regardless of git availability.
+
+#### Download Details
+
 | Strategy | Condition | Detail |
 | ---------- | ----------- | -------- |
-| git sparse-checkout | `git` available on PATH | `git clone --filter=blob:none --sparse <repoUrl>` then `git sparse-checkout set <folderPath>` |
-| Tree API + raw URLs | No git (subfolder) | One API call to `GET /repos/{owner}/{repo}/git/trees/main?recursive=1` (60 req/hr) to enumerate files, then download each via `raw.githubusercontent.com` (~5,000 req/hr). Tree response capped at 5 MB and cached. |
-| GitHub zip API | No git (whole repo) | `GET https://api.github.com/repos/<owner>/<repo>/zipball/<ref>` → extract and strip `repo-main/` prefix |
+| git sparse-checkout | `--fetch git` + `folderPath` is subfolder | `git clone --filter=blob:none --sparse --branch <gitRef> <repoUrl> <tempDir>` then `git sparse-checkout set <folderPath>` |
+| git clone (whole repo) | `--fetch git` + `folderPath` is `"."` | `git clone --depth 1 --branch <gitRef> <repoUrl> <tempDir>` |
+| Tree API + raw URLs | `--fetch http` + `folderPath` is subfolder | `GET /repos/{owner}/{repo}/git/trees/<gitRef>?recursive=1` to enumerate, then download each file via `raw.githubusercontent.com/<owner>/<repo>/<gitRef>/<path>`. Rate limit: 60 tree req/hr (unauthenticated), ~5,000 raw req/hr |
+| GitHub zip API | `--fetch http` + `folderPath` is `"."` | `GET https://api.github.com/repos/<owner>/<repo>/zipball/<gitRef>` → extract and strip root prefix |
 | Path traversal prevention | Always | Resolve each extracted path and assert it starts with `targetDirectory + Path.DirectorySeparatorChar` |
 | Trusted org | Always | Validate `owner` from `repositoryUrl` before any network call |
 | URL scheme | Always | Only `https://github.com/` allowed as repository base |
+
+#### Git Process Requirements
+
+All git child-process invocations must satisfy:
+
+| Requirement | Implementation |
+| --- | --- |
+| **Process abstraction** | Wrap behind `IGitRunner` interface — no direct `Process.Start` in business logic. Testable via `FakeGitRunner` in tests |
+| **Argument-array invocation** | Pass arguments via `ProcessStartInfo.ArgumentList` (string array), never as a shell-concatenated string. Prevents injection if a URL or path contains special characters |
+| **Non-interactive** | Set `GIT_TERMINAL_PROMPT=0` environment variable on the child process — git must never prompt for credentials. Private/inaccessible repos fail cleanly with an error message |
+| **Timeout** | Configurable timeout (default 120s). Kill the process and report `Template download timed out. Try again or use --fetch http.` |
+| **Cancellation** | `CancellationToken` from the command handler kills the git child process on Ctrl+C. Use `Process.Kill(entireProcessTree: true)` |
+| **Temp directory cleanup** | Clone into a temp directory; move files to target on success. On failure or cancellation, delete the temp directory in a `finally` block |
 
 ---
 
@@ -389,7 +428,7 @@ flowchart TD
     LANG{"--language<br/>supplied?"}
     LANG -- yes --> TRIG
     LANG -- "no + --yes" --> LERR(["Error: --language required<br/>cannot auto-detect"])
-    LANG -- "no, interactive" --> LPROMPT["Use the up/down arrow keys to select a worker runtime:<br/>──────────────────────────<br/>dotnet (isolated worker model)<br/>Node<br/>Python<br/>Java<br/>Powershell"]
+    LANG -- "no, interactive" --> LPROMPT["Use the up/down arrow keys to select a worker runtime:<br/>──────────────────────────<br/>.NET<br/>Node<br/>Python<br/>Java<br/>Powershell"]
 
     LPROMPT --> DOTNETCHECK{"dotnet selected?"}
     DOTNETCHECK -- yes --> DOTNETPROMPT["Use the up/down arrow keys to select a language:<br/>C#<br/>F#"]
@@ -532,7 +571,7 @@ internal sealed class TemplatesCommand : FuncCliCommand
     // Carried forward from v4 func new — preserve agent/CI compatibility
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
-        Description = "Worker runtime or language (e.g. python, node, java, dotnet-isolated, csharp, fsharp, javascript, typescript)"
+        Description = "Worker runtime or language (e.g. python, node, java, dotnet, csharp, fsharp, javascript, typescript)"
     };
     public Option<string?> TemplateOption { get; } = new("--template", "-t")
     {
@@ -580,12 +619,12 @@ internal sealed class TemplatesCommand : FuncCliCommand
         // Runtime/language resolution:
         //   → if --language missing in non-interactive/--yes mode: fail with clear error
         //   → if --language missing in interactive mode: prompt "Use the up/down arrow keys to select a worker runtime:"
-        //     showing: dotnet (isolated), dotnet (in-process), Node, Python, Java, Powershell
-        //   → if user selects "dotnet (isolated)": sub-prompt for C# vs F#
+        //     showing: .NET, Node, Python, Java, Powershell
+        //   → if user selects ".NET": sub-prompt for C# vs F#
         //   → if user selects "Node": sub-prompt for JavaScript vs TypeScript
         //   → map prompt selection to manifest `language` value (see Runtime-to-Language Mapping)
         //   → if --language supplied directly: map flag value to manifest language
-        //     (e.g. "python" → "Python", "dotnet-isolated" → sub-prompt or default C# with --yes,
+        //     (e.g. "python" → "Python", "dotnet" → sub-prompt or default C# with --yes,
         //      "node" → sub-prompt or default TypeScript with --yes)
         // Directory resolution:
         //   target = --path (absolute or relative) if supplied, else cwd
@@ -617,7 +656,7 @@ internal sealed class TemplatesListCommand : FuncCliCommand
 {
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
-        Description = "Filter by worker runtime or language (e.g. python, node, java, dotnet-isolated)"
+        Description = "Filter by worker runtime or language (e.g. python, node, java, dotnet)"
     };
     public Option<string?> ResourceOption { get; } = new("--resource", "-r")
     {
@@ -784,7 +823,7 @@ All user-facing errors are surfaced as `GracefulException` (caught by `Program.M
 | **Template not found** | `--template <id>` does not match any entry in the manifest | `Template '<id>' not found. Run 'func new templates list' to see available templates.` | `templates --template <id>` or `info <id>` |
 | **Language required** | `--yes` supplied without `--language` | `--language is required. Target directory is empty; cannot auto-detect language.` | `templates --yes` (non-interactive mode with no language) |
 | **No templates for language** | `--language` value is valid but no manifest templates match | `No templates found for language '<lang>'.` | `templates --language <lang>` or `list --language <lang>` |
-| **Invalid language** | `--language` value doesn't map to any known runtime | `Unknown language '<value>'. Valid values: dotnet-isolated, node, javascript, typescript, python, java, powershell.` | Any command that accepts `--language` |
+| **Invalid language** | `--language` value doesn't map to any known runtime | `Unknown language '<value>'. Valid values: dotnet, node, javascript, typescript, python, java, powershell.` | Any command that accepts `--language` |
 | **No search results** | `--search` filter (or combined `--language`/`--resource`/`--iac` filters) produces zero matching templates | `No templates found matching '<query>'. Run 'func new templates list' to see all available templates.` | `templates` and `templates list` after filtering |
 | **Directory not empty** | Target directory contains any files or subdirectories | `Target directory '<path>' is not empty. Use an empty directory or a new --path.` | `templates` (scaffold) before download, during directory validation |
 | **Untrusted org** | Template's `repositoryUrl` owner is not in the trusted-org allowlist (`azure`, `azure-samples`, `microsoft`) | `Template references an untrusted repository (<owner>/<repo>). This template cannot be downloaded.` | `templates` (scaffold) before any network call to GitHub |
@@ -811,47 +850,13 @@ Following the Core Tools vnext error handling convention:
 
 ---
 
-## Incremental: `--env` Flag
-
-> **Status:** Deferred — not in v1 scope. Tracked as a follow-up after the core `func new templates` command.
-
-The `--env` flag would automatically set up the runtime environment after scaffolding, so `func start` works without any manual steps.
-
-**What `--env` does per runtime:**
-
-| Runtime | Actions | Detects |
-| --- | --- | --- |
-| Python | `python -m venv .venv`, activate venv, `pip install -r requirements.txt` | `requirements.txt` in template |
-| TypeScript | `npm install`, `npm run build` | `package.json` + `tsconfig.json` in template |
-| JavaScript | `npm install` | `package.json` in template |
-| .NET (isolated) | `dotnet restore` | `*.csproj` in template |
-| Java | `mvn clean package` | `pom.xml` in template |
-| PowerShell | *(no-op — no dependency install needed)* | — |
-
-**UX with `--env`:**
-
-```bash
-$ func new templates --language python --template http-trigger-python-azd --env
-
-  Downloading http-trigger-python-azd...
-  Creating virtual environment (.venv)...
-  Installing dependencies (pip install -r requirements.txt)...
-
-  Created http-trigger-python-azd in current directory
-
-  Next steps:
-    1. func start
-```
-
-When `--env` succeeds, the post-scaffold banner drops all install/activate steps — the environment is ready, so only `cd` (if `--path` was used) and `func start` remain. If `--env` partially fails (e.g. `pip install` fails), the banner falls back to showing the full manual steps with a warning that automatic setup was incomplete.
-
 ---
 
 ## Open Questions
 
 - [ ] **Default language** — `--language` is currently required with no fallback (target dir is empty, nothing to detect from). Should there be a default so repeat users don't have to supply it every time? Options:
   - **Detect from existing files** — run `ProjectDetector.DetectStackAndLanguage(targetDir)` on the resolved target before prompting; if detectable files exist (e.g. `requirements.txt`, `package.json`, `*.csproj`), use the detected language as the default; if target is empty, fall through to prompt or error. Already exists at `src/Func/Commands/ProjectDetector.cs`. Becomes more useful when `--force` is added in a future iteration (target dir may have project files).
-  - **Persist last-used language** — store in `~/.azure-functions-core-tools/config` after first scaffold; use as default on next run
+  - **Persist last-used language** — store in `~/.azure-functions/<verb>/preferences.json` after first scaffold; use as default on next run
   - **Explicit `func config set default-language <lang>`** — user opts in deliberately; no implicit magic
   - **Keep required** — simplest; interactive prompt is low friction anyway; scripts always supply it
   - Consider: does a persisted or detected default interact badly with `--yes` in CI (wrong language silently used)? Detection from files is safer than persistence — it's scoped to the target dir, not global state.
