@@ -8,19 +8,19 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Loads user-level profiles from the Azure Functions CLI home directory.
 /// </summary>
-internal sealed class UserProfileSource(ProfileDocumentParser parser, IProfileFileSystem fileSystem, UserConfigurationPathsOptions userConfigurationPaths)
+internal sealed class UserProfileSource(ProfileDocumentParser parser, IProfileFileSystem fileSystem, CliConfigurationPathsOptions configurationPaths)
     : IProfileSource
 {
     private readonly ProfileDocumentParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
     private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-    private readonly UserConfigurationPathsOptions _userConfigurationPaths =
-        userConfigurationPaths ?? throw new ArgumentNullException(nameof(userConfigurationPaths));
+    private readonly CliConfigurationPathsOptions _configurationPaths =
+        configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
 
     public async Task<ProfileSourceSnapshot> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        string path = _userConfigurationPaths.ProfilesPath;
+        string path = _configurationPaths.ProfilesPath;
         ProfileSourceInfo source = new(ProfileSourceKind.User, "~/.azure-functions/profiles.json", path);
         string? json = await _fileSystem.ReadAllTextIfExistsAsync(path, cancellationToken);
 

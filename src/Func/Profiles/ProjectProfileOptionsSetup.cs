@@ -13,9 +13,7 @@ namespace Azure.Functions.Cli.Profiles;
 internal sealed class ProjectProfileOptionsSetup(IConfiguration configuration, ICliConfigurationProvider? configurationProvider = null)
     : IConfigureNamedOptions<ProjectProfileOptions>
 {
-    private static readonly string _projectConfigDisplayName = Path.Combine(
-        CliConfigurationNames.ProjectConfigFolderName,
-        CliConfigurationNames.ConfigFileName);
+    private static readonly string _projectConfigDisplayName = CliConfigurationPathsOptions.ProjectConfigDisplayPath;
 
     private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     private readonly ICliConfigurationProvider? _configurationProvider = configurationProvider;

@@ -10,23 +10,23 @@ namespace Azure.Functions.Cli.Configuration;
 /// <summary>
 /// Builds and caches scoped CLI configuration roots.
 /// </summary>
-internal sealed class CliConfigurationProvider(ILocalSettingsProvider localSettingsProvider, UserConfigurationPathsOptions userConfigurationPaths)
+internal sealed class CliConfigurationProvider(ILocalSettingsProvider localSettingsProvider, CliConfigurationPathsOptions configurationPaths)
     : ICliConfigurationProvider
 {
     private readonly ILocalSettingsProvider _localSettingsProvider = localSettingsProvider ?? throw new ArgumentNullException(nameof(localSettingsProvider));
-    private readonly UserConfigurationPathsOptions _userConfigurationPaths = userConfigurationPaths ?? throw new ArgumentNullException(nameof(userConfigurationPaths));
+    private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
     private readonly ConcurrentDictionary<string, IConfigurationRoot> _projectConfigurations = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, IConfigurationRoot> _effectiveConfigurations = new(StringComparer.OrdinalIgnoreCase);
     private IConfigurationRoot? _userConfiguration;
     private readonly Lock _userConfigurationLock = new();
 
     public CliConfigurationProvider(ILocalSettingsProvider localSettingsProvider)
-        : this(localSettingsProvider, new UserConfigurationPathsOptions())
+        : this(localSettingsProvider, new CliConfigurationPathsOptions())
     {
     }
 
     internal CliConfigurationProvider(ILocalSettingsProvider localSettingsProvider, DirectoryInfo userConfigurationDirectory)
-        : this(localSettingsProvider, CreateUserConfigurationPaths(userConfigurationDirectory))
+        : this(localSettingsProvider, CreateConfigurationPaths(userConfigurationDirectory))
     {
     }
 
@@ -39,7 +39,7 @@ internal sealed class CliConfigurationProvider(ILocalSettingsProvider localSetti
 
         lock (_userConfigurationLock)
         {
-            _userConfiguration ??= BuildUserConfiguration(_userConfigurationPaths);
+            _userConfiguration ??= BuildUserConfiguration(_configurationPaths);
 
             return _userConfiguration;
         }
@@ -67,11 +67,11 @@ internal sealed class CliConfigurationProvider(ILocalSettingsProvider localSetti
         return _effectiveConfigurations.GetOrAdd(key, static (_, state) => state.Provider.BuildEffectiveConfiguration(state.ProjectDirectory), state);
     }
 
-    private static IConfigurationRoot BuildUserConfiguration(UserConfigurationPathsOptions userConfigurationPaths)
+    private static IConfigurationRoot BuildUserConfiguration(CliConfigurationPathsOptions configurationPaths)
     {
         var builder = new ConfigurationBuilder();
         builder.AddEnvironmentVariables(prefix: Constants.EnvironmentVariablePrefix);
-        builder.AddJsonFile(userConfigurationPaths.ConfigPath, optional: true, reloadOnChange: false);
+        builder.AddJsonFile(configurationPaths.ConfigPath, optional: true, reloadOnChange: false);
 
         return builder.Build();
     }
@@ -80,7 +80,7 @@ internal sealed class CliConfigurationProvider(ILocalSettingsProvider localSetti
     {
         var builder = new ConfigurationBuilder();
         builder.Add(new LocalSettingsConfigurationSource(projectDirectory, _localSettingsProvider));
-        builder.AddJsonFile(GetProjectConfigPath(projectDirectory), optional: true, reloadOnChange: false);
+        builder.AddJsonFile(CliConfigurationPathsOptions.GetProjectConfigPath(projectDirectory), optional: true, reloadOnChange: false);
 
         return builder.Build();
     }
@@ -94,16 +94,10 @@ internal sealed class CliConfigurationProvider(ILocalSettingsProvider localSetti
         return builder.Build();
     }
 
-    private static string GetProjectConfigPath(DirectoryInfo projectDirectory)
-        => Path.Combine(
-            projectDirectory.FullName,
-            CliConfigurationNames.ProjectConfigFolderName,
-            CliConfigurationNames.ConfigFileName);
-
-    private static UserConfigurationPathsOptions CreateUserConfigurationPaths(DirectoryInfo userConfigurationDirectory)
+    private static CliConfigurationPathsOptions CreateConfigurationPaths(DirectoryInfo userConfigurationDirectory)
     {
         ArgumentNullException.ThrowIfNull(userConfigurationDirectory);
-        return new UserConfigurationPathsOptions(userConfigurationDirectory.FullName);
+        return new CliConfigurationPathsOptions(userConfigurationDirectory.FullName);
     }
 
     private static string NormalizeProjectDirectory(DirectoryInfo projectDirectory)

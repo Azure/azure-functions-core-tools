@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Text.Json;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Common;
@@ -15,6 +16,7 @@ namespace Azure.Functions.Cli.Tests.Commands.Profile;
 public sealed class ProfileCommandTests : IDisposable
 {
     private readonly string _tempDir;
+    private readonly FakeProfileFileSystem _fileSystem = new();
     private readonly TestInteractionService _interaction = new();
 
     public ProfileCommandTests()
@@ -40,6 +42,7 @@ public sealed class ProfileCommandTests : IDisposable
         Assert.NotNull(profileCommand);
         Assert.Contains(profileCommand!.Subcommands, c => c.Name == "list");
         Assert.Contains(profileCommand.Subcommands, c => c.Name == "show");
+        Assert.Contains(profileCommand.Subcommands, c => c.Name == "set");
     }
 
     [Fact]
@@ -146,6 +149,111 @@ public sealed class ProfileCommandTests : IDisposable
         Assert.Contains("Profile 'missing' was not found.", ex.Message);
     }
 
+    [Fact]
+    public async Task Set_AddsProfileToExistingProjectConfigAndSetsDefault()
+    {
+        WriteProjectConfig("{}");
+        ProfileSetCommand command = CreateSetCommand(
+            Source(ProfileSourceKind.BuiltIn, Profile("flex", hostRange: "[4.0.0, 5.0.0)")));
+
+        int exit = await InvokeAsync(command, "flex", _tempDir);
+
+        Assert.Equal(0, exit);
+        Assert.Contains("SUCCESS: Profile 'flex' set as this project's default.", _interaction.Lines);
+        Assert.Contains("HINT: Added 'flex' to this project's profiles list.", _interaction.Lines);
+        using JsonDocument document = ReadProjectConfig();
+        JsonElement root = document.RootElement;
+        Assert.Equal("flex", root.GetProperty("defaultProfile").GetString());
+        JsonElement profile = Assert.Single(root.GetProperty("profiles").EnumerateArray());
+        Assert.Equal("flex", profile.GetString());
+    }
+
+    [Fact]
+    public async Task Set_PreservesExistingProjectConfigAndAddsProfile()
+    {
+        WriteProjectConfig(
+            """
+            {
+              "Stack": {
+                "Runtime": "node"
+              },
+              "profiles": [ "flex" ],
+              "defaultProfile": "flex"
+            }
+            """);
+        ProfileSetCommand command = CreateSetCommand(
+            Source(ProfileSourceKind.BuiltIn, Profile("flex"), Profile("staging")));
+
+        int exit = await InvokeAsync(command, "staging", _tempDir);
+
+        Assert.Equal(0, exit);
+        using JsonDocument document = ReadProjectConfig();
+        JsonElement root = document.RootElement;
+        Assert.Equal("node", root.GetProperty("Stack").GetProperty("Runtime").GetString());
+        Assert.Equal("staging", root.GetProperty("defaultProfile").GetString());
+        string?[] profiles = [.. root.GetProperty("profiles").EnumerateArray().Select(p => p.GetString())];
+        string?[] expectedProfiles = ["flex", "staging"];
+        Assert.Equal(expectedProfiles, profiles);
+    }
+
+    [Fact]
+    public async Task Set_ExistingProfile_DoesNotDuplicateProfile()
+    {
+        WriteProjectConfig("""{"profiles":["FLEX"],"defaultProfile":"FLEX"}""");
+        ProfileSetCommand command = CreateSetCommand(
+            Source(ProfileSourceKind.BuiltIn, Profile("flex")));
+
+        int exit = await InvokeAsync(command, "flex", _tempDir);
+
+        Assert.Equal(0, exit);
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("HINT: Added", StringComparison.Ordinal));
+        using JsonDocument document = ReadProjectConfig();
+        JsonElement root = document.RootElement;
+        JsonElement profile = Assert.Single(root.GetProperty("profiles").EnumerateArray());
+        Assert.Equal("FLEX", profile.GetString());
+        Assert.Equal("FLEX", root.GetProperty("defaultProfile").GetString());
+    }
+
+    [Fact]
+    public async Task Set_MissingProfile_ThrowsGracefulException()
+    {
+        ProfileSetCommand command = CreateSetCommand(
+            Source(ProfileSourceKind.BuiltIn, Profile("flex")));
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => InvokeAsync(command, "missing", _tempDir));
+
+        Assert.Contains("Profile 'missing' was not found.", ex.Message);
+        Assert.False(_fileSystem.Exists(ProjectConfigPath()));
+    }
+
+    [Fact]
+    public async Task Set_MissingProjectConfig_ThrowsGracefulException()
+    {
+        ProfileSetCommand command = CreateSetCommand(
+            Source(ProfileSourceKind.BuiltIn, Profile("flex")));
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => InvokeAsync(command, "flex", _tempDir));
+
+        Assert.Contains("Project config '.func", ex.Message);
+        Assert.Contains("Run 'func init'", ex.Message);
+        Assert.False(_fileSystem.Exists(ProjectConfigPath()));
+    }
+
+    [Fact]
+    public async Task Set_InvalidProjectConfig_ThrowsGracefulException()
+    {
+        WriteProjectConfig("{ not valid json");
+        ProfileSetCommand command = CreateSetCommand(
+            Source(ProfileSourceKind.BuiltIn, Profile("flex")));
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => InvokeAsync(command, "flex", _tempDir));
+
+        Assert.Contains("contains invalid JSON", ex.Message);
+    }
+
     private ProfileListCommand CreateListCommand(ProjectProfileOptions options, params IProfileSource[] sources)
     {
         var catalog = new ProfileCatalog(sources);
@@ -157,6 +265,13 @@ public sealed class ProfileCommandTests : IDisposable
     {
         var catalog = new ProfileCatalog(sources);
         return new ProfileShowCommand(_interaction, catalog);
+    }
+
+    private ProfileSetCommand CreateSetCommand(params IProfileSource[] sources)
+    {
+        var catalog = new ProfileCatalog(sources);
+        var store = new ProjectProfileConfigStore(_fileSystem);
+        return new ProfileSetCommand(_interaction, catalog, store);
     }
 
     private static Task<int> InvokeAsync(FuncCliCommand command, params string[] args)
@@ -203,6 +318,43 @@ public sealed class ProfileCommandTests : IDisposable
             worker => worker.Runtime,
             worker => (ProfileWorkerConstraint?)new ProfileWorkerConstraint { Version = worker.Range },
             StringComparer.OrdinalIgnoreCase);
+
+    private void WriteProjectConfig(string contents)
+        => _fileSystem.WriteAllText(ProjectConfigPath(), contents);
+
+    private JsonDocument ReadProjectConfig()
+        => JsonDocument.Parse(_fileSystem.ReadAllText(ProjectConfigPath()));
+
+    private string ProjectConfigPath()
+        => Path.Combine(_tempDir, ".func", "config.json");
+
+    private sealed class FakeProfileFileSystem : IProfileFileSystem
+    {
+        private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
+
+        public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _files.TryGetValue(path, out string? contents);
+            return Task.FromResult(contents);
+        }
+
+        public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            WriteAllText(path, contents);
+            return Task.CompletedTask;
+        }
+
+        public void WriteAllText(string path, string contents)
+            => _files[path] = contents;
+
+        public string ReadAllText(string path)
+            => _files[path];
+
+        public bool Exists(string path)
+            => _files.ContainsKey(path);
+    }
 
     private sealed class FakeProfileSource(
         ProfileSourceInfo source,

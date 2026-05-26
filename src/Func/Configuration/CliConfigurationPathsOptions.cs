@@ -6,21 +6,21 @@ using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
 namespace Azure.Functions.Cli.Configuration;
 
 /// <summary>
-/// Computed filesystem layout for user-scoped CLI configuration.
+/// Computed filesystem layout for CLI configuration.
 /// </summary>
-internal sealed class UserConfigurationPathsOptions
+internal sealed class CliConfigurationPathsOptions
 {
     public const string VersionCacheFileName = ".version-check";
     public const string ProfilesFileName = "profiles.json";
 
-    public UserConfigurationPathsOptions()
+    public CliConfigurationPathsOptions()
         : this(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             AbstractionsConstants.FuncHomeDirectoryName))
     {
     }
 
-    internal UserConfigurationPathsOptions(string home)
+    internal CliConfigurationPathsOptions(string home)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(home);
         Home = Path.GetFullPath(home);
@@ -33,4 +33,18 @@ internal sealed class UserConfigurationPathsOptions
     public string ProfilesPath => Path.Combine(Home, ProfilesFileName);
 
     public string VersionCachePath => Path.Combine(Home, VersionCacheFileName);
+
+    public static string ProjectConfigDisplayPath => Path.Combine(CliConfigurationNames.ProjectConfigFolderName, CliConfigurationNames.ConfigFileName);
+
+    public static string GetProjectConfigFolderPath(DirectoryInfo projectDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(projectDirectory);
+        return Path.Combine(projectDirectory.FullName, CliConfigurationNames.ProjectConfigFolderName);
+    }
+
+    public static string GetProjectConfigPath(DirectoryInfo projectDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(projectDirectory);
+        return Path.Combine(projectDirectory.FullName, ProjectConfigDisplayPath);
+    }
 }

@@ -243,10 +243,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return true;
         }
 
-        string config = Path.Combine(
-            workingDirectory.FullName,
-            CliConfigurationNames.ProjectConfigFolderName,
-            CliConfigurationNames.ConfigFileName);
+        string config = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
         if (File.Exists(config))
         {
             existingFile = Path.GetRelativePath(workingDirectory.FullName, config);
@@ -259,8 +256,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
     {
-        string folder = Path.Combine(workingDirectory.FullName, CliConfigurationNames.ProjectConfigFolderName);
-        string path = Path.Combine(folder, CliConfigurationNames.ConfigFileName);
+        string folder = CliConfigurationPathsOptions.GetProjectConfigFolderPath(workingDirectory);
+        string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
 
         // Treat an existing file as user-owned unless --force was passed.
         if (File.Exists(path) && !force)
@@ -297,7 +294,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
             _interaction.WriteLine(l => l
                 .Muted("· Wrote ")
-                .Code(Path.Combine(CliConfigurationNames.ProjectConfigFolderName, CliConfigurationNames.ConfigFileName))
+                .Code(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
                 .Muted("."));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -306,7 +303,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             // create .func/config.json by hand if they want stack pinning.
             _interaction.WriteLine(l => l
                 .Warning("! ")
-                .Muted("Could not write .func/config.json (")
+                .Muted($"Could not write {CliConfigurationPathsOptions.ProjectConfigDisplayPath} (")
                 .Code(ex.Message)
                 .Muted(")."));
         }

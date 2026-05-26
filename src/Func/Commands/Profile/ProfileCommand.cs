@@ -10,13 +10,15 @@ namespace Azure.Functions.Cli.Commands.Profile;
 /// </summary>
 internal sealed class ProfileCommand : FuncCliCommand, IBuiltInCommand
 {
-    public ProfileCommand(ProfileListCommand listCommand, ProfileShowCommand showCommand)
+    public ProfileCommand(ProfileListCommand listCommand, ProfileShowCommand showCommand, ProfileSetCommand setCommand)
         : base("profile", "Inspect and manage Azure Functions CLI profiles.")
     {
         ArgumentNullException.ThrowIfNull(listCommand);
         ArgumentNullException.ThrowIfNull(showCommand);
+        ArgumentNullException.ThrowIfNull(setCommand);
 
         Subcommands.Add(listCommand);
         Subcommands.Add(showCommand);
+        Subcommands.Add(setCommand);
     }
 }

@@ -19,4 +19,13 @@ internal sealed class ProfileFileSystem : IProfileFileSystem
 
         return await File.ReadAllTextAsync(path, cancellationToken);
     }
+
+    public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(contents);
+
+        return File.WriteAllTextAsync(path, contents, cancellationToken);
+    }
+
 }

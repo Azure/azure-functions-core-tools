@@ -24,11 +24,11 @@ internal static class VersionChecker
     /// </summary>
     public static Task<string?> CheckForUpdateAsync(CancellationToken cancellationToken = default)
     {
-        UserConfigurationPathsOptions userConfigurationPaths = new();
+        CliConfigurationPathsOptions userConfigurationPaths = new();
         return CheckForUpdateAsync(userConfigurationPaths, cancellationToken);
     }
 
-    internal static async Task<string?> CheckForUpdateAsync(UserConfigurationPathsOptions userConfigurationPaths, CancellationToken cancellationToken = default)
+    internal static async Task<string?> CheckForUpdateAsync(CliConfigurationPathsOptions userConfigurationPaths, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(userConfigurationPaths);
 
@@ -134,7 +134,7 @@ internal static class VersionChecker
     private static bool IsNewer(Version latest, Version current)
         => latest > current;
 
-    private static Version? ReadCache(UserConfigurationPathsOptions userConfigurationPaths)
+    private static Version? ReadCache(CliConfigurationPathsOptions userConfigurationPaths)
     {
         try
         {
@@ -159,7 +159,7 @@ internal static class VersionChecker
         }
     }
 
-    private static void WriteCache(UserConfigurationPathsOptions userConfigurationPaths, Version version)
+    private static void WriteCache(CliConfigurationPathsOptions userConfigurationPaths, Version version)
     {
         try
         {

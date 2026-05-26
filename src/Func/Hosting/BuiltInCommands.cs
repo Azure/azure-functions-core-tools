@@ -39,6 +39,7 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, StartCommand>();
         services.AddSingleton<ProfileListCommand>();
         services.AddSingleton<ProfileShowCommand>();
+        services.AddSingleton<ProfileSetCommand>();
         services.AddSingleton<FuncCliCommand, ProfileCommand>();
 
         // Shared dashboard primitives (renderers and per-invocation pipeline

@@ -37,7 +37,7 @@ public class VersionCheckerTests
     public async Task CheckForUpdateAsync_UsesUserConfigurationPathsForCache()
     {
         string userHome = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
-        var paths = new UserConfigurationPathsOptions(userHome);
+        var paths = new CliConfigurationPathsOptions(userHome);
 
         try
         {
