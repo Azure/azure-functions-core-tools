@@ -16,9 +16,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads.Host;
 
-internal sealed class FunctionsHostStartup(IConfiguration configuration, bool enableAuth) : IStartup
+internal sealed class FunctionsHostStartup(
+    IConfiguration configuration,
+    bool enableAuth,
+    ScriptApplicationHostOptions hostOptions) : IStartup
 {
     private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly ScriptApplicationHostOptions _hostOptions = hostOptions ?? throw new ArgumentNullException(nameof(hostOptions));
 
     public IServiceProvider ConfigureServices(IServiceCollection services)
     {
@@ -42,6 +46,14 @@ internal sealed class FunctionsHostStartup(IConfiguration configuration, bool en
             .AddApplicationPart(typeof(HostController).Assembly);
 
         services.AddWebJobsScriptHost(_configuration);
+        services.Configure<ScriptApplicationHostOptions>(options =>
+        {
+            options.ScriptPath = _hostOptions.ScriptPath;
+            options.LogPath = _hostOptions.LogPath;
+            options.IsSelfHost = _hostOptions.IsSelfHost;
+            options.SecretsPath = _hostOptions.SecretsPath;
+        });
+
         services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
 
         return services.BuildServiceProvider();

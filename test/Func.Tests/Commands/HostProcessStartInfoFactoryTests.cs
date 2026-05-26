@@ -60,6 +60,10 @@ public class HostProcessStartInfoFactoryTests : IDisposable
         Assert.Equal(["--enable-auth", "--urls", "http://0.0.0.0:7071"], launchInfo.StartInfo.ArgumentList);
         Assert.Equal("custom-value", launchInfo.StartInfo.Environment["CUSTOM_ENV"]);
         Assert.Equal(_startupDirectory.FullName, launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.ScriptRootEnvironmentVariable]);
+        Assert.Equal("Development", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AzureFunctionsEnvironmentVariable]);
+        Assert.Equal("localhost:7071", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable]);
+        Assert.Equal("true", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AspNetCoreSuppressStatusMessagesEnvironmentVariable]);
+        Assert.Equal("None", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable]);
     }
 
     [Fact]

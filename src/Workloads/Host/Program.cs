@@ -18,8 +18,10 @@ internal static class Program
         using IHost shellHost = builder.Build();
         await shellHost.StartAsync();
         using CancellationTokenSource shutdownTokenSource = new();
+        // Console.In can block synchronously on redirected pipes; keep stdin
+        // monitoring off the host startup path.
         Task standardInputClosedTask = Console.IsInputRedirected
-            ? CancelOnStandardInputClosedAsync(shutdownTokenSource)
+            ? StartStandardInputClosedMonitorAsync(Console.In, shutdownTokenSource)
             : Task.CompletedTask;
         ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
         {
@@ -50,12 +52,24 @@ internal static class Program
         }
     }
 
-    private static async Task CancelOnStandardInputClosedAsync(CancellationTokenSource shutdownTokenSource)
+    internal static Task StartStandardInputClosedMonitorAsync(
+        TextReader standardInput,
+        CancellationTokenSource shutdownTokenSource)
+    {
+        ArgumentNullException.ThrowIfNull(standardInput);
+        ArgumentNullException.ThrowIfNull(shutdownTokenSource);
+
+        return Task.Run(() => CancelOnStandardInputClosedAsync(standardInput, shutdownTokenSource));
+    }
+
+    private static async Task CancelOnStandardInputClosedAsync(
+        TextReader standardInput,
+        CancellationTokenSource shutdownTokenSource)
     {
         try
         {
             while (!shutdownTokenSource.IsCancellationRequested
-                   && await Console.In.ReadLineAsync() is not null)
+                   && await standardInput.ReadLineAsync() is not null)
             {
             }
 
