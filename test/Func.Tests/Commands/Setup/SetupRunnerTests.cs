@@ -279,6 +279,92 @@ public sealed class SetupRunnerTests : IDisposable
         Assert.Contains(_interaction.Lines, line => line.Contains("does not support runtime 'node'"));
     }
 
+    [Fact]
+    public async Task RunAsync_ProfileWithSupportedRuntimes_InstallsMatchingStackWorkloads()
+    {
+        const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
+        const string pythonStack = "Azure.Functions.Cli.Workloads.Python";
+        const string goStack = "Azure.Functions.Cli.Workloads.Go";
+        const string dotnetStack = "Azure.Functions.Cli.Workloads.DotNet";
+
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
+            .WithLatest(nodeStack, "1.0.0")
+            .WithLatest(pythonStack, "1.0.0")
+            .WithLatest(goStack, "1.0.0")
+            .WithLatest(dotnetStack, "1.0.0");
+
+        SetupRunner runner = CreateRunner(
+            catalog,
+            profileCatalog: new ProfileCatalog([
+                new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
+                    new("flex", new ProfileDefinition
+                    {
+                        Host = new ProfileVersionConstraint { Version = "[4.0.0, 5.0.0)" },
+                        ExtensionBundle = new ProfileVersionConstraint { Version = "[4.0.0, 5.0.0)" },
+                        SupportedRuntimes = ["node", "python", "java", "powershell", "dotnet-isolated", "custom", "go"],
+                    }),
+                ]),
+            ]));
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(profiles: ["flex"]),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+
+        foreach (string stackPackageId in new[] { nodeStack, pythonStack, goStack, dotnetStack })
+        {
+            await _installer.Received(1).InstallFromCatalogAsync(
+                Arg.Is<string>(id => string.Equals(id, stackPackageId, StringComparison.OrdinalIgnoreCase)),
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>());
+        }
+
+        foreach (string runtime in new[] { "java", "powershell", "custom" })
+        {
+            string unexpectedPackageId = "Azure.Functions.Cli.Workloads." + runtime;
+            await _installer.DidNotReceive().InstallFromCatalogAsync(
+                Arg.Is<string>(id => string.Equals(id, unexpectedPackageId, StringComparison.OrdinalIgnoreCase)),
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>());
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_NoProfile_DoesNotInstallStackWorkloads()
+    {
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["host"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => id.StartsWith("Azure.Functions.Cli.Workloads.Node", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("Azure.Functions.Cli.Workloads.Python", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("Azure.Functions.Cli.Workloads.Go", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("Azure.Functions.Cli.Workloads.DotNet", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
     private SetupRunner CreateRunner(
         IWorkloadCatalog catalog,
         IReadOnlyDictionary<string, string?>? projectConfig = null,

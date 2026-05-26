@@ -194,6 +194,7 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
         {
             SetupDependencyKind.Host => "host",
             SetupDependencyKind.Worker => "worker",
+            SetupDependencyKind.Stack => "stack",
             SetupDependencyKind.ExtensionBundle => "extension-bundle",
             _ => kind.ToString(),
         };
