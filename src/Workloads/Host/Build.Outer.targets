@@ -32,14 +32,9 @@
     <MSBuild Projects="@(_ProjectsForDispatch)" Targets="Pack" BuildInParallel="true"/>
   </Target>
 
-  <Target Name="Build" DependsOnTargets="_ResolveInnerProjects">
-    <ItemGroup>
-      <!-- Also build the AnyCPU version for tests. -->
-      <_ProjectsForDispatch Include="$(MSBuildProjectFullPath)" />
-    </ItemGroup>
-
-    <!-- Set 'IsInnerBuild=true' here to avoid infinite recursion with the RID-less build. -->
-    <MSBuild Projects="@(_ProjectsForDispatch)" Targets="Build" BuildInParallel="true" Properties="IsInnerBuild=true"/>
+  <Target Name="_DispatchInnerBuilds" BeforeTargets="Build" DependsOnTargets="_ResolveInnerProjects">
+    <!-- Don't override the default build behavior, but hook onto it to ensure all the RID-specific builds are performed. -->
+    <MSBuild Projects="@(_ProjectsForDispatch)" Targets="Build" BuildInParallel="true" />
   </Target>
 
 </Project>
