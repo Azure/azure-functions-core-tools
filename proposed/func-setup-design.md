@@ -1,6 +1,6 @@
 # `func setup` Design (Draft)
 
-This document describes the proposed `func setup` command for the Azure Functions CLI (`func`). It is a working draft. Open questions are called out inline.
+This document describes the proposed `func setup` command for the Azure Functions CLI (`func`). It is a working draft.
 
 ## 1. Identity
 
@@ -8,181 +8,252 @@ This document describes the proposed `func setup` command for the Azure Function
 
 It is intentionally a small, thin command. Its interface is small ("ready this machine for func"), but behind that interface it sequences work across:
 
-- Workload installation (via `func workload install`).
-- Profile pre-install for runtime constraint sets (via `func profile install`, see [cli-profiles.md](./cli-profiles.md)).
-- Cache priming (extension bundle cache, profile registry cache).
-- First-run hints (telemetry consent is handled separately, see §6).
+- Host workload installation.
+- Setup feature expansion, where user-facing feature IDs such as `runtime`, `node`, or `dotnet-isolated` map to one or more lower-level workload installs.
+- Profile-constrained installation for runtime constraint sets.
+- Extension bundle cache priming when the selected feature/worker runtime uses extension bundles.
 
 ### What it is *not*
 
-- **Not an alias for `func workload install`.** That command is a sharp tool ("install this specific workload"). `setup` is an orchestration verb ("ready this machine"). The distinction is by intent, not capability.
-- **Not a project bootstrapper.** That is `func init`. `setup` may *read* project files for inference, but it never writes to the project.
-- **Not the telemetry owner.** Telemetry consent is a global first-CLI-invocation concern, not a `setup` concern. See §6.
-- **Not a profile authoring tool.** Profile authoring lives with [cli-profiles.md](./cli-profiles.md) (`.func/profiles.json`, `~/.azure-functions/profiles.json`).
-- **Has no "profile" concept of its own.** The word *profile* is reserved for [cli-profiles.md](./cli-profiles.md).
+- **Not an alias for `func workload install`.** `workload install` is a sharp tool ("install this specific workload package"). `setup` is an orchestration verb ("ready this machine"). `setup --features node` may expand to multiple workload installs and should not be treated as a literal workload package ID.
+- **Not a project bootstrapper.** That is `func init`. `setup` may read selected project configuration for setup inputs, but it never writes to the project.
+- **Not a project detector.** Stack/project detection remains a stack-specific implementation detail. `setup` does not infer stacks from files such as `package.json`, `requirements.txt`, `*.csproj`, `pom.xml`, or `local.settings.json`.
+- **Not the telemetry owner.** Telemetry consent is a global first-CLI-invocation concern, not a `setup` concern.
+- **Not a profile authoring tool.** Profile authoring remains with profile configuration files and profile-specific commands.
 
 ## 2. Goals
 
 - Give a new user a single command to go from "I installed `func`" to "I can run a function".
 - Give CI a single command to bring a fresh runner to a known-ready state.
-- Be idempotent: safe to re-run on every CI job, on a developer's machine after adding new languages, after partial failures.
+- Be idempotent: safe to re-run on every CI job, on a developer's machine after adding new features, and after partial failures.
 - Keep responsibilities narrow: orchestrate, do not own. Each underlying subsystem remains the source of truth for its own state.
+- Allow profile constraints to influence dependency selection, including installing the maximum available version inside a profile range when requested.
 
 ## 3. Command Surface
 
-```
-func setup [--workloads <list>] [--profiles <list>]
+```text
+func setup [--features <list>]
+           [--profile <name>]... [--profiles <list>]
+           [--install-policy <latest-compatible|if-needed>]
+           [--prerelease]
            [--non-interactive] [--yes] [--check]
+           [--output <plain|json>]
 ```
 
-| Option              | Description                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `--workloads <list>`| Comma-separated workload IDs to ensure are installed (e.g. `node,python,durable`).                                  |
-| `--profiles <list>` | Comma-separated profile names whose dependencies should be pre-installed (see [cli-profiles.md](./cli-profiles.md)).|
-| `--non-interactive` | Never prompt. Fail if a required answer is missing or a step would otherwise block.                                 |
-| `--yes`, `-y`       | Accept defaults for any prompt that would otherwise block. Implies non-interactive.                                 |
-| `--check`           | Report what would change. Make no mutations. Exits non-zero if anything is missing.                                 |
+| Option | Description |
+| --- | --- |
+| `--features <list>` | Comma-separated setup feature IDs to ensure are present. Features are CLI-curated capabilities, not raw workload package IDs. |
+| `--profile <name>` | Canonical repeatable option for profile names whose constraints should be applied. |
+| `--profiles <list>` | Comma-separated convenience alias for passing multiple profiles. |
+| `--install-policy <policy>` | Dependency reconciliation policy. Default: `latest-compatible`. |
+| `--prerelease` | Allow prerelease package versions during catalog resolution. Prerelease versions are not considered unless this option is present. |
+| `--non-interactive` | Never prompt. Fail if a required answer is missing or a step would otherwise block. |
+| `--yes`, `-y` | Accept defaults for any prompt that would otherwise block. Implies non-interactive. |
+| `--check` | Report what would change. Make no mutations. Exits non-zero if anything is missing or drifted according to the selected install policy. |
+| `--output <plain|json>` | Output mode. `plain` is human-readable text. `json` emits newline-delimited JSON events. |
 
-### 3.1 Interactive flow (default)
+## 4. Setup Features
 
-1. If running inside a project directory, infer suggested workloads via the shared **project detection** module (see §9.6). This is a read-only signal source reused from the workloads spec's "find missing workloads" flow ([workload-spec.md](./workload-spec.md)).
-2. Present a grouped picker (language stacks, feature workloads).
-3. Confirm and install the selected workloads via the workload subsystem.
-4. If `.func/config.json` declares profiles (see [cli-profiles.md](./cli-profiles.md)), pre-install their dependencies.
-5. Print "what's next" hints (`func init`, `func new`, `func start`).
+`--features` accepts setup feature IDs. A feature is a user-facing capability that expands to one or more lower-level dependencies.
 
-### 3.2 Non-interactive flow (CI)
+The initial built-in feature catalog is:
 
+| Feature | Meaning |
+| --- | --- |
+| `host` | Install or verify only the Azure Functions host workload. No workers. No extension bundle. |
+| `runtime` | Install or verify the host and the default stable extension bundle. No stack worker. |
+| `node`, `python`, `java`, `powershell`, `custom`, `go` | Install or verify host, the selected worker workload, and the default stable extension bundle. |
+| `dotnet-isolated` | Install or verify host and the `dotnet-isolated` worker. Extension bundles are skipped because this stack does not use them. |
+| Future feature IDs, such as `durable` | Expand to one or more additional workloads or caches. |
+
+Raw workload package IDs remain the responsibility of `func workload install`. Unknown setup feature IDs fail with a message that distinguishes setup features from workload package IDs and points users to `func workload search` or `func workload install`.
+
+The supported .NET setup stack is `dotnet-isolated`. There is no separate in-process `dotnet` stack feature.
+
+## 5. Feature Defaults
+
+If `--features` is provided, it is the complete explicit feature request.
+
+If `--features` is not provided:
+
+1. If `.func/config.json` declares a worker runtime, setup treats that worker runtime as the stack feature to prepare.
+2. Otherwise, setup defaults to the `runtime` feature.
+
+Setup does not infer worker runtime from any other project file.
+
+## 6. Profile Selection
+
+Profiles provide version constraints. `setup` has no separate profile concept of its own; it consumes the existing profile catalog/resolution model.
+
+Profile selection order:
+
+1. Explicit profiles from repeatable `--profile` and comma-separated `--profiles`.
+2. If no explicit profiles are provided and the project `.func/config.json` declares profiles, setup runs once for each declared profile.
+3. If no project profiles are declared, setup uses the user default profile when one is configured.
+4. If no profile is selected, setup runs without profile constraints.
+
+Explicit profile names are de-duplicated case-insensitively while preserving the first occurrence.
+
+If a profile is explicitly requested inside a project that declares a profile allow-list, and the profile is not listed in `.func/config.json`, setup warns but continues if the profile can be resolved. This matches the current active-profile resolver behavior.
+
+Deprecated profiles warn and continue.
+
+## 7. Profile-Constrained Dependencies
+
+For each selected profile, setup runs a separate reconciliation loop. Profile constraints are not merged across profiles.
+
+The profile affects dependency selection as follows:
+
+| Dependency | Constraint behavior |
+| --- | --- |
+| Host workload | Constrained by the profile host version range. |
+| Selected worker workloads | Constrained by the matching profile worker version range when one exists. |
+| Extension bundle | Constrained by the profile extension bundle range, but only when the selected feature/worker runtime uses extension bundles. |
+
+Worker constraints apply only to workers selected by `--features` or by `.func/config.json` worker runtime. Setup does not install every worker listed by a profile.
+
+If a selected worker runtime is not supported by a profile, setup fails for that profile. If the profile supports the runtime but does not specify an explicit worker version range for it, setup installs the worker according to the selected install policy without a profile range.
+
+## 8. Extension Bundle Policy
+
+Setup uses a two-value extension bundle policy:
+
+```text
+NotSupported
+DefaultStable
 ```
-func setup --workloads node,python --profiles flex --non-interactive --yes
-```
 
-- No prompts. Telemetry default is whatever the env/config dictates (see §6).
-- Installs the listed workloads. Pre-installs dependencies for the listed profiles.
-- Exits non-zero on any failure or ambiguity.
+Policy resolution:
 
-### 3.3 Catalog and recommendations
+| Worker runtime / feature | Policy |
+| --- | --- |
+| `dotnet-isolated` | `NotSupported` |
+| All other known stack features | `DefaultStable` |
+| Unknown worker runtimes | `DefaultStable` |
 
-The picker draws from two sources, owned by different layers:
+`NotSupported` means setup does not install or check extension bundles for that feature. A profile `extensionBundle` range does not force bundle installation for a stack that does not use bundles.
 
-| Zone                  | Source                                                       | Owned by                               |
-| --------------------- | ------------------------------------------------------------ | -------------------------------------- |
-| Featured / recommended | CLI-curated stack list (`node`, `python`, `dotnet-isolated`, `java`, `powershell`, `custom`) plus a per-stack **recommendation bundle** | Func CLI (hard-coded, small)           |
-| Browse all            | `func workload search` against the configured NuGet feed     | Workload subsystem ([workload-spec.md](./workload-spec.md) §4.1) |
+`DefaultStable` means setup ensures the stable default extension bundle workload is present when the selected feature includes bundle setup.
 
-**Featured** is what gets *surfaced first* and what counts as "the Python recommendation" for §9.3 pre-selection. Members are the well-known Functions worker runtimes; the same list already exists in the workloads spec for the install-hint flow (workload-spec §4.2). `setup` reuses that list, it does not introduce a new one.
+When a project `host.json` declares an extension bundle, setup intersects the `host.json` bundle version range with the selected profile range. When no project bundle declaration is available, setup uses the stable default bundle ID with the profile range, if any.
 
-**Browse all** is the full dynamic catalog. Third-party workloads, less-common stacks, and anything the user reaches via search live here. `setup` does not maintain this list; it is whatever `func workload search` returns.
+## 9. Install Policy
 
-A recommendation bundle is initially the single canonical workload for that stack (e.g. Python recommendation = `python`). Bundles can grow over time (e.g. `python` + `azure-tools` + `durable`) without changing the picker UX.
+`--install-policy` controls how aggressively setup reconciles installed state.
 
-This split avoids two failure modes: all hard-coded means stale catalogs and no third-party visibility; all catalog means no opinion and a slow path for new users.
+### `latest-compatible` (default)
 
-### 3.4 `--check` mode
+For each dependency, setup resolves the maximum available version that satisfies all active constraints and ensures that version is installed.
 
-Same resolution logic as a real run, no mutations. Reports what is missing (workloads, profile dependencies, caches). Useful for verifying a pre-baked CI image.
+- If a lower compatible version is installed and the catalog resolves a newer compatible version, setup installs the newer version.
+- If catalog resolution fails for any reason but an installed version satisfies the active constraints, setup warns and accepts the installed version as a fallback. JSON output reports this as a fallback result.
+- If no installed compatible version exists and catalog resolution fails, setup fails.
 
-## 4. Re-run Model: Idempotent Additive Reconciliation
+### `if-needed`
 
-Each invocation ensures the requested set is *present*. It never removes.
+For each dependency, setup first checks installed state.
 
-- Workloads already installed are skipped.
-- Workloads not yet installed are installed.
-- Profile dependencies already cached are skipped.
-- Profile dependencies not yet cached are fetched.
+- If any installed version satisfies the active constraints, setup skips installation.
+- If no installed compatible version exists, setup resolves and installs the maximum available compatible version.
+- If no installed compatible version exists and catalog resolution fails, setup fails.
 
-`setup` does not maintain a manifest of "what setup installed." The workload subsystem and profile registry are the source of truth for installed state. Removing a workload is `func workload uninstall`'s job, not `setup`'s.
+### `--prerelease`
 
-The only state `setup` writes is a **first-run completed** marker (user-level), used to suppress first-run hints on subsequent invocations.
+Prerelease versions are considered only when `--prerelease` is present. Otherwise, setup resolves stable packages only.
 
-## 5. Boundaries with `init` and `start`
+## 10. Check Mode
 
-The three commands each own one verb (scaffold, ready, run). They do not call each other. They communicate through state on disk and installed workloads, not through invocation.
+`--check` uses the same resolution logic as a real run but makes no mutations.
 
-| Scenario                                                            | Behavior                                                                                                       |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `func init` on a fresh machine (no workloads installed)             | `init` succeeds. It does not check or auto-run `setup`. Project scaffolding does not gate on machine state.    |
-| `func start` on a fresh machine (no host workload installed)        | Uses the auto-install pattern from [cli-profiles.md](./cli-profiles.md) §13.2: prompt interactive, error in CI.|
-| `func setup` inside an existing project                             | Reads project files (read-only) for inference. Reads `.func/config.json` for declared profiles. No project writes.|
+`--check` follows the selected install policy:
 
-## 6. Telemetry
+- With `latest-compatible`, check reports drift when an installed compatible version is older than the maximum available compatible version.
+- With `if-needed`, check passes when any installed version satisfies the active constraints.
+- If catalog resolution fails and an installed compatible version exists, check reports the same fallback result as install mode.
 
-Telemetry consent is **out of scope for `func setup`**. It is a global concern, prompted on first invocation of any `func` command, owned by the CLI bootstrap path. `setup` happens to be one such command but is not special in this regard. Env vars (`DOTNET_CLI_TELEMETRY_OPTOUT`-style) override the prompt as expected.
+`--check` exits with code `1` on any drift, missing dependency, incompatible installed state, or failed dependency resolution. It exits with code `0` only when all selected profiles and dependencies are satisfied according to the selected install policy.
 
-This avoids the failure mode where a user runs `func init` first, never sees `setup`, and is silently never asked about telemetry.
+When multiple profiles are selected, check mode evaluates all profile loops and summarizes all failures.
 
-## 7. State and File Layout
+## 11. Interactive and Non-Interactive Behavior
 
-`func setup` mutates only user-level state:
+The default interactive flow may prompt before installing selected dependencies.
 
-```
+`--non-interactive` never prompts. It fails if setup cannot decide what to install from explicit arguments and supported defaults.
+
+`--yes` implies non-interactive and accepts setup defaults. For example, with no `--features` and no `.func/config.json` worker runtime, `--yes` accepts the default `runtime` feature.
+
+Telemetry consent remains out of scope for `func setup`; it is handled by the global CLI bootstrap path.
+
+## 12. JSON Output
+
+`--output json` emits newline-delimited JSON (NDJSON). Each line is one event object. There is no separate final JSON document; the final state is represented by the `setup.completed` or `setup.failed` event.
+
+The v1 event set is:
+
+| Event | Description |
+| --- | --- |
+| `setup.started` | Emitted once when setup begins. Includes selected features, profiles, install policy, check mode, and prerelease setting. |
+| `profile.started` | Emitted at the start of each profile loop. Includes profile name/source when one is active. |
+| `dependency.detected` | Emitted for every resolved dependency before it is checked or installed. Includes dependency type, ID, constraints, feature, and profile. |
+| `dependency.result` | Emitted after each dependency is checked or reconciled. Includes action/result, selected version, installed version, fallback state, and message. |
+| `profile.completed` | Emitted after a profile loop completes. Includes profile outcome and summary counts. |
+| `setup.completed` | Emitted when setup completes successfully or with check drift. Includes exit code and summary counts. |
+| `setup.failed` | Emitted for fatal failures that prevent normal completion. |
+
+Recommended dependency result states:
+
+- `installed`
+- `already-satisfied`
+- `satisfied-fallback`
+- `would-install`
+- `would-skip`
+- `skipped`
+- `failed`
+
+Human-readable output should present the same decisions in plain language.
+
+## 13. State and File Layout
+
+`func setup` mutates only dependency/cache state owned by the underlying subsystems:
+
+```text
 ~/.azure-functions/
-  .first-run                     # Marker: first-run hints already shown
-  workloads/                     # Owned by the workload subsystem
-  profiles/                      # Owned by the profiles subsystem
+  workloads/   # Owned by the workload subsystem
+  profiles/    # Owned by the profiles subsystem, if applicable
 ```
 
-`setup` does not write to:
+Setup does not write to:
 
-- `.func/config.json` (owned by the profiles proposal).
-- `.func/profiles.json` (owned by the profiles proposal).
-- `host.json`, `local.settings.json` (owned by `func init`).
+- `.func/config.json`
+- `.func/profiles.json`
+- `host.json`
+- `local.settings.json`
 
-## 8. Failure Semantics
+The first-run marker/hints originally proposed for setup are deferred from v1. First-run UX should be handled separately.
 
-- Each underlying subsystem call is atomic per its own contract (e.g. workload install per the Workloads spec).
-- `setup` itself accepts partial completion: a re-run finishes the job. There is no rollback.
-- Errors clearly state what completed and what did not, with the exact command to retry the failed step.
-- Non-zero exit on any failure in `--non-interactive` or `--check` mode.
+## 14. Failure Semantics
 
-## 9. Resolved Questions
+- Each underlying subsystem call is atomic per its own contract.
+- Setup accepts partial completion; a re-run finishes the job. There is no rollback.
+- Install mode stops at the first failed profile loop and exits non-zero.
+- Check mode continues through all selected profile loops and exits non-zero if any loop fails or drifts.
+- Errors clearly state what completed and what did not, with the exact command or option to retry when possible.
 
-These are concrete, lower-level decisions. The foundational architecture (identity, scope, re-run model, boundaries) is in §1 through §8.
+## 15. Boundaries with `init`, `start`, and `workload`
 
-### 9.1 Progress reporting
+The commands each own one verb:
 
-How is long-running workload install progress surfaced in CI logs (where TTY tricks fail)?
+| Command | Verb |
+| --- | --- |
+| `func init` | Scaffold a project. |
+| `func setup` | Ready a machine by ensuring selected features and profile-constrained dependencies are present. |
+| `func start` | Run a project. |
+| `func workload install` | Install a specific workload package ID or alias. |
 
-**Decision:** Spinner / progress bar when a TTY is detected. Plain-text periodic lines otherwise (the default for CI). Opt-in structured output via `--output json` for tooling that wants to parse progress events.
+`setup` does not call `init` or `start`.
 
-### 9.2 Offline / air-gapped
+`setup` may reuse the same lower-level resolvers as `start` for host, worker, profile, and extension bundle compatibility, but the setup reconciliation policy is different: setup can install or check the maximum compatible version according to `--install-policy`.
 
-Should `setup` accept a `--offline` flag that skips network attempts and only validates that already-cached artifacts satisfy the request?
-
-**Decision:** Deferred. Offline / air-gapped support will be addressed in a separate proposal that covers the CLI as a whole, not bolted onto `setup` in isolation. `setup` does not ship an `--offline` flag in v1.
-
-### 9.3 Picker UX
-
-Categorized prompt vs flat list. Do we ship a recommended-defaults set per detected language?
-
-**Decision:** Categorized picker (Languages / Features / Tools). When project inference suggests a language, that language's recommended defaults are pre-selected. The user can deselect or add to the recommendation before confirming.
-
-### 9.4 Discoverability after install
-
-Where does the "next step is `func setup`" hint surface?
-
-**Decision:** Both. The package installer prints a post-install message pointing at `func setup`, and `func` with no arguments shows a getting-started hint that includes `func setup`.
-
-### 9.5 `--check` exit codes
-
-Single non-zero on any drift, or distinct codes per drift type?
-
-**Decision:** Single non-zero exit (`exit 1`) on any drift. Drift details (which workloads are missing, which profile caches are stale, etc.) are written to stdout/stderr in human-readable form. No distinct exit codes per drift type. Tooling that needs structured drift information can use `--output json` (see §9.1).
-
-### 9.6 Inferring workloads from a project
-
-What signals does `setup` read, and how is the inference surfaced?
-
-**Decision:** `setup` does not implement its own detection. It calls the shared **project detection** module owned by the workloads spec (see [workload-spec.md](./workload-spec.md), and PR #4923 thread r3190018800 for the original signal list). Signals include:
-
-- `--stack <name>` (explicit override, when provided).
-- `local.settings.json` `FUNCTIONS_WORKER_RUNTIME`.
-- `host.json` (presence and `workerRuntime`).
-- Project marker files: `*.csproj`, `requirements.txt`, `package.json`, `pom.xml`, etc.
-- `.func/config.json` (for declared profiles, per [cli-profiles.md](./cli-profiles.md)).
-
-The inference is **informational**: the picker surfaces what was detected ("detected: Python"). What gets *pre-selected* in the picker comes from §9.3's curated recommendations, not raw detection output. The user remains the decider.
-
-Reusing the same detection module as the workloads "missing workloads" flow ensures the two callers cannot drift apart.
-
+`setup --features` should not accept arbitrary workload package IDs as if it were `func workload install`. That separation keeps the user-facing readiness command distinct from the lower-level workload package command.
 
