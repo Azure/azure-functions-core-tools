@@ -14,8 +14,8 @@ public class UserProfileSourceTests
     public async Task LoadAsync_ReadsProfilesFromUserConfigurationHome()
     {
         string userHome = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        string expectedPath = Path.Combine(userHome, UserConfigurationPathsOptions.ProfilesFileName);
-        var paths = new UserConfigurationPathsOptions(userHome);
+        string expectedPath = Path.Combine(userHome, CliConfigurationPathsOptions.ProfilesFileName);
+        var paths = new CliConfigurationPathsOptions(userHome);
         IProfileFileSystem fileSystem = Substitute.For<IProfileFileSystem>();
         fileSystem.ReadAllTextIfExistsAsync(expectedPath, CancellationToken.None).Returns(Task.FromResult<string?>(null));
         var source = new UserProfileSource(new ProfileDocumentParser(), fileSystem, paths);

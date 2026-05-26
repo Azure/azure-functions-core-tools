@@ -8,5 +8,14 @@ namespace Azure.Functions.Cli.Profiles;
 /// </summary>
 internal interface IProfileFileSystem
 {
+    /// <summary>
+    /// Reads a text file if it exists.
+    /// </summary>
     public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Writes a text file.
+    /// </summary>
+    public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken);
+
 }

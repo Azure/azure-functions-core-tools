@@ -62,7 +62,8 @@ func
 ├── start [path]          Start the Functions host (placeholder)
 ├── profile
 │   ├── list [path]       List available profiles
-│   └── show <name> [path]  Show profile details
+│   ├── show <name> [path]  Show profile details
+│   └── set <name> [path]   Set the project default profile
 ├── workload
 │   └── list              List installed workloads
 ├── version (hidden)      Print version info

@@ -59,11 +59,11 @@ internal static class CliHostFactory
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
         var localSettingsProvider = new LocalSettingsProvider();
-        var userConfigurationPaths = new UserConfigurationPathsOptions();
-        var configurationProvider = new CliConfigurationProvider(localSettingsProvider, userConfigurationPaths);
+        var configurationPaths = new CliConfigurationPathsOptions();
+        var configurationProvider = new CliConfigurationProvider(localSettingsProvider, configurationPaths);
         builder.Services.AddSingleton(localSettingsProvider);
         builder.Services.AddSingleton<ILocalSettingsProvider>(localSettingsProvider);
-        builder.Services.AddSingleton(userConfigurationPaths);
+        builder.Services.AddSingleton(configurationPaths);
         builder.Services.AddSingleton(configurationProvider);
         builder.Services.AddSingleton<ICliConfigurationProvider>(configurationProvider);
 

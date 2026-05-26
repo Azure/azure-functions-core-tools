@@ -18,7 +18,7 @@ internal static class ProfileRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.TryAddSingleton<UserConfigurationPathsOptions>();
+        services.TryAddSingleton<CliConfigurationPathsOptions>();
         services.AddSingleton<ProfileDocumentParser>();
         services.AddSingleton<IProfileFileSystem, ProfileFileSystem>();
         services.AddSingleton<IProfileSource, ProjectProfileSource>();
@@ -26,6 +26,7 @@ internal static class ProfileRegistration
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
         services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
         services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
+        services.AddSingleton<IProjectProfileConfigStore, ProjectProfileConfigStore>();
         services.AddSingleton<IProfileCatalog, ProfileCatalog>();
         services.AddSingleton<IProfileResolver, ProfileResolver>();
 

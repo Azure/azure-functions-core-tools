@@ -62,14 +62,16 @@ string commandName = "unknown";
 
 using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
 {
+    FuncRootCommand? rootCommand = null;
+    ParseResult? commandParseResult = null;
     try
     {
         using IHost host = await CliHostFactory.CreateHostAsync(interaction, cts.Token);
         await host.StartAsync(cts.Token);
 
-        FuncRootCommand rootCommand = Parser.CreateCommand(host.Services);
+        rootCommand = Parser.CreateCommand(host.Services);
 
-        ParseResult commandParseResult = rootCommand.Parse(args);
+        commandParseResult = rootCommand.Parse(args);
         commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);
 
@@ -86,7 +88,9 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         activity?.Fail(ex);
         interaction.WriteError(ex.Message);
 
-        if (ex.VerboseMessage is not null)
+        if (ex.VerboseMessage is not null
+            && rootCommand is not null
+            && commandParseResult?.GetValue(rootCommand.VerboseOption) is true)
         {
             interaction.WriteHint(ex.VerboseMessage);
         }
