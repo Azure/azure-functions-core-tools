@@ -45,7 +45,8 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool> PrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease workload versions when resolving from the catalog.",
+        Description = "Allow prerelease workload versions when resolving from the catalog. Default: enabled while workloads are in preview.",
+        DefaultValueFactory = _ => true,
     };
 
     public Option<bool> NonInteractiveOption { get; } = new("--non-interactive")

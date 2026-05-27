@@ -51,7 +51,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving from the catalog. Default: stable only.",
+        Description = "Allow prerelease versions when resolving from the catalog. Default: enabled while workloads are in preview.",
+        DefaultValueFactory = _ => true,
     };
 
     public Option<bool> ExactOption { get; } = new("--exact", "-e")
@@ -121,6 +122,11 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? source = parseResult.GetValue(SourceOption);
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
+
+        if (includePrerelease)
+        {
+            _interaction.WriteHint(WorkloadInstallCommand.PrereleasePreviewHint);
+        }
 
         if (all)
         {
