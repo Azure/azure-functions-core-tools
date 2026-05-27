@@ -20,12 +20,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
         private const string DefaultBundleId = "Microsoft.Azure.Functions.ExtensionBundle";
 
         /// <summary>
-        /// Runs func start with --offline when extension bundles have already been cached
-        /// (from the fixture's initialization). The host should start successfully
-        /// and emit a warning indicating it is using the cached version.
+        /// Runs func start with --offline when extension bundles have already been cached.
         /// </summary>
         public static void RunOfflineWithCachedBundlesTest(BaseFunctionAppFixture fixture, string language, string testName)
         {
+            EnsureBundlesCached(fixture, language, testName);
+
             int port = ProcessHelper.GetAvailablePort();
 
             var funcStartCommand = new FuncStartCommand(fixture.FuncPath, testName, fixture.Log);
@@ -110,6 +110,25 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Ensures extension bundles are downloaded and cached before offline tests run.
+        /// </summary>
+        private static void EnsureBundlesCached(BaseFunctionAppFixture fixture, string language, string testName)
+        {
+            string bundlePath = ExtensionBundleHelper.GetBundleDownloadPath(DefaultBundleId);
+            if (Directory.Exists(bundlePath) && Directory.GetDirectories(bundlePath).Length > 0)
+            {
+                return;
+            }
+
+            var downloadCommand = new FuncRootCommand(fixture.FuncPath, testName + "_EnsureBundlesCached", fixture.Log);
+
+            downloadCommand
+                .WithWorkingDirectory(fixture.WorkingDirectory)
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
+                .Execute(["bundles", "download"]);
         }
     }
 }
