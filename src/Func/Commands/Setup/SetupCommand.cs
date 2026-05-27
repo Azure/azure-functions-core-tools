@@ -14,7 +14,12 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<string[]?> FeaturesOption { get; } = new("--features")
     {
-        Description = "Setup features to install or check. Examples: host, runtime, node, python, dotnet-isolated.",
+        Description =
+            "Components to install. Repeatable or comma-separated. Names:\n"
+            + "  host                          Functions host only\n"
+            + "  runtime                       host + extension bundle (no language)\n"
+            + "  node | python | go | dotnet   language: host + worker (if any) + stack + bundle\n"
+            + "Omit to auto-detect from local.settings.json, or be prompted when interactive.",
         Arity = ArgumentArity.OneOrMore,
     };
 

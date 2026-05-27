@@ -165,8 +165,12 @@ internal sealed class SetupRunner(
 
                 case "dotnet":
                 case ".net":
+                case "dotnet-isolated":
+                    workerRuntimes.Add("dotnet-isolated");
+                    break;
+
                 case "dotnet-inprocess":
-                    throw new SetupConfigurationException("The 'dotnet' feature is not supported. Use 'dotnet-isolated'.");
+                    throw new SetupConfigurationException("The 'dotnet-inprocess' feature is not supported. Use 'dotnet-isolated'.");
 
                 default:
                     workerRuntimes.Add(feature);
@@ -292,7 +296,10 @@ internal sealed class SetupRunner(
 
             VersionRange? workerRange = null;
             profileScope.Profile?.WorkerVersionRanges.TryGetValue(workerRuntime, out workerRange);
-            dependencies.Add(SetupDependency.Worker(workerRuntime, workerRange));
+            if (SetupDependency.SupportsWorker(workerRuntime))
+            {
+                dependencies.Add(SetupDependency.Worker(workerRuntime, workerRange));
+            }
 
             if (SetupDependency.SupportsStack(workerRuntime))
             {
@@ -627,6 +634,12 @@ internal sealed record SetupDependency(
     private static readonly HashSet<string> _stacks =
         new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet-isolated" };
 
+    // Runtimes that ship a Workers.<runtime> workload package. Other runtimes
+    // (dotnet-isolated uses the .NET SDK; java/powershell/custom have no worker
+    // package today) skip worker install silently.
+    private static readonly HashSet<string> _workers =
+        new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go" };
+
     public static SetupDependency Host(VersionRange? versionRange)
         => new(
             SetupDependencyKind.Host,
@@ -669,6 +682,9 @@ internal sealed record SetupDependency(
 
     public static bool SupportsStack(string stack)
         => !string.IsNullOrWhiteSpace(stack) && _stacks.Contains(stack.Trim());
+
+    public static bool SupportsWorker(string runtime)
+        => !string.IsNullOrWhiteSpace(runtime) && _workers.Contains(runtime.Trim());
 
     public static IReadOnlyList<string> Stacks => [.. _stacks];
 

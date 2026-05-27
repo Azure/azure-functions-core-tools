@@ -94,7 +94,7 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_ConfiguredDotnetIsolated_InstallsWorkerAndStackAndSkipsBundle()
+    public async Task RunAsync_ConfiguredDotnetIsolated_InstallsStackAndSkipsWorkerAndBundle()
     {
         string workerPackageId = WorkerPackage("dotnet-isolated");
         const string dotnetStack = "Azure.Functions.Cli.Workloads.DotNet";
@@ -111,14 +111,46 @@ public sealed class SetupRunnerTests : IDisposable
 
         Assert.Equal(0, result.ExitCode);
         await _installer.Received(1).InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
-            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.2.3"),
+            Arg.Is<string>(id => string.Equals(id, dotnetStack, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
-            Arg.Is(false),
-            Arg.Is(true),
-            Arg.Is(false),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => id.Contains("ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_FeatureDotnetAlias_InstallsStackAsDotnetIsolated()
+    {
+        const string dotnetStack = "Azure.Functions.Cli.Workloads.DotNet";
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(dotnetStack, "1.0.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["dotnet"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, dotnetStack, StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -129,7 +161,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
-            Arg.Is<string>(id => id.Contains("ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<string>(id => id.Contains(".Workers.", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
             Arg.Any<bool>(),
