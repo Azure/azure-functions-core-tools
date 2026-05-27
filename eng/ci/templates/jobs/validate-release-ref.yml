@@ -14,15 +14,20 @@ jobs:
 
   - pwsh: |
       $source = "$(Build.SourceBranch)"
-      if (!($source -like "refs/tags/*-v*" || $source -like "refs/tags/v*" || $source -like "refs/heads/release/*" || $source -like "refs/heads/internal/release/*"))
-      {
-        if ('${{ parameters.skipBranchValidation }}' -eq 'True')
-        {
-          Write-Host "##vso[task.logissue type=warning]Source branch release validation was skipped (skipBranchValidation enabled)."
-        } 
-        else
-        {
-          Write-Host "##vso[task.logissue type=error]Invalid release branch. Branch must be a tag (v* or *-v*) or a release branch (release/*, internal/release/*)."
+      $validPatterns = @(
+        'refs/tags/*/v*'
+        'refs/tags/*-v*'
+        'refs/tags/v*'
+        'refs/heads/release/*'
+        'refs/heads/internal/release/*'
+      )
+
+      $isValid = $validPatterns | Where-Object { $source -like $_ } | Select-Object -First 1
+      if (-not $isValid) {
+        $patternList = $validPatterns -join ', '
+        $verbosity = if ('${{ parameters.skipBranchValidation }}' -eq 'True') { 'warning' } else { 'error' }
+        Write-Host "##vso[task.logissue type=$verbosity]Invalid release branch '$source'. Valid patterns: $patternList"
+        if ($verbosity -eq 'error') {
           exit 1
         }
       }
