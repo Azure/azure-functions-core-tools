@@ -44,7 +44,7 @@ internal sealed class SetupRunner(
         var renderer = new SetupRenderer(_interaction, options.OutputMode);
         try
         {
-            SetupFeaturePlan featurePlan = ResolveFeatures(options);
+            SetupFeaturePlan featurePlan = await ResolveFeaturesAsync(options, cancellationToken);
             IReadOnlyList<SetupProfileScope> profileScopes = await ResolveProfileScopesAsync(options, renderer, cancellationToken);
 
             renderer.SetupStarted(options, featurePlan, profileScopes);
@@ -131,10 +131,10 @@ internal sealed class SetupRunner(
         return new ProfileSetupOutcome(failures);
     }
 
-    private SetupFeaturePlan ResolveFeatures(SetupCommandOptions options)
+    private async Task<SetupFeaturePlan> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
         IReadOnlyList<string> requestedFeatures = options.Features.Count == 0
-            ? GetDefaultFeatures(options.WorkingDirectory)
+            ? await GetDefaultFeaturesAsync(options, cancellationToken)
             : options.Features;
 
         if (requestedFeatures.Count == 0)
@@ -185,15 +185,27 @@ internal sealed class SetupRunner(
             includeExtensionBundle);
     }
 
-    private IReadOnlyList<string> GetDefaultFeatures(DirectoryInfo workingDirectory)
+    private async Task<IReadOnlyList<string>> GetDefaultFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
         string? configuredStack = _configurationProvider
-            .GetProjectConfiguration(workingDirectory)
+            .GetProjectConfiguration(options.WorkingDirectory)
             [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"];
 
-        return string.IsNullOrWhiteSpace(configuredStack)
-            ? ["runtime"]
-            : [configuredStack.Trim()];
+        if (!string.IsNullOrWhiteSpace(configuredStack))
+        {
+            return [configuredStack.Trim()];
+        }
+
+        if (!options.NonInteractive && _interaction.IsInteractive)
+        {
+            string picked = await _interaction.PromptForSelectionAsync(
+                "Select a stack to install:",
+                SetupDependency.Stacks,
+                cancellationToken);
+            return [picked];
+        }
+
+        return ["runtime"];
     }
 
     private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(
@@ -281,6 +293,11 @@ internal sealed class SetupRunner(
             VersionRange? workerRange = null;
             profileScope.Profile?.WorkerVersionRanges.TryGetValue(workerRuntime, out workerRange);
             dependencies.Add(SetupDependency.Worker(workerRuntime, workerRange));
+
+            if (SetupDependency.SupportsStack(workerRuntime))
+            {
+                dependencies.Add(SetupDependency.Stack(workerRuntime));
+            }
         }
 
         if (featurePlan.IncludeExtensionBundle)
@@ -366,6 +383,13 @@ internal sealed class SetupRunner(
                     selected.Entry.PackageId,
                     selected.Version.ToNormalizedString(),
                     $"{dependency.DisplayName} is satisfied by installed version {selected.Version.ToNormalizedString()} because catalog resolution failed: {resolution.FailureMessage}");
+            }
+
+            if (resolution.PackageMissing && dependency.Optional)
+            {
+                return SetupDependencyResult.Skipped(
+                    dependency,
+                    $"Skipped {dependency.DisplayName}: no workload package published for this runtime.");
             }
 
             return SetupDependencyResult.Failed(dependency, resolution.FailureMessage);
@@ -466,7 +490,7 @@ internal sealed class SetupRunner(
             if (package is null)
             {
                 string range = dependency.RangeText is null ? string.Empty : $" in range '{dependency.RangeText}'";
-                return CatalogResolution.Failed($"No {dependency.DisplayName} workload version{range} is available from the configured workload catalog.");
+                return CatalogResolution.Missing($"No {dependency.DisplayName} workload version{range} is available from the configured workload catalog.");
             }
 
             return CatalogResolution.Resolved(package);
@@ -565,11 +589,13 @@ internal sealed class SetupRunner(
             ? SetupBundlePolicy.NotSupported
             : SetupBundlePolicy.DefaultStable;
 
-    private sealed record CatalogResolution(ResolvedPackage? Package, string? FailureMessage)
+    private sealed record CatalogResolution(ResolvedPackage? Package, string? FailureMessage, bool PackageMissing)
     {
-        public static CatalogResolution Resolved(ResolvedPackage package) => new(package, FailureMessage: null);
+        public static CatalogResolution Resolved(ResolvedPackage package) => new(package, FailureMessage: null, PackageMissing: false);
 
-        public static CatalogResolution Failed(string failureMessage) => new(Package: null, failureMessage);
+        public static CatalogResolution Failed(string failureMessage) => new(Package: null, failureMessage, PackageMissing: false);
+
+        public static CatalogResolution Missing(string failureMessage) => new(Package: null, failureMessage, PackageMissing: true);
     }
 
     private sealed record InstalledCandidate(WorkloadEntry Entry, NuGetVersion Version);
@@ -598,9 +624,18 @@ internal sealed record SetupDependency(
     string PackageId,
     VersionRange? VersionRange,
     string? RangeText,
-    string? ResolvedPackageId)
+    string? ResolvedPackageId,
+    bool Optional = false)
 {
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
+    private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
+
+    // TODO: this should not be hardcoded in the CLI; discover the stack package
+    // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
+    // require a CLI release. Stacks not in this set (java, powershell, custom)
+    // skip silently today.
+    private static readonly HashSet<string> _stacks =
+        new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet-isolated" };
 
     public static SetupDependency Host(VersionRange? versionRange)
         => new(
@@ -620,7 +655,8 @@ internal sealed record SetupDependency(
             SetupRunnerWorkerPackageId(runtime),
             versionRange,
             SetupRunnerRangeText(versionRange),
-            ResolvedPackageId: null);
+            ResolvedPackageId: null,
+            Optional: true);
 
     public static SetupDependency Bundle(string bundleId, VersionRange? versionRange, string? rangeText)
         => new(
@@ -631,6 +667,26 @@ internal sealed record SetupDependency(
             versionRange,
             rangeText,
             ResolvedPackageId: null);
+
+    public static SetupDependency Stack(string stack)
+        => new(
+            SetupDependencyKind.Stack,
+            stack,
+            $"{stack} stack",
+            StackPackagePrefix + StackPackageSuffix(stack),
+            VersionRange: null,
+            RangeText: null,
+            ResolvedPackageId: null);
+
+    public static bool SupportsStack(string stack)
+        => !string.IsNullOrWhiteSpace(stack) && _stacks.Contains(stack.Trim());
+
+    public static IReadOnlyList<string> Stacks => [.. _stacks];
+
+    // dotnet-isolated maps to the .dotnet package suffix; the rest concat
+    // directly (NuGet package ids are case-insensitive).
+    private static string StackPackageSuffix(string stack)
+        => string.Equals(stack, "dotnet-isolated", StringComparison.OrdinalIgnoreCase) ? "dotnet" : stack;
 
     private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
 
@@ -643,6 +699,7 @@ internal enum SetupDependencyKind
 {
     Host,
     Worker,
+    Stack,
     ExtensionBundle,
 }
 
@@ -651,6 +708,7 @@ internal enum SetupDependencyStatus
     Satisfied,
     Installed,
     SatisfiedFallback,
+    Skipped,
     Failed,
 }
 
@@ -669,6 +727,9 @@ internal sealed record SetupDependencyResult(
 
     public static SetupDependencyResult SatisfiedFallback(SetupDependency dependency, string packageId, string version, string message)
         => new(dependency, SetupDependencyStatus.SatisfiedFallback, packageId, version, message);
+
+    public static SetupDependencyResult Skipped(SetupDependency dependency, string message)
+        => new(dependency, SetupDependencyStatus.Skipped, dependency.PackageId, Version: null, message);
 
     public static SetupDependencyResult Failed(SetupDependency dependency, string message)
         => new(dependency, SetupDependencyStatus.Failed, dependency.PackageId, Version: null, message);

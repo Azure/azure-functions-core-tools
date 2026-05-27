@@ -21,7 +21,7 @@ internal class TestInteractionService : IInteractionService
 
     public IReadOnlyList<string> Lines => _lines;
     public string AllOutput => string.Join(Environment.NewLine, _lines);
-    public bool IsInteractive => false;
+    public virtual bool IsInteractive => false;
     public ITheme Theme { get; } = new DefaultTheme();
 
     // --- Plain output ---

@@ -40,6 +40,15 @@ internal static class Constants
     public const string WorkloadsHomeEnvironmentVariable = "FUNC_CLI_WORKLOADS_HOME";
 
     /// <summary>
+    /// Environment variable that, when explicitly set to a non-empty value,
+    /// overrides the default workload catalog source (a v3 NuGet
+    /// <c>index.json</c> URL). Read directly (not through
+    /// <c>IConfiguration</c>) so the source cannot be redirected by host
+    /// config, global config, or project <c>.func/config.json</c>.
+    /// </summary>
+    public const string WorkloadsSourceEnvironmentVariable = "FUNC_CLI_WORKLOADS_SOURCE";
+
+    /// <summary>
     /// The telemetry instrumentation key, injected at build time via Telemetry.props.
     /// </summary>
     public static readonly string TelemetryInstrumentationKey =

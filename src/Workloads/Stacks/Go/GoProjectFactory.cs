@@ -50,20 +50,4 @@ internal sealed class GoProjectFactory : IFunctionsProjectFactory
 
         return null;
     }
-
-    private sealed class GoFunctionsProject(WorkingDirectory workingDirectory) : FunctionsProject
-    {
-        private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(_workerId);
-
-        public override WorkingDirectory WorkingDirectory => _workingDirectory;
-
-        public override string StackName => "go";
-
-        public override string StackDisplayName => "Go";
-
-        public override bool SupportsExtensionBundles => true;
-
-        public override FunctionsWorkerReference WorkerReference => _workerReference;
-    }
 }
