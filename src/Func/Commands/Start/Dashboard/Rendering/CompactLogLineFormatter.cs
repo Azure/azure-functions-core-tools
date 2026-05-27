@@ -15,6 +15,8 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// </summary>
 internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette palette)
 {
+    private const int SourceColumnWidth = 18;
+
     private readonly ITheme _theme = theme ?? throw new ArgumentNullException(nameof(theme));
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
 
@@ -34,14 +36,18 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
         }
 
         bool isError = IsErrorLogLine(entry, events);
-        return new CompactLogLine(
-            FormatRenderable(entry, events, listenUri),
-            GetFunctionName(entry, events),
-            isError,
-            GetEffectiveLogLevel(entry, isError));
+        string? functionName = GetFunctionName(entry, events);
+        LogLevel effectiveLogLevel = GetEffectiveLogLevel(entry, isError);
+        return FormatLine(entry, events, listenUri, functionName, isError, effectiveLogLevel);
     }
 
-    private IRenderable FormatRenderable(HostLogEntry entry, IReadOnlyList<DashboardEvent> events, string? listenUri)
+    private CompactLogLine FormatLine(
+        HostLogEntry entry,
+        IReadOnlyList<DashboardEvent> events,
+        string? listenUri,
+        string? functionName,
+        bool isError,
+        LogLevel effectiveLogLevel)
     {
         string ts = entry.Timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
@@ -50,15 +56,23 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             switch (ev)
             {
                 case HostStateChangedEvent hs:
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]             {Markup.Escape(DescribeHostState(hs))}"));
+                    return CreateSingleLine(
+                        string.Create(CultureInfo.InvariantCulture,
+                            $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]             {Markup.Escape(DescribeHostState(hs))}"),
+                        functionName,
+                        isError,
+                        effectiveLogLevel);
 
                 case FunctionDiscoveredEvent fd:
                 {
                     string color = _palette.GetColorFor(fd.Function.Name);
                     string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, listenUri, _theme);
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"));
+                    return CreateSingleLine(
+                        string.Create(CultureInfo.InvariantCulture,
+                            $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"),
+                        functionName,
+                        isError,
+                        effectiveLogLevel);
                 }
 
                 case InvocationStartedEvent inv:
@@ -71,8 +85,12 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                         detail = $"{method} {target}";
                     }
 
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  [{SuccessTag}]→[/]  {Markup.Escape(detail)}"));
+                    return CreateSingleLine(
+                        string.Create(CultureInfo.InvariantCulture,
+                            $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  [{SuccessTag}]→[/]  {Markup.Escape(detail)}"),
+                        functionName,
+                        isError,
+                        effectiveLogLevel);
                 }
 
                 case InvocationCompletedEvent inv:
@@ -84,16 +102,21 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                         ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorType ?? string.Empty)}: {Markup.Escape(inv.ErrorMessage ?? string.Empty)}[/]"
                         : $"[{MutedTag}]{(inv.DurationMs.HasValue ? ((long)inv.DurationMs.Value).ToString(CultureInfo.InvariantCulture) + "ms" : string.Empty)}[/]";
 
-                    return new Markup(string.Create(CultureInfo.InvariantCulture,
-                        $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  {arrow}  {suffix}"));
+                    return CreateSingleLine(
+                        string.Create(CultureInfo.InvariantCulture,
+                            $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  {arrow}  {suffix}"),
+                        functionName,
+                        isError,
+                        effectiveLogLevel);
                 }
             }
         }
 
-        string? functionName = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName);
+        string source = functionName ?? entry.Category;
+        int sourceWidth = Math.Max(SourceColumnWidth, source.Length);
         string nameMarkup = functionName is not null
-            ? $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-18}[/]"
-            : $"[{MutedTag}]{Markup.Escape(entry.Category),-18}[/]";
+            ? $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-SourceColumnWidth}[/]"
+            : $"[{MutedTag}]{Markup.Escape(entry.Category),-SourceColumnWidth}[/]";
 
         string levelMarkup = entry.Level switch
         {
@@ -102,9 +125,79 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             _ => $"[{MutedTag}]·[/]",
         };
 
-        return new Markup(string.Create(CultureInfo.InvariantCulture,
-            $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  {Markup.Escape(entry.Message)}"));
+        string prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
+        int prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
+        return CreateWrappedLine(prefix, prefixWidth, entry.Message, functionName, isError, effectiveLogLevel);
     }
+
+    private static CompactLogLine CreateSingleLine(string markup, string? functionName, bool isError, LogLevel level)
+        => new(new Markup(markup), functionName, isError, level);
+
+    private static CompactLogLine CreateWrappedLine(
+        string prefixMarkup,
+        int prefixWidth,
+        string message,
+        string? functionName,
+        bool isError,
+        LogLevel level)
+    {
+        string continuationPrefix = new(' ', prefixWidth);
+        Markup first = new(prefixMarkup + Markup.Escape(message));
+        return new CompactLogLine(
+            first,
+            width => BuildWrappedRows(prefixMarkup, prefixWidth, continuationPrefix, message, width),
+            functionName,
+            isError,
+            level);
+    }
+
+    private static IReadOnlyList<IRenderable> BuildWrappedRows(
+        string firstPrefixMarkup,
+        int prefixWidth,
+        string continuationPrefix,
+        string message,
+        int viewportWidth)
+    {
+        int messageWidth = Math.Max(1, viewportWidth - prefixWidth);
+        List<string> segments = WrapMessage(message, messageWidth);
+        if (segments.Count == 0)
+        {
+            segments.Add(string.Empty);
+        }
+
+        var rows = new List<IRenderable>(segments.Count);
+        for (int i = 0; i < segments.Count; i++)
+        {
+            string prefix = i == 0 ? firstPrefixMarkup : continuationPrefix;
+            rows.Add(new Markup(prefix + Markup.Escape(segments[i])));
+        }
+
+        return rows;
+    }
+
+    private static List<string> WrapMessage(string message, int width)
+    {
+        var rows = new List<string>();
+        foreach (string line in NormalizeLineEndings(message).Split('\n'))
+        {
+            if (line.Length == 0)
+            {
+                rows.Add(string.Empty);
+                continue;
+            }
+
+            for (int start = 0; start < line.Length; start += width)
+            {
+                int length = Math.Min(width, line.Length - start);
+                rows.Add(line.Substring(start, length));
+            }
+        }
+
+        return rows;
+    }
+
+    private static string NormalizeLineEndings(string value)
+        => value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
     private static bool ShouldSuppress(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
     {

@@ -107,7 +107,7 @@ internal sealed class CompactRenderer(
         {
             if (_logScrollOffset > 0 && MatchesLogFilters(line, _activeFunctionFilter, _errorsOnly, _minimumLogLevel))
             {
-                _logScrollOffset = Math.Min(MaxLogTailLines, _logScrollOffset + 1);
+                _logScrollOffset = Math.Min(MaxLogTailLines, _logScrollOffset + line.RenderRows(GetViewportWidth()).Count);
             }
         }
 
@@ -378,20 +378,21 @@ internal sealed class CompactRenderer(
         tail = [.. tail.Where(line => line.Level >= minimumLogLevel)];
 
         int logBudget = ComputeLogBudget(snapshot);
+        List<IRenderable> visualRows = BuildLogVisualRows(tail, activeFunctionFilter, GetViewportWidth());
         int logScrollOffset;
         lock (_uiLock)
         {
-            _logScrollOffset = Math.Clamp(_logScrollOffset, 0, Math.Max(0, tail.Length - logBudget));
+            _logScrollOffset = Math.Clamp(_logScrollOffset, 0, Math.Max(0, visualRows.Count - logBudget));
             logScrollOffset = _logScrollOffset;
         }
 
-        if (tail.Length > logBudget)
+        if (visualRows.Count > logBudget)
         {
-            int start = Math.Max(0, tail.Length - logBudget - logScrollOffset);
-            tail = tail[start..Math.Min(tail.Length, start + logBudget)];
+            int start = Math.Max(0, visualRows.Count - logBudget - logScrollOffset);
+            visualRows = visualRows[start..Math.Min(visualRows.Count, start + logBudget)];
         }
 
-        IRenderable logRows = BuildLogRows(tail, activeFunctionFilter, logBudget);
+        IRenderable logRows = BuildLogRows(visualRows, logBudget);
         IRenderable footer = BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly, minimumLogLevel);
 
         var rows = new Rows(
@@ -403,23 +404,35 @@ internal sealed class CompactRenderer(
         return rows;
     }
 
-    private IRenderable BuildLogRows(CompactLogLine[] tail, string? activeFunctionFilter, int logBudget)
+    private List<IRenderable> BuildLogVisualRows(CompactLogLine[] tail, string? activeFunctionFilter, int viewportWidth)
+    {
+        if (tail.Length == 0)
+        {
+            return [new Markup($"[{MutedTag}]{Markup.Escape(GetEmptyLogMessage(activeFunctionFilter))}[/]")];
+        }
+
+        var rows = new List<IRenderable>();
+        foreach (CompactLogLine line in tail)
+        {
+            rows.AddRange(line.RenderRows(viewportWidth));
+        }
+
+        return rows;
+    }
+
+    private static IRenderable BuildLogRows(List<IRenderable> visualRows, int logBudget)
     {
         if (logBudget <= 0)
         {
             return new Rows([]);
         }
 
-        List<IRenderable> rows = tail.Length == 0
-            ? [new Markup($"[{MutedTag}]{Markup.Escape(GetEmptyLogMessage(activeFunctionFilter))}[/]")]
-            : [.. tail.Select(static line => line.Renderable)];
-
-        while (rows.Count < logBudget)
+        while (visualRows.Count < logBudget)
         {
-            rows.Add(new Markup(string.Empty));
+            visualRows.Add(new Markup(string.Empty));
         }
 
-        return new Rows(rows);
+        return new Rows(visualRows);
     }
 
     private int ComputeLogBudget(DashboardSnapshot snapshot)
@@ -781,6 +794,17 @@ internal sealed class CompactRenderer(
         }
 
         return viewportHeight;
+    }
+
+    private int GetViewportWidth()
+    {
+        int viewportWidth = _console.Profile.Width;
+        if (viewportWidth <= 0 || viewportWidth > 1000)
+        {
+            viewportWidth = 120;
+        }
+
+        return viewportWidth;
     }
 
     private static string GetEmptyLogMessage(string? activeFunctionFilter)
