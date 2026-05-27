@@ -61,8 +61,16 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
         // Suppress the WebJobs invocation envelope ("Executing '...'" /
         // "Executed '...'") because the synthetic events already convey it.
         string? kind = entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind);
-        if (events.Count == 0 && kind is null or CliEventKinds.Log && !IsWebJobsInvocationEnvelope(entry.Message))
+        if (events.Count == 0
+            && kind is null or CliEventKinds.Log
+            && !IsSuppressedLogCategory(entry.Category)
+            && !IsWebJobsInvocationEnvelope(entry.Message))
         {
+            if (string.IsNullOrWhiteSpace(entry.Message))
+            {
+                return Task.CompletedTask;
+            }
+
             string function = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName) ?? entry.Category;
             string tag = entry.Level switch
             {
@@ -84,6 +92,9 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
         => !string.IsNullOrEmpty(message) && (
             message.StartsWith("Executing '", StringComparison.Ordinal) ||
             message.StartsWith("Executed '", StringComparison.Ordinal));
+
+    private static bool IsSuppressedLogCategory(string category)
+        => string.Equals(category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal);
 
     private void PrintBanner()
     {

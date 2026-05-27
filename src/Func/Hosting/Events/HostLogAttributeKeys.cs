@@ -14,6 +14,8 @@ internal static class HostLogAttributeKeys
 {
     public const string FunctionName = "function.name";
 
+    public const string FunctionId = "function.id";
+
     public const string FunctionInvocationId = "function.invocation_id";
 
     /// <summary>
@@ -32,6 +34,14 @@ internal static class HostLogAttributeKeys
     /// Array of HTTP verbs for HTTP-triggered functions (<c>string[]</c>).
     /// </summary>
     public const string FunctionHttpMethods = "function.http_methods";
+
+    public const string FunctionLanguage = "function.language";
+
+    public const string FunctionScriptFile = "function.script_file";
+
+    public const string FunctionEntryPoint = "function.entry_point";
+
+    public const string FunctionBindings = "function.bindings";
 
     public const string DurationMs = "duration_ms";
 

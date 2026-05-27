@@ -7,6 +7,7 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Workloads.Host;
@@ -23,11 +24,12 @@ internal sealed class FunctionsHostRunner : IFunctionsHostRunner
             {
                 configBuilder.AddEnvironmentVariables();
             })
-            .ConfigureLogging(loggingBuilder =>
+            .ConfigureLogging((context, loggingBuilder) =>
             {
                 loggingBuilder.ClearProviders();
-                loggingBuilder.Services.AddSingleton<ILoggerProvider, HostConsoleLoggerProvider>();
-                loggingBuilder.AddDefaultWebJobsFilters<HostConsoleLoggerProvider>(LogLevel.Trace);
+                loggingBuilder.Services.AddSingleton<ILoggerProvider, HostStructuredLoggerProvider>();
+                loggingBuilder.AddDefaultWebJobsFilters<HostStructuredLoggerProvider>(LogLevel.Trace);
+                RawHostLogCaptureProvider.AddIfEnabled(loggingBuilder, context.Configuration);
                 loggingBuilder.AddFilter(static (category, logLevel) =>
                 {
                     bool isSharedMemoryWarning = logLevel == LogLevel.Warning
@@ -52,7 +54,23 @@ internal sealed class FunctionsHostRunner : IFunctionsHostRunner
             })
             .Build();
 
+        RegisterFunctionMetadataEmission(host.Services);
         await host.RunAsync(cancellationToken);
+    }
+
+    private static void RegisterFunctionMetadataEmission(IServiceProvider services)
+    {
+        IHostApplicationLifetime? lifetime = services.GetService<IHostApplicationLifetime>();
+        if (lifetime is null)
+        {
+            return;
+        }
+
+        lifetime.ApplicationStarted.Register(static state =>
+        {
+            var services = (IServiceProvider)state!;
+            HostFunctionMetadataEmitter.EmitSnapshot(services);
+        }, services);
     }
 
     private static ScriptApplicationHostOptions CreateHostOptions(string scriptPath)

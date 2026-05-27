@@ -245,6 +245,90 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
+    public async Task Runner_HostContentRootOverride_BypassesResolutionAndInstall()
+    {
+        string contentRoot = CreateLocalHostContentRoot();
+        using var environment = new EnvironmentVariableScope(
+            ValidateHostWorkloadInitializationStep.HostContentRootEnvironmentVariable,
+            contentRoot);
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(_tempDir));
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
+        IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+        hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HostWorkloadResolution>(
+                new InvalidOperationException("Host workload resolution should be bypassed.")));
+        IWorkloadInstaller workloadInstaller = Substitute.For<IWorkloadInstaller>();
+        workloadInstaller.InstallFromCatalogAsync(
+                Arg.Any<string>(),
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<WorkloadInstallResult>(
+                new InvalidOperationException("Host workload installation should be bypassed.")));
+        HostProcessStartContext? capturedStartContext = null;
+        IHostProcessRunner hostProcessRunner = Substitute.For<IHostProcessRunner>();
+        var eventStream = new InMemoryHostEventStream();
+        eventStream.Complete();
+        hostProcessRunner.StartAsync(Arg.Do<HostProcessStartContext>(value => capturedStartContext = value), Arg.Any<CancellationToken>())
+            .Returns(eventStream);
+        var renderer = new RecordingStartInitializationRenderer();
+        var runner = CreateRunner(
+            projectResolver,
+            hostWorkloadResolver: hostWorkloadResolver,
+            workloadInstaller: workloadInstaller,
+            hostProcessRunner: hostProcessRunner);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true,
+            demoMode: false);
+
+        StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
+
+        Assert.Equal("local-dev", result.HostVersion);
+        Assert.Same(eventStream, result.EventStream);
+        Assert.NotNull(capturedStartContext);
+        HostProcessStartContext startContext = capturedStartContext!;
+        Assert.Equal(contentRoot, startContext.HostWorkload.ContentRoot);
+        Assert.Equal("Azure.Functions.Cli.Workloads.Host.local", startContext.HostWorkload.PackageId);
+        Assert.Contains("host", startContext.HostWorkload.Aliases);
+        Assert.Equal(-1, FindStartedStepIndex(renderer.Events, InstallHostWorkloadInitializationStep.StepId));
+    }
+
+    [Fact]
+    public async Task Runner_HostContentRootOverride_RejectsMissingExecutable()
+    {
+        string contentRoot = Path.Combine(_tempDir, "invalid-host-content");
+        Directory.CreateDirectory(contentRoot);
+        using var environment = new EnvironmentVariableScope(
+            ValidateHostWorkloadInitializationStep.HostContentRootEnvironmentVariable,
+            contentRoot);
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        var runner = CreateRunner(projectResolver);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true,
+            demoMode: false);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None));
+
+        Assert.Contains(ValidateHostWorkloadInitializationStep.HostContentRootEnvironmentVariable, ex.Message);
+        Assert.Contains("host executable was not found", ex.Message);
+    }
+
+    [Fact]
     public async Task DemoRunner_ResolvedProfileFlowsToHostProjectAndRunInfo()
     {
         IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
@@ -885,6 +969,20 @@ public class StartInitializationTests : IDisposable
         return new ProfileResolution.Resolved(profile, []);
     }
 
+    private string CreateLocalHostContentRoot()
+    {
+        string contentRoot = Path.Combine(_tempDir, "local-host-content");
+        Directory.CreateDirectory(contentRoot);
+        string executableName = OperatingSystem.IsWindows()
+            ? $"{HostProcessStartInfoFactory.ExecutableBaseName}.exe"
+            : HostProcessStartInfoFactory.ExecutableBaseName;
+        File.WriteAllText(Path.Combine(contentRoot, executableName), string.Empty);
+        string workersDirectory = Path.Combine(contentRoot, "workers");
+        Directory.CreateDirectory(workersDirectory);
+        File.WriteAllText(Path.Combine(workersDirectory, "workers.txt"), string.Empty);
+        return Path.GetFullPath(contentRoot);
+    }
+
     private static WorkloadEntry CreateHostEntry(string packageVersion)
         => new()
         {
@@ -977,6 +1075,24 @@ public class StartInitializationTests : IDisposable
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class EnvironmentVariableScope : IDisposable
+    {
+        private readonly string _name;
+        private readonly string? _previousValue;
+
+        public EnvironmentVariableScope(string name, string value)
+        {
+            _name = name;
+            _previousValue = Environment.GetEnvironmentVariable(name);
+            Environment.SetEnvironmentVariable(name, value);
+        }
+
+        public void Dispose()
+        {
+            Environment.SetEnvironmentVariable(_name, _previousValue);
+        }
     }
 
     private sealed class TestFunctionsProject(

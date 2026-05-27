@@ -113,7 +113,13 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             return false;
         }
 
-        return IsFunctionsInvocationEnvelope(entry.Message);
+        if (string.Equals(entry.Category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return string.IsNullOrWhiteSpace(entry.Message)
+            || IsFunctionsInvocationEnvelope(entry.Message);
     }
 
     private static bool IsFunctionsInvocationEnvelope(string message)

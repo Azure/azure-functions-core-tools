@@ -35,6 +35,11 @@ directory, overlaying prepared environment variables, and building host argument
 The working directory and `AzureWebJobsScriptRoot` environment variable both point to the prepared function app startup
 directory.
 
+For local CLI/host iteration, set `FUNC_HOST_CONTENT_ROOT` to a built host
+content root that contains `Azure.Functions.Cli.Workloads.Host(.exe)` and
+`workers/workers.txt`. The CLI then skips workload resolution/installation and
+launches that local content root through the normal start pipeline.
+
 | Argument | Owner | Description |
 | --- | --- | --- |
 | `--enable-auth` | Host workload shell | Enables the host's full authentication pipeline. When omitted, the shell starts the host with local auth bypassed, matching local Core Tools behavior. This argument is consumed by the shell and is not forwarded to the host. |
@@ -45,3 +50,17 @@ The shell does not support private CLI options such as `--script-root`, `--port`
 `--cors`, `--cors-credentials`, or `--functions`. The CLI should resolve those
 concepts before process launch and express them using the host's expected
 environment/configuration surface.
+
+## Diagnostics
+
+The workload writes the normal stdout/stderr host event stream as newline-delimited
+JSON records with `source: "azure-functions-cli-host"` and `schema_version: 1`.
+The CLI parses those records before falling back to plain line output. Records may
+include dashboard attributes such as `cli.event_kind`, `host.state`,
+`function.name`, `function.invocation_id`, HTTP request details, and function
+metadata snapshots emitted after host startup.
+
+Set `FUNC_HOST_RAW_LOG_CAPTURE_PATH` to an absolute file path to capture raw host
+`ILogger` records as newline-delimited JSON. This is a diagnostic-only capture
+file used to inspect category, level, event id, structured state, scopes, and
+exception data without changing the stdout/stderr stream consumed by the CLI.

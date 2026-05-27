@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Commands.Start.Host;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 
@@ -17,6 +19,11 @@ internal sealed class ValidateHostWorkloadInitializationStep(
     : DemoInitializationStep
 {
     public const string StepId = "resolve_host_workload";
+    public const string HostContentRootEnvironmentVariable = "FUNC_HOST_CONTENT_ROOT";
+
+    private const string LocalHostPackageId = "Azure.Functions.Cli.Workloads.Host.local";
+    private const string LocalHostVersion = "local-dev";
+    private const string HostAlias = "host";
 
     private readonly IHostWorkloadResolver _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
@@ -33,6 +40,15 @@ internal sealed class ValidateHostWorkloadInitializationStep(
         ArgumentNullException.ThrowIfNull(context);
 
         await SimulateWorkAsync(context, cancellationToken);
+
+        string? localContentRoot = Environment.GetEnvironmentVariable(HostContentRootEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(localContentRoot))
+        {
+            ContentWorkloadInfo workload = CreateLocalContentWorkload(localContentRoot);
+            context.State.HostVersion = workload.PackageVersion;
+            context.State.HostWorkload = workload;
+            return StartInitializationStepResult.Completed($"Using local host content root {workload.ContentRoot}");
+        }
 
         HostWorkloadResolution resolution;
         try
@@ -76,5 +92,41 @@ internal sealed class ValidateHostWorkloadInitializationStep(
             default:
                 throw new InvalidOperationException($"Unknown host workload resolution: {resolution.GetType().Name}");
         }
+    }
+
+    private static ContentWorkloadInfo CreateLocalContentWorkload(string configuredContentRoot)
+    {
+        string contentRoot = Path.GetFullPath(configuredContentRoot);
+        if (!Directory.Exists(contentRoot))
+        {
+            throw new GracefulException(
+                $"{HostContentRootEnvironmentVariable} points to '{contentRoot}', but that directory does not exist.",
+                isUserError: true);
+        }
+
+        string executablePath = HostProcessStartInfoFactory.ResolveExecutablePath(contentRoot);
+        if (!File.Exists(executablePath))
+        {
+            throw new GracefulException(
+                $"{HostContentRootEnvironmentVariable} points to '{contentRoot}', but the host executable was not found at '{executablePath}'.",
+                isUserError: true);
+        }
+
+        string workersMarkerPath = Path.Combine(contentRoot, "workers", "workers.txt");
+        if (!File.Exists(workersMarkerPath))
+        {
+            throw new GracefulException(
+                $"{HostContentRootEnvironmentVariable} points to '{contentRoot}', but the host content marker was not found at '{workersMarkerPath}'.",
+                isUserError: true);
+        }
+
+        return new ContentWorkloadInfo(
+            LocalHostPackageId,
+            LocalHostVersion,
+            [HostAlias],
+            contentRoot,
+            contentRoot,
+            "Azure Functions host (local)",
+            $"Local host content root from {HostContentRootEnvironmentVariable}.");
     }
 }
