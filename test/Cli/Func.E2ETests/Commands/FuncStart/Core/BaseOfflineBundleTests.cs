@@ -117,12 +117,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
         /// </summary>
         private static void EnsureBundlesCached(BaseFunctionAppFixture fixture, string language, string testName)
         {
-            string bundlePath = ExtensionBundleHelper.GetBundleDownloadPath(DefaultBundleId);
-            if (Directory.Exists(bundlePath) && Directory.GetDirectories(bundlePath).Length > 0)
-            {
-                return;
-            }
-
             var downloadCommand = new FuncRootCommand(fixture.FuncPath, testName + "_EnsureBundlesCached", fixture.Log);
 
             downloadCommand
