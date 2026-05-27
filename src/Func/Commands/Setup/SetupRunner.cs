@@ -283,13 +283,8 @@ internal sealed class SetupRunner(
             dependencies.Add(SetupDependency.Worker(workerRuntime, workerRange));
         }
 
-        // Stack workloads own the project resolver and pre-run hooks. Install one per
-        // supported runtime in the profile so a fresh machine can run `func start`
-        // against any supported language after `func setup`. Runtimes without a
-        // matching stack workload (java, powershell, custom, dotnet in-proc) are
-        // skipped silently. Stacks aren't pinned in the profile today, so they
-        // resolve with no version range ("*", latest stable, or latest prerelease
-        // when --prerelease is passed). Ordered after workers, before bundles.
+        // Install one stack workload per profile-supported runtime that has a
+        // matching package; unmapped runtimes (java, powershell, custom) skip silently.
         if (profileScope.Profile?.SupportedRuntimes is { } runtimes)
         {
             HashSet<string> addedStacks = new(StringComparer.OrdinalIgnoreCase);
