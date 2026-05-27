@@ -11,9 +11,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Starts the host event stream.
 /// </summary>
-internal sealed class StartHostInitializationStep(
-    IHostProcessRunner hostProcessRunner,
-    TimeProvider? timeProvider = null) : DemoInitializationStep
+internal sealed class StartHostInitializationStep(IHostProcessRunner hostProcessRunner, TimeProvider? timeProvider = null) : DemoInitializationStep
 {
     public const string StepId = "start_host";
 
@@ -45,11 +43,8 @@ internal sealed class StartHostInitializationStep(
         }
         else
         {
-            ContentWorkloadInfo hostWorkload = context.State.HostWorkload
-                ?? throw new InvalidOperationException("Host workload was not resolved.");
-            context.State.EventStream = await _hostProcessRunner.StartAsync(
-                new HostProcessStartContext(hostWorkload, hostRunContext, context.Options),
-                cancellationToken);
+            ContentWorkloadInfo hostWorkload = context.State.HostWorkload ?? throw new InvalidOperationException("Host workload was not resolved.");
+            context.State.EventStream = await _hostProcessRunner.StartAsync(new HostProcessStartContext(hostWorkload, hostRunContext, context.Options), cancellationToken);
         }
 
         return StartInitializationStepResult.Completed("Host process started");
