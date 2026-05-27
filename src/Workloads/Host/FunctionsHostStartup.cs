@@ -9,17 +9,12 @@ using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
 using Microsoft.Azure.WebJobs.Script.WebHost.Controllers;
 using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads.Host;
 
-internal sealed class FunctionsHostStartup(
-    IConfiguration configuration,
-    bool enableAuth,
-    ScriptApplicationHostOptions hostOptions) : IStartup
+internal sealed class FunctionsHostStartup(IConfiguration configuration, bool enableAuth, ScriptApplicationHostOptions hostOptions) : IStartup
 {
     private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     private readonly ScriptApplicationHostOptions _hostOptions = hostOptions ?? throw new ArgumentNullException(nameof(hostOptions));

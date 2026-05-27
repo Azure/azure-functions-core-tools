@@ -3,11 +3,13 @@
 
 using System.Buffers;
 using System.Collections;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Workloads.Host;
 
@@ -35,33 +37,15 @@ internal static class HostStructuredEventWriter
         SkipValidation = true,
     };
 
-    private static readonly object _consoleSync = new();
+    private static readonly Lock _consoleSync = new();
 
-    public static void WriteLog(
-        string category,
-        LogLevel level,
-        EventId eventId,
-        string message,
-        IReadOnlyDictionary<string, object?> attributes,
-        Exception? exception = null,
-        IReadOnlyDictionary<string, object?>? state = null,
-        IReadOnlyList<IReadOnlyDictionary<string, object?>>? scopes = null,
-        TextWriter? writer = null)
+    public static void WriteLog(string category, LogLevel level, EventId eventId, string message, IReadOnlyDictionary<string, object?> attributes, Exception? exception = null, IReadOnlyDictionary<string, object?>? state = null, IReadOnlyList<IReadOnlyDictionary<string, object?>>? scopes = null, TextWriter? writer = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(category);
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(attributes);
 
-        WriteRecord(
-            writer ?? SelectWriter(level),
-            NormalizeCategory(category),
-            level,
-            eventId,
-            message,
-            attributes,
-            exception,
-            state,
-            scopes);
+        WriteRecord(writer ?? SelectWriter(level), NormalizeCategory(category), level, eventId, message, attributes, exception, state, scopes);
     }
 
     internal static string NormalizeCategory(string category)
@@ -491,7 +475,7 @@ internal static class HostStructuredEventWriter
         {
             return null;
         }
-
+        Debugger.Launch();
         if (string.Equals(triggerType, "http", StringComparison.OrdinalIgnoreCase))
         {
             string route = TryGetStringProperty(trigger, "route") ?? metadata.Name;
@@ -528,7 +512,9 @@ internal static class HostStructuredEventWriter
     private static string? TryGetStringProperty(BindingMetadata binding, string propertyName)
         => binding.Properties.TryGetValue(propertyName, out object? value)
             ? Convert.ToString(value, CultureInfo.InvariantCulture)
-            : null;
+            : binding.Raw.TryGetValue(propertyName, out JToken? token)
+                ? token?.ToString()
+                : null;
 
     private static string ToLevelString(LogLevel level) => level switch
     {

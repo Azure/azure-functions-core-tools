@@ -30,6 +30,7 @@ internal sealed class FunctionsHostRunner : IFunctionsHostRunner
                 loggingBuilder.Services.AddSingleton<ILoggerProvider, HostStructuredLoggerProvider>();
                 loggingBuilder.AddDefaultWebJobsFilters<HostStructuredLoggerProvider>(LogLevel.Trace);
                 RawHostLogCaptureProvider.AddIfEnabled(loggingBuilder, context.Configuration);
+
                 loggingBuilder.AddFilter(static (category, logLevel) =>
                 {
                     bool isSharedMemoryWarning = logLevel == LogLevel.Warning

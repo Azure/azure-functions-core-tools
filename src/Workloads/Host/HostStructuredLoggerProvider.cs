@@ -36,13 +36,7 @@ internal sealed class HostStructuredLoggerProvider : ILoggerProvider, ISupportEx
     private TextWriter? SelectWriter(LogLevel level)
         => level >= LogLevel.Error ? _stderr : _stdout;
 
-    private void Write<TState>(
-        string categoryName,
-        LogLevel logLevel,
-        EventId eventId,
-        TState state,
-        Exception? exception,
-        Func<TState, Exception?, string> formatter)
+    private void Write<TState>(string categoryName, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         ArgumentNullException.ThrowIfNull(formatter);
 
@@ -54,23 +48,9 @@ internal sealed class HostStructuredLoggerProvider : ILoggerProvider, ISupportEx
 
         IReadOnlyDictionary<string, object?> stateProperties = CaptureState(state);
         IReadOnlyList<IReadOnlyDictionary<string, object?>> scopes = CaptureScopes();
-        IReadOnlyDictionary<string, object?> attributes = HostLogSemanticEnricher.BuildAttributes(
-            categoryName,
-            eventId,
-            message,
-            stateProperties,
-            scopes);
+        IReadOnlyDictionary<string, object?> attributes = HostLogSemanticEnricher.BuildAttributes(categoryName, eventId, message, stateProperties, scopes);
 
-        HostStructuredEventWriter.WriteLog(
-            categoryName,
-            logLevel,
-            eventId,
-            message,
-            attributes,
-            exception,
-            stateProperties,
-            scopes,
-            SelectWriter(logLevel));
+        HostStructuredEventWriter.WriteLog(categoryName, logLevel, eventId, message, attributes, exception, stateProperties, scopes, SelectWriter(logLevel));
     }
 
     private IReadOnlyList<IReadOnlyDictionary<string, object?>> CaptureScopes()
