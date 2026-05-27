@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 
 namespace Azure.Functions.Cli.Commands.Setup;
@@ -28,7 +29,7 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
             {
                 ["features"] = featurePlan.Features,
                 ["worker_runtimes"] = featurePlan.WorkerRuntimes,
-                ["profiles"] = profileScopes.Select(scope => scope.Profile?.Name).Where(name => name is not null).ToArray(),
+                [CliConfigurationNames.ProfilesKey] = profileScopes.Select(scope => scope.Profile?.Name).Where(name => name is not null).ToArray(),
                 ["source"] = options.Source,
                 ["install_policy"] = ToPolicyText(options.InstallPolicy),
                 ["check"] = options.Check,
