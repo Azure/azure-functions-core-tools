@@ -47,7 +47,7 @@ if [ -z "$VERSION" ]; then
             {
                 split($1, a, ":"); tag = a[2]
                 split($2, b, ":"); pre = b[2]
-                if (tag ~ /^5\./ && (include_pre == "true" || pre == "false")) {
+                if (tag ~ /^v5\./ && (include_pre == "true" || pre == "false")) {
                     print tag; exit
                 }
             }')
@@ -63,7 +63,7 @@ if [ -z "$VERSION" ]; then
                     {
                         split($1, a, ":"); tag = a[2]
                         split($2, b, ":"); pre = b[2]
-                        if (tag ~ /^5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
+                        if (tag ~ /^v5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
                     }')
 
             if [ -n "$PRE_VERSIONS" ]; then

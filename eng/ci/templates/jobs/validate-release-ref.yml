@@ -1,6 +1,6 @@
 parameters:
-- name: skipBranchValidation
-  displayName: Allow non-release source
+- name: publicRelease
+  displayName: Public Release
   type: boolean
   default: false
 
@@ -14,15 +14,16 @@ jobs:
 
   - pwsh: |
       $source = "$(Build.SourceBranch)"
-      if ('${{ parameters.skipBranchValidation }}' -eq 'True')
-      {
-        Write-Host "##vso[task.logissue type=warning]Source branch release validation was skipped (skipBranchValidation enabled)."
-        return
-      }
-
       if (!($source -like "refs/tags/*-v*" || $source -like "refs/tags/v*" || $source -like "refs/heads/release/*" || $source -like "refs/heads/internal/release/*"))
       {
-        Write-Host "##vso[task.logissue type=error]Invalid release branch. Branch must be a tag (v* or *-v*) or a release branch (release/*, internal/release/*)."
-        exit 1
+        if ('${{ parameters.skipBranchValidation }}' -eq 'True')
+        {
+          Write-Host "##vso[task.logissue type=warning]Source branch release validation was skipped (skipBranchValidation enabled)."
+        } 
+        else
+        {
+          Write-Host "##vso[task.logissue type=error]Invalid release branch. Branch must be a tag (v* or *-v*) or a release branch (release/*, internal/release/*)."
+          exit 1
+        }
       }
     displayName: Validate Source Branch

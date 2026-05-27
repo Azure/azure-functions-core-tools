@@ -6,10 +6,6 @@ parameters:
 - name: public
   type: boolean
   default: false
-- name: skipBranchValidation
-  displayName: Allow non-release source
-  type: boolean
-  default: false
 
 resources:
   repositories:
@@ -43,7 +39,7 @@ extends:
       jobs:
       - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
         parameters:
-          skipBranchValidation: ${{ parameters.skipBranchValidation }}
+          skipBranchValidation: ${{ not(parameters.public) }}
 
     - stage: Build
       dependsOn: Validate

@@ -64,12 +64,12 @@ if (-not $Version) {
     Write-Host "Resolving $label..."
     $releases = Invoke-RestMethod -Uri "$apiBase/releases?per_page=50"
     $release = $releases |
-        Where-Object { $_.tag_name -like '5.*' -and ($Prerelease -or -not $_.prerelease) } |
+        Where-Object { $_.tag_name -like 'v5.*' -and ($Prerelease -or -not $_.prerelease) } |
         Select-Object -First 1
 
     if (-not $release) {
         if (-not $Prerelease) {
-            $prereleases = $releases | Where-Object { $_.tag_name -like '5.*' -and $_.prerelease }
+            $prereleases = $releases | Where-Object { $_.tag_name -like 'v5.*' -and $_.prerelease }
             if ($prereleases) {
                 Write-Host 'No stable 5.x release found. Available pre-releases:' -ForegroundColor Red
                 $prereleases | Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.tag_name)" -ForegroundColor Red }

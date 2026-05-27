@@ -3,10 +3,6 @@ parameters:
   displayName: Publish to nuget.org?
   type: boolean
   default: false
-- name: skipBranchValidation
-  displayName: Allow non-release source
-  type: boolean
-  default: false
 
 # Release has no triggers outside of pipeline
 trigger: none
@@ -16,7 +12,6 @@ extends:
   template: /eng/ci/templates/pipelines/release-packages.yml@self
   parameters:
     public: ${{ parameters.public }}
-    skipBranchValidation: ${{ parameters.skipBranchValidation }}
     folder: workloads/dotnet
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj
