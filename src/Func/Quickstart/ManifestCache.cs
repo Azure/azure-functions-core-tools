@@ -70,8 +70,17 @@ internal sealed class ManifestCache(IOptions<QuickstartManifestOptions> options)
 
     private static void AtomicWrite(string destinationPath, string content)
     {
-        string tempPath = destinationPath + ".tmp";
-        File.WriteAllText(tempPath, content);
-        File.Move(tempPath, destinationPath, overwrite: true);
+        string tempPath = $"{destinationPath}.{Path.GetRandomFileName()}.tmp";
+        try
+        {
+            File.WriteAllText(tempPath, content);
+            File.Move(tempPath, destinationPath, overwrite: true);
+        }
+        catch
+        {
+            // Best-effort cleanup of the unique temp file.
+            try { File.Delete(tempPath); } catch { }
+            throw;
+        }
     }
 }

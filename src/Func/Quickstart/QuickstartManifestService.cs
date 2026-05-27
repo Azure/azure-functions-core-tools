@@ -140,11 +140,21 @@ internal sealed class QuickstartManifestService(
                 path);
         }
 
-        List<QuickstartEntry>? entries = DeserializeEntries(json)
-            ?? throw new InvalidOperationException(
-                $"Manifest override file '{path}' is empty or malformed.");
+        string errorMessage = $"Manifest override file '{path}' is empty or malformed.";
 
-        return BuildManifest(entries);
+        List<QuickstartEntry>? entries;
+        try
+        {
+            entries = DeserializeEntries(json);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException(errorMessage, ex);
+        }
+
+        return entries is not null
+            ? BuildManifest(entries)
+            : throw new InvalidOperationException(errorMessage);
     }
 
     private QuickstartManifest BuildManifest(List<QuickstartEntry> entries)
@@ -183,7 +193,11 @@ internal sealed class QuickstartManifestService(
             string.IsNullOrWhiteSpace(entry.RepositoryUrl) ||
             string.IsNullOrWhiteSpace(entry.FolderPath))
         {
-            _logger.LogDebug("Dropping quickstart entry with missing required field: '{Id}'.", entry.Id);
+            string identifier = !string.IsNullOrWhiteSpace(entry.Id) ? entry.Id
+                : !string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.DisplayName
+                : !string.IsNullOrWhiteSpace(entry.RepositoryUrl) ? entry.RepositoryUrl
+                : "(unknown)";
+            _logger.LogDebug("Dropping quickstart entry '{Identifier}': missing required fields.", identifier);
             return false;
         }
 

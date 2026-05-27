@@ -235,6 +235,31 @@ public sealed class QuickstartManifestServiceTests
         await Assert.ThrowsAsync<FileNotFoundException>(() => service.GetManifestAsync());
     }
 
+    [Fact]
+    public async Task GetManifestAsync_Throws_WhenLocalFileContainsMalformedJson()
+    {
+        string tempFile = Path.Combine(Path.GetTempPath(), $"test-manifest-{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(tempFile, "{ not valid json }}}");
+            IManifestCache cache = Substitute.For<IManifestCache>();
+
+            _options.ManifestUrl = tempFile;
+            QuickstartManifestService service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
+
+            InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => service.GetManifestAsync());
+
+            Assert.Contains("empty or malformed", ex.Message);
+            Assert.IsType<System.Text.Json.JsonException>(ex.InnerException);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
     private QuickstartManifestService CreateService(HttpResponseMessage response, IManifestCache cache)
     {
         var handler = new FakeHttpMessageHandler(response);
