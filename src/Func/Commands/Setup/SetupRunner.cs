@@ -44,7 +44,7 @@ internal sealed class SetupRunner(
         var renderer = new SetupRenderer(_interaction, options.OutputMode);
         try
         {
-            SetupFeaturePlan featurePlan = ResolveFeatures(options);
+            SetupFeaturePlan featurePlan = await ResolveFeaturesAsync(options, cancellationToken);
             IReadOnlyList<SetupProfileScope> profileScopes = await ResolveProfileScopesAsync(options, renderer, cancellationToken);
 
             renderer.SetupStarted(options, featurePlan, profileScopes);
@@ -131,10 +131,10 @@ internal sealed class SetupRunner(
         return new ProfileSetupOutcome(failures);
     }
 
-    private SetupFeaturePlan ResolveFeatures(SetupCommandOptions options)
+    private async Task<SetupFeaturePlan> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
         IReadOnlyList<string> requestedFeatures = options.Features.Count == 0
-            ? GetDefaultFeatures(options.WorkingDirectory)
+            ? await GetDefaultFeaturesAsync(options, cancellationToken)
             : options.Features;
 
         if (requestedFeatures.Count == 0)
@@ -185,15 +185,27 @@ internal sealed class SetupRunner(
             includeExtensionBundle);
     }
 
-    private IReadOnlyList<string> GetDefaultFeatures(DirectoryInfo workingDirectory)
+    private async Task<IReadOnlyList<string>> GetDefaultFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
         string? configuredStack = _configurationProvider
-            .GetProjectConfiguration(workingDirectory)
+            .GetProjectConfiguration(options.WorkingDirectory)
             [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"];
 
-        return string.IsNullOrWhiteSpace(configuredStack)
-            ? ["runtime"]
-            : [configuredStack.Trim()];
+        if (!string.IsNullOrWhiteSpace(configuredStack))
+        {
+            return [configuredStack.Trim()];
+        }
+
+        if (!options.NonInteractive && _interaction.IsInteractive)
+        {
+            string picked = await _interaction.PromptForSelectionAsync(
+                "Select a stack to install:",
+                SetupDependency.StackRuntimes,
+                cancellationToken);
+            return [picked];
+        }
+
+        return ["runtime"];
     }
 
     private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(
@@ -281,19 +293,10 @@ internal sealed class SetupRunner(
             VersionRange? workerRange = null;
             profileScope.Profile?.WorkerVersionRanges.TryGetValue(workerRuntime, out workerRange);
             dependencies.Add(SetupDependency.Worker(workerRuntime, workerRange));
-        }
 
-        // Install one stack workload per profile-supported runtime that has a
-        // matching package; unmapped runtimes (java, powershell, custom) skip silently.
-        if (profileScope.Profile?.SupportedRuntimes is { } runtimes)
-        {
-            HashSet<string> addedStacks = new(StringComparer.OrdinalIgnoreCase);
-            foreach (string runtime in runtimes)
+            if (SetupDependency.SupportsStack(workerRuntime))
             {
-                if (SetupDependency.SupportsStack(runtime) && addedStacks.Add(runtime))
-                {
-                    dependencies.Add(SetupDependency.Stack(runtime));
-                }
+                dependencies.Add(SetupDependency.Stack(workerRuntime));
             }
         }
 
@@ -672,6 +675,8 @@ internal sealed record SetupDependency(
 
     public static bool SupportsStack(string runtime)
         => !string.IsNullOrWhiteSpace(runtime) && _runtimeToStackSuffix.ContainsKey(runtime.Trim());
+
+    public static IReadOnlyList<string> StackRuntimes => [.. _runtimeToStackSuffix.Keys];
 
     private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
 

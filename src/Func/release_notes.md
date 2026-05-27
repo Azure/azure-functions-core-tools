@@ -2,5 +2,5 @@
 
 #### Changes
 
-- `func setup` now installs the stack workloads (Node, Python, Go, DotNet) for the active profile's `supportedRuntimes` alongside host, workers, and extension bundles.
+- `func setup` now installs the matching stack workload (Node, Python, Go, DotNet) for the project's worker runtime, detected from `local.settings.json` or selected via prompt / `--features`.
 - <entry>
