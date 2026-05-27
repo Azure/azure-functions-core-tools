@@ -61,7 +61,8 @@ internal sealed class NodeFunctionsProject : FunctionsProject
             await RunAsync(root, ["install"], "npm install", cancellationToken).ConfigureAwait(false);
         }
 
-        if (HasBuildScript(packageJsonPath))
+        // --no-build skips compilation only; npm install above is restore, not build.
+        if (!context.SkipBuild && HasBuildScript(packageJsonPath))
         {
             await RunAsync(root, ["run", "build"], "npm run build", cancellationToken).ConfigureAwait(false);
         }

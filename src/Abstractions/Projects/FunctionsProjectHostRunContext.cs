@@ -23,6 +23,7 @@ public sealed class FunctionsProjectHostRunContext
 
         _startupDirectory = startupDirectory;
         EnvironmentVariables = environmentVariables;
+        SkipBuild = skipBuild;
         WorkerRuntime = workerRuntime;
         SkipBuild = skipBuild;
     }
@@ -38,7 +39,8 @@ public sealed class FunctionsProjectHostRunContext
     /// <summary>
     /// When <c>true</c>, project pre-run hooks should skip optional build/restore steps
     /// (e.g. <c>npm run build</c>, <c>go build</c>) but still perform dependency
-    /// installs required for the host to start.
+    /// installs required for the host to start. Matches the contract of the
+    /// <c>func start --no-build</c> flag.
     /// </summary>
     public bool SkipBuild { get; }
 

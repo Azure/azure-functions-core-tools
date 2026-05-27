@@ -111,6 +111,40 @@ public class NodeFunctionsProjectTests : IDisposable
         Assert.Contains("ENOENT", ex.Message);
     }
 
+    [Fact]
+    public async Task PrepareForHostRun_skips_build_script_when_SkipBuild()
+    {
+        WritePackageJson("""{ "name": "x", "scripts": { "build": "tsc" } }""");
+        Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "node_modules"));
+        var commands = new List<IReadOnlyList<string>>();
+        NodeFunctionsProject project = CreateProject((_, args, _) =>
+        {
+            commands.Add(args);
+            return Task.FromResult((0, string.Empty));
+        });
+
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+
+        Assert.Empty(commands);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_still_runs_install_when_SkipBuild()
+    {
+        WritePackageJson("""{ "name": "x", "scripts": { "build": "tsc" } }""");
+        var commands = new List<IReadOnlyList<string>>();
+        NodeFunctionsProject project = CreateProject((_, args, _) =>
+        {
+            commands.Add(args);
+            return Task.FromResult((0, string.Empty));
+        });
+
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+
+        Assert.Single(commands);
+        Assert.Equal(new[] { "install" }, commands[0]);
+    }
+
     private NodeFunctionsProject CreateProject(Func<string, IReadOnlyList<string>, CancellationToken, Task<(int, string)>> runner)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
@@ -120,9 +154,8 @@ public class NodeFunctionsProjectTests : IDisposable
     private void WritePackageJson(string contents)
         => File.WriteAllText(Path.Combine(_projectDir.FullName, "package.json"), contents);
 
-    private FunctionsProjectHostRunContext CreateContext()
+    private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
         => new(_projectDir, "node", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["FUNCTIONS_WORKER_RUNTIME"] = "node",
-        });
+        }, skipBuild);
 }

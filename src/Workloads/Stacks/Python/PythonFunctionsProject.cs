@@ -49,6 +49,8 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Python has no compile step, so --no-build (context.SkipBuild) is a no-op
+        // here: venv creation and pip install are restore, not build.
         string root = _workingDirectory.Info.FullName;
         string venvPath = Path.Combine(root, VenvFolderName);
 

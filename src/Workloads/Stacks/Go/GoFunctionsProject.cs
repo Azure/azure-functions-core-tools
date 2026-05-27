@@ -47,6 +47,13 @@ internal sealed class GoFunctionsProject : FunctionsProject
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (context.SkipBuild)
+        {
+            // Go projects compile to bin/<module>; with --no-build the user is
+            // asserting that binary already exists. Trust them and skip.
+            return;
+        }
+
         string root = _workingDirectory.Info.FullName;
         string executableName = ResolveExecutableName(root);
         string outputPath = Path.Combine(root, ExecutableRelativeFolder, executableName);

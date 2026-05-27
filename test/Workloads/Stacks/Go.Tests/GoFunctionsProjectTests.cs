@@ -87,9 +87,27 @@ public class GoFunctionsProjectTests : IDisposable
         Assert.Contains("compile error", ex.Message);
     }
 
-    private FunctionsProjectHostRunContext CreateContext()
+    [Fact]
+    public async Task PrepareForHostRun_skips_build_when_SkipBuild()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n");
+        bool invoked = false;
+        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunGoBuild = (_, _, _) =>
+            {
+                invoked = true;
+                return Task.FromResult((0, string.Empty));
+            },
+        };
+
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+
+        Assert.False(invoked);
+    }
+
+    private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
         => new(_projectDir, "go", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["FUNCTIONS_WORKER_RUNTIME"] = "go",
-        });
+        }, skipBuild);
 }
