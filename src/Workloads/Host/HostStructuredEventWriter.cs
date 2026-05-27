@@ -26,6 +26,8 @@ internal static class HostStructuredEventWriter
     private const string FunctionRoute = "function.route";
     private const string FunctionScriptFile = "function.script_file";
     private const string FunctionTriggerType = "function.trigger_type";
+    private const string HostTriggersCategoryPrefix = "Host.Triggers.";
+    private const string WebJobsCategoryPrefix = "Microsoft.Azure.WebJobs.";
 
     private static readonly JsonWriterOptions _writerOptions = new()
     {
@@ -52,7 +54,7 @@ internal static class HostStructuredEventWriter
 
         WriteRecord(
             writer ?? SelectWriter(level),
-            category,
+            NormalizeCategory(category),
             level,
             eventId,
             message,
@@ -60,6 +62,15 @@ internal static class HostStructuredEventWriter
             exception,
             state,
             scopes);
+    }
+
+    internal static string NormalizeCategory(string category)
+    {
+        ReadOnlySpan<char> categorySpan = category.AsSpan();
+        return TryNormalizePrefixedCategory(categorySpan, WebJobsCategoryPrefix.AsSpan(), out ReadOnlySpan<char> normalized)
+            || TryNormalizePrefixedCategory(categorySpan, HostTriggersCategoryPrefix.AsSpan(), out normalized)
+            ? normalized.ToString()
+            : category;
     }
 
     public static void WriteFunctionDiscovered(FunctionMetadata metadata, TextWriter? writer = null)
@@ -169,6 +180,31 @@ internal static class HostStructuredEventWriter
 
     private static TextWriter SelectWriter(LogLevel level)
         => level >= LogLevel.Error ? Console.Error : Console.Out;
+
+    private static bool TryNormalizePrefixedCategory(
+        ReadOnlySpan<char> category,
+        ReadOnlySpan<char> prefix,
+        out ReadOnlySpan<char> normalized)
+    {
+        normalized = default;
+        if (!category.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        ReadOnlySpan<char> suffix = category[prefix.Length..];
+        if (suffix.IsEmpty)
+        {
+            return false;
+        }
+
+        int lastSeparator = suffix.LastIndexOf('.');
+        normalized = lastSeparator >= 0
+            ? suffix[(lastSeparator + 1)..]
+            : suffix;
+
+        return !normalized.IsEmpty;
+    }
 
     private static void WriteEventId(Utf8JsonWriter writer, EventId eventId)
     {
