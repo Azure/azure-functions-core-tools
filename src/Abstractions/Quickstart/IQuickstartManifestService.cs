@@ -14,5 +14,5 @@ public interface IQuickstartManifestService
     /// Returns the current template manifest, fetching from the CDN if the
     /// local cache is stale or absent.
     /// </summary>
-    public Task<IReadOnlyList<QuickstartEntry>> GetManifestAsync(CancellationToken cancellationToken = default);
+    public Task<QuickstartManifest> GetManifestAsync(CancellationToken cancellationToken = default);
 }

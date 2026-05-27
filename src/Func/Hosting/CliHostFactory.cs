@@ -7,6 +7,8 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Http;
+using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workers;
 using Azure.Monitor.OpenTelemetry.Exporter;
@@ -99,11 +101,13 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();
 
+        builder.Services.AddCliHttpDefaults();
         builder.Services.AddBuiltInCommands();
         builder.Services.AddWorkloadStorage();
         builder.Services.AddProfiles();
         builder.Services.AddWorkloadCatalog();
         builder.Services.AddWorkloadInstaller();
+        builder.Services.AddQuickstartManifest();
 
         return builder;
     }
