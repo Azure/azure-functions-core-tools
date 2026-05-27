@@ -16,7 +16,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
     {
         Description =
             "Components to install. Repeatable or comma-separated. One of:\n"
-            + "  node | python | go | dotnet   full dev setup for the language (host, worker if any, stack, bundle)\n"
+            + "  node | python | go | dotnet   full dev setup for the stack\n"
             + "  runtime                       host + extension bundle\n"
             + "  host                          host only",
         Arity = ArgumentArity.OneOrMore,
