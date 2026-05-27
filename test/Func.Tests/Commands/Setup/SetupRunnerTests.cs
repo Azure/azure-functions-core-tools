@@ -94,12 +94,13 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_ConfiguredDotnetIsolated_InstallsWorkerAndSkipsBundle()
+    public async Task RunAsync_ConfiguredDotnetIsolated_InstallsStackAndSkipsWorkerAndBundle()
     {
         string workerPackageId = WorkerPackage("dotnet-isolated");
+        const string dotnetStack = "Azure.Functions.Cli.Workloads.dotnet";
         FakeCatalog catalog = Catalog()
             .WithLatest(_hostPackageId, "4.1.0")
-            .WithLatest(workerPackageId, "1.2.3");
+            .WithLatest(dotnetStack, "1.0.0");
         SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
         {
             [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "dotnet-isolated",
@@ -109,12 +110,21 @@ public sealed class SetupRunnerTests : IDisposable
 
         Assert.Equal(0, result.ExitCode);
         await _installer.Received(1).InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
-            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.2.3"),
+            Arg.Is<string>(id => string.Equals(id, dotnetStack, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
-            Arg.Is(false),
-            Arg.Is(true),
-            Arg.Is(false),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
@@ -277,6 +287,132 @@ public sealed class SetupRunnerTests : IDisposable
 
         Assert.Equal(1, result.ExitCode);
         Assert.Contains(_interaction.Lines, line => line.Contains("does not support runtime 'node'"));
+    }
+
+    [Fact]
+    public async Task RunAsync_FeatureForRuntime_InstallsStackWorkload()
+    {
+        string workerPackageId = WorkerPackage("node");
+        const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
+            .WithLatest(workerPackageId, "1.0.0")
+            .WithLatest(nodeStack, "1.0.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, nodeStack, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_FeatureWithoutStackMapping_DoesNotInstallStack()
+    {
+        string workerPackageId = WorkerPackage("java");
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
+            .WithLatest(workerPackageId, "1.0.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["java"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => id.StartsWith("Azure.Functions.Cli.Workloads.", StringComparison.OrdinalIgnoreCase)
+                && !id.StartsWith("Azure.Functions.Cli.Workloads.Workers.", StringComparison.OrdinalIgnoreCase)
+                && !id.StartsWith("Azure.Functions.Cli.Workloads.Host.", StringComparison.OrdinalIgnoreCase)
+                && !id.StartsWith("Azure.Functions.Cli.Workloads.ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_InteractiveEmptyFolder_PromptsForStackAndInstalls()
+    {
+        string workerPackageId = WorkerPackage("node");
+        const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
+            .WithLatest(workerPackageId, "1.0.0")
+            .WithLatest(nodeStack, "1.0.0");
+
+        InteractiveTestInteractionService interactive = new();
+        SetupRunner runner = new(
+            interactive,
+            _store,
+            catalog,
+            _installer,
+            _profileCatalog,
+            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
+            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
+            _bundleReader);
+
+        SetupRunResult result = await runner.RunAsync(
+            new SetupCommandOptions(
+                new DirectoryInfo(_tempDir),
+                Features: [],
+                ProfileNames: [],
+                Source: null,
+                SetupInstallPolicy.LatestCompatible,
+                IncludePrerelease: false,
+                NonInteractive: false,
+                AssumeYes: true,
+                Check: false,
+                SetupOutputMode.Plain),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(interactive.Lines, line => line.StartsWith("SELECT:", StringComparison.Ordinal));
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, nodeStack, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_NoProfile_DoesNotInstallStackWorkloads()
+    {
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["host"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => id.StartsWith("Azure.Functions.Cli.Workloads.Node", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("Azure.Functions.Cli.Workloads.Python", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("Azure.Functions.Cli.Workloads.Go", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("Azure.Functions.Cli.Workloads.DotNet", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     private SetupRunner CreateRunner(
@@ -445,6 +581,11 @@ public sealed class SetupRunnerTests : IDisposable
         public TOptions Get(string? name) => value;
 
         public IDisposable? OnChange(Action<TOptions, string?> listener) => null;
+    }
+
+    private sealed class InteractiveTestInteractionService : TestInteractionService
+    {
+        public override bool IsInteractive => true;
     }
 
     private sealed class FakeProfileSource(
