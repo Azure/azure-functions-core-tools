@@ -3,6 +3,7 @@
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
@@ -18,6 +19,8 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 {
     internal const string VenvFolderName = ".venv";
     internal const string IsolateWorkerDepsEnvVar = "PYTHON_ISOLATE_WORKER_DEPENDENCIES";
+    internal const string WorkerExecutablePathEnvVar = "languageWorkers:python:defaultExecutablePath";
+    internal const string WorkerRuntimeVersionEnvVar = "FUNCTIONS_WORKER_RUNTIME_VERSION";
     private const string RequirementsFileName = "requirements.txt";
 
     private readonly WorkingDirectory _workingDirectory;
@@ -33,6 +36,8 @@ internal sealed class PythonFunctionsProject : FunctionsProject
     internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunCreateVenv { get; set; } = DefaultRunCreateVenv;
 
     internal Func<string, string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunPipInstall { get; set; } = DefaultRunPipInstall;
+
+    internal Func<string, CancellationToken, Task<string?>> ReadPythonVersion { get; set; } = DefaultReadPythonVersion;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -82,6 +87,21 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 
         // Pin worker deps to the venv so a global site-packages can't shadow it.
         context.EnvironmentVariables[IsolateWorkerDepsEnvVar] = "1";
+
+        // Point the host at the venv interpreter so the worker process actually has
+        // the packages we just pip-installed. Without this, the host falls back to
+        // the system Python and `import <user-dep>` fails at runtime.
+        string venvPython = GetVenvExecutablePath(venvPath, "python");
+        context.EnvironmentVariables[WorkerExecutablePathEnvVar] = venvPython;
+
+        // Tell the host which Python worker to load (3.9 vs 3.13 etc.). Best-effort:
+        // if we can't parse `python --version`, we leave it unset and let the host
+        // fall back to whatever default it would pick.
+        string? majorMinor = await ReadPythonVersion(venvPython, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(majorMinor))
+        {
+            context.EnvironmentVariables[WorkerRuntimeVersionEnvVar] = majorMinor;
+        }
     }
 
     internal static string GetVenvExecutablePath(string venvPath, string executable)
@@ -131,6 +151,48 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         CancellationToken cancellationToken)
     {
         return RunProcessAsync(pipPath, ["install", "-r", requirementsPath], workingDirectory, cancellationToken);
+    }
+
+    private static async Task<string?> DefaultReadPythonVersion(string pythonPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = pythonPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.ArgumentList.Add("--version");
+
+            using var process = Process.Start(psi);
+            if (process is null)
+            {
+                return null;
+            }
+
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (process.ExitCode != 0)
+            {
+                return null;
+            }
+
+            // `python --version` historically printed to stderr (Python 2) and now
+            // prints to stdout (Python 3). Inspect both so we don't miss it.
+            string raw = stdoutTask.Result + " " + stderrTask.Result;
+            Match match = Regex.Match(raw, @"Python\s+(\d+)\.(\d+)");
+            return match.Success ? $"{match.Groups[1].Value}.{match.Groups[2].Value}" : null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     private static async Task<(int ExitCode, string Stderr)> RunProcessAsync(

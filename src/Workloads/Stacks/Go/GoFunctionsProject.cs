@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
@@ -9,15 +10,19 @@ using Azure.Functions.Cli.Workers;
 namespace Azure.Functions.Cli.Workloads.Go;
 
 /// <summary>
-/// Go Functions project. Before the host runs, builds the user's Go module
-/// to <c>bin/&lt;module&gt;</c> so the Go worker can launch it via the
-/// <c>defaultExecutablePath</c> in <c>worker.config.json</c>.
+/// Go Functions project. Before the host runs, validates the Go toolchain and
+/// builds the user's Go module to <c>bin/app</c> (or <c>bin\app.exe</c> on
+/// Windows) so the Go worker can launch it via the <c>defaultExecutablePath</c>
+/// in <c>worker.config.json</c>.
 /// </summary>
 internal sealed class GoFunctionsProject : FunctionsProject
 {
+    // Hardcoded to match the Go worker's worker.config.json `defaultExecutablePath = bin/app`.
+    // Don't derive from go.mod: the worker spawns this exact name regardless of module.
     internal const string DefaultExecutableName = "app";
+    internal const int MinimumGoMajorVersion = 1;
+    internal const int MinimumGoMinorVersion = 24;
     private const string ExecutableRelativeFolder = "bin";
-    private const string GoModFileName = "go.mod";
 
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
@@ -31,6 +36,8 @@ internal sealed class GoFunctionsProject : FunctionsProject
     // Internal seam so tests can stub out the `go build` invocation
     // without spawning real processes.
     internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoBuild { get; set; } = DefaultRunGoBuild;
+
+    internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersion;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -49,13 +56,29 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
         if (context.SkipBuild)
         {
-            // Go projects compile to bin/<module>; with --no-build the user is
+            // Go projects compile to bin/app; with --no-build the user is
             // asserting that binary already exists. Trust them and skip.
             return;
         }
 
+        (int Major, int Minor)? version = await ReadGoVersion(cancellationToken).ConfigureAwait(false);
+        if (version is null)
+        {
+            throw new GracefulException(
+                $"Could not find a Go installation. Go {MinimumGoMajorVersion}.{MinimumGoMinorVersion} or later is required. Install Go from https://go.dev/dl/.",
+                isUserError: true);
+        }
+
+        (int major, int minor) = version.Value;
+        if (major < MinimumGoMajorVersion || (major == MinimumGoMajorVersion && minor < MinimumGoMinorVersion))
+        {
+            throw new GracefulException(
+                $"Go {major}.{minor} is not supported. Go {MinimumGoMajorVersion}.{MinimumGoMinorVersion} or later is required. Update Go from https://go.dev/dl/.",
+                isUserError: true);
+        }
+
         string root = _workingDirectory.Info.FullName;
-        string executableName = ResolveExecutableName(root);
+        string executableName = OperatingSystem.IsWindows() ? DefaultExecutableName + ".exe" : DefaultExecutableName;
         string outputPath = Path.Combine(root, ExecutableRelativeFolder, executableName);
 
         (int exitCode, string stderr) = await RunGoBuild(root, outputPath, cancellationToken).ConfigureAwait(false);
@@ -68,52 +91,48 @@ internal sealed class GoFunctionsProject : FunctionsProject
         }
     }
 
-    internal static string ResolveExecutableName(string projectRoot)
+    private static async Task<(int Major, int Minor)?> DefaultReadGoVersion(CancellationToken cancellationToken)
     {
-        // Match the Go worker's default executable name (bin/app) when we can't
-        // read a module name from go.mod. The worker.config.json hard-codes
-        // bin/app; once that becomes module-aware we can switch to module name.
-        string goModPath = Path.Combine(projectRoot, GoModFileName);
-        if (!File.Exists(goModPath))
-        {
-            return DefaultExecutableName;
-        }
-
         try
         {
-            // The `module` directive is conventionally near the top of go.mod;
-            // bound the scan so a malformed file can't make us read megabytes.
-            int scanned = 0;
-            foreach (string line in File.ReadLines(goModPath))
+            var psi = new ProcessStartInfo("go")
             {
-                if (++scanned > 100)
-                {
-                    break;
-                }
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.ArgumentList.Add("version");
 
-                string trimmed = line.Trim();
-                if (!trimmed.StartsWith("module ", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                string modulePath = trimmed[("module ".Length)..].Trim();
-                if (modulePath.Length == 0)
-                {
-                    return DefaultExecutableName;
-                }
-
-                int lastSlash = modulePath.LastIndexOf('/');
-                string moduleName = lastSlash >= 0 ? modulePath[(lastSlash + 1)..] : modulePath;
-                return string.IsNullOrWhiteSpace(moduleName) ? DefaultExecutableName : moduleName;
+            using var process = Process.Start(psi);
+            if (process is null)
+            {
+                return null;
             }
-        }
-        catch (IOException)
-        {
-            // Falling back keeps the build attempt alive; the worker will surface a clearer error.
-        }
 
-        return DefaultExecutableName;
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (process.ExitCode != 0)
+            {
+                return null;
+            }
+
+            // `go version` prints e.g. "go version go1.24.3 darwin/arm64"
+            Match match = Regex.Match(stdoutTask.Result, @"go(\d+)\.(\d+)");
+            if (!match.Success)
+            {
+                return null;
+            }
+
+            return (int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     private static async Task<(int ExitCode, string Stderr)> DefaultRunGoBuild(

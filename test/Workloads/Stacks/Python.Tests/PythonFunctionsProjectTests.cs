@@ -52,6 +52,7 @@ public class PythonFunctionsProjectTests : IDisposable
                 requirementsUsed = req;
                 return Task.FromResult((0, string.Empty));
             },
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
         };
         FunctionsProjectHostRunContext context = CreateContext();
 
@@ -77,6 +78,7 @@ public class PythonFunctionsProjectTests : IDisposable
                 return Task.FromResult((0, string.Empty));
             },
             RunPipInstall = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
         };
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
@@ -100,6 +102,7 @@ public class PythonFunctionsProjectTests : IDisposable
                 pipRan = true;
                 return Task.FromResult((0, string.Empty));
             },
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
         };
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
@@ -144,6 +147,53 @@ public class PythonFunctionsProjectTests : IDisposable
         Assert.True(ex.IsUserError);
         Assert.Contains("pip install", ex.Message);
         Assert.Contains("invalid spec", ex.Message);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_sets_worker_executable_path_and_runtime_version()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunCreateVenv = (_, path, _) =>
+            {
+                Directory.CreateDirectory(path);
+                return Task.FromResult((0, string.Empty));
+            },
+            RunPipInstall = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.12"),
+        };
+        FunctionsProjectHostRunContext context = CreateContext();
+
+        await project.PrepareForHostRunAsync(context, default);
+
+        string expectedExe = PythonFunctionsProject.GetVenvExecutablePath(
+            Path.Combine(_projectDir.FullName, PythonFunctionsProject.VenvFolderName),
+            "python");
+
+        Assert.Equal(expectedExe, context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar]);
+        Assert.Equal("3.12", context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar]);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_omits_runtime_version_when_python_version_unreadable()
+    {
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunCreateVenv = (_, path, _) =>
+            {
+                Directory.CreateDirectory(path);
+                return Task.FromResult((0, string.Empty));
+            },
+            RunPipInstall = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>(null),
+        };
+        FunctionsProjectHostRunContext context = CreateContext();
+
+        await project.PrepareForHostRunAsync(context, default);
+
+        Assert.False(context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerRuntimeVersionEnvVar));
+        Assert.True(context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerExecutablePathEnvVar));
     }
 
     private FunctionsProjectHostRunContext CreateContext()

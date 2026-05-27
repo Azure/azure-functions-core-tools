@@ -31,53 +31,30 @@ public class GoFunctionsProjectTests : IDisposable
     }
 
     [Fact]
-    public async Task PrepareForHostRun_invokes_go_build_to_module_bin()
+    public async Task PrepareForHostRun_invokes_go_build_to_bin_app()
     {
         File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n\ngo 1.24\n");
 
         string? observedRoot = null;
         string? observedOutput = null;
-        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        GoFunctionsProject project = CreateProject((root, output, _) =>
         {
-            RunGoBuild = (root, output, _) =>
-            {
-                observedRoot = root;
-                observedOutput = output;
-                return Task.FromResult((0, string.Empty));
-            },
-        };
+            observedRoot = root;
+            observedOutput = output;
+            return Task.FromResult((0, string.Empty));
+        });
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
+        string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
         Assert.Equal(_projectDir.FullName, observedRoot);
-        Assert.Equal(Path.Combine(_projectDir.FullName, "bin", "myapp"), observedOutput);
-    }
-
-    [Fact]
-    public async Task PrepareForHostRun_falls_back_to_default_executable_when_no_go_mod()
-    {
-        string? observedOutput = null;
-        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
-        {
-            RunGoBuild = (_, output, _) =>
-            {
-                observedOutput = output;
-                return Task.FromResult((0, string.Empty));
-            },
-        };
-
-        await project.PrepareForHostRunAsync(CreateContext(), default);
-
-        Assert.Equal(Path.Combine(_projectDir.FullName, "bin", GoFunctionsProject.DefaultExecutableName), observedOutput);
+        Assert.Equal(Path.Combine(_projectDir.FullName, "bin", expectedName), observedOutput);
     }
 
     [Fact]
     public async Task PrepareForHostRun_throws_graceful_on_nonzero_exit()
     {
-        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
-        {
-            RunGoBuild = (_, _, _) => Task.FromResult((1, "compile error")),
-        };
+        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((1, "compile error")));
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => project.PrepareForHostRunAsync(CreateContext(), default));
@@ -90,24 +67,51 @@ public class GoFunctionsProjectTests : IDisposable
     [Fact]
     public async Task PrepareForHostRun_skips_build_when_SkipBuild()
     {
-        File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n");
         bool invoked = false;
-        var project = new GoFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        GoFunctionsProject project = CreateProject((_, _, _) =>
         {
-            RunGoBuild = (_, _, _) =>
-            {
-                invoked = true;
-                return Task.FromResult((0, string.Empty));
-            },
-        };
+            invoked = true;
+            return Task.FromResult((0, string.Empty));
+        });
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
 
         Assert.False(invoked);
     }
 
-    private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
-        => new(_projectDir, "go", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    [Fact]
+    public async Task PrepareForHostRun_throws_graceful_when_go_not_installed()
+    {
+        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        project.ReadGoVersion = _ => Task.FromResult<(int, int)?>(null);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => project.PrepareForHostRunAsync(CreateContext(), default));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("Could not find a Go installation", ex.Message);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_throws_graceful_when_go_too_old()
+    {
+        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        project.ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 21));
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => project.PrepareForHostRunAsync(CreateContext(), default));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("Go 1.21 is not supported", ex.Message);
+    }
+
+    private GoFunctionsProject CreateProject(Func<string, string, CancellationToken, Task<(int, string)>> runner)
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-        }, skipBuild);
+            RunGoBuild = runner,
+            ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 24)),
+        };
+
+    private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
+        => new(_projectDir, "go", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);
 }

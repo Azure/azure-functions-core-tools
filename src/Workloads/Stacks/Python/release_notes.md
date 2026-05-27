@@ -4,3 +4,4 @@
 
 - Initial scaffold of the Python workload (entry point + stub project initializer).
 - Create a `.venv` (if missing), run `pip install -r requirements.txt`, and set `PYTHON_ISOLATE_WORKER_DEPENDENCIES=1` before host start.
+- Point the host at the venv interpreter via `languageWorkers:python:defaultExecutablePath` and surface the detected Python major.minor as `FUNCTIONS_WORKER_RUNTIME_VERSION` so the worker sees the user's installed packages.
