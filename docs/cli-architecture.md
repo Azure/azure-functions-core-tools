@@ -64,6 +64,9 @@ func
 │   ├── list [path]       List available profiles
 │   ├── show <name> [path]  Show profile details
 │   └── set <name> [path]   Set the project default profile
+├── quickstart [path]     Scaffold a project from a CDN-hosted template
+│   ├── list [path]       List available quickstart templates
+│   └── info <id> [path]  Show details for a quickstart template
 ├── workload
 │   └── list              List installed workloads
 ├── version (hidden)      Print version info
@@ -316,6 +319,27 @@ At startup, the CLI runs a non-blocking background check for newer v5 releases v
 - **Rate limits**: GitHub allows 60 unauthenticated requests/hour; the 24h cache prevents hitting this
 
 If a newer version is found, a notice is printed after the command completes.
+
+## HTTP Client Defaults
+
+`HttpClientDefaults.AddCliHttpDefaults()` applies a `User-Agent` header (`AzureFunctionsCli/{version} ({os})`) to every `IHttpClientFactory` client. Individual features configure their own timeouts per-client.
+
+## Quickstart Manifest
+
+`func quickstart` scaffolds a project from a CDN-hosted template manifest.
+
+```text
+1. IQuickstartManifestService.GetManifestAsync()
+   ├── Fresh cache (< 24h) → return cached manifest, skip network
+   ├── CDN fetch with ETag/If-None-Match → 200 (cache + return) or 304 (return cached)
+   └── Network failure → stale cache fallback (any age), or error if no cache
+2. QuickstartManifest.Filter(language, resource, iac, search) → filtered entries
+3. Command scaffolds selected template
+```
+
+- **Cache**: `~/.azure-functions/quickstart/` (manifest JSON + ETag metadata), 24h TTL
+- **Validation**: only `v`-prefixed gitRef entries; HTTPS URLs on `github.com` from trusted orgs
+- **Override**: `FUNC_QUICKSTART_MANIFEST_URL` env var replaces CDN URL
 
 ## Init and New Command Flow
 
