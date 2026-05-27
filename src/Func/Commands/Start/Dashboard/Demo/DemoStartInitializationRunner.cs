@@ -4,8 +4,11 @@
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +23,10 @@ internal sealed class DemoStartInitializationRunner(
     IHostJsonBundleSectionReader bundleSectionReader,
     IProfileResolver profileResolver,
     IHostWorkloadResolver hostWorkloadResolver,
+    IFunctionsWorkerResolverFactory workerResolverFactory,
+    IWorkloadCatalog workloadCatalog,
     IWorkloadInstaller workloadInstaller,
+    IInteractionService interaction,
     ILoggerFactory loggerFactory,
     TimeProvider? timeProvider = null)
     : IStartInitializationRunner
@@ -40,18 +46,22 @@ internal sealed class DemoStartInitializationRunner(
     private readonly IHostWorkloadResolver _hostWorkloadResolver = hostWorkloadResolver
         ?? throw new ArgumentNullException(nameof(hostWorkloadResolver));
 
+    private readonly IFunctionsWorkerResolverFactory _workerResolverFactory = workerResolverFactory
+        ?? throw new ArgumentNullException(nameof(workerResolverFactory));
+
+    private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
+
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller
         ?? throw new ArgumentNullException(nameof(workloadInstaller));
+
+    private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
 
     private readonly ILoggerFactory _loggerFactory = loggerFactory
         ?? throw new ArgumentNullException(nameof(loggerFactory));
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
-    public async Task<StartInitializationResult> RunAsync(
-        StartInitializationContext context,
-        IStartInitializationRenderer renderer,
-        CancellationToken cancellationToken)
+    public async Task<StartInitializationResult> RunAsync(StartInitializationContext context, IStartInitializationRenderer renderer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(renderer);
@@ -75,10 +85,8 @@ internal sealed class DemoStartInitializationRunner(
             new ResolveConstraintsInitializationStep(),
             new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
-            new ValidateExtensionBundleInitializationStep(
-                _bundleResolver,
-                _bundleSectionReader,
-                _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
+            new ResolveFunctionsWorkerInitializationStep(_workerResolverFactory,_workloadCatalog,_workloadInstaller,_interaction),
+            new ValidateExtensionBundleInitializationStep(_bundleResolver, _bundleSectionReader, _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
             new PrepareProjectHostRunInitializationStep(),
             new StartHostInitializationStep(_time),
         ];
@@ -86,12 +94,8 @@ internal sealed class DemoStartInitializationRunner(
         return steps;
     }
 
-    private async Task RunStepsAsync(
-        StartInitializationStepCollection steps,
-        StartInitializationContext context,
-        StartInitializationState state,
-        IStartInitializationRenderer renderer,
-        CancellationToken cancellationToken)
+    private async Task RunStepsAsync(StartInitializationStepCollection steps, StartInitializationContext context, StartInitializationState state,
+        IStartInitializationRenderer renderer, CancellationToken cancellationToken)
     {
         Queue<IStartInitializationStep> pending = new(steps);
         while (pending.TryDequeue(out IStartInitializationStep? step))
@@ -111,9 +115,7 @@ internal sealed class DemoStartInitializationRunner(
         }
     }
 
-    private static Queue<IStartInitializationStep> Prepend(
-        IReadOnlyList<IStartInitializationStep> nextSteps,
-        Queue<IStartInitializationStep> pending)
+    private static Queue<IStartInitializationStep> Prepend(IReadOnlyList<IStartInitializationStep> nextSteps, Queue<IStartInitializationStep> pending)
     {
         Queue<IStartInitializationStep> updated = new();
         foreach (IStartInitializationStep nextStep in nextSteps)
@@ -129,13 +131,8 @@ internal sealed class DemoStartInitializationRunner(
         return updated;
     }
 
-    private async Task EmitAsync(
-        IStartInitializationRenderer renderer,
-        StartInitializationEvent initializationEvent,
-        CancellationToken cancellationToken)
-    {
-        await renderer.OnEventAsync(initializationEvent, cancellationToken);
-    }
+    private async Task EmitAsync(IStartInitializationRenderer renderer, StartInitializationEvent initializationEvent, CancellationToken cancellationToken)
+        => await renderer.OnEventAsync(initializationEvent, cancellationToken);
 
     private DateTimeOffset Now() => _time.GetUtcNow();
 }

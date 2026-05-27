@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -24,6 +25,8 @@ internal sealed class StartInitializationState
     public string? HostVersion { get; set; }
 
     public FunctionsProject? Project { get; set; }
+
+    public IFunctionsWorker? Worker { get; set; }
 
     public FunctionsProjectHostRunContext? HostRunContext { get; set; }
 
@@ -44,6 +47,7 @@ internal sealed class StartInitializationState
 
         string hostVersion = HostVersion ?? throw new InvalidOperationException("Host version was not resolved.");
         FunctionsProject project = Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+        IFunctionsWorker worker = Worker ?? throw new InvalidOperationException("Functions worker was not resolved.");
         FunctionsProjectHostRunContext hostRunContext = HostRunContext
             ?? throw new InvalidOperationException("Host run context was not prepared.");
         IHostEventStream eventStream = EventStream ?? throw new InvalidOperationException("Host event stream was not initialized.");
@@ -57,6 +61,7 @@ internal sealed class StartInitializationState
             project.SupportsExtensionBundles,
             BundleVersion,
             project,
+            worker,
             hostRunContext,
             CreateProfileInfo());
     }
