@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
@@ -146,6 +147,52 @@ public class StartInitializationTests : IDisposable
         Assert.Same(result.HostRunContext, project.PreparedContexts.Single());
         Assert.Equal(startupDirectory.FullName, result.HostRunContext.StartupDirectory.FullName);
         Assert.Equal("dotnet-isolated", result.HostRunContext.WorkerRuntime);
+    }
+
+    [Fact]
+    public async Task DemoRunner_PopulatesEnvironmentVariablesForHostRun()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, "local.settings.json"),
+            """{ "Values": { "FROM_LOCAL": "yes", "FUNCTIONS_WORKER_RUNTIME": "stale" } }""");
+
+        string workerDir = Path.Combine(_tempDir, "workers", "node");
+        Directory.CreateDirectory(workerDir);
+        string workerConfigPath = Path.Combine(workerDir, "worker.config.json");
+
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "node",
+            stackDisplayName: "Node.js");
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found package.json"));
+
+        IFunctionsWorkerResolver workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+        workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                FunctionsWorkerId id = callInfo.ArgAt<FunctionsWorkerId>(0);
+                IFunctionsWorker worker = new TestFunctionsWorker(id, id.Value, workerConfigPath, "1.0.0");
+                return FunctionsWorkerResolutionResults.Resolved(worker);
+            });
+        IFunctionsWorkerResolverFactory workerResolverFactory = CreateWorkerResolverFactory(workerResolver);
+
+        var renderer = new RecordingStartInitializationRenderer();
+        var runner = CreateRunner(projectResolver, workerResolverFactory: workerResolverFactory);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 1,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
+
+        IDictionary<string, string> env = result.HostRunContext.EnvironmentVariables;
+        Assert.Equal("yes", env["FROM_LOCAL"]);
+        Assert.Equal("node", env["FUNCTIONS_WORKER_RUNTIME"]);
+        Assert.Equal(workerDir, env["languageWorkers:node:workerDirectory"]);
     }
 
     [Fact]
@@ -622,7 +669,10 @@ public class StartInitializationTests : IDisposable
         => new(
             workingDirectory.Info,
             "dotnet-isolated",
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["FUNCTIONS_WORKER_RUNTIME"] = "dotnet-isolated",
+            });
 
     private static IAnsiConsole CreateInteractiveConsole(TextWriter writer)
         => AnsiConsole.Create(new AnsiConsoleSettings
@@ -674,6 +724,7 @@ public class StartInitializationTests : IDisposable
             workloadCatalog,
             workloadInstaller,
             interaction,
+            new LocalSettingsProvider(),
             NullLoggerFactory.Instance);
     }
 

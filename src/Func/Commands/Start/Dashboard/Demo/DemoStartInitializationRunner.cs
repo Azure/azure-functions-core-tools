@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
@@ -27,6 +28,7 @@ internal sealed class DemoStartInitializationRunner(
     IWorkloadCatalog workloadCatalog,
     IWorkloadInstaller workloadInstaller,
     IInteractionService interaction,
+    ILocalSettingsProvider localSettingsProvider,
     ILoggerFactory loggerFactory,
     TimeProvider? timeProvider = null)
     : IStartInitializationRunner
@@ -55,6 +57,9 @@ internal sealed class DemoStartInitializationRunner(
         ?? throw new ArgumentNullException(nameof(workloadInstaller));
 
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+
+    private readonly ILocalSettingsProvider _localSettingsProvider = localSettingsProvider
+        ?? throw new ArgumentNullException(nameof(localSettingsProvider));
 
     private readonly ILoggerFactory _loggerFactory = loggerFactory
         ?? throw new ArgumentNullException(nameof(loggerFactory));
@@ -85,9 +90,12 @@ internal sealed class DemoStartInitializationRunner(
             new ResolveConstraintsInitializationStep(),
             new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
-            new ResolveFunctionsWorkerInitializationStep(_workerResolverFactory,_workloadCatalog,_workloadInstaller,_interaction),
-            new ValidateExtensionBundleInitializationStep(_bundleResolver, _bundleSectionReader, _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
-            new PrepareProjectHostRunInitializationStep(),
+            new ResolveFunctionsWorkerInitializationStep(_workerResolverFactory, _workloadCatalog, _workloadInstaller, _interaction),
+            new ValidateExtensionBundleInitializationStep(
+                _bundleResolver,
+                _bundleSectionReader,
+                _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
+            new PrepareProjectHostRunInitializationStep(_localSettingsProvider),
             new StartHostInitializationStep(_time),
         ];
 
