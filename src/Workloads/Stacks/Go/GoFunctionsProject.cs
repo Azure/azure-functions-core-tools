@@ -74,8 +74,16 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
         try
         {
+            // The `module` directive is conventionally near the top of go.mod;
+            // bound the scan so a malformed file can't make us read megabytes.
+            int scanned = 0;
             foreach (string line in File.ReadLines(goModPath))
             {
+                if (++scanned > 100)
+                {
+                    break;
+                }
+
                 string trimmed = line.Trim();
                 if (!trimmed.StartsWith("module ", StringComparison.Ordinal))
                 {
@@ -108,7 +116,11 @@ internal sealed class GoFunctionsProject : FunctionsProject
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+            string? outputDir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(outputDir))
+            {
+                Directory.CreateDirectory(outputDir);
+            }
 
             var psi = new ProcessStartInfo("go")
             {
@@ -129,9 +141,13 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 return (-1, "Failed to start 'go' process.");
             }
 
-            string stderr = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            // Drain stdout and stderr in parallel: if either pipe buffer (~64KB) fills
+            // while we're only reading the other, go blocks on write and we deadlock.
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, stderr);
+            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -144,9 +144,13 @@ internal sealed class NodeFunctionsProject : FunctionsProject
                 return (-1, "Failed to start 'npm' process.");
             }
 
-            string stderr = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            // Drain stdout and stderr in parallel: if either pipe buffer (~64KB) fills
+            // while we're only reading the other, npm blocks on write and we deadlock.
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, stderr);
+            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
