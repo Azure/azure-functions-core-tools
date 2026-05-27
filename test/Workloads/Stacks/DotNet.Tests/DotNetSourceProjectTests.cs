@@ -143,9 +143,37 @@ public class DotNetSourceProjectTests : IDisposable
             () => project.PrepareForHostRunAsync(context, cts.Token));
     }
 
+    [Fact]
+    public async Task PrepareForHostRunAsync_skips_build_when_skip_build_is_true()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        File.WriteAllText(projectFile, "<Project></Project>");
+
+        _dotnetCli.RunWithOutputAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns("bin/Debug/net10.0/\n");
+
+        DotNetSourceProject project = CreateProject(projectFile);
+        FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
+
+        await project.PrepareForHostRunAsync(context, default);
+
+        // Build should NOT be called
+        await _dotnetCli.DidNotReceive().RunAsync(
+            Arg.Any<IReadOnlyList<string>>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+
+        // OutputPath query should still be called
+        await _dotnetCli.Received(1).RunWithOutputAsync(
+            Arg.Is<IReadOnlyList<string>>(args => args[0] == "msbuild" && args[2] == "--getProperty:OutputPath"),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+
+        string expectedPath = Path.GetFullPath("bin/Debug/net10.0/", _projectDir.FullName);
+        Assert.Equal(expectedPath, context.StartupDirectory.FullName);
+    }
+
     private DotNetSourceProject CreateProject(string projectFile)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName), projectFile, _dotnetCli);
 
-    private FunctionsProjectHostRunContext CreateHostRunContext()
-        => new(_projectDir, "dotnet", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+    private FunctionsProjectHostRunContext CreateHostRunContext(bool skipBuild = false)
+        => new(_projectDir, "dotnet", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);
 }

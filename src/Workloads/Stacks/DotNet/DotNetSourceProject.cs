@@ -25,7 +25,10 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
             ?? throw new InvalidOperationException(
                 $"Could not determine directory for project file '{ProjectFilePath}'.");
 
-        await BuildAsync(projectDir, cancellationToken);
+        if (!context.SkipBuild)
+        {
+            await BuildAsync(projectDir, cancellationToken);
+        }
 
         DirectoryInfo outputDirectory = await GetOutputDirectoryAsync(projectDir, cancellationToken);
         context.StartupDirectory = outputDirectory;
