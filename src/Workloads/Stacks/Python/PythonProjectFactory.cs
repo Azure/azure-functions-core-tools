@@ -15,32 +15,25 @@ internal sealed class PythonProjectFactory : IFunctionsProjectFactory
 {
     private static readonly FunctionsWorkerId _workerId = new("python");
 
-    public async Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
+    public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(context.WorkerResolver);
         cancellationToken.ThrowIfCancellationRequested();
 
         DirectoryInfo workingDirectory = context.WorkingDirectory.Info;
         if (!workingDirectory.Exists)
         {
-            return NotCreated("directory does not exist");
+            return Task.FromResult(NotCreated("directory does not exist"));
         }
 
         string? reason = TryGetReason(workingDirectory);
         if (reason is null)
         {
-            return NotCreated("no Python project fingerprint found");
+            return Task.FromResult(NotCreated("no Python project fingerprint found"));
         }
 
-        FunctionsWorkerResolutionResult workerResult = await context.WorkerResolver.ResolveWorkerAsync(_workerId, cancellationToken);
-
-        return workerResult switch
-        {
-            FunctionsWorkerResolutionResult.Resolved resolved => Created(new PythonFunctionsProject(context.WorkingDirectory, resolved.Worker), reason),
-            FunctionsWorkerResolutionResult.NotResolved notResolved => Failed(ProjectCreationFailures.WorkerNotResolved(notResolved.Failure)),
-            _ => throw new InvalidOperationException($"Unsupported worker resolution result: {workerResult.GetType().FullName}"),
-        };
+        FunctionsProject project = new PythonFunctionsProject(context.WorkingDirectory);
+        return Task.FromResult(Created(project, reason));
     }
 
     private static string? TryGetReason(DirectoryInfo workingDirectory)
@@ -82,10 +75,10 @@ internal sealed class PythonProjectFactory : IFunctionsProjectFactory
         return null;
     }
 
-    private sealed class PythonFunctionsProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
+    private sealed class PythonFunctionsProject(WorkingDirectory workingDirectory) : FunctionsProject
     {
         private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
+        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(_workerId);
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -95,6 +88,6 @@ internal sealed class PythonProjectFactory : IFunctionsProjectFactory
 
         public override bool SupportsExtensionBundles => true;
 
-        public override IFunctionsWorker Worker => _worker;
+        public override FunctionsWorkerReference WorkerReference => _workerReference;
     }
 }

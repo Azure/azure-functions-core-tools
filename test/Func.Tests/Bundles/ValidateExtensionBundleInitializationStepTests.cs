@@ -245,6 +245,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         var state = new StartInitializationState
         {
             Project = new BundleSupportingTestProject(resolvedProjectDirectory),
+            Worker = new TestFunctionsWorker(new FunctionsWorkerId("node"), "node", "worker.config.json", "1.0.0"),
             ResolvedProfile = profile,
             ProfileName = profile?.Name ?? "none",
         };
@@ -292,6 +293,12 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         public override bool SupportsExtensionBundles => true;
 
-        public override IFunctionsWorker Worker { get; } = Substitute.For<IFunctionsWorker>();
+        public override FunctionsWorkerReference WorkerReference { get; } = FunctionsWorkerReference.FromWorkload("node");
     }
+
+    private sealed record TestFunctionsWorker(
+        FunctionsWorkerId Id,
+        string WorkerRuntime,
+        string WorkerConfigPath,
+        string Version) : IFunctionsWorker;
 }

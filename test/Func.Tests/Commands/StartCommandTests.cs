@@ -306,7 +306,7 @@ public class StartCommandTests : IDisposable
         project ??= new TestFunctionsProject();
         var hostRunContext = new FunctionsProjectHostRunContext(
             project.WorkingDirectory.Info,
-            project.Worker.WorkerRuntime,
+            project.TestWorker.WorkerRuntime,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
         var runInfo = new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET");
@@ -317,6 +317,7 @@ public class StartCommandTests : IDisposable
             BundleRequired: false,
             BundleVersion: null,
             project,
+            project.TestWorker,
             hostRunContext);
     }
 
@@ -332,11 +333,13 @@ public class StartCommandTests : IDisposable
     private sealed class TestFunctionsProject : FunctionsProject
     {
         private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
-        private readonly IFunctionsWorker _worker = new TestFunctionsWorker();
+        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload("dotnet-isolated");
 
         public List<FunctionsProjectHostRunCompletionContext> CompletionContexts { get; } = [];
 
         public Exception? CleanupException { get; init; }
+
+        public IFunctionsWorker TestWorker { get; } = new TestFunctionsWorker();
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -346,7 +349,7 @@ public class StartCommandTests : IDisposable
 
         public override bool SupportsExtensionBundles => false;
 
-        public override IFunctionsWorker Worker => _worker;
+        public override FunctionsWorkerReference WorkerReference => _workerReference;
 
         public override Task CompleteHostRunAsync(
             FunctionsProjectHostRunCompletionContext context,

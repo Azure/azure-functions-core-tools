@@ -20,6 +20,10 @@ internal sealed class DefaultFunctionsWorkerResolverFactory(
     public IFunctionsWorkerResolver Create(IReadOnlyDictionary<string, VersionRange> workerVersionRanges)
     {
         ArgumentNullException.ThrowIfNull(workerVersionRanges);
-        return new DefaultFunctionsWorkerResolver(_workloadProvider, _workerConfigFileSystem, workerVersionRanges);
+
+        return new DefaultFunctionsWorkerResolver(
+            _workloadProvider,
+            _workerConfigFileSystem,
+            workerVersionRanges);
     }
 }

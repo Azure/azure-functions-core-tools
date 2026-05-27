@@ -33,14 +33,15 @@ internal sealed class PrepareProjectHostRunInitializationStep : DemoInitializati
             environmentVariables[name] = value;
         }
 
-        var hostRunContext = new FunctionsProjectHostRunContext(
-            project.WorkingDirectory.Info,
-            project.Worker.WorkerRuntime,
-            environmentVariables);
+        if (context.State.Worker?.WorkerRuntime is null)
+        {
+            throw new InvalidOperationException("Functions worker runtime was not resolved.");
+        }
+
+        var hostRunContext = new FunctionsProjectHostRunContext(project.WorkingDirectory.Info, context.State.Worker.WorkerRuntime, environmentVariables);
 
         await project.PrepareForHostRunAsync(hostRunContext, cancellationToken);
 
-        _ = hostRunContext.WorkerRuntime;
         context.State.HostRunContext = hostRunContext;
 
         return StartInitializationStepResult.Completed(hostRunContext.StartupDirectory.FullName);

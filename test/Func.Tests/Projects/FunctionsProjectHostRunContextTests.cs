@@ -72,7 +72,7 @@ public sealed class FunctionsProjectHostRunContextTests
         var project = new TestFunctionsProject();
         var hostRunContext = new FunctionsProjectHostRunContext(
             project.WorkingDirectory.Info,
-            project.Worker.WorkerRuntime,
+            project.TestWorker.WorkerRuntime,
             new Dictionary<string, string>());
         var completionContext = new FunctionsProjectHostRunCompletionContext(
             hostRunContext,
@@ -85,7 +85,9 @@ public sealed class FunctionsProjectHostRunContextTests
     private sealed class TestFunctionsProject : FunctionsProject
     {
         private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
-        private readonly IFunctionsWorker _worker = new TestFunctionsWorker();
+        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload("dotnet-isolated");
+
+        public IFunctionsWorker TestWorker { get; } = new TestFunctionsWorker();
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -95,7 +97,7 @@ public sealed class FunctionsProjectHostRunContextTests
 
         public override bool SupportsExtensionBundles => false;
 
-        public override IFunctionsWorker Worker => _worker;
+        public override FunctionsWorkerReference WorkerReference => _workerReference;
     }
 
     private sealed class TestFunctionsWorker : IFunctionsWorker

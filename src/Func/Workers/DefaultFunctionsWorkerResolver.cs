@@ -14,7 +14,6 @@ internal sealed class DefaultFunctionsWorkerResolver(
     IWorkerConfigFileSystem workerConfigFileSystem,
     IReadOnlyDictionary<string, VersionRange>? activeWorkerConstraints = null) : IFunctionsWorkerResolver
 {
-    private const string WorkerPackageIdPrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string WorkerConfigFileName = "worker.config.json";
 
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
@@ -79,14 +78,17 @@ internal sealed class DefaultFunctionsWorkerResolver(
 
     private IReadOnlyList<ContentWorkloadInfo> GetWorkerWorkloads(FunctionsWorkerId workerId)
     {
-        string packageId = GetWorkerPackageId(workerId);
-        string alias = GetWorkerInstallAlias(workerId);
+        string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
+        string alias = GetWorkerAlias(workerId);
         List<ContentWorkloadInfo> workloads = [];
         AddDistinct(workloads, _workloadProvider.GetContentWorkloadsByPackageId(packageId));
-        AddDistinct(
-            workloads,
-            _workloadProvider.GetContentWorkloads()
-                .Where(workload => workload.Aliases.Any(candidate => string.Equals(candidate, alias, StringComparison.OrdinalIgnoreCase))));
+
+        IEnumerable<ContentWorkloadInfo> candidates = _workloadProvider.GetContentWorkloads()
+                .Where(workload => workload.Aliases.Any(candidate
+                    => string.Equals(candidate, alias, StringComparison.OrdinalIgnoreCase)));
+
+        AddDistinct(workloads, candidates);
+
         return workloads;
     }
 
@@ -108,15 +110,13 @@ internal sealed class DefaultFunctionsWorkerResolver(
     private static bool SatisfiesConstraint(NuGetVersion version, VersionRange? constraint)
         => constraint is null || constraint.Satisfies(version);
 
-    private static string GetWorkerPackageId(FunctionsWorkerId workerId) => WorkerPackageIdPrefix + workerId.Value;
-
-    private static string GetWorkerInstallAlias(FunctionsWorkerId workerId) => workerId.Value + "-worker";
+    private static string GetWorkerAlias(FunctionsWorkerId workerId) => workerId.Value + "-worker";
 
     private static FunctionsWorkerResolutionResult NotInstalled(FunctionsWorkerId workerId)
         => NotInstalledResult(
             workerId,
             $"No installed Azure Functions worker was found for '{workerId.Value}'. "
-            + $"Run 'func workload install {GetWorkerInstallAlias(workerId)}' to install it.");
+            + $"Run '{FunctionsWorkerWorkloadPackages.GetInstallCommand(workerId)}' to install it.");
 
     private static FunctionsWorkerResolutionResult NotInstalledResult(FunctionsWorkerId workerId, string message)
     {
@@ -135,7 +135,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
                     workerId,
                     versionConstraint: null,
                     $"Installed Azure Functions worker workloads for '{workerId.Value}' do not include a valid package version. "
-                    + $"Run 'func workload install {GetWorkerInstallAlias(workerId)} --force' to repair the install.");
+                    + $"Run '{FunctionsWorkerWorkloadPackages.GetRepairCommand(workerId)}' to repair the install.");
 
             return FunctionsWorkerResolutionResults.NotResolved(invalidVersionFailure);
         }
@@ -145,7 +145,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
             workerId,
             rangeText,
             $"Installed Azure Functions worker workloads for '{workerId.Value}' do not satisfy version range '{rangeText}'. "
-            + $"Run 'func workload install {GetWorkerInstallAlias(workerId)}' to install a compatible worker.");
+            + $"Run '{FunctionsWorkerWorkloadPackages.GetInstallCommand(workerId)}' to install a compatible worker.");
 
         return FunctionsWorkerResolutionResults.NotResolved(failure);
     }
@@ -162,7 +162,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
             workerConfigPath,
             $"Installed Azure Functions worker '{workerId.Value}' package '{selected.Workload.PackageId}' "
             + $"{selected.Version.ToNormalizedString()} is missing '{workerConfigPath}'. "
-            + $"Run 'func workload install {GetWorkerInstallAlias(workerId)} --force' to repair the install.");
+            + $"Run '{FunctionsWorkerWorkloadPackages.GetRepairCommand(workerId)}' to repair the install.");
 
         return FunctionsWorkerResolutionResults.NotResolved(failure);
     }
@@ -171,9 +171,5 @@ internal sealed class DefaultFunctionsWorkerResolver(
 
     private sealed record InstalledWorkerCandidate(ContentWorkloadInfo Workload, NuGetVersion Version);
 
-    private sealed record ResolvedFunctionsWorker(
-        FunctionsWorkerId Id,
-        string WorkerRuntime,
-        string WorkerConfigPath,
-        string Version) : IFunctionsWorker;
+    private sealed record ResolvedFunctionsWorker(FunctionsWorkerId Id, string WorkerRuntime, string WorkerConfigPath, string Version) : IFunctionsWorker;
 }

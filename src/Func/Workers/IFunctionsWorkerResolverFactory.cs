@@ -6,7 +6,7 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Workers;
 
 /// <summary>
-/// Creates worker resolvers for one project-resolution operation.
+/// Creates worker resolvers for one operation.
 /// </summary>
 internal interface IFunctionsWorkerResolverFactory
 {

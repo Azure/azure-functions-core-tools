@@ -20,7 +20,7 @@ internal sealed class DemoProjectFactory : IFunctionsProjectFactory
     private sealed class DemoFunctionsProject(WorkingDirectory workingDirectory) : FunctionsProject
     {
         private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        private readonly IFunctionsWorker _worker = new DotnetFunctionWorker();
+        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkerInfo(".NET", "dotnet-isolated", @"c:\test\worker.config.json", "1.0.0");
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -30,17 +30,6 @@ internal sealed class DemoProjectFactory : IFunctionsProjectFactory
 
         public override bool SupportsExtensionBundles => false;
 
-        public override IFunctionsWorker Worker => _worker;
-    }
-
-    private sealed class DotnetFunctionWorker : IFunctionsWorker
-    {
-        public FunctionsWorkerId Id => new("dotnet-isolated");
-
-        public string WorkerRuntime => "dotnet-isolated";
-
-        public string WorkerConfigPath => @"c:\\demo\\worker.config.json";
-
-        public string Version => "1.0.0";
+        public override FunctionsWorkerReference WorkerReference => _workerReference;
     }
 }
