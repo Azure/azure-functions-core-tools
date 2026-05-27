@@ -312,7 +312,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                     else
                     {
-                        await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings);
+                        await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings, workerRuntime);
                     }
                 }
                 catch (HttpRequestException ex)
@@ -677,7 +677,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings)
+        private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings, WorkerRuntime workerRuntime)
         {
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
@@ -697,7 +697,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, GlobalCoreToolsSettings.CurrentWorkerRuntime, ignoreParser, AdditionalPackages);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, workerRuntime, ignoreParser, AdditionalPackages);
 
             bool shouldSyncTriggers = true;
             bool shouldDeferPublishZipDeploy = false;

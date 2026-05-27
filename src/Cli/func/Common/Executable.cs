@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Common
         // Cap the post-exit drain (see RunAsync) so a stuck async output handler can never
         // hold up the caller indefinitely. The drain only flushes already-buffered stdout/stderr
         // bytes, which normally completes in milliseconds; 5s is a defensive safety net.
-        private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromMilliseconds(5000);
+        private static readonly TimeSpan _outputDrainTimeout = TimeSpan.FromMilliseconds(5000);
 
         private readonly string _arguments;
         private readonly string _exeName;
@@ -170,7 +170,7 @@ namespace Azure.Functions.Cli.Common
         {
             try
             {
-                using var cts = new CancellationTokenSource(OutputDrainTimeout);
+                using var cts = new CancellationTokenSource(_outputDrainTimeout);
                 await Process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -178,7 +178,7 @@ namespace Azure.Functions.Cli.Common
                 if (GlobalCoreToolsSettings.IsVerbose)
                 {
                     Colors.Net.ColoredConsole.WriteLine(VerboseColor(
-                        $"Output drain for '{_exeName}' did not complete within {OutputDrainTimeout.TotalMilliseconds}ms; returning exit code with possibly truncated output."));
+                        $"Output drain for '{_exeName}' did not complete within {_outputDrainTimeout.TotalMilliseconds}ms; returning exit code with possibly truncated output."));
                 }
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)

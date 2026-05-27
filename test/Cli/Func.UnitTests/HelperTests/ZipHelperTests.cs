@@ -236,7 +236,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             Directory.CreateDirectory(dir);
             Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
 
-            var previousRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             try
             {
                 File.WriteAllText(Path.Combine(dir, "host.json"), "{}");
@@ -246,8 +245,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 File.WriteAllText(Path.Combine(dir, "main.go"), "package main\nfunc main() {}\n");
                 File.WriteAllText(Path.Combine(dir, "go.mod"), "module example.com/test\n");
                 File.WriteAllText(Path.Combine(dir, "local.settings.json"), "{}");
-
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
 
                 var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: false, WorkerRuntime.Go);
 
@@ -264,7 +261,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             }
             finally
             {
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = previousRuntime;
                 Directory.Delete(dir, recursive: true);
             }
         }

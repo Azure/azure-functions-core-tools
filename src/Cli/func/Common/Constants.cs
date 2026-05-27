@@ -21,10 +21,10 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
 
-        // CLI-only preview opt-in for the Go worker. Read from env first, then local.settings.json
-        // (Values). Never sent to the host or to Azure (the CLI strips local.settings on publish).
-        // Intentionally Go-specific and short-lived: when the platform exposes a first-class
-        // mapping for "native" → concrete language, this flag and its consumers should be removed.
+        // CLI-only disambiguator for FUNCTIONS_WORKER_RUNTIME=native projects. Read from env
+        // first, then local.settings.json (Values). Never sent to the host or to Azure (the CLI
+        // strips local.settings on publish). Today only "go" is recognized; new native languages
+        // (rust, c++, etc.) extend this same value space rather than introducing parallel flags.
         public const string FunctionsCliNativeLanguage = "FUNCTIONS_CLI_NATIVE_LANGUAGE";
         public const string RequirementsTxt = "requirements.txt";
         public const string PythonGettingStarted = "getting_started.md";

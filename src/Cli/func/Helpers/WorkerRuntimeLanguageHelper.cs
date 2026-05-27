@@ -193,10 +193,10 @@ namespace Azure.Functions.Cli.Helpers
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
-            // Preview opt-in: FUNCTIONS_CLI_NATIVE_LANGUAGE lets a project declare its native language
-            // without forcing the resolver to scan the working directory for go.mod. Env var
-            // wins; local.settings.json is the secondary source. See TryResolveGoPreviewFlag.
-            if (TryResolveGoPreviewFlag(secretsManager, refreshSecrets))
+            // FUNCTIONS_CLI_NATIVE_LANGUAGE lets a project declare its native language without
+            // forcing the resolver to scan the working directory for go.mod. Env var wins;
+            // local.settings.json is the secondary source. See TryResolveNativeLanguageAsGo.
+            if (TryResolveNativeLanguageAsGo(secretsManager, refreshSecrets))
             {
                 if (GlobalCoreToolsSettings.IsVerbose)
                 {
@@ -295,7 +295,7 @@ namespace Azure.Functions.Cli.Helpers
         /// process environment or in <c>local.settings.json</c>. Env var wins; local.settings.json
         /// access failures (e.g. command run from outside a project root) are treated as "not set".
         /// </summary>
-        private static bool TryResolveGoPreviewFlag(ISecretsManager secretsManager, bool refreshSecrets = false)
+        private static bool TryResolveNativeLanguageAsGo(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
             var envValue = Environment.GetEnvironmentVariable(Constants.FunctionsCliNativeLanguage);
             if (!string.IsNullOrEmpty(envValue) && envValue.Equals("go", StringComparison.OrdinalIgnoreCase))

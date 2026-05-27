@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         private readonly ISecretsManager _secretsManager;
 
         public NodePackSubcommandAction(ISecretsManager secretsManager)
+            : base(WorkerRuntime.Node)
         {
             _secretsManager = secretsManager;
         }
@@ -67,7 +68,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         protected override Task PackFunctionAsync(string packingRoot, string outputPath, PackOptions options)
         {
-            return PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, WorkerRuntime.Node, TelemetryCommandEvents);
+            return PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, Runtime, TelemetryCommandEvents);
         }
 
         private async Task RunNodeJsBuildProcess(string functionAppRoot)
