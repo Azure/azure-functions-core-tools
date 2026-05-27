@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Catalog;
-using Microsoft.Extensions.Options;
 using Xunit;
 using PackageSource = NuGet.Configuration.PackageSource;
 
@@ -75,7 +74,6 @@ public sealed class PackageSourceProviderTests
 
     private static PackageSourceProvider NewProvider(string? source = null)
     {
-        var options = Options.Create(new WorkloadCatalogOptions { Source = source });
-        return new PackageSourceProvider(options);
+        return new PackageSourceProvider(new WorkloadCatalogOptions(source));
     }
 }

@@ -88,10 +88,10 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
                     writer.WriteString("profile", completed.Result.RunInfo.ProfileName);
                     writer.WriteString("stack", completed.Result.RunInfo.StackName);
                     writer.WriteString("host_version", completed.Result.HostVersion);
-                    writer.WriteString("worker_runtime", completed.Result.Project.Worker.WorkerRuntime);
-                    if (!string.IsNullOrWhiteSpace(completed.Result.Project.Worker.Version))
+                    writer.WriteString("worker_runtime", completed.Result.Worker.WorkerRuntime);
+                    if (!string.IsNullOrWhiteSpace(completed.Result.Worker.Version))
                     {
-                        writer.WriteString("worker_version", completed.Result.Project.Worker.Version);
+                        writer.WriteString("worker_version", completed.Result.Worker.Version);
                     }
 
                     writer.WriteBoolean("bundle_required", completed.Result.BundleRequired);
@@ -136,7 +136,6 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
         {
             writer.WriteString("extension_bundle_version_range", profile.ExtensionBundleVersionRange);
         }
-        WriteStringDictionary(writer, "worker_version_ranges", profile.WorkerVersionRanges);
         WriteStringDictionary(writer, "worker_version_ranges", profile.WorkerVersionRanges);
         if (profile.SupportedRuntimes is { Count: > 0 })
         {

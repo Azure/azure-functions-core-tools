@@ -15,7 +15,8 @@ public sealed class FunctionsProjectHostRunContext
     public FunctionsProjectHostRunContext(
         DirectoryInfo startupDirectory,
         string workerRuntime,
-        IDictionary<string, string> environmentVariables)
+        IDictionary<string, string> environmentVariables,
+        bool skipBuild = false)
     {
         ArgumentNullException.ThrowIfNull(startupDirectory);
         ArgumentNullException.ThrowIfNull(environmentVariables);
@@ -23,6 +24,7 @@ public sealed class FunctionsProjectHostRunContext
         _startupDirectory = startupDirectory;
         EnvironmentVariables = environmentVariables;
         WorkerRuntime = workerRuntime;
+        SkipBuild = skipBuild;
     }
 
     public DirectoryInfo StartupDirectory
@@ -32,6 +34,14 @@ public sealed class FunctionsProjectHostRunContext
     }
 
     public IDictionary<string, string> EnvironmentVariables { get; }
+
+    /// <summary>
+    /// When <c>true</c>, project pre-run hooks should skip optional build/restore steps
+    /// (e.g. <c>npm run build</c>, <c>go build</c>) but still perform dependency
+    /// installs required for the host to start. Matches the contract of the
+    /// <c>func start --no-build</c> flag.
+    /// </summary>
+    public bool SkipBuild { get; }
 
     public string WorkerRuntime
     {

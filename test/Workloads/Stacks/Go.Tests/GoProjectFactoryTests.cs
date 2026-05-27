@@ -91,7 +91,8 @@ public class GoProjectFactoryTests : IDisposable
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
         Assert.Equal("go", created.Project.StackName);
         Assert.Equal("Go", created.Project.StackDisplayName);
-        Assert.Equal("native", created.Project.Worker.WorkerRuntime);
+        IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
+        Assert.Equal("native", worker.WorkerRuntime);
         Assert.NotNull(created.Reason);
     }
 
@@ -119,7 +120,7 @@ public class GoProjectFactoryTests : IDisposable
     }
 
     [Fact]
-    public async Task MatchingDirectory_WhenWorkerNotResolved_Fails()
+    public async Task MatchingDirectory_WhenWorkerNotResolved_WorkerReferenceReportsFailure()
     {
         WriteFile("go.mod", "module example");
         FunctionsWorkerResolutionFailure failure = FunctionsWorkerResolutionFailures.NotInstalled(
@@ -130,10 +131,12 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Failed failed = Assert.IsType<ProjectCreationResult.Failed>(result);
-        ProjectCreationFailure.WorkerNotResolved workerFailure =
-            Assert.IsType<ProjectCreationFailure.WorkerNotResolved>(failed.Failure);
-        Assert.Same(failure, workerFailure.WorkerFailure);
+        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
+        FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
+            new FunctionsWorkerResolutionContext(_workerResolver),
+            default);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(workerResult);
+        Assert.Same(failure, notResolved.Failure);
     }
 
     [Fact]
@@ -147,7 +150,16 @@ public class GoProjectFactoryTests : IDisposable
         => File.WriteAllText(Path.Combine(_projectDir.FullName, name), contents);
 
     private ProjectCreationContext CreateContext()
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), _workerResolver);
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName));
+
+    private async Task<IFunctionsWorker> ResolveWorkerAsync(FunctionsProject project)
+    {
+        FunctionsWorkerResolutionResult result = await project.WorkerReference.ResolveWorkerAsync(
+            new FunctionsWorkerResolutionContext(_workerResolver),
+            default);
+        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        return resolved.Worker;
+    }
 
     private static IFunctionsWorker CreateWorker(string workerId, string workerRuntime)
         => new TestFunctionsWorker(new FunctionsWorkerId(workerId), workerRuntime, "worker.config.json", "1.0.0");

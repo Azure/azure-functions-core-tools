@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -17,5 +18,6 @@ internal sealed record StartInitializationResult(
     bool BundleRequired,
     string? BundleVersion,
     FunctionsProject Project,
+    IFunctionsWorker Worker,
     FunctionsProjectHostRunContext HostRunContext,
     StartInitializationProfileInfo? Profile = null);

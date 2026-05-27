@@ -19,7 +19,7 @@ public abstract class FunctionsProject
 
     public abstract bool SupportsExtensionBundles { get; }
 
-    public abstract IFunctionsWorker Worker { get; }
+    public abstract FunctionsWorkerReference WorkerReference { get; }
 
     public virtual Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {

@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Projects;
@@ -10,22 +9,17 @@ namespace Azure.Functions.Cli.Projects;
 /// Default aggregate project resolver.
 /// </summary>
 internal sealed class FunctionsProjectResolver(
-    IEnumerable<WorkloadProjectFactoryRegistration> factories,
-    IFunctionsWorkerResolverFactory workerResolverFactory)
+    IEnumerable<WorkloadProjectFactoryRegistration> factories)
     : IFunctionsProjectResolver
 {
     private readonly IReadOnlyList<WorkloadProjectFactoryRegistration> _factories =
         (factories ?? throw new ArgumentNullException(nameof(factories))).ToList();
 
-    private readonly IFunctionsWorkerResolverFactory _workerResolverFactory = workerResolverFactory
-        ?? throw new ArgumentNullException(nameof(workerResolverFactory));
-
     public async Task<ProjectResolutionResult> ResolveProjectAsync(ProjectResolutionContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        IFunctionsWorkerResolver workerResolver = _workerResolverFactory.Create(context.WorkerVersionRanges);
-        var creationContext = new ProjectCreationContext(context.WorkingDirectory, workerResolver);
+        var creationContext = new ProjectCreationContext(context.WorkingDirectory);
         foreach (WorkloadProjectFactoryRegistration registration in _factories)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -46,17 +40,5 @@ internal sealed class FunctionsProjectResolver(
 
         return ProjectResolutionResults.NotResolved(
             "No installed workload recognized this directory as an Azure Functions project.");
-    }
-
-    public class DotnetWorkload : Workload
-    {
-        public override string DisplayName => ".NET Workload";
-
-        public override string Description => "Demo .NET Workload";
-
-        public override void Configure(FunctionsCliBuilder builder)
-        {
-           
-        }
     }
 }

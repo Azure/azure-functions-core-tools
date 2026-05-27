@@ -317,7 +317,6 @@ public class QuickstartScaffolderTests : IDisposable
             ShortDescription: "A test template",
             LongDescription: "A test template for unit tests",
             WhatsIncluded: ["HTTP trigger", "Bicep files"],
-            Tags: ["test"],
             Priority: 1);
     }
 }

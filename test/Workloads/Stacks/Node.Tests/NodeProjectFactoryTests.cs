@@ -97,7 +97,8 @@ public class NodeProjectFactoryTests : IDisposable
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
         Assert.Equal("node", created.Project.StackName);
         Assert.Equal("Node.js", created.Project.StackDisplayName);
-        Assert.Equal("node", created.Project.Worker.WorkerRuntime);
+        IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
+        Assert.Equal("node", worker.WorkerRuntime);
         Assert.NotNull(created.Reason);
     }
 
@@ -160,7 +161,7 @@ public class NodeProjectFactoryTests : IDisposable
     }
 
     [Fact]
-    public async Task MatchingDirectory_WhenWorkerNotResolved_Fails()
+    public async Task MatchingDirectory_WhenWorkerNotResolved_WorkerReferenceReportsFailure()
     {
         WriteFile("package.json", "{}");
         FunctionsWorkerResolutionFailure failure = FunctionsWorkerResolutionFailures.NotInstalled(
@@ -171,10 +172,12 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Failed failed = Assert.IsType<ProjectCreationResult.Failed>(result);
-        ProjectCreationFailure.WorkerNotResolved workerFailure =
-            Assert.IsType<ProjectCreationFailure.WorkerNotResolved>(failed.Failure);
-        Assert.Same(failure, workerFailure.WorkerFailure);
+        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
+        FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
+            new FunctionsWorkerResolutionContext(_workerResolver),
+            default);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(workerResult);
+        Assert.Same(failure, notResolved.Failure);
     }
 
     [Fact]
@@ -188,7 +191,16 @@ public class NodeProjectFactoryTests : IDisposable
         => File.WriteAllText(Path.Combine(_projectDir.FullName, name), contents);
 
     private ProjectCreationContext CreateContext(DirectoryInfo? directory = null)
-        => new(WorkingDirectory.FromExplicit((directory ?? _projectDir).FullName), _workerResolver);
+        => new(WorkingDirectory.FromExplicit((directory ?? _projectDir).FullName));
+
+    private async Task<IFunctionsWorker> ResolveWorkerAsync(FunctionsProject project)
+    {
+        FunctionsWorkerResolutionResult result = await project.WorkerReference.ResolveWorkerAsync(
+            new FunctionsWorkerResolutionContext(_workerResolver),
+            default);
+        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        return resolved.Worker;
+    }
 
     private static IFunctionsWorker CreateWorker(string workerId, string workerRuntime)
         => new TestFunctionsWorker(new FunctionsWorkerId(workerId), workerRuntime, "worker.config.json", "1.0.0");
