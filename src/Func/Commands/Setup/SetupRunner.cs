@@ -622,8 +622,8 @@ internal sealed record SetupDependency(
 
     // TODO: this should not be hardcoded in the CLI; discover the stack package
     // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
-    // require a CLI release. Stacks not in this set (java, powershell, custom,
-    // dotnet in-proc) skip silently today.
+    // require a CLI release. Stacks not in this set (java, powershell, custom)
+    // skip silently today.
     private static readonly HashSet<string> _stacks =
         new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet-isolated" };
 
