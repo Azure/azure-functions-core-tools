@@ -272,17 +272,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
             if (!string.IsNullOrWhiteSpace(stack))
             {
-                stackConfig[nameof(StackOptions.Runtime)] = stack;
+                stackConfig[CliConfigurationNames.StackRuntimeKey] = stack;
             }
             if (!string.IsNullOrWhiteSpace(language))
             {
-                stackConfig[nameof(StackOptions.Language)] = language;
+                stackConfig[CliConfigurationNames.StackLanguageKey] = language;
             }
 
             var payload = new Dictionary<string, object>(StringComparer.Ordinal);
             if (stackConfig.Count > 0)
             {
-                payload[StackOptions.SectionName] = stackConfig;
+                payload[CliConfigurationNames.StackSectionName] = stackConfig;
             }
 
             string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions

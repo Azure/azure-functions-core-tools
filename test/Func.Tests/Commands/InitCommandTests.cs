@@ -95,9 +95,9 @@ public class InitCommandTests
             Assert.True(File.Exists(configPath), $"Expected .func/config.json at {configPath}.");
 
             using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
-            JsonElement stack = doc.RootElement.GetProperty("Stack");
-            Assert.Equal("python", stack.GetProperty("Runtime").GetString());
-            Assert.Equal("python", stack.GetProperty("Language").GetString());
+            JsonElement stack = doc.RootElement.GetProperty("stack");
+            Assert.Equal("python", stack.GetProperty("runtime").GetString());
+            Assert.Equal("python", stack.GetProperty("language").GetString());
         }
         finally
         {
@@ -152,9 +152,9 @@ public class InitCommandTests
 
             string configPath = Path.Combine(newDir, ".func", "config.json");
             using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
-            JsonElement stack = doc.RootElement.GetProperty("Stack");
-            Assert.Equal("dotnet", stack.GetProperty("Runtime").GetString());
-            Assert.False(stack.TryGetProperty("Language", out _));
+            JsonElement stack = doc.RootElement.GetProperty("stack");
+            Assert.Equal("dotnet", stack.GetProperty("runtime").GetString());
+            Assert.False(stack.TryGetProperty("language", out _));
         }
         finally
         {
@@ -450,22 +450,22 @@ public class InitCommandTests
         using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
         if (expectedStack is null)
         {
-            Assert.False(doc.RootElement.TryGetProperty("Stack", out _));
+            Assert.False(doc.RootElement.TryGetProperty("stack", out _));
         }
         else
         {
-            Assert.Equal(expectedStack, doc.RootElement.GetProperty("Stack").GetProperty("Runtime").GetString());
+            Assert.Equal(expectedStack, doc.RootElement.GetProperty("stack").GetProperty("runtime").GetString());
         }
         if (expectedLanguage is null)
         {
-            if (doc.RootElement.TryGetProperty("Stack", out JsonElement stack))
+            if (doc.RootElement.TryGetProperty("stack", out JsonElement stack))
             {
-                Assert.False(stack.TryGetProperty("Language", out _));
+                Assert.False(stack.TryGetProperty("language", out _));
             }
         }
         else
         {
-            Assert.Equal(expectedLanguage, doc.RootElement.GetProperty("Stack").GetProperty("Language").GetString());
+            Assert.Equal(expectedLanguage, doc.RootElement.GetProperty("stack").GetProperty("language").GetString());
         }
     }
 

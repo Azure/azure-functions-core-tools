@@ -14,6 +14,7 @@
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <!-- The pinned WebHost package still exposes IWebHost; remove this when the package exposes the IHost-based entry point from dev. -->
     <NoWarn>$(NoWarn);NU5128;NU5100;ASPDEPR008</NoWarn>
+    <PackAllRids>$(CI)</PackAllRids>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,9 +33,13 @@
     <None Include="workload.json" Pack="true" PackagePath="/" />
   </ItemGroup>
 
-  <!-- When calling 'dotnet pack' without a runtime identifier, we will fan out to a per-RID pack. -->
-  <Import Project="Build.Inner.targets" Condition="'$(RuntimeIdentifier)' != ''" />
+  <!--
+    In CI, we want to build and pack the host workload for each runtime identifier.
+    We use 'PackAllRids' as an intermediate property so local dev can still pack with -p:PackAllRids=true
+    (and not needing to set the full CI=true).
+  -->
+  <Import Project="Build.Inner.targets" Condition="$(PackAllRids) AND '$(RuntimeIdentifier)' != ''" />
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
-  <Import Project="Build.Outer.targets" Condition="'$(RuntimeIdentifier)' == '' AND '$(IsInnerBuild)' != 'true'" />
+  <Import Project="Build.Outer.targets" Condition="$(PackAllRids) AND '$(RuntimeIdentifier)' == ''" />
 
 </Project>

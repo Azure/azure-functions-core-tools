@@ -174,8 +174,8 @@ public sealed class ProfileCommandTests : IDisposable
         WriteProjectConfig(
             """
             {
-              "Stack": {
-                "Runtime": "node"
+              "stack": {
+                "runtime": "node"
               },
               "profiles": [ "flex" ],
               "defaultProfile": "flex"
@@ -189,7 +189,7 @@ public sealed class ProfileCommandTests : IDisposable
         Assert.Equal(0, exit);
         using JsonDocument document = ReadProjectConfig();
         JsonElement root = document.RootElement;
-        Assert.Equal("node", root.GetProperty("Stack").GetProperty("Runtime").GetString());
+        Assert.Equal("node", root.GetProperty("stack").GetProperty("runtime").GetString());
         Assert.Equal("staging", root.GetProperty("defaultProfile").GetString());
         string?[] profiles = [.. root.GetProperty("profiles").EnumerateArray().Select(p => p.GetString())];
         string?[] expectedProfiles = ["flex", "staging"];
