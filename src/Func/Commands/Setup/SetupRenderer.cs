@@ -95,6 +95,10 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
                 _interaction.WriteWarning(result.Message);
                 break;
 
+            case SetupDependencyStatus.Skipped:
+                _interaction.WriteWarning(result.Message);
+                break;
+
             case SetupDependencyStatus.Failed:
                 _interaction.WriteError(result.Message);
                 break;
@@ -213,6 +217,7 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
             SetupDependencyStatus.Satisfied => "satisfied",
             SetupDependencyStatus.Installed => "installed",
             SetupDependencyStatus.SatisfiedFallback => "satisfied-fallback",
+            SetupDependencyStatus.Skipped => "skipped",
             SetupDependencyStatus.Failed => "failed",
             _ => status.ToString(),
         };

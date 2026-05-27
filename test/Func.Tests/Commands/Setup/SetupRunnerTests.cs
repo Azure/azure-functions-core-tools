@@ -94,13 +94,12 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_ConfiguredDotnetIsolated_InstallsWorkerAndStackAndSkipsBundle()
+    public async Task RunAsync_ConfiguredDotnetIsolated_InstallsStackAndSkipsWorkerAndBundle()
     {
         string workerPackageId = WorkerPackage("dotnet-isolated");
-        const string dotnetStack = "Azure.Functions.Cli.Workloads.DotNet";
+        const string dotnetStack = "Azure.Functions.Cli.Workloads.dotnet";
         FakeCatalog catalog = Catalog()
             .WithLatest(_hostPackageId, "4.1.0")
-            .WithLatest(workerPackageId, "1.2.3")
             .WithLatest(dotnetStack, "1.0.0");
         SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
         {
@@ -111,16 +110,16 @@ public sealed class SetupRunnerTests : IDisposable
 
         Assert.Equal(0, result.ExitCode);
         await _installer.Received(1).InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
-            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.2.3"),
+            Arg.Is<string>(id => string.Equals(id, dotnetStack, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
-            Arg.Is(false),
-            Arg.Is(true),
-            Arg.Is(false),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
-        await _installer.Received(1).InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, dotnetStack, StringComparison.OrdinalIgnoreCase)),
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
             Arg.Any<bool>(),

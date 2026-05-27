@@ -385,6 +385,13 @@ internal sealed class SetupRunner(
                     $"{dependency.DisplayName} is satisfied by installed version {selected.Version.ToNormalizedString()} because catalog resolution failed: {resolution.FailureMessage}");
             }
 
+            if (resolution.PackageMissing && dependency.Optional)
+            {
+                return SetupDependencyResult.Skipped(
+                    dependency,
+                    $"Skipped {dependency.DisplayName}: no workload package published for this runtime.");
+            }
+
             return SetupDependencyResult.Failed(dependency, resolution.FailureMessage);
         }
 
@@ -483,7 +490,7 @@ internal sealed class SetupRunner(
             if (package is null)
             {
                 string range = dependency.RangeText is null ? string.Empty : $" in range '{dependency.RangeText}'";
-                return CatalogResolution.Failed($"No {dependency.DisplayName} workload version{range} is available from the configured workload catalog.");
+                return CatalogResolution.Missing($"No {dependency.DisplayName} workload version{range} is available from the configured workload catalog.");
             }
 
             return CatalogResolution.Resolved(package);
@@ -582,11 +589,13 @@ internal sealed class SetupRunner(
             ? SetupBundlePolicy.NotSupported
             : SetupBundlePolicy.DefaultStable;
 
-    private sealed record CatalogResolution(ResolvedPackage? Package, string? FailureMessage)
+    private sealed record CatalogResolution(ResolvedPackage? Package, string? FailureMessage, bool PackageMissing)
     {
-        public static CatalogResolution Resolved(ResolvedPackage package) => new(package, FailureMessage: null);
+        public static CatalogResolution Resolved(ResolvedPackage package) => new(package, FailureMessage: null, PackageMissing: false);
 
-        public static CatalogResolution Failed(string failureMessage) => new(Package: null, failureMessage);
+        public static CatalogResolution Failed(string failureMessage) => new(Package: null, failureMessage, PackageMissing: false);
+
+        public static CatalogResolution Missing(string failureMessage) => new(Package: null, failureMessage, PackageMissing: true);
     }
 
     private sealed record InstalledCandidate(WorkloadEntry Entry, NuGetVersion Version);
@@ -615,7 +624,8 @@ internal sealed record SetupDependency(
     string PackageId,
     VersionRange? VersionRange,
     string? RangeText,
-    string? ResolvedPackageId)
+    string? ResolvedPackageId,
+    bool Optional = false)
 {
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
@@ -645,7 +655,8 @@ internal sealed record SetupDependency(
             SetupRunnerWorkerPackageId(runtime),
             versionRange,
             SetupRunnerRangeText(versionRange),
-            ResolvedPackageId: null);
+            ResolvedPackageId: null,
+            Optional: true);
 
     public static SetupDependency Bundle(string bundleId, VersionRange? versionRange, string? rangeText)
         => new(
@@ -672,11 +683,10 @@ internal sealed record SetupDependency(
 
     public static IReadOnlyList<string> Stacks => [.. _stacks];
 
-    // dotnet-isolated is the one stack whose package suffix doesn't match the
-    // runtime identifier verbatim; the rest concat directly (NuGet package ids
-    // are case-insensitive).
+    // dotnet-isolated maps to the .dotnet package suffix; the rest concat
+    // directly (NuGet package ids are case-insensitive).
     private static string StackPackageSuffix(string stack)
-        => string.Equals(stack, "dotnet-isolated", StringComparison.OrdinalIgnoreCase) ? "DotNet" : stack;
+        => string.Equals(stack, "dotnet-isolated", StringComparison.OrdinalIgnoreCase) ? "dotnet" : stack;
 
     private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
 
@@ -698,6 +708,7 @@ internal enum SetupDependencyStatus
     Satisfied,
     Installed,
     SatisfiedFallback,
+    Skipped,
     Failed,
 }
 
@@ -716,6 +727,9 @@ internal sealed record SetupDependencyResult(
 
     public static SetupDependencyResult SatisfiedFallback(SetupDependency dependency, string packageId, string version, string message)
         => new(dependency, SetupDependencyStatus.SatisfiedFallback, packageId, version, message);
+
+    public static SetupDependencyResult Skipped(SetupDependency dependency, string message)
+        => new(dependency, SetupDependencyStatus.Skipped, dependency.PackageId, Version: null, message);
 
     public static SetupDependencyResult Failed(SetupDependency dependency, string message)
         => new(dependency, SetupDependencyStatus.Failed, dependency.PackageId, Version: null, message);
