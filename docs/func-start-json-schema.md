@@ -342,6 +342,7 @@ Names align with OpenTelemetry FaaS semantic conventions where applicable.
 | `function.trigger_type` | string | `http`, `queue`, `timer`, `blob`, … |
 | `function.route` | string | Route template, source path, or cron expression. |
 | `function.http_methods` | array of strings | HTTP verbs (HTTP triggers). |
+| `function.bindings` | array of objects | Safe binding summary entries containing `name`, `type`, `direction`, and `is_trigger`; connection values and arbitrary binding properties are intentionally omitted. |
 | `function.result` | string | `succeeded` \| `failed` (on `invocation_completed`). |
 | `duration_ms` | number | Numeric milliseconds. |
 | `trace_id` | string | OTel trace id (when known). |

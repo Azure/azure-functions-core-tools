@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using System.Text.Json;
+using Azure.Functions.Cli.Workloads.Host.Logging;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -113,6 +114,8 @@ public sealed class HostStructuredEventWriterTests
         };
         trigger.Properties["route"] = "widgets/{id}";
         trigger.Properties["methods"] = new[] { "get", "post" };
+        trigger.Connection = "UseDevelopmentStorage=true";
+        trigger.Properties["customSecret"] = "user-supplied-value";
         metadata.Bindings.Add(trigger);
 
         HostStructuredEventWriter.WriteFunctionDiscovered(metadata, writer);
@@ -137,7 +140,10 @@ public sealed class HostStructuredEventWriterTests
         Assert.Equal("httpTrigger", binding.GetProperty("type").GetString());
         Assert.Equal("In", binding.GetProperty("direction").GetString());
         Assert.True(binding.GetProperty("is_trigger").GetBoolean());
-        Assert.Equal("widgets/{id}", binding.GetProperty("route").GetString());
+        Assert.False(binding.TryGetProperty("connection", out _));
+        Assert.False(binding.TryGetProperty("route", out _));
+        Assert.False(binding.TryGetProperty("methods", out _));
+        Assert.False(binding.TryGetProperty("customSecret", out _));
     }
 
     [Fact]

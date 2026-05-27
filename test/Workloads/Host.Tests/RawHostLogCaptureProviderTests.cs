@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Workloads.Host.Logging;
 using Microsoft.Extensions.Logging;
 using Xunit;
 

@@ -11,6 +11,8 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        SetHostEnvironmentVariables();
+
         HostApplicationBuilder builder = DotnetHost.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton<HostShell>();
         builder.Services.AddSingleton<IFunctionsHostRunner, FunctionsHostRunner>();
@@ -50,6 +52,12 @@ internal static class Program
 
             await shellHost.StopAsync();
         }
+    }
+
+    private static void SetHostEnvironmentVariables()
+    {
+        Environment.SetEnvironmentVariable("AzureFunctionsJobHost__Logging__Console__IsEnabled", "false");
+        Environment.SetEnvironmentVariable("FUNCTIONS_CORETOOLS_ENVIRONMENT", "true");
     }
 
     internal static Task StartStandardInputClosedMonitorAsync(
