@@ -94,11 +94,16 @@ internal sealed class HttpTemplateFetcher(IHttpClientFactory httpClientFactory, 
     private static string BuildArchiveUrl(QuickstartEntry entry)
     {
         var uri = new Uri(entry.RepositoryUrl);
+
+        if (!string.Equals(uri.Host, QuickstartConstants.GitHubHostName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Template '{entry.Id}' has RepositoryUrl host '{uri.Host}', " +
+                $"but HTTP archive downloads are only supported for {QuickstartConstants.GitHubHostName} repositories.");
+        }
+
         string path = uri.AbsolutePath.TrimEnd('/');
 
-        string tag = entry.GitRef ?? throw new InvalidOperationException(
-            $"Template '{entry.Id}' has no GitRef. Cannot build archive URL.");
-
-        return $"{QuickstartConstants.GitHubHost}{path}{ArchiveUrlPathSegment}{tag}{ArchiveUrlExtension}";
+        return $"{QuickstartConstants.RequiredScheme}://{QuickstartConstants.GitHubHostName}{path}{ArchiveUrlPathSegment}{entry.GitRef}{ArchiveUrlExtension}";
     }
 }

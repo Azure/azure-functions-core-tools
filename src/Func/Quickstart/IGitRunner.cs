@@ -4,8 +4,8 @@
 namespace Azure.Functions.Cli.Quickstart;
 
 /// <summary>
-/// Runs <c>git</c> CLI commands in a child process with security-hardened
-/// environment variables that prevent credential prompts and network leaks.
+/// Runs <c>git</c> CLI commands in a child process with environment
+/// variables that suppress credential prompts and interactive behaviour.
 /// </summary>
 internal interface IGitRunner
 {

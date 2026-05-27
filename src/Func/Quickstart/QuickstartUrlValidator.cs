@@ -9,9 +9,6 @@ namespace Azure.Functions.Cli.Quickstart;
 /// </summary>
 internal static class QuickstartUrlValidator
 {
-    private const string RequiredScheme = "https";
-    private const string RequiredHost = "github.com";
-
     internal static readonly IReadOnlySet<string> TrustedOrganizations =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -37,7 +34,7 @@ internal static class QuickstartUrlValidator
             return false;
         }
 
-        if (!string.Equals(uri.Scheme, RequiredScheme, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(uri.Scheme, QuickstartConstants.RequiredScheme, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -47,7 +44,7 @@ internal static class QuickstartUrlValidator
             return false;
         }
 
-        if (!string.Equals(uri.Host, RequiredHost, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(uri.Host, QuickstartConstants.GitHubHostName, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }

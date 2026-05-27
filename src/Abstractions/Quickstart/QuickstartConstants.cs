@@ -9,7 +9,12 @@ namespace Azure.Functions.Cli.Quickstart;
 public static class QuickstartConstants
 {
     /// <summary>
-    /// The GitHub host used for template repository URLs and archive downloads.
+    /// The required URL scheme for template repository URLs.
     /// </summary>
-    public const string GitHubHost = "https://github.com";
+    public const string RequiredScheme = "https";
+
+    /// <summary>
+    /// The GitHub hostname used for URL validation and archive downloads.
+    /// </summary>
+    public const string GitHubHostName = "github.com";
 }

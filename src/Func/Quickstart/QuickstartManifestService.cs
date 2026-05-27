@@ -200,6 +200,7 @@ internal sealed class QuickstartManifestService(
         if (string.IsNullOrWhiteSpace(entry.Resource)) missing.Add(nameof(entry.Resource));
         if (string.IsNullOrWhiteSpace(entry.RepositoryUrl)) missing.Add(nameof(entry.RepositoryUrl));
         if (string.IsNullOrWhiteSpace(entry.FolderPath)) missing.Add(nameof(entry.FolderPath));
+        if (string.IsNullOrWhiteSpace(entry.GitRef)) missing.Add(nameof(entry.GitRef));
 
         if (missing.Count == 0)
         {
@@ -216,7 +217,7 @@ internal sealed class QuickstartManifestService(
 
     private static bool HasValidGitRef(QuickstartEntry entry)
     {
-        return !string.IsNullOrWhiteSpace(entry.GitRef)
+        return entry.GitRef is not null
             && entry.GitRef.StartsWith(GitRefPrefix, StringComparison.Ordinal);
     }
 

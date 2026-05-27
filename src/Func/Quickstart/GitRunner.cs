@@ -66,6 +66,8 @@ internal sealed class GitRunner : IGitRunner
         }
     }
 
+    private static readonly TimeSpan _versionProbeTimeout = TimeSpan.FromSeconds(5);
+
     public async Task<string?> TryGetVersionAsync(CancellationToken cancellationToken)
     {
         try
@@ -73,13 +75,17 @@ internal sealed class GitRunner : IGitRunner
             ProcessStartInfo psi = CreateStartInfo(workingDirectory: null);
             psi.ArgumentList.Add("--version");
 
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(_versionProbeTimeout);
+            CancellationToken linked = timeoutCts.Token;
+
             using Process process = Process.Start(psi)
                 ?? throw new InvalidOperationException("Failed to start git process.");
 
             try
             {
-                string output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-                await process.WaitForExitAsync(cancellationToken);
+                string output = await process.StandardOutput.ReadToEndAsync(linked);
+                await process.WaitForExitAsync(linked);
 
                 return process.ExitCode == 0 ? output.Trim() : null;
             }
@@ -90,7 +96,7 @@ internal sealed class GitRunner : IGitRunner
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or OperationCanceledException)
         {
-            // git not installed, not on PATH, or timed out
+            // git not installed, not on PATH, or timed out — fall back to HTTP
             return null;
         }
     }

@@ -100,15 +100,23 @@ public class QuickstartScaffolderTests : IDisposable
     }
 
     [Fact]
-    public async Task ScaffoldAsync_NullGitRef_SkipsTagVerification()
+    public async Task ScaffoldAsync_NullGitRef_ThrowsArgumentException()
     {
         QuickstartEntry entry = CreateEntry(gitRef: null);
 
-        await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None);
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        Assert.Contains("no GitRef", ex.Message);
+    }
 
-        // Only clone, no ls-remote or cat-file
-        Assert.Single(_gitRunner.Calls);
-        Assert.Contains("clone", _gitRunner.Calls[0].Arguments);
+    [Fact]
+    public async Task ScaffoldAsync_WhitespaceGitRef_ThrowsArgumentException()
+    {
+        QuickstartEntry entry = CreateEntry(gitRef: "  ");
+
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        Assert.Contains("no GitRef", ex.Message);
     }
 
     [Fact]
@@ -206,6 +214,38 @@ public class QuickstartScaffolderTests : IDisposable
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData(@"C:\evil\path")]
+    [InlineData("/etc/passwd")]
+    public async Task ScaffoldAsync_RootedFolderPath_ThrowsArgumentException(string folderPath)
+    {
+        QuickstartEntry entry = CreateEntry(folderPath: folderPath);
+
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        Assert.Contains("relative path", ex.Message);
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_NonGitHubRepo_HttpMode_ThrowsInvalidOperationException()
+    {
+        var noGitRunner = new FakeGitRunner(version: null);
+        ITemplateFetcher gitFetcher = new GitTemplateFetcher(noGitRunner, NullLogger<GitTemplateFetcher>.Instance);
+        ITemplateFetcher httpFetcher = new HttpTemplateFetcher(
+            Substitute.For<IHttpClientFactory>(),
+            NullLogger<HttpTemplateFetcher>.Instance);
+        IFetchModeResolver resolver = new FetchModeResolver(noGitRunner);
+        var scaffolder = new QuickstartScaffolder(
+            [gitFetcher, httpFetcher],
+            resolver,
+            NullLogger<QuickstartScaffolder>.Instance);
+        QuickstartEntry entry = CreateEntry(repositoryUrl: "https://gitlab.com/org/repo");
+
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Http, CancellationToken.None));
+        Assert.Contains("github.com", ex.Message);
     }
 
     [Fact]

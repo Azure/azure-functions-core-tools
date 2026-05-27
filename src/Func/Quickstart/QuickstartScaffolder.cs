@@ -118,7 +118,14 @@ internal sealed class QuickstartScaffolder(
 
     private static void ValidateEntry(QuickstartEntry entry)
     {
-        if (entry.GitRef is not null && entry.GitRef.StartsWith('-'))
+        if (string.IsNullOrWhiteSpace(entry.GitRef))
+        {
+            throw new ArgumentException(
+                $"Template '{entry.Id}' has no GitRef. A git tag or branch reference is required.",
+                nameof(entry));
+        }
+
+        if (entry.GitRef.StartsWith('-'))
         {
             throw new ArgumentException(
                 $"Invalid GitRef '{entry.GitRef}': must not start with '-' (potential flag injection).",
@@ -129,6 +136,13 @@ internal sealed class QuickstartScaffolder(
         {
             throw new ArgumentException(
                 $"Invalid FolderPath '{entry.FolderPath}': must not contain '..' (path traversal).",
+                nameof(entry));
+        }
+
+        if (Path.IsPathRooted(entry.FolderPath))
+        {
+            throw new ArgumentException(
+                $"Invalid FolderPath '{entry.FolderPath}': must be a relative path.",
                 nameof(entry));
         }
     }
