@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization;
 
-namespace Azure.Functions.Cli.Workloads.Host;
+namespace Azure.Functions.Cli.Workloads.Host.Security;
 
 internal sealed class FunctionsHostAuthorizationHandler
     : AuthorizationHandler<FunctionAuthorizationRequirement, FunctionDescriptor>

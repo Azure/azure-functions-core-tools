@@ -5,7 +5,7 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Azure.Functions.Cli.Workloads.Host;
+namespace Azure.Functions.Cli.Workloads.Host.Logging;
 
 internal static class HostFunctionMetadataEmitter
 {

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Workloads.Host.Logging;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Azure.WebJobs.Script;
@@ -27,31 +28,14 @@ internal sealed class FunctionsHostRunner : IFunctionsHostRunner
             .ConfigureLogging((context, loggingBuilder) =>
             {
                 loggingBuilder.ClearProviders();
-                loggingBuilder.Services.AddSingleton<ILoggerProvider, HostStructuredLoggerProvider>();
-                loggingBuilder.AddDefaultWebJobsFilters<HostStructuredLoggerProvider>(LogLevel.Trace);
+                loggingBuilder.AddHostStructuredLogging();
                 RawHostLogCaptureProvider.AddIfEnabled(loggingBuilder, context.Configuration);
-
-                loggingBuilder.AddFilter(static (category, logLevel) =>
-                {
-                    bool isSharedMemoryWarning = logLevel == LogLevel.Warning
-                        && string.Equals(
-                            category,
-                            "Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor",
-                            StringComparison.Ordinal);
-
-                    bool isAppInsightsExtensionWarning = logLevel == LogLevel.Warning
-                        && string.Equals(
-                            category,
-                            "Microsoft.Azure.WebJobs.Script.DependencyInjection.ScriptStartupTypeLocator",
-                            StringComparison.Ordinal);
-
-                    return !isSharedMemoryWarning && !isAppInsightsExtensionWarning;
-                });
             })
             .ConfigureServices((context, services) =>
             {
                 services.AddSingleton<IStartup>(new FunctionsHostStartup(context.Configuration, enableAuth, hostOptions));
                 services.AddSingleton<IDiagnosticEventRepository, DiagnosticEventNullRepository>();
+                services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, HostStructuredScriptLoggingBuilder>();
             })
             .Build();
 

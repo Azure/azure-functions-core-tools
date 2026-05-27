@@ -10,7 +10,7 @@ using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Azure.Functions.Cli.Workloads.Host;
+namespace Azure.Functions.Cli.Workloads.Host.Security;
 
 internal sealed class FunctionsHostAuthenticationHandler<TOptions>(
     IOptionsMonitor<TOptions> options,

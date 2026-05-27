@@ -4,7 +4,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 
-namespace Azure.Functions.Cli.Workloads.Host;
+namespace Azure.Functions.Cli.Workloads.Host.Logging;
 
 internal static class HostLogSemanticEnricher
 {

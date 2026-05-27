@@ -10,7 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Azure.Functions.Cli.Workloads.Host;
+namespace Azure.Functions.Cli.Workloads.Host.Logging;
 
 internal sealed class RawHostLogCaptureProvider : ILoggerProvider, ISupportExternalScope
 {

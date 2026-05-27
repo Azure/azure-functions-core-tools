@@ -5,7 +5,7 @@ using System.Collections;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 
-namespace Azure.Functions.Cli.Workloads.Host;
+namespace Azure.Functions.Cli.Workloads.Host.Logging;
 
 internal sealed class HostStructuredLoggerProvider : ILoggerProvider, ISupportExternalScope
 {

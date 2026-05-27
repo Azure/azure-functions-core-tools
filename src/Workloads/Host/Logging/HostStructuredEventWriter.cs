@@ -11,7 +11,7 @@ using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
-namespace Azure.Functions.Cli.Workloads.Host;
+namespace Azure.Functions.Cli.Workloads.Host.Logging;
 
 internal static class HostStructuredEventWriter
 {
@@ -437,19 +437,6 @@ internal static class HostStructuredEventWriter
                 ["is_trigger"] = binding.IsTrigger,
             };
 
-            if (!string.IsNullOrEmpty(binding.Connection))
-            {
-                snapshot["connection"] = binding.Connection;
-            }
-
-            foreach (KeyValuePair<string, object> property in binding.Properties)
-            {
-                if (!snapshot.ContainsKey(property.Key))
-                {
-                    snapshot[property.Key] = property.Value;
-                }
-            }
-
             bindings.Add(snapshot);
         }
 
@@ -475,7 +462,7 @@ internal static class HostStructuredEventWriter
         {
             return null;
         }
-        Debugger.Launch();
+
         if (string.Equals(triggerType, "http", StringComparison.OrdinalIgnoreCase))
         {
             string route = TryGetStringProperty(trigger, "route") ?? metadata.Name;
