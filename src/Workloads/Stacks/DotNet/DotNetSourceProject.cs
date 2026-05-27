@@ -22,8 +22,9 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         cancellationToken.ThrowIfCancellationRequested();
 
         string projectDir = Path.GetDirectoryName(ProjectFilePath)
-            ?? throw new InvalidOperationException(
-                $"Could not determine directory for project file '{ProjectFilePath}'.");
+            ?? throw new GracefulException(
+                $"Could not determine directory for project file '{ProjectFilePath}'.",
+                isUserError: true);
 
         if (!context.SkipBuild)
         {
@@ -44,8 +45,9 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         string outputPath = output.Trim();
         if (string.IsNullOrEmpty(outputPath))
         {
-            throw new InvalidOperationException(
-                $"Could not determine OutputPath for project '{Path.GetFileName(ProjectFilePath)}'.");
+            throw new GracefulException(
+                $"Could not determine OutputPath for project '{Path.GetFileName(ProjectFilePath)}'. Ensure the project has been built or has a valid OutputPath configured.",
+                isUserError: true);
         }
 
         // OutputPath may be relative to the project directory.
@@ -58,9 +60,19 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
 
     private async Task BuildAsync(string projectDir, CancellationToken cancellationToken)
     {
-        await _dotnetCli.RunAsync(
-            ["build", ProjectFilePath],
-            projectDir,
-            cancellationToken);
+        try
+        {
+            await _dotnetCli.RunAsync(
+                ["build", ProjectFilePath],
+                projectDir,
+                cancellationToken);
+        }
+        catch (DotnetCliException ex)
+        {
+            string detail = string.IsNullOrWhiteSpace(ex.StandardError) ? "see build output above." : ex.StandardError.Trim();
+            throw new GracefulException(
+                $"'dotnet build' failed (exit {ex.ExitCode}). {detail}",
+                isUserError: true);
+        }
     }
 }

@@ -94,10 +94,11 @@ public class DotNetSourceProjectTests : IDisposable
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => project.PrepareForHostRunAsync(context, default));
 
         Assert.Contains("OutputPath", ex.Message);
+        Assert.True(ex.IsUserError);
     }
 
     [Fact]
@@ -112,8 +113,12 @@ public class DotNetSourceProjectTests : IDisposable
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
 
-        await Assert.ThrowsAsync<DotnetCliException>(
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => project.PrepareForHostRunAsync(context, default));
+
+        Assert.Contains("dotnet build", ex.Message);
+        Assert.Contains("exit 1", ex.Message);
+        Assert.True(ex.IsUserError);
     }
 
     [Fact]
