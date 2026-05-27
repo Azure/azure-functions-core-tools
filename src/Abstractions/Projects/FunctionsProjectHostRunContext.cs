@@ -23,7 +23,6 @@ public sealed class FunctionsProjectHostRunContext
 
         _startupDirectory = startupDirectory;
         EnvironmentVariables = environmentVariables;
-        SkipBuild = skipBuild;
         WorkerRuntime = workerRuntime;
         SkipBuild = skipBuild;
     }
