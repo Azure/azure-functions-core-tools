@@ -1,0 +1,51 @@
+<Project>
+
+  <!--
+    Shared versioning for the bundle-backed templates workloads
+    (Node, Python). The DotNet templates workload has its own
+    Directory.Version.props because it does not snapshot from an
+    extension bundle (see proposed/templates-workload-spec.md §4.4.3).
+
+      $(TemplatesVersion)         workload pkg version. Bare three-part SemVer.
+      $(TemplatesChannel)         stable | preview | experimental. Selects the
+                                  source bundle id at build time and the
+                                  workload pkg's prerelease label.
+      $(SourceBundleVersion)      bundle version snapshotted at build time.
+                                  Defaults to $(LatestExtensionBundleVersion)
+                                  so a bundle bump propagates from one file
+                                  (eng/build/Workloads.Templates.SourceBundleVersion.props).
+                                  Recorded as build provenance only; not
+                                  used to derive the templates pkg version
+                                  (Templates Workload Spec §4.4.1).
+      $(MinBundleVersionRange)    NuGet version range the workload pkg
+                                  declares it is compatible with. Feeds the
+                                  nuspec `minBundle:` tag, the workload.json
+                                  description sentence, and the generated
+                                  templates-workload.json sibling manifest,
+                                  so the three storage locations cannot
+                                  drift (Templates Workload Spec §4.4.4).
+
+    Derived $(VersionPrefix):
+      stable        -> 1.0.0
+      preview       -> 1.0.0-preview
+      experimental  -> 1.0.0-experimental
+  -->
+
+  <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
+
+  <PropertyGroup>
+    <TemplatesVersion>1.0.0</TemplatesVersion>
+    <TemplatesChannel>stable</TemplatesChannel>
+    <SourceBundleVersion Condition="'$(SourceBundleVersion)' == ''">$(LatestExtensionBundleVersion)</SourceBundleVersion>
+    <MinBundleVersionRange Condition="'$(MinBundleVersionRange)' == ''">[4.0.0,)</MinBundleVersionRange>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TemplatesChannel)' == 'stable'">
+    <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TemplatesChannel)' != 'stable'">
+    <VersionPrefix>$(TemplatesVersion)-$(TemplatesChannel)</VersionPrefix>
+  </PropertyGroup>
+
+</Project>

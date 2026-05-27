@@ -1,0 +1,25 @@
+{
+  "$schema": "https://aka.ms/func-workloads/templates/v1/dotnet-templates.json/schema.json",
+  "templates": [
+    {
+      "id": "http",
+      "name": "HTTP trigger",
+      "language": "C#"
+    },
+    {
+      "id": "timer",
+      "name": "Timer trigger",
+      "language": "C#"
+    },
+    {
+      "id": "blob",
+      "name": "Blob trigger",
+      "language": "C#"
+    },
+    {
+      "id": "queue",
+      "name": "Queue trigger",
+      "language": "C#"
+    }
+  ]
+}

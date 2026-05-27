@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>Azure Functions .NET Templates</Title>
+    <Description>.NET function templates for the func CLI. Resolves templates from Microsoft.Azure.Functions.Worker.ItemTemplates at func new time.</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>kind:content alias:dotnet-templates func-workload</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+    <None Include="content/dotnet-templates.json" Pack="true" PackagePath="tools/any/content/" />
+    <None Include="content/source.json"           Pack="true" PackagePath="tools/any/content/" />
+  </ItemGroup>
+
+</Project>

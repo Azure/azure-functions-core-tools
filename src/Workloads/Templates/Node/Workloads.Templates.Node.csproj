@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>Azure Functions Node.js Templates</Title>
+    <Description>Node.js function templates for the func CLI. Compatible with Microsoft.Azure.Functions.ExtensionBundle (minBundle:$(MinBundleVersionRange)).</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>kind:content alias:templates-node alias:node-templates func-workload minBundle:$(MinBundleVersionRange)</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+
+    <TemplatesStackLanguageFilter>JavaScript;TypeScript</TemplatesStackLanguageFilter>
+    <IncludeV2Templates>false</IncludeV2Templates>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <Import Project="..\..\..\..\eng\build\Workloads.Templates.targets" />
+
+</Project>

@@ -1,0 +1,169 @@
+<Project>
+
+  <!--
+    Templates workload pack-time pipeline (Node + Python).
+    Downloads StaticContent files from the extension-bundle CDN for the
+    channel selected by $(TemplatesChannel), filters
+    v1/templates/templates.json by $(TemplatesStackLanguageFilter),
+    generates the templates-workload.json sibling manifest from
+    $(MinBundleVersionRange), and packs the result under
+    tools/any/content/ of the workload nupkg.
+    Skip with -p:SkipDownloadTemplates=true (dev / offline only — produces
+    an empty pack with no templates payload).
+
+    Per-csproj inputs:
+      $(TemplatesChannel)              stable | preview | experimental.
+      $(SourceBundleVersion)           Bundle version snapshotted at pack
+                                       time. Build-provenance only; does
+                                       not derive the workload pkg version
+                                       (Templates Workload Spec §4.4.1).
+      $(TemplatesStackLanguageFilter)  Comma/semicolon allow-list of v1
+                                       metadata.language values
+                                       (e.g. JavaScript;TypeScript for
+                                       Node, Python for Python). Required.
+      $(IncludeV2Templates)            true | false. Defaults true. Set
+                                       false for stacks with no v2
+                                       programming model (e.g. Node).
+      $(MinBundleVersionRange)         NuGet range the workload declares
+                                       compatibility with. Drives the
+                                       generated templates-workload.json,
+                                       the nuspec `minBundle:` tag, and
+                                       the csproj <Description> sentence —
+                                       single source of truth for spec
+                                       §4.4.4.
+
+    Source bundle id selection (Templates Workload Spec §4.4.2):
+      stable       -> Microsoft.Azure.Functions.ExtensionBundle
+      preview      -> Microsoft.Azure.Functions.ExtensionBundle.Preview
+      experimental -> Microsoft.Azure.Functions.ExtensionBundle.Experimental
+
+    All intermediate staging lives under $(IntermediateOutputPath)templates\
+    (i.e. obj\<config>\<tfm>\templates\). $(IntermediateOutputPath) is not
+    populated during property evaluation, only when targets execute, so
+    every path that derives from it is built inline in target attributes
+    or inside target bodies — never in a top-level <PropertyGroup>.
+  -->
+
+  <PropertyGroup>
+    <_TplCdnId Condition="'$(TemplatesChannel)' == 'stable'">Microsoft.Azure.Functions.ExtensionBundle</_TplCdnId>
+    <_TplCdnId Condition="'$(TemplatesChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_TplCdnId>
+    <_TplCdnId Condition="'$(TemplatesChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_TplCdnId>
+
+    <IncludeV2Templates Condition="'$(IncludeV2Templates)' == ''">true</IncludeV2Templates>
+
+    <_TplBaseUrl>https://cdn.functions.azure.com/public/ExtensionBundles/$(_TplCdnId)/$(SourceBundleVersion)/StaticContent</_TplBaseUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Locale variants. en-US is served as the default (no suffix) Resources.json;
+      locale siblings may or may not be present on the CDN for any given bundle
+      release. ContinueOnError below tolerates 404s on individual locales so
+      bundle-version drift doesn't break the pack.
+    -->
+    <_TplLocale Include="cs-CZ;de-DE;es-ES;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW" />
+  </ItemGroup>
+
+  <Target Name="DownloadTemplatesContent"
+          Condition="'$(SkipDownloadTemplates)' != 'true'"
+          BeforeTargets="GenerateNuspec;_GetPackageFiles"
+          Inputs="$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)templates\.downloaded">
+    <Error Condition="'$(_TplCdnId)' == ''"
+           Text="TemplatesChannel '$(TemplatesChannel)' is not one of stable|preview|experimental." />
+    <Error Condition="'$(SourceBundleVersion)' == ''"
+           Text="SourceBundleVersion must be set (the bundle version whose StaticContent the workload snapshots)." />
+
+    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/templates/templates.json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v1\templates\"
+                  SkipUnchangedFiles="true" Retries="3" />
+    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/bindings/bindings.json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v1\bindings\"
+                  SkipUnchangedFiles="true" Retries="3" />
+    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v1\resources\"
+                  SkipUnchangedFiles="true" Retries="3" />
+    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.%(_TplLocale.Identity).json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v1\resources\"
+                  SkipUnchangedFiles="true" Retries="3"
+                  ContinueOnError="true" />
+
+    <DownloadFile Condition="'$(IncludeV2Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v2/templates/templates.json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v2\templates\"
+                  SkipUnchangedFiles="true" Retries="3" />
+    <DownloadFile Condition="'$(IncludeV2Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v2/bindings/userPrompts.json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v2\bindings\"
+                  SkipUnchangedFiles="true" Retries="3" />
+    <DownloadFile Condition="'$(IncludeV2Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v2/resources/Resources.json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v2\resources\"
+                  SkipUnchangedFiles="true" Retries="3" />
+    <DownloadFile Condition="'$(IncludeV2Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v2/resources/Resources.%(_TplLocale.Identity).json"
+                  DestinationFolder="$(IntermediateOutputPath)templates\v2\resources\"
+                  SkipUnchangedFiles="true" Retries="3"
+                  ContinueOnError="true" />
+
+    <Touch Files="$(IntermediateOutputPath)templates\.downloaded" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="FilterTemplatesByLanguage"
+          DependsOnTargets="DownloadTemplatesContent"
+          Condition="'$(SkipDownloadTemplates)' != 'true'"
+          BeforeTargets="_GetPackageFiles"
+          Inputs="$(IntermediateOutputPath)templates\.downloaded"
+          Outputs="$(IntermediateOutputPath)templates\.filtered">
+    <Error Condition="'$(TemplatesStackLanguageFilter)' == ''"
+           Text="TemplatesStackLanguageFilter must be set (e.g. 'JavaScript;TypeScript' for Node, 'Python' for Python)." />
+
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\filter-templates.ps1&quot; -Path &quot;$(IntermediateOutputPath)templates\v1\templates\templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot;" />
+
+    <Touch Files="$(IntermediateOutputPath)templates\.filtered" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="GenerateTemplatesWorkloadJson"
+          Condition="'$(SkipDownloadTemplates)' != 'true'"
+          BeforeTargets="_GetPackageFiles"
+          Inputs="$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)templates\templates-workload.json">
+    <Error Condition="'$(MinBundleVersionRange)' == ''"
+           Text="MinBundleVersionRange must be set (the NuGet range the templates workload declares compatibility with)." />
+
+    <!--
+      Sibling manifest mandated by spec §4.4.4. Authoritative source for
+      the workload's min-bundle constraint at func new time. The nuspec
+      `minBundle:` tag (PackageTags in the csproj) and the csproj
+      Description sentence are both driven by $(MinBundleVersionRange), so
+      the three locations cannot drift.
+    -->
+    <MakeDir Directories="$(IntermediateOutputPath)templates\" />
+    <WriteLinesToFile File="$(IntermediateOutputPath)templates\templates-workload.json"
+                      Lines="{ &quot;%24schema&quot;: &quot;https://aka.ms/func-workloads/templates/v1/templates-workload.json/schema.json&quot;, &quot;minBundleVersion&quot;: &quot;$(MinBundleVersionRange)&quot; }"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+  </Target>
+
+  <Target Name="_AddTemplatesToPack"
+          DependsOnTargets="FilterTemplatesByLanguage;GenerateTemplatesWorkloadJson"
+          Condition="'$(SkipDownloadTemplates)' != 'true'"
+          BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(IntermediateOutputPath)templates\v1\**\*.json"
+            Pack="true" PackagePath="tools/any/content/v1/" Visible="false" />
+      <None Condition="'$(IncludeV2Templates)' == 'true'"
+            Include="$(IntermediateOutputPath)templates\v2\**\*.json"
+            Pack="true" PackagePath="tools/any/content/v2/" Visible="false" />
+      <None Include="$(IntermediateOutputPath)templates\templates-workload.json"
+            Pack="true" PackagePath="tools/any/content/" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_WarnSkipDownloadTemplatesOnPack"
+          Condition="'$(SkipDownloadTemplates)' == 'true'"
+          BeforeTargets="GenerateNuspec">
+    <Warning Text="SkipDownloadTemplates=true: the $(MSBuildProjectName) pack will ship without any templates payload (no v1/v2 JSON, no templates-workload.json). Intended for offline dev builds only; do not use for release packs." />
+  </Target>
+
+</Project>

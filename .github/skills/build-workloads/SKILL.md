@@ -80,6 +80,6 @@ workload.
 - The script discovers workloads by parsing `Azure.Functions.Cli.slnx` for
   projects under `src/Workloads/`, so new workloads added per the
   `create-workload` skill are picked up automatically. Do **not** hardcode the
-  current eight workload paths.
+  current eleven workload paths.
 - This skill is local-loop tooling. Do not wire it into CI, do not commit
   generated `.nupkg`s, and do not change the published feed configuration.

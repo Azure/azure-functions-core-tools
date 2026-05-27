@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    DotNet templates workload has no extension-bundle channel
+    (see proposed/templates-workload-spec.md §4.4.3). The pkg version
+    follows its own SemVer cadence, independent of the upstream
+    Microsoft.Azure.Functions.Worker.ItemTemplates NuGet pin (which
+    lives in content/source.json).
+  -->
+
+  <PropertyGroup>
+    <TemplatesVersion>1.0.0</TemplatesVersion>
+    <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
+  </PropertyGroup>
+
+</Project>

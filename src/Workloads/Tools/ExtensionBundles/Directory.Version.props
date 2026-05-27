@@ -6,7 +6,12 @@
     version it carries:
       $(BundleVersion)  - the bundle payload version. Drives the CDN URL
                           and the user-facing version in func logs. Bare
-                          three-part SemVer.
+                          three-part SemVer. Defaults to
+                          $(LatestExtensionBundleVersion) from
+                          eng/build/Workloads.Templates.SourceBundleVersion.props
+                          so the bundle this workload ships always matches
+                          the snapshot the templates workloads were built
+                          against (one-line bump for both).
       $(BundleChannel)  - stable | preview | experimental. Selects the CDN
                           bundle id (see DownloadDefaultBundle.targets) and
                           the workload pkg's prerelease label.
@@ -17,8 +22,10 @@
       experimental  -> 4.35.0-experimental
   -->
 
+  <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
+
   <PropertyGroup>
-    <BundleVersion>4.35.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleVersion)' == ''">$(LatestExtensionBundleVersion)</BundleVersion>
     <BundleChannel>stable</BundleChannel>
   </PropertyGroup>
 
