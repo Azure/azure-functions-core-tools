@@ -40,7 +40,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
             .Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()))
             .Build();
 
-        Assert.Equal("node", configuration["Stack:Runtime"]);
+        Assert.Equal("node", configuration["stack:runtime"]);
         Assert.Equal("7073", configuration["HostStartup:Port"]);
         Assert.Equal("*", configuration["HostStartup:Cors"]);
         Assert.Equal("True", configuration["HostStartup:CorsCredentials"]);
@@ -56,7 +56,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
             .Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()))
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Stack:Runtime"] = "python",
+                ["stack:runtime"] = "python",
             })
             .Build();
 
@@ -74,16 +74,16 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Stack:Runtime"] = "environment",
+                ["stack:runtime"] = "environment",
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Stack:Runtime"] = "global",
+                ["stack:runtime"] = "global",
             })
             .Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()))
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Stack:Runtime"] = "project",
+                ["stack:runtime"] = "project",
             })
             .Build();
 
@@ -101,11 +101,11 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Stack:Runtime"] = "environment",
+                ["stack:runtime"] = "environment",
             })
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Stack:Runtime"] = "global",
+                ["stack:runtime"] = "global",
             })
             .Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()))
             .Build();
@@ -156,20 +156,20 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         Assert.Equal("project-profile", configuration["profiles:0"]);
         Assert.Null(configuration["defaultProfile"]);
-        Assert.Equal("node", configuration["Stack:Runtime"]);
+        Assert.Equal("node", configuration["stack:runtime"]);
     }
 
     [Fact]
     public void CliConfigurationProvider_EffectiveConfigurationPreservesSourcePrecedence()
     {
-        WriteUserConfig("""{"Stack":{"Runtime":"user"}}""");
+        WriteUserConfig("""{"stack":{"runtime":"user"}}""");
         WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"local"}}""");
-        WriteProjectConfig("""{"Stack":{"Runtime":"project"}}""");
+        WriteProjectConfig("""{"stack":{"runtime":"project"}}""");
         var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
 
         IConfiguration configuration = configurationProvider.GetEffectiveConfiguration(_dir);
 
-        Assert.Equal("project", configuration["Stack:Runtime"]);
+        Assert.Equal("project", configuration["stack:runtime"]);
     }
 
     [Fact]

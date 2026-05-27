@@ -32,8 +32,8 @@ internal sealed class ProjectProfileConfigStore(IProfileFileSystem fileSystem) :
         List<string> profiles = ReadProfiles(root);
         string selectedProfile = EnsureProfile(profiles, normalizedProfileName, out bool addedProfile);
 
-        root["profiles"] = CreateProfilesArray(profiles);
-        root["defaultProfile"] = selectedProfile;
+        root[CliConfigurationNames.ProfilesKey] = CreateProfilesArray(profiles);
+        root[CliConfigurationNames.DefaultProfileKey] = selectedProfile;
 
         string updatedJson = root.ToJsonString(_jsonOptions) + Environment.NewLine;
         await WriteProjectConfigAsync(configPath, updatedJson, cancellationToken);
@@ -104,12 +104,12 @@ internal sealed class ProjectProfileConfigStore(IProfileFileSystem fileSystem) :
 
     private static List<string> ReadProfiles(JsonObject root)
     {
-        if (root["profiles"] is null)
+        if (root[CliConfigurationNames.ProfilesKey] is null)
         {
             return [];
         }
 
-        if (root["profiles"] is not JsonArray profilesArray)
+        if (root[CliConfigurationNames.ProfilesKey] is not JsonArray profilesArray)
         {
             throw new ProfileConfigurationException($"Project config '{_projectConfigDisplayName}' property 'profiles' must be an array.");
         }
