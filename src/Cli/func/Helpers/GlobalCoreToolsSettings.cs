@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (_currentWorkerRuntime == WorkerRuntime.None)
                 {
-                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--dotnet-isolated, --dotnet, --javascript, --typescript, --python, --powershell, --custom, --go]"));
+                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--dotnet-isolated, --dotnet, --javascript, --typescript, --python, --powershell, --custom, --go (preview)]"));
                     throw new CliException($"Worker runtime cannot be '{WorkerRuntime.None}'. Please set a valid runtime.");
                 }
 

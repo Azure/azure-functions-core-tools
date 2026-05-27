@@ -734,14 +734,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task PreRunConditions()
         {
             // GetCurrentWorkerRuntimeLanguage transparently resolves FUNCTIONS_WORKER_RUNTIME=native
-            // to a concrete runtime (e.g. Go via go.mod). Mirror the result into the global so
-            // downstream code that reads GlobalCoreToolsSettings.CurrentWorkerRuntime sees Go
-            // rather than None for Go projects.
-            var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
-            if (resolved != WorkerRuntime.None)
+            // to a concrete runtime (e.g. Go via go.mod). Only re-resolve when the Init-time value
+            // was None; otherwise use the global set during Init. Mirror resolved value into the
+            // global so downstream code that reads GlobalCoreToolsSettings.CurrentWorkerRuntime
+            // sees Go rather than None for Go projects.
+            var resolved = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+            if (resolved == WorkerRuntime.None)
             {
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = resolved;
+                resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+                if (resolved != WorkerRuntime.None)
+                {
+                    GlobalCoreToolsSettings.CurrentWorkerRuntime = resolved;
+                }
             }
+
+            Utilities.WarnIfGoWorkerRuntime(resolved);
 
             EnsureWorkerRuntimeIsSet();
 

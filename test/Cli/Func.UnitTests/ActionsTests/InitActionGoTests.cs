@@ -192,10 +192,9 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Theory]
-        [InlineData("true")]
-        [InlineData("True")]
-        [InlineData("TRUE")]
-        [InlineData("1")]
+        [InlineData("go")]
+        [InlineData("Go")]
+        [InlineData("GO")]
         public void GetCurrentWorkerRuntimeLanguage_GoPreviewEnvVar_ResolvesToGo(string envValue)
         {
             // Env var takes precedence over local.settings.json and the go.mod fallback.
@@ -204,11 +203,11 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
-            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliNativeLanguage);
             var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
             try
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, envValue);
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, envValue);
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
                 var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
@@ -217,30 +216,30 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             }
             finally
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, previousFlag);
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
             }
         }
 
         [Theory]
-        [InlineData("true")]
-        [InlineData("True")]
-        [InlineData("1")]
+        [InlineData("go")]
+        [InlineData("Go")]
+        [InlineData("GO")]
         public void GetCurrentWorkerRuntimeLanguage_GoPreviewSetting_ResolvesToGo(string settingValue)
         {
             // local.settings.json wins when the env var isn't set, without any go.mod scan.
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                { Constants.FunctionsCliGoPreview, settingValue },
+                { Constants.FunctionsCliNativeLanguage, settingValue },
                 { Constants.FunctionsWorkerRuntime, "native" },
             });
 
-            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliNativeLanguage);
             var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
             try
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, null);
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, null);
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
                 var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
@@ -249,34 +248,33 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             }
             finally
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, previousFlag);
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
             }
         }
 
         [Theory]
-        [InlineData("false")]
-        [InlineData("0")]
-        [InlineData("yes")]
+        [InlineData("python")]
+        [InlineData("rust")]
         [InlineData("")]
         public void GetCurrentWorkerRuntimeLanguage_GoPreviewFalsy_FallsThroughToLegacyResolution(string flagValue)
         {
-            // Falsy flag values must not short-circuit; the legacy native+go.mod path should still run.
+            // Non-"go" flag values must not short-circuit; the legacy native+go.mod path should still run.
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                { Constants.FunctionsCliGoPreview, flagValue },
+                { Constants.FunctionsCliNativeLanguage, flagValue },
                 { Constants.FunctionsWorkerRuntime, "native" },
             });
 
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Is<string>(p => p.EndsWith("go.mod"))).Returns(true);
 
-            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliNativeLanguage);
             var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
             try
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, null);
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, null);
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
                 using (FileSystemHelpers.Override(fileSystem))
@@ -288,7 +286,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             }
             finally
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, previousFlag);
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
             }
         }
@@ -301,11 +299,11 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(_ => throw new CliException("no project"));
 
-            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliGoPreview);
+            var previousFlag = Environment.GetEnvironmentVariable(Constants.FunctionsCliNativeLanguage);
             var previousRuntime = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
             try
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, "true");
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, "go");
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, null);
 
                 var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
@@ -314,7 +312,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             }
             finally
             {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCliGoPreview, previousFlag);
+                Environment.SetEnvironmentVariable(Constants.FunctionsCliNativeLanguage, previousFlag);
                 Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntime, previousRuntime);
             }
         }

@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
+        public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, WorkerRuntime workerRuntime, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -31,16 +31,16 @@ namespace Azure.Functions.Cli.Helpers
                 ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project."));
             }
 
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && !noBuild)
+            if (workerRuntime == WorkerRuntime.Python && !noBuild)
             {
                 return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, buildOption, additionalPackages);
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet && buildOption == BuildOption.Remote)
+            else if (workerRuntime == WorkerRuntime.Dotnet && buildOption == BuildOption.Remote)
             {
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
                 return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Array.Empty<string>());
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
+            else if (workerRuntime == WorkerRuntime.Go)
             {
                 // Go deploys an explicit allowlist: host.json + the cross-compiled binary.
                 // The binary lives under bin/ locally (for .gitignore) but must appear at

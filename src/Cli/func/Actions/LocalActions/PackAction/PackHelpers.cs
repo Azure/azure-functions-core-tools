@@ -63,9 +63,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
         }
 
-        public static async Task CreatePackage(string packingRoot, string outputPath, bool noBuild, IDictionary<string, string> telemetryCommandEvents, bool buildNativeDeps = false)
+        public static async Task CreatePackage(string packingRoot, string outputPath, bool noBuild, WorkerRuntime workerRuntime, IDictionary<string, string> telemetryCommandEvents, bool buildNativeDeps = false)
         {
-            var stream = await ZipHelper.GetAppZipFile(packingRoot, buildNativeDeps, BuildOption.Default, noBuild: noBuild);
+            var stream = await ZipHelper.GetAppZipFile(packingRoot, buildNativeDeps, BuildOption.Default, noBuild: noBuild, workerRuntime);
 
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
             await FileSystemHelpers.WriteToFile(outputPath, stream);

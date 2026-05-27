@@ -9,6 +9,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
     [Action(Name = "pack go", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to Go apps when running func pack")]
     internal class GoPackSubcommandAction : PackSubcommandAction
     {
+        public GoPackSubcommandAction()
+            : base(WorkerRuntime.Go)
+        {
+        }
+
         public async Task RunAsync(PackOptions packOptions)
         {
             await ExecuteAsync(packOptions);

@@ -15,6 +15,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         private readonly bool _isDotnetIsolated;
 
         public DotnetPackSubcommandAction(bool isDotnetIsolated)
+            : base(isDotnetIsolated ? WorkerRuntime.DotnetIsolated : WorkerRuntime.Dotnet)
         {
             _isDotnetIsolated = isDotnetIsolated;
         }

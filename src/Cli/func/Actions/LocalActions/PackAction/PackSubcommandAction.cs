@@ -2,12 +2,22 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 {
     // Base class for pack subcommands to reduce duplication using a template method.
     internal abstract class PackSubcommandAction : BaseAction
     {
+        protected PackSubcommandAction(WorkerRuntime workerRuntime)
+        {
+            Runtime = workerRuntime;
+        }
+
+        // The worker runtime this subcommand packs for. Set once at construction so the
+        // pack flow never has to read GlobalCoreToolsSettings.CurrentWorkerRuntime.
+        protected WorkerRuntime Runtime { get; }
+
         // Orchestrates the pack flow for subcommands that don't need extra args
         protected async Task ExecuteAsync(PackOptions options)
         {
@@ -61,7 +71,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         // Hook: actual packaging operation (default zip from packingRoot)
         protected virtual Task PackFunctionAsync(string packingRoot, string outputPath, PackOptions options)
-            => PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, TelemetryCommandEvents);
+            => PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, Runtime, TelemetryCommandEvents);
 
         // Hook: optional cleanup after packaging
         protected virtual Task PerformCleanupAfterPackingAsync(string packingRoot, string functionAppRoot, PackOptions options) => Task.CompletedTask;

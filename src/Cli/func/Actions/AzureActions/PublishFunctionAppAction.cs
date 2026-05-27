@@ -164,16 +164,21 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"--build {PublishBuildOption} is not supported for Windows Elastic Premium Function Apps.");
             }
 
-            // Get the WorkerRuntime
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
-            if (workerRuntime != WorkerRuntime.None)
+            // Get the WorkerRuntime. Only re-resolve from local.settings.json when the Init-time
+            // value was None. This preserves the original behavior for Python/.NET/Node/PowerShell
+            // (single global read set during Init), while allowing Go's "native" → Go resolution
+            // when func publish is invoked without a prior func init.
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+            if (workerRuntime == WorkerRuntime.None)
             {
-                GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
+                workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+                if (workerRuntime != WorkerRuntime.None)
+                {
+                    GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
+                }
             }
-            else
-            {
-                workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
-            }
+
+            Utilities.WarnIfGoWorkerRuntime(workerRuntime);
 
             // Go is cross-compiled to linux/amd64 and currently only supported on Flex Consumption.
             // Reject Windows targets, non-Flex SKUs, and unsupported build modes up front.
@@ -307,7 +312,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                     else
                     {
-                        await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings);
+                        await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings, workerRuntime);
                     }
                 }
                 catch (HttpRequestException ex)
@@ -672,7 +677,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings)
+        private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings, WorkerRuntime workerRuntime)
         {
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
@@ -692,7 +697,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, workerRuntime, ignoreParser, AdditionalPackages);
 
             bool shouldSyncTriggers = true;
             bool shouldDeferPublishZipDeploy = false;

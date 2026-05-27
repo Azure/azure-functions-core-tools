@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Fclp;
 using Newtonsoft.Json.Linq;
@@ -12,6 +13,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
     [Action(Name = "pack python", ParentCommandName = "pack", ShowInHelp = true, HelpText = "Arguments specific to Python apps when running func pack")]
     internal class PythonPackSubcommandAction : PackSubcommandAction
     {
+        public PythonPackSubcommandAction()
+            : base(WorkerRuntime.Python)
+        {
+        }
+
         public bool BuildNativeDeps { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -78,7 +84,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         protected override Task PackFunctionAsync(string packingRoot, string outputPath, PackOptions options)
         {
             // Include BuildNativeDeps in packaging call
-            return PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, TelemetryCommandEvents, BuildNativeDeps);
+            return PackHelpers.CreatePackage(packingRoot, outputPath, options.NoBuild, Runtime, TelemetryCommandEvents, BuildNativeDeps);
         }
 
         public override Task RunAsync()
