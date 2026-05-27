@@ -44,6 +44,12 @@ jobs:
 
   steps:
     - ${{ if eq(parameters.sign, true) }}:
+      - task: UseDotNet@2 # ESRP doesn't yet support net10 SDK
+        displayName: Install .NET 9 SDK (for esrp tool)
+        inputs:
+          packageType: sdk
+          version: 9.x
+
       - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: windows

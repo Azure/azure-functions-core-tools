@@ -10,6 +10,8 @@ jobs:
     type: validationJob
 
   steps:
+  - checkout: none
+
   - pwsh: |
       $source = "$(Build.SourceBranch)"
       if ('${{ parameters.skipBranchValidation }}' -eq 'True')
