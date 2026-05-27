@@ -5,7 +5,11 @@ namespace Azure.Functions.Cli.Configuration;
 
 internal sealed class StackOptions
 {
-    public const string SectionName = "Stack";
+    public const string SectionName = "stack";
+
+    public const string RuntimeKey = "runtime";
+
+    public const string LanguageKey = "language";
 
     public string? Runtime { get; set; }
 
