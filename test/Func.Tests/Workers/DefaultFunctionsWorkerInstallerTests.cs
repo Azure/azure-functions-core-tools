@@ -57,6 +57,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
+                Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(CreateWorkerEntry("3.13.0"), AlreadyInstalled: false));
@@ -92,6 +93,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
+                Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(CreateWorkerEntry("3.14.0"), AlreadyInstalled: true));
@@ -108,7 +110,7 @@ public class DefaultFunctionsWorkerInstallerTests
             includePrerelease: true,
             exact: true,
             force: false,
-            progress: null,
+            Arg.Any<bool>(),progress: null,
             cancellationToken: Arg.Any<CancellationToken>());
     }
 
@@ -146,6 +148,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
+                Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),

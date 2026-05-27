@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
+using Azure.Functions.Cli.Workloads.Install.Trust;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
@@ -21,7 +22,8 @@ internal sealed class WorkloadInstaller(
     IWorkloadPaths paths,
     IWorkloadStore store,
     IWorkloadMetadataReader metadataReader,
-    IWorkloadCatalog catalog) : IWorkloadInstaller
+    IWorkloadCatalog catalog,
+    IWorkloadTrustVerifier trustVerifier) : IWorkloadInstaller
 {
     /// <summary>
     /// Prefix on nuspec tags that marks the tag as a CLI-facing alias, so
@@ -51,11 +53,13 @@ internal sealed class WorkloadInstaller(
     private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IWorkloadMetadataReader _metadataReader = metadataReader ?? throw new ArgumentNullException(nameof(metadataReader));
     private readonly IWorkloadCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+    private readonly IWorkloadTrustVerifier _trustVerifier = trustVerifier ?? throw new ArgumentNullException(nameof(trustVerifier));
 
     /// <inheritdoc />
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(
         string nupkgPath,
         bool force = false,
+        bool allowUntrusted = false,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -84,6 +88,13 @@ internal sealed class WorkloadInstaller(
             throw new InvalidWorkloadException(
                 $"Package '{packageId}' is not a func CLI workload " +
                 $"(missing package type '{FuncCliWorkloadPackageType}' in its .nuspec).");
+        }
+
+        TrustVerificationResult trust = await _trustVerifier.VerifyAsync(
+            nupkgPath, packageId, allowUntrusted, cancellationToken);
+        if (!trust.IsTrusted)
+        {
+            throw new UntrustedWorkloadException(trust.Reason!);
         }
 
         string installPath = _paths.GetInstallDirectory(packageId, version);
@@ -166,6 +177,7 @@ internal sealed class WorkloadInstaller(
         bool includePrerelease,
         bool exact,
         bool force,
+        bool allowUntrusted = false,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -195,7 +207,7 @@ internal sealed class WorkloadInstaller(
                 await packageStream.CopyToAsync(tempStream, cancellationToken);
             }
 
-            return await InstallFromPackageAsync(tempPath, force, progress, cancellationToken);
+            return await InstallFromPackageAsync(tempPath, force, allowUntrusted, progress, cancellationToken);
         }
         finally
         {
@@ -222,6 +234,7 @@ internal sealed class WorkloadInstaller(
         string? source,
         bool includePrerelease,
         bool allowMajor,
+        bool allowUntrusted = false,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -266,7 +279,7 @@ internal sealed class WorkloadInstaller(
             return new WorkloadUpdateResult(currentEntry, currentEntry.PackageVersion, NoUpdateAvailable: true);
         }
 
-        WorkloadEntry newEntry = await StageAndSwapAsync(currentEntry, resolved, progress, cancellationToken);
+        WorkloadEntry newEntry = await StageAndSwapAsync(currentEntry, resolved, allowUntrusted, progress, cancellationToken);
 
         return new WorkloadUpdateResult(newEntry, currentEntry.PackageVersion, NoUpdateAvailable: false);
     }
@@ -398,6 +411,7 @@ internal sealed class WorkloadInstaller(
     private async Task<WorkloadEntry> StageAndSwapAsync(
         WorkloadEntry currentEntry,
         ResolvedPackage resolved,
+        bool allowUntrusted,
         IProgress<WorkloadInstallProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -446,6 +460,13 @@ internal sealed class WorkloadInstaller(
                 throw new InvalidWorkloadException(
                     $"Resolved package '{resolved.PackageId}' {resolved.Version.ToNormalizedString()} but the source returned " +
                     $"'{newPackageId}' {newVersion}.");
+            }
+
+            TrustVerificationResult trust = await _trustVerifier.VerifyAsync(
+                tempNupkg, newPackageId, allowUntrusted, cancellationToken);
+            if (!trust.IsTrusted)
+            {
+                throw new UntrustedWorkloadException(trust.Reason!);
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);

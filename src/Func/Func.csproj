@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Profiles/BuiltInProfiles.json" LogicalName="Azure.Functions.Cli.Profiles.BuiltInProfiles.json" />
+    <EmbeddedResource Include="Workloads/Install/Trust/trusted-roots.pem" LogicalName="Azure.Functions.Cli.Workloads.Install.Trust.trusted-roots.pem" />
   </ItemGroup>
 
   <ItemGroup>

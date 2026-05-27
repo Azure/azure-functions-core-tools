@@ -47,6 +47,7 @@ public sealed class SetupRunnerTests : IDisposable
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
+                Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
@@ -83,6 +84,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(false),
             Arg.Is(true),
             Arg.Is(false),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
         await _installer.Received(1).InstallFromCatalogAsync(
@@ -92,6 +94,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(false),
             Arg.Is(true),
             Arg.Is(false),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -120,6 +123,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(false),
             Arg.Is(true),
             Arg.Is(false),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
         await _installer.Received(1).InstallFromCatalogAsync(
@@ -129,6 +133,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(false),
             Arg.Is(true),
             Arg.Is(false),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
 
@@ -139,12 +144,14 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Contains("ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
@@ -173,6 +180,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(true),
             Arg.Is(false),
+            Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
@@ -182,12 +190,14 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Contains("ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
@@ -326,6 +336,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(false),
             Arg.Is(true),
             Arg.Is(false),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -349,6 +360,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(false),
             Arg.Is(true),
             Arg.Is(false),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -372,6 +384,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -392,6 +405,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<string>(),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
@@ -479,6 +493,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -507,6 +522,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -531,6 +547,7 @@ public sealed class SetupRunnerTests : IDisposable
                 && !id.StartsWith("Azure.Functions.Cli.Workloads.ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
@@ -584,6 +601,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
+            Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -604,6 +622,7 @@ public sealed class SetupRunnerTests : IDisposable
                 || id.StartsWith("Azure.Functions.Cli.Workloads.DotNet", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
@@ -643,7 +662,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains(interactive.Lines, line => line.StartsWith("HINT:", StringComparison.Ordinal) && line.Contains("No stacks selected", StringComparison.Ordinal));
-        await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(default!, default, default, default, default, default, default, default);
+        await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(default!, default, default, default, default, default, default, default, default);
     }
 
     [Fact]

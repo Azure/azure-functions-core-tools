@@ -232,6 +232,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
+                Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(installResult);
@@ -251,6 +252,7 @@ public class HostWorkloadResolverTests
             includePrerelease: true,
             exact: true,
             force: false,
+            allowUntrusted: false,
             progress: null,
             cancellationToken: Arg.Any<CancellationToken>());
     }
@@ -263,6 +265,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
+                Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),

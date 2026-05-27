@@ -564,8 +564,9 @@ internal sealed class SetupRunner(
                     includePrerelease: options.IncludePrerelease,
                     exact: true,
                     force: false,
+                    allowUntrusted: false,
                     progress: null,
-                    cancellationToken)
+                    cancellationToken: cancellationToken)
                 : await _interaction.RunWithProgressAsync(
                     $"Installing {dependency.DisplayName} {targetVersion}",
                     async (ctx, ct) => await _workloadInstaller.InstallFromCatalogAsync(
@@ -575,8 +576,9 @@ internal sealed class SetupRunner(
                         includePrerelease: options.IncludePrerelease,
                         exact: true,
                         force: false,
-                        new WorkloadInstallProgressAdapter(ctx),
-                        ct),
+                        allowUntrusted: false,
+                        progress: new WorkloadInstallProgressAdapter(ctx),
+                        cancellationToken: ct),
                     cancellationToken);
 
             string installedVersion = installResult.Entry.PackageVersion;

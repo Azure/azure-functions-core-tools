@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Install.Trust;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
 
@@ -60,7 +61,15 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
-    public WorkloadUpdateCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store)
+    public Option<bool> AllowUntrustedOption { get; } = new("--allow-untrusted")
+    {
+        Description = "Bypass the publisher trust check. Required for installing unsigned local development packs.",
+    };
+
+    public WorkloadUpdateCommand(
+        IInteractionService interaction,
+        IWorkloadInstaller installer,
+        IWorkloadStore store)
         : base("update", "Update an installed workload in place.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
@@ -77,6 +86,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         Options.Add(SourceOption);
         Options.Add(IncludePrereleaseOption);
         Options.Add(ExactOption);
+        Options.Add(AllowUntrustedOption);
 
         Validators.Add(result =>
         {
@@ -119,6 +129,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? source = parseResult.GetValue(SourceOption);
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
+        bool allowUntrusted = parseResult.GetValue(AllowUntrustedOption);
 
         if (includePrerelease)
         {
@@ -127,7 +138,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
         if (all)
         {
-            return await UpdateAllAsync(source, includePrerelease, allowMajor, cancellationToken);
+            return await UpdateAllAsync(source, includePrerelease, allowMajor, allowUntrusted, cancellationToken);
         }
 
         string packageId = await ResolveInstalledPackageIdAsync(identifier!, exact, cancellationToken);
@@ -138,6 +149,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             source,
             includePrerelease,
             allowMajor,
+            allowUntrusted,
             cancellationToken);
     }
 
@@ -175,6 +187,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? source,
         bool includePrerelease,
         bool allowMajor,
+        bool allowUntrusted,
         CancellationToken cancellationToken)
     {
         try
@@ -182,7 +195,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             WorkloadUpdateResult result = await _interaction.RunWithProgressAsync(
                 $"Updating workload '{packageId}'",
                 async (ctx, ct) => await _installer.UpdateAsync(
-                    packageId, targetVersion, source, includePrerelease, allowMajor,
+                    packageId, targetVersion, source, includePrerelease, allowMajor, allowUntrusted,
                     new WorkloadInstallProgressAdapter(ctx),
                     ct),
                 cancellationToken);
@@ -202,13 +215,24 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
+        catch (UntrustedWorkloadException ex)
+        {
+            throw new GracefulException(
+                $"{ex.Message} Pass --allow-untrusted to install this package anyway.",
+                isUserError: true);
+        }
         catch (InvalidOperationException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
     }
 
-    private async Task<int> UpdateAllAsync(string? source, bool includePrerelease, bool allowMajor, CancellationToken cancellationToken)
+    private async Task<int> UpdateAllAsync(
+        string? source,
+        bool includePrerelease,
+        bool allowMajor,
+        bool allowUntrusted,
+        CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<string> packageIds = [.. installed
@@ -234,6 +258,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                         source,
                         includePrerelease,
                         allowMajor,
+                        allowUntrusted,
                         new WorkloadInstallProgressAdapter(ctx),
                         ct),
                     cancellationToken);
@@ -243,6 +268,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 ex is WorkloadPackageNotFoundException
                 or FileNotFoundException
                 or InvalidWorkloadException
+                or UntrustedWorkloadException
                 or InvalidOperationException)
             {
                 // Per-id failure must not block other workloads. Surface

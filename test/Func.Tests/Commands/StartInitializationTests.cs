@@ -267,6 +267,7 @@ public class StartInitializationTests : IDisposable
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
+                Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<WorkloadInstallResult>(
@@ -525,6 +526,7 @@ public class StartInitializationTests : IDisposable
             Arg.Any<string>(),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),
@@ -1143,6 +1145,7 @@ public class StartInitializationTests : IDisposable
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
+                Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),

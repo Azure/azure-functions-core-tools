@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Catalog;
+using Azure.Functions.Cli.Workloads.Install.Trust;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
 
@@ -23,6 +24,11 @@ internal interface IWorkloadInstaller
     /// When <c>true</c>, an existing install of the same id+version is removed
     /// before extraction.
     /// </param>
+    /// <param name="allowUntrusted">
+    /// When <c>true</c>, the publisher trust check is skipped so unsigned
+    /// or third-party packages can install. Required only for local dev
+    /// workflows; production installs leave this <c>false</c>.
+    /// </param>
     /// <param name="cancellationToken">Token to cancel the install.</param>
     /// <returns>
     /// The registry entry plus a flag indicating whether the install was a
@@ -33,6 +39,10 @@ internal interface IWorkloadInstaller
     /// The package is unreadable, missing the <c>FuncCliWorkload</c> package
     /// type, or its <c>workload.json</c> is missing or malformed.
     /// </exception>
+    /// <exception cref="UntrustedWorkloadException">
+    /// The package failed the publisher trust check and
+    /// <paramref name="allowUntrusted"/> is <c>false</c>.
+    /// </exception>
     /// <exception cref="InvalidOperationException">
     /// The install directory exists without a matching registry entry and
     /// <paramref name="force"/> is <c>false</c>.
@@ -40,6 +50,7 @@ internal interface IWorkloadInstaller
     public Task<WorkloadInstallResult> InstallFromPackageAsync(
         string nupkgPath,
         bool force = false,
+        bool allowUntrusted = false,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
@@ -67,6 +78,7 @@ internal interface IWorkloadInstaller
     /// <paramref name="packageId"/> as a literal package id.
     /// </param>
     /// <param name="force">Forwarded to <see cref="InstallFromPackageAsync"/>.</param>
+    /// <param name="allowUntrusted">Forwarded to <see cref="InstallFromPackageAsync"/>.</param>
     /// <param name="cancellationToken">Token to cancel resolve, download, and install.</param>
     /// <exception cref="WorkloadPackageNotFoundException">
     /// No version matched on any configured source.
@@ -75,6 +87,10 @@ internal interface IWorkloadInstaller
     /// The alias matches multiple packages and <paramref name="exact"/> is
     /// <c>false</c>.
     /// </exception>
+    /// <exception cref="UntrustedWorkloadException">
+    /// The downloaded package failed the publisher trust check and
+    /// <paramref name="allowUntrusted"/> is <c>false</c>.
+    /// </exception>
     public Task<WorkloadInstallResult> InstallFromCatalogAsync(
         string packageId,
         NuGetVersion? version,
@@ -82,6 +98,7 @@ internal interface IWorkloadInstaller
         bool includePrerelease,
         bool exact,
         bool force,
+        bool allowUntrusted = false,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
@@ -102,10 +119,19 @@ internal interface IWorkloadInstaller
     /// Default is <c>false</c> per spec; <c>--major</c> on the command sets
     /// it to <c>true</c>.
     /// </param>
+    /// <param name="allowUntrusted">
+    /// When <c>true</c>, skips the publisher trust check on the resolved
+    /// update candidate. Required for updates of locally-installed
+    /// unsigned dev packs.
+    /// </param>
     /// <param name="cancellationToken">Token propagated to catalog + I/O.</param>
     /// <exception cref="InvalidOperationException">
     /// <paramref name="packageId"/> is not installed, or
     /// <paramref name="targetInstalledVersion"/> is not present.
+    /// </exception>
+    /// <exception cref="UntrustedWorkloadException">
+    /// The resolved update candidate failed the publisher trust check and
+    /// <paramref name="allowUntrusted"/> is <c>false</c>.
     /// </exception>
     public Task<WorkloadUpdateResult> UpdateAsync(
         string packageId,
@@ -113,6 +139,7 @@ internal interface IWorkloadInstaller
         string? source,
         bool includePrerelease,
         bool allowMajor,
+        bool allowUntrusted = false,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 

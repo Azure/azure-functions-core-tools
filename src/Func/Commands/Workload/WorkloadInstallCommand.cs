@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Install.Trust;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
 
@@ -59,6 +60,11 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
+    public Option<bool> AllowUntrustedOption { get; } = new("--allow-untrusted")
+    {
+        Description = "Bypass the publisher trust check. Required for installing unsigned local development packs.",
+    };
+
     public WorkloadInstallCommand(
         IInteractionService interaction,
         IWorkloadInstaller installer,
@@ -79,6 +85,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         Options.Add(SourceOption);
         Options.Add(IncludePrereleaseOption);
         Options.Add(ExactOption);
+        Options.Add(AllowUntrustedOption);
         Options.Add(ForceOption);
     }
 
@@ -89,6 +96,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string? source = parseResult.GetValue(SourceOption);
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
+        bool allowUntrusted = parseResult.GetValue(AllowUntrustedOption);
         bool force = parseResult.GetValue(ForceOption);
 
         if (includePrerelease)
@@ -103,7 +111,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             // prompt entirely. Non-interactive contexts treat the prompt as
             // a decline and exit non-zero with the same hint. Local .nupkg
             // installs bypass the check since the resolver path differs.
-            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, cancellationToken);
+            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, allowUntrusted, cancellationToken);
             if (earlyExit is { } code)
             {
                 return code;
@@ -121,7 +129,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                     var progress = new WorkloadInstallProgressAdapter(ctx);
 
                     return LooksLikeLocalPackagePath(workload)
-                        ? await _installer.InstallFromPackageAsync(workload, force, progress, ct)
+                        ? await _installer.InstallFromPackageAsync(workload, force, allowUntrusted, progress, ct)
                         : await _installer.InstallFromCatalogAsync(
                             workload,
                             string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
@@ -129,6 +137,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                             includePrerelease,
                             exact,
                             force,
+                            allowUntrusted,
                             progress,
                             ct);
                 },
@@ -158,6 +167,12 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
+        catch (UntrustedWorkloadException ex)
+        {
+            throw new GracefulException(
+                $"{ex.Message} Pass --allow-untrusted to install this package anyway.",
+                isUserError: true);
+        }
         catch (FileNotFoundException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
@@ -185,6 +200,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         bool exact,
         string? source,
         bool includePrerelease,
+        bool allowUntrusted,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
@@ -226,7 +242,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        return await DispatchToUpdateAsync(match.PackageId, source, includePrerelease, cancellationToken);
+        return await DispatchToUpdateAsync(match.PackageId, source, includePrerelease, allowUntrusted, cancellationToken);
     }
 
     // Delegate to the `func workload update` command (Parse + InvokeAsync) so
@@ -238,6 +254,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string packageId,
         string? source,
         bool includePrerelease,
+        bool allowUntrusted,
         CancellationToken cancellationToken)
     {
         var args = new List<string> { packageId };
@@ -249,6 +266,10 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         if (includePrerelease)
         {
             args.Add("--prerelease");
+        }
+        if (allowUntrusted)
+        {
+            args.Add("--allow-untrusted");
         }
 
         return await _updateCommand.Parse(args.ToArray()).InvokeAsync(configuration: null, cancellationToken);
