@@ -48,6 +48,12 @@ internal sealed class JsonRenderer : IDashboardRenderer
 
     public Task OnEventAsync(HostLogEntry entry, IReadOnlyList<DashboardEvent> events, CancellationToken cancellationToken)
     {
+        if (events.Count == 0
+            && (string.IsNullOrWhiteSpace(entry.Message) || IsSuppressedLogCategory(entry.Category)))
+        {
+            return Task.CompletedTask;
+        }
+
         // Always emit the raw log record first so synthetic events appear in
         // causal order after the line that produced them.
         WriteLog(entry);
@@ -110,6 +116,9 @@ internal sealed class JsonRenderer : IDashboardRenderer
             WriteAttributes(writer, entry.Attributes);
         });
     }
+
+    private static bool IsSuppressedLogCategory(string category)
+        => string.Equals(category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal);
 
     private void WriteEvent(DashboardEvent ev)
     {

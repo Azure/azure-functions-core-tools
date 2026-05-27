@@ -90,6 +90,42 @@ public class CompactLogComponentsTests
         Assert.Contains("Boom", output);
     }
 
+    [Fact]
+    public void Format_WithEmptyLogMessage_SuppressesLine()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService",
+            LogLevel.Information,
+            new EventId(0),
+            string.Empty,
+            Exception: null,
+            HostLogEntry.EmptyAttributes);
+
+        CompactLogLine? line = formatter.Format(entry, [], listenUri: null);
+
+        Assert.Null(line);
+    }
+
+    [Fact]
+    public void Format_WithOptionsLoggingService_SuppressesLine()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService",
+            LogLevel.Information,
+            new EventId(0),
+            "ConcurrencyOptions",
+            Exception: null,
+            HostLogEntry.EmptyAttributes);
+
+        CompactLogLine? line = formatter.Format(entry, [], listenUri: null);
+
+        Assert.Null(line);
+    }
+
     private static string Render(IRenderable renderable)
     {
         using var writer = new StringWriter();

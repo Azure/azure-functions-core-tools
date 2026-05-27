@@ -71,7 +71,7 @@ internal sealed class HostProcessStartInfoFactory
             new Uri(localBaseUriText), context.HostWorkload.PackageVersion);
     }
 
-    private static string ResolveExecutablePath(string contentRoot)
+    internal static string ResolveExecutablePath(string contentRoot)
     {
         string executableName = OperatingSystem.IsWindows()
             ? $"{ExecutableBaseName}.exe"
