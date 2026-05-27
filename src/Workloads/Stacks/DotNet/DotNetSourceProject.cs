@@ -21,11 +21,13 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string projectDir = Path.GetDirectoryName(ProjectFilePath)!;
+        string projectDir = Path.GetDirectoryName(ProjectFilePath)
+            ?? throw new InvalidOperationException(
+                $"Could not determine directory for project file '{ProjectFilePath}'.");
 
-        DirectoryInfo outputDirectory = await GetOutputDirectoryAsync(projectDir, cancellationToken);
         await BuildAsync(projectDir, cancellationToken);
 
+        DirectoryInfo outputDirectory = await GetOutputDirectoryAsync(projectDir, cancellationToken);
         context.StartupDirectory = outputDirectory;
     }
 
