@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 
@@ -12,12 +14,21 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// Populates the environment dictionary the host will see: <c>local.settings.json</c> values,
 /// <c>FUNCTIONS_WORKER_RUNTIME</c>, the worker directory hint, and any bundle env vars.
 /// </summary>
-internal sealed class PrepareProjectHostRunInitializationStep(ILocalSettingsProvider localSettingsProvider) : DemoInitializationStep
+internal sealed class PrepareProjectHostRunInitializationStep(
+    ILocalSettingsProvider localSettingsProvider,
+    IProcessEnvironment processEnvironment,
+    IInteractionService interaction) : DemoInitializationStep
 {
     public const string StepId = "prepare_host_run";
 
     private readonly ILocalSettingsProvider _localSettingsProvider = localSettingsProvider
         ?? throw new ArgumentNullException(nameof(localSettingsProvider));
+
+    private readonly IProcessEnvironment _processEnvironment = processEnvironment
+        ?? throw new ArgumentNullException(nameof(processEnvironment));
+
+    private readonly IInteractionService _interaction = interaction
+        ?? throw new ArgumentNullException(nameof(interaction));
 
     public override string Id => StepId;
 
@@ -54,19 +65,17 @@ internal sealed class PrepareProjectHostRunInitializationStep(ILocalSettingsProv
 
     private Dictionary<string, string> BuildEnvironmentVariables(StartInitializationStepContext context, FunctionsProject project, IFunctionsWorker worker)
     {
-        // Priority (low -> high): local.settings.json Values, host state, worker hints, bundle vars.
-        // Bundle vars and worker hints sit on top because the CLI just resolved them and should
-        // win over anything stale a user left in local.settings.json. In particular, the resolved
-        // FUNCTIONS_WORKER_RUNTIME overrides whatever local.settings.json declares: the project
-        // resolver picked a worker, and letting a stale value steer the host would surface as a
-        // confusing "wrong language" failure deep in startup rather than a clear resolver error.
+        // Priority (low -> high): local.settings.json Values (gated by current process env),
+        // host state, worker hints, bundle vars. A shell-set env var beats local.settings.json:
+        // users override settings per-shell for CI, debugging, and secret rotation, and a stale
+        // value in local.settings.json must not silently win. Bundle vars and worker hints sit
+        // on top because the CLI just resolved them; in particular, the resolved
+        // FUNCTIONS_WORKER_RUNTIME overrides whatever local.settings.json declares so a stale
+        // value can't steer the host into a confusing "wrong language" failure deep in startup.
         var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         LocalSettingsSnapshot localSettings = _localSettingsProvider.Get(project.WorkingDirectory.Info);
-        foreach ((string name, string value) in localSettings.Values)
-        {
-            environmentVariables[name] = value;
-        }
+        MergeLocalSettingsValues(localSettings.Values, environmentVariables);
 
         foreach ((string name, string value) in context.State.HostEnvironmentVariables)
         {
@@ -92,4 +101,28 @@ internal sealed class PrepareProjectHostRunInitializationStep(ILocalSettingsProv
 
         return environmentVariables;
     }
+
+    private void MergeLocalSettingsValues(
+        IReadOnlyDictionary<string, string> values,
+        Dictionary<string, string> environmentVariables)
+    {
+        foreach ((string name, string value) in values)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                _interaction.WriteWarning("Skipping local setting with empty key.");
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(_processEnvironment.Get(name)))
+            {
+                _interaction.WriteWarning($"Skipping '{name}' from local.settings.json: already set in the current environment.");
+                continue;
+            }
+
+            // Empty string is intentionally preserved: callers use it to clear an inherited value.
+            environmentVariables[name] = value;
+        }
+    }
 }
+

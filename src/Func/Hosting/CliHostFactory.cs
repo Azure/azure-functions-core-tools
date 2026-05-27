@@ -85,6 +85,7 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
         }
 
+        builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerResolverFactory, DefaultFunctionsWorkerResolverFactory>();
         builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
