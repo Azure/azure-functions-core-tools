@@ -37,9 +37,4 @@ internal interface IManifestCache
     /// Returns <see langword="true"/> if a cached manifest file exists on disk.
     /// </summary>
     public bool ManifestExists();
-
-    /// <summary>
-    /// Reads a local file override, or <see langword="null"/> if the file doesn't exist.
-    /// </summary>
-    public Task<string?> TryReadLocalFileAsync(string path, CancellationToken cancellationToken);
 }

@@ -18,11 +18,13 @@ internal static class HttpClientDefaults
 
     public static IServiceCollection AddCliHttpDefaults(this IServiceCollection services)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.ConfigureHttpClientDefaults(builder =>
         {
             builder.ConfigureHttpClient(client =>
             {
-                client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
+                client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", _userAgent);
             });
         });
 

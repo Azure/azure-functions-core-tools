@@ -202,28 +202,33 @@ public sealed class QuickstartManifestServiceTests
     public async Task GetManifestAsync_LoadsFromLocalFile_WhenOverrideIsFilePath()
     {
         string manifest = CreateManifestJson("local-entry", "Python", "http", "v1.0.0");
-        IManifestCache cache = Substitute.For<IManifestCache>();
-        cache.TryReadLocalFileAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(manifest);
+        string tempFile = Path.Combine(Path.GetTempPath(), $"test-manifest-{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(tempFile, manifest);
+            IManifestCache cache = Substitute.For<IManifestCache>();
 
-        _options.ManifestUrl = Path.Combine(Path.GetTempPath(), "local-manifest.json");
-        QuickstartManifestService service = CreateService(
-            new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
+            _options.ManifestUrl = tempFile;
+            QuickstartManifestService service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
 
-        QuickstartManifest result = await service.GetManifestAsync();
+            QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("local-entry", result.Entries[0].Id);
+            Assert.Single(result.Entries);
+            Assert.Equal("local-entry", result.Entries[0].Id);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
     }
 
     [Fact]
     public async Task GetManifestAsync_Throws_WhenLocalFileDoesNotExist()
     {
         IManifestCache cache = Substitute.For<IManifestCache>();
-        cache.TryReadLocalFileAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((string?)null);
 
-        _options.ManifestUrl = Path.Combine(Path.GetTempPath(), "nonexistent.json");
+        _options.ManifestUrl = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid()}.json");
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
 

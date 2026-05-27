@@ -52,7 +52,14 @@ internal static class QuickstartUrlValidator
             return false;
         }
 
-        string[] segments = uri.AbsolutePath.Trim('/').Split('/', 2);
-        return segments.Length >= 1 && TrustedOrganizations.Contains(segments[0]);
+        if (!uri.IsDefaultPort)
+        {
+            return false;
+        }
+
+        string[] segments = uri.AbsolutePath.Trim('/').Split('/', 3);
+        return segments.Length >= 2
+            && TrustedOrganizations.Contains(segments[0])
+            && segments[1].Length > 0;
     }
 }

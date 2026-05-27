@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Quickstart;
 
@@ -35,10 +37,15 @@ internal static class QuickstartRegistration
                 }
             });
 
-        services.AddHttpClient(HttpClientName);
+        services.AddHttpClient(HttpClientName)
+            .ConfigureHttpClient((sp, client) =>
+            {
+                QuickstartManifestOptions opts = sp.GetRequiredService<IOptions<QuickstartManifestOptions>>().Value;
+                client.Timeout = opts.HttpTimeout;
+            });
 
         services.AddSingleton<IManifestCache, ManifestCache>();
-        services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IQuickstartManifestService, QuickstartManifestService>();
 
         return services;

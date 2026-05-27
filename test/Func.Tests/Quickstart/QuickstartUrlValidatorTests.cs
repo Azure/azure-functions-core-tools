@@ -64,4 +64,16 @@ public sealed class QuickstartUrlValidatorTests
     {
         Assert.False(QuickstartUrlValidator.IsAllowed("file:///c:/manifests/test.json"));
     }
+
+    [Fact]
+    public void IsAllowed_RejectsNonDefaultPort()
+    {
+        Assert.False(QuickstartUrlValidator.IsAllowed("https://github.com:8080/Azure/some-repo"));
+    }
+
+    [Fact]
+    public void IsAllowed_RejectsOrgWithoutRepo()
+    {
+        Assert.False(QuickstartUrlValidator.IsAllowed("https://github.com/Azure"));
+    }
 }

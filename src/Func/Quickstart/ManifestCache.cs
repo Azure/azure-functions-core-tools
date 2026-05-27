@@ -37,7 +37,7 @@ internal sealed class ManifestCache(IOptions<QuickstartManifestOptions> options)
     }
 
     /// <inheritdoc/>
-    public void WriteManifest(string json) => File.WriteAllText(ManifestFilePath, json);
+    public void WriteManifest(string json) => AtomicWrite(ManifestFilePath, json);
 
     /// <inheritdoc/>
     public ManifestCacheMeta? TryReadMeta()
@@ -62,20 +62,16 @@ internal sealed class ManifestCache(IOptions<QuickstartManifestOptions> options)
     public void WriteMeta(ManifestCacheMeta meta)
     {
         string json = JsonSerializer.Serialize(meta, QuickstartJsonContext.Default.ManifestCacheMeta);
-        File.WriteAllText(MetaFilePath, json);
+        AtomicWrite(MetaFilePath, json);
     }
 
     /// <inheritdoc/>
     public bool ManifestExists() => File.Exists(ManifestFilePath);
 
-    /// <inheritdoc/>
-    public async Task<string?> TryReadLocalFileAsync(string path, CancellationToken cancellationToken)
+    private static void AtomicWrite(string destinationPath, string content)
     {
-        if (!File.Exists(path))
-        {
-            return null;
-        }
-
-        return await File.ReadAllTextAsync(path, cancellationToken);
+        string tempPath = destinationPath + ".tmp";
+        File.WriteAllText(tempPath, content);
+        File.Move(tempPath, destinationPath, overwrite: true);
     }
 }

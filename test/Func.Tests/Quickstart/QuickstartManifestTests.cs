@@ -16,11 +16,10 @@ public sealed class QuickstartManifestTests
         string displayName = "Test Entry",
         string? shortDescription = "A test template",
         string? longDescription = null,
-        IReadOnlyList<string>? tags = null,
         int priority = 100) =>
         new(id, displayName, language, resource, iac,
             "https://github.com/Azure-Samples/test-repo", ".", "v1.0.0",
-            shortDescription, longDescription, null, tags ?? [], priority);
+            shortDescription, longDescription, null, priority);
 
     [Fact]
     public void Filter_ByLanguage_ReturnsMatchingEntries()

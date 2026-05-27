@@ -13,7 +13,7 @@ public sealed class QuickstartManifest
     /// </summary>
     public IReadOnlyList<QuickstartEntry> Entries { get; }
 
-    public QuickstartManifest(IReadOnlyList<QuickstartEntry> entries)
+    internal QuickstartManifest(IReadOnlyList<QuickstartEntry> entries)
     {
         Entries = entries ?? throw new ArgumentNullException(nameof(entries));
     }

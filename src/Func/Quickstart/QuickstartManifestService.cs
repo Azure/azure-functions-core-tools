@@ -75,7 +75,6 @@ internal sealed class QuickstartManifestService(
     private async Task<QuickstartManifest?> TryFetchFromCdnAsync(string? etag, CancellationToken cancellationToken)
     {
         HttpClient httpClient = _httpClientFactory.CreateClient(QuickstartRegistration.HttpClientName);
-        httpClient.Timeout = _options.HttpTimeout;
         using HttpRequestMessage request = new(HttpMethod.Get, _options.ManifestUrl);
         if (!string.IsNullOrEmpty(etag))
         {
@@ -87,7 +86,7 @@ internal sealed class QuickstartManifestService(
         if (response.StatusCode == HttpStatusCode.NotModified)
         {
             _logger.LogDebug("Manifest not modified (304); refreshing cache timestamp.");
-            _cache.WriteMeta(new ManifestCacheMeta(etag!, _timeProvider.GetUtcNow()));
+            _cache.WriteMeta(new ManifestCacheMeta(etag ?? string.Empty, _timeProvider.GetUtcNow()));
             return LoadCachedManifest();
         }
 
@@ -132,7 +131,7 @@ internal sealed class QuickstartManifestService(
     {
         _logger.LogDebug("Loading quickstart manifest from local file '{Path}'.", path);
 
-        string? json = await _cache.TryReadLocalFileAsync(path, cancellationToken);
+        string? json = File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken) : null;
         if (json is null)
         {
             throw new FileNotFoundException(
