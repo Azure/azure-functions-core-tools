@@ -12,10 +12,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Validates that the requested host workload is available.
 /// </summary>
-internal sealed class ValidateHostWorkloadInitializationStep(
-    IHostWorkloadResolver resolver,
-    IWorkloadInstaller installer,
-    IWorkloadPaths workloadPaths)
+internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolver resolver, IWorkloadInstaller installer, IWorkloadPaths workloadPaths)
     : DemoInitializationStep
 {
     public const string StepId = "resolve_host_workload";
@@ -81,12 +78,9 @@ internal sealed class ValidateHostWorkloadInitializationStep(
                     throw new GracefulException(message, isUserError: true);
                 }
 
-                var installStep = new InstallHostWorkloadInitializationStep(
-                    _installer,
-                    _workloadPaths,
-                    installRequired.PackageId,
-                    installRequired.HostVersion);
+                var installStep = new InstallHostWorkloadInitializationStep(_installer, _workloadPaths, installRequired.PackageId, installRequired.HostVersion);
                 context.AddNext(installStep);
+
                 return StartInitializationStepResult.Completed(installRequired.Message);
 
             default:
@@ -109,14 +103,6 @@ internal sealed class ValidateHostWorkloadInitializationStep(
         {
             throw new GracefulException(
                 $"{HostContentRootEnvironmentVariable} points to '{contentRoot}', but the host executable was not found at '{executablePath}'.",
-                isUserError: true);
-        }
-
-        string workersMarkerPath = Path.Combine(contentRoot, "workers", "workers.txt");
-        if (!File.Exists(workersMarkerPath))
-        {
-            throw new GracefulException(
-                $"{HostContentRootEnvironmentVariable} points to '{contentRoot}', but the host content marker was not found at '{workersMarkerPath}'.",
                 isUserError: true);
         }
 
