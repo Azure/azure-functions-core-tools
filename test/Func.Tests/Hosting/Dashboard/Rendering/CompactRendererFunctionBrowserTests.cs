@@ -443,6 +443,21 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
+    public async Task BuildLayout_WhenLogLineWraps_KeepsLayoutWithinViewport()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        console.Profile.Height = 18;
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        await renderer.OnEventAsync(Log("HttpTrigger1", new string('x', 500)), [], CancellationToken.None);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        string output = writer.ToString();
+        Assert.Contains("Function", output);
+        Assert.True(CountRenderedLines(output) <= console.Profile.Height);
+    }
+
+    [Fact]
     public void HandleKey_SlashSearchEnter_AppliesSelectedMatch()
     {
         (CompactRenderer renderer, _, _) = NewRenderer();

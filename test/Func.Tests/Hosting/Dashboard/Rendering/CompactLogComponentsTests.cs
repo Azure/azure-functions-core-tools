@@ -19,9 +19,9 @@ public class CompactLogComponentsTests
     {
         var buffer = new CompactLogBuffer(capacity: 2);
 
-        buffer.Add(new CompactLogLine(new Text("first"), "First", IsError: false, LogLevel.Information));
-        buffer.Add(new CompactLogLine(new Text("second"), "Second", IsError: false, LogLevel.Information));
-        buffer.Add(new CompactLogLine(new Text("third"), "Third", IsError: true, LogLevel.Error));
+        buffer.Add(new CompactLogLine(new Text("first"), "First", isError: false, LogLevel.Information));
+        buffer.Add(new CompactLogLine(new Text("second"), "Second", isError: false, LogLevel.Information));
+        buffer.Add(new CompactLogLine(new Text("third"), "Third", isError: true, LogLevel.Error));
 
         CompactLogLine[] lines = buffer.Snapshot();
 
@@ -53,6 +53,27 @@ public class CompactLogComponentsTests
         Assert.False(line.IsError);
         Assert.Equal(LogLevel.Warning, line.Level);
         Assert.Contains("Queue depth is high", Render(line.Renderable));
+    }
+
+    [Fact]
+    public void Format_WithLongRawFunctionLog_WrapsIntoVisualRows()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Function.HttpTrigger1",
+            LogLevel.Information,
+            default,
+            new string('x', 120),
+            Exception: null,
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.FunctionName] = "HttpTrigger1",
+            });
+
+        CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
+
+        Assert.True(line.RenderRows(width: 80).Count > 1);
     }
 
     [Fact]
