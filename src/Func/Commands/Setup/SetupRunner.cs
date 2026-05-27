@@ -200,7 +200,7 @@ internal sealed class SetupRunner(
         {
             string picked = await _interaction.PromptForSelectionAsync(
                 "Select a stack to install:",
-                SetupDependency.StackRuntimes,
+                SetupDependency.Stacks,
                 cancellationToken);
             return [picked];
         }
@@ -620,18 +620,12 @@ internal sealed record SetupDependency(
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
 
-    // Maps a profile `supportedRuntimes` entry to the suffix of the matching stack
-    // workload package. Runtimes that don't have a corresponding stack workload
-    // (java, powershell, custom, dotnet in-proc) are intentionally absent and
-    // callers skip them silently.
-    private static readonly IReadOnlyDictionary<string, string> _runtimeToStackSuffix =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["node"] = "Node",
-            ["python"] = "Python",
-            ["go"] = "Go",
-            ["dotnet-isolated"] = "DotNet",
-        };
+    // TODO: this should not be hardcoded in the CLI; discover the stack package
+    // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
+    // require a CLI release. Stacks not in this set (java, powershell, custom,
+    // dotnet in-proc) skip silently today.
+    private static readonly HashSet<string> _stacks =
+        new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet-isolated" };
 
     public static SetupDependency Host(VersionRange? versionRange)
         => new(
@@ -663,20 +657,26 @@ internal sealed record SetupDependency(
             rangeText,
             ResolvedPackageId: null);
 
-    public static SetupDependency Stack(string runtime)
+    public static SetupDependency Stack(string stack)
         => new(
             SetupDependencyKind.Stack,
-            runtime,
-            $"{runtime} stack",
-            StackPackagePrefix + _runtimeToStackSuffix[runtime],
+            stack,
+            $"{stack} stack",
+            StackPackagePrefix + StackPackageSuffix(stack),
             VersionRange: null,
             RangeText: null,
             ResolvedPackageId: null);
 
-    public static bool SupportsStack(string runtime)
-        => !string.IsNullOrWhiteSpace(runtime) && _runtimeToStackSuffix.ContainsKey(runtime.Trim());
+    public static bool SupportsStack(string stack)
+        => !string.IsNullOrWhiteSpace(stack) && _stacks.Contains(stack.Trim());
 
-    public static IReadOnlyList<string> StackRuntimes => [.. _runtimeToStackSuffix.Keys];
+    public static IReadOnlyList<string> Stacks => [.. _stacks];
+
+    // dotnet-isolated is the one stack whose package suffix doesn't match the
+    // runtime identifier verbatim; the rest concat directly (NuGet package ids
+    // are case-insensitive).
+    private static string StackPackageSuffix(string stack)
+        => string.Equals(stack, "dotnet-isolated", StringComparison.OrdinalIgnoreCase) ? "DotNet" : stack;
 
     private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
 
