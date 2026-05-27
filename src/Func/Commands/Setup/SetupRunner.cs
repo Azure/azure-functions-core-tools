@@ -170,7 +170,7 @@ internal sealed class SetupRunner(
                     break;
 
                 case "dotnet-inprocess":
-                    throw new SetupConfigurationException("The 'dotnet-inprocess' feature is not supported. Use 'dotnet-isolated'.");
+                    throw new SetupConfigurationException(".NET in-process is not supported. Use 'dotnet-isolated'.");
 
                 default:
                     workerRuntimes.Add(feature);
