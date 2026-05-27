@@ -6,19 +6,16 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
-using Azure.Functions.Cli.DemoProject;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Http;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workers;
-using Azure.Functions.Cli.Workloads;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using static Azure.Functions.Cli.Projects.FunctionsProjectResolver;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -97,17 +94,6 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IExtensionBundleResolver, ExtensionBundleResolver>();
         builder.Services.AddSingleton<IHostWorkloadResolver, DefaultHostWorkloadResolver>();
         builder.Services.AddSingleton<IStartInitializationRunner, DemoStartInitializationRunner>();
-        builder.Services.AddSingleton(new WorkloadProjectFactoryRegistration(
-            new RuntimeWorkloadInfo(
-                new DotnetWorkload(),
-                "test",
-                "1.0",
-                [],
-                AppContext.BaseDirectory,
-                AppContext.BaseDirectory,
-                "test",
-                "description"),
-            new DemoProjectFactory()));
 
         builder.Services.AddSingleton<StartDashboardEventStreamFactory>();
 

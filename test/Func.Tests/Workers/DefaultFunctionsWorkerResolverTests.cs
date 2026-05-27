@@ -125,7 +125,7 @@ public class DefaultFunctionsWorkerResolverTests
         FunctionsWorkerResolutionFailure.NotInstalled failure =
             Assert.IsType<FunctionsWorkerResolutionFailure.NotInstalled>(notResolved.Failure);
         Assert.Equal("ruby", failure.WorkerId.Value);
-        Assert.Contains("func workload install ruby-worker", failure.Message);
+        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.ruby --exact", failure.Message);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class DefaultFunctionsWorkerResolverTests
             Assert.IsType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>(notResolved.Failure);
         Assert.Equal("node", failure.WorkerId.Value);
         Assert.Null(failure.VersionConstraint);
-        Assert.Contains("func workload install node-worker --force", failure.Message);
+        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.node --exact --force", failure.Message);
         _fileSystem.DidNotReceive().FileExists(Arg.Any<string>());
     }
 
@@ -202,7 +202,7 @@ public class DefaultFunctionsWorkerResolverTests
         FunctionsWorkerResolutionFailure.MissingCompatibleVersion failure =
             Assert.IsType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>(notResolved.Failure);
         Assert.Equal("[3.13.0]", failure.VersionConstraint);
-        Assert.Contains("func workload install node-worker", failure.Message);
+        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.node --exact", failure.Message);
     }
 
     [Fact]
@@ -225,7 +225,7 @@ public class DefaultFunctionsWorkerResolverTests
         Assert.Equal(PythonWorkerPackageId, failure.PackageId);
         Assert.Equal("4.43.0", failure.PackageVersion);
         Assert.Equal(workerConfigPath, failure.WorkerConfigPath);
-        Assert.Contains("func workload install python-worker --force", failure.Message);
+        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.python --exact --force", failure.Message);
     }
 
     [Fact]
@@ -292,4 +292,5 @@ public class DefaultFunctionsWorkerResolverTests
             packageId,
             string.Empty);
     }
+
 }

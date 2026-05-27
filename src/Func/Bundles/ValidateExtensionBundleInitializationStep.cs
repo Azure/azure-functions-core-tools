@@ -106,7 +106,7 @@ internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializa
     }
 
     private static string? ResolveWorkerRuntime(StartInitializationStepContext context)
-        => context.State.Project?.StackName?.ToLowerInvariant();
+        => context.State.Worker?.WorkerRuntime;
 
     private static string? NullIfNone(string? profile) =>
         string.IsNullOrWhiteSpace(profile) || string.Equals(profile, "none", StringComparison.OrdinalIgnoreCase)

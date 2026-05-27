@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
@@ -15,10 +16,12 @@ using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using NuGet.Configuration;
 using NuGet.Versioning;
 using Spectre.Console;
 using Xunit;
@@ -183,7 +186,12 @@ public class StartInitializationTests : IDisposable
         hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(hostResolution);
         var renderer = new RecordingStartInitializationRenderer();
-        var runner = CreateRunner(projectResolver, profileResolution, hostWorkloadResolver);
+        IFunctionsWorkerResolverFactory workerResolverFactory = CreateWorkerResolverFactory();
+        var runner = CreateRunner(
+            projectResolver,
+            profileResolution,
+            hostWorkloadResolver,
+            workerResolverFactory: workerResolverFactory);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -200,8 +208,83 @@ public class StartInitializationTests : IDisposable
                 ReferenceEquals(hostContext.ProfileHostVersionRange, hostRange)),
             Arg.Any<CancellationToken>());
         await projectResolver.Received(1).ResolveProjectAsync(
-            Arg.Is<ProjectResolutionContext>(projectContext => HasWorkerRange(projectContext, workerRanges["node"])),
+            Arg.Is<ProjectResolutionContext>(projectContext =>
+                projectContext.WorkingDirectory.Info.FullName == _tempDir),
             Arg.Any<CancellationToken>());
+        workerResolverFactory.Received(1).Create(
+            Arg.Is<IReadOnlyDictionary<string, VersionRange>>(ranges =>
+                HasWorkerRange(ranges, workerRanges["node"])));
+    }
+
+    [Fact]
+    public async Task DemoRunner_ProfiledMissingWorkerInstallsConventionPackageAndRetries()
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "node",
+            stackDisplayName: "Node.js");
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found package.json"));
+        var workerId = new FunctionsWorkerId("node");
+        FunctionsWorkerResolutionFailure failure = CreateNotInstalledWorkerFailure("node");
+        IFunctionsWorkerResolver workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+        workerResolver.ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>())
+            .Returns(
+                FunctionsWorkerResolutionResults.NotResolved(failure),
+                FunctionsWorkerResolutionResults.Resolved(CreateWorker("node", "node", "3.13.0")));
+        IFunctionsWorkerResolverFactory workerResolverFactory = CreateWorkerResolverFactory(workerResolver);
+        var workerRange = VersionRange.Parse("[3.13.0]");
+        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = workerRange,
+        };
+        IWorkloadCatalog workloadCatalog = Substitute.For<IWorkloadCatalog>();
+        workloadCatalog.ResolveLatestVersionInRangeAsync(
+                FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
+                workerRange,
+                includePrerelease: false,
+                source: null,
+                Arg.Any<CancellationToken>())
+            .Returns(new ResolvedPackage(
+                FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
+                NuGetVersion.Parse("3.13.0"),
+                new PackageSource("https://example.test/v3/index.json")));
+        IWorkloadInstaller workloadInstaller = CreateSuccessfulInstaller();
+        IInteractionService interaction = Substitute.For<IInteractionService>();
+        interaction.ConfirmAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        var runner = CreateRunner(
+            projectResolver,
+            CreateResolvedProfile(workerRanges),
+            CreateInstalledHostWorkloadResolver(),
+            workloadInstaller,
+            workerResolverFactory,
+            workloadCatalog,
+            interaction);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        StartInitializationResult result = await runner.RunAsync(
+            context,
+            new RecordingStartInitializationRenderer(),
+            CancellationToken.None);
+
+        Assert.Equal("node", result.Worker.WorkerRuntime);
+        Assert.Equal("3.13.0", result.Worker.Version);
+        await workloadInstaller.Received(1).InstallFromCatalogAsync(
+            FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
+            NuGetVersion.Parse("3.13.0"),
+            "https://example.test/v3/index.json",
+            includePrerelease: false,
+            exact: true,
+            force: false,
+            progress: null,
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -246,6 +329,43 @@ public class StartInitializationTests : IDisposable
             () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None));
 
         Assert.Contains("does not support the detected runtime 'node'", ex.Message);
+    }
+
+    [Fact]
+    public async Task DemoRunner_WorkerProjectCreationFailure_ThrowsWithoutInstallingWorker()
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        FunctionsWorkerResolutionFailure workerFailure = CreateNotInstalledWorkerFailure("node");
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(CreateWorkerNotResolvedResult(workerFailure));
+        IWorkloadInstaller workloadInstaller = CreateSuccessfulInstaller();
+        var runner = CreateRunner(
+            projectResolver,
+            hostWorkloadResolver: CreateInstalledHostWorkloadResolver(),
+            workloadInstaller: workloadInstaller);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None));
+
+        Assert.Contains(workerFailure.Message, ex.Message);
+        await projectResolver.Received(1).ResolveProjectAsync(
+            Arg.Any<ProjectResolutionContext>(),
+            Arg.Any<CancellationToken>());
+        await workloadInstaller.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -299,6 +419,7 @@ public class StartInitializationTests : IDisposable
             stackName: "node",
             stackDisplayName: "Node.js");
         FunctionsProjectHostRunContext hostRunContext = CreateHostRunContext(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
+        IFunctionsWorker worker = CreateWorker("node", "node");
         var result = new StartInitializationResult(
             runInfo,
             eventStream,
@@ -306,6 +427,7 @@ public class StartInitializationTests : IDisposable
             BundleRequired: true,
             BundleVersion: "4.35.0",
             project,
+            worker,
             hostRunContext,
             profile);
         var completedEvent = new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, result);
@@ -366,6 +488,7 @@ public class StartInitializationTests : IDisposable
         var eventStream = new InMemoryHostEventStream();
         FunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
         FunctionsProjectHostRunContext hostRunContext = CreateHostRunContext(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
+        IFunctionsWorker worker = CreateWorker("dotnet-isolated", "dotnet-isolated");
         var result = new StartInitializationResult(
             runInfo,
             eventStream,
@@ -373,6 +496,7 @@ public class StartInitializationTests : IDisposable
             BundleRequired: false,
             BundleVersion: null,
             project,
+            worker,
             hostRunContext);
         var completedEvent = new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, result);
 
@@ -454,7 +578,9 @@ public class StartInitializationTests : IDisposable
         string cliVersion,
         int demoFunctionCount,
         double demoSpeedMultiplier,
-        bool demoAutoExit)
+        bool demoAutoExit,
+        bool offline = false,
+        bool canPrompt = true)
     {
         var options = new StartCommandOptions(
             workingDirectory,
@@ -466,7 +592,7 @@ public class StartInitializationTests : IDisposable
             EnableAuth: false,
             RequestedProfileName: null,
             RequestedHostVersion: null,
-            Offline: false,
+            Offline: offline,
             OutputMode.Compact,
             NoTui: false,
             LogFilePath: null,
@@ -477,8 +603,8 @@ public class StartInitializationTests : IDisposable
         return new StartInitializationContext(
             options,
             cliVersion,
-            IsInteractive: true,
-            CanPrompt: true);
+            IsInteractive: canPrompt,
+            CanPrompt: canPrompt);
     }
 
     private static TestFunctionsProject CreateProject(
@@ -486,20 +612,11 @@ public class StartInitializationTests : IDisposable
         string stackName = "dotnet-isolated",
         string stackDisplayName = ".NET",
         bool supportsExtensionBundles = false)
-    {
-        IFunctionsWorker worker = Substitute.For<IFunctionsWorker>();
-        worker.Id.Returns(new FunctionsWorkerId(stackName));
-        worker.WorkerRuntime.Returns(stackName);
-        worker.WorkerConfigPath.Returns("c:\\some\\path");
-        worker.Version.Returns("1.0.0");
-
-        return new TestFunctionsProject(
+        => new(
             workingDirectory,
             stackName,
             stackDisplayName,
-            supportsExtensionBundles,
-            worker);
-    }
+            supportsExtensionBundles);
 
     private static FunctionsProjectHostRunContext CreateHostRunContext(WorkingDirectory workingDirectory)
         => new(
@@ -520,7 +637,10 @@ public class StartInitializationTests : IDisposable
         IFunctionsProjectResolver projectResolver,
         ProfileResolution? profileResolution = null,
         IHostWorkloadResolver? hostWorkloadResolver = null,
-        IWorkloadInstaller? workloadInstaller = null)
+        IWorkloadInstaller? workloadInstaller = null,
+        IFunctionsWorkerResolverFactory? workerResolverFactory = null,
+        IWorkloadCatalog? workloadCatalog = null,
+        IInteractionService? interaction = null)
     {
         IProfileResolver profileResolver = Substitute.For<IProfileResolver>();
         profileResolver.ResolveAsync(Arg.Any<ProfileResolutionContext>(), Arg.Any<CancellationToken>())
@@ -535,7 +655,12 @@ public class StartInitializationTests : IDisposable
                 .Returns(defaultHostResolution);
         }
 
-        workloadInstaller ??= CreateSuccessfulHostInstaller();
+        workloadInstaller ??= CreateSuccessfulInstaller();
+        workerResolverFactory ??= CreateWorkerResolverFactory();
+        workloadCatalog ??= Substitute.For<IWorkloadCatalog>();
+        interaction ??= Substitute.For<IInteractionService>();
+        interaction.ConfirmAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(true);
         IExtensionBundleResolver bundleResolver = Substitute.For<IExtensionBundleResolver>();
         var bundleSectionReader = new HostJsonBundleSectionReader();
 
@@ -545,11 +670,39 @@ public class StartInitializationTests : IDisposable
             bundleSectionReader,
             profileResolver,
             hostWorkloadResolver,
+            workerResolverFactory,
+            workloadCatalog,
             workloadInstaller,
+            interaction,
             NullLoggerFactory.Instance);
     }
 
-    private static IWorkloadInstaller CreateSuccessfulHostInstaller()
+    private static IFunctionsWorkerResolverFactory CreateWorkerResolverFactory(IFunctionsWorkerResolver? workerResolver = null)
+    {
+        if (workerResolver is null)
+        {
+            workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+            workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
+                .Returns(callInfo =>
+                {
+                    FunctionsWorkerId workerId = callInfo.ArgAt<FunctionsWorkerId>(0);
+                    return FunctionsWorkerResolutionResults.Resolved(CreateWorker(workerId.Value, workerId.Value));
+                });
+        }
+
+        IFunctionsWorkerResolverFactory workerResolverFactory = Substitute.For<IFunctionsWorkerResolverFactory>();
+        workerResolverFactory.Create(Arg.Any<IReadOnlyDictionary<string, VersionRange>>())
+            .Returns(workerResolver);
+        return workerResolverFactory;
+    }
+
+    private static IFunctionsWorker CreateWorker(
+        string workerId,
+        string workerRuntime,
+        string version = "1.0.0")
+        => new TestFunctionsWorker(new FunctionsWorkerId(workerId), workerRuntime, "worker.config.json", version);
+
+    private static IWorkloadInstaller CreateSuccessfulInstaller()
     {
         IWorkloadInstaller workloadInstaller = Substitute.For<IWorkloadInstaller>();
         workloadInstaller.InstallFromCatalogAsync(
@@ -563,12 +716,48 @@ public class StartInitializationTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
+                string packageId = callInfo.ArgAt<string>(0);
                 var version = (NuGetVersion?)callInfo[1];
-                string packageVersion = version?.ToNormalizedString() ?? "4.834.0";
-                return new WorkloadInstallResult(CreateHostEntry(packageVersion), AlreadyInstalled: false);
+                string packageVersion = version?.ToNormalizedString() ?? DefaultInstallVersion(packageId);
+                WorkloadEntry entry = string.Equals(packageId, "host", StringComparison.OrdinalIgnoreCase)
+                    ? CreateHostEntry(packageVersion)
+                    : CreateWorkerEntry(packageId, packageVersion);
+                return new WorkloadInstallResult(entry, AlreadyInstalled: false);
             });
 
         return workloadInstaller;
+    }
+
+    private static string DefaultInstallVersion(string packageId)
+        => packageId.Contains("worker", StringComparison.OrdinalIgnoreCase) ? "3.13.0" : "4.834.0";
+
+    private static IHostWorkloadResolver CreateInstalledHostWorkloadResolver()
+    {
+        IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+        HostWorkloadResolution hostResolution = new HostWorkloadResolution.Installed(
+            CreateHostWorkload("4.1000.0"),
+            NuGetVersion.Parse("4.1000.0"),
+            ExplicitlyRequested: false);
+        hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(hostResolution);
+        return hostWorkloadResolver;
+    }
+
+    private static ProfileResolution CreateResolvedProfile(IReadOnlyDictionary<string, VersionRange> workerVersionRanges)
+    {
+        var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
+        var profile = new ResolvedProfile(
+            "flex",
+            profileSource,
+            Sku: "flex",
+            ProfileStatus.Stable,
+            DeprecationUrl: null,
+            VersionRange.Parse("[1.8.1, 4.1048.200)"),
+            workerVersionRanges,
+            ExtensionBundleVersionRange: null,
+            SupportedRuntimes: ["node"],
+            Notes: null);
+        return new ProfileResolution.Resolved(profile, []);
     }
 
     private static WorkloadEntry CreateHostEntry(string packageVersion)
@@ -582,6 +771,32 @@ public class StartInitializationTests : IDisposable
             Description = string.Empty,
         };
 
+    private static WorkloadEntry CreateWorkerEntry(string packageId, string packageVersion)
+        => new()
+        {
+            PackageId = packageId,
+            PackageVersion = packageVersion,
+            Kind = WorkloadKind.Content,
+            Aliases = packageId.EndsWith("-worker", StringComparison.OrdinalIgnoreCase) ? [packageId] : [],
+            DisplayName = packageId,
+            Description = string.Empty,
+        };
+
+    private static FunctionsWorkerResolutionFailure CreateNotInstalledWorkerFailure(string runtime)
+    {
+        var workerId = new FunctionsWorkerId(runtime);
+        string packageId = $"Azure.Functions.Cli.Workloads.Workers.{runtime}";
+        return FunctionsWorkerResolutionFailures.NotInstalled(
+            workerId,
+            $"No installed Azure Functions worker was found for '{runtime}'. Run 'func workload install {packageId} --exact' to install it.");
+    }
+
+    private static ProjectResolutionResult CreateWorkerNotResolvedResult(FunctionsWorkerResolutionFailure workerFailure)
+    {
+        ProjectCreationFailure failure = new ProjectCreationFailure.WorkerNotResolved(workerFailure, workerFailure.Message);
+        return ProjectResolutionResults.NotResolved(workerFailure.Message, failure);
+    }
+
     private static ContentWorkloadInfo CreateHostWorkload(string packageVersion)
         => new(
             PackageId: HostWorkloadPackage.CurrentPackageId,
@@ -592,8 +807,8 @@ public class StartInitializationTests : IDisposable
             DisplayName: "Azure Functions host",
             Description: string.Empty);
 
-    private static bool HasWorkerRange(ProjectResolutionContext context, VersionRange expectedRange)
-        => context.WorkerVersionRanges.TryGetValue("node", out VersionRange? actualRange)
+    private static bool HasWorkerRange(IReadOnlyDictionary<string, VersionRange> ranges, VersionRange expectedRange)
+        => ranges.TryGetValue("node", out VersionRange? actualRange)
            && ReferenceEquals(actualRange, expectedRange);
 
     private static int FindStartedStepIndex(IReadOnlyList<StartInitializationEvent> events, string stepId)
@@ -643,11 +858,10 @@ public class StartInitializationTests : IDisposable
         WorkingDirectory workingDirectory,
         string stackName,
         string stackDisplayName,
-        bool supportsExtensionBundles,
-        IFunctionsWorker worker) : FunctionsProject
+        bool supportsExtensionBundles) : FunctionsProject
     {
         private readonly WorkingDirectory _workingDirectory = workingDirectory;
-        private readonly IFunctionsWorker _worker = worker;
+        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(stackName);
 
         public List<FunctionsProjectHostRunContext> PreparedContexts { get; } = [];
 
@@ -661,7 +875,7 @@ public class StartInitializationTests : IDisposable
 
         public override bool SupportsExtensionBundles => supportsExtensionBundles;
 
-        public override IFunctionsWorker Worker => _worker;
+        public override FunctionsWorkerReference WorkerReference => _workerReference;
 
         public override Task PrepareForHostRunAsync(
             FunctionsProjectHostRunContext context,
@@ -672,6 +886,12 @@ public class StartInitializationTests : IDisposable
             return Task.CompletedTask;
         }
     }
+
+    private sealed record TestFunctionsWorker(
+        FunctionsWorkerId Id,
+        string WorkerRuntime,
+        string WorkerConfigPath,
+        string Version) : IFunctionsWorker;
 
     private sealed class TestTerminalOutput(TextWriter writer) : IAnsiConsoleOutput
     {
