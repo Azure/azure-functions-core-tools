@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workers;
 using NSubstitute;
 using Xunit;
 
@@ -12,14 +11,11 @@ namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 public class DotNetProjectFactoryTests : IDisposable
 {
     private readonly DirectoryInfo _projectDir;
-    private readonly IFunctionsWorkerResolver _workerResolver = Substitute.For<IFunctionsWorkerResolver>();
     private readonly IDotnetCliRunner _dotnetCli = Substitute.For<IDotnetCliRunner>();
 
     public DotNetProjectFactoryTests()
     {
         _projectDir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "func-dotnet-resolver-" + Guid.NewGuid().ToString("N")));
-        _workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
-            .Returns(FunctionsWorkerResolutionResults.Resolved(CreateWorker("dotnet", "dotnet")));
     }
 
     public void Dispose()
@@ -92,30 +88,12 @@ public class DotNetProjectFactoryTests : IDisposable
     public async Task Nonexistent_directory_does_not_match()
     {
         var nonexistent = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "func-dotnet-missing-" + Guid.NewGuid().ToString("N")));
-        var context = new ProjectCreationContext(WorkingDirectory.FromExplicit(nonexistent.FullName), _workerResolver);
+        var context = new ProjectCreationContext(WorkingDirectory.FromExplicit(nonexistent.FullName));
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(context, default);
 
         ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
         Assert.Equal("directory does not exist", notCreated.Reason);
-    }
-
-    [Fact]
-    public async Task Worker_not_resolved_returns_failed()
-    {
-        WriteFile("MyApp.csproj", "<Project></Project>");
-        FunctionsWorkerResolutionFailure failure = FunctionsWorkerResolutionFailures.NotInstalled(
-            new FunctionsWorkerId("dotnet"),
-            "missing dotnet worker");
-        _workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
-            .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
-
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
-
-        ProjectCreationResult.Failed failed = Assert.IsType<ProjectCreationResult.Failed>(result);
-        ProjectCreationFailure.WorkerNotResolved workerFailure =
-            Assert.IsType<ProjectCreationFailure.WorkerNotResolved>(failed.Failure);
-        Assert.Same(failure, workerFailure.WorkerFailure);
     }
 
     [Fact]
@@ -191,14 +169,5 @@ public class DotNetProjectFactoryTests : IDisposable
         => File.WriteAllText(Path.Combine(_projectDir.FullName, name), contents);
 
     private ProjectCreationContext CreateContext()
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), _workerResolver);
-
-    private static IFunctionsWorker CreateWorker(string workerId, string workerRuntime)
-        => new TestFunctionsWorker(new FunctionsWorkerId(workerId), workerRuntime, "worker.config.json", "1.0.0");
-
-    private sealed record TestFunctionsWorker(
-        FunctionsWorkerId Id,
-        string WorkerRuntime,
-        string WorkerConfigPath,
-        string Version) : IFunctionsWorker;
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName));
 }

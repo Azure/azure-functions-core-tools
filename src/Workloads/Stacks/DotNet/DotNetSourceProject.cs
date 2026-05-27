@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workers;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
@@ -11,7 +10,7 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// A .NET Functions project detected from source (has a .csproj/.fsproj).
 /// Requires building before host startup.
 /// </summary>
-internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, IFunctionsWorker worker, string projectFilePath, IDotnetCliRunner dotnetCli) : DotNetProject(workingDirectory, worker)
+internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, string projectFilePath, IDotnetCliRunner dotnetCli) : DotNetProject(workingDirectory)
 {
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
 
@@ -33,7 +32,7 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, IFu
     private async Task<DirectoryInfo> GetOutputDirectoryAsync(string projectDir, CancellationToken cancellationToken)
     {
         string output = await _dotnetCli.RunWithOutputAsync(
-            ["msbuild", ProjectFilePath, "--getProperty:OutputDir"],
+            ["msbuild", ProjectFilePath, "--getProperty:OutputPath"],
             projectDir,
             cancellationToken);
 
@@ -41,7 +40,7 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, IFu
         if (string.IsNullOrEmpty(outputPath))
         {
             throw new InvalidOperationException(
-                $"Could not determine OutputDirectory for project '{Path.GetFileName(ProjectFilePath)}'.");
+                $"Could not determine OutputPath for project '{Path.GetFileName(ProjectFilePath)}'.");
         }
 
         // OutputPath may be relative to the project directory.

@@ -10,10 +10,11 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// <summary>
 /// Base class for .NET Functions projects. Holds the common stack metadata.
 /// </summary>
-internal abstract class DotNetProject(WorkingDirectory workingDirectory, IFunctionsWorker worker) : FunctionsProject
+internal abstract class DotNetProject(WorkingDirectory workingDirectory) : FunctionsProject
 {
+    private static readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload("dotnet");
+
     private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-    private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -23,5 +24,5 @@ internal abstract class DotNetProject(WorkingDirectory workingDirectory, IFuncti
 
     public override bool SupportsExtensionBundles => false;
 
-    public override IFunctionsWorker Worker => _worker;
+    public override FunctionsWorkerReference WorkerReference => _workerReference;
 }
