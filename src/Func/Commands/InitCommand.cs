@@ -193,9 +193,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     // Returns false only when the user declined the interactive prompt.
     private async Task<bool> ConfirmClearDirectoryAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
     {
-        bool hasContent = workingDirectory.EnumerateFiles().Any()
-            || workingDirectory.EnumerateDirectories().Any(d => !string.Equals(d.Name, ".git", StringComparison.Ordinal));
-        if (!hasContent)
+        if (!DirectoryGuard.HasNonGitContent(workingDirectory))
         {
             return true;
         }
@@ -217,21 +215,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     // doesn't lose history.
     private static void ClearDirectory(DirectoryInfo workingDirectory)
     {
-        foreach (FileInfo file in workingDirectory.EnumerateFiles())
-        {
-            file.Attributes = FileAttributes.Normal;
-            file.Delete();
-        }
-
-        foreach (DirectoryInfo dir in workingDirectory.EnumerateDirectories())
-        {
-            if (string.Equals(dir.Name, ".git", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            dir.Delete(recursive: true);
-        }
+        DirectoryGuard.ClearExceptGit(workingDirectory);
     }
 
     private static bool IsAlreadyInitialized(DirectoryInfo workingDirectory, out string existingFile)

@@ -13,6 +13,10 @@ public interface IQuickstartScaffolder
     /// <summary>
     /// Scaffolds the given template entry into <paramref name="targetDirectory"/>.
     /// </summary>
+    /// <param name="entry">The manifest entry describing the template to scaffold.</param>
+    /// <param name="targetDirectory">Absolute path to the directory where template files are written.</param>
+    /// <param name="fetchMode">Strategy for downloading the template content.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public Task ScaffoldAsync(
         QuickstartEntry entry,
         string targetDirectory,

@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.DemoProject;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
@@ -114,6 +115,7 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();
 
         builder.Services.AddBuiltInCommands();
+        builder.Services.AddQuickstartScaffolder();
         builder.Services.AddWorkloadStorage();
         builder.Services.AddProfiles();
         builder.Services.AddWorkloadCatalog();
