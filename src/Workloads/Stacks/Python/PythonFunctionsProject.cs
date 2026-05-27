@@ -11,17 +11,24 @@ using Azure.Functions.Cli.Workers;
 namespace Azure.Functions.Cli.Workloads.Python;
 
 /// <summary>
-/// Python Functions project. Before the host runs, creates a project-local
-/// <c>.venv</c> (when missing) and installs <c>requirements.txt</c> into it,
-/// then points the worker at the venv so the user's deps are resolvable.
+/// Python Functions project. Before the host runs, resolves the project's
+/// virtual environment (honoring <c>$VIRTUAL_ENV</c> or a pre-existing
+/// <c>.venv</c> / <c>venv</c> / <c>env</c> folder, otherwise creating
+/// <c>.venv</c>), installs <c>requirements.txt</c> into it, and points the
+/// worker at the venv interpreter so the user's deps are resolvable.
 /// </summary>
 internal sealed class PythonFunctionsProject : FunctionsProject
 {
-    internal const string VenvFolderName = ".venv";
+    internal const string DefaultVenvFolderName = ".venv";
     internal const string IsolateWorkerDepsEnvVar = "PYTHON_ISOLATE_WORKER_DEPENDENCIES";
     internal const string WorkerExecutablePathEnvVar = "languageWorkers:python:defaultExecutablePath";
     internal const string WorkerRuntimeVersionEnvVar = "FUNCTIONS_WORKER_RUNTIME_VERSION";
+    internal const string VirtualEnvEnvVar = "VIRTUAL_ENV";
     private const string RequirementsFileName = "requirements.txt";
+
+    // Conventional venv folder names to look for in the project root before
+    // creating a new one. Order matters: most-common first.
+    private static readonly string[] _venvFolderCandidates = [".venv", "venv", "env", ".virtualenv"];
 
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
@@ -38,6 +45,8 @@ internal sealed class PythonFunctionsProject : FunctionsProject
     internal Func<string, string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunPipInstall { get; set; } = DefaultRunPipInstall;
 
     internal Func<string, CancellationToken, Task<string?>> ReadPythonVersion { get; set; } = DefaultReadPythonVersion;
+
+    internal Func<string, string?> ReadEnvironmentVariable { get; set; } = Environment.GetEnvironmentVariable;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -57,16 +66,16 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         // Python has no compile step, so --no-build (context.SkipBuild) is a no-op
         // here: venv creation and pip install are restore, not build.
         string root = _workingDirectory.Info.FullName;
-        string venvPath = Path.Combine(root, VenvFolderName);
+        (string venvPath, bool venvAlreadyExisted) = ResolveVenvPath(root);
 
-        if (!Directory.Exists(venvPath))
+        if (!venvAlreadyExisted)
         {
             (int exitCode, string stderr) = await RunCreateVenv(root, venvPath, cancellationToken).ConfigureAwait(false);
             if (exitCode != 0)
             {
                 string detail = string.IsNullOrWhiteSpace(stderr) ? "see output above." : stderr.Trim();
                 throw new GracefulException(
-                    $"'python -m venv {VenvFolderName}' failed (exit {exitCode}). {detail}",
+                    $"'python -m venv {Path.GetFileName(venvPath)}' failed (exit {exitCode}). {detail}",
                     isUserError: true);
             }
         }
@@ -109,6 +118,34 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         string folder = OperatingSystem.IsWindows() ? "Scripts" : "bin";
         string name = OperatingSystem.IsWindows() ? executable + ".exe" : executable;
         return Path.Combine(venvPath, folder, name);
+    }
+
+    // Pick the venv to use, in priority order:
+    //   1. $VIRTUAL_ENV (set by the `activate` script) so an explicitly-activated
+    //      venv wins, even if it lives outside the project.
+    //   2. Any conventional folder already present at the project root
+    //      (.venv, venv, env, .virtualenv).
+    //   3. Fall back to creating .venv inside the project root.
+    // Returns the resolved venv path and whether it already exists on disk; the
+    // caller skips `python -m venv` when it does.
+    private (string Path, bool AlreadyExists) ResolveVenvPath(string projectRoot)
+    {
+        string? activated = ReadEnvironmentVariable(VirtualEnvEnvVar);
+        if (!string.IsNullOrWhiteSpace(activated) && Directory.Exists(activated))
+        {
+            return (activated, true);
+        }
+
+        foreach (string candidate in _venvFolderCandidates)
+        {
+            string candidatePath = Path.Combine(projectRoot, candidate);
+            if (Directory.Exists(candidatePath))
+            {
+                return (candidatePath, true);
+            }
+        }
+
+        return (Path.Combine(projectRoot, DefaultVenvFolderName), false);
     }
 
     private static async Task<(int ExitCode, string Stderr)> DefaultRunCreateVenv(
