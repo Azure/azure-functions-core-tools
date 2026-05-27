@@ -260,6 +260,24 @@ public sealed class QuickstartManifestServiceTests
         }
     }
 
+    [Theory]
+    [InlineData(@"\\server\share\manifest.json")]
+    [InlineData("//server/share/manifest.json")]
+    public async Task GetManifestAsync_DoesNotTreatUncPathAsLocalFile(string uncPath)
+    {
+        string manifest = CreateManifestJson("cdn-entry", "Python", "http", "v1.0.0");
+        IManifestCache cache = CreateCache(manifestJson: null, meta: null);
+
+        _options.ManifestUrl = uncPath;
+        QuickstartManifestService service = CreateService(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifest) }, cache);
+
+        QuickstartManifest result = await service.GetManifestAsync();
+
+        Assert.Single(result.Entries);
+        Assert.Equal("cdn-entry", result.Entries[0].Id);
+    }
+
     private QuickstartManifestService CreateService(HttpResponseMessage response, IManifestCache cache)
     {
         var handler = new FakeHttpMessageHandler(response);

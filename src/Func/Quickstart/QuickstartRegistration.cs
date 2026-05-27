@@ -19,7 +19,8 @@ internal static class QuickstartRegistration
 
     /// <summary>
     /// Environment variable that overrides the CDN manifest URL.
-    /// Accepts HTTPS URLs or local file paths.
+    /// Accepts HTTPS URLs, <c>file://</c> URIs, or absolute local file paths
+    /// (e.g. <c>C:\manifest.json</c> or <c>/home/user/manifest.json</c>).
     /// </summary>
     internal const string ManifestUrlEnvVar = "FUNC_QUICKSTART_MANIFEST_URL";
 

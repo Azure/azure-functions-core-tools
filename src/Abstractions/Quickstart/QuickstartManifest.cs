@@ -15,7 +15,8 @@ public sealed class QuickstartManifest
 
     internal QuickstartManifest(IReadOnlyList<QuickstartEntry> entries)
     {
-        Entries = entries ?? throw new ArgumentNullException(nameof(entries));
+        Entries = [.. (entries ?? throw new ArgumentNullException(nameof(entries)))
+            .OrderBy(e => e.Priority)];
     }
 
     /// <summary>
@@ -53,7 +54,7 @@ public sealed class QuickstartManifest
             results = results.Where(e => MatchesSearch(e, search));
         }
 
-        return [.. results.OrderBy(e => e.Priority)];
+        return [.. results];
     }
 
     private static bool MatchesSearch(QuickstartEntry entry, string search)

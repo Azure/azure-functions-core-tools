@@ -110,15 +110,19 @@ internal sealed class QuickstartManifestService(
     {
         localPath = null;
 
-        // Support file:// URIs
-        if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && uri.IsFile)
+        // Support file:// URIs (but not UNC file URIs like file://server/share)
+        if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && uri.IsFile && !uri.IsUnc)
         {
             localPath = uri.LocalPath;
             return true;
         }
 
-        // Support raw absolute file paths (Windows or Unix)
-        if (Path.IsPathFullyQualified(url) && !url.StartsWith(HttpSchemePrefix, StringComparison.OrdinalIgnoreCase))
+        // Support raw absolute file paths: drive-letter (C:\...) or Unix root (/).
+        // UNC paths (\\server\share) are not accepted; use file:// URI instead.
+        if (Path.IsPathFullyQualified(url)
+            && !url.StartsWith(HttpSchemePrefix, StringComparison.OrdinalIgnoreCase)
+            && !url.StartsWith("//", StringComparison.Ordinal)
+            && !url.StartsWith(@"\\", StringComparison.Ordinal))
         {
             localPath = url;
             return true;
@@ -162,8 +166,11 @@ internal sealed class QuickstartManifestService(
         List<QuickstartEntry> filtered = [];
         foreach (QuickstartEntry entry in entries)
         {
-            if (!HasRequiredFields(entry))
+            (string Identifier, List<string> MissingFields)? missingInfo = GetMissingFields(entry);
+            if (missingInfo is not null)
             {
+                _logger.LogDebug("Dropping quickstart entry '{Identifier}': missing {Fields}.",
+                    missingInfo.Value.Identifier, string.Join(", ", missingInfo.Value.MissingFields));
                 continue;
             }
 
@@ -185,23 +192,26 @@ internal sealed class QuickstartManifestService(
         return new QuickstartManifest(filtered);
     }
 
-    private bool HasRequiredFields(QuickstartEntry entry)
+    private static (string Identifier, List<string> MissingFields)? GetMissingFields(QuickstartEntry entry)
     {
-        if (string.IsNullOrWhiteSpace(entry.Id) ||
-            string.IsNullOrWhiteSpace(entry.Language) ||
-            string.IsNullOrWhiteSpace(entry.Resource) ||
-            string.IsNullOrWhiteSpace(entry.RepositoryUrl) ||
-            string.IsNullOrWhiteSpace(entry.FolderPath))
+        List<string> missing = [];
+        if (string.IsNullOrWhiteSpace(entry.Id)) missing.Add(nameof(entry.Id));
+        if (string.IsNullOrWhiteSpace(entry.Language)) missing.Add(nameof(entry.Language));
+        if (string.IsNullOrWhiteSpace(entry.Resource)) missing.Add(nameof(entry.Resource));
+        if (string.IsNullOrWhiteSpace(entry.RepositoryUrl)) missing.Add(nameof(entry.RepositoryUrl));
+        if (string.IsNullOrWhiteSpace(entry.FolderPath)) missing.Add(nameof(entry.FolderPath));
+
+        if (missing.Count == 0)
         {
-            string identifier = !string.IsNullOrWhiteSpace(entry.Id) ? entry.Id
-                : !string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.DisplayName
-                : !string.IsNullOrWhiteSpace(entry.RepositoryUrl) ? entry.RepositoryUrl
-                : "(unknown)";
-            _logger.LogDebug("Dropping quickstart entry '{Identifier}': missing required fields.", identifier);
-            return false;
+            return null;
         }
 
-        return true;
+        string identifier = !string.IsNullOrWhiteSpace(entry.Id) ? entry.Id
+            : !string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.DisplayName
+            : !string.IsNullOrWhiteSpace(entry.RepositoryUrl) ? entry.RepositoryUrl
+            : "(unknown)";
+
+        return (identifier, missing);
     }
 
     private static bool HasValidGitRef(QuickstartEntry entry)
