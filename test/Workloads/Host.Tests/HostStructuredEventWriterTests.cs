@@ -63,6 +63,36 @@ public sealed class HostStructuredEventWriterTests
         Assert.Equal("trace-1", root.GetProperty("scopes")[0].GetProperty("values").GetProperty("TraceId").GetString());
     }
 
+    [Theory]
+    [InlineData("Microsoft.Azure.WebJobs.Script.DependencyInjection.ScriptStartupTypeLocator", "ScriptStartupTypeLocator")]
+    [InlineData("Microsoft.Azure.WebJobs.Script.WebHost.Middleware.SystemTraceMiddleware", "SystemTraceMiddleware")]
+    [InlineData("Microsoft.Azure.WebJobs.TypeName", "TypeName")]
+    [InlineData("Host.Triggers.Timer.Listener.TimerListener", "TimerListener")]
+    [InlineData("Host.Triggers.TypeName", "TypeName")]
+    [InlineData("Host.General", "Host.General")]
+    [InlineData("Function.HttpTrigger1.User", "Function.HttpTrigger1.User")]
+    public void NormalizeCategory_AppliesKnownPrefixRules(string category, string expected)
+    {
+        Assert.Equal(expected, HostStructuredEventWriter.NormalizeCategory(category));
+    }
+
+    [Fact]
+    public void WriteLog_NormalizesKnownCategoryPrefixes()
+    {
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        HostStructuredEventWriter.WriteLog(
+            "Microsoft.Azure.WebJobs.Script.DependencyInjection.ScriptStartupTypeLocator",
+            LogLevel.Information,
+            new EventId(0),
+            "Startup type located.",
+            new Dictionary<string, object?>(StringComparer.Ordinal),
+            writer: writer);
+
+        using var document = JsonDocument.Parse(writer.ToString());
+        Assert.Equal("ScriptStartupTypeLocator", document.RootElement.GetProperty("category").GetString());
+    }
+
     [Fact]
     public void WriteFunctionDiscovered_EmitsDashboardMetadata()
     {
@@ -187,6 +217,7 @@ public sealed class HostStructuredEventWriterTests
             42.25);
 
         using var document = JsonDocument.Parse(stdout.ToString());
+        Assert.Equal("SystemTraceMiddleware", document.RootElement.GetProperty("category").GetString());
         JsonElement attributes = document.RootElement.GetProperty("attributes");
         Assert.Equal("GET", attributes.GetProperty("http.method").GetString());
         Assert.Equal("http://localhost/api/HttpTrigger1", attributes.GetProperty("http.target").GetString());
