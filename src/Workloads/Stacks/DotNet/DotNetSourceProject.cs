@@ -11,23 +11,11 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// A .NET Functions project detected from source (has a .csproj/.fsproj).
 /// Requires building before host startup.
 /// </summary>
-internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, IFunctionsWorker worker, string projectFilePath, IDotnetCliRunner dotnetCli) : FunctionsProject
+internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, IFunctionsWorker worker, string projectFilePath, IDotnetCliRunner dotnetCli) : DotNetProject(workingDirectory, worker)
 {
-    private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-    private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
 
     public string ProjectFilePath { get; } = projectFilePath ?? throw new ArgumentNullException(nameof(projectFilePath));
-
-    public override WorkingDirectory WorkingDirectory => _workingDirectory;
-
-    public override string StackName => "dotnet";
-
-    public override string StackDisplayName => ".NET";
-
-    public override bool SupportsExtensionBundles => false;
-
-    public override IFunctionsWorker Worker => _worker;
 
     public override async Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {
@@ -45,7 +33,7 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, IFu
     private async Task<DirectoryInfo> GetOutputDirectoryAsync(string projectDir, CancellationToken cancellationToken)
     {
         string output = await _dotnetCli.RunWithOutputAsync(
-            ["msbuild", ProjectFilePath, "--getProperty:OutputPath"],
+            ["msbuild", ProjectFilePath, "--getProperty:OutputDir"],
             projectDir,
             cancellationToken);
 
@@ -53,7 +41,7 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, IFu
         if (string.IsNullOrEmpty(outputPath))
         {
             throw new InvalidOperationException(
-                $"Could not determine OutputPath for project '{Path.GetFileName(ProjectFilePath)}'.");
+                $"Could not determine OutputDirectory for project '{Path.GetFileName(ProjectFilePath)}'.");
         }
 
         // OutputPath may be relative to the project directory.

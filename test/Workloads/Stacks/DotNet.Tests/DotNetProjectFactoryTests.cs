@@ -141,17 +141,17 @@ public class DotNetProjectFactoryTests : IDisposable
     {
         WriteFile("host.json", "{}");
         WriteFile("worker.config.json", "{}");
-        WriteFile("MyApp.exe", "");
+        Directory.CreateDirectory(Path.Combine(_projectDir.FullName, ".azurefunctions"));
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
         ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
         Assert.IsType<DotNetOutputProject>(created.Project);
-        Assert.Equal("found .NET build output (host.json, worker.config.json, .exe)", created.Reason);
+        Assert.Equal("found .NET build output (host.json, worker.config.json, .azurefunctions)", created.Reason);
     }
 
     [Fact]
-    public async Task Output_directory_missing_exe_does_not_match()
+    public async Task Output_directory_missing_azurefunctions_does_not_match()
     {
         WriteFile("host.json", "{}");
         WriteFile("worker.config.json", "{}");
@@ -165,7 +165,7 @@ public class DotNetProjectFactoryTests : IDisposable
     public async Task Output_directory_missing_worker_config_does_not_match()
     {
         WriteFile("host.json", "{}");
-        WriteFile("MyApp.exe", "");
+        Directory.CreateDirectory(Path.Combine(_projectDir.FullName, ".azurefunctions"));
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
@@ -179,7 +179,7 @@ public class DotNetProjectFactoryTests : IDisposable
         WriteFile("MyApp.csproj", "<Project></Project>");
         WriteFile("host.json", "{}");
         WriteFile("worker.config.json", "{}");
-        WriteFile("MyApp.exe", "");
+        Directory.CreateDirectory(Path.Combine(_projectDir.FullName, ".azurefunctions"));
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 

@@ -30,14 +30,19 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
             return NotCreated("directory does not exist");
         }
 
-        ProjectCreationResult? sourceResult = TryMatchSourceProject(workingDirectory, out string? projectFile);
-        if (sourceResult is not null)
+        var projectFiles = workingDirectory
+            .EnumerateFiles("*.*proj", SearchOption.TopDirectoryOnly)
+            .Where(f => f.Extension is ".csproj" or ".fsproj")
+            .ToList();
+
+        if (projectFiles.Count > 1)
         {
-            return sourceResult;
+            return NotCreated("multiple .NET project files found; cannot determine which to use");
         }
 
-        if (projectFile is not null)
+        if (projectFiles.Count == 1)
         {
+            string projectFile = projectFiles[0].FullName;
             return await ResolveWorkerAndCreateAsync(
                 context,
                 $"found {Path.GetFileName(projectFile)}",
@@ -50,7 +55,7 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
         {
             return await ResolveWorkerAndCreateAsync(
                 context,
-                "found .NET build output (host.json, worker.config.json, .exe)",
+                "found .NET build output (host.json, worker.config.json, .azurefunctions)",
                 (wd, worker) => new DotNetOutputProject(wd, worker),
                 cancellationToken);
         }
@@ -59,34 +64,7 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
     }
 
     /// <summary>
-    /// Checks for a single .csproj/.fsproj. Returns a terminal result (NotCreated) if multiple are found,
-    /// or null if detection should continue. Sets <paramref name="projectFile"/> when exactly one is found.
-    /// </summary>
-    private static ProjectCreationResult? TryMatchSourceProject(DirectoryInfo directory, out string? projectFile)
-    {
-        var projectFiles = directory
-            .EnumerateFiles("*.*proj", SearchOption.TopDirectoryOnly)
-            .Where(f => f.Extension is ".csproj" or ".fsproj")
-            .ToList();
-
-        if (projectFiles.Count == 0)
-        {
-            projectFile = null;
-            return null;
-        }
-
-        if (projectFiles.Count > 1)
-        {
-            projectFile = null;
-            return NotCreated("multiple .NET project files found; cannot determine which to use");
-        }
-
-        projectFile = projectFiles[0].FullName;
-        return null;
-    }
-
-    /// <summary>
-    /// Detects a pre-built .NET output directory by the presence of host.json, worker.config.json, and an .exe.
+    /// Detects a pre-built .NET output directory by the presence of host.json, worker.config.json, and a .azurefunctions directory.
     /// </summary>
     private static bool IsOutputDirectory(DirectoryInfo directory)
     {
@@ -94,9 +72,9 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
 
         bool hasHostJson = File.Exists(Path.Combine(dirPath, "host.json"));
         bool hasWorkerConfig = File.Exists(Path.Combine(dirPath, "worker.config.json"));
-        bool hasExe = directory.EnumerateFiles("*.exe", SearchOption.TopDirectoryOnly).Any();
+        bool hasAzureFunctions = Directory.Exists(Path.Combine(dirPath, ".azurefunctions"));
 
-        return hasHostJson && hasWorkerConfig && hasExe;
+        return hasHostJson && hasWorkerConfig && hasAzureFunctions;
     }
 
     private async Task<ProjectCreationResult> ResolveWorkerAndCreateAsync(
