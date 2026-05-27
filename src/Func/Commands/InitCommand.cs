@@ -272,11 +272,11 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
             if (!string.IsNullOrWhiteSpace(stack))
             {
-                stackConfig[StackOptions.RuntimeKey] = stack;
+                stackConfig["runtime"] = stack;
             }
             if (!string.IsNullOrWhiteSpace(language))
             {
-                stackConfig[StackOptions.LanguageKey] = language;
+                stackConfig["language"] = language;
             }
 
             var payload = new Dictionary<string, object>(StringComparer.Ordinal);

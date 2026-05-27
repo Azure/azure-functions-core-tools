@@ -7,10 +7,6 @@ internal sealed class StackOptions
 {
     public const string SectionName = "stack";
 
-    public const string RuntimeKey = "runtime";
-
-    public const string LanguageKey = "language";
-
     public string? Runtime { get; set; }
 
     public string? Language { get; set; }

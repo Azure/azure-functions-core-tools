@@ -20,7 +20,7 @@ internal sealed class LocalSettingsConfigurationProvider(
 
         if (localSettings.WorkerRuntime is { Length: > 0 } runtime)
         {
-            data[$"{StackOptions.SectionName}:{StackOptions.RuntimeKey}"] = runtime;
+            data[$"{StackOptions.SectionName}:runtime"] = runtime;
         }
 
         if (localSettings.Host?.LocalHttpPort is { } port)

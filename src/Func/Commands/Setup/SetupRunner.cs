@@ -189,7 +189,7 @@ internal sealed class SetupRunner(
     {
         string? configuredStack = _configurationProvider
             .GetProjectConfiguration(workingDirectory)
-            [$"{StackOptions.SectionName}:{StackOptions.RuntimeKey}"];
+            [$"{StackOptions.SectionName}:runtime"];
 
         return string.IsNullOrWhiteSpace(configuredStack)
             ? ["runtime"]

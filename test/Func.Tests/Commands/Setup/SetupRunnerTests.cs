@@ -102,7 +102,7 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(workerPackageId, "1.2.3");
         SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
         {
-            [$"{StackOptions.SectionName}:{StackOptions.RuntimeKey}"] = "dotnet-isolated",
+            [$"{StackOptions.SectionName}:runtime"] = "dotnet-isolated",
         });
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
