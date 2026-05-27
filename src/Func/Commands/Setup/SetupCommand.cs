@@ -15,11 +15,10 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
     public Option<string[]?> FeaturesOption { get; } = new("--features")
     {
         Description =
-            "Components to install. Repeatable or comma-separated. Names:\n"
-            + "  host                          Functions host only\n"
-            + "  runtime                       host + extension bundle (no language)\n"
-            + "  node | python | go | dotnet   Full dev set for the language (host, worker if any, stack, bundle)\n"
-            + "Omit to auto-detect from local.settings.json, or be prompted when interactive.",
+            "Components to install. Repeatable or comma-separated. One of:\n"
+            + "  node | python | go | dotnet   full dev setup for the language (host, worker if any, stack, bundle)\n"
+            + "  runtime                       host + extension bundle\n"
+            + "  host                          host only",
         Arity = ArgumentArity.OneOrMore,
     };
 
