@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Workloads.Catalog;
@@ -13,7 +14,8 @@ internal interface IPackageSourceProvider
     /// <summary>
     /// Returns the source to consult. <paramref name="source"/> takes precedence
     /// (typically from <c>--source</c>); <c>null</c> falls through to the
-    /// configured <c>Workloads:Catalog:Source</c>, then the nuget.org default.
+    /// <see cref="Constants.WorkloadsSourceEnvironmentVariable"/> env var,
+    /// then the nuget.org default.
     /// </summary>
     /// <param name="source">
     /// Optional explicit source: a v3 <c>index.json</c> URL or a local
