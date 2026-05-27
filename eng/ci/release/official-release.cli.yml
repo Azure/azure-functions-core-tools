@@ -1,3 +1,9 @@
+parameters:
+- name: skipBranchValidation
+  displayName: Allow non-release source
+  type: boolean
+  default: false
+
 resources:
   repositories:
   - repository: 1es
@@ -32,6 +38,8 @@ extends:
     - stage: Validate
       jobs:
       - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
+        parameters:
+          skipBranchValidation: ${{ parameters.skipBranchValidation }}
   
     - stage: Build
       dependsOn: Validate
@@ -49,21 +57,6 @@ extends:
     - stage: Release
       dependsOn: ['Build', 'SDLSources']
       jobs:
-      - job: Approval
-        timeoutInMinutes: 1440
-        pool: server
-
-        steps:
-        - task: ManualValidation@1
-          inputs:
-            notifyUsers: '' # no notification
-            approvers: '[internal]\Azure Functions Core'
-            allowApproversToApproveTheirOwnRuns: false
-            instructions: |
-              Approve to release packages to:
-                - staging feed 'public/pre-release' (universal artifacts)
-
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
         parameters:
           sign: true
-          dependsOn: Approval

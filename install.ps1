@@ -13,17 +13,26 @@
 
 .PARAMETER Prerelease
     Include pre-release versions when resolving latest.
+
+.PARAMETER Source
+    GitHub repository to fetch releases from (e.g., 'Azure/azure-functions-core-tools').
+    Defaults to 'Azure/azure-functions-core-tools'.
+
+.PARAMETER Force
+    Overwrite an existing installation.
 #>
 
 param(
     [string] $Version,
     [switch] $Prerelease,
+    [switch] $Force,
+    [string] $Source = 'Azure/azure-functions-core-tools',
     [string] $InstallDir = (Join-Path $HOME '.azure-functions')
 )
 
 $ErrorActionPreference = 'Stop'
 
-$repo = 'Azure/azure-functions-core-tools'
+$repo = $Source
 $apiBase = "https://api.github.com/repos/$repo"
 
 # --- Detect platform ---
@@ -55,10 +64,20 @@ if (-not $Version) {
     Write-Host "Resolving $label..."
     $releases = Invoke-RestMethod -Uri "$apiBase/releases?per_page=50"
     $release = $releases |
-        Where-Object { $_.tag_name -like '5.*' -and ($Prerelease -or -not $_.prerelease) } |
+        Where-Object { $_.tag_name -like 'v5.*' -and ($Prerelease -or -not $_.prerelease) } |
         Select-Object -First 1
 
     if (-not $release) {
+        if (-not $Prerelease) {
+            $prereleases = $releases | Where-Object { $_.tag_name -like 'v5.*' -and $_.prerelease }
+            if ($prereleases) {
+                Write-Host 'No stable 5.x release found. Available pre-releases:' -ForegroundColor Red
+                $prereleases | Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.tag_name)" -ForegroundColor Red }
+                Write-Host ''
+                Write-Host 'To install a pre-release, re-run with -Prerelease.' -ForegroundColor Red
+                exit 1
+            }
+        }
         Write-Error 'Could not find a 5.x release.'
         exit 1
     }
@@ -69,6 +88,15 @@ if (-not $Version) {
 }
 
 Write-Host "Installing func CLI $Version ($os-$archStr)..."
+
+# --- Check existing install ---
+
+$funcPath = Join-Path $InstallDir $(if ($os -eq 'win') { 'func.exe' } else { 'func' })
+if ((Test-Path $funcPath) -and -not $Force) {
+    Write-Host "func CLI is already installed at $InstallDir." -ForegroundColor Red
+    Write-Host 'To overwrite, re-run with -Force.' -ForegroundColor Red
+    exit 0
+}
 
 # --- Download and extract ---
 

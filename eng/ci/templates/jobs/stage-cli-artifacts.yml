@@ -42,17 +42,14 @@ jobs:
       targetPath: $(release_path)
       artifactName: release
 
-    - ${{ each runtime in parameters.runtimes }}:
-      - output: universalPackages
-        publishDirectory: $(drop_path)/${{ runtime }}
-        vstsFeedPublish: public/pre-release
-        vstsFeedPackagePublish: func-cli-${{ runtime }}
-        versionOption: custom
-        versionPublish: $(Build.BuildNumber)
-        packagePublishDescription: 'Azure Functions CLI (${{ runtime }})'
-
   steps:
     - ${{ if eq(parameters.sign, true) }}:
+      - task: UseDotNet@2 # ESRP doesn't yet support net10 SDK
+        displayName: Install .NET 9 SDK (for esrp tool)
+        inputs:
+          packageType: sdk
+          version: 9.x
+
       - template: /eng/ci/templates/steps/sign-app.yml@self
         parameters:
           platform: windows
@@ -104,17 +101,13 @@ jobs:
       - ${{ if not(startsWith(runtime, 'win')) }}:
         - pwsh: |
             $dropDir = '$(drop_path)/${{ runtime }}'
-            chmod +x "$dropDir/func"
-            tar -czf "$dropDir/func.tar.gz" -C $dropDir func
-            Remove-Item "$dropDir/func"
             New-Item -ItemType Directory -Path '$(release_path)' -Force | Out-Null
-            Copy-Item "$dropDir/func.tar.gz" '$(release_path)/func-${{ runtime }}.tar.gz'
+            chmod +x "$dropDir/func"
+            tar -czf '$(release_path)/func-${{ runtime }}.tar.gz' -C $dropDir func
           displayName: 'Archive ${{ runtime }}'
 
       - ${{ if startsWith(runtime, 'win') }}:
         - pwsh: |
-            Compress-Archive -Path '$(drop_path)/${{ runtime }}/func.exe' -DestinationPath '$(drop_path)/${{ runtime }}/func.zip'
-            Remove-Item '$(drop_path)/${{ runtime }}/func.exe'
             New-Item -ItemType Directory -Path '$(release_path)' -Force | Out-Null
-            Copy-Item '$(drop_path)/${{ runtime }}/func.zip' '$(release_path)/func-${{ runtime }}.zip'
+            Compress-Archive -Path '$(drop_path)/${{ runtime }}/func.exe' -DestinationPath '$(release_path)/func-${{ runtime }}.zip'
           displayName: 'Archive ${{ runtime }}'
