@@ -733,6 +733,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task PreRunConditions()
         {
+            // GetCurrentWorkerRuntimeLanguage transparently resolves FUNCTIONS_WORKER_RUNTIME=native
+            // to a concrete runtime (e.g. Go via go.mod). Only re-resolve when the Init-time value
+            // was None; otherwise use the global set during Init. Mirror resolved value into the
+            // global so downstream code that reads GlobalCoreToolsSettings.CurrentWorkerRuntime
+            // sees Go rather than None for Go projects.
+            var resolved = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+            if (resolved == WorkerRuntime.None)
+            {
+                resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+                if (resolved != WorkerRuntime.None)
+                {
+                    GlobalCoreToolsSettings.CurrentWorkerRuntime = resolved;
+                }
+            }
+
+            Utilities.WarnIfGoWorkerRuntime(resolved);
+
             EnsureWorkerRuntimeIsSet();
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python)
@@ -757,6 +774,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Powershell && !CommandChecker.CommandExists("dotnet"))
             {
                 throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
+            }
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
+            {
+                var goVersion = await GoHelpers.GetEnvironmentGoVersion();
+                GoHelpers.AssertGoVersion(goVersion);
+
+                if (NoBuild)
+                {
+                    GoHelpers.AssertBinaryExists();
+                }
+                else
+                {
+                    await GoHelpers.BuildProject();
+                }
             }
 
             if (!NetworkHelpers.IsPortAvailable(Port))

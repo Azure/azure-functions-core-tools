@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 using Newtonsoft.Json;
@@ -12,6 +13,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
     [Action(Name = "pack custom", ParentCommandName = "pack", ShowInHelp = false, HelpText = "Arguments specific to custom worker runtime apps when running func pack")]
     internal class CustomPackSubcommandAction : PackSubcommandAction
     {
+        public CustomPackSubcommandAction()
+            : base(WorkerRuntime.Custom)
+        {
+        }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             return base.ParseArgs(args);

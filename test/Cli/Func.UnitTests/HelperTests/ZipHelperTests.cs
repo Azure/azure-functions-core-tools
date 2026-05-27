@@ -36,8 +36,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 if (_isCI)
                 {
-                    // copy the windows-built linux zip so we can include it in ci artifacts for validation on linux
-                    File.Copy(linuxZip, Path.Combine(Directory.GetCurrentDirectory(), "ZippedOnWindows.zip"), true);
+                    // Copy the windows-built linux zip so we can include it in CI artifacts for
+                    // validation on Linux. Use a deterministic repo-relative path because the
+                    // VSTest runner's working directory varies across SDK versions.
+                    File.Copy(linuxZip, Path.Combine(GetUnitTestsOutputDir(), "ZippedOnWindows.zip"), true);
                 }
 
                 VerifyWindowsZip(windowsZip);
@@ -60,6 +62,18 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 throw new Exception("Unsupported OS");
             }
+        }
+
+        private static string GetUnitTestsOutputDir()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Azure.Functions.Cli.sln")))
+            {
+                dir = dir.Parent;
+            }
+
+            Assert.True(dir is not null, "Could not find repo root (Azure.Functions.Cli.sln).");
+            return Path.Combine(dir!.FullName, "out", "bin", "Azure.Functions.Cli.UnitTests", "debug");
         }
 
         private async Task<string> BuildAndCopyFileToZipAsync(string rid)
@@ -213,6 +227,42 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         private void WriteOutput(string output)
         {
             _output.WriteLine(output);
+        }
+
+        [Fact]
+        public async Task GetAppZipFile_GoRuntime_ContainsOnlyHostJsonAndApp()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(Path.Combine(dir, GoHelpers.GoBinDir));
+
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "host.json"), "{}");
+                File.WriteAllBytes(Path.Combine(dir, GoHelpers.GoBinDir, GoHelpers.GoBinaryName), new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F', 2, 1 });
+
+                // Files that must NOT be picked up — Go uses an explicit allowlist, not funcignore.
+                File.WriteAllText(Path.Combine(dir, "main.go"), "package main\nfunc main() {}\n");
+                File.WriteAllText(Path.Combine(dir, "go.mod"), "module example.com/test\n");
+                File.WriteAllText(Path.Combine(dir, "local.settings.json"), "{}");
+
+                var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: false, WorkerRuntime.Go);
+
+                Assert.NotNull(stream);
+                using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+                var entries = archive.Entries.Select(e => e.FullName).OrderBy(n => n).ToArray();
+
+                Assert.Equal(new[] { "app", "host.json" }, entries);
+
+                // Verify Unix exec bit on the binary — without this, the Linux Functions
+                // host won't be able to launch the extracted binary.
+                var appEntry = archive.Entries.Single(e => e.FullName == "app");
+                Assert.Equal(0x49, (appEntry.ExternalAttributes >> 16) & 0x49);
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
         }
     }
 }

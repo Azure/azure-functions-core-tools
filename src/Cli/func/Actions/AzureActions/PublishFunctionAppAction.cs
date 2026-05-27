@@ -164,12 +164,54 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"--build {PublishBuildOption} is not supported for Windows Elastic Premium Function Apps.");
             }
 
+            // Get the WorkerRuntime. Only re-resolve from local.settings.json when the Init-time
+            // value was None. This preserves the original behavior for Python/.NET/Node/PowerShell
+            // (single global read set during Init), while allowing Go's "native" → Go resolution
+            // when func publish is invoked without a prior func init.
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+            if (workerRuntime == WorkerRuntime.None)
+            {
+                workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager, refreshSecrets: true);
+                if (workerRuntime != WorkerRuntime.None)
+                {
+                    GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntime;
+                }
+            }
+
+            Utilities.WarnIfGoWorkerRuntime(workerRuntime);
+
+            // Go is cross-compiled to linux/amd64 and currently only supported on Flex Consumption.
+            // Reject Windows targets, non-Flex SKUs, and unsupported build modes up front.
+            if (workerRuntime == WorkerRuntime.Go)
+            {
+                if (!functionApp.IsLinux)
+                {
+                    throw new CliException("Go is only supported for Linux Function Apps.");
+                }
+
+                if (!functionApp.IsFlex)
+                {
+                    throw new CliException("Go is only supported on Flex Consumption Function Apps.");
+                }
+
+                if (PublishBuildOption == BuildOption.Remote || PublishBuildOption == BuildOption.Container)
+                {
+                    throw new CliException(
+                        $"--build {PublishBuildOption} is not supported for Go. Run 'func publish' without '--build {PublishBuildOption}'.");
+                }
+
+                // BuildNativeDeps is checked separately because ResolveBuildOption (called later) flips
+                // PublishBuildOption to BuildOption.Container when --build-native-deps is set, which would
+                // bypass the Go build branch and ship a zip with a missing or stale 'app' binary.
+                if (BuildNativeDeps)
+                {
+                    throw new CliException("--build-native-deps is not supported for Go. Run 'func publish' without '--build-native-deps'.");
+                }
+            }
+
             // Get the GitIgnoreParser from the functionApp root
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
             var ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
-
-            // Get the WorkerRuntime
-            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Get Stacks once for both .NET version determination and EOL checking
             var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
@@ -224,6 +266,26 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "publish"), DotnetCliParameters);
             }
+            else if (workerRuntime == WorkerRuntime.Go &&
+                     PublishBuildOption != BuildOption.Remote &&
+                     PublishBuildOption != BuildOption.Container)
+            {
+                // Go always builds locally — there is no remote/container path for Go publishes.
+                // The remote/container conditions are redundant given the up-front rejection above;
+                // keeping them documents intent and stays defensive against future changes to ResolveBuildOption.
+                GoHelpers.AssertGoFunctionAppLayout(functionAppRoot);
+
+                if (NoBuild)
+                {
+                    // Trust the user's pre-built binary, but verify it is actually a linux/amd64 ELF
+                    // so we don't silently upload a host-OS binary to a Linux Flex host.
+                    GoHelpers.AssertLinuxAmd64Binary(functionAppRoot);
+                }
+                else
+                {
+                    await GoHelpers.BuildForLinux(functionAppRoot);
+                }
+            }
 
             if (!isNonCsxDotnetRuntime)
             {
@@ -250,7 +312,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                     else
                     {
-                        await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings);
+                        await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings, workerRuntime);
                     }
                 }
                 catch (HttpRequestException ex)
@@ -615,7 +677,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings)
+        private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings, WorkerRuntime workerRuntime)
         {
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
@@ -635,7 +697,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, workerRuntime, ignoreParser, AdditionalPackages);
 
             bool shouldSyncTriggers = true;
             bool shouldDeferPublishZipDeploy = false;
@@ -1314,6 +1376,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private static void InternalListIgnoredFiles(GitIgnoreParser ignoreParser)
         {
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
+            {
+                // Go uses an explicit allowlist (see GoHelpers.GetPackFiles); funcignore is not consulted.
+                ColoredConsole.WriteLine($"Go publishes only {Constants.HostJsonFileName} and {GoHelpers.GoBinaryName}; all other files are excluded.");
+                return;
+            }
+
             if (ignoreParser == null)
             {
                 ColoredConsole.Error.WriteLine("No .funcignore file");
@@ -1328,6 +1397,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private static void InternalListIncludedFiles(GitIgnoreParser ignoreParser)
         {
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Go)
+            {
+                // Go zip is built from the explicit allowlist in GoHelpers.GetPackFiles; print those
+                // files rooted at the function app root so output matches what is actually packaged
+                // even when 'func publish' is run from a subdirectory. The Go binary ('app') may
+                // not exist yet when --list-included-files is run before a build, so annotate it
+                // rather than printing a misleading path that doesn't exist on disk.
+                var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+                foreach (var file in GoHelpers.GetPackFiles(functionAppRoot))
+                {
+                    if (FileSystemHelpers.FileExists(file))
+                    {
+                        ColoredConsole.WriteLine(file);
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine($"{file} (will be built during publish)");
+                    }
+                }
+
+                return;
+            }
+
             if (ignoreParser == null)
             {
                 ColoredConsole.Error.WriteLine("No .funcignore file");

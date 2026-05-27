@@ -19,6 +19,17 @@ jobs:
       sudo apt-get -y install fuse-zip
     displayName: 'Install fuse-zip'
 
+  - script: |
+      set -e
+      VERSION=1.24.2
+      ARCHIVE=go${VERSION}.linux-amd64.tar.gz
+      DEST="$AGENT_TOOLSDIRECTORY/go-${VERSION}"
+      mkdir -p "$DEST"
+      curl -fsSL "https://go.dev/dl/${ARCHIVE}" -o "$AGENT_TEMPDIRECTORY/${ARCHIVE}"
+      tar -C "$DEST" -xzf "$AGENT_TEMPDIRECTORY/${ARCHIVE}"
+      echo "##vso[task.prependpath]$DEST/go/bin"
+    displayName: 'Install Go 1.24.2'
+
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self

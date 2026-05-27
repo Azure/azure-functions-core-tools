@@ -330,15 +330,6 @@ namespace Azure.Functions.Cli.Helpers
 
             if (exitCode == 0)
             {
-                var trials = 0;
-
-                // this delay to make sure the output
-                while (string.IsNullOrWhiteSpace(sb.ToString()) && trials < 5)
-                {
-                    trials++;
-                    await Task.Delay(TimeSpan.FromMilliseconds(200));
-                }
-
                 return sb.ToString().Trim();
             }
             else

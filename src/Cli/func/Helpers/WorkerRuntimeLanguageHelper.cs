@@ -25,7 +25,9 @@ namespace Azure.Functions.Cli.Helpers
         [DisplayString("powershell")]
         Powershell,
         [DisplayString("custom")]
-        Custom
+        Custom,
+        [DisplayString("go (preview)")]
+        Go
     }
 
     public static class WorkerRuntimeLanguageHelper
@@ -36,9 +38,10 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.Dotnet, new[] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.Node, new[] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.Python, new[] { "py" } },
+            { WorkerRuntime.Go, new[] { "golang" } },
             { WorkerRuntime.Java, new string[] { } },
             { WorkerRuntime.Powershell, new[] { "pwsh" } },
-            { WorkerRuntime.Custom, new string[] { } }
+            { WorkerRuntime.Custom, new string[] { } },
         };
 
         private static readonly IDictionary<string, WorkerRuntime> _normalizeMap = _availableWorkersRuntime
@@ -67,7 +70,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.CSharp, new[] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.FSharp, new[] { "fsharp" } },
             { Constants.Languages.Java, new string[] { } },
-            { Constants.Languages.Custom, new string[] { } }
+            { Constants.Languages.Custom, new string[] { } },
         };
 
         public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = _languageToAlias
@@ -79,7 +82,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             { WorkerRuntime.Node, new[] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
             { WorkerRuntime.Dotnet, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
-            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } }
+            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
         };
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => _availableWorkersRuntime.Keys
@@ -110,6 +113,8 @@ namespace Azure.Functions.Cli.Helpers
                     return "powershell";
                 case WorkerRuntime.Custom:
                     return "custom";
+                case WorkerRuntime.Go:
+                    return "go";
                 default:
                     return "None";
             }
@@ -159,7 +164,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentNullException(nameof(languageString), "language can't be empty");
             }
-            else if (_normalizeMap.ContainsKey(languageString))
+            else if (WorkerRuntimeStringToLanguage.ContainsKey(languageString))
             {
                 return WorkerRuntimeStringToLanguage[languageString];
             }
@@ -169,6 +174,18 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        public static bool TryNormalizeLanguage(string languageString, out string normalized)
+        {
+            if (!string.IsNullOrWhiteSpace(languageString) && WorkerRuntimeStringToLanguage.ContainsKey(languageString))
+            {
+                normalized = WorkerRuntimeStringToLanguage[languageString];
+                return true;
+            }
+
+            normalized = null;
+            return false;
+        }
+
         public static IEnumerable<string> LanguagesForWorker(WorkerRuntime worker)
         {
             return _normalizeMap.Where(p => p.Value == worker).Select(p => p.Key);
@@ -176,8 +193,39 @@ namespace Azure.Functions.Cli.Helpers
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager, bool refreshSecrets = false)
         {
-            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
-                          ?? secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            // FUNCTIONS_CLI_NATIVE_LANGUAGE lets a project declare its native language without
+            // forcing the resolver to scan the working directory for go.mod. Env var wins;
+            // local.settings.json is the secondary source. See TryResolveNativeLanguageAsGo.
+            if (TryResolveNativeLanguageAsGo(secretsManager, refreshSecrets))
+            {
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving worker runtime to 'go' ({Constants.FunctionsCliNativeLanguage} is set)."));
+                }
+
+                return WorkerRuntime.Go;
+            }
+
+            string setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+
+            if (string.IsNullOrWhiteSpace(setting))
+            {
+                // When FUNCTIONS_WORKER_RUNTIME isn't in the environment, check local.settings.json.
+                // If secrets cannot be loaded (e.g. 'func pack' invoked from a parent directory
+                // before cwd is changed), the GetSecrets exceptions will propagate to the caller.
+                // Callers that want a silent None on missing secrets should catch CliException.
+                setting = secretsManager?.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            }
+
+            // The Functions host registers some workers under the literal "native" language
+            // identifier (see workers/native/worker.config.json). Map "native" back to a
+            // concrete WorkerRuntime using well-known project markers in the current directory.
+            // Throws CliException with an actionable message when the setting is "native" but
+            // no supported marker is found — callers that want a silent None should catch.
+            if (string.Equals(setting, "native", StringComparison.OrdinalIgnoreCase))
+            {
+                return ResolveNativeFromProjectMarkers();
+            }
 
             try
             {
@@ -207,6 +255,75 @@ namespace Azure.Functions.Cli.Helpers
                 .WriteLine(WarningColor($"Worker runtime '{runtimeMoniker}' has been set in '{SecretsManager.AppSettingsFilePath}'."));
 
             return workerRuntime;
+        }
+
+        /// <summary>
+        /// Maps <c>FUNCTIONS_WORKER_RUNTIME=native</c> to a concrete <see cref="WorkerRuntime"/>
+        /// by inspecting well-known project-marker files in the current directory. Throws
+        /// <see cref="CliException"/> when no supported marker is found.
+        /// </summary>
+        /// <remarks>
+        /// Marker -> runtime:
+        /// <list type="bullet">
+        ///   <item><c>go.mod</c> -> <see cref="WorkerRuntime.Go"/></item>
+        /// </list>
+        /// Add new native languages here as they are introduced. Invoked exclusively from
+        /// <see cref="GetCurrentWorkerRuntimeLanguage"/> so callers never have to special-case
+        /// the "native" literal. Preferred path is the explicit <see cref="Constants.FunctionsCliNativeLanguage"/>
+        /// opt-in checked earlier in the resolver; this fallback exists for projects that
+        /// predate the flag.
+        /// </remarks>
+        private static WorkerRuntime ResolveNativeFromProjectMarkers()
+        {
+            if (FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, GoHelpers.GoModFileName)))
+            {
+                if (GlobalCoreToolsSettings.IsVerbose)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Resolving native worker runtime to 'go' ({GoHelpers.GoModFileName} found; consider setting {Constants.FunctionsCliNativeLanguage}=go in local.settings.json)."));
+                }
+
+                return WorkerRuntime.Go;
+            }
+
+            throw new CliException(
+                $"FUNCTIONS_WORKER_RUNTIME is set to 'native' but no supported project marker was found in '{Environment.CurrentDirectory}'. " +
+                $"Set '{Constants.FunctionsCliNativeLanguage}=go' in local.settings.json, or run 'func init' to initialize a supported function app in this directory.");
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when FUNCTIONS_CLI_NATIVE_LANGUAGE is set to "go" either in the
+        /// process environment or in <c>local.settings.json</c>. Env var wins; local.settings.json
+        /// access failures (e.g. command run from outside a project root) are treated as "not set".
+        /// </summary>
+        private static bool TryResolveNativeLanguageAsGo(ISecretsManager secretsManager, bool refreshSecrets = false)
+        {
+            var envValue = Environment.GetEnvironmentVariable(Constants.FunctionsCliNativeLanguage);
+            if (!string.IsNullOrEmpty(envValue) && envValue.Equals("go", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (secretsManager is null)
+            {
+                return false;
+            }
+
+            string fromSettings;
+            try
+            {
+                fromSettings = secretsManager.GetSecrets(refreshSecrets)?.FirstOrDefault(s => s.Key.Equals(Constants.FunctionsCliNativeLanguage, StringComparison.OrdinalIgnoreCase)).Value;
+            }
+            catch (CliException)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(fromSettings))
+            {
+                return false;
+            }
+
+            return fromSettings.Equals("go", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)

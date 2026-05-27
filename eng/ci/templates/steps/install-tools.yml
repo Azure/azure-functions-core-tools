@@ -38,3 +38,31 @@ steps:
   inputs:
     packageType: sdk
     useGlobalJson: true
+
+- pwsh: |
+    $version = '1.24.2'
+    if ($IsWindows) {
+      $archive = "go$version.windows-amd64.zip"
+      $url = "https://go.dev/dl/$archive"
+      $dest = Join-Path $env:AGENT_TOOLSDIRECTORY "go-$version"
+      New-Item -ItemType Directory -Force -Path $dest | Out-Null
+      $zipPath = Join-Path $env:AGENT_TEMPDIRECTORY $archive
+      Invoke-WebRequest -Uri $url -OutFile $zipPath
+      Expand-Archive -Path $zipPath -DestinationPath $dest -Force
+      $goBin = Join-Path $dest 'go\bin'
+    } else {
+      $archive = "go$version.linux-amd64.tar.gz"
+      $url = "https://go.dev/dl/$archive"
+      $dest = Join-Path $env:AGENT_TOOLSDIRECTORY "go-$version"
+      New-Item -ItemType Directory -Force -Path $dest | Out-Null
+      $tarPath = Join-Path $env:AGENT_TEMPDIRECTORY $archive
+      Invoke-WebRequest -Uri $url -OutFile $tarPath
+      & tar -C $dest -xzf $tarPath
+      $goBin = Join-Path $dest 'go/bin'
+    }
+    Write-Host "##vso[task.prependpath]$goBin"
+    Write-Host "Installed Go $version to $goBin"
+  displayName: 'Install Go 1.24.2'
+  # Skip on macOS: macOS-latest is arm64 (Apple Silicon). Mac jobs that need
+  # Go install it via Homebrew themselves (see test-e2e-osx.yml).
+  condition: ne(variables['Agent.OS'], 'Darwin')

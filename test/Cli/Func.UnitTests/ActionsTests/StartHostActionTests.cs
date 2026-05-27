@@ -19,6 +19,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
+    [Collection("NativeWorkerRuntimeTests")]
     public class StartHostActionTests
     {
         [SkippableFact]
@@ -509,6 +510,85 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             {
                 // Cleanup
                 Environment.SetEnvironmentVariable(pythonEnvVar, originalValue);
+            }
+        }
+
+        [Fact]
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithGoMod_ResolvesToGo()
+        {
+            string envVar = Constants.FunctionsWorkerRuntime;
+            string original = Environment.GetEnvironmentVariable(envVar);
+            Environment.SetEnvironmentVariable(envVar, "native");
+
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Is<string>(p => p.EndsWith("go.mod"))).Returns(true);
+
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
+
+            try
+            {
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager.Object);
+
+                    resolved.Should().Be(WorkerRuntime.Go);
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void GetCurrentWorkerRuntimeLanguage_NativeWithoutGoMod_Throws()
+        {
+            string envVar = Constants.FunctionsWorkerRuntime;
+            string original = Environment.GetEnvironmentVariable(envVar);
+            Environment.SetEnvironmentVariable(envVar, "native");
+
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(false);
+
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
+
+            try
+            {
+                using (FileSystemHelpers.Override(fileSystem))
+                {
+                    Action act = () => WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager.Object);
+
+                    act.Should().Throw<CliException>()
+                        .Which.Message.Should().Contain("native");
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
+            }
+        }
+
+        [Fact]
+        public void GetCurrentWorkerRuntimeLanguage_NonNativeRuntime_ReturnsRuntime()
+        {
+            string envVar = Constants.FunctionsWorkerRuntime;
+            string original = Environment.GetEnvironmentVariable(envVar);
+            Environment.SetEnvironmentVariable(envVar, "python");
+
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetSecrets()).Returns(new Dictionary<string, string>());
+
+            try
+            {
+                var resolved = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager.Object);
+
+                resolved.Should().Be(WorkerRuntime.Python);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(envVar, original);
             }
         }
     }

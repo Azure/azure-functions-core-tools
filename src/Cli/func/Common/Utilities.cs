@@ -64,6 +64,19 @@ namespace Azure.Functions.Cli
             ColoredConsole.WriteLine();
         }
 
+        internal static void WarnIfGoWorkerRuntime(Helpers.WorkerRuntime workerRuntime)
+        {
+            if (workerRuntime != Helpers.WorkerRuntime.Go)
+            {
+                return;
+            }
+
+            ColoredConsole
+                .WriteLine("Go support is in preview. The build/publish behavior and deployment layout may change before GA.".DarkYellow());
+
+            ColoredConsole.WriteLine();
+        }
+
         internal static void PrintSupportInformation()
         {
             Architecture arch = RuntimeInformation.ProcessArchitecture;
