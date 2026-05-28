@@ -7,9 +7,10 @@ namespace Azure.Functions.Cli.Templates;
 
 /// <summary>
 /// Input to <see cref="ITemplateEngineProvider.ApplyAsync"/>. Carries the
-/// already-resolved template, function name, working directory, and language
-/// so engines have everything they need to materialise files without
-/// re-running the resolution pipeline.
+/// already-resolved template, function name, working directory, language,
+/// and (for Node/Python) the channel-matched workload install directory so
+/// engines have everything they need to materialise files without re-running
+/// the resolution pipeline.
 /// </summary>
 /// <param name="WorkingDirectory">The resolved project working directory.</param>
 /// <param name="Template">
@@ -29,9 +30,19 @@ namespace Azure.Functions.Cli.Templates;
 /// When <c>true</c>, overwrite existing files in the working directory
 /// (the <c>--force</c> flag).
 /// </param>
+/// <param name="InstallDirectory">
+/// Absolute path to the install directory of the templates content workload
+/// the orchestrator selected for this invocation (§4.8.1). Providers must
+/// load payload from this directory rather than re-running workload
+/// selection — otherwise the orchestrator's channel match is silently
+/// discarded. <c>null</c> when the provider is invoked outside the
+/// orchestrator; providers then fall back to a best-effort highest-version
+/// pick from <see cref="IInstalledTemplatesWorkloads"/>.
+/// </param>
 public sealed record NewContext(
     WorkingDirectory WorkingDirectory,
     FunctionTemplateInfo Template,
     string FunctionName,
     string? Language,
-    bool Force);
+    bool Force,
+    string? InstallDirectory = null);

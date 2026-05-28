@@ -23,11 +23,21 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
 {
     private readonly IInstalledTemplatesWorkloads _installed;
     private readonly IDotnetTemplateRunner _runner;
+    private readonly IItemTemplateHiveProvisioner? _hiveProvisioner;
 
     public DotNetEngineProvider(IInstalledTemplatesWorkloads installed, IDotnetTemplateRunner runner)
+        : this(installed, runner, hiveProvisioner: null)
+    {
+    }
+
+    public DotNetEngineProvider(
+        IInstalledTemplatesWorkloads installed,
+        IDotnetTemplateRunner runner,
+        IItemTemplateHiveProvisioner? hiveProvisioner)
     {
         _installed = installed ?? throw new ArgumentNullException(nameof(installed));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _hiveProvisioner = hiveProvisioner;
     }
 
     public string EngineId => EngineIds.DotNet;
@@ -38,17 +48,26 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Stack, cancellationToken);
-        if (rows.Count == 0)
+        string? installDir = context.InstallDirectory;
+        if (installDir is null)
         {
-            return [];
+            // Fallback for callers that invoke the provider directly
+            // (e.g. unit tests with no orchestrator). DotNet has no channel
+            // axis (templates-workload-spec § 4.4.3) so highest-installed is
+            // the right pick.
+            IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Stack, cancellationToken);
+            if (rows.Count == 0)
+            {
+                return [];
+            }
+
+            installDir = rows
+                .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
+                .First()
+                .InstallDirectory;
         }
 
-        InstalledTemplatesWorkload selected = rows
-            .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
-            .First();
-
-        DotNetTemplatesIndex? index = DotNetPayloadReader.Load(selected.InstallDirectory);
+        DotNetTemplatesIndex? index = DotNetPayloadReader.Load(installDir);
         if (index is null)
         {
             return [];
@@ -100,11 +119,24 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
 
         try
         {
+            // Provision the custom item-template hive on demand from the
+            // chosen workload's source.json (templates-workload-spec §6.3 /
+                // func-new spec §4.8.3). Skip when no provisioner was injected
+                // (test path) or when no install dir is known.
+            string? customHivePath = null;
+            if (_hiveProvisioner is not null && !string.IsNullOrWhiteSpace(context.InstallDirectory))
+            {
+                customHivePath = await _hiveProvisioner.EnsureProvisionedAsync(
+                    context.InstallDirectory!,
+                    cancellationToken);
+            }
+
             DotnetTemplateRunResult result = await _runner.RunAsync(
                 context.Template.Id,
                 context.WorkingDirectory.Info,
                 args,
-                cancellationToken);
+                cancellationToken,
+                customHivePath);
 
             if (result.ExitCode != 0)
             {

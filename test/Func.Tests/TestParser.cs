@@ -80,6 +80,8 @@ internal static class TestParser
         // exercise the resolver replace the substitute.
         services.AddSingleton(Substitute.For<Cli.Projects.IFunctionsProjectResolver>());
         services.AddSingleton(Substitute.For<Cli.Workloads.Storage.IWorkloadPaths>());
+        services.AddSingleton(Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>());
+        services.AddSingleton(Substitute.For<Cli.Bundles.IExtensionBundleResolver>());
         services.AddSingleton(Substitute.For<IStartInitializationRunner>());
         ISetupRunner setupRunner = Substitute.For<ISetupRunner>();
         setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())

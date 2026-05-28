@@ -68,6 +68,7 @@ internal sealed class V2Input
     public string? ParamId { get; set; }
 
     [JsonPropertyName("defaultValue")]
+    [JsonConverter(typeof(PermissiveStringConverter))]
     public string? DefaultValue { get; set; }
 
     [JsonPropertyName("required")]
@@ -116,6 +117,7 @@ internal sealed class UserPromptDoc
     public string? Placeholder { get; set; }
 
     [JsonPropertyName("defaultValue")]
+    [JsonConverter(typeof(PermissiveStringConverter))]
     public string? DefaultValue { get; set; }
 
     [JsonPropertyName("required")]
