@@ -29,11 +29,11 @@ public static class CommonInitOptions
 
     /// <summary>
     /// <c>--bundles-channel</c> / <c>-c</c>. Selects the extension bundle release channel
-    /// (<see cref="BundleChannel.GA"/> by default).
+    /// (<see cref="BundleChannel.Stable"/> by default).
     /// </summary>
     public static Option<BundleChannel> BundlesChannel() => new("--bundles-channel", "-c")
     {
-        Description = "Extension bundle release channel: GA (default), Preview, or Experimental.",
-        DefaultValueFactory = _ => BundleChannel.GA,
+        Description = "Extension bundle release channel: Stable (default), Preview, or Experimental.",
+        DefaultValueFactory = _ => BundleChannel.Stable,
     };
 }

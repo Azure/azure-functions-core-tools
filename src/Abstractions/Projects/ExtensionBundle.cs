@@ -5,11 +5,11 @@ namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
 /// Release channel for the Functions extension bundle. Values map to the
-/// three published bundle ids (GA / Preview / Experimental).
+/// three published bundle ids (Stable / Preview / Experimental).
 /// </summary>
 public enum BundleChannel
 {
-    GA,
+    Stable,
     Preview,
     Experimental,
 }
