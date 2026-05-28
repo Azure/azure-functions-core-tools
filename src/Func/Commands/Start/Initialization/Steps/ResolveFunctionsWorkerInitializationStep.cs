@@ -128,7 +128,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             ResolvedPackage? package = await _workloadCatalog.ResolveLatestVersionInRangeAsync(
                 packageId,
                 versionRange,
-                includePrerelease: false,
+                includePrerelease: true,
                 source: null,
                 cancellationToken);
 
@@ -150,7 +150,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
                 packageId,
                 version,
                 source,
-                includePrerelease: false,
+                includePrerelease: true,
                 exact: true,
                 force: false,
                 progress: null,

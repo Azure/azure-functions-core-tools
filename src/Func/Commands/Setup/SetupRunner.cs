@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Bundles;
+using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Profiles;
@@ -42,6 +43,10 @@ internal sealed class SetupRunner(
         ArgumentNullException.ThrowIfNull(options);
 
         var renderer = new SetupRenderer(_interaction, options.OutputMode);
+        if (options.IncludePrerelease && options.OutputMode != SetupOutputMode.Json)
+        {
+            _interaction.WriteHint(WorkloadInstallCommand.PrereleasePreviewHint);
+        }
         try
         {
             SetupFeaturePlan featurePlan = await ResolveFeaturesAsync(options, cancellationToken);

@@ -48,7 +48,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
                 HostWorkloadPackage.CurrentPackageId,
                 _hostVersion,
                 source: null,
-                includePrerelease: false,
+                includePrerelease: true,
                 exact: true,
                 force: false,
                 progress: null,

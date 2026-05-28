@@ -34,7 +34,8 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Include prerelease versions in the results.",
+        Description = "Include prerelease versions in the results. Default: enabled while workloads are in preview.",
+        DefaultValueFactory = _ => true,
     };
 
     public Option<bool> JsonOption { get; } = new("--json")
@@ -60,6 +61,11 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         string? source = parseResult.GetValue(SourceOption);
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool json = parseResult.GetValue(JsonOption);
+
+        if (includePrerelease && !json)
+        {
+            _interaction.WriteHint(WorkloadInstallCommand.PrereleasePreviewHint);
+        }
 
         // TODO: surface --skip and --take for paging once we have a UX
         // story for repeated queries (see workload spec §4.1).
