@@ -241,23 +241,28 @@
           Condition="'$(TemplatesContentSource)' == 'static' and '$(FilterTemplatesByBundleChannel)' == 'true' and '$(IncludeV2Templates)' == 'true'"
           BeforeTargets="_GetPackageFiles"
           Inputs="$(MSBuildProjectFullPath)"
-          Outputs="$(IntermediateOutputPath)templates\bundle\extensions.json">
+          Outputs="$(IntermediateOutputPath)templates/bundle/extensions.json">
     <Error Condition="'$(TemplatesChannel)' == ''"
            Text="FilterTemplatesByBundleChannel=true requires TemplatesChannel to be set (stable | preview | experimental)." />
-    <MakeDir Directories="$(IntermediateOutputPath)templates\bundle\" />
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\fetch-bundle-extensions-json.ps1&quot; -Channel &quot;$(TemplatesChannel)&quot; -OutputPath &quot;$(IntermediateOutputPath)templates\bundle\extensions.json&quot; -VersionOut &quot;$(IntermediateOutputPath)templates\bundle\version.txt&quot;" />
+    <!--
+      Paths passed to `<Exec>` are substituted into the shell command
+      verbatim, so they must use the platform-neutral forward-slash form
+      (per AGENTS.md and the repo style guide). On Linux build agents,
+      backslashes are literal filename characters, not path separators,
+      and the staged file ends up at the wrong path.
+    -->
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../scripts/fetch-bundle-extensions-json.ps1&quot; -Channel &quot;$(TemplatesChannel)&quot; -OutputPath &quot;$(IntermediateOutputPath)templates/bundle/extensions.json&quot; -VersionOut &quot;$(IntermediateOutputPath)templates/bundle/version.txt&quot;" />
   </Target>
 
   <Target Name="FilterStaticTemplatesByBundleChannel"
           DependsOnTargets="FetchBundleExtensionsForChannel"
           Condition="'$(TemplatesContentSource)' == 'static' and '$(FilterTemplatesByBundleChannel)' == 'true' and '$(IncludeV2Templates)' == 'true'"
           BeforeTargets="_GetPackageFiles"
-          Inputs="$(MSBuildProjectDirectory)/content/v2/templates/templates.json;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json;$(IntermediateOutputPath)templates\bundle\extensions.json"
-          Outputs="$(IntermediateOutputPath)templates\v2\templates\templates.json">
+          Inputs="$(MSBuildProjectDirectory)/content/v2/templates/templates.json;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json;$(IntermediateOutputPath)templates/bundle/extensions.json"
+          Outputs="$(IntermediateOutputPath)templates/v2/templates/templates.json">
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json')"
            Text="FilterTemplatesByBundleChannel=true requires content/v2/templates/_bindings.json (per-template binding-requirements map)." />
-    <MakeDir Directories="$(IntermediateOutputPath)templates\v2\templates\" />
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\filter-node-templates-by-bundle.ps1&quot; -TemplatesPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/templates.json&quot; -BindingsMapPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json&quot; -ExtensionsJsonPath &quot;$(IntermediateOutputPath)templates\bundle\extensions.json&quot; -OutputPath &quot;$(IntermediateOutputPath)templates\v2\templates\templates.json&quot; -ChannelLabel &quot;$(TemplatesChannel)&quot;" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../scripts/filter-node-templates-by-bundle.ps1&quot; -TemplatesPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/templates.json&quot; -BindingsMapPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json&quot; -ExtensionsJsonPath &quot;$(IntermediateOutputPath)templates/bundle/extensions.json&quot; -OutputPath &quot;$(IntermediateOutputPath)templates/v2/templates/templates.json&quot; -ChannelLabel &quot;$(TemplatesChannel)&quot;" />
   </Target>
 
   <Target Name="_AddStaticTemplatesToPack"
@@ -285,7 +290,7 @@
             Exclude="$(MSBuildProjectDirectory)/content/v2/templates/templates.json;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json"
             Pack="true" PackagePath="tools/any/content/v2/" Visible="false" />
       <None Condition="'$(IncludeV2Templates)' == 'true' and '$(FilterTemplatesByBundleChannel)' == 'true'"
-            Include="$(IntermediateOutputPath)templates\v2\templates\templates.json"
+            Include="$(IntermediateOutputPath)templates/v2/templates/templates.json"
             Pack="true" PackagePath="tools/any/content/v2/templates/" Visible="false" />
 
       <!--

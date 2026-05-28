@@ -63,6 +63,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Normalize path separators upfront. On Linux, backslashes are literal
+# filename characters, not directory separators. .NET accepts forward
+# slashes on both platforms.
+$TemplatesPath      = $TemplatesPath      -replace '\\', '/'
+$BindingsMapPath    = $BindingsMapPath    -replace '\\', '/'
+$ExtensionsJsonPath = $ExtensionsJsonPath -replace '\\', '/'
+$OutputPath         = $OutputPath         -replace '\\', '/'
+
 foreach ($p in $TemplatesPath, $BindingsMapPath, $ExtensionsJsonPath) {
     if (-not (Test-Path -LiteralPath $p)) {
         throw "filter-node-templates-by-bundle: file not found: $p"
