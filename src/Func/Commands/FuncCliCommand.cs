@@ -34,6 +34,16 @@ internal abstract class FuncCliCommand : Command
     }
 
     /// <summary>
+    /// Optional one-line tip appended to <c>--help</c> output as a "Tips"
+    /// section. Use for cross-command discovery (e.g. pointing <c>func init</c>
+    /// at <c>func workload search</c>). Return <see langword="null"/> to omit
+    /// the section.
+    /// </summary>
+    protected virtual string? HelpFooterHint => null;
+
+    internal string? GetHelpFooterHint() => HelpFooterHint;
+
+    /// <summary>
     /// Executes the command asynchronously with cancellation support. Parent-only
     /// commands that have subcommands but no execution logic of their own can
     /// inherit the default implementation, which invokes the help action wired

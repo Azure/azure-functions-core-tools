@@ -31,6 +31,16 @@ internal sealed class WorkloadInstaller(
     public const string AliasTagPrefix = "alias:";
 
     /// <summary>
+    /// NuGet-tag prefix that flags a workload's package shape. Mirrors the
+    /// <c>kind</c> field in <c>workload.json</c>: <c>kind:workload</c> for a
+    /// stack, <c>kind:content</c> for a payload-only package, <c>kind:meta</c>
+    /// for a meta package. Surfaced in catalog responses so the CLI can filter
+    /// search results (e.g. <c>func workload search --stack</c>) without
+    /// downloading the package.
+    /// </summary>
+    public const string KindTagPrefix = "kind:";
+
+    /// <summary>
     /// Package-type name a workload package must declare in its .nuspec so
     /// the installer can refuse arbitrary .nupkgs. Mirrors dotnet's
     /// <c>DotnetTool</c> convention.

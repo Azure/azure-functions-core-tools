@@ -147,6 +147,14 @@ internal class HelpCommand : FuncCliCommand
             _interaction.WriteHint(description);
             _interaction.WriteBlankLine();
         }
+
+        if (command is FuncCliCommand func && func.GetHelpFooterHint() is { Length: > 0 } hint)
+        {
+            _interaction.WriteSectionHeader("Tips");
+            _interaction.WriteBlankLine();
+            _interaction.WriteHint(hint);
+            _interaction.WriteBlankLine();
+        }
     }
 
     /// <summary>

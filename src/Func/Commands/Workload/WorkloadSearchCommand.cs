@@ -18,6 +18,11 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
     private const int DescriptionMaxLength = 80;
     private const string Placeholder = "-";
 
+    // Lowercased value of the `kind:` NuGet tag that marks a package as a stack
+    // workload (the only kind `func init --stack` can target). Mirrors the
+    // `kind:workload` PackageTag stack csprojs emit.
+    private const string StackKind = "workload";
+
     private readonly IInteractionService _interaction;
     private readonly IWorkloadCatalog _catalog;
 
@@ -43,6 +48,11 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         Description = "Emit machine-readable JSON instead of a table.",
     };
 
+    public Option<bool> StackOption { get; } = new("--stack")
+    {
+        Description = "Show only stack workloads (packages tagged 'kind:workload', e.g. dotnet, node, python).",
+    };
+
     public WorkloadSearchCommand(IInteractionService interaction, IWorkloadCatalog catalog)
         : base("search", "Search the workload catalog.")
     {
@@ -53,6 +63,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         Options.Add(SourceOption);
         Options.Add(IncludePrereleaseOption);
         Options.Add(JsonOption);
+        Options.Add(StackOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -61,6 +72,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         string? source = parseResult.GetValue(SourceOption);
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool json = parseResult.GetValue(JsonOption);
+        bool stackOnly = parseResult.GetValue(StackOption);
 
         if (includePrerelease && !json)
         {
@@ -85,6 +97,11 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         catch (ArgumentException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
+        }
+
+        if (stackOnly)
+        {
+            results = [.. results.Where(r => string.Equals(r.Kind, StackKind, StringComparison.OrdinalIgnoreCase))];
         }
 
         if (json)
