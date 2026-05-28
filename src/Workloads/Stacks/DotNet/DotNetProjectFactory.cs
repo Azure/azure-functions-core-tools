@@ -1,0 +1,69 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Projects;
+using static Azure.Functions.Cli.Projects.ProjectCreationResults;
+
+namespace Azure.Functions.Cli.Workloads.DotNet;
+
+/// <summary>
+/// Creates .NET Functions projects from .NET-specific fingerprints.
+/// Recognizes both source directories (containing a project file) and
+/// pre-built output directories (containing host.json, worker.config.json, and .azurefunctions).
+/// </summary>
+internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFunctionsProjectFactory
+{
+    private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
+
+    public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        DirectoryInfo workingDirectory = context.WorkingDirectory.Info;
+        if (!workingDirectory.Exists)
+        {
+            return Task.FromResult(NotCreated("directory does not exist"));
+        }
+
+        var projectFiles = workingDirectory
+            .EnumerateFiles("*.*proj", SearchOption.TopDirectoryOnly)
+            .Where(f => f.Extension is ".csproj" or ".fsproj")
+            .ToList();
+
+        if (projectFiles.Count > 1)
+        {
+            return Task.FromResult(NotCreated("multiple .NET project files found; cannot determine which to use"));
+        }
+
+        if (projectFiles.Count == 1)
+        {
+            string projectFile = projectFiles[0].FullName;
+            FunctionsProject project = new DotNetSourceProject(context.WorkingDirectory, projectFile, _dotnetCli);
+            return Task.FromResult(Created(project, $"found {Path.GetFileName(projectFile)}"));
+        }
+
+        // No project file — check for pre-built output directory.
+        if (IsOutputDirectory(workingDirectory))
+        {
+            FunctionsProject project = new DotNetOutputProject(context.WorkingDirectory);
+            return Task.FromResult(Created(project, "found .NET build output (host.json, worker.config.json, .azurefunctions)"));
+        }
+
+        return Task.FromResult(NotCreated("no .NET project file or build output found"));
+    }
+
+    /// <summary>
+    /// Detects a pre-built .NET output directory by the presence of host.json, worker.config.json, and a .azurefunctions directory.
+    /// </summary>
+    private static bool IsOutputDirectory(DirectoryInfo directory)
+    {
+        string dirPath = directory.FullName;
+
+        bool hasHostJson = File.Exists(Path.Combine(dirPath, "host.json"));
+        bool hasWorkerConfig = File.Exists(Path.Combine(dirPath, "worker.config.json"));
+        bool hasAzureFunctions = Directory.Exists(Path.Combine(dirPath, ".azurefunctions"));
+
+        return hasHostJson && hasWorkerConfig && hasAzureFunctions;
+    }
+}

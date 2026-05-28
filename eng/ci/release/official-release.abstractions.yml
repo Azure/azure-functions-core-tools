@@ -2,7 +2,6 @@ parameters:
 - name: public
   displayName: Publish to nuget.org?
   type: boolean
-  default: false
 
 # Release has no triggers outside of pipeline
 trigger: none

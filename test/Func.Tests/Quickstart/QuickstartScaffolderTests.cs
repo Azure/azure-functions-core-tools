@@ -309,6 +309,37 @@ public class QuickstartScaffolderTests : IDisposable
         Assert.IsType<GitRunnerException>(ex.InnerException);
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_CancellationRequested_ThrowsOperationCanceled()
+    {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _scaffolder.ScaffoldAsync(CreateEntry(), _targetDir, FetchMode.Git, cts.Token));
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_FetcherThrows_CleansTempDirectory()
+    {
+        string[] tempDirsBefore = Directory.GetDirectories(Path.GetTempPath(), "func-quickstart-*");
+
+        var failingRunner = new FakeGitRunner(exception: new GitRunnerException(2, "fatal: repo not found", "", "ls-remote"));
+        ITemplateFetcher gitFetcher = new GitTemplateFetcher(failingRunner, NullLogger<GitTemplateFetcher>.Instance);
+        IFetchModeResolver resolver = new FetchModeResolver(failingRunner);
+        var scaffolder = new QuickstartScaffolder(
+            [gitFetcher],
+            resolver,
+            NullLogger<QuickstartScaffolder>.Instance);
+        QuickstartEntry entry = CreateEntry();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+
+        string[] tempDirsAfter = Directory.GetDirectories(Path.GetTempPath(), "func-quickstart-*");
+        Assert.Equal(tempDirsBefore.Length, tempDirsAfter.Length);
+    }
+
     /// <summary>
     /// Simulates git commands: ls-remote (no-op), clone (creates files), cat-file (no-op).
     /// </summary>

@@ -30,6 +30,7 @@ internal sealed class FakeGitRunner : IGitRunner
 
     public Task RunAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _calls.Add((arguments, workingDirectory));
 
         if (_exception is not null)
@@ -43,6 +44,7 @@ internal sealed class FakeGitRunner : IGitRunner
 
     public Task<string> RunWithOutputAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _calls.Add((arguments, workingDirectory));
 
         if (_exception is not null)
@@ -50,13 +52,13 @@ internal sealed class FakeGitRunner : IGitRunner
             throw _exception;
         }
 
-        _onRun?.Invoke(arguments, workingDirectory);
         string output = _onRunWithOutput?.Invoke(arguments) ?? string.Empty;
         return Task.FromResult(output);
     }
 
     public Task<string?> TryGetVersionAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_version);
     }
 }

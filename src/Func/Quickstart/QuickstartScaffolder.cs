@@ -89,12 +89,25 @@ internal sealed class QuickstartScaffolder(
             return tempDir;
         }
 
-        if (Path.IsPathRooted(folderPath))
+        if (IsAbsoluteOrTraversal(folderPath))
         {
-            throw new ArgumentException($"FolderPath must be a relative path, but got '{folderPath}'.", nameof(folderPath));
+            throw new ArgumentException(
+                $"FolderPath '{folderPath}' resolves outside the template directory. " +
+                "It must be a relative path within the template.",
+                nameof(folderPath));
         }
 
-        string subfolder = Path.Combine(tempDir, folderPath.Replace('/', Path.DirectorySeparatorChar));
+        string subfolder = Path.GetFullPath(Path.Combine(tempDir, folderPath));
+        string containingDir = Path.GetFullPath(tempDir + Path.DirectorySeparatorChar);
+
+        if (!subfolder.StartsWith(containingDir, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"FolderPath '{folderPath}' resolves outside the template directory. " +
+                "It must be a relative path within the template.",
+                nameof(folderPath));
+        }
+
         if (!Directory.Exists(subfolder))
         {
             throw new DirectoryNotFoundException(
@@ -107,16 +120,17 @@ internal sealed class QuickstartScaffolder(
 
     private static void CopyContentsToTarget(string sourceDir, string targetDirectory)
     {
-        foreach (string dir in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories))
-        {
-            string relative = Path.GetRelativePath(sourceDir, dir);
-            Directory.CreateDirectory(Path.Combine(targetDirectory, relative));
-        }
-
         foreach (string file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
         {
             string relative = Path.GetRelativePath(sourceDir, file);
             string dest = Path.Combine(targetDirectory, relative);
+            string? destDir = Path.GetDirectoryName(dest);
+
+            if (destDir is not null)
+            {
+                Directory.CreateDirectory(destDir);
+            }
+
             File.Copy(file, dest, overwrite: true);
         }
     }
@@ -137,19 +151,39 @@ internal sealed class QuickstartScaffolder(
                 nameof(entry));
         }
 
-        if (entry.FolderPath.Contains("..", StringComparison.Ordinal))
+        if (IsAbsoluteOrTraversal(entry.FolderPath))
         {
             throw new ArgumentException(
-                $"Invalid FolderPath '{entry.FolderPath}': must not contain '..' (path traversal).",
+                $"Invalid FolderPath '{entry.FolderPath}': must be a relative path without traversal.",
                 nameof(entry));
+        }
+    }
+
+    /// <summary>
+    /// OS-agnostic check for absolute or traversal paths. Manifest data may contain
+    /// Windows-style roots (<c>C:\foo</c>) even when the CLI runs on Linux/macOS,
+    /// so we check for both Unix and Windows patterns on every platform.
+    /// </summary>
+    private static bool IsAbsoluteOrTraversal(string path)
+    {
+        if (path.Contains("..", StringComparison.Ordinal))
+        {
+            return true;
         }
 
-        if (Path.IsPathRooted(entry.FolderPath))
+        // Unix absolute or UNC path
+        if (path.StartsWith('/') || path.StartsWith('\\'))
         {
-            throw new ArgumentException(
-                $"Invalid FolderPath '{entry.FolderPath}': must be a relative path.",
-                nameof(entry));
+            return true;
         }
+
+        // Windows drive-letter root (e.g. "C:\", "D:/")
+        if (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':')
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static IReadOnlyDictionary<FetchMode, ITemplateFetcher> BuildFetcherMap(IEnumerable<ITemplateFetcher> fetchers)
@@ -159,7 +193,11 @@ internal sealed class QuickstartScaffolder(
         Dictionary<FetchMode, ITemplateFetcher> map = [];
         foreach (ITemplateFetcher fetcher in fetchers)
         {
-            map[fetcher.Mode] = fetcher;
+            if (!map.TryAdd(fetcher.Mode, fetcher))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate template fetcher registered for mode '{fetcher.Mode}'.");
+            }
         }
 
         return map;
