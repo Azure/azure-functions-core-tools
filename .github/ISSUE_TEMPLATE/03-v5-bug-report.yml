@@ -1,0 +1,57 @@
+name: V5 Bug Report
+description: Report a bug or issue with the Azure Functions CLI v5.
+title: "[v5] "
+labels: ["v5"]
+body:
+- id: version
+  type: textarea
+  attributes:
+    label: Version
+    description: Output of `func --verbose` (include the Core Tools version and RID).
+    placeholder: |
+      $ func --verbose
+      ...
+- id: os
+  type: textarea
+  attributes:
+    label: OS / shell
+    placeholder: e.g., macOS 14.4, zsh; Windows 11, PowerShell 7.4
+- id: stack
+  type: textarea
+  attributes:
+    label: Stack
+    description: If applicable, the worker stack and runtime version.
+    placeholder: e.g., node 20.11, python 3.11, dotnet 8.0, go 1.22
+- id: description
+  type: textarea
+  attributes:
+    label: Description
+    placeholder: Description of the bug or issue.
+  validations:
+    required: true
+- id: repro
+  type: textarea
+  attributes:
+    label: Steps to reproduce
+    placeholder: Steps to reproduce, including the exact commands run.
+  validations:
+    required: true
+- id: expected
+  type: textarea
+  attributes:
+    label: Expected behavior
+    placeholder: What you expected to happen.
+- id: actual
+  type: textarea
+  attributes:
+    label: Actual behavior
+    description: Actual behavior and the full command output. For colored output, re-run with `NO_COLOR=1` set before copying.
+    placeholder: |
+      $ NO_COLOR=1 func ...
+      ...
+- id: logs
+  type: textarea
+  attributes:
+    label: Stack trace / logs
+    description: If this is a crash, re-run with `--verbose` and paste the output here.
+    render: shell
