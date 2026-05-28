@@ -17,7 +17,11 @@ internal sealed class FirstRunCoordinator(
     IFirstRunStateStore stateStore,
     ISetupRunner setupRunner) : IFirstRunCoordinator
 {
-    private const string PromptMessage = "Looks like it's your first run. Run setup now?";
+    private const string PromptExplanation =
+        "The Azure Functions CLI uses workloads (host, runtime, language stacks) to do its work, "
+        + "and they aren't installed yet. Running `func setup` now will install everything you need to get started.";
+
+    private const string PromptMessage = "Run `func setup` now?";
 
     // Commands that should not trigger the first-run prompt: the user is
     // either already setting up, just inspecting the CLI, or hit a typo.
@@ -66,6 +70,7 @@ internal sealed class FirstRunCoordinator(
         }
 
         _interaction.WriteBlankLine();
+        _interaction.WriteHint(PromptExplanation);
         bool runSetup = await _interaction.ConfirmAsync(PromptMessage, defaultValue: true, cancellationToken);
 
         if (runSetup)
