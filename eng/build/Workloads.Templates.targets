@@ -4,10 +4,10 @@
     Templates workload pack-time pipeline (Node + Python).
     Downloads StaticContent files from the extension-bundle CDN for the
     channel selected by $(TemplatesChannel), filters
-    v1/templates/templates.json by $(TemplatesStackLanguageFilter),
-    generates the templates-workload.json sibling manifest from
-    $(MinBundleVersionRange), and packs the result under
-    tools/any/content/ of the workload nupkg.
+    v1/templates/templates.json and/or v2/templates/templates.json by
+    $(TemplatesStackLanguageFilter), generates the templates-workload.json
+    sibling manifest from $(MinBundleVersionRange), and packs the
+    result under tools/any/content/ of the workload nupkg.
     Skip with -p:SkipDownloadTemplates=true (dev / offline only — produces
     an empty pack with no templates payload).
 
@@ -17,13 +17,23 @@
                                        time. Build-provenance only; does
                                        not derive the workload pkg version
                                        (Templates Workload Spec §4.4.1).
-      $(TemplatesStackLanguageFilter)  Comma/semicolon allow-list of v1
-                                       metadata.language values
-                                       (e.g. JavaScript;TypeScript for
-                                       Node, Python for Python). Required.
+      $(TemplatesStackLanguageFilter)  Comma/semicolon allow-list of
+                                       language values, matched
+                                       case-insensitively. Applied to v1
+                                       `metadata.language` and v2
+                                       top-level `language`. Required when
+                                       any of $(IncludeV1Templates) or
+                                       $(IncludeV2Templates) is true.
+      $(IncludeV1Templates)            true | false. Defaults true. Set
+                                       false for stacks that ship v2-only
+                                       (e.g. Python after the v2-only
+                                       cutover — Templates Workload Spec
+                                       §5.2 / §6.2).
       $(IncludeV2Templates)            true | false. Defaults true. Set
-                                       false for stacks with no v2
-                                       programming model (e.g. Node).
+                                       false for stacks whose v2 content
+                                       is not yet available (e.g. Node,
+                                       until its v2 source pipeline lands
+                                       — Templates Workload Spec §6.1).
       $(MinBundleVersionRange)         NuGet range the workload declares
                                        compatibility with. Drives the
                                        generated templates-workload.json,
@@ -49,6 +59,7 @@
     <_TplCdnId Condition="'$(TemplatesChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_TplCdnId>
     <_TplCdnId Condition="'$(TemplatesChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_TplCdnId>
 
+    <IncludeV1Templates Condition="'$(IncludeV1Templates)' == ''">true</IncludeV1Templates>
     <IncludeV2Templates Condition="'$(IncludeV2Templates)' == ''">true</IncludeV2Templates>
 
     <_TplBaseUrl>https://cdn.functions.azure.com/public/ExtensionBundles/$(_TplCdnId)/$(SourceBundleVersion)/StaticContent</_TplBaseUrl>
@@ -73,17 +84,23 @@
            Text="TemplatesChannel '$(TemplatesChannel)' is not one of stable|preview|experimental." />
     <Error Condition="'$(SourceBundleVersion)' == ''"
            Text="SourceBundleVersion must be set (the bundle version whose StaticContent the workload snapshots)." />
+    <Error Condition="'$(IncludeV1Templates)' != 'true' and '$(IncludeV2Templates)' != 'true'"
+           Text="At least one of IncludeV1Templates or IncludeV2Templates must be true; the templates workload would otherwise ship an empty payload." />
 
-    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/templates/templates.json"
+    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v1/templates/templates.json"
                   DestinationFolder="$(IntermediateOutputPath)templates\v1\templates\"
                   SkipUnchangedFiles="true" Retries="3" />
-    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/bindings/bindings.json"
+    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v1/bindings/bindings.json"
                   DestinationFolder="$(IntermediateOutputPath)templates\v1\bindings\"
                   SkipUnchangedFiles="true" Retries="3" />
-    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.json"
+    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.json"
                   DestinationFolder="$(IntermediateOutputPath)templates\v1\resources\"
                   SkipUnchangedFiles="true" Retries="3" />
-    <DownloadFile SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.%(_TplLocale.Identity).json"
+    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
+                  SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.%(_TplLocale.Identity).json"
                   DestinationFolder="$(IntermediateOutputPath)templates\v1\resources\"
                   SkipUnchangedFiles="true" Retries="3"
                   ContinueOnError="true" />
@@ -111,16 +128,30 @@
 
   <Target Name="FilterTemplatesByLanguage"
           DependsOnTargets="DownloadTemplatesContent"
-          Condition="'$(SkipDownloadTemplates)' != 'true'"
+          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(IncludeV1Templates)' == 'true'"
           BeforeTargets="_GetPackageFiles"
           Inputs="$(IntermediateOutputPath)templates\.downloaded"
-          Outputs="$(IntermediateOutputPath)templates\.filtered">
+          Outputs="$(IntermediateOutputPath)templates\.filtered.v1">
     <Error Condition="'$(TemplatesStackLanguageFilter)' == ''"
            Text="TemplatesStackLanguageFilter must be set (e.g. 'JavaScript;TypeScript' for Node, 'Python' for Python)." />
 
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\filter-templates.ps1&quot; -Path &quot;$(IntermediateOutputPath)templates\v1\templates\templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot;" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\filter-templates.ps1&quot; -Path &quot;$(IntermediateOutputPath)templates\v1\templates\templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v1" />
 
-    <Touch Files="$(IntermediateOutputPath)templates\.filtered" AlwaysCreate="true" />
+    <Touch Files="$(IntermediateOutputPath)templates\.filtered.v1" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="FilterTemplatesByLanguageV2"
+          DependsOnTargets="DownloadTemplatesContent"
+          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(IncludeV2Templates)' == 'true'"
+          BeforeTargets="_GetPackageFiles"
+          Inputs="$(IntermediateOutputPath)templates\.downloaded"
+          Outputs="$(IntermediateOutputPath)templates\.filtered.v2">
+    <Error Condition="'$(TemplatesStackLanguageFilter)' == ''"
+           Text="TemplatesStackLanguageFilter must be set (e.g. 'JavaScript;TypeScript' for Node, 'Python' for Python)." />
+
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\filter-templates.ps1&quot; -Path &quot;$(IntermediateOutputPath)templates\v2\templates\templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v2" />
+
+    <Touch Files="$(IntermediateOutputPath)templates\.filtered.v2" AlwaysCreate="true" />
   </Target>
 
   <Target Name="GenerateTemplatesWorkloadJson"
@@ -146,11 +177,12 @@
   </Target>
 
   <Target Name="_AddTemplatesToPack"
-          DependsOnTargets="FilterTemplatesByLanguage;GenerateTemplatesWorkloadJson"
+          DependsOnTargets="FilterTemplatesByLanguage;FilterTemplatesByLanguageV2;GenerateTemplatesWorkloadJson"
           Condition="'$(SkipDownloadTemplates)' != 'true'"
           BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <None Include="$(IntermediateOutputPath)templates\v1\**\*.json"
+      <None Condition="'$(IncludeV1Templates)' == 'true'"
+            Include="$(IntermediateOutputPath)templates\v1\**\*.json"
             Pack="true" PackagePath="tools/any/content/v1/" Visible="false" />
       <None Condition="'$(IncludeV2Templates)' == 'true'"
             Include="$(IntermediateOutputPath)templates\v2\**\*.json"
