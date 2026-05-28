@@ -89,6 +89,11 @@ internal sealed class QuickstartScaffolder(
             return tempDir;
         }
 
+        if (Path.IsPathRooted(folderPath))
+        {
+            throw new ArgumentException($"FolderPath must be a relative path, but got '{folderPath}'.", nameof(folderPath));
+        }
+
         string subfolder = Path.Combine(tempDir, folderPath.Replace('/', Path.DirectorySeparatorChar));
         if (!Directory.Exists(subfolder))
         {
