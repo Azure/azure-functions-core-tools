@@ -21,7 +21,7 @@ public class QuickstartScaffolderTests : IDisposable
 
         _gitRunner = new FakeGitRunner(
             onRun: SimulateGitCommand,
-            onRunWithOutput: args => args.Contains("cat-file") ? "tag" : string.Empty);
+            onRunWithOutput: SimulateGitOutputCommand);
         ITemplateFetcher gitFetcher = new GitTemplateFetcher(_gitRunner, NullLogger<GitTemplateFetcher>.Instance);
         ITemplateFetcher httpFetcher = new HttpTemplateFetcher(
             Substitute.For<IHttpClientFactory>(),
@@ -43,46 +43,63 @@ public class QuickstartScaffolderTests : IDisposable
     }
 
     [Fact]
-    public async Task ScaffoldAsync_GitMode_VerifiesTagThenClonesThenVerifiesAnnotated()
+    public async Task ScaffoldAsync_GitMode_InitsFetchesCheckoutsAndVerifiesTag()
     {
         QuickstartEntry entry = CreateEntry();
 
         await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None);
 
-        Assert.Equal(3, _gitRunner.Calls.Count);
+        // init → remote add → fetch → checkout → cat-file → rev-parse → rev-list = 7 calls
+        Assert.Equal(7, _gitRunner.Calls.Count);
 
-        // Call 1: ls-remote --tags --exit-code
-        IReadOnlyList<string> lsRemoteArgs = _gitRunner.Calls[0].Arguments;
-        Assert.Contains("ls-remote", lsRemoteArgs);
-        Assert.Contains("--tags", lsRemoteArgs);
-        Assert.Contains("--exit-code", lsRemoteArgs);
-        Assert.Contains($"refs/tags/v1.0.0", lsRemoteArgs);
+        // Call 1: git init <tempDir>
+        Assert.Contains("init", _gitRunner.Calls[0].Arguments);
 
-        // Call 2: clone --depth 1 --branch
-        IReadOnlyList<string> cloneArgs = _gitRunner.Calls[1].Arguments;
-        Assert.Contains("clone", cloneArgs);
-        Assert.Contains("--depth", cloneArgs);
-        Assert.Contains("1", cloneArgs);
-        Assert.Contains("--branch", cloneArgs);
-        Assert.Contains("v1.0.0", cloneArgs);
-        Assert.Contains("--", cloneArgs);
+        // Call 2: git -C <tempDir> remote add origin -- <url>
+        IReadOnlyList<string> remoteArgs = _gitRunner.Calls[1].Arguments;
+        Assert.Contains("remote", remoteArgs);
+        Assert.Contains("add", remoteArgs);
+        Assert.Contains("origin", remoteArgs);
 
-        // Call 3: cat-file -t refs/tags/v1.0.0
-        IReadOnlyList<string> catFileArgs = _gitRunner.Calls[2].Arguments;
+        // Call 3: git -C <tempDir> fetch --depth 1 --no-tags origin refs/tags/v1.0.0:refs/tags/v1.0.0
+        IReadOnlyList<string> fetchArgs = _gitRunner.Calls[2].Arguments;
+        Assert.Contains("fetch", fetchArgs);
+        Assert.Contains("--depth", fetchArgs);
+        Assert.Contains("--no-tags", fetchArgs);
+        Assert.Contains("refs/tags/v1.0.0:refs/tags/v1.0.0", fetchArgs);
+
+        // Call 4: git -C <tempDir> checkout --detach refs/tags/v1.0.0
+        IReadOnlyList<string> checkoutArgs = _gitRunner.Calls[3].Arguments;
+        Assert.Contains("checkout", checkoutArgs);
+        Assert.Contains("--detach", checkoutArgs);
+        Assert.Contains("refs/tags/v1.0.0", checkoutArgs);
+
+        // Call 5: git -C <tempDir> cat-file -t refs/tags/v1.0.0
+        IReadOnlyList<string> catFileArgs = _gitRunner.Calls[4].Arguments;
         Assert.Contains("cat-file", catFileArgs);
         Assert.Contains("-t", catFileArgs);
         Assert.Contains("refs/tags/v1.0.0", catFileArgs);
+
+        // Call 6: git -C <tempDir> rev-parse HEAD
+        IReadOnlyList<string> revParseArgs = _gitRunner.Calls[5].Arguments;
+        Assert.Contains("rev-parse", revParseArgs);
+        Assert.Contains("HEAD", revParseArgs);
+
+        // Call 7: git -C <tempDir> rev-list -n 1 refs/tags/v1.0.0
+        IReadOnlyList<string> revListArgs = _gitRunner.Calls[6].Arguments;
+        Assert.Contains("rev-list", revListArgs);
+        Assert.Contains("refs/tags/v1.0.0", revListArgs);
     }
 
     [Fact]
     public async Task ScaffoldAsync_BranchRef_ThrowsInvalidOperationException()
     {
-        // ls-remote --exit-code returns exit code 2 for branch refs (no matching tag)
+        // fetch with refs/tags/ refspec fails when the ref is a branch (no matching tag)
         var branchRunner = new FakeGitRunner(onRun: (args, _) =>
         {
-            if (args.Contains("ls-remote"))
+            if (args.Contains("fetch"))
             {
-                throw new GitRunnerException(2, "", "", "ls-remote --tags --exit-code");
+                throw new GitRunnerException(128, "", "fatal: couldn't find remote ref", "fetch");
             }
         });
         ITemplateFetcher gitFetcher = new GitTemplateFetcher(branchRunner, NullLogger<GitTemplateFetcher>.Instance);
@@ -120,12 +137,23 @@ public class QuickstartScaffolderTests : IDisposable
     }
 
     [Fact]
+    public async Task GitTemplateFetcher_NullGitRef_ThrowsArgumentException()
+    {
+        var fetcher = new GitTemplateFetcher(_gitRunner, NullLogger<GitTemplateFetcher>.Instance);
+        QuickstartEntry entry = CreateEntry(gitRef: null);
+
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => fetcher.FetchAsync(entry, _targetDir, CancellationToken.None));
+        Assert.Contains("no GitRef", ex.Message);
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_LightweightTag_ThrowsInvalidOperationException()
     {
         // cat-file -t returns "commit" for lightweight tags
         var lightweightRunner = new FakeGitRunner(
             onRun: SimulateGitCommand,
-            onRunWithOutput: args => args.Contains("cat-file") ? "commit" : string.Empty);
+            onRunWithOutput: args => args.Contains("cat-file") ? "commit" : FakeCommitHash);
         ITemplateFetcher gitFetcher = new GitTemplateFetcher(lightweightRunner, NullLogger<GitTemplateFetcher>.Instance);
         IFetchModeResolver resolver = new FetchModeResolver(lightweightRunner);
         var scaffolder = new QuickstartScaffolder(
@@ -179,9 +207,9 @@ public class QuickstartScaffolderTests : IDisposable
 
         await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Auto, CancellationToken.None);
 
-        // ls-remote + clone + cat-file = 3 calls
-        Assert.Equal(3, _gitRunner.Calls.Count);
-        Assert.Contains("clone", _gitRunner.Calls[1].Arguments);
+        // init → remote add → fetch → checkout → cat-file → rev-parse → rev-list = 7 calls
+        Assert.Equal(7, _gitRunner.Calls.Count);
+        Assert.Contains("init", _gitRunner.Calls[0].Arguments);
     }
 
     [Fact]
@@ -292,9 +320,9 @@ public class QuickstartScaffolderTests : IDisposable
     }
 
     [Fact]
-    public async Task ScaffoldAsync_GitRunnerThrows_PropagatesAsInvalidOperationException()
+    public async Task ScaffoldAsync_GitRunnerThrows_PropagatesAsGitRunnerException()
     {
-        var failingRunner = new FakeGitRunner(exception: new GitRunnerException(2, "fatal: repo not found", "", "ls-remote"));
+        var failingRunner = new FakeGitRunner(exception: new GitRunnerException(128, "fatal: repo not found", "", "init"));
         ITemplateFetcher gitFetcher = new GitTemplateFetcher(failingRunner, NullLogger<GitTemplateFetcher>.Instance);
         IFetchModeResolver resolver = new FetchModeResolver(failingRunner);
         var scaffolder = new QuickstartScaffolder(
@@ -303,10 +331,9 @@ public class QuickstartScaffolderTests : IDisposable
             NullLogger<QuickstartScaffolder>.Instance);
         QuickstartEntry entry = CreateEntry();
 
-        // ls-remote fails → wrapped as InvalidOperationException by GitTemplateFetcher
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        // init fails → GitRunnerException propagates directly (not wrapped)
+        await Assert.ThrowsAsync<GitRunnerException>(
             () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.IsType<GitRunnerException>(ex.InnerException);
     }
 
     [Fact]
@@ -324,7 +351,7 @@ public class QuickstartScaffolderTests : IDisposable
     {
         string[] tempDirsBefore = Directory.GetDirectories(Path.GetTempPath(), "func-quickstart-*");
 
-        var failingRunner = new FakeGitRunner(exception: new GitRunnerException(2, "fatal: repo not found", "", "ls-remote"));
+        var failingRunner = new FakeGitRunner(exception: new GitRunnerException(128, "fatal: repo not found", "", "init"));
         ITemplateFetcher gitFetcher = new GitTemplateFetcher(failingRunner, NullLogger<GitTemplateFetcher>.Instance);
         IFetchModeResolver resolver = new FetchModeResolver(failingRunner);
         var scaffolder = new QuickstartScaffolder(
@@ -333,42 +360,84 @@ public class QuickstartScaffolderTests : IDisposable
             NullLogger<QuickstartScaffolder>.Instance);
         QuickstartEntry entry = CreateEntry();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<GitRunnerException>(
             () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
 
         string[] tempDirsAfter = Directory.GetDirectories(Path.GetTempPath(), "func-quickstart-*");
         Assert.Equal(tempDirsBefore.Length, tempDirsAfter.Length);
     }
 
+    private const string FakeCommitHash = "abc123def456";
+
     /// <summary>
-    /// Simulates git commands: ls-remote (no-op), clone (creates files), cat-file (no-op).
+    /// Simulates git commands for the init+fetch+checkout flow.
+    /// <c>init</c> creates the directory structure, <c>checkout</c> populates template files.
+    /// Other commands (remote add, fetch) succeed as no-ops.
     /// </summary>
     private static void SimulateGitCommand(IReadOnlyList<string> args, string? workingDirectory)
     {
-        // ls-remote and cat-file succeed as no-ops — only clone needs to create files
-        if (!args.Contains("clone"))
+        if (args.Contains("init"))
         {
+            // git init <path> — create the directory
+            string initTarget = args[^1];
+            Directory.CreateDirectory(initTarget);
+            Directory.CreateDirectory(Path.Combine(initTarget, ".git"));
+            File.WriteAllText(Path.Combine(initTarget, ".git", "HEAD"), "ref: refs/heads/main");
             return;
         }
 
-        // Last argument is the target path
-        string cloneTarget = args[^1];
-        Directory.CreateDirectory(cloneTarget);
+        if (args.Contains("checkout"))
+        {
+            // git -C <tempDir> checkout — populate template files
+            int dashCIndex = -1;
+            for (int i = 0; i < args.Count; i++)
+            {
+                if (args[i] == "-C")
+                {
+                    dashCIndex = i;
+                    break;
+                }
+            }
 
-        // Simulate .git and .github dirs
-        Directory.CreateDirectory(Path.Combine(cloneTarget, ".git"));
-        File.WriteAllText(Path.Combine(cloneTarget, ".git", "HEAD"), "ref: refs/heads/main");
-        Directory.CreateDirectory(Path.Combine(cloneTarget, ".github"));
-        File.WriteAllText(Path.Combine(cloneTarget, ".github", "CODEOWNERS"), "* @team");
+            if (dashCIndex < 0 || dashCIndex + 1 >= args.Count)
+            {
+                return;
+            }
 
-        // Simulate template files
-        File.WriteAllText(Path.Combine(cloneTarget, "host.json"), "{}");
-        File.WriteAllText(Path.Combine(cloneTarget, "function_app.py"), "import azure.functions");
+            string repoDir = args[dashCIndex + 1];
 
-        // Simulate subfolder for subfolder promotion tests
-        string subDir = Path.Combine(cloneTarget, "src", "starter");
-        Directory.CreateDirectory(subDir);
-        File.WriteAllText(Path.Combine(subDir, "starter.txt"), "starter content");
+            // Simulate .github dir
+            Directory.CreateDirectory(Path.Combine(repoDir, ".github"));
+            File.WriteAllText(Path.Combine(repoDir, ".github", "CODEOWNERS"), "* @team");
+
+            // Simulate template files
+            File.WriteAllText(Path.Combine(repoDir, "host.json"), "{}");
+            File.WriteAllText(Path.Combine(repoDir, "function_app.py"), "import azure.functions");
+
+            // Simulate subfolder for subfolder promotion tests
+            string subDir = Path.Combine(repoDir, "src", "starter");
+            Directory.CreateDirectory(subDir);
+            File.WriteAllText(Path.Combine(subDir, "starter.txt"), "starter content");
+        }
+    }
+
+    /// <summary>
+    /// Simulates git output commands: <c>cat-file</c> returns "tag",
+    /// <c>rev-parse</c> and <c>rev-list</c> return matching commit hashes.
+    /// </summary>
+    private static string SimulateGitOutputCommand(IReadOnlyList<string> args)
+    {
+        if (args.Contains("cat-file"))
+        {
+            return "tag";
+        }
+
+        if (args.Contains("rev-parse") || args.Contains("rev-list"))
+        {
+            return FakeCommitHash;
+        }
+
+        return string.Empty;
     }
 
     private static QuickstartEntry CreateEntry(

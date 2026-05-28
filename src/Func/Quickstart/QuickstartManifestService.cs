@@ -119,10 +119,12 @@ internal sealed class QuickstartManifestService(
 
         // Support raw absolute file paths: drive-letter (C:\...) or Unix root (/).
         // UNC paths (\\server\share) are not accepted; use file:// URI instead.
-        if (Path.IsPathFullyQualified(url)
-            && !url.StartsWith(HttpSchemePrefix, StringComparison.OrdinalIgnoreCase)
+        // Path.IsPathFullyQualified is OS-specific (won't recognise "C:\..." on Linux),
+        // so we check for both Unix and Windows roots on every platform.
+        if (!url.StartsWith(HttpSchemePrefix, StringComparison.OrdinalIgnoreCase)
             && !url.StartsWith("//", StringComparison.Ordinal)
-            && !url.StartsWith(@"\\", StringComparison.Ordinal))
+            && !url.StartsWith(@"\\", StringComparison.Ordinal)
+            && IsAbsolutePath(url))
         {
             localPath = url;
             return true;
@@ -255,5 +257,26 @@ internal sealed class QuickstartManifestService(
             _logger.LogWarning(ex, "Failed to read cached quickstart manifest.");
             return null;
         }
+    }
+
+    /// <summary>
+    /// OS-agnostic check for absolute paths. <see cref="Path.IsPathFullyQualified"/>
+    /// is platform-specific and won't recognise Windows drive-letter paths on Linux.
+    /// </summary>
+    private static bool IsAbsolutePath(string path)
+    {
+        // Unix absolute
+        if (path.StartsWith('/'))
+        {
+            return true;
+        }
+
+        // Windows drive-letter root (e.g. "C:\", "D:/")
+        if (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':')
+        {
+            return true;
+        }
+
+        return false;
     }
 }

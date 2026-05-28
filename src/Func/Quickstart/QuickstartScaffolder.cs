@@ -34,8 +34,8 @@ internal sealed class QuickstartScaffolder(
 
         ValidateEntry(entry);
 
-        string tempDir = Path.Combine(Path.GetTempPath(), $"{TempDirectoryPrefix}{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
+        DirectoryInfo tempDirInfo = Directory.CreateTempSubdirectory(TempDirectoryPrefix);
+        string tempDir = tempDirInfo.FullName;
 
         try
         {
