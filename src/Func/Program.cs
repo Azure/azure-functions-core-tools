@@ -9,7 +9,9 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Telemetry;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 // Force UTF-8 stdout so glyphs like →, ●, ✗, ◉ render correctly on Windows
@@ -74,6 +76,9 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         commandParseResult = rootCommand.Parse(args);
         commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);
+
+        IFirstRunCoordinator firstRunCoordinator = host.Services.GetRequiredService<IFirstRunCoordinator>();
+        await firstRunCoordinator.EnsureFirstRunPromptedAsync(commandName, commandParseResult, cts.Token);
 
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         exitCode = await commandParseResult.InvokeAsync(config, cts.Token);
