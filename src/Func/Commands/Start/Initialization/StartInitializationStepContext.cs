@@ -41,6 +41,13 @@ internal sealed class StartInitializationStepContext(
             cancellationToken);
     }
 
+    public async Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+
+        return await _renderer.ConfirmAsync(prompt, defaultValue, cancellationToken);
+    }
+
     internal IReadOnlyList<IStartInitializationStep> DrainNextSteps()
     {
         IStartInitializationStep[] steps = [.. _nextSteps];

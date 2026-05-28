@@ -72,6 +72,56 @@ internal sealed class CompactStartInitializationRenderer(
             : StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, cancellationToken);
     }
 
+    public async Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        Task? liveTaskToStop;
+        CancellationTokenSource? liveCtsToStop;
+        bool restartLiveDisplay;
+        lock (_stateLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            liveTaskToStop = _liveTask;
+            liveCtsToStop = _liveCts;
+            restartLiveDisplay = liveTaskToStop is not null;
+            _liveTask = null;
+            _liveCts = null;
+        }
+
+        if (liveTaskToStop is not null)
+        {
+            await StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, cancellationToken);
+            WritePromptContext();
+        }
+
+        try
+        {
+            return await _interaction.ConfirmAsync(prompt, defaultValue, cancellationToken);
+        }
+        finally
+        {
+            if (restartLiveDisplay && !cancellationToken.IsCancellationRequested)
+            {
+                lock (_stateLock)
+                {
+                    if (!_disposed)
+                    {
+                        EnsureLiveDisplayStarted();
+                    }
+                }
+
+                SignalRedraw();
+            }
+        }
+    }
+
+    private void WritePromptContext()
+    {
+        _console.Write(BuildLayout());
+        _console.WriteLine();
+    }
+
     private void EnsureLiveDisplayStarted()
     {
         if (_liveTask is not null)
