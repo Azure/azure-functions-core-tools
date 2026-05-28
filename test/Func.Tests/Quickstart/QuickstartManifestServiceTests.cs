@@ -15,7 +15,7 @@ public sealed class QuickstartManifestServiceTests
     private readonly QuickstartManifestOptions _options = new()
     {
         ManifestUrl = "https://cdn.functions.azure.com/test/manifest.json",
-        CacheDirectory = "/tmp/quickstart-test",
+        CacheDirectory = Path.Combine(Path.GetTempPath(), "quickstart-test"),
         CacheTtl = TimeSpan.FromHours(24),
     };
 

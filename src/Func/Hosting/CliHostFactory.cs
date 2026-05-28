@@ -109,6 +109,7 @@ internal static class CliHostFactory
 
         builder.Services.AddCliHttpDefaults();
         builder.Services.AddBuiltInCommands();
+        builder.Services.AddQuickstartScaffolder();
         builder.Services.AddWorkloadStorage();
         builder.Services.AddProfiles();
         builder.Services.AddWorkloadCatalog();
