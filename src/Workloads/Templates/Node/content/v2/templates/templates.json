@@ -4,7 +4,7 @@
     "name": "Azure Blob Storage trigger",
     "description": "$BlobTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Blob Storage trigger (JavaScript)",
@@ -63,7 +63,7 @@
     "name": "Azure Blob Storage trigger",
     "description": "$BlobTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Blob Storage trigger (TypeScript)",
@@ -122,7 +122,7 @@
     "name": "Azure Cosmos DB trigger",
     "description": "$CosmosDBTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Cosmos DB trigger (JavaScript)",
@@ -193,7 +193,7 @@
     "name": "Azure Cosmos DB trigger",
     "description": "$CosmosDBTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Cosmos DB trigger (TypeScript)",
@@ -264,7 +264,7 @@
     "name": "Dapr Publish Output Binding",
     "description": "$DaprPublishOutputBinding_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Dapr Publish Output Binding (JavaScript)",
@@ -311,7 +311,7 @@
     "name": "Dapr Service Invocation Trigger",
     "description": "$DaprServiceInvocationTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Dapr Service Invocation Trigger (JavaScript)",
@@ -358,7 +358,7 @@
     "name": "Dapr Topic Trigger",
     "description": "$DaprTopicTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Dapr Topic Trigger (JavaScript)",
@@ -405,7 +405,7 @@
     "name": "Durable Functions entity",
     "description": "$DurableFunctionsEntity_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Durable Functions entity (JavaScript)",
@@ -452,7 +452,7 @@
     "name": "Durable Functions entity",
     "description": "$DurableFunctionsEntity_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Durable Functions entity (TypeScript)",
@@ -499,7 +499,7 @@
     "name": "Durable Functions orchestrator",
     "description": "$DurableFunctionsOrchestrator_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Durable Functions orchestrator (JavaScript)",
@@ -546,7 +546,7 @@
     "name": "Durable Functions orchestrator",
     "description": "$DurableFunctionsOrchestrator_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Durable Functions orchestrator (TypeScript)",
@@ -593,7 +593,7 @@
     "name": "Azure Blob Storage trigger (using Event Grid)",
     "description": "$BlobTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Blob Storage trigger (using Event Grid) (JavaScript)",
@@ -652,7 +652,7 @@
     "name": "Azure Blob Storage trigger (using Event Grid)",
     "description": "$BlobTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Blob Storage trigger (using Event Grid) (TypeScript)",
@@ -711,7 +711,7 @@
     "name": "Azure Event Grid trigger",
     "description": "$EventGridTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Event Grid trigger (JavaScript)",
@@ -758,7 +758,7 @@
     "name": "Azure Event Grid trigger",
     "description": "$EventGridTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Event Grid trigger (TypeScript)",
@@ -805,7 +805,7 @@
     "name": "Azure Event Hub trigger",
     "description": "$EventHubTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Event Hub trigger (JavaScript)",
@@ -858,7 +858,7 @@
     "name": "Azure Event Hub trigger",
     "description": "$EventHubTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Event Hub trigger (TypeScript)",
@@ -911,7 +911,7 @@
     "name": "HTTP trigger",
     "description": "$HttpTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new HTTP trigger (JavaScript)",
@@ -958,7 +958,7 @@
     "name": "HTTP trigger",
     "description": "$HttpTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new HTTP trigger (TypeScript)",
@@ -1005,7 +1005,7 @@
     "name": "MCP Prompt Trigger",
     "description": "Template for an MCP prompt function.",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new MCP Prompt Trigger (JavaScript)",
@@ -1052,7 +1052,7 @@
     "name": "MCP Prompt Trigger",
     "description": "Template for an MCP prompt function.",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new MCP Prompt Trigger (TypeScript)",
@@ -1099,7 +1099,7 @@
     "name": "MCP Resource Trigger",
     "description": "$McpResourceTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new MCP Resource Trigger (JavaScript)",
@@ -1146,7 +1146,7 @@
     "name": "MCP Resource Trigger",
     "description": "$McpResourceTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new MCP Resource Trigger (TypeScript)",
@@ -1193,7 +1193,7 @@
     "name": "MCP Tool Trigger",
     "description": "$McpToolTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new MCP Tool Trigger (JavaScript)",
@@ -1240,7 +1240,7 @@
     "name": "MCP Tool Trigger",
     "description": "$McpToolTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new MCP Tool Trigger (TypeScript)",
@@ -1287,7 +1287,7 @@
     "name": "Azure Queue Storage trigger",
     "description": "$QueueTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Queue Storage trigger (JavaScript)",
@@ -1346,7 +1346,7 @@
     "name": "Azure Queue Storage trigger",
     "description": "$QueueTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Queue Storage trigger (TypeScript)",
@@ -1405,7 +1405,7 @@
     "name": "Azure Service Bus Queue trigger",
     "description": "$ServiceBusQueueTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Service Bus Queue trigger (JavaScript)",
@@ -1464,7 +1464,7 @@
     "name": "Azure Service Bus Queue trigger",
     "description": "$ServiceBusQueueTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Service Bus Queue trigger (TypeScript)",
@@ -1523,7 +1523,7 @@
     "name": "Azure Service Bus Topic trigger",
     "description": "$ServiceBusTopicTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Azure Service Bus Topic trigger (JavaScript)",
@@ -1588,7 +1588,7 @@
     "name": "Azure Service Bus Topic trigger",
     "description": "$ServiceBusTopicTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Azure Service Bus Topic trigger (TypeScript)",
@@ -1653,7 +1653,7 @@
     "name": "Timer trigger",
     "description": "$TimerTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "javascript",
     "jobs": [
       {
         "name": "Create new Timer trigger (JavaScript)",
@@ -1706,7 +1706,7 @@
     "name": "Timer trigger",
     "description": "$TimerTrigger_description",
     "programmingModel": "v2",
-    "language": "node",
+    "language": "typescript",
     "jobs": [
       {
         "name": "Create new Timer trigger (TypeScript)",
