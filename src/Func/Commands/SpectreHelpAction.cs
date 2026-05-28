@@ -24,6 +24,17 @@ internal sealed class SpectreHelpAction(HelpCommand helpCommand) : SynchronousCo
             return _helpCommand.ShowGeneralHelp();
         }
 
+        // Stage-B help hydration: when the matched command is a
+        // template-aware verb (e.g. `func new`) and the user supplied a
+        // stage-A value the help renderer needs to know about
+        // (`--template <id>`), let the command attach the relevant
+        // dynamic options before we hand it to the renderer. Falls
+        // through to a built-ins-only render when the hook returns 0.
+        if (command is ITemplateAwareHelpProvider templateAware)
+        {
+            templateAware.AttachHydratedOptionsForHelp(parseResult);
+        }
+
         _helpCommand.RenderCommandHelp(command);
         return 0;
     }
