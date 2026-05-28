@@ -341,7 +341,7 @@ If a newer version is found, a notice is printed after the command completes.
 
 - **Cache**: `~/.azure-functions/quickstart/` (manifest JSON + ETag metadata), 24h TTL
 - **Validation**: only `v`-prefixed gitRef entries; HTTPS URLs on `github.com` from trusted orgs
-- **Override**: `FUNC_QUICKSTART_MANIFEST_URL` env var replaces CDN URL
+- **Override**: `FUNC_CLI_QUICKSTART_MANIFEST_URL` env var replaces CDN URL
 
 ## Init and New Command Flow
 

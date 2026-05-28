@@ -22,7 +22,7 @@ internal static class QuickstartRegistration
     /// Accepts HTTPS URLs, <c>file://</c> URIs, or absolute local file paths
     /// (e.g. <c>C:\manifest.json</c> or <c>/home/user/manifest.json</c>).
     /// </summary>
-    internal const string ManifestUrlEnvVar = "FUNC_QUICKSTART_MANIFEST_URL";
+    internal const string ManifestUrlEnvVar = "FUNC_CLI_QUICKSTART_MANIFEST_URL";
 
     public static IServiceCollection AddQuickstartManifest(this IServiceCollection services)
     {
