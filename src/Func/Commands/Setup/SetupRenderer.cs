@@ -74,7 +74,12 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
         {
             Dictionary<string, object?> payload = DependencyPayload(profileScope, dependency);
             payload["status"] = ToStatusText(result.Status);
-            payload["package_id"] = result.PackageId ?? dependency.ResolvedPackageId ?? dependency.PackageId;
+            string? packageId = result.PackageId ?? GetPackageId(dependency);
+            if (packageId is not null)
+            {
+                payload["package_id"] = packageId;
+            }
+
             payload["version"] = result.Version;
             payload["message"] = result.Message;
             WriteEvent("dependency.result", payload);
@@ -184,21 +189,34 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
     }
 
     private static Dictionary<string, object?> DependencyPayload(SetupProfileScope profileScope, SetupDependency dependency)
-        => new()
+    {
+        Dictionary<string, object?> payload = new()
         {
             ["profile"] = profileScope.Profile?.Name,
             ["dependency_type"] = ToDependencyKindText(dependency.Kind),
             ["name"] = dependency.Name,
-            ["package_id"] = dependency.ResolvedPackageId ?? dependency.PackageId,
             ["version_range"] = dependency.RangeText,
         };
+
+        string? packageId = GetPackageId(dependency);
+        if (packageId is not null)
+        {
+            payload["package_id"] = packageId;
+        }
+
+        return payload;
+    }
+
+    private static string? GetPackageId(SetupDependency dependency)
+        => dependency.Kind == SetupDependencyKind.Runtime ? null : dependency.ResolvedPackageId ?? dependency.PackageId;
 
     private static string ToDependencyKindText(SetupDependencyKind kind)
         => kind switch
         {
             SetupDependencyKind.Host => "host",
-            SetupDependencyKind.Worker => "worker",
+            SetupDependencyKind.Runtime => "runtime",
             SetupDependencyKind.Stack => "stack",
+            SetupDependencyKind.Worker => "worker",
             SetupDependencyKind.ExtensionBundle => "extension-bundle",
             _ => kind.ToString(),
         };

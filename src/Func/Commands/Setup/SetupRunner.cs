@@ -28,6 +28,9 @@ internal sealed class SetupRunner(
     ICliConfigurationProvider configurationProvider,
     IHostJsonBundleSectionReader hostJsonBundleSectionReader) : ISetupRunner
 {
+    private const string DotNetFeature = "dotnet";
+    private const string DotNetProfileRuntime = "dotnet-isolated";
+
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
@@ -97,12 +100,7 @@ internal sealed class SetupRunner(
         }
     }
 
-    private async Task<ProfileSetupOutcome> RunProfileAsync(
-        SetupCommandOptions options,
-        SetupFeaturePlan featurePlan,
-        SetupProfileScope profileScope,
-        SetupRenderer renderer,
-        CancellationToken cancellationToken)
+    private async Task<ProfileSetupOutcome> RunProfileAsync(SetupCommandOptions options, SetupFeaturePlan featurePlan, SetupProfileScope profileScope, SetupRenderer renderer, CancellationToken cancellationToken)
     {
         SetupDependencyPlan plan = await BuildDependencyPlanAsync(options.WorkingDirectory, featurePlan, profileScope, cancellationToken);
         int failures = 0;
@@ -147,33 +145,58 @@ internal sealed class SetupRunner(
             throw new SetupConfigurationException("At least one setup feature is required.");
         }
 
-        HashSet<string> normalizedFeatures = new(StringComparer.OrdinalIgnoreCase);
+        List<string> features = [];
+        HashSet<string> featureNames = new(StringComparer.OrdinalIgnoreCase);
+        List<SetupRuntimeFeature> runtimeFeatures = [];
+        HashSet<string> runtimeFeatureNames = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> workerRuntimes = new(StringComparer.OrdinalIgnoreCase);
         bool includeExtensionBundle = false;
 
         foreach (string rawFeature in requestedFeatures)
         {
             string feature = NormalizeFeature(rawFeature);
-            if (!normalizedFeatures.Add(feature))
-            {
-                continue;
-            }
 
             switch (feature)
             {
                 case "host":
+                    AddFeature(features, featureNames, "host");
                     break;
 
                 case "runtime":
-                    includeExtensionBundle = true;
+                    if (AddFeature(features, featureNames, "runtime"))
+                    {
+                        includeExtensionBundle = true;
+                    }
+
                     break;
 
-                case "dotnet":
+                case DotNetFeature:
+                case DotNetProfileRuntime:
+                    if (AddFeature(features, featureNames, DotNetFeature))
+                    {
+                        AddRuntimeFeature(
+                            runtimeFeatures,
+                            runtimeFeatureNames,
+                            DotNetFeature,
+                            DotNetProfileRuntime,
+                            installWorker: false);
+                    }
+
+                    break;
+
                 case ".net":
+                    throw new SetupConfigurationException($"The '{rawFeature}' feature is not supported. Use 'dotnet'.");
+
                 case "dotnet-inprocess":
-                    throw new SetupConfigurationException("The 'dotnet' feature is not supported. Use 'dotnet-isolated'.");
+                    throw new SetupConfigurationException($"The '{rawFeature}' feature is not supported. Use 'dotnet'.");
 
                 default:
+                    if (!AddFeature(features, featureNames, feature))
+                    {
+                        break;
+                    }
+
+                    AddRuntimeFeature(runtimeFeatures, runtimeFeatureNames, feature, profileRuntime: feature, installWorker: true);
                     workerRuntimes.Add(feature);
                     if (GetBundlePolicy(feature) == SetupBundlePolicy.DefaultStable)
                     {
@@ -185,7 +208,8 @@ internal sealed class SetupRunner(
         }
 
         return new SetupFeaturePlan(
-            [.. normalizedFeatures],
+            [.. features],
+            [.. runtimeFeatures],
             [.. workerRuntimes.OrderBy(static runtime => runtime, StringComparer.OrdinalIgnoreCase)],
             includeExtensionBundle);
     }
@@ -213,10 +237,7 @@ internal sealed class SetupRunner(
         return ["runtime"];
     }
 
-    private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(
-        SetupCommandOptions options,
-        SetupRenderer renderer,
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(SetupCommandOptions options, SetupRenderer renderer, CancellationToken cancellationToken)
     {
         string projectDirectory = Path.GetFullPath(options.WorkingDirectory.FullName);
         ProjectProfileOptions projectOptions = _projectProfileOptions.Get(projectDirectory);
@@ -255,10 +276,7 @@ internal sealed class SetupRunner(
         return [SetupProfileScope.Unconstrained];
     }
 
-    private SetupProfileScope CreateProfileScope(
-        string profileName,
-        IReadOnlyList<ProfileSourceSnapshot> snapshots,
-        SetupRenderer renderer)
+    private SetupProfileScope CreateProfileScope(string profileName, IReadOnlyList<ProfileSourceSnapshot> snapshots, SetupRenderer renderer)
     {
         ResolvedProfile profile = _profileCatalog.ResolveProfile(profileName, snapshots);
         if (profile.Status == ProfileStatus.Deprecated)
@@ -266,42 +284,44 @@ internal sealed class SetupRunner(
             string suffix = string.IsNullOrWhiteSpace(profile.DeprecationUrl)
                 ? string.Empty
                 : $" See {profile.DeprecationUrl}.";
+
             renderer.Warning($"Profile '{profile.Name}' is deprecated.{suffix}");
         }
 
         return new SetupProfileScope(profile);
     }
 
-    private async Task<SetupDependencyPlan> BuildDependencyPlanAsync(
-        DirectoryInfo workingDirectory,
-        SetupFeaturePlan featurePlan,
-        SetupProfileScope profileScope,
-        CancellationToken cancellationToken)
+    private async Task<SetupDependencyPlan> BuildDependencyPlanAsync(DirectoryInfo workingDirectory, SetupFeaturePlan featurePlan, SetupProfileScope profileScope, CancellationToken cancellationToken)
     {
         List<SetupDependency> dependencies = [];
         List<SetupDependencyResult> failures = [];
 
         dependencies.Add(SetupDependency.Host(profileScope.Profile?.HostVersionRange));
 
-        foreach (string workerRuntime in featurePlan.WorkerRuntimes)
+        foreach (SetupRuntimeFeature runtimeFeature in featurePlan.RuntimeFeatures)
         {
             if (profileScope.Profile?.SupportedRuntimes is { } supportedRuntimes
-                && !supportedRuntimes.Any(runtime => string.Equals(runtime, workerRuntime, StringComparison.OrdinalIgnoreCase)))
+                && !supportedRuntimes.Any(runtime => string.Equals(runtime, runtimeFeature.ProfileRuntime, StringComparison.OrdinalIgnoreCase)))
             {
-                var dependency = SetupDependency.Worker(workerRuntime, versionRange: null);
-                string message = $"Profile '{profileScope.Profile.Name}' does not support runtime '{workerRuntime}'. "
+                SetupDependency dependency = runtimeFeature.InstallWorker
+                    ? SetupDependency.Worker(runtimeFeature.Name, versionRange: null)
+                    : SetupDependency.Runtime(runtimeFeature.Name);
+                string message = $"Profile '{profileScope.Profile.Name}' does not support runtime '{runtimeFeature.Name}'. "
                     + $"Supported runtimes: {string.Join(", ", supportedRuntimes)}.";
                 failures.Add(SetupDependencyResult.Failed(dependency, message));
                 continue;
             }
 
-            VersionRange? workerRange = null;
-            profileScope.Profile?.WorkerVersionRanges.TryGetValue(workerRuntime, out workerRange);
-            dependencies.Add(SetupDependency.Worker(workerRuntime, workerRange));
-
-            if (SetupDependency.SupportsStack(workerRuntime))
+            if (runtimeFeature.InstallWorker)
             {
-                dependencies.Add(SetupDependency.Stack(workerRuntime));
+                VersionRange? workerRange = null;
+                profileScope.Profile?.WorkerVersionRanges.TryGetValue(runtimeFeature.ProfileRuntime, out workerRange);
+                dependencies.Add(SetupDependency.Worker(runtimeFeature.Name, workerRange));
+            }
+
+            if (SetupDependency.SupportsStack(runtimeFeature.Name))
+            {
+                dependencies.Add(SetupDependency.Stack(runtimeFeature.Name));
             }
         }
 
@@ -572,6 +592,30 @@ internal sealed class SetupRunner(
         return result;
     }
 
+    private static bool AddFeature(List<string> features, HashSet<string> featureNames, string feature)
+    {
+        if (!featureNames.Add(feature))
+        {
+            return false;
+        }
+
+        features.Add(feature);
+        return true;
+    }
+
+    private static void AddRuntimeFeature(
+        List<SetupRuntimeFeature> runtimeFeatures,
+        HashSet<string> runtimeFeatureNames,
+        string name,
+        string profileRuntime,
+        bool installWorker)
+    {
+        if (runtimeFeatureNames.Add(name))
+        {
+            runtimeFeatures.Add(new SetupRuntimeFeature(name, profileRuntime, installWorker));
+        }
+    }
+
     private static string NormalizeFeature(string value)
     {
         string? normalized = NullIfWhiteSpace(value);
@@ -590,9 +634,13 @@ internal sealed class SetupRunner(
         => range is null ? null : range.OriginalString ?? range.ToString();
 
     private static SetupBundlePolicy GetBundlePolicy(string workerRuntime)
-        => string.Equals(workerRuntime, "dotnet-isolated", StringComparison.OrdinalIgnoreCase)
+        => IsDotNetRuntime(workerRuntime)
             ? SetupBundlePolicy.NotSupported
             : SetupBundlePolicy.DefaultStable;
+
+    private static bool IsDotNetRuntime(string runtime)
+        => string.Equals(runtime, DotNetFeature, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(runtime, DotNetProfileRuntime, StringComparison.OrdinalIgnoreCase);
 
     private sealed record CatalogResolution(ResolvedPackage? Package, string? FailureMessage, bool PackageMissing)
     {
@@ -608,8 +656,11 @@ internal sealed class SetupRunner(
 
 internal sealed record SetupFeaturePlan(
     IReadOnlyList<string> Features,
+    IReadOnlyList<SetupRuntimeFeature> RuntimeFeatures,
     IReadOnlyList<string> WorkerRuntimes,
     bool IncludeExtensionBundle);
+
+internal sealed record SetupRuntimeFeature(string Name, string ProfileRuntime, bool InstallWorker);
 
 internal sealed record SetupProfileScope(ResolvedProfile? Profile)
 {
@@ -639,8 +690,7 @@ internal sealed record SetupDependency(
     // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
     // require a CLI release. Stacks not in this set (java, powershell, custom)
     // skip silently today.
-    private static readonly HashSet<string> _stacks =
-        new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet-isolated" };
+    private static readonly HashSet<string> _stacks = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet" };
 
     public static SetupDependency Host(VersionRange? versionRange)
         => new(
@@ -650,6 +700,16 @@ internal sealed record SetupDependency(
             HostWorkloadPackage.CurrentPackageId,
             versionRange,
             SetupRunnerRangeText(versionRange),
+            ResolvedPackageId: null);
+
+    public static SetupDependency Runtime(string runtime)
+        => new(
+            SetupDependencyKind.Runtime,
+            runtime,
+            $"{runtime} runtime",
+            runtime,
+            VersionRange: null,
+            RangeText: null,
             ResolvedPackageId: null);
 
     public static SetupDependency Worker(string runtime, VersionRange? versionRange)
@@ -688,10 +748,15 @@ internal sealed record SetupDependency(
 
     public static IReadOnlyList<string> Stacks => [.. _stacks];
 
-    // dotnet-isolated maps to the .dotnet package suffix; the rest concat
-    // directly (NuGet package ids are case-insensitive).
     private static string StackPackageSuffix(string stack)
-        => string.Equals(stack, "dotnet-isolated", StringComparison.OrdinalIgnoreCase) ? "dotnet" : stack;
+        => stack.Trim().ToLowerInvariant() switch
+        {
+            "dotnet" => "DotNet",
+            "node" => "Node",
+            "python" => "Python",
+            "go" => "Go",
+            _ => stack,
+        };
 
     private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
 
@@ -703,6 +768,7 @@ internal sealed record SetupDependency(
 internal enum SetupDependencyKind
 {
     Host,
+    Runtime,
     Worker,
     Stack,
     ExtensionBundle,
@@ -737,7 +803,12 @@ internal sealed record SetupDependencyResult(
         => new(dependency, SetupDependencyStatus.Skipped, dependency.PackageId, Version: null, message);
 
     public static SetupDependencyResult Failed(SetupDependency dependency, string message)
-        => new(dependency, SetupDependencyStatus.Failed, dependency.PackageId, Version: null, message);
+        => new(
+            dependency,
+            SetupDependencyStatus.Failed,
+            dependency.Kind == SetupDependencyKind.Runtime ? null : dependency.PackageId,
+            Version: null,
+            message);
 }
 
 internal sealed record ProfileSetupOutcome(int FailureCount);

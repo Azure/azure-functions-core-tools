@@ -22,6 +22,7 @@ namespace Azure.Functions.Cli.Tests.Commands.Setup;
 public sealed class SetupRunnerTests : IDisposable
 {
     private static readonly string _hostPackageId = HostWorkloadPackage.CurrentPackageId;
+    private static readonly string _dotNetStackPackageId = "Azure.Functions.Cli.Workloads.DotNet";
 
     private readonly string _tempDir;
     private readonly TestInteractionService _interaction = new();
@@ -93,33 +94,44 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task RunAsync_ConfiguredDotnetIsolated_InstallsStackAndSkipsWorkerAndBundle()
+    [Theory]
+    [InlineData("dotnet")]
+    [InlineData("dotnet-isolated")]
+    public async Task RunAsync_ConfiguredDotnetRuntime_InstallsHostAndStackAndSkipsWorkerAndBundle(string configuredRuntime)
     {
-        string workerPackageId = WorkerPackage("dotnet-isolated");
-        const string dotnetStack = "Azure.Functions.Cli.Workloads.dotnet";
         FakeCatalog catalog = Catalog()
             .WithLatest(_hostPackageId, "4.1.0")
-            .WithLatest(dotnetStack, "1.0.0");
+            .WithLatest(_dotNetStackPackageId, "1.0.0");
         SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
         {
-            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "dotnet-isolated",
+            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = configuredRuntime,
         });
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
+
         await _installer.Received(1).InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, dotnetStack, StringComparison.OrdinalIgnoreCase)),
-            Arg.Any<NuGetVersion?>(),
+            Arg.Is<string>(id => string.Equals(id, _hostPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.1.0"),
             Arg.Any<string?>(),
-            Arg.Any<bool>(),
-            Arg.Any<bool>(),
-            Arg.Any<bool>(),
+            Arg.Is(false),
+            Arg.Is(true),
+            Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, _dotNetStackPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.0.0"),
+            Arg.Any<string?>(),
+            Arg.Is(false),
+            Arg.Is(true),
+            Arg.Is(false),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+
         await _installer.DidNotReceive().InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<string>(id => id.Contains(".Workers.", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
             Arg.Any<bool>(),
@@ -136,6 +148,160 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_DotnetFeature_InstallsDotnetStackAndSkipsWorkerAndBundle()
+    {
+        const string source = "http://localhost:5555/v3/index.json";
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(_dotNetStackPackageId, "1.0.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: ["dotnet"], source: source, includePrerelease: true),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, _dotNetStackPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.0.0"),
+            Arg.Is<string?>(actual => actual == source),
+            Arg.Is(true),
+            Arg.Is(true),
+            Arg.Is(false),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => id.Contains(".Workers.", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Is<string>(id => id.Contains("ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_DotnetFeature_AllowsProfileWithDotnetIsolatedRuntime()
+    {
+        SetupRunner runner = CreateRunner(
+            Catalog()
+                .WithLatest(_hostPackageId, "4.1.0")
+                .WithLatest(_dotNetStackPackageId, "1.0.0"),
+            profileCatalog: new ProfileCatalog([
+                new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
+                    new("flex", new ProfileDefinition
+                    {
+                        Host = new ProfileVersionConstraint { Version = "[4.0.0, 5.0.0)" },
+                        SupportedRuntimes = ["dotnet-isolated"],
+                    }),
+                ]),
+            ]));
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["dotnet"], profiles: ["flex"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("does not support runtime", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData("dotnet")]
+    [InlineData("dotnet-isolated")]
+    public async Task RunAsync_JsonOutput_DotnetRuntimeUsesDotnetFeatureName(string requestedFeature)
+    {
+        SetupRunner runner = CreateRunner(
+            Catalog()
+                .WithLatest(_hostPackageId, "4.1.0")
+                .WithLatest(_dotNetStackPackageId, "1.0.0"));
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: [requestedFeature], outputMode: SetupOutputMode.Json),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        using var started = JsonDocument.Parse(_interaction.Lines[0]);
+        JsonElement root = started.RootElement;
+        string[] features = [.. root.GetProperty("features").EnumerateArray().Select(feature => feature.GetString()!)];
+        string[] workerRuntimes = [.. root.GetProperty("worker_runtimes").EnumerateArray().Select(runtime => runtime.GetString()!)];
+
+        Assert.Equal(["dotnet"], features);
+        Assert.Empty(workerRuntimes);
+        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("dotnet-isolated", StringComparison.OrdinalIgnoreCase));
+        string stackLine = Assert.Single(
+            _interaction.Lines,
+            line => line.Contains("\"type\":\"dependency.detected\"", StringComparison.OrdinalIgnoreCase)
+                && line.Contains("\"dependency_type\":\"stack\"", StringComparison.OrdinalIgnoreCase));
+        using var stackEvent = JsonDocument.Parse(stackLine);
+        JsonElement stackRoot = stackEvent.RootElement;
+
+        Assert.Equal("dotnet", stackRoot.GetProperty("name").GetString());
+        Assert.Equal(_dotNetStackPackageId, stackRoot.GetProperty("package_id").GetString(), ignoreCase: true);
+    }
+
+    [Theory]
+    [InlineData("dotnet")]
+    [InlineData("dotnet-isolated")]
+    public async Task RunAsync_DotnetRuntimeUnsupportedProfile_ReportsDotnetFeatureName(string requestedFeature)
+    {
+        SetupRunner runner = CreateRunner(
+            Catalog().WithLatest(_hostPackageId, "4.1.0"),
+            profileCatalog: new ProfileCatalog([
+                new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
+                    new("flex", new ProfileDefinition
+                    {
+                        Host = new ProfileVersionConstraint { Version = "[4.0.0, 5.0.0)" },
+                        SupportedRuntimes = ["python"],
+                    }),
+                ]),
+            ]));
+
+        SetupRunResult result = await runner.RunAsync(Options(features: [requestedFeature], profiles: ["flex"]), CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(_interaction.Lines, line => line.Contains("does not support runtime 'dotnet'", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("dotnet-isolated", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RunAsync_JsonOutput_DotnetUnsupportedProfileReportsRuntimeDiagnostic()
+    {
+        SetupRunner runner = CreateRunner(
+            Catalog().WithLatest(_hostPackageId, "4.1.0"),
+            profileCatalog: new ProfileCatalog([
+                new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
+                    new("flex", new ProfileDefinition
+                    {
+                        Host = new ProfileVersionConstraint { Version = "[4.0.0, 5.0.0)" },
+                        SupportedRuntimes = ["python"],
+                    }),
+                ]),
+            ]));
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: ["dotnet"], profiles: ["flex"], outputMode: SetupOutputMode.Json),
+            CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        string failureLine = Assert.Single(_interaction.Lines, line => line.Contains("\"status\":\"failed\"", StringComparison.OrdinalIgnoreCase));
+        using var failure = JsonDocument.Parse(failureLine);
+        JsonElement root = failure.RootElement;
+
+        Assert.Equal("runtime", root.GetProperty("dependency_type").GetString());
+        Assert.Equal("dotnet", root.GetProperty("name").GetString());
+        Assert.False(root.TryGetProperty("package_id", out _));
+        Assert.DoesNotContain("dotnet-isolated", failureLine, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -435,6 +601,7 @@ public sealed class SetupRunnerTests : IDisposable
         IReadOnlyList<string>? profiles = null,
         string? source = null,
         SetupInstallPolicy installPolicy = SetupInstallPolicy.LatestCompatible,
+        bool includePrerelease = false,
         bool check = false,
         SetupOutputMode outputMode = SetupOutputMode.Plain)
         => new(
@@ -443,7 +610,7 @@ public sealed class SetupRunnerTests : IDisposable
             profiles ?? [],
             source,
             installPolicy,
-            IncludePrerelease: false,
+            IncludePrerelease: includePrerelease,
             NonInteractive: true,
             AssumeYes: true,
             check,
@@ -451,8 +618,7 @@ public sealed class SetupRunnerTests : IDisposable
 
     private static FakeCatalog Catalog() => new();
 
-    private static string WorkerPackage(string runtime)
-        => "Azure.Functions.Cli.Workloads.Workers." + runtime;
+    private static string WorkerPackage(string runtime) => $"Azure.Functions.Cli.Workloads.Workers.{runtime}";
 
     private static WorkloadEntry Entry(
         string packageId,
