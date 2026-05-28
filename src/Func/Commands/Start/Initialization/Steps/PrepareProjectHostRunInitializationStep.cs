@@ -114,7 +114,7 @@ internal sealed class PrepareProjectHostRunInitializationStep(
                 continue;
             }
 
-            if (!string.IsNullOrEmpty(_processEnvironment.Get(name)))
+            if (_processEnvironment.Get(name) is not null)
             {
                 _interaction.WriteWarning($"Skipping '{name}' from local.settings.json: already set in the current environment.");
                 continue;

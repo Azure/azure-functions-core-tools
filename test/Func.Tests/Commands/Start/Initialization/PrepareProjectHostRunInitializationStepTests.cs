@@ -25,6 +25,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     {
         _projectDir = Path.Combine(Path.GetTempPath(), "prep-host-step-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_projectDir);
+        _processEnv.Get(Arg.Any<string>()).Returns((string?)null);
     }
 
     public void Dispose()
@@ -99,18 +100,29 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     }
 
     [Fact]
-    public async Task ProcessEnvEmptyOrNull_DoesNotBlockLocalSettings()
+    public async Task ProcessEnvNull_DoesNotBlockLocalSettings()
     {
-        SetLocalSettings(new() { ["KeyA"] = "valueA", ["KeyB"] = "valueB" });
+        SetLocalSettings(new() { ["KeyA"] = "valueA" });
         _processEnv.Get("KeyA").Returns((string?)null);
-        _processEnv.Get("KeyB").Returns(string.Empty);
         StartInitializationStepContext context = NewContext();
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
         Assert.Equal("valueA", context.State.HostRunContext!.EnvironmentVariables["KeyA"]);
-        Assert.Equal("valueB", context.State.HostRunContext!.EnvironmentVariables["KeyB"]);
         _interaction.DidNotReceiveWithAnyArgs().WriteWarning(default!);
+    }
+
+    [Fact]
+    public async Task ProcessEnvEmptyString_BlocksLocalSettings()
+    {
+        SetLocalSettings(new() { ["KeyB"] = "valueB" });
+        _processEnv.Get("KeyB").Returns(string.Empty);
+        StartInitializationStepContext context = NewContext();
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        Assert.False(context.State.HostRunContext!.EnvironmentVariables.ContainsKey("KeyB"));
+        _interaction.Received(1).WriteWarning(Arg.Is<string>(s => s.Contains("KeyB")));
     }
 
     [Fact]
