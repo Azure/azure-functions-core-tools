@@ -30,7 +30,6 @@ internal sealed class DotNetQuickstartProvider : IQuickstartProvider
 
     public IReadOnlyList<string> GetNextSteps(string manifestLanguage) =>
     [
-        "Verify `local.settings.json` exists and has the required settings values",
         "Run `func run` to launch the app"
     ];
 }

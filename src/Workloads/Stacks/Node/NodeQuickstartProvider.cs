@@ -28,7 +28,6 @@ internal sealed class NodeQuickstartProvider : IQuickstartProvider
     public IReadOnlyList<string> GetNextSteps(string manifestLanguage) =>
     [
         "Run `npm install` to install dependencies",
-        "Verify `local.settings.json` exists and has the required settings values",
         "Run `func run` to launch the app"
     ];
 }
