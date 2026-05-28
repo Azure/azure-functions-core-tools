@@ -29,9 +29,13 @@
   all live in the CLI core. This spec only specifies what the
   workload contributes to that flow.
 - **CDN access from `func new`.** Mirrors the bundles posture: the
-  CLI performs no network I/O for templates at invocation time. Template payloads are obtained at workload
-  **build time** (Node/Python) or via NuGet at `func new` time
-  through `dotnet new` (DotNet) — see §6.
+  CLI performs no network I/O for templates at invocation time. Template
+  payloads are obtained at workload **build time**: Node/Python embed a
+  filtered bundle StaticContent snapshot; DotNet hydrates
+  `dotnet-templates.json` from the pinned NuGet template pkg and pins
+  the same pkg in `source.json`, which `func workload install`
+  provisions into the dotnet template hive (no NuGet I/O at `func new`
+  time) — see §6.
 - **Auto-install of a templates workload on `func new`.** Missing or
   unsatisfying installed templates causes `func new` to print an
   install hint and exit non-zero (mirrors host/bundles workloads).
@@ -50,9 +54,9 @@ Listed alphabetically.
 | Term | Meaning |
 |------|---------|
 | **Channel** | One of `stable` / `preview` / `experimental`. Determines the templates workload pkg version's prerelease label. See §4.4.2. |
-| **`dotnet-templates.json`** | The DotNet templates workload's lean index file under `content/`. Lists template ids that the CLI core dispatches to `dotnet new` at scaffold time. Distinct from the bundle-derived `templates.json` schema used by Node and Python (§5.3). |
+| **`dotnet-templates.json`** | The DotNet templates workload's fully-hydrated catalog + per-template option index under `content/`. Built at workload pack time from each upstream `template.json` (+ optional `dotnetcli.host.json`); drives `func templates list` and `func new --template <id> --help` fully offline from the workload payload. Distinct from the bundle-derived `templates.json` schema used by Node and Python (§5.3, §5.3.1). |
 | **Min bundle version** | The lowest extension-bundle version a Node/Python templates workload is known to be compatible with, expressed as a NuGet version range. |
-| **Source bundle** | The extension-bundle release (id + version) whose `StaticContent/v1` and `StaticContent/v2` sub-trees are the upstream source for a Node/Python templates workload's payload. Recorded as build-time provenance; the templates pkg version is independent of the source bundle version (§4.4.1, §4.4.2). |
+| **Source bundle** | The extension-bundle release (id + version) whose `StaticContent/v2` sub-tree is the upstream source for a Node/Python templates workload's payload. Recorded as build-time provenance; the templates pkg version is independent of the source bundle version (§4.4.1, §4.4.2). |
 | **Stack** | The CLI's per-language axis: `node`, `python`, `dotnet`. |
 | **Template** | A single scaffoldable unit, identified by a stack-unique `id` and `name` (e.g. `HttpTrigger-JavaScript`). Produces one or more files. The exact production mechanism is engine-specific — see §4.4, §5.4. |
 | **Template metadata** | The per-template descriptor (id, language, trigger type, default function name, category, referenced user prompts, …) the CLI core reads to drive `func new`. |
@@ -107,11 +111,12 @@ the build-time plumbing that fetched it. It has no runtime code.
 
 | Concern | Node | Python | DotNet |
 |---|---|---|---|
-| Workload payload format | `v1/{bindings,resources,templates}/` | `v1/` + `v2/{bindings,resources,templates}/` | `dotnet-templates.json` + `source.json` (NuGet pin) |
-| Template source at workload build time | Extension-bundle CDN | Extension-bundle CDN | `Microsoft.Azure.Functions.Worker.ItemTemplates` NuGet pkg (pinned, not fetched at build) |
-| Template files inside `.nupkg`? | Yes (inline in `files` map) | Yes (inline in `files` map) | No (resolved at `func new` time via NuGet → `dotnet new` template hive) |
-| Channel axis (stable/preview/experimental)? | Yes (matches bundle channel id) | Yes (matches bundle channel id) | No (stable only; upstream NuGet preview signals propagate via `source.json`) |
-| Templating engine in CLI | Node schema engine | Python schema engine (v1 + v2) | `dotnet new <id>` shell-out |
+| Workload payload format | `v2/{bindings,resources,templates}/` | `v2/{bindings,resources,templates}/` | `dotnet-templates.json` + `source.json` (NuGet pin) |
+| Template source at workload build time | **In-repo static content** (`src/Workloads/Templates/Node/content/v2/`), ported from the v4 Node templates in core-tools `main` via a converter script. The upstream extension bundle does not yet publish v2 Node entries. | Extension-bundle CDN | `Microsoft.Azure.Functions.Worker.ItemTemplates` NuGet pkg (fetched at build to hydrate `dotnet-templates.json`) |
+| Per-template source files in workload? | Yes (inline in `files` map) | Yes (inline in `files` map) | No — provisioned into the dotnet template hive from `source.json`'s NuGet pin (§6.3) |
+| Catalog + per-template option metadata in workload? | Inline in each `NewTemplate` entry | Inline in each `NewTemplate` entry | Yes — `dotnet-templates.json` is fully hydrated at workload build time from the pinned NuGet pkg's `template.json` files (§5.3, §6.3) |
+| Channel axis (stable/preview/experimental)? | **Yes**, with **per-channel template subsetting**: pack time fetches `bin/extensions.json` from the channel's latest listed bundle (`index.json` + HTTP-Range zip extraction) and drops templates whose required bindings aren't in the channel (§6.1). | Yes (matches bundle channel id) | No (stable only; upstream NuGet preview signals propagate via `source.json`) |
+| Templating engine in CLI | v2 schema engine (jobs / actions DSL) | v2 schema engine (jobs / actions DSL) | Catalog + `--help` from `dotnet-templates.json`; scaffold via `dotnet new <id>` shell-out (§5.3) |
 
 ### 4.4 Versioning, channels, and bundle compatibility
 
@@ -154,7 +159,7 @@ the host/bundles model. Channel semantics differ by stack — see
 #### 4.4.2 Channel scheme and bundle compatibility — Node and Python
 
 A Node/Python templates workload is built from one extension-bundle
-channel's `v1/`+`v2/` content (§6.1, §6.2). The mapping is recorded
+channel's `v2/` content (§6.1, §6.2). The mapping is recorded
 on the workload pkg version via its prerelease label:
 
 | Templates channel (prerelease label) | Source bundle id |
@@ -259,36 +264,35 @@ Each templates workload:
 - **Package id:** `Azure.Functions.Cli.Workloads.Templates.<Stack>`
   (e.g. `Azure.Functions.Cli.Workloads.Templates.Node`).
 - **Package type:** `FuncCliWorkload`.
-- **Tags:** `kind:content alias:templates-<stack> alias:<stack>-templates func-workload`.
+- **Tags:** `kind:content alias:<stack>-templates func-workload`.
   Node and Python workloads additionally carry a min-bundle tag,
   e.g. `minBundle:[4.18.0, )` (§4.4.4).
 - **No `<dependencies>`** in the nuspec. Templates workloads are
   self-contained; the min-bundle dependency is not expressed as a
   NuGet dependency (§4.4.4).
 
-The `workload.json` at the package root carries the manifest plus a
-compatibility hint in the description (Node/Python):
+The `workload.json` at the package root carries the manifest:
 
 ```json
 {
   "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
   "kind": "content",
-  "displayName": "Python templates",
-  "description": "Function-scaffold templates for Python Azure Functions projects. Compatible with Microsoft.Azure.Functions.ExtensionBundle (min version 4.0.0)."
+  "displayName": "Python function templates",
+  "description": "Function-scaffold templates for Python Azure Functions projects (v2 programming model)."
 }
 ```
 
-`displayName` and `description` surface in `func workload list`.
-The compatibility sentence in `description` is documentary; the
-authoritative min-bundle value lives in `content/templates-workload.json`
-(§4.4.4).
+`displayName` and `description` surface in `func workload list`. The
+`description` is kept short and bundle-agnostic; the authoritative
+min-bundle constraint lives in `content/templates-workload.json`
+(§4.4.4), not in the `workload.json` description.
 
 ### 5.2 On-disk layout — Node and Python
 
-Both stacks ship template content under `tools/any/content/` with
-`v1/` and `v2/` directories at the root, matching the programming-model
-split the Functions extension bundle uses internally. The CLI core
-reads from these directories directly.
+Both stacks ship template content under `tools/any/content/` with a
+single `v2/` directory at the root. v1 (legacy) programming-model
+templates are not shipped in v5 templates workloads. The CLI core
+reads from `v2/` directly.
 
 ```
 Azure.Functions.Cli.Workloads.Templates.Node.<version>.nupkg
@@ -301,57 +305,54 @@ Azure.Functions.Cli.Workloads.Templates.Node.<version>.nupkg
             ├── templates-workload.json      ← CLI-owned sibling manifest:
             │                                  { "minBundleVersion": "[4.0.0, )" }
             │                                  (Node/Python only; §4.4.4)
-            ├── v1/                          ← legacy programming model
-            │   ├── bindings/
-            │   │   └── bindings.json
-            │   ├── resources/
-            │   │   ├── Resources.json        ← en-US default
-            │   │   ├── Resources.de-DE.json
-            │   │   ├── Resources.fr-FR.json
-            │   │   └── …                     ← i18n siblings
-            │   └── templates/
-            │       └── templates.json        ← Template[] (files inline)
             └── v2/                          ← v2 programming model
                 ├── bindings/
                 │   └── userPrompts.json     ← UserPrompt[]
                 ├── resources/
-                │   └── Resources*.json
+                │   ├── Resources.json        ← en-US default
+                │   ├── Resources.de-DE.json
+                │   ├── Resources.fr-FR.json
+                │   └── …                     ← i18n siblings
                 └── templates/
                     └── templates.json        ← NewTemplate[] (jobs/actions)
 ```
 
 **Per-stack content of these files:**
 
-- The **Node** workload ships `v1/templates/templates.json` populated
-  with Node-language `Template` entries (`language: "JavaScript"`,
-  `"TypeScript"`); `v1/bindings/` and `v1/resources/` are language-
-  agnostic and copied from the bundle source. `v2/` is absent
-  (Node has no v2 programming model).
-- The **Python** workload ships both `v1/` (legacy `Template` entries
-  with `language: "Python"`) and `v2/` (`NewTemplate` jobs/actions
-  for the v2 programming model).
+- The **Node** workload ships `v2/templates/templates.json` populated
+  with Node-language `NewTemplate` entries (`language: "javascript"`,
+  `"typescript"`); `v2/bindings/` and `v2/resources/` are language-
+  agnostic and copied from the bundle source. **Status:** the
+  extension bundle does not yet publish v2 templates for Node, so the
+  Node v2 content pipeline is tracked as a follow-up (§6.1); the
+  shipped Node workload payload may be empty or transitional until
+  that work lands.
+- The **Python** workload ships `v2/` (`NewTemplate` jobs/actions for
+  the v2 programming model, `language: "python"`) filtered from the
+  bundle's `StaticContent/v2` sub-tree. v1 (legacy) Python templates
+  are not shipped.
 
-**Note on file representation.** Templates in both `v1/templates/templates.json`
-and `v2/templates/templates.json` carry their per-template files **inline**
-as a `files: { "<filename>": "<contents>" }` map within each template
-object. There is no separate on-disk file tree under `templates/`. The
-CLI core materialises individual files at `func new` time by reading
-these inline strings.
+**Note on file representation.** Templates in `v2/templates/templates.json`
+carry their per-template files **inline** as a `files: { "<filename>":
+"<contents>" }` map within each template object. There is no separate
+on-disk file tree under `templates/`. The CLI core materialises
+individual files at `func new` time by reading these inline strings.
 
 **Mapping to the bundle source.** This layout is a filtered, repacked
-mirror of the bundle's `StaticContent/v1` and `StaticContent/v2`
-sub-trees. The bundle is the upstream source; the templates workload
-strips the bundle's `StaticContent/` wrapper since the workload
-package's `tools/any/content/` already plays that role. The bundle
-channel and the templates workload channel correspond 1:1 (§4.4.2).
+mirror of the bundle's `StaticContent/v2` sub-tree. The bundle is the
+upstream source; the templates workload strips the bundle's
+`StaticContent/` wrapper since the workload package's
+`tools/any/content/` already plays that role. The bundle channel and
+the templates workload channel correspond 1:1 (§4.4.2).
 
 ### 5.3 On-disk layout — DotNet
 
-Templates files are **not** in the workload payload, and the DotNet
-workload does **not** use the bundle StaticContent layout (DotNet has
-no extension-bundle dependency — §4.4.3). Instead the workload ships a
-small DotNet-specific index plus a pin on the upstream NuGet template
-package:
+Template source files are **not** in the workload payload, and the DotNet
+workload does **not** use the bundle StaticContent layout (DotNet has no
+extension-bundle dependency — §4.4.3). The DotNet workload instead carries a
+**fully-hydrated catalog + option index** (`dotnet-templates.json`) generated at
+workload build time from the upstream NuGet template package, plus the NuGet
+pin that drives scaffold-time hive provisioning:
 
 ```
 Azure.Functions.Cli.Workloads.Templates.DotNet.<version>.nupkg
@@ -361,11 +362,12 @@ Azure.Functions.Cli.Workloads.Templates.DotNet.<version>.nupkg
 └── tools/
     └── any/
         └── content/
-            ├── dotnet-templates.json        ← DotNet-only index (lean):
-            │                                  { "templates": [
-            │                                      { "id": "http", "language": "C#", ... },
-            │                                      { "id": "blob", "language": "C#", ... }
-            │                                    ] }
+            ├── dotnet-templates.json        ← hydrated at workload build time
+            │                                  from each template's template.json
+            │                                  (+ dotnetcli.host.json). Drives
+            │                                  `func templates list` and
+            │                                  `func new --template <id> --help`
+            │                                  fully offline. Schema below.
             └── source.json                  ← NuGet pin (§6.3):
                                                { "kind": "nuget",
                                                  "packageId":
@@ -378,58 +380,129 @@ Azure.Functions.Cli.Workloads.Templates.DotNet.<version>.nupkg
 > the Node/Python bundle schema. The two are distinct file formats
 > with distinct readers in the CLI core.
 
-When `func new --stack dotnet` runs, the CLI core reads `source.json`,
-ensures the pinned NuGet template package is installed into the dotnet
-template hive maintained by the CLI core, and dispatches each
-`dotnet-templates.json` entry to `dotnet new <id>`.
+#### 5.3.1 `dotnet-templates.json` schema
 
-The full `dotnet-templates.json` schema (fields per entry, optional
-metadata) is open — see §8.
+`dotnet-templates.json` is the canonical CLI-side index for the DotNet stack.
+It is built once at workload pack time by projecting each
+`*/.template.config/template.json` (+ optional sibling `dotnetcli.host.json`)
+from the pinned NuGet template package into a CLI-friendly record. Every field
+needed to render catalog rows and to hydrate `func new --template <id> --help`
+options is present, so both commands serve **fully offline, deterministically,
+from the workload payload** — no NuGet I/O, no `dotnet new` shell-out on read
+paths. Only the actual scaffold (`func new <template>`) shells out to
+`dotnet new`, and even that is offline once the hive is provisioned at install
+time (see §6.3).
+
+```jsonc
+{
+  "$schema": "https://aka.ms/func-workloads/dotnet-templates/v1/schema.json",
+  "sourcePackage": {
+    "id":      "Microsoft.Azure.Functions.Worker.ItemTemplates.NetCore",
+    "version": "4.0.5569"
+  },
+  "templates": [
+    {
+      // ── Catalog row (powers `func templates list`) ───────────────────
+      "id":              "http",                                  // shortNameList[0]
+      "shortNames":      ["http"],                                // full alias list
+      "identity":        "Azure.Function.CSharp.HttpTrigger.2.x", // stable, used to dispatch dotnet new
+      "groupIdentity":   "Azure.Function.HttpTrigger",            // dedupes C#/F# variants
+      "name":            "HttpTrigger",
+      "description":     "Creates an HTTP-triggered function.",
+      "author":          "Microsoft",
+      "language":        "C#",                                    // tags.language
+      "type":            "item",                                  // tags.type
+      "classifications": ["Azure Function", "Trigger", "Http"],   // triggers the "TRIGGER" column
+      "defaultName":     "HttpTriggerCSharp",
+      "constraints":     [ /* mirrored from template.json `constraints` */ ],
+
+      // ── Option hydration (powers `func new --template http --help`) ──
+      "parameters": [
+        {
+          "name":         "namespace",
+          "description":  "namespace for the generated code",
+          "dataType":     "string",
+          "defaultValue": "Company.Function",
+          "isRequired":   false,
+          "isHidden":     false
+        },
+        {
+          "name":         "AccessRights",
+          "displayName":  "Authorization level",
+          "description":  "Authorization level controls whether the function requires an API key …",
+          "dataType":     "choice",
+          "defaultValue": "Function",
+          "choices": [
+            { "value": "Function",  "description": "Function"  },
+            { "value": "Anonymous", "description": "Anonymous" },
+            { "value": "Admin",     "description": "Admin"     }
+          ],
+          "allowMultipleValues": false,
+          "shortNameOverride":   null,    // from dotnetcli.host.json (if present)
+          "longNameOverride":    null
+        }
+        // `bind`, `derived`, `computed`, `generated`, and hidden symbols are
+        // not user-facing options and are excluded from `parameters[]`.
+      ]
+    }
+  ]
+}
+```
+
+**Field provenance.** Every field is derivable from the upstream NuGet
+template package without re-running the dotnet template engine at scaffold
+time, mirroring the surface exposed by `ITemplateInfo` / `ITemplateMetadata`
+and (for `parameters[]`) `CliTemplateParameter.GetOption(...)`:
+
+| Schema field | Source on the upstream template |
+|---|---|
+| `id`, `shortNames` | `template.json` `shortName` |
+| `identity` | `template.json` `identity` |
+| `groupIdentity` | `template.json` `groupIdentity` |
+| `name`, `description`, `author` | `template.json` `name` / `description` / `author` |
+| `language`, `type` | `template.json` `tags.language` / `tags.type` |
+| `classifications` | `template.json` `classifications` |
+| `defaultName` | `template.json` `defaultName` |
+| `constraints` | `template.json` `constraints` |
+| `parameters[].name` | `template.json` `symbols.<key>` |
+| `parameters[].dataType` | `symbols.<key>.datatype` |
+| `parameters[].defaultValue` | `symbols.<key>.defaultValue` |
+| `parameters[].choices[]` | `symbols.<key>.choices[]` |
+| `parameters[].isRequired` | derived from `symbols.<key>.isRequired` / precedence |
+| `parameters[].isHidden` | `dotnetcli.host.json` `hiddenParameterNames` ∪ implicit/disabled precedence |
+| `parameters[].displayName` | `symbols.<key>.displayName` |
+| `parameters[].shortNameOverride`, `parameters[].longNameOverride` | `dotnetcli.host.json` `symbolInfo[].shortName` / `longName` |
+
+**Symbol filter.** Only `type: parameter` symbols are projected into
+`parameters[]`. `bind` (host-supplied values like `HostIdentifier`), `derived`,
+`computed`, and `generated` symbols are excluded — they're engine- or
+host-resolved, not user-facing. Symbols whose precedence is `Implicit` or
+`Disabled` are also excluded.
+
+**Localization.** v1 hydrates **en-US only**. The schema reserves a future
+`localizations` key for per-locale `description` / `choices[].description`
+overrides without requiring a schema bump.
+
+**Scaffold path.** At `func new --template <id>` time, the CLI core dispatches
+`dotnet new <shortName> --<param> <value> …` against the dotnet template hive
+provisioned from the `source.json` pin (§6.3). The hydrated `parameters[]` is
+the canonical source for option names, aliases, and defaults; the engine
+only renders the template content.
 
 ### 5.4 Templates and binding schemas
 
 The templates workload uses a **CLI-owned schema** derived from the
-Functions extension bundle's `StaticContent/v1/` and `StaticContent/v2/`
-schemas. Minor modifications from the bundle baseline are expected
-(e.g. fields the bundle doesn't have, fields the CLI doesn't consume
-that may be omitted). Two top-level shapes apply, one per
-programming-model version.
+Functions extension bundle's `StaticContent/v2/` schema. Minor
+modifications from the bundle baseline are expected (e.g. fields the
+bundle doesn't have, fields the CLI doesn't consume that may be
+omitted). One top-level shape applies (v2 programming model). v1
+(legacy) templates are not shipped in v5 templates workloads.
 
 > Paths in the schema examples below are **bundle-source** paths.
 > Workload-side paths drop the `StaticContent/` prefix (§5.2).
 
-**v1 — `StaticContent/v1/templates/templates.json`** is a `Template[]`
-array. Each entry has the legacy fields the v4 CLI already understands:
-
-```jsonc
-{
-  "id": "HttpTrigger-JavaScript",
-  "files": {
-    "index.js": "module.exports = async function (context, req) { ... }",
-    "function.json": "{ \"bindings\": [ ... ] }",
-    "sample.dat": "..."
-  },
-  "function": { "bindings": [ { "type": "httpTrigger", ... } ] },
-  "metadata": {
-    "defaultFunctionName": "HttpTrigger",
-    "description": "$HttpTrigger_description",         // resource key
-    "name": "HTTP trigger",
-    "language": "JavaScript",
-    "category": [ "$temp_category_core", "$temp_category_api" ],
-    "categoryStyle": "http",
-    "enabledInTryMode": true,
-    "userPrompt": [ "connection", "httpTrigger-route", "httpTrigger-authLevel" ]
-  }
-}
-```
-
-> `userPrompt[]` references prompt ids defined in
-> `StaticContent/v2/bindings/userPrompts.json` — yes, v1 templates
-> reference v2 prompts. This is intentional in the upstream bundle:
-> the prompt catalog is unified across model versions.
-
 **v2 — `StaticContent/v2/templates/templates.json`** is a `NewTemplate[]`
-array used by the Python v2 programming model. Each entry carries the
+array used by the v2 programming model. Each entry carries the
 job/action DSL:
 
 ```jsonc
@@ -458,96 +531,190 @@ job/action DSL:
 
 **Supporting files** (paths are bundle-source; workload-side drops the `StaticContent/` prefix):
 
-- `StaticContent/v1/bindings/bindings.json` — binding catalog (v1).
 - `StaticContent/v2/bindings/userPrompts.json` — `UserPrompt[]`, defines
-  validators / enums / labels referenced by `paramId` from templates and
-  `metadata.userPrompt`.
-- `StaticContent/<v1|v2>/resources/Resources.json` (+ `Resources.<locale>.json`)
+  validators / enums / labels referenced by `paramId` from templates.
+- `StaticContent/v2/resources/Resources.json` (+ `Resources.<locale>.json`)
   — i18n strings the templates and prompts reference via `$key` syntax.
 
 **Schema authority.** The templates workload owns its schema. The
-bundle's schemas are the baseline; the workload-side schema may
+bundle's v2 schema is the baseline; the workload-side schema may
 diverge as the CLI's needs evolve. The build pipeline (§6.1, §6.2)
 applies the divergences when extracting content from the bundle
 source.
 
 ## 6. Template Source
 
-### 6.1 Node templates — bundle StaticContent
+### 6.1 Node templates — static in-repo content
 
-The Node templates workload **does not reauthor templates**. It pulls
-its content at workload build time from the **Functions extension
-bundle CDN**, the same source the v4 CLI's `func new` resolves
-templates from today. Specifically: the templates workload package
-embeds a filtered snapshot of one bundle's `StaticContent/` directory
-tree (the layout shown in §5.2).
+The Node templates workload **does not** snapshot template content from
+the extension-bundle CDN. The upstream bundle's
+`StaticContent/v2/templates/templates.json` does not yet publish Node
+entries (only Python). The Node v2 template content is therefore
+authored **statically in this repo** under
+`src/Workloads/Templates/Node/content/v2/`. The build pipeline packs
+these files directly into the nupkg at `tools/any/content/v2/`. No
+network access is required at pack time beyond the standard NuGet
+restore, so the workload builds cleanly under strict network-isolation
+CI policies.
 
-**Source bundle.** Each templates workload package targets one of the
-three published bundle channels (channel ↔ bundle id mapping in §4.4.2).
+**Authoring source.** The static `content/v2/templates/templates.json`
+is hand-curated against the v2 `NewTemplate` schema (see
+[v2 template engine schema](https://github.com/Azure/azure-functions-templates/tree/dev/Docs)).
+Each entry follows the same shape:
 
-**Build pipeline.**
+- `id`: stack-unique (e.g. `HttpTrigger-JavaScript`).
+- `language`: `"node"` for both JS and TS variants (the v2 schema
+  enumerates language as `dotnet`/`node`/`python`/`powershell`; the
+  JS/TS distinction is encoded in the `id`).
+- `programmingModel`: `"v2"` (refers to the **template-engine schema**,
+  not the Node runtime programming model — which is itself v4 /
+  decorators-based).
+- `jobs`: one `CreateNewApp` job per template carrying:
+  - an input for the function name (`paramId: trigger-functionName`)
+    with a stable default,
+  - one further input per binding-config field, with the paramId
+    resolved to a context-aware `<triggerContext>-<param>` form in the
+    workload's `content/v2/bindings/userPrompts.json`.
+- Top-level `actions`: a `GetTemplateFileContent` +
+  `WriteToFile` pair that materialises the function file at
+  `src/functions/$(FUNCTION_NAME_INPUT).<js|ts>`.
+- `files`: the function-body content, with `$(FUNCTION_NAME_INPUT)`
+  tokens for the function name. Per-binding literal values
+  (queue name, connection string, blob path, etc.) currently match
+  the v4 defaults; per-binding tokenisation is a follow-up (§8).
 
-1. The workload csproj declares two MSBuild properties:
-   - `$(SourceBundleId)` — one of the three bundle ids.
-   - `$(SourceBundleVersion)` — the bundle version to snapshot (e.g.
-     `4.30.0`). Recorded as workload-build provenance only; **not**
-     used to derive the templates pkg version (see §4.4.2).
-2. A `FetchBundleStaticContent.targets` target downloads
-   `<SourceBundleId>/<SourceBundleVersion>` from the bundle CDN and
-   extracts only the `StaticContent/` subdirectory of the bundle's
-   payload.
-3. A filter pass removes per-language template entries that don't
-   belong to this stack: keep `Template` entries with
-   `metadata.language ∈ {"JavaScript", "TypeScript"}` from
-   `v1/templates/templates.json`; drop everything else.
-   Bindings and resources are language-agnostic — copied.
-4. `Pack` places the filtered tree under `tools/any/content/` of the
-   templates workload nupkg, stripping the bundle's outer
-   `StaticContent/` wrapper so the layout in §5.2 is achieved.
+**Build pipeline (static mode).**
 
-Build-time fetch keeps `func new` offline-at-invocation. The bundle
-CDN is contacted **once per workload republish**, not per user
-invocation.
+```msbuild
+<TemplatesContentSource>static</TemplatesContentSource>
+<IncludeV1Templates>false</IncludeV1Templates>
+<IncludeV2Templates>true</IncludeV2Templates>
+<FilterTemplatesByBundleChannel>true</FilterTemplatesByBundleChannel>
+```
+
+is set in `Workloads.Templates.Node.csproj`. The shared
+`eng/build/Workloads.Templates.targets` recognises the `static` value
+of `$(TemplatesContentSource)` and:
+
+1. Skips every CDN `<DownloadFile>` and the language-filter scripts.
+2. Validates that `content/v2/templates/templates.json` exists under
+   the project directory.
+3. Adds every `content/v2/**/*.json` (and `content/v1/**/*.json` when
+   `$(IncludeV1Templates)` is true) as a `<None Pack="true"
+   PackagePath="tools/any/content/v2/" />` item — minus the build-time-
+   only manifest `content/v2/templates/_bindings.json` (excluded).
+4. Still generates the `templates-workload.json` sibling manifest from
+   `$(MinBundleVersionRange)`, identical to CDN-mode behaviour.
+
+**Per-channel subsetting** is **on** for the Node workload via
+`$(FilterTemplatesByBundleChannel)=true`. At pack time the build
+cross-references the master `content/v2/templates/templates.json`
+against the active `$(TemplatesChannel)`'s authoritative extension
+bundle:
+
+1. **Resolve the listed version.** `eng/scripts/fetch-bundle-extensions-json.ps1`
+   fetches `index.json` from CDN for the active channel
+   (`https://cdn.functions.azure.com/public/ExtensionBundles/<id>/index.json`,
+   id mapping per §4.4.2). It picks the **last `4.x` entry** — array
+   order in `index.json` is publication order, so the tail is the
+   newest listed bundle. Versions present on CDN but **not** listed in
+   `index.json` are unlisted and must not be consumed.
+2. **Extract `bin/extensions.json` via HTTP Range.** The script issues
+   two Range requests against `<id>/<version>/<id>.<version>.zip`: one
+   for the End-of-Central-Directory and central directory (last
+   ~64 KB), then one for the `bin/extensions.json` entry's local file
+   header + compressed payload. Total transfer is on the order of
+   10–20 KB instead of the full 150–250 MB bundle, so per-build cost
+   is negligible.
+3. **Filter against `_bindings.json`.** `eng/scripts/filter-node-templates-by-bundle.ps1`
+   reads:
+   - the master `templates.json` (NewTemplate[]),
+   - the committed `content/v2/templates/_bindings.json` (template
+     id → string[] of required binding names; empty array means the
+     template has no extension dependency and is always included),
+   - the channel's `bin/extensions.json`.
+
+   For each template entry, every required binding must appear (case-
+   insensitively) in some `extensions[].bindings[]` array of the
+   channel's `extensions.json`. Templates whose binding set isn't fully
+   satisfied are dropped. The filtered file is staged at
+   `$(IntermediateOutputPath)templates\v2\templates\templates.json`
+   and packed in place of the source file.
+
+If a new template is added to `templates.json` without a corresponding
+entry in `_bindings.json`, the filter script fails the build — so
+per-channel subsetting can't silently drop content.
+
+**Cross-reference snapshot at the time of this revision** (latest
+listed `4.x` per channel):
+
+| Channel | Listed bundle | Templates kept |
+|---|---|---|
+| stable | `Microsoft.Azure.Functions.ExtensionBundle` `4.32.0` | **31 of 33** — drops `McpPromptTrigger-{Javascript,Typescript}` (`mcpPromptTrigger` binding not yet in stable) |
+| preview | `Microsoft.Azure.Functions.ExtensionBundle.Preview` `4.42.0` | **33 of 33** — full set |
+| experimental | `Microsoft.Azure.Functions.ExtensionBundle.Experimental` `4.6.0` | **31 of 33** — same drop as stable |
 
 ### 6.2 Python templates — bundle StaticContent
 
-Same mechanism as §6.1, filtered for Python.
+Same mechanism as §6.1 (target), filtered for Python and shipping
+today.
 
-- **v1 templates:** keep `Template` entries with
-  `metadata.language == "Python"` from
-  `v1/templates/templates.json`.
 - **v2 templates:** keep `NewTemplate` entries with
-  `language == "python"` from `v2/templates/templates.json`
-  (the Python v2 programming model lives here).
-- Bindings and resources for both v1 and v2 are copied
-  (language-agnostic).
+  `language == "python"` (case-insensitive) from
+  `v2/templates/templates.json` (the Python v2 programming model
+  lives here).
+- **v1 templates:** **not shipped.** The Python templates workload
+  drops v1 (legacy programming model) content; users on v1 should
+  migrate to v2 (see §7.1).
+- Bindings (`v2/bindings/userPrompts.json`) and resources
+  (`v2/resources/Resources*.json`) are copied (language-agnostic).
 
 The bundle's `v2/bindings/userPrompts.json` is included in the Python
-workload because Python v1 templates also reference v2 prompts via
-their `metadata.userPrompt[]` lists (see §5.4 note).
+workload because v2 Python templates reference its prompt definitions
+via `paramId` references inside `jobs[].inputs[]`.
 
-### 6.3 DotNet templates — NuGet pin
+### 6.3 DotNet templates — hydrate-from-pinned-NuGet
 
-DotNet does not fetch templates at workload build time. Instead:
+DotNet does not author templates and does not ship the template *source
+files* in the workload payload. Instead, the workload build pipeline:
 
-1. The DotNet templates workload ships only `dotnet-templates.json` +
-   `source.json` (§5.3).
-2. `source.json` pins a specific version of
-   `Microsoft.Azure.Functions.Worker.ItemTemplates` (the upstream
-   `dotnet new` template package).
+1. **Pin the source.** The workload csproj declares two MSBuild properties:
+   - `$(SourceItemTemplatesPackageId)` — `Microsoft.Azure.Functions.Worker.ItemTemplates`
+     (or its `.NetCore` / `.NetFx` variant).
+   - `$(SourceItemTemplatesVersion)` — the upstream template-package version
+     to pin (e.g. `4.0.5569`).
+2. **Restore the pinned pkg at build time.** A `PackageDownload` (the same
+   pattern `eng/build/Templates.targets` uses today) drops the unpacked
+   contents into the workload's `obj/`.
+3. **Hydrate `dotnet-templates.json`.** A build target walks
+   `*/.template.config/template.json` (+ optional sibling
+   `dotnetcli.host.json`) inside the unpacked pkg and projects each Functions
+   template into a `dotnet-templates.json` entry (schema in §5.3.1). Selection
+   criteria:
+   - `classifications` contains `"Azure Function"` (or `groupIdentity`
+     starts with `"Azure.Function."`), **and**
+   - `tags.type == "item"`.
 
-At `func new` time, the CLI core consults `source.json`, provisions
-the pinned NuGet pkg into the dotnet template hive, and dispatches
-templates from `dotnet-templates.json` to `dotnet new <id>`. The
-CLI-side mechanics are out of scope; see the `func new` CLI spec.
+   The symbol filter described in §5.3.1 strips `bind` / `derived` /
+   `computed` / `generated` / hidden symbols before emitting `parameters[]`.
+4. **Emit `source.json`.** The pinned package id + version are written into
+   `content/source.json` so the CLI core knows which NuGet pkg to provision
+   into the dotnet template hive at install time (step 5).
+5. **Pack.** Both files land under `tools/any/content/` of the templates
+   workload nupkg (§5.3). No template *source* files are packed.
 
-The DotNet templates workload is therefore much smaller (KB-scale:
-just the two JSON files). The pin gives the CLI a deterministic,
-reviewable template version.
+At **`func workload install` time**, the CLI core reads `source.json` and
+provisions the pinned NuGet template pkg into the dotnet template hive it
+manages. After install, both read paths (`func templates list`,
+`func new --template <id> --help`) and the scaffold path
+(`func new --template <id>`) are offline-deterministic. The CLI-side
+mechanics of hive provisioning are out of scope for this spec; see the
+`func new` CLI spec.
 
-Open question (§8): when offline at `func new` time, can the CLI
-fall back to whatever templates are already in the hive even if
-they differ from `source.json`'s pin?
+The DotNet templates workload is therefore much smaller than Node/Python
+(KB-scale: just `dotnet-templates.json` and `source.json`), and reviewers
+can audit the hydrated catalog and parameter set directly from the workload
+package without unpacking the upstream NuGet pkg.
 
 ## 7. Compatibility & Migration
 
@@ -560,6 +727,12 @@ they differ from `source.json`'s pin?
   source of truth.
 - The legacy `func new` command from v4 is replaced by the v5 CLI's
   built-in `func new` consuming this workload model.
+- **v1 (legacy) programming-model templates are not shipped in v5
+  templates workloads.** Users still authoring against the v1
+  programming model should either migrate to v2 (the v5 baseline
+  shape — `NewTemplate[]` with jobs/actions) or stay on v4 tooling
+  until migration is complete. The CLI does not provide a
+  v5-side bridge for v1 template content.
 
 ### 7.2 Within v5 (templates workload revisions)
 
@@ -570,9 +743,46 @@ open question (§8).
 
 ## 8. Open Questions
 
-_None at this time._
+- **Per-binding tokenisation of Node template file contents.** The v4
+  Node templates rely on the v4 engine's userPrompt-name-matching
+  substitution: e.g. a `connection: ''` field in the JS source is
+  replaced based on the userPrompt named `connection`. The v2 schema
+  uses explicit `$(VAR)` tokens. The v4→v2 converter only handles the
+  function-name token mechanically (`%functionName%` →
+  `$(FUNCTION_NAME_INPUT)`); per-binding literals (queue name,
+  connection string, blob path, etc.) currently match v4 defaults.
+  Producing fully-tokenised v2 files requires per-template hand
+  tokenisation. Tracked as a follow-up against §6.1.
 
 ### Resolved
+
+- ✅ **Per-channel template subsetting for the Node workload.** At
+  pack time the build cross-references the master Node `templates.json`
+  against the active channel's authoritative extension bundle: the
+  latest **listed** version (per the channel's CDN `index.json`) has
+  its `bin/extensions.json` extracted via HTTP Range from
+  `<id>.<version>.zip`, and templates are filtered against a committed
+  `_bindings.json` map (template id → required binding names). The
+  filtered subset is what gets packed for the channel-tagged nupkg.
+  Versions present on CDN but not listed in `index.json` are unlisted
+  and not consumed. Cross-reference snapshot at this revision: stable
+  31 / 33, preview 33 / 33, experimental 31 / 33 (the two `McpPromptTrigger`
+  variants drop in stable + experimental because the
+  `mcpPromptTrigger` binding hasn't propagated to those channels yet)
+  — see §4.3 / §6.1.
+
+- ✅ **Node templates ship as in-repo static v2 content.** The
+  upstream extension bundle does not yet publish v2 Node templates,
+  so the Node templates workload owns its content under
+  `src/Workloads/Templates/Node/content/v2/`. The static `templates.json`
+  is hand-curated against the v2 `NewTemplate` schema. No CDN download
+  of templates at pack time (§4.3, §6.1).
+
+- ✅ **Node and Python templates workloads ship v2-only.** Both
+  stacks ship `NewTemplate[]` v2 programming-model content under
+  `tools/any/content/v2/`. v1 (legacy) programming-model templates
+  are not shipped. Users still on v1 migrate to v2 or stay on v4
+  tooling (§5.2, §5.4, §6.1, §6.2, §7.1).
 
 - ✅ **`kind: content`, not `kind: workload`.** No DI / no
   contribution points. Settled at this draft.
@@ -583,9 +793,29 @@ _None at this time._
   every stack. The only version-axis relationship between a templates
   workload and the extension bundle is `minBundleVersion`. §4.4.1,
   §4.4.2.
-- ✅ **Templates packaged at workload build time** for Node/Python
-  (CDN fetch becomes a build dependency), **at `func new` time
-  via `dotnet new`** for DotNet (NuGet pin). §6.
+- ✅ **Templates packaged at workload build time** for every stack.
+  Python embeds a filtered bundle StaticContent snapshot (§6.2);
+  Node packs in-repo static v2 content authored from the v4 Node
+  templates in core-tools `main` via a converter script (§6.1);
+  DotNet hydrates a catalog + parameter index (`dotnet-templates.json`)
+  from the pinned NuGet template pkg's `template.json` files (§6.3).
+  No CDN call from `func new` itself.
+- ✅ **`dotnet-templates.json` schema (DotNet only).** Fully-hydrated
+  catalog rows + `parameters[]` per template (§5.3.1). Drives
+  `func templates list` and `func new --template <id> --help` offline from
+  the workload payload — the upstream NuGet pkg is consulted only to
+  produce content during the workload's build. Field provenance traces
+  to the dotnet template engine's `ITemplateInfo` /
+  `ITemplateMetadata` / `CliTemplateParameter` surface.
+- ✅ **Offline at `func new` time for DotNet.** Catalog read and
+  `--template X --help` are always offline (served from
+  `dotnet-templates.json`). The scaffold path is also offline once the
+  pinned pkg from `source.json` has been provisioned into the dotnet
+  template hive — the CLI core does that provisioning **at
+  `func workload install` time**, not lazily at `func new` time. This
+  preserves the §1 "offline at invocation" goal across all paths and
+  removes the earlier open question about lazy fallback to whatever
+  templates are already in the hive.
 - ✅ **Schema is CLI-owned**, derived from but not identical to the
   bundle baseline. Minor divergences expected over time. §5.4.
 - ✅ **Min-bundle storage:** sibling manifest `content/templates-workload.json`
