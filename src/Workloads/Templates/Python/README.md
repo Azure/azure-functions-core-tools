@@ -52,15 +52,15 @@ recorded in three locations that all derive from the single
 ```bash
 func workload install Azure.Functions.Cli.Workloads.Templates.Python@1.0.0
 # or by alias
-func workload install templates-python@1.0.0
+func workload install python-templates@1.0.0
 ```
 
 Preview / experimental channels resolve via the matching prerelease
 label:
 
 ```bash
-func workload install templates-python@1.0.0-preview
-func workload install templates-python@1.0.0-experimental
+func workload install python-templates@1.0.0-preview
+func workload install python-templates@1.0.0-experimental
 ```
 
 Multiple templates versions coexist via `--force` (Workload Spec §4.6).

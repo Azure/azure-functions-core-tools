@@ -5,7 +5,7 @@
     <Title>Azure Functions Python Templates</Title>
     <Description>Python function templates for the func CLI. Compatible with Microsoft.Azure.Functions.ExtensionBundle (minBundle:$(MinBundleVersionRange)).</Description>
     <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:content alias:templates-python alias:python-templates func-workload minBundle:$(MinBundleVersionRange)</PackageTags>
+    <PackageTags>kind:content alias:python-templates func-workload minBundle:$(MinBundleVersionRange)</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
