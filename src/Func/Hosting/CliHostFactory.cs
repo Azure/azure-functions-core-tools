@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
@@ -116,6 +117,7 @@ internal static class CliHostFactory
         builder.Services.AddWorkloadCatalog();
         builder.Services.AddWorkloadInstaller();
         builder.Services.AddQuickstartManifest();
+        builder.Services.AddManagedAzurite();
 
         return builder;
     }

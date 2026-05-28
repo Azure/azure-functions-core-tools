@@ -26,4 +26,5 @@ internal sealed record StartCommandOptions(
     bool DemoMode,
     int DemoFunctionCount,
     double DemoSpeedMultiplier,
-    bool DemoAutoExit);
+    bool DemoAutoExit,
+    bool NoAzurite = false);

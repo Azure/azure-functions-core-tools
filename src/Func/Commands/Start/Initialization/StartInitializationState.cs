@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
@@ -44,6 +45,14 @@ internal sealed class StartInitializationState
 
     public IHostEventStream? EventStream { get; set; }
 
+    /// <summary>
+    /// Disposable handle for the managed Azurite process the CLI launched
+    /// for this run, or null when there is no managed process (user-managed,
+    /// non-local storage, or <c>--no-azurite</c>). The <see cref="StartCommand"/>
+    /// owns disposal once <see cref="ToResult"/> has been called.
+    /// </summary>
+    public ManagedAzuriteHandle? ManagedAzurite { get; set; }
+
     public StartInitializationResult ToResult(StartInitializationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -66,7 +75,8 @@ internal sealed class StartInitializationState
             project,
             worker,
             hostRunContext,
-            CreateProfileInfo());
+            CreateProfileInfo(),
+            ManagedAzurite);
     }
 
     private StartInitializationProfileInfo? CreateProfileInfo()

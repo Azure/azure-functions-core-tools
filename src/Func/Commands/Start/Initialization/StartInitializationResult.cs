@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Projects;
@@ -20,4 +21,5 @@ internal sealed record StartInitializationResult(
     FunctionsProject Project,
     IFunctionsWorker Worker,
     FunctionsProjectHostRunContext HostRunContext,
-    StartInitializationProfileInfo? Profile = null);
+    StartInitializationProfileInfo? Profile = null,
+    ManagedAzuriteHandle? ManagedAzurite = null);

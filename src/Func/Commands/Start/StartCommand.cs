@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.Globalization;
+using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
@@ -91,6 +92,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Hidden = true,
     };
 
+    public Option<bool> NoAzuriteOption { get; } = new("--no-azurite")
+    {
+        Description = "Disable managed Azurite. The host will start without probing or starting a local emulator."
+    };
+
     // Demo-only knob: scales the number of functions DemoEventSource
     // generates so layout variants (full-table ≤8 vs. status-strip >8) can
     // be demoed without code changes. Hidden from --help; intended for
@@ -151,6 +157,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(LogFileOption);
         Options.Add(DemoOption);
         Options.Add(DemoFunctionsOption);
+        Options.Add(NoAzuriteOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -202,6 +209,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, initializationResult.EventStream);
         var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink);
         FunctionsProjectHostRunOutcome? outcome = null;
+        // Stop any managed Azurite instance the orchestrator launched when
+        // the host run completes (success, failure, or Ctrl+C). Wrapping the
+        // host run in `await using` guarantees the process never outlives
+        // `func start`.
+        await using ManagedAzuriteHandle? azurite = initializationResult.ManagedAzurite;
         try
         {
             int exitCode = await pipeline.RunAsync(cancellationToken);
@@ -299,7 +311,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
                 parseResult.GetValue(DemoFunctionsOption),
                 Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
             ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
-            ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")));
+            ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")),
+            parseResult.GetValue(NoAzuriteOption));
 
     private static string[] ParseCors(string? cors)
         => string.IsNullOrWhiteSpace(cors)
