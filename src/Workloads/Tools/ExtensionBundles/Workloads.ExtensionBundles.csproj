@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Title>Extension Bundles</Title>
-    <Description>Azure Functions CLI extension bundles.</Description>
+    <Description>Azure Functions CLI extension bundle payload, delivered as a content workload for the func CLI.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:bundles func-workload func-tool</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
