@@ -57,6 +57,9 @@ internal sealed class V2Job
 
     [JsonPropertyName("inputs")]
     public List<V2Input>? Inputs { get; set; }
+
+    [JsonPropertyName("actions")]
+    public List<string>? Actions { get; set; }
 }
 
 internal sealed class V2Input
@@ -97,6 +100,9 @@ internal sealed class V2Action
 
     [JsonPropertyName("continueOnError")]
     public bool ContinueOnError { get; set; }
+
+    [JsonPropertyName("createIfNotExists")]
+    public bool? CreateIfNotExists { get; set; }
 }
 
 /// <summary>

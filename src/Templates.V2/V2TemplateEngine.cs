@@ -8,17 +8,37 @@ namespace Azure.Functions.Cli.Templates.V2;
 /// <summary>
 /// Runs a <see cref="NewTemplate"/>'s job and action graph against a
 /// variables dictionary built from user-supplied option values + per-input
-/// defaults, then materialises files declared by <c>WriteToFile</c> actions.
-/// PR2 covers the two action types that drive Node and Python v2 templates
-/// (<c>GetTemplateFileContent</c>, <c>WriteToFile</c>); other action types
-/// surface as <see cref="TemplateApplicationFailure.ProviderError"/>.
+/// defaults, then materialises files declared by the action sequence.
 /// </summary>
 /// <remarks>
-/// Callers supply <paramref name="optionValuesByPromptId"/> — a mapping from
-/// each prompt's <see cref="TemplateUserPrompt.Id"/> (= the v2
-/// <c>paramId</c>) to the user-supplied value. PR2's provider derives this
-/// from a minimal "use defaults" map; PR4 replaces it with the stage-B
-/// parse result built by the orchestrator.
+/// <para>
+/// V2 templates expose multiple jobs (e.g. <c>CreateNewApp</c>,
+/// <c>AppendToFile</c>, <c>CreateNewBlueprint</c>) that share a single
+/// top-level <c>actions</c> pool. Each job declares an <c>actions</c>
+/// list naming the actions it runs, in order; this engine selects the
+/// first job by default (matching legacy <c>func new</c> behaviour) and
+/// runs only that job's named actions rather than every action at the
+/// template root.
+/// </para>
+/// <para>
+/// Callers supply <paramref name="optionValuesByPromptId"/> — a mapping
+/// from each prompt's <see cref="TemplateUserPrompt.Id"/> (= the v2
+/// <c>paramId</c>) to the user-supplied value.
+/// </para>
+/// <para>
+/// Supported action types:
+/// <list type="bullet">
+/// <item><c>GetTemplateFileContent</c> — load an inline file into a variable.</item>
+/// <item><c>WriteToFile</c> — substitute + write a new file (honours
+/// <c>--force</c> via the engine call).</item>
+/// <item><c>AppendToFile</c> — substitute + append a snippet to an
+/// existing file (or create it when <c>createIfNotExists</c> is true).</item>
+/// <item><c>ShowMarkdownPreview</c> — no-op (IDE-only hint; not a
+/// scaffold step).</item>
+/// </list>
+/// Other types fall through to a <see cref="TemplateApplicationFailure.ProviderError"/>
+/// unless the action declares <c>continueOnError: true</c>.
+/// </para>
 /// </remarks>
 internal sealed class V2TemplateEngine
 {
@@ -36,102 +56,150 @@ internal sealed class V2TemplateEngine
         ArgumentNullException.ThrowIfNull(workingDirectory);
         ArgumentException.ThrowIfNullOrWhiteSpace(functionName);
 
+        V2Job? job = template.Jobs?.FirstOrDefault();
+
         var variables = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["FUNCTION_NAME_INPUT"] = functionName,
         };
 
-        if (template.Jobs is { Count: > 0 })
+        if (job?.Inputs is { Count: > 0 })
         {
-            foreach (V2Job job in template.Jobs)
+            foreach (V2Input input in job.Inputs)
             {
-                if (job.Inputs is null)
+                if (string.IsNullOrWhiteSpace(input.AssignTo))
                 {
                     continue;
                 }
 
-                foreach (V2Input input in job.Inputs)
+                string? varName = ExtractVarName(input.AssignTo);
+                if (varName is null)
                 {
-                    if (string.IsNullOrWhiteSpace(input.AssignTo))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    string? varName = ExtractVarName(input.AssignTo);
-                    if (varName is null)
-                    {
-                        continue;
-                    }
+                string? value = ResolveInputValue(input, optionValuesByPromptId);
+                if (value is null && input.Required)
+                {
+                    return new TemplateApplicationResult.Failed(
+                        new TemplateApplicationFailure.InvalidPrompt(
+                            input.ParamId ?? input.AssignTo,
+                            $"Required input '{input.ParamId ?? input.AssignTo}' has no supplied value or default."));
+                }
 
-                    string? value = ResolveInputValue(input, optionValuesByPromptId);
-                    if (value is null && input.Required)
-                    {
-                        return new TemplateApplicationResult.Failed(
-                            new TemplateApplicationFailure.InvalidPrompt(
-                                input.ParamId ?? input.AssignTo,
-                                $"Required input '{input.ParamId ?? input.AssignTo}' has no supplied value or default."));
-                    }
-
-                    if (value is not null)
-                    {
-                        variables[varName] = value;
-                    }
+                if (value is not null)
+                {
+                    variables[varName] = value;
                 }
             }
         }
 
+        // Resolve the action sequence the selected job runs. When the job
+        // declares no actions list, fall back to every top-level action in
+        // order — preserves behaviour for older / simpler templates that
+        // didn't split actions across multiple jobs.
+        IReadOnlyList<V2Action> sequence = ResolveActionSequence(template, job);
+
         List<string> writtenFiles = [];
         List<string> existingFiles = [];
 
-        if (template.Actions is { Count: > 0 })
+        foreach (V2Action action in sequence)
         {
-            foreach (V2Action action in template.Actions)
+            switch ((action.Type ?? string.Empty).ToLowerInvariant())
             {
-                switch ((action.Type ?? string.Empty).ToLowerInvariant())
-                {
-                    case "gettemplatefilecontent":
+                case "gettemplatefilecontent":
+                    {
+                        string? filePath = Substitute(action.FilePath, variables);
+                        if (filePath is null)
                         {
-                            string? filePath = Substitute(action.FilePath, variables);
-                            if (filePath is null)
-                            {
-                                continue;
-                            }
-
-                            if (template.Files is null || !template.Files.TryGetValue(filePath, out string? content))
-                            {
-                                return Failed(
-                                    $"GetTemplateFileContent: file '{filePath}' not found in template.files map.");
-                            }
-
-                            string? assign = ExtractVarName(action.AssignTo);
-                            if (assign is not null)
-                            {
-                                variables[assign] = Substitute(content, variables) ?? content;
-                            }
-                            break;
+                            continue;
                         }
 
-                    case "writetofile":
+                        if (template.Files is null || !template.Files.TryGetValue(filePath, out string? content))
                         {
-                            string? filePath = Substitute(action.FilePath, variables);
-                            if (filePath is null)
+                            if (action.ContinueOnError)
                             {
-                                return Failed("WriteToFile: filePath is required.");
+                                continue;
                             }
 
-                            string content = Substitute(action.FileContent, variables) ?? string.Empty;
-                            string fullPath = Path.GetFullPath(Path.Combine(workingDirectory.FullName, filePath));
+                            return Failed(
+                                $"GetTemplateFileContent: file '{filePath}' not found in template.files map.");
+                        }
 
-                            if (File.Exists(fullPath) && !force)
+                        string? assign = ExtractVarName(action.AssignTo);
+                        if (assign is not null)
+                        {
+                            variables[assign] = Substitute(content, variables) ?? content;
+                        }
+                        break;
+                    }
+
+                case "writetofile":
+                    {
+                        string? filePath = Substitute(action.FilePath, variables);
+                        if (filePath is null)
+                        {
+                            return Failed("WriteToFile: filePath is required.");
+                        }
+
+                        string content = ResolveActionPayload(action, variables);
+                        string fullPath = Path.GetFullPath(Path.Combine(workingDirectory.FullName, filePath));
+
+                        if (File.Exists(fullPath) && !force)
+                        {
+                            existingFiles.Add(fullPath);
+                            continue;
+                        }
+
+                        try
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                            File.WriteAllText(fullPath, content);
+                            writtenFiles.Add(fullPath);
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            return new TemplateApplicationResult.Failed(
+                                new TemplateApplicationFailure.WriteFailed(fullPath, ex.Message));
+                        }
+                        break;
+                    }
+
+                case "appendtofile":
+                    {
+                        string? filePath = Substitute(action.FilePath, variables);
+                        if (filePath is null)
+                        {
+                            return Failed("AppendToFile: filePath is required.");
+                        }
+
+                        string snippet = ResolveActionPayload(action, variables);
+                        string fullPath = Path.GetFullPath(Path.Combine(workingDirectory.FullName, filePath));
+
+                        if (!File.Exists(fullPath))
+                        {
+                            // Default semantics in the v2 schema: when the
+                            // target file is missing and the action doesn't
+                            // explicitly opt-in to creation, treat the
+                            // append as a no-op (mirrors the upstream
+                            // engine's "skip if target absent" behaviour).
+                            // CreateIfNotExists=true falls through to a
+                            // write of the snippet as the initial content.
+                            if (action.CreateIfNotExists != true)
                             {
-                                existingFiles.Add(fullPath);
-                                continue;
+                                if (action.ContinueOnError)
+                                {
+                                    continue;
+                                }
+
+                                return Failed(
+                                    $"AppendToFile: target file '{filePath}' does not exist and createIfNotExists is false.");
                             }
 
                             try
                             {
                                 Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-                                File.WriteAllText(fullPath, content);
+                                File.WriteAllText(fullPath, snippet);
                                 writtenFiles.Add(fullPath);
                             }
                             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -142,22 +210,96 @@ internal sealed class V2TemplateEngine
                             break;
                         }
 
-                    default:
-                        if (!action.ContinueOnError)
+                        try
                         {
-                            return Failed($"Unsupported v2 action type '{action.Type}'.");
+                            File.AppendAllText(fullPath, snippet);
+                            if (!writtenFiles.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
+                            {
+                                writtenFiles.Add(fullPath);
+                            }
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            return new TemplateApplicationResult.Failed(
+                                new TemplateApplicationFailure.WriteFailed(fullPath, ex.Message));
                         }
                         break;
-                }
+                    }
+
+                case "showmarkdownpreview":
+                    // Editor-only hint (VS Code surface): the upstream
+                    // schema uses this to open a help file alongside the
+                    // scaffolded function. No-op for the CLI.
+                    break;
+
+                default:
+                    if (!action.ContinueOnError)
+                    {
+                        return Failed($"Unsupported v2 action type '{action.Type}'.");
+                    }
+                    break;
             }
         }
 
-        if (existingFiles.Count > 0)
+        if (existingFiles.Count > 0 && writtenFiles.Count == 0)
         {
             return new TemplateApplicationResult.AlreadyExists(existingFiles);
         }
 
         return new TemplateApplicationResult.Created(writtenFiles);
+    }
+
+    private static IReadOnlyList<V2Action> ResolveActionSequence(NewTemplate template, V2Job? job)
+    {
+        IReadOnlyList<V2Action> allActions = template.Actions ?? (IReadOnlyList<V2Action>)[];
+
+        // No job-level action list → run every top-level action (legacy
+        // single-job templates).
+        if (job?.Actions is null || job.Actions.Count == 0)
+        {
+            return allActions;
+        }
+
+        // Build a lookup so the resolution is O(n + m); the schema requires
+        // action names to be unique within a template, but the lookup is
+        // tolerant of case differences seen in real workloads (e.g. job
+        // references "showMarkdownPreview" and the action declares
+        // "ShowMarkdownPreview").
+        var byName = new Dictionary<string, V2Action>(StringComparer.OrdinalIgnoreCase);
+        foreach (V2Action action in allActions)
+        {
+            if (!string.IsNullOrWhiteSpace(action.Name))
+            {
+                byName[action.Name] = action;
+            }
+        }
+
+        var sequence = new List<V2Action>(job.Actions.Count);
+        foreach (string name in job.Actions)
+        {
+            if (byName.TryGetValue(name, out V2Action? action))
+            {
+                sequence.Add(action);
+            }
+        }
+
+        return sequence;
+    }
+
+    private static string ResolveActionPayload(V2Action action, IReadOnlyDictionary<string, string> variables)
+    {
+        // Real-world v2 actions write content via either `Source` (a
+        // substitution expression pointing at a variable, e.g.
+        // "$(FUNCTION_BODY)") or `FileContent` (an inline literal). Try
+        // Source first; fall back to FileContent so older templates keep
+        // working.
+        string? sourceSubstituted = Substitute(action.Source, variables);
+        if (!string.IsNullOrEmpty(sourceSubstituted))
+        {
+            return sourceSubstituted;
+        }
+
+        return Substitute(action.FileContent, variables) ?? string.Empty;
     }
 
     private static string? ResolveInputValue(V2Input input, IReadOnlyDictionary<string, string?> optionValuesByPromptId)
