@@ -30,5 +30,8 @@ internal sealed class RecordingStartInitializationRenderer(IStartInitializationR
         await _inner.OnEventAsync(initializationEvent, cancellationToken);
     }
 
+    public async Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+        => await _inner.ConfirmAsync(prompt, defaultValue, cancellationToken);
+
     public ValueTask DisposeAsync() => _inner.DisposeAsync();
 }
