@@ -37,16 +37,15 @@
         },
         {
             "label": "deploy-workload-for-debug",
-            "command": "pwsh",
+            "command": "dotnet",
             "type": "process",
             "args": [
-                "-NoProfile",
-                "-File",
-                "${workspaceFolder}/eng/scripts/deploy-workload-for-debug.ps1",
-                "-WorkloadProject",
+                "build",
                 "${input:debugWorkloadProject}",
-                "-WorkloadsHome",
-                "${workspaceFolder}/.debug-workloads"
+                "-t:DeployForDebug",
+                "-p:FuncCliWorkloadsHome=${workspaceFolder}/.debug-workloads",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
             ],
             "problemMatcher": "$msCompile"
         },

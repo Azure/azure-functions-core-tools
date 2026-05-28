@@ -1,0 +1,50 @@
+<Project>
+
+  <!--
+    DeployForDebug: copy the freshly built workload assembly + PDB into an
+    already-installed workload home so a single F5 (or `dotnet build
+    -t:DeployForDebug`) gives you breakpoints in workload source.
+
+    Lives at the build layer instead of in an IDE-specific script so VS Code,
+    Visual Studio, Rider, and the CLI all consume the same logic.
+
+    Resolution order for the workload home:
+      1. $(FuncCliWorkloadsHome) MSBuild property (-p:FuncCliWorkloadsHome=...)
+      2. FUNC_CLI_WORKLOADS_HOME environment variable
+      3. $(RepoRoot).debug-workloads/ (matches the VS Code launch config)
+
+    No-op for non-workload projects so it's safe to invoke from a solution-wide
+    build target.
+  -->
+  <Target Name="DeployForDebug" DependsOnTargets="Build">
+
+    <Message Condition="'$(PackageType)' != 'FuncCliWorkload'"
+             Importance="High"
+             Text="DeployForDebug: skipping '$(MSBuildProjectName)' (PackageType='$(PackageType)', expected 'FuncCliWorkload')." />
+
+    <PropertyGroup Condition="'$(PackageType)' == 'FuncCliWorkload'">
+      <_DeployForDebugHome Condition="'$(FuncCliWorkloadsHome)' != ''">$(FuncCliWorkloadsHome)</_DeployForDebugHome>
+      <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(FUNC_CLI_WORKLOADS_HOME)</_DeployForDebugHome>
+      <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(RepoRoot).debug-workloads</_DeployForDebugHome>
+      <_DeployForDebugTargetDir>$([System.IO.Path]::GetFullPath('$(_DeployForDebugHome)/workloads/$(PackageId)/$(PackageVersion)/tools/any'))</_DeployForDebugTargetDir>
+    </PropertyGroup>
+
+    <Error Condition="'$(PackageType)' == 'FuncCliWorkload' AND !Exists('$(_DeployForDebugTargetDir)')"
+           Text="DeployForDebug: no install found at '$(_DeployForDebugTargetDir)'. Install $(PackageId) $(PackageVersion) once first against the same home (e.g. `func workload install &lt;path-to-nupkg&gt;`), then rerun. Reinstall if you've bumped the workload's version since the last install." />
+
+    <ItemGroup Condition="'$(PackageType)' == 'FuncCliWorkload'">
+      <_DeployForDebugPayload Include="$(TargetPath)" />
+      <_DeployForDebugPayload Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    </ItemGroup>
+
+    <Copy Condition="'$(PackageType)' == 'FuncCliWorkload'"
+          SourceFiles="@(_DeployForDebugPayload)"
+          DestinationFolder="$(_DeployForDebugTargetDir)"
+          SkipUnchangedFiles="false" />
+
+    <Message Condition="'$(PackageType)' == 'FuncCliWorkload'"
+             Importance="High"
+             Text="DeployForDebug: copied @(_DeployForDebugPayload->'%(Filename)%(Extension)', ', ') -> $(_DeployForDebugTargetDir)" />
+  </Target>
+
+</Project>

@@ -391,20 +391,28 @@ Workloads load into the CLI process via `LoadFromAssemblyPath`, so the
 debugger steps into them as long as the workload's PDB sits next to its DLL
 in the install directory.
 
-The `Run func cli (debug workload)` launch config in `.vscode/launch.json`
-wires this up:
+The `DeployForDebug` MSBuild target (in `eng/build/WorkloadDebug.targets`,
+imported by every project) handles that copy. It's safe to invoke on any
+project; it no-ops for anything that isn't `PackageType=FuncCliWorkload`.
 
-1. It sets `FUNC_CLI_WORKLOADS_HOME=${workspaceFolder}/.debug-workloads`
-   so debugging never touches your real workload home.
-2. The `build-and-deploy-workload` preLaunchTask rebuilds Func and runs
-   `eng/scripts/deploy-workload-for-debug.ps1`, which copies the freshly
-   built workload DLL + PDB into
-   `.debug-workloads/workloads/<id>/<version>/tools/any/`.
-3. F5 then launches `func` with your args. Breakpoints in both Func and
-   the workload source bind once the workload loads.
+```bash
+# Builds the workload and copies its DLL + PDB into the matching
+# <home>/workloads/<id>/<version>/tools/any/ directory.
+dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug \
+    -p:FuncCliWorkloadsHome=$PWD/.debug-workloads
+```
 
-The workload must be installed into `.debug-workloads` once before the
-script can redeploy bits over it:
+The home is resolved as `$(FuncCliWorkloadsHome)` property, then
+`FUNC_CLI_WORKLOADS_HOME` env var, then `$(RepoRoot).debug-workloads`.
+
+VS Code's `Run func cli (debug workload)` launch config in
+`.vscode/launch.json` wraps this: it picks a workload csproj, runs
+`DeployForDebug` as a preLaunchTask, then launches `func` with
+`FUNC_CLI_WORKLOADS_HOME` pointed at the same home. F5 binds breakpoints in
+both Func and the workload source once the workload loads.
+
+The workload must be installed into the chosen home once before the target
+can redeploy bits over it:
 
 ```pwsh
 $env:FUNC_CLI_WORKLOADS_HOME = "$PWD/.debug-workloads"
