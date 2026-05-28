@@ -13,14 +13,12 @@ namespace Azure.Functions.Cli.Templates.V2;
 /// <see cref="V2TemplateEngine"/>.
 /// </summary>
 /// <remarks>
-/// Channel match and min-bundle gates live in the orchestrator (PR4); this
-/// provider operates over whichever installed workload(s) the orchestrator
-/// hands it. PR2 takes the highest-version installed pkg per stack as a
-/// best-effort default and supplies the engine with each prompt's declared
-/// default value; PR4 replaces this with the orchestrator's stage-B
-/// hydrated parse result so user-supplied option values flow through.
+/// PR2 takes the highest-version installed pkg per stack as a best-effort
+/// default and supplies the engine with each prompt's declared default
+/// value; PR4 replaces this with the orchestrator's stage-B hydrated parse
+/// result so user-supplied option values flow through.
 /// </remarks>
-public sealed class V2EngineProvider : ITemplateEngineProvider
+internal sealed class V2EngineProvider : ITemplateEngineProvider
 {
     private readonly IInstalledTemplatesWorkloads _installed;
     private readonly V2TemplateEngine _engine;
