@@ -28,6 +28,6 @@ internal sealed class NodeQuickstartProvider : IQuickstartProvider
     public IReadOnlyList<string> GetNextSteps(string manifestLanguage) =>
     [
         "Run `npm install` to install dependencies",
-        "Run `func run` to launch the app"
+        "Run `func run [path]` where path is root folder containing host.json to launch the app"
     ];
 }

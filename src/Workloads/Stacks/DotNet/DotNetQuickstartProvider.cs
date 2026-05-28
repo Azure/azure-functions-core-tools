@@ -30,6 +30,6 @@ internal sealed class DotNetQuickstartProvider : IQuickstartProvider
 
     public IReadOnlyList<string> GetNextSteps(string manifestLanguage) =>
     [
-        "Run `func run` to launch the app"
+        "Run `func run [path]` where path is root folder containing host.json to launch the app"
     ];
 }
