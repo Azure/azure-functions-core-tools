@@ -33,6 +33,22 @@ internal static class AzuriteServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Registers <see cref="IClock"/> and <see cref="IAzuriteManagedPathsProvider"/>
+    /// for resolving managed-Azurite on-disk locations. The path provider
+    /// reads <c>&lt;funcHome&gt;</c> from <see cref="Configuration.CliConfigurationPathsOptions"/>,
+    /// which is registered separately by the CLI host.
+    /// </summary>
+    public static IServiceCollection AddAzuriteManagedPaths(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IAzuriteManagedPathsProvider, AzuriteManagedPathsProvider>();
+
+        return services;
+    }
+
+    /// <summary>
     /// Registers the host-side seams and discovery services used by the CLI
     /// to locate Azurite and probe for Docker. Does not start anything and
     /// does not depend on probe/process startup services from later slices.
