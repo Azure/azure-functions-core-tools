@@ -1,12 +1,14 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
+using Azure.Functions.Cli.Abstractions.Common;
 
 namespace Azure.Functions.Cli.Configuration;
 
 /// <summary>
-/// Computed filesystem layout for CLI configuration.
+/// Computed filesystem layout for CLI configuration. <see cref="Home"/>
+/// resolves to <see cref="FuncHomeResolver.Resolve"/> by default, which
+/// honors the <see cref="Constants.FuncHomeEnvironmentVariable"/> env var.
 /// </summary>
 internal sealed class CliConfigurationPathsOptions
 {
@@ -14,9 +16,7 @@ internal sealed class CliConfigurationPathsOptions
     public const string ProfilesFileName = "profiles.json";
 
     public CliConfigurationPathsOptions()
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            AbstractionsConstants.FuncHomeDirectoryName))
+        : this(FuncHomeResolver.Resolve())
     {
     }
 
