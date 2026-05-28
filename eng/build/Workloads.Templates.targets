@@ -2,38 +2,56 @@
 
   <!--
     Templates workload pack-time pipeline (Node + Python).
-    Downloads StaticContent files from the extension-bundle CDN for the
-    channel selected by $(TemplatesChannel), filters
-    v1/templates/templates.json and/or v2/templates/templates.json by
-    $(TemplatesStackLanguageFilter), generates the templates-workload.json
-    sibling manifest from $(MinBundleVersionRange), and packs the
-    result under tools/any/content/ of the workload nupkg.
-    Skip with -p:SkipDownloadTemplates=true (dev / offline only — produces
-    an empty pack with no templates payload).
+
+    Two source modes, selected by $(TemplatesContentSource):
+
+      cdn (default)
+        Downloads StaticContent files from the extension-bundle CDN for
+        the channel selected by $(TemplatesChannel), filters
+        v1/templates/templates.json and/or v2/templates/templates.json by
+        $(TemplatesStackLanguageFilter), and packs the result under
+        tools/any/content/ of the workload nupkg. Skip the download with
+        -p:SkipDownloadTemplates=true for dev / offline-only builds.
+
+      static
+        Packs files from $(MSBuildProjectDirectory)/content/v2/**/*.json
+        (and content/v1/**/*.json when $(IncludeV1Templates) is true)
+        directly. No CDN access at pack time. Used when the templates
+        workload owns its content in-repo (e.g. Node — see Templates
+        Workload Spec §6.1, where the upstream bundle does not yet ship
+        v2 Node templates).
+
+    Both modes generate the same templates-workload.json sibling manifest
+    from $(MinBundleVersionRange).
 
     Per-csproj inputs:
+      $(TemplatesContentSource)        cdn (default) | static. Picks the
+                                       source of the v1/v2 content.
       $(TemplatesChannel)              stable | preview | experimental.
       $(SourceBundleVersion)           Bundle version snapshotted at pack
-                                       time. Build-provenance only; does
-                                       not derive the workload pkg version
+                                       time when TemplatesContentSource=cdn.
+                                       Build-provenance only; does not
+                                       derive the workload pkg version
                                        (Templates Workload Spec §4.4.1).
+                                       Ignored when TemplatesContentSource
+                                       is static.
       $(TemplatesStackLanguageFilter)  Comma/semicolon allow-list of
                                        language values, matched
                                        case-insensitively. Applied to v1
                                        `metadata.language` and v2
-                                       top-level `language`. Required when
-                                       any of $(IncludeV1Templates) or
+                                       top-level `language`. Required
+                                       when TemplatesContentSource=cdn
+                                       and any of $(IncludeV1Templates) /
                                        $(IncludeV2Templates) is true.
       $(IncludeV1Templates)            true | false. Defaults true. Set
                                        false for stacks that ship v2-only
                                        (e.g. Python after the v2-only
                                        cutover — Templates Workload Spec
-                                       §5.2 / §6.2).
+                                       §5.2 / §6.2). Also drops v1 from
+                                       static-mode packs.
       $(IncludeV2Templates)            true | false. Defaults true. Set
                                        false for stacks whose v2 content
-                                       is not yet available (e.g. Node,
-                                       until its v2 source pipeline lands
-                                       — Templates Workload Spec §6.1).
+                                       is not yet available.
       $(MinBundleVersionRange)         NuGet range the workload declares
                                        compatibility with. Drives the
                                        generated templates-workload.json,
@@ -42,7 +60,7 @@
                                        single source of truth for spec
                                        §4.4.4.
 
-    Source bundle id selection (Templates Workload Spec §4.4.2):
+    Source bundle id selection (Templates Workload Spec §4.4.2), cdn mode:
       stable       -> Microsoft.Azure.Functions.ExtensionBundle
       preview      -> Microsoft.Azure.Functions.ExtensionBundle.Preview
       experimental -> Microsoft.Azure.Functions.ExtensionBundle.Experimental
@@ -55,6 +73,8 @@
   -->
 
   <PropertyGroup>
+    <TemplatesContentSource Condition="'$(TemplatesContentSource)' == ''">cdn</TemplatesContentSource>
+
     <_TplCdnId Condition="'$(TemplatesChannel)' == 'stable'">Microsoft.Azure.Functions.ExtensionBundle</_TplCdnId>
     <_TplCdnId Condition="'$(TemplatesChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_TplCdnId>
     <_TplCdnId Condition="'$(TemplatesChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_TplCdnId>
@@ -76,14 +96,14 @@
   </ItemGroup>
 
   <Target Name="DownloadTemplatesContent"
-          Condition="'$(SkipDownloadTemplates)' != 'true'"
+          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'cdn'"
           BeforeTargets="GenerateNuspec;_GetPackageFiles"
           Inputs="$(MSBuildProjectFullPath)"
           Outputs="$(IntermediateOutputPath)templates\.downloaded">
     <Error Condition="'$(_TplCdnId)' == ''"
            Text="TemplatesChannel '$(TemplatesChannel)' is not one of stable|preview|experimental." />
     <Error Condition="'$(SourceBundleVersion)' == ''"
-           Text="SourceBundleVersion must be set (the bundle version whose StaticContent the workload snapshots)." />
+           Text="SourceBundleVersion must be set when TemplatesContentSource=cdn (the bundle version whose StaticContent the workload snapshots)." />
     <Error Condition="'$(IncludeV1Templates)' != 'true' and '$(IncludeV2Templates)' != 'true'"
            Text="At least one of IncludeV1Templates or IncludeV2Templates must be true; the templates workload would otherwise ship an empty payload." />
 
@@ -128,7 +148,7 @@
 
   <Target Name="FilterTemplatesByLanguage"
           DependsOnTargets="DownloadTemplatesContent"
-          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(IncludeV1Templates)' == 'true'"
+          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'cdn' and '$(IncludeV1Templates)' == 'true'"
           BeforeTargets="_GetPackageFiles"
           Inputs="$(IntermediateOutputPath)templates\.downloaded"
           Outputs="$(IntermediateOutputPath)templates\.filtered.v1">
@@ -142,7 +162,7 @@
 
   <Target Name="FilterTemplatesByLanguageV2"
           DependsOnTargets="DownloadTemplatesContent"
-          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(IncludeV2Templates)' == 'true'"
+          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'cdn' and '$(IncludeV2Templates)' == 'true'"
           BeforeTargets="_GetPackageFiles"
           Inputs="$(IntermediateOutputPath)templates\.downloaded"
           Outputs="$(IntermediateOutputPath)templates\.filtered.v2">
@@ -178,7 +198,7 @@
 
   <Target Name="_AddTemplatesToPack"
           DependsOnTargets="FilterTemplatesByLanguage;FilterTemplatesByLanguageV2;GenerateTemplatesWorkloadJson"
-          Condition="'$(SkipDownloadTemplates)' != 'true'"
+          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'cdn'"
           BeforeTargets="_GetPackageFiles">
     <ItemGroup>
       <None Condition="'$(IncludeV1Templates)' == 'true'"
@@ -187,6 +207,96 @@
       <None Condition="'$(IncludeV2Templates)' == 'true'"
             Include="$(IntermediateOutputPath)templates\v2\**\*.json"
             Pack="true" PackagePath="tools/any/content/v2/" Visible="false" />
+      <None Include="$(IntermediateOutputPath)templates\templates-workload.json"
+            Pack="true" PackagePath="tools/any/content/" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Static-mode pack: pull v1/v2 content from `$(MSBuildProjectDirectory)/content/`
+    instead of downloading from the bundle CDN. The directory layout under
+    content/ mirrors the nupkg layout under tools/any/content/.
+
+    Per-channel subsetting (opt in via $(FilterTemplatesByBundleChannel)=true):
+      When enabled, the v2 templates.json is filtered against the active
+      $(TemplatesChannel)'s authoritative bundle. The build:
+        1. Reads index.json from the channel's CDN to find the latest
+           listed 4.x bundle version.
+        2. Extracts bin/extensions.json from that bundle via HTTP Range
+           requests (~10 KB instead of ~160 MB).
+        3. Filters content/v2/templates/templates.json by
+           content/v2/templates/_bindings.json, dropping any entry whose
+           required binding(s) aren't in the channel's extensions.json.
+      The filtered file is staged at $(IntermediateOutputPath)templates\v2\templates\templates.json
+      and packed in place of the source file. _bindings.json itself is
+      excluded from the pack — it is a build-time-only manifest.
+
+      When disabled (default), every channel ships every static template.
+  -->
+  <PropertyGroup Condition="'$(TemplatesContentSource)' == 'static'">
+    <FilterTemplatesByBundleChannel Condition="'$(FilterTemplatesByBundleChannel)' == ''">false</FilterTemplatesByBundleChannel>
+  </PropertyGroup>
+
+  <Target Name="FetchBundleExtensionsForChannel"
+          Condition="'$(TemplatesContentSource)' == 'static' and '$(FilterTemplatesByBundleChannel)' == 'true' and '$(IncludeV2Templates)' == 'true'"
+          BeforeTargets="_GetPackageFiles"
+          Inputs="$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)templates\bundle\extensions.json">
+    <Error Condition="'$(TemplatesChannel)' == ''"
+           Text="FilterTemplatesByBundleChannel=true requires TemplatesChannel to be set (stable | preview | experimental)." />
+    <MakeDir Directories="$(IntermediateOutputPath)templates\bundle\" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\fetch-bundle-extensions-json.ps1&quot; -Channel &quot;$(TemplatesChannel)&quot; -OutputPath &quot;$(IntermediateOutputPath)templates\bundle\extensions.json&quot; -VersionOut &quot;$(IntermediateOutputPath)templates\bundle\version.txt&quot;" />
+  </Target>
+
+  <Target Name="FilterStaticTemplatesByBundleChannel"
+          DependsOnTargets="FetchBundleExtensionsForChannel"
+          Condition="'$(TemplatesContentSource)' == 'static' and '$(FilterTemplatesByBundleChannel)' == 'true' and '$(IncludeV2Templates)' == 'true'"
+          BeforeTargets="_GetPackageFiles"
+          Inputs="$(MSBuildProjectDirectory)/content/v2/templates/templates.json;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json;$(IntermediateOutputPath)templates\bundle\extensions.json"
+          Outputs="$(IntermediateOutputPath)templates\v2\templates\templates.json">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json')"
+           Text="FilterTemplatesByBundleChannel=true requires content/v2/templates/_bindings.json (per-template binding-requirements map)." />
+    <MakeDir Directories="$(IntermediateOutputPath)templates\v2\templates\" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\scripts\filter-node-templates-by-bundle.ps1&quot; -TemplatesPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/templates.json&quot; -BindingsMapPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json&quot; -ExtensionsJsonPath &quot;$(IntermediateOutputPath)templates\bundle\extensions.json&quot; -OutputPath &quot;$(IntermediateOutputPath)templates\v2\templates\templates.json&quot; -ChannelLabel &quot;$(TemplatesChannel)&quot;" />
+  </Target>
+
+  <Target Name="_AddStaticTemplatesToPack"
+          DependsOnTargets="GenerateTemplatesWorkloadJson;FilterStaticTemplatesByBundleChannel"
+          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'static'"
+          BeforeTargets="_GetPackageFiles">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/content/v2/templates/templates.json') and '$(IncludeV2Templates)' == 'true'"
+           Text="TemplatesContentSource=static but $(MSBuildProjectDirectory)/content/v2/templates/templates.json is missing." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/content/v1/templates/templates.json') and '$(IncludeV1Templates)' == 'true'"
+           Text="TemplatesContentSource=static but $(MSBuildProjectDirectory)/content/v1/templates/templates.json is missing." />
+
+    <ItemGroup>
+      <None Condition="'$(IncludeV1Templates)' == 'true'"
+            Include="$(MSBuildProjectDirectory)/content/v1/**/*.json"
+            Pack="true" PackagePath="tools/any/content/v1/" Visible="false" />
+
+      <!--
+        v2 content with per-channel filter ON: pack the bundles/resources
+        from the repo but the templates.json from the obj/-staged filtered
+        copy. The bindings-requirements manifest (_bindings.json) is a
+        build-time-only artefact and is intentionally excluded.
+      -->
+      <None Condition="'$(IncludeV2Templates)' == 'true' and '$(FilterTemplatesByBundleChannel)' == 'true'"
+            Include="$(MSBuildProjectDirectory)/content/v2/**/*.json"
+            Exclude="$(MSBuildProjectDirectory)/content/v2/templates/templates.json;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json"
+            Pack="true" PackagePath="tools/any/content/v2/" Visible="false" />
+      <None Condition="'$(IncludeV2Templates)' == 'true' and '$(FilterTemplatesByBundleChannel)' == 'true'"
+            Include="$(IntermediateOutputPath)templates\v2\templates\templates.json"
+            Pack="true" PackagePath="tools/any/content/v2/templates/" Visible="false" />
+
+      <!--
+        v2 content with per-channel filter OFF: pack the repo content
+        directly, excluding the build-time-only _bindings.json manifest.
+      -->
+      <None Condition="'$(IncludeV2Templates)' == 'true' and '$(FilterTemplatesByBundleChannel)' != 'true'"
+            Include="$(MSBuildProjectDirectory)/content/v2/**/*.json"
+            Exclude="$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json"
+            Pack="true" PackagePath="tools/any/content/v2/" Visible="false" />
+
       <None Include="$(IntermediateOutputPath)templates\templates-workload.json"
             Pack="true" PackagePath="tools/any/content/" Visible="false" />
     </ItemGroup>

@@ -1,0 +1,118 @@
+[
+  {
+    "id": "trigger-functionName",
+    "name": "trigger-functionName",
+    "value": "string",
+    "label": "$trigger_functionName_label",
+    "help": "$trigger_functionName_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z][a-zA-Z0-9_]{0,126}[a-zA-Z0-9]$",
+        "errorText": "$trigger_functionName_errorText"
+      }
+    ]
+  },
+  {
+    "id": "timerTrigger-schedule",
+    "name": "timerTrigger-schedule",
+    "value": "string",
+    "label": "$timerTrigger_schedule_label",
+    "help": "$timerTrigger_schedule_help"
+  },
+  {
+    "id": "queueTrigger-name",
+    "name": "queueTrigger-name",
+    "value": "string",
+    "label": "$queueTrigger_name_label",
+    "help": "$queueTrigger_name_help"
+  },
+  {
+    "id": "queueTrigger-connection",
+    "name": "queueTrigger-connection",
+    "value": "string",
+    "label": "$queueTrigger_connection_label",
+    "help": "$queueTrigger_connection_help"
+  },
+  {
+    "id": "blobTrigger-path",
+    "name": "blobTrigger-path",
+    "value": "string",
+    "label": "$blobTrigger_path_label",
+    "help": "$blobTrigger_path_help"
+  },
+  {
+    "id": "blobTrigger-connection",
+    "name": "blobTrigger-connection",
+    "value": "string",
+    "label": "$blobTrigger_connection_label",
+    "help": "$blobTrigger_connection_help"
+  },
+  {
+    "id": "cosmosTrigger-connection",
+    "name": "cosmosTrigger-connection",
+    "value": "string",
+    "label": "$cosmosTrigger_connection_label",
+    "help": "$cosmosTrigger_connection_help"
+  },
+  {
+    "id": "cosmosTrigger-database",
+    "name": "cosmosTrigger-database",
+    "value": "string",
+    "label": "$cosmosTrigger_database_label",
+    "help": "$cosmosTrigger_database_help"
+  },
+  {
+    "id": "cosmosTrigger-collection",
+    "name": "cosmosTrigger-collection",
+    "value": "string",
+    "label": "$cosmosTrigger_collection_label",
+    "help": "$cosmosTrigger_collection_help"
+  },
+  {
+    "id": "cosmosTrigger-createLease",
+    "name": "cosmosTrigger-createLease",
+    "value": "enum",
+    "defaultValue": "true",
+    "enum": [
+      { "value": "true",  "display": "true" },
+      { "value": "false", "display": "false" }
+    ],
+    "label": "$cosmosTrigger_createLease_label",
+    "help": "$cosmosTrigger_createLease_help"
+  },
+  {
+    "id": "eventHubTrigger-name",
+    "name": "eventHubTrigger-name",
+    "value": "string",
+    "label": "$eventHubTrigger_name_label",
+    "help": "$eventHubTrigger_name_help"
+  },
+  {
+    "id": "serviceBusTrigger-name",
+    "name": "serviceBusTrigger-name",
+    "value": "string",
+    "label": "$serviceBusTrigger_name_label",
+    "help": "$serviceBusTrigger_name_help"
+  },
+  {
+    "id": "serviceBusTrigger-connection",
+    "name": "serviceBusTrigger-connection",
+    "value": "string",
+    "label": "$serviceBusTrigger_connection_label",
+    "help": "$serviceBusTrigger_connection_help"
+  },
+  {
+    "id": "serviceBusTrigger-topic",
+    "name": "serviceBusTrigger-topic",
+    "value": "string",
+    "label": "$serviceBusTrigger_topic_label",
+    "help": "$serviceBusTrigger_topic_help"
+  },
+  {
+    "id": "serviceBusTrigger-subscription",
+    "name": "serviceBusTrigger-subscription",
+    "value": "string",
+    "label": "$serviceBusTrigger_subscription_label",
+    "help": "$serviceBusTrigger_subscription_help"
+  }
+]

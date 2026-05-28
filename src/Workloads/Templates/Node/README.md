@@ -1,11 +1,20 @@
 # Azure Functions CLI: Node templates workload
 
 This package ships function-scaffold templates for Node.js Azure
-Functions projects, consumed by the `func` CLI's `func new` command.
-It is a **content workload** (Workload Spec §3; Templates Workload
-Spec §4.1): the package carries template files only, with no
-entry-point assembly and no runtime services. `func new` resolves the
-install directory by package id and reads the template payload directly.
+Functions projects (**v2 template-engine schema, Node v4 programming
+model**), consumed by the `func` CLI's `func new` command. It is a
+**content workload** (Workload Spec §3; Templates Workload Spec §4.1):
+the package carries template files only, with no entry-point assembly
+and no runtime services. `func new` resolves the install directory by
+package id and reads the template payload directly.
+
+> **Template source.** The Node templates workload **does not** snapshot
+> content from the extension-bundle CDN — the upstream bundle's
+> `StaticContent/v2/templates/templates.json` does not yet publish Node
+> entries (only Python). The Node v2 template content is therefore
+> authored statically in this repo under
+> `src/Workloads/Templates/Node/content/v2/`. See Templates Workload
+> Spec §6.1.
 
 The workload pkg version is independent of the source bundle version
 (Templates Workload Spec §4.4.1). The channel a workload was built
@@ -19,11 +28,22 @@ channel maps 1:1 to an extension-bundle id (Templates Workload Spec
 | preview       | `1.0.0-preview`        | `Microsoft.Azure.Functions.ExtensionBundle.Preview`                |
 | experimental  | `1.0.0-experimental`   | `Microsoft.Azure.Functions.ExtensionBundle.Experimental`           |
 
-The bundle id is both the upstream extension bundle the workload's
-templates were snapshotted from at build time and the value `func new`
-expects in the project's `host.json` `extensionBundle.id` at scaffold
-time. Channel selection at `func new` is implicit — derived from the
-project's `host.json` bundle id.
+The bundle id is the value `func new` expects in the project's
+`host.json` `extensionBundle.id` at scaffold time. Channel selection
+at `func new` is implicit — derived from the project's `host.json`
+bundle id.
+
+> **Per-channel template subsetting** is **on** by default for the
+> Node workload. At pack time the build fetches `bin/extensions.json`
+> from the latest **listed** bundle of `$(TemplatesChannel)`
+> (resolved from the channel's CDN `index.json`) using HTTP Range
+> requests (~10 KB rather than the full 150 MB bundle) and drops any
+> template whose required bindings aren't present in that channel's
+> bundle. The mapping of templates to required bindings is committed
+> in `src/Workloads/Templates/Node/content/v2/templates/_bindings.json`.
+> See Templates Workload Spec §4.3 / §6.1. Snapshot at the time of
+> writing: stable `4.32.0` → 31 of 33 (no `mcpPromptTrigger`),
+> preview `4.42.0` → 33 of 33, experimental `4.6.0` → 31 of 33.
 
 ## Bundle compatibility
 
@@ -31,7 +51,7 @@ This workload declares a minimum compatible extension-bundle version
 (`[4.0.0,)`). `func new` validates the project's resolved bundle
 version against this constraint and surfaces incompatibilities as a
 warning or error (Templates Workload Spec §4.4.4). The constraint is
-recorded in three locations that all derive from the single
+recorded in two locations that both derive from the single
 `$(MinBundleVersionRange)` MSBuild property, so they cannot drift:
 
 - `tools/any/content/templates-workload.json` — CLI-owned sibling
@@ -39,7 +59,6 @@ recorded in three locations that all derive from the single
   `GenerateTemplatesWorkloadJson` target.
 - Nuspec `minBundle:[4.0.0,)` tag — discoverable via
   `func workload search` / `list`.
-- Nuspec `<description>` sentence — surfaced by `func workload list`.
 
 ## Install
 
@@ -61,7 +80,7 @@ Multiple templates versions coexist via `--force` (Workload Spec §4.6).
 
 ## Build-time channel selection
 
-The source bundle id used at pack time is driven by
+The workload pkg version's prerelease label is driven by
 `$(TemplatesChannel)` in `Directory.Version.props`:
 
 ```bash
@@ -69,38 +88,37 @@ dotnet pack ... /p:TemplatesChannel=preview
 dotnet pack ... /p:TemplatesChannel=experimental
 ```
 
-`$(SourceBundleVersion)` selects the bundle version whose
-`StaticContent/v1` subtree is snapshotted at build time. It is
-recorded as build provenance only; it does not derive the templates
-pkg version (Templates Workload Spec §4.4.1).
+For Node, channel does **not** select a CDN source — `$(TemplatesContentSource)`
+is `static` and the content always comes from `content/v2/` in this
+repo. `$(SourceBundleVersion)` is unused for Node.
 
 ## Layout
 
-The package places the template payload under `tools/any/content/v1/`,
-matching the upstream extension bundle's `StaticContent/v1/` subtree
-with the `StaticContent/` wrapper stripped (Templates Workload Spec
-§5.2). Node has no v2 programming model, so no `v2/` directory is
-shipped. After install:
+The package places the template payload under `tools/any/content/v2/`,
+following the v2 template-engine schema layout (Templates Workload
+Spec §5.2):
 
 ```
 <workload-home>/workloads/azure.functions.cli.workloads.templates.node/<version>/
   tools/any/content/
     templates-workload.json     ← min-bundle sibling manifest
-    v1/
-      bindings/bindings.json
+    v2/
+      bindings/userPrompts.json
       resources/Resources.json
-      resources/Resources.<locale>.json
-      templates/templates.json  ← Template[] with files inline
+      templates/templates.json  ← NewTemplate[] (jobs/actions DSL)
   workload.json
 ```
 
-Template files are carried **inline** inside each `Template` entry's
-`files: { <filename>: <contents> }` map; there are no separate
-per-template file directories on disk (Templates Workload Spec §5.2).
-`tools/any/` is the canonical content-workload payload path.
+Each `NewTemplate` entry carries its per-template file contents
+**inline** in a `files: { <filename>: <contents> }` map; the
+`WriteToFile` action writes the file to
+`src/functions/$(FUNCTION_NAME_INPUT).<js|ts>` after the engine
+substitutes the `$(FUNCTION_NAME_INPUT)` token (Templates Workload
+Spec §5.2 / §5.4).
 
 ## Links
 
 - [Azure Functions CLI](https://github.com/Azure/azure-functions-core-tools)
 - [Workload spec](https://github.com/Azure/azure-functions-core-tools/blob/docs/proposed/workload-spec.md)
 - [Templates workload spec](https://github.com/Azure/azure-functions-core-tools/blob/docs/proposed/templates-workload-spec.md)
+- [v2 template engine schema (Azure/azure-functions-templates)](https://github.com/Azure/azure-functions-templates/tree/dev/Docs)
