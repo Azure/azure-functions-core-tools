@@ -17,6 +17,8 @@ public static class DotNetServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<IDotnetTemplateRunner, DefaultDotnetTemplateRunner>();
+        services.AddSingleton<IItemTemplateHivePathProvider, ItemTemplateHivePathProvider>();
+        services.AddSingleton<IItemTemplateHiveProvisioner, ItemTemplateHiveProvisioner>();
         services.AddSingleton<ITemplateEngineProvider, DotNetEngineProvider>();
         return services;
     }

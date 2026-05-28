@@ -31,11 +31,21 @@ internal interface IDotnetTemplateRunner
     /// the orchestrator built from the stage-B parsed values. Already
     /// shell-safe — the implementation forwards them verbatim.
     /// </param>
+    /// <param name="customHivePath">
+    /// Optional CLI-scoped custom template hive (passed as
+    /// <c>--debug:custom-hive &lt;path&gt;</c>). When non-null, <c>dotnet new</c>
+    /// is isolated from the user's machine-global templating store and
+    /// reads from the hive the engine provisioned from the templates
+    /// workload's <c>source.json</c>. When null, <c>dotnet new</c> uses
+    /// its default hive (caller has already ensured the templates are
+    /// installed there).
+    /// </param>
     public Task<DotnetTemplateRunResult> RunAsync(
         string shortName,
         DirectoryInfo workingDirectory,
         IReadOnlyList<string> extraArgs,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? customHivePath = null);
 }
 
 /// <summary>

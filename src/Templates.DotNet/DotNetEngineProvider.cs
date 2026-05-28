@@ -23,11 +23,21 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
 {
     private readonly IInstalledTemplatesWorkloads _installed;
     private readonly IDotnetTemplateRunner _runner;
+    private readonly IItemTemplateHiveProvisioner? _hiveProvisioner;
 
     public DotNetEngineProvider(IInstalledTemplatesWorkloads installed, IDotnetTemplateRunner runner)
+        : this(installed, runner, hiveProvisioner: null)
+    {
+    }
+
+    public DotNetEngineProvider(
+        IInstalledTemplatesWorkloads installed,
+        IDotnetTemplateRunner runner,
+        IItemTemplateHiveProvisioner? hiveProvisioner)
     {
         _installed = installed ?? throw new ArgumentNullException(nameof(installed));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _hiveProvisioner = hiveProvisioner;
     }
 
     public string EngineId => EngineIds.DotNet;
@@ -109,11 +119,24 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
 
         try
         {
+            // Provision the custom item-template hive on demand from the
+            // chosen workload's source.json (templates-workload-spec §6.3 /
+                // func-new spec §4.8.3). Skip when no provisioner was injected
+                // (test path) or when no install dir is known.
+            string? customHivePath = null;
+            if (_hiveProvisioner is not null && !string.IsNullOrWhiteSpace(context.InstallDirectory))
+            {
+                customHivePath = await _hiveProvisioner.EnsureProvisionedAsync(
+                    context.InstallDirectory!,
+                    cancellationToken);
+            }
+
             DotnetTemplateRunResult result = await _runner.RunAsync(
                 context.Template.Id,
                 context.WorkingDirectory.Info,
                 args,
-                cancellationToken);
+                cancellationToken,
+                customHivePath);
 
             if (result.ExitCode != 0)
             {

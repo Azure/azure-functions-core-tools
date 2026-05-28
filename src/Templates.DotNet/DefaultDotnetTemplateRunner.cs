@@ -18,7 +18,8 @@ internal sealed class DefaultDotnetTemplateRunner : IDotnetTemplateRunner
         string shortName,
         DirectoryInfo workingDirectory,
         IReadOnlyList<string> extraArgs,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? customHivePath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(shortName);
         ArgumentNullException.ThrowIfNull(workingDirectory);
@@ -38,6 +39,12 @@ internal sealed class DefaultDotnetTemplateRunner : IDotnetTemplateRunner
         foreach (string arg in extraArgs)
         {
             psi.ArgumentList.Add(arg);
+        }
+
+        if (!string.IsNullOrWhiteSpace(customHivePath))
+        {
+            psi.ArgumentList.Add("--debug:custom-hive");
+            psi.ArgumentList.Add(customHivePath);
         }
 
         using var process = new Process { StartInfo = psi };
