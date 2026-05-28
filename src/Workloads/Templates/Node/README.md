@@ -46,15 +46,15 @@ recorded in three locations that all derive from the single
 ```bash
 func workload install Azure.Functions.Cli.Workloads.Templates.Node@1.0.0
 # or by alias
-func workload install templates-node@1.0.0
+func workload install node-templates@1.0.0
 ```
 
 Preview / experimental channels resolve via the matching prerelease
 label:
 
 ```bash
-func workload install templates-node@1.0.0-preview
-func workload install templates-node@1.0.0-experimental
+func workload install node-templates@1.0.0-preview
+func workload install node-templates@1.0.0-experimental
 ```
 
 Multiple templates versions coexist via `--force` (Workload Spec §4.6).
