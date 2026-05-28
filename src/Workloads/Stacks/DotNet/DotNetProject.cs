@@ -12,17 +12,20 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// </summary>
 internal abstract class DotNetProject(WorkingDirectory workingDirectory) : FunctionsProject
 {
-    private static readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload("dotnet");
+    private const string DotNetStack = "dotnet";
+    private const string DotNetStackDisplayName = ".NET";
+    private const string DotNetIsolatedRuntime = "dotnet-isolated";
 
     private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override string StackName => "dotnet";
+    public override string StackName => DotNetStack;
 
-    public override string StackDisplayName => ".NET";
+    public override string StackDisplayName => DotNetStackDisplayName;
 
     public override bool SupportsExtensionBundles => false;
 
-    public override FunctionsWorkerReference WorkerReference => _workerReference;
+    public override FunctionsWorkerReference WorkerReference
+        => FunctionsWorkerReference.FromWorkerInfo(DotNetStack, DotNetIsolatedRuntime, _workingDirectory.Info.FullName);
 }
