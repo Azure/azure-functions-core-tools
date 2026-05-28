@@ -37,17 +37,26 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Stack, cancellationToken);
-        if (rows.Count == 0)
+        string? installDir = context.InstallDirectory;
+        if (installDir is null)
         {
-            return [];
+            // Fallback for callers that invoke the provider directly
+            // (e.g. unit tests with no orchestrator). Pick the highest
+            // installed version across all channels — channel matching
+            // is the orchestrator's responsibility (§4.8.1).
+            IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Stack, cancellationToken);
+            if (rows.Count == 0)
+            {
+                return [];
+            }
+
+            installDir = rows
+                .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
+                .First()
+                .InstallDirectory;
         }
 
-        InstalledTemplatesWorkload selected = rows
-            .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
-            .First();
-
-        V2Payload? payload = V2PayloadReader.Load(selected.InstallDirectory);
+        V2Payload? payload = V2PayloadReader.Load(installDir);
         if (payload is null)
         {
             return [];
@@ -74,19 +83,26 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);
 
-        IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Template.Stack, cancellationToken);
-        if (rows.Count == 0)
+        string? installDir = context.InstallDirectory;
+        if (installDir is null)
         {
-            return new TemplateApplicationResult.Failed(
-                new TemplateApplicationFailure.ProviderError(
-                    $"No installed templates workload found for stack '{context.Template.Stack}'.", null));
+            // Same fallback as ListTemplatesAsync — used only when the
+            // provider is invoked outside the orchestrator.
+            IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Template.Stack, cancellationToken);
+            if (rows.Count == 0)
+            {
+                return new TemplateApplicationResult.Failed(
+                    new TemplateApplicationFailure.ProviderError(
+                        $"No installed templates workload found for stack '{context.Template.Stack}'.", null));
+            }
+
+            installDir = rows
+                .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
+                .First()
+                .InstallDirectory;
         }
 
-        InstalledTemplatesWorkload selected = rows
-            .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
-            .First();
-
-        V2Payload? payload = V2PayloadReader.Load(selected.InstallDirectory);
+        V2Payload? payload = V2PayloadReader.Load(installDir);
         NewTemplate? raw = payload?.Templates.FirstOrDefault(t =>
             string.Equals(t.Id, context.Template.Id, StringComparison.OrdinalIgnoreCase));
 
@@ -94,7 +110,7 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
         {
             return new TemplateApplicationResult.Failed(
                 new TemplateApplicationFailure.ProviderError(
-                    $"Template '{context.Template.Id}' was not found in the v2 payload at '{selected.InstallDirectory}'.",
+                    $"Template '{context.Template.Id}' was not found in the v2 payload at '{installDir}'.",
                     null));
         }
 

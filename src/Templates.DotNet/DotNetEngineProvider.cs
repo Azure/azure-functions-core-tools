@@ -38,17 +38,26 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Stack, cancellationToken);
-        if (rows.Count == 0)
+        string? installDir = context.InstallDirectory;
+        if (installDir is null)
         {
-            return [];
+            // Fallback for callers that invoke the provider directly
+            // (e.g. unit tests with no orchestrator). DotNet has no channel
+            // axis (templates-workload-spec § 4.4.3) so highest-installed is
+            // the right pick.
+            IReadOnlyList<InstalledTemplatesWorkload> rows = await _installed.ListInstalledAsync(context.Stack, cancellationToken);
+            if (rows.Count == 0)
+            {
+                return [];
+            }
+
+            installDir = rows
+                .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
+                .First()
+                .InstallDirectory;
         }
 
-        InstalledTemplatesWorkload selected = rows
-            .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
-            .First();
-
-        DotNetTemplatesIndex? index = DotNetPayloadReader.Load(selected.InstallDirectory);
+        DotNetTemplatesIndex? index = DotNetPayloadReader.Load(installDir);
         if (index is null)
         {
             return [];

@@ -143,7 +143,8 @@ internal sealed class NewCommandRunner
             template,
             functionName,
             resolved.Language,
-            invocation.Force);
+            invocation.Force,
+            resolved.Workload.InstallDirectory);
 
         ParseResult emptyParseResult = new RootCommand().Parse(string.Empty);
         TemplateApplicationResult applyResult = await provider.ApplyAsync(context, emptyParseResult, cancellationToken);
@@ -368,7 +369,11 @@ internal sealed class NewCommandRunner
         ResolvedContext resolved,
         CancellationToken cancellationToken)
     {
-        var listContext = new TemplateListContext(resolved.WorkingDirectory, resolved.Stack, resolved.Language);
+        var listContext = new TemplateListContext(
+            resolved.WorkingDirectory,
+            resolved.Stack,
+            resolved.Language,
+            resolved.Workload.InstallDirectory);
         List<FunctionTemplateInfo> templates = [];
         foreach (ITemplateEngineProvider provider in _engineProviders.Providers)
         {
