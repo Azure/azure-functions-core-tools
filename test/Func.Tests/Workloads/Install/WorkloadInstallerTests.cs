@@ -638,12 +638,66 @@ public sealed class WorkloadInstallerTests : IDisposable
 
     private WorkloadInstaller NewInstaller() => new(_paths, _store, _metadataReader, _catalog);
 
+    [Fact]
+    public async Task InstallFromPackage_HostPackage_SetsExecutableBitOnHostBinary_OnUnix()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string nupkg = BuildNupkg(
+            id: "Azure.Functions.Cli.Workloads.Host.osx-arm64",
+            payloadFileName: "Azure.Functions.Cli.Workloads.Host");
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+
+        string hostBinary = Path.Combine(
+            _paths.GetInstallDirectory(result.Entry.PackageId, result.Entry.PackageVersion),
+            "tools", "any", "Azure.Functions.Cli.Workloads.Host");
+
+        Assert.True(File.Exists(hostBinary));
+        UnixFileMode mode = File.GetUnixFileMode(hostBinary);
+        Assert.True(mode.HasFlag(UnixFileMode.UserExecute));
+        Assert.True(mode.HasFlag(UnixFileMode.GroupExecute));
+        Assert.True(mode.HasFlag(UnixFileMode.OtherExecute));
+    }
+
+    [Fact]
+    public async Task InstallFromPackage_NonHostPackage_DoesNotChmodPayload_OnUnix()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // A non-host package that happens to ship a file at the same
+        // relative path must not be touched: only Host.* packages opt in.
+        string nupkg = BuildNupkg(
+            id: "Some.Other.Workload",
+            payloadFileName: "Azure.Functions.Cli.Workloads.Host");
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+
+        string payload = Path.Combine(
+            _paths.GetInstallDirectory(result.Entry.PackageId, result.Entry.PackageVersion),
+            "tools", "any", "Azure.Functions.Cli.Workloads.Host");
+
+        Assert.True(File.Exists(payload));
+        UnixFileMode mode = File.GetUnixFileMode(payload);
+        Assert.False(mode.HasFlag(UnixFileMode.UserExecute));
+    }
+
     private string BuildNupkg(
         string? tags = null,
         bool includeFuncCliWorkloadType = true,
         string version = "1.0.0",
         string? title = null,
         string description = "For tests.",
+        string id = "Test.Workload",
+        string payloadFileName = "Test.dll",
         IEnumerable<(string SourcePath, string TargetPath)>? extraFiles = null)
     {
         string stubAssembly = Path.Combine(_root, $"stub-{Guid.NewGuid():N}.dll");
@@ -651,7 +705,7 @@ public sealed class WorkloadInstallerTests : IDisposable
 
         var builder = new PackageBuilder
         {
-            Id = "Test.Workload",
+            Id = id,
             Version = NuGetVersion.Parse(version),
             Description = description,
         };
@@ -676,7 +730,7 @@ public sealed class WorkloadInstallerTests : IDisposable
         builder.Files.Add(new PhysicalPackageFile
         {
             SourcePath = stubAssembly,
-            TargetPath = $"tools/{NuGetFramework.Parse("any").GetShortFolderName()}/Test.dll",
+            TargetPath = $"tools/{NuGetFramework.Parse("any").GetShortFolderName()}/{payloadFileName}",
         });
 
         if (extraFiles is not null)
@@ -687,7 +741,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             }
         }
 
-        string path = Path.Combine(_root, $"Test.Workload.{Guid.NewGuid():N}.nupkg");
+        string path = Path.Combine(_root, $"{id}.{Guid.NewGuid():N}.nupkg");
         using (FileStream stream = File.Create(path))
         {
             builder.Save(stream);

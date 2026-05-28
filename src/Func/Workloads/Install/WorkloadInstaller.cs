@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -119,6 +120,7 @@ internal sealed class WorkloadInstaller(
                 $"Extracting workload '{packageId}' {version}"));
 
             await ExtractPackageAsync(reader, installPath, cancellationToken);
+            EnsureHostExecutableBit(installPath, packageId);
 
             WorkloadMetadata metadata = _metadataReader.Read(installPath);
 
@@ -450,6 +452,7 @@ internal sealed class WorkloadInstaller(
                 $"Extracting workload '{newPackageId}' {newVersion}"));
 
             await ExtractPackageAsync(reader, stagingPath, cancellationToken);
+            EnsureHostExecutableBit(stagingPath, newPackageId);
             WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
 
             WorkloadEntry newEntry = new()
@@ -522,6 +525,44 @@ internal sealed class WorkloadInstaller(
                 $"Failed to read .nupkg at '{nupkgPath}': {ex.Message}",
                 ex);
         }
+    }
+
+    /// <summary>
+    /// Targeted workaround: NuGet's zip extraction does not preserve Unix
+    /// mode bits, so the host apphost lands without the execute bit and
+    /// the launcher fails with "Permission denied". We narrowly chmod the
+    /// single well-known host binary path, and only for the host workload
+    /// package family (<c>Azure.Functions.Cli.Workloads.Host.*</c>), so no
+    /// other package can use this code path to mark files executable.
+    /// A general per-package executables mechanism can replace this later.
+    /// </summary>
+    private static void EnsureHostExecutableBit(string installPath, string packageId)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        if (!packageId.StartsWith(HostWorkloadPackage.PackageIdPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        string hostBinary = Path.Combine(
+            installPath,
+            "tools",
+            "any",
+            HostProcessStartInfoFactory.ExecutableBaseName);
+
+        if (!File.Exists(hostBinary))
+        {
+            return;
+        }
+
+        UnixFileMode mode = File.GetUnixFileMode(hostBinary);
+        File.SetUnixFileMode(
+            hostBinary,
+            mode | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
     }
 
     private static async Task ExtractPackageAsync(PackageArchiveReader reader, string destination, CancellationToken cancellationToken)
