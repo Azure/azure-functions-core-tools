@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Quickstart;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Quickstart;
@@ -11,13 +12,21 @@ namespace Azure.Functions.Cli.Tests.Commands.Quickstart;
 public class QuickstartCommandTests
 {
     private readonly TestInteractionService _interaction = new();
+    private readonly IQuickstartProviderResolver _resolver = Substitute.For<IQuickstartProviderResolver>();
+    private readonly IQuickstartManifestService _manifestService = Substitute.For<IQuickstartManifestService>();
+    private readonly IQuickstartScaffolder _scaffolder = Substitute.For<IQuickstartScaffolder>();
+
+    private QuickstartCommand CreateCommand(params IQuickstartProvider[] providers)
+    {
+        var listCmd = new QuickstartListCommand(_interaction, _resolver, _manifestService);
+        var infoCmd = new QuickstartInfoCommand(_interaction, _resolver, _manifestService);
+        return new QuickstartCommand(listCmd, infoCmd, _interaction, _resolver, _manifestService, _scaffolder, providers);
+    }
 
     [Fact]
     public void QuickstartCommand_HasExpectedOptions()
     {
-        var listCmd = new QuickstartListCommand(_interaction, []);
-        var infoCmd = new QuickstartInfoCommand(_interaction, []);
-        var cmd = new QuickstartCommand(listCmd, infoCmd, _interaction, []);
+        QuickstartCommand cmd = CreateCommand();
 
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
@@ -28,14 +37,13 @@ public class QuickstartCommandTests
         Assert.Contains("--iac", optionNames);
         Assert.Contains("--search", optionNames);
         Assert.Contains("--fetch", optionNames);
+        Assert.Contains("--force", optionNames);
     }
 
     [Fact]
     public void QuickstartCommand_HasSubcommands()
     {
-        var listCmd = new QuickstartListCommand(_interaction, []);
-        var infoCmd = new QuickstartInfoCommand(_interaction, []);
-        var cmd = new QuickstartCommand(listCmd, infoCmd, _interaction, []);
+        QuickstartCommand cmd = CreateCommand();
 
         var subcommandNames = cmd.Subcommands.Select(c => c.Name).ToList();
 
@@ -46,9 +54,7 @@ public class QuickstartCommandTests
     [Fact]
     public void QuickstartCommand_HasPathArgument()
     {
-        var listCmd = new QuickstartListCommand(_interaction, []);
-        var infoCmd = new QuickstartInfoCommand(_interaction, []);
-        var cmd = new QuickstartCommand(listCmd, infoCmd, _interaction, []);
+        QuickstartCommand cmd = CreateCommand();
 
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);

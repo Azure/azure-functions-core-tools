@@ -19,7 +19,6 @@ internal sealed class QuickstartManifestService(
     TimeProvider timeProvider,
     ILogger<QuickstartManifestService> logger) : IQuickstartManifestService
 {
-    private const string GitRefPrefix = "v";
     private const string HttpSchemePrefix = "http";
 
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
@@ -220,7 +219,7 @@ internal sealed class QuickstartManifestService(
     private static bool HasValidGitRef(QuickstartEntry entry)
     {
         return entry.GitRef is not null
-            && entry.GitRef.StartsWith(GitRefPrefix, StringComparison.Ordinal);
+            && entry.GitRef.StartsWith(QuickstartConstants.TagRefPrefix, StringComparison.Ordinal);
     }
 
     private static List<QuickstartEntry>? DeserializeEntries(string json)

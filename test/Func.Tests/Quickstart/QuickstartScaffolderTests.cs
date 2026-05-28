@@ -90,28 +90,23 @@ public class QuickstartScaffolderTests : IDisposable
     }
 
     [Fact]
-    public async Task ScaffoldAsync_BranchRef_ThrowsInvalidOperationException()
+    public async Task ScaffoldAsync_BranchRef_ThrowsArgumentException()
     {
-        // fetch with refs/tags/ refspec fails when the ref is a branch (no matching tag)
-        var branchRunner = new FakeGitRunner(onRun: (args, _) =>
-        {
-            if (args.Contains("fetch"))
-            {
-                throw new GitRunnerException(128, "", "fatal: couldn't find remote ref", "fetch");
-            }
-        });
-        ITemplateFetcher gitFetcher = new GitTemplateFetcher(branchRunner, NullLogger<GitTemplateFetcher>.Instance);
-        IFetchModeResolver resolver = new FetchModeResolver(branchRunner);
-        var scaffolder = new QuickstartScaffolder(
-            [gitFetcher],
-            resolver,
-            NullLogger<QuickstartScaffolder>.Instance);
-        QuickstartEntry entry = CreateEntry(gitRef: "main");
+        QuickstartEntry entry = CreateEntry(gitRef: "refs/heads/main");
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("not a tag", ex.Message);
-        Assert.Contains("Branch refs", ex.Message);
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        Assert.Contains("not a tag ref", ex.Message);
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_BareTagName_ThrowsArgumentException()
+    {
+        QuickstartEntry entry = CreateEntry(gitRef: "v1.0.0");
+
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        Assert.Contains("not a tag ref", ex.Message);
     }
 
     [Fact]
@@ -131,17 +126,6 @@ public class QuickstartScaffolderTests : IDisposable
 
         ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
             () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("no GitRef", ex.Message);
-    }
-
-    [Fact]
-    public async Task GitTemplateFetcher_NullGitRef_ThrowsArgumentException()
-    {
-        var fetcher = new GitTemplateFetcher(_gitRunner, NullLogger<GitTemplateFetcher>.Instance);
-        QuickstartEntry entry = CreateEntry(gitRef: null);
-
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => fetcher.FetchAsync(entry, _targetDir, CancellationToken.None));
         Assert.Contains("no GitRef", ex.Message);
     }
 
@@ -439,7 +423,7 @@ public class QuickstartScaffolderTests : IDisposable
     }
 
     private static QuickstartEntry CreateEntry(
-        string? gitRef = "v1.0.0",
+        string? gitRef = "refs/tags/v1.0.0",
         string folderPath = ".",
         string repositoryUrl = "https://github.com/Azure-Samples/functions-quickstart")
     {
@@ -458,3 +442,4 @@ public class QuickstartScaffolderTests : IDisposable
             Priority: 1);
     }
 }
+

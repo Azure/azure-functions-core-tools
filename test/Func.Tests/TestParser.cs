@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -99,6 +100,11 @@ internal static class TestParser
         // resolve without standing up the real install/uninstall side effects.
         services.AddSingleton(Substitute.For<Cli.Workloads.Install.IWorkloadInstaller>());
         services.AddSingleton(Substitute.For<Cli.Workloads.Catalog.IWorkloadCatalog>());
+
+        // Quickstart: stub manifest service, scaffolder, and resolver so the command resolves.
+        services.AddSingleton(Substitute.For<IQuickstartManifestService>());
+        services.AddSingleton(Substitute.For<IQuickstartScaffolder>());
+        services.AddSingleton(Substitute.For<IQuickstartProviderResolver>());
 
         return services;
     }
