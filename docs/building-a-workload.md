@@ -385,6 +385,32 @@ private sealed class TestBuilder(IServiceCollection services) : FunctionsCliBuil
 
 Initializers are themselves easy to unit-test: drive them with a temp directory and a synthetic `ParseResult`.
 
+## Debugging
+
+Workloads load into the CLI process via `LoadFromAssemblyPath`, so the
+debugger steps into them as long as the workload's PDB sits next to its DLL
+in the install directory.
+
+The `Run func cli (debug workload)` launch config in `.vscode/launch.json`
+wires this up:
+
+1. It sets `FUNC_CLI_WORKLOADS_HOME=${workspaceFolder}/.debug-workloads`
+   so debugging never touches your real workload home.
+2. The `build-and-deploy-workload` preLaunchTask rebuilds Func and runs
+   `eng/scripts/deploy-workload-for-debug.ps1`, which copies the freshly
+   built workload DLL + PDB into
+   `.debug-workloads/workloads/<id>/<version>/tools/any/`.
+3. F5 then launches `func` with your args. Breakpoints in both Func and
+   the workload source bind once the workload loads.
+
+The workload must be installed into `.debug-workloads` once before the
+script can redeploy bits over it:
+
+```pwsh
+$env:FUNC_CLI_WORKLOADS_HOME = "$PWD/.debug-workloads"
+func workload install <path-to-nupkg>
+```
+
 ## Solution + CI
 
 Add the project (and its test project) to the solution:

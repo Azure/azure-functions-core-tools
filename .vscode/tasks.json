@@ -34,6 +34,43 @@
                 "${workspaceFolder}/src/Func/Func.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "deploy-workload-for-debug",
+            "command": "pwsh",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-File",
+                "${workspaceFolder}/eng/scripts/deploy-workload-for-debug.ps1",
+                "-WorkloadProject",
+                "${input:debugWorkloadProject}",
+                "-WorkloadsHome",
+                "${workspaceFolder}/.debug-workloads"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-and-deploy-workload",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "build",
+                "deploy-workload-for-debug"
+            ],
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "debugWorkloadProject",
+            "type": "pickString",
+            "description": "Workload csproj to rebuild and redeploy before launch",
+            "options": [
+                "${workspaceFolder}/src/Workloads/Stacks/Node/Workloads.Node.csproj",
+                "${workspaceFolder}/src/Workloads/Stacks/Python/Workloads.Python.csproj",
+                "${workspaceFolder}/src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj",
+                "${workspaceFolder}/src/Workloads/Stacks/Go/Workloads.Go.csproj"
+            ]
         }
     ]
 }
