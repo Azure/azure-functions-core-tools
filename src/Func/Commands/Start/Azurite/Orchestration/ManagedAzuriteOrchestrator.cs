@@ -114,6 +114,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
                     .Muted("Using existing Azurite endpoint at ")
                     .Path(endpoints.BlobEndpoint.ToString())
                     .Muted("."));
+                _interaction.WriteBlankLine();
                 return new ManagedAzuriteResult.UserManaged(endpoints, "Endpoints already responded with storage-shaped replies.");
 
             case AzuriteProbeStatus.PortConflict:
