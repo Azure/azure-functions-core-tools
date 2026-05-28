@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Http;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Telemetry;
@@ -111,6 +112,7 @@ internal static class CliHostFactory
 
         builder.Services.AddCliHttpDefaults();
         builder.Services.AddBuiltInCommands();
+        builder.Services.AddFirstRunExperience();
         builder.Services.AddQuickstartScaffolder();
         builder.Services.AddWorkloadStorage();
         builder.Services.AddProfiles();
