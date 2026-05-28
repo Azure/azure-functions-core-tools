@@ -1,7 +1,7 @@
-name: V5 Bug Bash Report
-description: Report a bug, issue, or suggestion from the Azure Functions CLI v5 bug bash.
-title: "[v5 bug bash] "
-labels: ["v5", "bug-bash"]
+name: V5 Bug Report
+description: Report a bug or issue with the Azure Functions CLI v5.
+title: "[v5] "
+labels: ["v5"]
 body:
 - id: version
   type: textarea
@@ -26,7 +26,7 @@ body:
   type: textarea
   attributes:
     label: Description
-    placeholder: Description of the bug, issue, or suggestion.
+    placeholder: Description of the bug or issue.
   validations:
     required: true
 - id: repro
