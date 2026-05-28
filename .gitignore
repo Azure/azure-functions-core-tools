@@ -491,3 +491,9 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Local workload install dir used by the "Run func cli (debug workload)" launch config
+.debug-workloads/
+
+# func init scratch dir in the worktree
+MyTestApp/

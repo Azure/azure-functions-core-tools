@@ -16,6 +16,38 @@
             "stopAtEntry": false
         },
         {
+            "name": "Run func cli (debug workload)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-and-deploy-workload",
+            "program": "${workspaceFolder}/out/bin/Func/debug/func.dll",
+            "env": {
+                "CLI_DEBUG": "1",
+                "FUNC_CLI_WORKLOADS_HOME": "${workspaceFolder}/.debug-workloads"
+            },
+            "args": "${input:funcArgs}",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false,
+            "justMyCode": false
+        },
+        {
+            "name": "Run func cli (debug workload, auto-install)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-and-deploy-workload (auto-install)",
+            "program": "${workspaceFolder}/out/bin/Func/debug/func.dll",
+            "env": {
+                "CLI_DEBUG": "1",
+                "FUNC_CLI_WORKLOADS_HOME": "${workspaceFolder}/.debug-workloads"
+            },
+            "args": "${input:funcArgs}",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false,
+            "justMyCode": false
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"

@@ -34,6 +34,66 @@
                 "${workspaceFolder}/src/Func/Func.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "deploy-workload-for-debug",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${input:debugWorkloadProject}",
+                "-t:DeployForDebug",
+                "-p:FuncCliWorkloadsHome=${workspaceFolder}/.debug-workloads",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "deploy-workload-for-debug (auto-install)",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${input:debugWorkloadProject}",
+                "-t:DeployForDebug",
+                "-p:FuncCliWorkloadsHome=${workspaceFolder}/.debug-workloads",
+                "-p:FuncCliEnsureWorkloadInstalled=true",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-and-deploy-workload",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "build",
+                "deploy-workload-for-debug"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "build-and-deploy-workload (auto-install)",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "build",
+                "deploy-workload-for-debug (auto-install)"
+            ],
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "debugWorkloadProject",
+            "type": "pickString",
+            "description": "Workload csproj to rebuild and redeploy before launch",
+            "options": [
+                "${workspaceFolder}/src/Workloads/Stacks/Node/Workloads.Node.csproj",
+                "${workspaceFolder}/src/Workloads/Stacks/Python/Workloads.Python.csproj",
+                "${workspaceFolder}/src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj",
+                "${workspaceFolder}/src/Workloads/Stacks/Go/Workloads.Go.csproj"
+            ]
         }
     ]
 }
