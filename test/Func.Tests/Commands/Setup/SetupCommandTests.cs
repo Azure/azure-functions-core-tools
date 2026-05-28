@@ -52,6 +52,16 @@ public sealed class SetupCommandTests : IDisposable
     }
 
     [Fact]
+    public void SetupCommand_FeaturesHelp_UsesDotnetFeatureName()
+    {
+        var cmd = new SetupCommand(Substitute.For<ISetupRunner>());
+        string description = cmd.FeaturesOption.Description ?? string.Empty;
+
+        Assert.Contains("dotnet", description);
+        Assert.DoesNotContain("dotnet-isolated", description);
+    }
+
+    [Fact]
     public void SetupCommand_RegisteredInParser()
     {
         var root = TestParser.CreateRoot(_interaction);
