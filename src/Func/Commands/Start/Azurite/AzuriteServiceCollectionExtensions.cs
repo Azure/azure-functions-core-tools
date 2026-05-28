@@ -29,4 +29,20 @@ internal static class AzuriteServiceCollectionExtensions
         services.AddSingleton<IAzuriteProbe, AzuriteProbe>();
         return services;
     }
+
+    /// <summary>
+    /// Registers <see cref="IClock"/> and <see cref="IAzuriteManagedPathsProvider"/>
+    /// for resolving managed-Azurite on-disk locations. The path provider
+    /// reads <c>&lt;funcHome&gt;</c> from <see cref="Configuration.CliConfigurationPathsOptions"/>,
+    /// which is registered separately by the CLI host.
+    /// </summary>
+    public static IServiceCollection AddAzuriteManagedPaths(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IAzuriteManagedPathsProvider, AzuriteManagedPathsProvider>();
+
+        return services;
+    }
 }
