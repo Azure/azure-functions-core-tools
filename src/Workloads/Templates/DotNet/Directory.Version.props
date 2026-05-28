@@ -5,12 +5,29 @@
     (see proposed/templates-workload-spec.md §4.4.3). The pkg version
     follows its own SemVer cadence, independent of the upstream
     Microsoft.Azure.Functions.Worker.ItemTemplates NuGet pin (which
-    lives in content/source.json).
+    is exposed below and written into content/source.json at pack time).
+
+      $(TemplatesVersion)               Workload pkg version (3-part SemVer).
+                                        Drives $(VersionPrefix).
+      $(SourceItemTemplatesPackageId)   Upstream NuGet template package id
+                                        that the workload hydrates from at
+                                        build time (Templates Workload Spec
+                                        §6.3 step 1).
+      $(SourceItemTemplatesVersion)     Upstream NuGet template package
+                                        version. Drives the dotnet new
+                                        install during the hydrate step and
+                                        is written into content/source.json
+                                        so the CLI core knows which pkg to
+                                        provision into the dotnet template
+                                        hive at func workload install time.
   -->
 
   <PropertyGroup>
     <TemplatesVersion>1.0.0</TemplatesVersion>
     <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
+
+    <SourceItemTemplatesPackageId>Microsoft.Azure.Functions.Worker.ItemTemplates</SourceItemTemplatesPackageId>
+    <SourceItemTemplatesVersion>4.0.5569</SourceItemTemplatesVersion>
   </PropertyGroup>
 
 </Project>

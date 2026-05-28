@@ -1,6 +1,0 @@
-{
-  "$schema": "https://aka.ms/func-workloads/templates/v1/source.json/schema.json",
-  "kind": "nuget",
-  "packageId": "Microsoft.Azure.Functions.Worker.ItemTemplates",
-  "version": "TBD"
-}

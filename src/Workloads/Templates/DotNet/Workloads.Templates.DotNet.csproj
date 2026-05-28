@@ -15,8 +15,8 @@
 
   <ItemGroup>
     <None Include="workload.json" Pack="true" PackagePath="/" />
-    <None Include="content/dotnet-templates.json" Pack="true" PackagePath="tools/any/content/" />
-    <None Include="content/source.json"           Pack="true" PackagePath="tools/any/content/" />
   </ItemGroup>
+
+  <Import Project="..\..\..\..\eng\build\Workloads.Templates.DotNet.targets" />
 
 </Project>
