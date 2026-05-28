@@ -12,8 +12,23 @@
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
 
-    <TemplatesStackLanguageFilter>JavaScript;TypeScript</TemplatesStackLanguageFilter>
-    <IncludeV2Templates>false</IncludeV2Templates>
+    <!--
+      Static content source: the v2 Node templates ship as in-repo content
+      under content/v2/. No CDN download for templates happens at pack
+      time. See Templates Workload Spec §6.1.
+
+      FilterTemplatesByBundleChannel=true makes pack also fetch
+      bin/extensions.json from the latest listed bundle of
+      $(TemplatesChannel) (CDN index.json + HTTP-Range zip extraction)
+      and subset templates.json against content/v2/templates/_bindings.json
+      so the published nupkg only carries templates whose extension
+      dependencies are present in the active channel's bundle. See
+      Templates Workload Spec §4.4.2.
+    -->
+    <TemplatesContentSource>static</TemplatesContentSource>
+    <IncludeV1Templates>false</IncludeV1Templates>
+    <IncludeV2Templates>true</IncludeV2Templates>
+    <FilterTemplatesByBundleChannel>true</FilterTemplatesByBundleChannel>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,1757 @@
+[
+  {
+    "author": "Microsoft",
+    "name": "Azure Blob Storage trigger",
+    "description": "$BlobTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Blob Storage trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "storageBlobTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(PATH_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "samples-workitems/{name}"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "BlobTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageBlob('$(FUNCTION_NAME_INPUT)', {\r\n    path: 'samples-workitems/{name}',\r\n    connection: '',\r\n    handler: (blob, context) => {\r\n        context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Blob Storage trigger",
+    "description": "$BlobTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Blob Storage trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "storageBlobTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(PATH_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "samples-workitems/{name}"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "BlobTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(blob: Buffer, context: InvocationContext): Promise<void> {\r\n    context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n}\r\n\r\napp.storageBlob('$(FUNCTION_NAME_INPUT)', {\r\n    path: 'samples-workitems/{name}',\r\n    connection: '',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Cosmos DB trigger",
+    "description": "$CosmosDBTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Cosmos DB trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "cosmosDBTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "cosmosTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(DATABASE_INPUT)",
+            "paramId": "cosmosTrigger-database",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(COLLECTION_INPUT)",
+            "paramId": "cosmosTrigger-collection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(CREATE_LEASE_INPUT)",
+            "paramId": "cosmosTrigger-createLease",
+            "required": true,
+            "defaultValue": "true"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "CosmosDBTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.cosmosDB('$(FUNCTION_NAME_INPUT)', {\r\n    connectionStringSetting: '',\r\n    databaseName: '',\r\n    collectionName: '',\r\n    createLeaseCollectionIfNotExists: true,\r\n    handler: (documents, context) => {\r\n        context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Cosmos DB trigger",
+    "description": "$CosmosDBTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Cosmos DB trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "cosmosDBTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "cosmosTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(DATABASE_INPUT)",
+            "paramId": "cosmosTrigger-database",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(COLLECTION_INPUT)",
+            "paramId": "cosmosTrigger-collection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(CREATE_LEASE_INPUT)",
+            "paramId": "cosmosTrigger-createLease",
+            "required": true,
+            "defaultValue": "true"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "CosmosDBTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(documents: unknown[], context: InvocationContext): Promise<void> {\r\n    context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n}\r\n\r\napp.cosmosDB('$(FUNCTION_NAME_INPUT)', {\r\n    connectionStringSetting: '',\r\n    databaseName: '',\r\n    collectionName: '',\r\n    createLeaseCollectionIfNotExists: true,\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Dapr Publish Output Binding",
+    "description": "$DaprPublishOutputBinding_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Dapr Publish Output Binding (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "daprPublishOutputBinding"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "DaprPublishOutputBinding-JavaScript",
+    "files": {
+      "function.js": "const { app, output, trigger } = require('@azure/functions');\r\n\r\n/**\r\n * Sample Dapr Publish Output Binding\r\n * See https://aka.ms/azure-function-dapr-publish-output-binding for more information about using this binding\r\n *\r\n * These tasks should be completed prior to running :\r\n *      1. Install Dapr\r\n * Run the app with below steps\r\n *      1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n *      2. Function will be invoked by Timer trigger and publish messages to message bus.\r\n */\r\nconst daprPublishOuput = output.generic({\r\n    type: \"daprPublish\",\r\n    name: \"pubEvent\",\r\n    pubsubname: \"pubsub\",\r\n    topic: \"A\"\r\n});\r\n\r\napp.timer('$(FUNCTION_NAME_INPUT)', {\r\n    schedule: '*/10 * * * * *',\r\n    return: daprPublishOuput,\r\n    handler: (myTimer, context) => {\r\n        context.log('JavaScript DaprPublish output binding function processed a request.');\r\n        const message = \"Invoked by Timer trigger: \" + `Hello, World! The time is ${new Date().toISOString()}`;\r\n\r\n        return { payload: message };\r\n    }\r\n});\r\n\r\napp.generic('DaprTopicTriggerNodeV4', {\r\n    trigger: trigger.generic({\r\n        type: \"daprTopicTrigger\",\r\n        pubsubname: \"pubsub\",\r\n        topic: \"A\",\r\n        name: \"subEvent\"\r\n    }),\r\n    handler: async (request, context) => {\r\n        context.log(\"JavaScript Dapr Topic Trigger function processed a request from the Dapr Runtime.\");\r\n        context.log(context.triggerMetadata.subEvent.data);\r\n    }\r\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Dapr Service Invocation Trigger",
+    "description": "$DaprServiceInvocationTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Dapr Service Invocation Trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "daprServiceInvocationTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "DaprServiceInvocationTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app, output, trigger } = require('@azure/functions');\r\n\r\n/**\r\n * Sample Dapr Service Invocation Trigger\r\n * See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n *\r\n * These tasks should be completed prior to running :\r\n *      1. Install Dapr\r\n * Run the app with below steps\r\n *      1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n *      2. Invoke the function app using one of the following options:\r\n *              a) Using the Dapr CLI: dapr invoke --app-id functionapp --method {yourFunctionName}  --data '{ \"data\": {\"value\": { \"orderId\": \"3215\" } } }'\r\n \r\n                b) Utilizing a Dapr Invoke Output Binding:\r\n \r\n                    Invoke-RestMethod -Uri 'http://localhost:7071/api/invoke/functionapp/{yourFunctionName}' -Method POST -Headers @{\r\n                    'Content-Type' = 'application/json'\r\n                    } -Body '{\r\n                    \"data\": {\r\n                        \"value\": {\r\n                            \"orderId\": \"122\"\r\n                            }\r\n                        }\r\n                    }'\r\n */\r\napp.generic('$(FUNCTION_NAME_INPUT)', {\r\n    trigger: trigger.generic({\r\n        type: 'daprServiceInvocationTrigger',\r\n        name: \"payload\"\r\n    }),\r\n    handler: async (request, context) => {\r\n        context.log(\"Azure function triggered by Dapr Service Invocation Trigger.\");\r\n        context.log(`Dapr service invocation trigger payload: ${JSON.stringify(context.triggerMetadata.payload)}`);\r\n    }\r\n});\r\n\r\nconst daprInvokeOuput = output.generic({\r\n    type: \"daprInvoke\",\r\n    appId: \"{appId}\",\r\n    methodName: \"{methodName}\",\r\n    httpVerb: \"post\"\r\n});\r\n\r\napp.http('InvokeOutputBinding', {\r\n    methods: ['GET', 'POST'],\r\n    authLevel: 'anonymous',\r\n    route: \"invoke/{appId}/{methodName}\",\r\n    return: daprInvokeOuput,\r\n    handler: async (request, context) => {\r\n        context.log(`JavaScript HTTP trigger function processed a request.`);\r\n        const payload = request.query.get('name') || await request.text();\r\n\r\n        return { body: payload };\r\n    }\r\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Dapr Topic Trigger",
+    "description": "$DaprTopicTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Dapr Topic Trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "daprTopicTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "DaprTopicTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app, output, trigger } = require('@azure/functions');\r\n\r\n/**\r\n * Sample Dapr Service Invocation Trigger\r\n * See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n *\r\n * These tasks should be completed prior to running :\r\n *      1. Install Dapr\r\n * Run the app with below steps\r\n *      1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n *      2. Invoke function app: dapr publish --pubsub pubsub --publish-app-id functionapp --topic A --data '{\"value\": { \"orderId\": \"42\" } }'\r\n */\r\nconst daprStateOuput = output.generic({\r\n    type: \"daprState\",\r\n    stateStore: \"statestore\",\r\n    direction: \"out\",\r\n    key: \"product\"\r\n});\r\n\r\napp.generic('$(FUNCTION_NAME_INPUT)', {\r\n    trigger: trigger.generic({\r\n        type: \"daprTopicTrigger\",\r\n        pubsubname: \"pubsub\",\r\n        topic: \"A\",\r\n        name: \"subEvent\"\r\n    }),\r\n    return: daprStateOuput,\r\n    handler: async (request, context) => {\r\n        context.log(\"JavaScript DaprTopic trigger with DaprState output binding function processed a request.\");\r\n        context.log(context.triggerMetadata.subEvent.data);\r\n\r\n        return context.triggerMetadata.subEvent.data;\r\n    }\r\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Durable Functions entity",
+    "description": "$DurableFunctionsEntity_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Durable Functions entity (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "counter"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "DurableFunctionsEntity-JavaScript",
+    "files": {
+      "function.js": "const { app, HttpResponse } = require('@azure/functions');\r\nconst df = require('durable-functions');\r\n\r\nconst entityName = '$(FUNCTION_NAME_INPUT)';\r\n\r\ndf.app.entity(entityName, (context) => {\r\n    const currentValue = context.df.getState(() => 0);\r\n    switch (context.df.operationName) {\r\n        case 'add':\r\n            const amount = context.df.getInput();\r\n            context.df.setState(currentValue + amount);\r\n            break;\r\n        case 'reset':\r\n            context.df.setState(0);\r\n            break;\r\n        case 'get':\r\n            context.df.return(currentValue);\r\n            break;\r\n    }\r\n});\r\n\r\napp.http('$(FUNCTION_NAME_INPUT)HttpStart', {\r\n    route: `${entityName}/{id}`,\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: async (req, context) => {\r\n        const id = req.params.id;\r\n        const entityId = new df.EntityId(entityName, id);\r\n        const client = df.getClient(context);\r\n\r\n        if (req.method === 'POST') {\r\n            // increment value\r\n            await client.signalEntity(entityId, 'add', 1);\r\n        } else {\r\n            // read current state of entity\r\n            const stateResponse = await client.readEntityState(entityId);\r\n            return new HttpResponse({\r\n                jsonBody: stateResponse.entityState,\r\n            });\r\n        }\r\n    },\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Durable Functions entity",
+    "description": "$DurableFunctionsEntity_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Durable Functions entity (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "counter"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "DurableFunctionsEntity-TypeScript",
+    "files": {
+      "function.ts": "import { app, HttpHandler, HttpRequest, HttpResponse, InvocationContext } from '@azure/functions';\r\nimport * as df from 'durable-functions';\r\nimport { EntityContext, EntityHandler } from 'durable-functions';\r\n\r\nconst entityName = '$(FUNCTION_NAME_INPUT)';\r\n\r\nconst $(FUNCTION_NAME_INPUT): EntityHandler<number> = (context: EntityContext<number>) => {\r\n    const currentValue: number = context.df.getState(() => 0);\r\n    switch (context.df.operationName) {\r\n        case 'add':\r\n            const amount: number = context.df.getInput();\r\n            context.df.setState(currentValue + amount);\r\n            break;\r\n        case 'reset':\r\n            context.df.setState(0);\r\n            break;\r\n        case 'get':\r\n            context.df.return(currentValue);\r\n            break;\r\n    }\r\n};\r\ndf.app.entity(entityName, $(FUNCTION_NAME_INPUT));\r\n\r\nconst $(FUNCTION_NAME_INPUT)HttpStart: HttpHandler = async (req: HttpRequest, context: InvocationContext): Promise<HttpResponse> => {\r\n    const id: string = req.params.id;\r\n    const entityId = new df.EntityId(entityName, id);\r\n    const client = df.getClient(context);\r\n\r\n    if (req.method === 'POST') {\r\n        // increment value\r\n        await client.signalEntity(entityId, 'add', 1);\r\n    } else {\r\n        // read current state of entity\r\n        const stateResponse = await client.readEntityState(entityId);\r\n        return new HttpResponse({\r\n            jsonBody: stateResponse.entityState,\r\n        });\r\n    }\r\n};\r\napp.http('$(FUNCTION_NAME_INPUT)HttpStart', {\r\n    route: `${entityName}/{id}`,\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: $(FUNCTION_NAME_INPUT)HttpStart,\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Durable Functions orchestrator",
+    "description": "$DurableFunctionsOrchestrator_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Durable Functions orchestrator (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "durableHello"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "DurableFunctionsOrchestrator-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\nconst df = require('durable-functions');\r\n\r\nconst activityName = '$(FUNCTION_NAME_INPUT)';\r\n\r\ndf.app.orchestration('$(FUNCTION_NAME_INPUT)Orchestrator', function* (context) {\r\n    const outputs = [];\r\n    outputs.push(yield context.df.callActivity(activityName, 'Tokyo'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Seattle'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Cairo'));\r\n\r\n    return outputs;\r\n});\r\n\r\ndf.app.activity(activityName, {\r\n    handler: (input) => {\r\n        return `Hello, ${input}`;\r\n    },\r\n});\r\n\r\napp.http('$(FUNCTION_NAME_INPUT)HttpStart', {\r\n    route: 'orchestrators/{orchestratorName}',\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: async (request, context) => {\r\n        const client = df.getClient(context);\r\n        const body = await request.text();\r\n        const instanceId = await client.startNew(request.params.orchestratorName, { input: body });\r\n\r\n        context.log(`Started orchestration with ID = '${instanceId}'.`);\r\n\r\n        return client.createCheckStatusResponse(request, instanceId);\r\n    },\r\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Durable Functions orchestrator",
+    "description": "$DurableFunctionsOrchestrator_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Durable Functions orchestrator (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "durableHello"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "DurableFunctionsOrchestrator-TypeScript",
+    "files": {
+      "function.ts": "import { app, HttpHandler, HttpRequest, HttpResponse, InvocationContext } from '@azure/functions';\r\nimport * as df from 'durable-functions';\r\nimport { ActivityHandler, OrchestrationContext, OrchestrationHandler } from 'durable-functions';\r\n\r\nconst activityName = '$(FUNCTION_NAME_INPUT)';\r\n\r\nconst $(FUNCTION_NAME_INPUT)Orchestrator: OrchestrationHandler = function* (context: OrchestrationContext) {\r\n    const outputs = [];\r\n    outputs.push(yield context.df.callActivity(activityName, 'Tokyo'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Seattle'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Cairo'));\r\n\r\n    return outputs;\r\n};\r\ndf.app.orchestration('$(FUNCTION_NAME_INPUT)Orchestrator', $(FUNCTION_NAME_INPUT)Orchestrator);\r\n\r\nconst $(FUNCTION_NAME_INPUT): ActivityHandler = (input: string): string => {\r\n    return `Hello, ${input}`;\r\n};\r\ndf.app.activity(activityName, { handler: $(FUNCTION_NAME_INPUT) });\r\n\r\nconst $(FUNCTION_NAME_INPUT)HttpStart: HttpHandler = async (request: HttpRequest, context: InvocationContext): Promise<HttpResponse> => {\r\n    const client = df.getClient(context);\r\n    const body: unknown = await request.text();\r\n    const instanceId: string = await client.startNew(request.params.orchestratorName, { input: body });\r\n\r\n    context.log(`Started orchestration with ID = '${instanceId}'.`);\r\n\r\n    return client.createCheckStatusResponse(request, instanceId);\r\n};\r\n\r\napp.http('$(FUNCTION_NAME_INPUT)HttpStart', {\r\n    route: 'orchestrators/{orchestratorName}',\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: $(FUNCTION_NAME_INPUT)HttpStart,\r\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Blob Storage trigger (using Event Grid)",
+    "description": "$BlobTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Blob Storage trigger (using Event Grid) (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "eventGridBlobTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(PATH_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "samples-workitems/{name}"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "EventGridBlobTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageBlob('$(FUNCTION_NAME_INPUT)', {\r\n    path: 'samples-workitems/{name}',\r\n    source: 'EventGrid',\r\n    connection: '',\r\n    handler: (blob, context) => {\r\n        context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Blob Storage trigger (using Event Grid)",
+    "description": "$BlobTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Blob Storage trigger (using Event Grid) (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "eventGridBlobTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(PATH_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "samples-workitems/{name}"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "EventGridBlobTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(blob: Buffer, context: InvocationContext): Promise<void> {\r\n    context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n}\r\n\r\napp.storageBlob('$(FUNCTION_NAME_INPUT)', {\r\n    path: 'samples-workitems/{name}',\r\n    source: 'EventGrid',\r\n    connection: '',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Event Grid trigger",
+    "description": "$EventGridTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Event Grid trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "eventGridTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "EventGridTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.eventGrid('$(FUNCTION_NAME_INPUT)', {\r\n    handler: (event, context) => {\r\n        context.log('Event grid function processed event:', event);\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Event Grid trigger",
+    "description": "$EventGridTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Event Grid trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "eventGridTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "EventGridTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, EventGridEvent, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(event: EventGridEvent, context: InvocationContext): Promise<void> {\r\n    context.log('Event grid function processed event:', event);\r\n}\r\n\r\napp.eventGrid('$(FUNCTION_NAME_INPUT)', {\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Event Hub trigger",
+    "description": "$EventHubTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Event Hub trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "eventHubTrigger"
+          },
+          {
+            "assignTo": "$(EVENT_HUB_NAME_INPUT)",
+            "paramId": "eventHubTrigger-name",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "EventHubTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.eventHub('$(FUNCTION_NAME_INPUT)', {\r\n    connection: '',\r\n    eventHubName: 'samples-workitems',\r\n    cardinality: 'many',\r\n    handler: (messages, context) => {\r\n        if (Array.isArray(messages)) {\r\n            context.log(`Event hub function processed ${messages.length} messages`);\r\n            for (const message of messages) {\r\n                context.log('Event hub message:', message);\r\n            }\r\n        } else {\r\n            context.log('Event hub function processed message:', messages);\r\n        }\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Event Hub trigger",
+    "description": "$EventHubTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Event Hub trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "eventHubTrigger"
+          },
+          {
+            "assignTo": "$(EVENT_HUB_NAME_INPUT)",
+            "paramId": "eventHubTrigger-name",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "EventHubTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(messages: unknown | unknown[], context: InvocationContext): Promise<void> {\r\n    if (Array.isArray(messages)) {\r\n        context.log(`Event hub function processed ${messages.length} messages`);\r\n        for (const message of messages) {\r\n            context.log('Event hub message:', message);\r\n        }\r\n    } else {\r\n        context.log('Event hub function processed message:', messages);\r\n    }\r\n}\r\n\r\napp.eventHub('$(FUNCTION_NAME_INPUT)', {\r\n    connection: '%connection%',\r\n    eventHubName: 'samples-workitems',\r\n    cardinality: 'many',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "HTTP trigger",
+    "description": "$HttpTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new HTTP trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "httpTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "HttpTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.http('$(FUNCTION_NAME_INPUT)', {\r\n    methods: ['GET', 'POST'],\r\n    authLevel: 'anonymous',\r\n    handler: async (request, context) => {\r\n        context.log(`Http function processed request for url \"${request.url}\"`);\r\n\r\n        const name = request.query.get('name') || await request.text() || 'world';\r\n\r\n        return { body: `Hello, ${name}!` };\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "HTTP trigger",
+    "description": "$HttpTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new HTTP trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "httpTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "HttpTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, HttpRequest, HttpResponseInit, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {\r\n    context.log(`Http function processed request for url \"${request.url}\"`);\r\n\r\n    const name = request.query.get('name') || await request.text() || 'world';\r\n\r\n    return { body: `Hello, ${name}!` };\r\n};\r\n\r\napp.http('$(FUNCTION_NAME_INPUT)', {\r\n    methods: ['GET', 'POST'],\r\n    authLevel: 'anonymous',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "MCP Prompt Trigger",
+    "description": "Template for an MCP prompt function.",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new MCP Prompt Trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "mcpPromptTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "McpPromptTrigger-Javascript",
+    "files": {
+      "function.js": "const { app, promptArg } = require('@azure/functions');\n\nasync function $(FUNCTION_NAME_INPUT)(promptContext, context) {\n    const code = promptContext.arguments.code ?? '';\n    const language = promptContext.arguments.language ?? 'javascript';\n\n    context.log(`MCP Prompt trigger function processed a request for ${language}.`);\n\n    return `Review this ${language} code and suggest improvements:\\n\\n${code}`;\n}\n\napp.mcpPrompt('$(FUNCTION_NAME_INPUT)', {\n    promptName: '$(FUNCTION_NAME_INPUT)',\n    description: 'Prompt that asks an MCP client to review code and suggest improvements.',\n    promptArguments: {\n        code: promptArg.describe('The code to review').isRequired(),\n        language: promptArg.describe('Programming language for the submitted code'),\n    },\n    handler: $(FUNCTION_NAME_INPUT)\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "MCP Prompt Trigger",
+    "description": "Template for an MCP prompt function.",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new MCP Prompt Trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "mcpPromptTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "McpPromptTrigger-Typescript",
+    "files": {
+      "function.ts": "import { app, InvocationContext, PromptInvocationContext, promptArg } from \"@azure/functions\";\n\nexport async function $(FUNCTION_NAME_INPUT)(promptContext: PromptInvocationContext, context: InvocationContext): Promise<string> {\n    const code = promptContext.arguments.code ?? '';\n    const language = promptContext.arguments.language ?? 'typescript';\n\n    context.log(`MCP Prompt trigger function processed a request for ${language}.`);\n\n    return `Review this ${language} code and suggest improvements:\\n\\n${code}`;\n}\n\napp.mcpPrompt('$(FUNCTION_NAME_INPUT)', {\n    promptName: '$(FUNCTION_NAME_INPUT)',\n    description: 'Prompt that asks an MCP client to review code and suggest improvements.',\n    promptArguments: {\n        code: promptArg.describe('The code to review').isRequired(),\n        language: promptArg.describe('Programming language for the submitted code'),\n    },\n    handler: $(FUNCTION_NAME_INPUT)\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "MCP Resource Trigger",
+    "description": "$McpResourceTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new MCP Resource Trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "mcpResourceTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "McpResourceTrigger-Javascript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\n\n// Handler returns the content for the MCP resource when a client reads it.\nasync function mcpResourceHello(_resourceContext, context) {\n    context.log('MCP Resource trigger function processed a request.');\n    return 'Hello from MCP Resource!';\n}\n\n// Register a file-style MCP resource clients can discover and read.\napp.mcpResource('mcpFileResource', {\n    uri: 'file://mcpFileResource.txt',\n    resourceName: 'mcpFileResource',\n    description: 'Simple MCP Resource that returns text content.',\n    mimeType: 'text/plain',\n    handler: mcpResourceHello\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "MCP Resource Trigger",
+    "description": "$McpResourceTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new MCP Resource Trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "mcpResourceTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "McpResourceTrigger-Typescript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\n\n// Handler returns the content for the MCP resource when a client reads it.\nexport async function mcpResourceHello(_resourceContext: unknown, context: InvocationContext): Promise<string> {\n    context.log('MCP Resource trigger function processed a request.');\n    return 'Hello from MCP Resource!';\n}\n\n// Register a file-style MCP resource clients can discover and read.\napp.mcpResource('mcpFileResource', {\n    uri: 'file://mcpFileResource.txt',\n    resourceName: 'mcpFileResource',\n    description: 'Simple MCP Resource that returns text content.',\n    mimeType: 'text/plain',\n    handler: mcpResourceHello\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "MCP Tool Trigger",
+    "description": "$McpToolTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new MCP Tool Trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "mcpToolTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "McpToolTrigger-Javascript",
+    "files": {
+      "function.js": "const { app, arg } = require('@azure/functions');\n\nfunction mcpToolHello(_toolArguments, context) {\n    const mcptoolargs = context.triggerMetadata.mcptoolargs || {};\n    const name = mcptoolargs.name;\n    console.info(`Hello ${name}, I am MCP Tool!`);\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responses with a hello message.',\n    toolProperties:{\n        name: arg.string().describe('Name to greet'),\n    },\n    handler: mcpToolHello\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "MCP Tool Trigger",
+    "description": "$McpToolTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new MCP Tool Trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "mcpToolTrigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "McpToolTrigger-Typescript",
+    "files": {
+      "function.ts": "import { app, InvocationContext, arg } from \"@azure/functions\";\n\nexport async function mcpToolHello(_toolArguments: any, context: InvocationContext): Promise<string> {\n    const mcptoolargs = _toolArguments.arguments as {\n        name?: string;\n    };\n    const name = mcptoolargs?.name;\n\n    console.info(`Hello ${name}, I am MCP Tool!`);\n\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responses with a hello message.',\n    toolProperties: {\n      name: arg.string().describe('Name to greet'),\n    },\n    handler: mcpToolHello\n});"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Queue Storage trigger",
+    "description": "$QueueTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Queue Storage trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "storageQueueTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "queueTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "queueTrigger-name",
+            "required": true,
+            "defaultValue": "js-queue-items"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "QueueTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageQueue('$(FUNCTION_NAME_INPUT)', {\r\n    queueName: 'js-queue-items',\r\n    connection: '',\r\n    handler: (queueItem, context) => {\r\n        context.log('Storage queue function processed work item:', queueItem);\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Queue Storage trigger",
+    "description": "$QueueTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Queue Storage trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "storageQueueTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "queueTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "queueTrigger-name",
+            "required": true,
+            "defaultValue": "js-queue-items"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "QueueTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(queueItem: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Storage queue function processed work item:', queueItem);\r\n}\r\n\r\napp.storageQueue('$(FUNCTION_NAME_INPUT)', {\r\n    queueName: 'js-queue-items',\r\n    connection: '',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Service Bus Queue trigger",
+    "description": "$ServiceBusQueueTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Service Bus Queue trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "serviceBusQueueTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-name",
+            "required": true,
+            "defaultValue": "js-queue-items"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "ServiceBusQueueTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusQueue('$(FUNCTION_NAME_INPUT)', {\r\n    connection: '',\r\n    queueName: 'myinputqueue',\r\n    handler: (message, context) => {\r\n        context.log('Service bus queue function processed message:', message);\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Service Bus Queue trigger",
+    "description": "$ServiceBusQueueTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Service Bus Queue trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "serviceBusQueueTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-name",
+            "required": true,
+            "defaultValue": "js-queue-items"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "ServiceBusQueueTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus queue function processed message:', message);\r\n}\r\n\r\napp.serviceBusQueue('$(FUNCTION_NAME_INPUT)', {\r\n    connection: '',\r\n    queueName: 'myinputqueue',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Service Bus Topic trigger",
+    "description": "$ServiceBusTopicTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Service Bus Topic trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "serviceBusTopicTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(TOPIC_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-topic",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(SUBSCRIPTION_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-subscription",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "ServiceBusTopicTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusTopic('$(FUNCTION_NAME_INPUT)', {\r\n    connection: '',\r\n    topicName: 'mytopic',\r\n    subscriptionName: 'mysubscription',\r\n    handler: (message, context) => {\r\n        context.log('Service bus topic function processed message:', message);\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Azure Service Bus Topic trigger",
+    "description": "$ServiceBusTopicTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Azure Service Bus Topic trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "serviceBusTopicTrigger"
+          },
+          {
+            "assignTo": "$(CONNECTION_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(TOPIC_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-topic",
+            "required": true,
+            "defaultValue": ""
+          },
+          {
+            "assignTo": "$(SUBSCRIPTION_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-subscription",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "ServiceBusTopicTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus topic function processed message:', message);\r\n}\r\n\r\napp.serviceBusTopic('$(FUNCTION_NAME_INPUT)', {\r\n    connection: '',\r\n    topicName: 'mytopic',\r\n    subscriptionName: 'mysubscription',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Timer trigger",
+    "description": "$TimerTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Timer trigger (JavaScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "timerTrigger"
+          },
+          {
+            "assignTo": "$(SCHEDULE_INPUT)",
+            "paramId": "timerTrigger-schedule",
+            "required": true,
+            "defaultValue": "0 */5 * * * *"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.js"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".js"
+      }
+    ],
+    "id": "TimerTrigger-JavaScript",
+    "files": {
+      "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.timer('$(FUNCTION_NAME_INPUT)', {\r\n    schedule: '0 */5 * * * *',\r\n    handler: (myTimer, context) => {\r\n        context.log('Timer function processed request.');\r\n    }\r\n});\r\n"
+    }
+  },
+  {
+    "author": "Microsoft",
+    "name": "Timer trigger",
+    "description": "$TimerTrigger_description",
+    "programmingModel": "v2",
+    "language": "node",
+    "jobs": [
+      {
+        "name": "Create new Timer trigger (TypeScript)",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "timerTrigger"
+          },
+          {
+            "assignTo": "$(SCHEDULE_INPUT)",
+            "paramId": "timerTrigger-schedule",
+            "required": true,
+            "defaultValue": "0 */5 * * * *"
+          }
+        ],
+        "actions": [
+          "readFileContent_Function",
+          "writeFile_Function"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_Function",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_CONTENT)",
+        "filePath": "function.ts"
+      },
+      {
+        "name": "writeFile_Function",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_CONTENT)",
+        "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts",
+        "continueOnError": false,
+        "errorText": "Unable to create the function file",
+        "replaceTokens": true,
+        "FileExtension": ".ts"
+      }
+    ],
+    "id": "TimerTrigger-TypeScript",
+    "files": {
+      "function.ts": "import { app, InvocationContext, Timer } from \"@azure/functions\";\r\n\r\nexport async function $(FUNCTION_NAME_INPUT)(myTimer: Timer, context: InvocationContext): Promise<void> {\r\n    context.log('Timer function processed request.');\r\n}\r\n\r\napp.timer('$(FUNCTION_NAME_INPUT)', {\r\n    schedule: '0 */5 * * * *',\r\n    handler: $(FUNCTION_NAME_INPUT)\r\n});\r\n"
+    }
+  }
+]
