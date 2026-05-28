@@ -10,10 +10,23 @@ namespace Azure.Functions.Cli.Commands;
 /// Replaces System.CommandLine's built-in help action on every command
 /// so that --help and -h render uniform Spectre-based output.
 /// Uses the HelpCommand's renderer to generate help from real Command metadata.
+///
+/// Acts as a small dispatcher: when the matched command needs specialised
+/// rendering (e.g. <see cref="ITemplateAwareHelpProvider"/> commands need
+/// dynamically-attached options grouped under their own section header),
+/// the dispatch is delegated to a sibling action so this class stays free
+/// of per-command rendering rules.
 /// </summary>
-internal sealed class SpectreHelpAction(HelpCommand helpCommand) : SynchronousCommandLineAction
+internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 {
-    private readonly HelpCommand _helpCommand = helpCommand ?? throw new ArgumentNullException(nameof(helpCommand));
+    private readonly HelpCommand _helpCommand;
+    private readonly TemplateAwareHelpAction _templateAwareHelp;
+
+    public SpectreHelpAction(HelpCommand helpCommand, TemplateAwareHelpAction templateAwareHelp)
+    {
+        _helpCommand = helpCommand ?? throw new ArgumentNullException(nameof(helpCommand));
+        _templateAwareHelp = templateAwareHelp ?? throw new ArgumentNullException(nameof(templateAwareHelp));
+    }
 
     public override int Invoke(ParseResult parseResult)
     {
@@ -24,15 +37,9 @@ internal sealed class SpectreHelpAction(HelpCommand helpCommand) : SynchronousCo
             return _helpCommand.ShowGeneralHelp();
         }
 
-        // Stage-B help hydration: when the matched command is a
-        // template-aware verb (e.g. `func new`) and the user supplied a
-        // stage-A value the help renderer needs to know about
-        // (`--template <id>`), let the command attach the relevant
-        // dynamic options before we hand it to the renderer. Falls
-        // through to a built-ins-only render when the hook returns 0.
-        if (command is ITemplateAwareHelpProvider templateAware)
+        if (command is ITemplateAwareHelpProvider)
         {
-            templateAware.AttachHydratedOptionsForHelp(parseResult);
+            return _templateAwareHelp.Invoke(parseResult);
         }
 
         _helpCommand.RenderCommandHelp(command);
