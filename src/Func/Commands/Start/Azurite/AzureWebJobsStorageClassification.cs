@@ -10,20 +10,20 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite;
 internal enum AzureWebJobsStorageClassification
 {
     /// <summary>
-    /// The value does not reference a local storage emulator. Core Tools must
+    /// The value does not reference a local storage emulator. The CLI must
     /// not probe or manage Azurite for this connection.
     /// </summary>
     NotLocal,
 
     /// <summary>
-    /// The value references local development storage in a shape Core Tools
+    /// The value references local development storage in a shape the CLI
     /// can reproduce, so it may start a managed Azurite instance if needed.
     /// </summary>
     ManageableAzurite,
 
     /// <summary>
     /// The value references local development storage but requires
-    /// user-specific configuration Core Tools cannot reproduce. Core Tools may
+    /// user-specific configuration the CLI cannot reproduce. The CLI may
     /// probe the endpoints but must not start Azurite for this connection.
     /// </summary>
     UserConfiguredAzurite,
