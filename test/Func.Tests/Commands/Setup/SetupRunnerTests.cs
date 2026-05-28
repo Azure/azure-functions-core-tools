@@ -380,7 +380,7 @@ public sealed class SetupRunnerTests : IDisposable
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains(interactive.Lines, line => line.StartsWith("SELECT:", StringComparison.Ordinal));
+        Assert.Contains(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal));
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, nodeStack, StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -586,6 +586,17 @@ public sealed class SetupRunnerTests : IDisposable
     private sealed class InteractiveTestInteractionService : TestInteractionService
     {
         public override bool IsInteractive => true;
+
+        public override Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
+        {
+            // Record the prompt then mimic an interactive user picking the
+            // first listed stack (preferring 'node' for stable test asserts).
+            var picks = choices.ToList();
+            base.PromptForMultiSelectionAsync(title, picks, cancellationToken).GetAwaiter().GetResult();
+            string? first = picks.FirstOrDefault(c => string.Equals(c, "node", StringComparison.OrdinalIgnoreCase))
+                ?? picks.FirstOrDefault();
+            return Task.FromResult<IReadOnlyList<string>>(first is null ? [] : [first]);
+        }
     }
 
     private sealed class FakeProfileSource(

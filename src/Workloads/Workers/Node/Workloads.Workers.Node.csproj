@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Azure Functions CLI Node.js Language Worker</Title>
-    <Description>Azure Functions CLI content workload that ships the Node.js language worker.</Description>
+    <Title>Node.js Worker</Title>
+    <Description>Azure Functions Node.js language worker.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:node-worker func-worker func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>

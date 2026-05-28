@@ -84,7 +84,7 @@ internal class HelpCommand : FuncCliCommand
         IEnumerable<DefinitionItem> options = _rootCommand.Options
             .Where(o => o is not HelpOption && o.Name != "--version")
             .Select(o => new DefinitionItem(FormatOptionName(o), o.Description ?? string.Empty))
-            .Append(new DefinitionItem("--help, -h, -?", "Show help information"))
+            .Append(new DefinitionItem("--help, -h", "Show help information"))
             .Append(new DefinitionItem("--version", "Display the current version"));
         _interaction.WriteDefinitionList(options);
         _interaction.WriteBlankLine();
@@ -113,7 +113,7 @@ internal class HelpCommand : FuncCliCommand
 
     /// <summary>
     /// Renders help for any <see cref="Command"/>. Used by both <c>func help &lt;command&gt;</c>
-    /// and the global <c>--help</c> / <c>-h</c> / <c>-?</c> handler.
+    /// and the global <c>--help</c> / <c>-h</c> handler.
     /// </summary>
     internal void RenderCommandHelp(Command command)
     {

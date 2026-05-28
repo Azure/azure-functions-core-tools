@@ -103,7 +103,7 @@ internal class SpectreInteractionService : IInteractionService
 
         foreach (string column in columns)
         {
-            table.AddColumn(new TableColumn(new Text(column, _theme.Heading)).Centered());
+            table.AddColumn(new TableColumn(new Text(column, _theme.Heading)));
         }
 
         foreach (string[] row in rows)
@@ -315,6 +315,23 @@ internal class SpectreInteractionService : IInteractionService
             .Title(title)
             .AddChoices(choiceList)
             .ShowAsync(_stderr, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
+    {
+        var choiceList = choices.ToList();
+        if (!IsInteractive || choiceList.Count == 0)
+        {
+            return [];
+        }
+
+        List<string> selected = await new MultiSelectionPrompt<string>()
+            .Title(title)
+            .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm)[/]")
+            .AddChoices(choiceList)
+            .ShowAsync(_stderr, cancellationToken);
+
+        return selected;
     }
 
     public async Task<string> PromptForInputAsync(string prompt, string? defaultValue = null, CancellationToken cancellationToken = default)

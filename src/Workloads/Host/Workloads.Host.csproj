@@ -6,8 +6,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <RuntimeIdentifiers>$(_CliRuntimeIdentifiers)</RuntimeIdentifiers>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <Title>Azure Functions Host</Title>
-    <Description>Azure Functions CLI content workload that ships the Azure Functions host.</Description>
+    <Title>Functions Host</Title>
+    <Description>Azure Functions host runtime.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:host func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>

@@ -140,6 +140,14 @@ internal class TestInteractionService : IInteractionService
         return Task.FromResult(choiceList.FirstOrDefault() ?? string.Empty);
     }
 
+    public virtual Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var choiceList = choices.ToList();
+        _lines.Add($"MULTISELECT: {title} [{string.Join(", ", choiceList)}]");
+        return Task.FromResult<IReadOnlyList<string>>([]);
+    }
+
     public Task<string> PromptForInputAsync(string prompt, string? defaultValue = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
