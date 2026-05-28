@@ -28,7 +28,7 @@ internal sealed class QuickstartListCommand : FuncCliCommand
         Description = "Filter by infrastructure-as-code type (e.g. bicep, terraform, none)"
     };
 
-    public Option<string?> SearchOption { get; } = new("--search", "-s")
+    public Option<string?> SearchOption { get; } = new("--search")
     {
         Description = "Case-insensitive substring match against template names, IDs, resources, tags, and descriptions"
     };
