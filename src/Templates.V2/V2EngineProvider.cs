@@ -114,17 +114,34 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
                     null));
         }
 
-        // PR4: seed defaults from each declared prompt, then override the
+        // Seed defaults from each declared prompt, then override the
         // function-name prompt with the user-supplied context.FunctionName
         // so it wins over the template's declared default. The engine reads
         // values by paramId; the recognised function-name prompt ids match
-        // the conventions Node v4 / Python v2 bundle templates use.
+        // the conventions Node v4 / Python v2 bundle templates use. Finally,
+        // layer in any caller-supplied UserOptionValues so flags like
+        // --auth-level override the template default.
         var optionValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (TemplateUserPrompt prompt in context.Template.Metadata.UserPrompts)
         {
             optionValues[prompt.Id] = _functionNamePromptIds.Contains(prompt.Id)
                 ? context.FunctionName
                 : prompt.DefaultValue;
+        }
+
+        if (context.UserOptionValues is not null)
+        {
+            foreach (KeyValuePair<string, string?> pair in context.UserOptionValues)
+            {
+                // Don't let the caller smuggle a value over the function
+                // name — that lives on context.FunctionName for a reason.
+                if (_functionNamePromptIds.Contains(pair.Key))
+                {
+                    continue;
+                }
+
+                optionValues[pair.Key] = pair.Value;
+            }
         }
 
         return _engine.Apply(

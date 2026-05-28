@@ -43,8 +43,14 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Description = "List available templates for this project instead of scaffolding.",
     };
 
+    public Option<string?> OutputOption { get; } = new("--output")
+    {
+        Description = "Output mode (plain | json). Defaults to plain.",
+    };
+
     private readonly NewCommandRunner _runner;
     private readonly HashSet<string> _builtInOptionNames;
+    private readonly Dictionary<string, string> _optionNameToPromptId = new(StringComparer.OrdinalIgnoreCase);
 
     public NewCommand(NewCommandRunner runner)
         : base("new", "Create a new function from a template.")
@@ -57,6 +63,14 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Options.Add(ForceOption);
         Options.Add(NonInteractiveOption);
         Options.Add(ListOption);
+        Options.Add(OutputOption);
+
+        // Tolerate unrecognised options so ExecuteAsync can re-interpret
+        // them as per-template prompt values (e.g. `--auth-level anonymous`
+        // for HttpTrigger). Without this SCL would reject the invocation
+        // before ExecuteAsync ever runs and the user couldn't supply the
+        // hydrated options surfaced under `--help`.
+        TreatUnmatchedTokensAsErrors = false;
 
         // Snapshot the built-in option names so the help-time hydration
         // pass can tell which Options on the command came from the user's
@@ -73,16 +87,231 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         ArgumentNullException.ThrowIfNull(parseResult);
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
+        string? requestedTemplate = parseResult.GetValue(TemplateOption);
+        bool jsonOutput = string.Equals(parseResult.GetValue(OutputOption), "json", StringComparison.OrdinalIgnoreCase);
+
+        // Collect per-template prompt overrides. Two sources, in priority order:
+        //   1. Options the pre-parse step in Program.Main attached to this
+        //      command from the hydrator. SCL parsed them; read the values
+        //      out of `parseResult` and translate Option.Name (kebab-cased
+        //      paramId) back into the v2 paramId the engine expects.
+        //   2. UnmatchedTokens — only populated when pre-parse couldn't
+        //      attach the options (template not found, project not init'd,
+        //      etc.). Walk the pairs manually so a typo still surfaces a
+        //      sensible "Template was not found" rather than a confusing
+        //      "Unrecognized option" error.
+        IReadOnlyDictionary<string, string?>? userOptionValues = null;
+        if (!string.IsNullOrWhiteSpace(requestedTemplate))
+        {
+            userOptionValues = ReadParsedPromptOverrides(parseResult)
+                ?? ParsePromptOverrides(parseResult.UnmatchedTokens, requestedTemplate);
+        }
+
         var invocation = new NewInvocation(
             workingDirectory,
-            RequestedTemplate: parseResult.GetValue(TemplateOption),
+            RequestedTemplate: requestedTemplate,
             RequestedFunctionName: parseResult.GetValue(NameOption),
             Force: parseResult.GetValue(ForceOption),
-            NonInteractive: parseResult.GetValue(NonInteractiveOption));
+            NonInteractive: parseResult.GetValue(NonInteractiveOption),
+            JsonOutput: jsonOutput,
+            UserOptionValues: userOptionValues);
 
         return parseResult.GetValue(ListOption)
             ? _runner.ListAsync(invocation, cancellationToken)
             : _runner.ExecuteAsync(invocation, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads supplied values for the options the pre-parse step attached
+    /// to this command. Each hydrated <see cref="Option"/> was registered
+    /// with name <c>--&lt;kebab-paramId&gt;</c>; translate back to the v2
+    /// paramId so the engine's variable substitution can pick the value
+    /// up. Returns <c>null</c> when no hydrated options were attached
+    /// (or none were bound on this invocation).
+    /// </summary>
+    private Dictionary<string, string?>? ReadParsedPromptOverrides(ParseResult parseResult)
+    {
+        var dynamicOptions = Options.Where(o => !_builtInOptionNames.Contains(o.Name)).ToList();
+        if (dynamicOptions.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, string?>? overrides = null;
+        foreach (Option option in dynamicOptions)
+        {
+            System.CommandLine.Parsing.OptionResult? result = parseResult.GetResult(option);
+            if (result is null || result.Tokens.Count == 0)
+            {
+                continue;
+            }
+
+            // The hydrator creates Option<string?>, so reading via Tokens
+            // gives us the raw string the user typed without having to
+            // know the closed generic type at this layer.
+            string raw = result.Tokens[0].Value;
+            overrides ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            // Translate the kebab-cased option.Name back to the v2 paramId
+            // the engine resolves against. Falls back to the trimmed name
+            // if the mapping is missing (defensive — shouldn't happen for
+            // options attached via AttachHydratedOptionsForPreParse).
+            string promptId = _optionNameToPromptId.TryGetValue(option.Name, out string? mapped)
+                ? mapped
+                : option.Name.TrimStart('-');
+            overrides[promptId] = raw;
+        }
+
+        return overrides;
+    }
+
+    /// <summary>
+    /// Translates SCL's <see cref="ParseResult.UnmatchedTokens"/> for a
+    /// <c>func new -t &lt;id&gt; --foo bar --baz qux</c> invocation into a
+    /// per-prompt override dict the runner can hand to the engine. The
+    /// hydrator is the source of truth for the available prompt set; only
+    /// tokens that match a hydrated <see cref="Option"/> survive — unknown
+    /// ones are ignored so a typo doesn't silently mask the real default
+    /// (SCL's normal error UX for unknown options is suppressed because
+    /// <see cref="TreatUnmatchedTokensAsErrors"/> is off; surface the same
+    /// posture by simply ignoring them here).
+    /// </summary>
+    private IReadOnlyDictionary<string, string?>? ParsePromptOverrides(
+        IReadOnlyList<string> unmatched,
+        string templateId)
+    {
+        IReadOnlyList<Option>? hydrated;
+        try
+        {
+            var invocation = new NewInvocation(
+                new WorkingDirectory(new DirectoryInfo(Environment.CurrentDirectory), false),
+                RequestedTemplate: templateId,
+                RequestedFunctionName: null,
+                Force: false,
+                NonInteractive: true);
+
+            hydrated = _runner.HydrateOptionsForTemplateAsync(invocation, templateId, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (hydrated is null || hydrated.Count == 0)
+        {
+            return null;
+        }
+
+        // Build a name → promptId map so both --kebab-name and the original
+        // paramId form land on the right key. The hydrator names each
+        // Option after the kebab-cased paramId.
+        var nameToPromptId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Option option in hydrated)
+        {
+            string promptId = option.Name.TrimStart('-');
+            nameToPromptId[option.Name] = promptId;
+            foreach (string alias in option.Aliases)
+            {
+                nameToPromptId[alias] = promptId;
+            }
+        }
+
+        var overrides = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < unmatched.Count; i++)
+        {
+            string token = unmatched[i];
+            if (!token.StartsWith('-'))
+            {
+                continue;
+            }
+
+            // Tolerate --opt=value syntax in addition to --opt value.
+            int eq = token.IndexOf('=');
+            if (eq > 0)
+            {
+                string name = token[..eq];
+                string val = token[(eq + 1)..];
+                if (nameToPromptId.TryGetValue(name, out string? promptIdInline))
+                {
+                    overrides[promptIdInline] = val;
+                }
+                continue;
+            }
+
+            if (!nameToPromptId.TryGetValue(token, out string? promptId))
+            {
+                continue;
+            }
+
+            string? value = (i + 1 < unmatched.Count && !unmatched[i + 1].StartsWith('-'))
+                ? unmatched[++i]
+                : "true";
+
+            overrides[promptId] = value;
+        }
+
+        return overrides.Count == 0 ? null : overrides;
+    }
+
+    /// <summary>
+    /// Pre-parse hook: invoked by <see cref="NewCommandArgPreparer"/>
+    /// from <c>Program.Main</c> before the parser runs, so per-template
+    /// options the user supplies on the same invocation as
+    /// <c>--template &lt;id&gt;</c> get registered in time for SCL to
+    /// recognise them. Idempotent — duplicate calls (including the
+    /// help-time path) drop previously-attached options first.
+    /// </summary>
+    public void AttachHydratedOptionsForPreParse(string templateId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(templateId);
+
+        DropDynamicOptions();
+
+        var invocation = new NewInvocation(
+            new WorkingDirectory(new DirectoryInfo(Environment.CurrentDirectory), false),
+            RequestedTemplate: templateId,
+            RequestedFunctionName: null,
+            Force: false,
+            NonInteractive: true);
+
+        IReadOnlyList<HydratedTemplateOption>? hydrated;
+        try
+        {
+            hydrated = _runner.HydrateOptionsForTemplateWithIdsAsync(invocation, templateId, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        catch
+        {
+            return;
+        }
+
+        if (hydrated is null || hydrated.Count == 0)
+        {
+            return;
+        }
+
+        foreach (HydratedTemplateOption pair in hydrated)
+        {
+            if (_builtInOptionNames.Contains(pair.Option.Name))
+            {
+                continue;
+            }
+
+            Options.Add(pair.Option);
+            _optionNameToPromptId[pair.Option.Name] = pair.PromptId;
+        }
+    }
+
+    private void DropDynamicOptions()
+    {
+        var stale = Options
+            .Where(o => !_builtInOptionNames.Contains(o.Name))
+            .ToList();
+        foreach (Option o in stale)
+        {
+            Options.Remove(o);
+        }
+        _optionNameToPromptId.Clear();
     }
 
     /// <summary>

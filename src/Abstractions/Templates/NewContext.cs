@@ -39,10 +39,18 @@ namespace Azure.Functions.Cli.Templates;
 /// orchestrator; providers then fall back to a best-effort highest-version
 /// pick from <see cref="IInstalledTemplatesWorkloads"/>.
 /// </param>
+/// <param name="UserOptionValues">
+/// User-supplied per-prompt overrides resolved from the CLI parse,
+/// keyed by the v2 paramId / DotNet parameter name. Engines layer these
+/// over each prompt's declared default before applying. <c>null</c> when
+/// the user supplied no overrides (the engine's prompt-default path
+/// applies as usual).
+/// </param>
 public sealed record NewContext(
     WorkingDirectory WorkingDirectory,
     FunctionTemplateInfo Template,
     string FunctionName,
     string? Language,
     bool Force,
-    string? InstallDirectory = null);
+    string? InstallDirectory = null,
+    IReadOnlyDictionary<string, string?>? UserOptionValues = null);

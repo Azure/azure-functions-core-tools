@@ -122,4 +122,51 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
             .Code("func new --template <NAME> --name <function-name>")
             .Muted("."));
     }
+
+    /// <summary>
+    /// Renders the <c>func new --list --output json</c> envelope (single
+    /// object, not NDJSON — list is a finite, ordered query). Shape:
+    /// <c>{ stack, language, templates: [...] }</c>. Each template entry
+    /// carries the public-facing fields plus the per-prompt option schema
+    /// so tooling can build forms / autocompletion without re-parsing the
+    /// workload payload.
+    /// </summary>
+    public void RenderCatalogueJson(string stack, string? language, IReadOnlyList<FunctionTemplateInfo> templates)
+    {
+        var envelope = new
+        {
+            stack,
+            language,
+            templates = templates.Select(t => new
+            {
+                id = t.Id,
+                displayName = t.DisplayName,
+                triggerKind = t.TriggerKind,
+                description = t.Description,
+                defaultFunctionName = t.DefaultFunctionName,
+                languages = t.Languages,
+                engineId = t.EngineId,
+                requiresExtensionBundle = t.Metadata.RequiresExtensionBundle,
+                minBundleVersion = t.Metadata.MinBundleVersion,
+                options = t.Metadata.UserPrompts.Select(p => new
+                {
+                    id = p.Id,
+                    description = p.Description,
+                    dataType = p.DataType,
+                    defaultValue = p.DefaultValue,
+                    choices = p.Choices,
+                    isRequired = p.IsRequired,
+                }),
+            }),
+        };
+
+        var jsonOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        };
+
+        string json = System.Text.Json.JsonSerializer.Serialize(envelope, jsonOptions);
+        _interaction.WriteLine(json);
+    }
 }
