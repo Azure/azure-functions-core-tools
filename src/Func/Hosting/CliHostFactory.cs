@@ -14,6 +14,7 @@ using Azure.Functions.Cli.Http;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.DotNet;
 using Azure.Functions.Cli.Templates.V2;
 using Azure.Functions.Cli.Workers;
 using Azure.Monitor.OpenTelemetry.Exporter;
@@ -124,6 +125,7 @@ internal static class CliHostFactory
         builder.Services.AddManagedAzurite();
         builder.Services.AddTemplatesOrchestrator();
         builder.Services.AddV2TemplateEngine();
+        builder.Services.AddDotNetTemplateEngine();
 
         return builder;
     }

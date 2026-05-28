@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="../Abstractions/Abstractions.csproj" />
     <ProjectReference Include="../Templates.V2/Templates.V2.csproj" />
+    <ProjectReference Include="../Templates.DotNet/Templates.DotNet.csproj" />
   </ItemGroup>
 
   <ItemGroup>
