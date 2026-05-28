@@ -39,7 +39,7 @@ extends:
       jobs:
       - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
         parameters:
-          skipBranchValidation: ${{ not(parameters.public) }}
+          failOnInvalidRef: ${{ parameters.public }}
 
     - stage: Build
       dependsOn: Validate

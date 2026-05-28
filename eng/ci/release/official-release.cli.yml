@@ -1,9 +1,3 @@
-parameters:
-- name: skipBranchValidation
-  displayName: Allow non-release source
-  type: boolean
-  default: false
-
 resources:
   repositories:
   - repository: 1es
@@ -37,9 +31,11 @@ extends:
     stages:
     - stage: Validate
       jobs:
+      # CLI release is not yet fully automated, so manual steps will perform the actual
+      # validation.
       - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
         parameters:
-          skipBranchValidation: ${{ parameters.skipBranchValidation }}
+          failOnInvalidRef: false
   
     - stage: Build
       dependsOn: Validate
