@@ -445,7 +445,7 @@ internal sealed class SetupRunner(
             SetupDependency? bundleDependency = await TryCreateBundleDependencyAsync(workingDirectory, profileScope, cancellationToken);
             if (bundleDependency is null)
             {
-                var dependency = SetupDependency.Bundle(InstalledBundleScanner.StableBundleId, versionRange: null, rangeText: null);
+                var dependency = SetupDependency.Bundle(BundleHelpers.StableBundleId, versionRange: null, rangeText: null);
                 failure = SetupDependencyResult.Failed(
                     dependency,
                     "The host.json extensionBundle range and profile extensionBundle range do not overlap.");
@@ -475,7 +475,7 @@ internal sealed class SetupRunner(
 
         if (hostJsonBundle is null)
         {
-            return SetupDependency.Bundle(InstalledBundleScanner.StableBundleId, profileRange, profileRangeText);
+            return SetupDependency.Bundle(BundleHelpers.StableBundleId, profileRange, profileRangeText);
         }
 
         VersionRange? effectiveRange = VersionRangeIntersection.Intersect(hostJsonBundle.Version, profileRangeText);

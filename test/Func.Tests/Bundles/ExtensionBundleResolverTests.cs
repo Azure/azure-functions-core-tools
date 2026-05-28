@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Bundles.Tests;
 
 public class ExtensionBundleResolverTests
 {
-    private const string BundleId = InstalledBundleScanner.StableBundleId;
+    private const string BundleId = BundleHelpers.StableBundleId;
 
     [Fact]
     public async Task HostJsonRangeOnly_PicksHighestInstalled()
