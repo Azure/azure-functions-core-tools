@@ -865,6 +865,7 @@ public class StartInitializationTests : IDisposable
             new LocalSettingsProvider(),
             workloadPaths,
             hostProcessRunner,
+            new ProcessEnvironment(),
             NullLoggerFactory.Instance);
     }
 

@@ -33,6 +33,7 @@ internal sealed class DemoStartInitializationRunner(
     ILocalSettingsProvider localSettingsProvider,
     IWorkloadPaths workloadPaths,
     IHostProcessRunner hostProcessRunner,
+    IProcessEnvironment processEnvironment,
     ILoggerFactory loggerFactory,
     TimeProvider? timeProvider = null)
     : IStartInitializationRunner
@@ -71,6 +72,9 @@ internal sealed class DemoStartInitializationRunner(
     private readonly IHostProcessRunner _hostProcessRunner = hostProcessRunner
         ?? throw new ArgumentNullException(nameof(hostProcessRunner));
 
+    private readonly IProcessEnvironment _processEnvironment = processEnvironment
+        ?? throw new ArgumentNullException(nameof(processEnvironment));
+
     private readonly ILoggerFactory _loggerFactory = loggerFactory
         ?? throw new ArgumentNullException(nameof(loggerFactory));
 
@@ -105,7 +109,7 @@ internal sealed class DemoStartInitializationRunner(
                 _bundleResolver,
                 _bundleSectionReader,
                 _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
-            new PrepareProjectHostRunInitializationStep(_localSettingsProvider),
+            new PrepareProjectHostRunInitializationStep(_localSettingsProvider, _processEnvironment, _interaction),
             new StartHostInitializationStep(_hostProcessRunner, _time),
         ];
 
