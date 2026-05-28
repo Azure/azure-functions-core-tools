@@ -8,7 +8,9 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// <summary>
 /// Default implementation that resolves the template hive path, honoring the
 /// <c>FUNC_CLI_DOTNET_TEMPLATE_HIVE</c> environment variable when set, and
-/// falling back to <c>~/.azure-functions/dotnet-template-hive</c>.
+/// otherwise falling back to <c>&lt;func cli home&gt;/dotnet-template-hive</c>
+/// (where the home itself honors <see cref="Constants.FuncHomeEnvironmentVariable"/>
+/// and defaults to <c>~/.azure-functions</c>).
 /// </summary>
 internal sealed class TemplateHivePathProvider : ITemplateHivePathProvider
 {
@@ -26,10 +28,7 @@ internal sealed class TemplateHivePathProvider : ITemplateHivePathProvider
         string? configured = Environment.GetEnvironmentVariable(HivePathEnvironmentVariable);
 
         string hivePath = string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                Constants.FuncHomeDirectoryName,
-                HiveDirectoryName)
+            ? Path.Combine(FuncHomeResolver.Resolve(), HiveDirectoryName)
             : configured;
 
         HivePath = Path.GetFullPath(hivePath);

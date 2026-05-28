@@ -310,6 +310,14 @@ The CLI is opt-out: when no instrumentation key is baked in (the default for loc
 
 The telemetry instrumentation key is injected at build time via `eng/build/Telemetry.props` as an assembly attribute. Local builds use an all-zeros placeholder (which disables telemetry). CI builds override via `/p:TelemetryInstrumentationKey=<key>`.
 
+## CLI Home Directory
+
+The CLI persists configuration, profiles, caches, the version-check stamp, the quickstart manifest cache, workloads, and the dotnet template hive under a single "func home" root. By default this is `~/.azure-functions/`.
+
+- **Override**: set `FUNC_CLI_HOME` to an absolute path to relocate the entire home (handy for sandboxed CI, devcontainers, or per-user installs that can't write the user profile).
+- The env var is read directly (not via `IConfiguration`) so host config, global config, or project `.func/config.json` can't redirect it.
+- Subsystems that need their own override on top of the home still honor it: `FUNC_CLI_WORKLOADS_HOME` (workloads root) and `FUNC_CLI_DOTNET_TEMPLATE_HIVE` (dotnet template hive) take precedence over `FUNC_CLI_HOME` when set.
+
 ## Version Upgrade Check
 
 At startup, the CLI runs a non-blocking background check for newer v5 releases via the GitHub Releases API.
