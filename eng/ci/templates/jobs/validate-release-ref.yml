@@ -1,8 +1,8 @@
 parameters:
-- name: publicRelease
-  displayName: Public Release
+- name: failOnInvalidRef
+  displayName: Fail on Invalid Reference
   type: boolean
-  default: false
+  default: true
 
 jobs:
 - job: Validate
@@ -25,7 +25,7 @@ jobs:
       $isValid = $validPatterns | Where-Object { $source -like $_ } | Select-Object -First 1
       if (-not $isValid) {
         $patternList = $validPatterns -join ', '
-        $verbosity = if ('${{ parameters.skipBranchValidation }}' -eq 'True') { 'warning' } else { 'error' }
+        $verbosity = if ('${{ parameters.failOnInvalidRef }}' -eq 'True') { 'error' } else { 'warning' }
         Write-Host "##vso[task.logissue type=$verbosity]Invalid release branch '$source'. Valid patterns: $patternList"
         if ($verbosity -eq 'error') {
           exit 1
