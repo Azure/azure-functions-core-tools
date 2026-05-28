@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Python</Title>
+    <Title>Python Stack</Title>
     <Description>Azure Functions CLI tooling for Python projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:python func-workload</PackageTags>
