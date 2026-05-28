@@ -148,7 +148,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             ClearDirectory(workingDirectory.Info);
         }
 
-        WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, language, force);
+        // Only persist 'language' when the stack actually offers a choice.
+        // For stacks with a single supported language, the stack runtime
+        // already implies the language and the duplicate entry is noise.
+        // For stacks with no declared language list, persist whatever the
+        // caller supplied so we don't silently drop their input.
+        string? persistedLanguage = initializer.SupportedLanguages.Count == 1 ? null : language;
+        WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
         _interaction.WriteBlankLine();
 
         var context = new InitContext(

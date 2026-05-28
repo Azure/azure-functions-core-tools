@@ -203,11 +203,17 @@ internal sealed class SetupRunner(
 
         if (!options.NonInteractive && _interaction.IsInteractive)
         {
-            string picked = await _interaction.PromptForSelectionAsync(
-                "Select a stack to install:",
+            IReadOnlyList<string> picked = await _interaction.PromptForMultiSelectionAsync(
+                "Select stacks to install (SPACE to toggle, ENTER to confirm):",
                 SetupDependency.Stacks,
                 cancellationToken);
-            return [picked];
+
+            // If the user confirmed without picking anything, fall through to
+            // the runtime-only default so we still install something useful.
+            if (picked.Count > 0)
+            {
+                return picked;
+            }
         }
 
         return ["runtime"];
@@ -667,7 +673,7 @@ internal sealed record SetupDependency(
         => new(
             SetupDependencyKind.ExtensionBundle,
             bundleId,
-            $"extension bundle {bundleId}",
+            "extension bundle",
             IInstalledBundleWorkloads.BundleWorkloadPackageId,
             versionRange,
             rangeText,

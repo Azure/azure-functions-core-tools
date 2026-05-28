@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Node.js</Title>
+    <Title>Node.js Stack</Title>
     <Description>Azure Functions CLI tooling for Node.js projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:node func-workload</PackageTags>

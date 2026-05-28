@@ -95,8 +95,10 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
 
         string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
 
+        // Live progress region is owned by the Spectre Progress task; leading
+        // newline keeps the prompt off the spinner's line.
         bool shouldInstall = await _interaction.ConfirmAsync(
-            $"The Functions worker workload '{packageId}' is required. Install it now?",
+            $"{Environment.NewLine}The Functions worker workload '{packageId}' is required. Install it now?",
             defaultValue: true,
             cancellationToken);
 

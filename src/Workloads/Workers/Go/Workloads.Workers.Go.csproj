@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Azure Functions CLI Go Language Worker</Title>
+    <Title>Go Worker</Title>
     <Description>Azure Functions CLI content workload that ships the Go worker assets (static worker config).</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:go-worker func-worker func-workload</PackageTags>

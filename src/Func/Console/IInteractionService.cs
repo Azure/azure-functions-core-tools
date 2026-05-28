@@ -119,6 +119,13 @@ internal interface IInteractionService
     public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Prompts the user to select one or more values from a list of choices, using
+    /// SPACE to toggle and ENTER to confirm. Returns an empty list in non-interactive
+    /// mode. Throws <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// </summary>
+    public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Prompts the user for free-form text with an optional default. Returns
     /// <paramref name="defaultValue"/> in non-interactive mode. Throws
     /// <see cref="OperationCanceledException"/> on Ctrl+C.

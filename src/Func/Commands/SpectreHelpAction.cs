@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
 /// Replaces System.CommandLine's built-in help action on every command
-/// so that --help, -h, and -? all render uniform Spectre-based output.
+/// so that --help and -h render uniform Spectre-based output.
 /// Uses the HelpCommand's renderer to generate help from real Command metadata.
 /// </summary>
 internal sealed class SpectreHelpAction(HelpCommand helpCommand) : SynchronousCommandLineAction

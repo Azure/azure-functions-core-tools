@@ -497,7 +497,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_AutoSelectsLanguageWhenInitializerHasOnlyOne()
+    public async Task InitCommand_OmitsLanguageWhenStackHasOnlySupportedLanguage()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -506,7 +506,10 @@ public class InitCommandTests
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
             Assert.Equal(0, exitCode);
-            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: "python");
+
+            // With a single supported language, the stack runtime implies the
+            // language; the config skips the redundant 'language' field.
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
         }
         finally
         {

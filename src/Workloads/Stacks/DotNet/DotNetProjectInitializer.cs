@@ -98,7 +98,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
             "--name", projectName,
             "--output", projectPath,
             "--language", language,
-            "--framework", framework,
+            "--Framework", framework,
             "--debug:custom-hive", _hivePathProvider.HivePath,
         ];
 
