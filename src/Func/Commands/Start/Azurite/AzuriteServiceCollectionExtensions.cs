@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Azure.Functions.Cli.Commands.Start.Azurite;
 
@@ -27,6 +29,24 @@ internal static class AzuriteServiceCollectionExtensions
         });
 
         services.AddSingleton<IAzuriteProbe, AzuriteProbe>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the host-side seams and discovery services used by the CLI
+    /// to locate Azurite and probe for Docker. Does not start anything and
+    /// does not depend on probe/process startup services from later slices.
+    /// </summary>
+    public static IServiceCollection AddAzuriteDiscovery(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IPlatform, Platform>();
+        services.TryAddSingleton<IAzuriteHostEnvironment, AzuriteHostEnvironment>();
+        services.TryAddSingleton<IProcessRunner, ProcessRunner>();
+        services.TryAddSingleton<IAzuriteExecutableLocator, AzuriteExecutableLocator>();
+        services.TryAddSingleton<IDockerAvailabilityProbe, DockerAvailabilityProbe>();
+
         return services;
     }
 }
