@@ -19,7 +19,14 @@ internal static class V2TemplateProjection
             return null;
         }
 
+        // The same prompt id can appear on inputs across multiple jobs
+        // (a v2 template typically has CreateNewApp / AppendToFile /
+        // CreateNewBlueprint / AppendToBlueprint jobs all asking for the
+        // same trigger-functionName). Dedupe on the prompt id so the
+        // hydrator surfaces each option once.
         List<TemplateUserPrompt> prompts = [];
+        HashSet<string> seenPromptIds = new(StringComparer.OrdinalIgnoreCase);
+
         if (template.Jobs is { Count: > 0 })
         {
             foreach (V2Job job in template.Jobs)
@@ -32,10 +39,17 @@ internal static class V2TemplateProjection
                 foreach (V2Input input in job.Inputs)
                 {
                     TemplateUserPrompt? prompt = ProjectInput(input, payload);
-                    if (prompt is not null)
+                    if (prompt is null)
                     {
-                        prompts.Add(prompt);
+                        continue;
                     }
+
+                    if (!seenPromptIds.Add(prompt.Id))
+                    {
+                        continue;
+                    }
+
+                    prompts.Add(prompt);
                 }
             }
         }
@@ -71,7 +85,7 @@ internal static class V2TemplateProjection
 
         payload.UserPrompts.TryGetValue(input.ParamId, out UserPromptDoc? doc);
         string id = input.ParamId;
-        string? description = doc?.Label;
+        string? description = ResolveResource(doc?.Label, payload.Resources);
         string dataType = doc?.Enum is { Count: > 0 } ? "choice" : "string";
         string? defaultValue = input.DefaultValue ?? doc?.DefaultValue;
         IReadOnlyList<string>? choices = doc?.Enum?

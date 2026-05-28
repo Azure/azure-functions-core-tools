@@ -177,6 +177,41 @@ internal sealed class NewCommandRunner
         return 0;
     }
 
+    /// <summary>
+    /// Resolves the single template identified by <paramref name="templateId"/>
+    /// for the project at <paramref name="invocation"/>, then hands back the
+    /// hydrated <see cref="Option"/> list the stage-B help renderer needs.
+    /// Returns <c>null</c> when the project can't be resolved, the templates
+    /// workload isn't installed, or <paramref name="templateId"/> doesn't
+    /// match any catalogued template — the caller decides whether to fall
+    /// back to a built-ins-only help render or surface the failure.
+    /// </summary>
+    public async Task<IReadOnlyList<Option>?> HydrateOptionsForTemplateAsync(
+        NewInvocation invocation,
+        string templateId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(invocation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(templateId);
+
+        ResolvedContext? resolved = await ResolveContextAsync(invocation, cancellationToken);
+        if (resolved is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<FunctionTemplateInfo> templates = await ListTemplatesAsync(resolved, cancellationToken);
+        FunctionTemplateInfo? template = templates.FirstOrDefault(t =>
+            string.Equals(t.Id, templateId, StringComparison.OrdinalIgnoreCase));
+
+        if (template is null)
+        {
+            return null;
+        }
+
+        return _optionHydrator.Hydrate(template);
+    }
+
     private async Task<ResolvedContext?> ResolveContextAsync(
         NewInvocation invocation,
         CancellationToken cancellationToken)
