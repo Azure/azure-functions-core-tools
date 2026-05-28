@@ -37,10 +37,7 @@ internal interface IWorkloadStore
     /// removed, <c>false</c> when no such entry existed. Other versions of
     /// the same package are left untouched.
     /// </summary>
-    public Task<bool> RemoveWorkloadAsync(
-        string packageId,
-        string version,
-        CancellationToken cancellationToken = default);
+    public Task<bool> RemoveWorkloadAsync(string packageId, string version, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Atomically removes the entry for (<paramref name="oldPackageId"/>,

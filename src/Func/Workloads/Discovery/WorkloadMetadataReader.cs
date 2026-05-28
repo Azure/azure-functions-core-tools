@@ -142,10 +142,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
             "entryPoint.assemblyPath");
     }
 
-    private static void ValidateRelativePathStaysWithinPackage(
-        string value,
-        string metadataPath,
-        string fieldName)
+    private static void ValidateRelativePathStaysWithinPackage(string value, string metadataPath, string fieldName)
     {
         if (Path.IsPathRooted(value))
         {

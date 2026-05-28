@@ -20,9 +20,7 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
     private readonly IInteractionService _interaction;
     private readonly IReadOnlyList<IQuickstartProvider> _providers;
 
-    public QuickstartInfoCommand(
-        IInteractionService interaction,
-        IEnumerable<IQuickstartProvider> providers)
+    public QuickstartInfoCommand(IInteractionService interaction, IEnumerable<IQuickstartProvider> providers)
         : base("info", "Show detailed information about a template.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -43,8 +41,7 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
             return Task.FromResult(1);
         }
 
-        _interaction.WriteWarning(
-            "The quickstart info command is not yet implemented.");
+        _interaction.WriteWarning("The quickstart info command is not yet implemented.");
         return Task.FromResult(1);
     }
 }

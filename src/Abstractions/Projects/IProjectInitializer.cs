@@ -46,8 +46,5 @@ public interface IProjectInitializer
     /// <summary>
     /// Scaffolds a new project at <see cref="WorkloadContext.WorkingDirectory"/>.
     /// </summary>
-    public Task InitializeAsync(
-        InitContext context,
-        ParseResult parseResult,
-        CancellationToken cancellationToken = default);
+    public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default);
 }

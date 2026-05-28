@@ -171,8 +171,7 @@ internal sealed class WorkloadInstaller(
             ? packageId
             : await ResolveAliasOrIdAsync(packageId, source, includePrerelease, cancellationToken);
 
-        ResolvedPackage resolved = await ResolveCatalogPackageAsync(
-            resolvedId, version, source, includePrerelease, cancellationToken);
+        ResolvedPackage resolved = await ResolveCatalogPackageAsync(resolvedId, version, source, includePrerelease, cancellationToken);
 
         string tempPath = Path.Combine(
             Path.GetTempPath(),
@@ -261,17 +260,13 @@ internal sealed class WorkloadInstaller(
             return new WorkloadUpdateResult(currentEntry, currentEntry.PackageVersion, NoUpdateAvailable: true);
         }
 
-        WorkloadEntry newEntry = await StageAndSwapAsync(
-            currentEntry, resolved, progress, cancellationToken);
+        WorkloadEntry newEntry = await StageAndSwapAsync(currentEntry, resolved, progress, cancellationToken);
 
         return new WorkloadUpdateResult(newEntry, currentEntry.PackageVersion, NoUpdateAvailable: false);
     }
 
     /// <inheritdoc />
-    public async Task<bool> UninstallAsync(
-        string packageId,
-        string version,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -482,11 +477,7 @@ internal sealed class WorkloadInstaller(
                 WorkloadInstallPhase.Registering,
                 $"Registering workload '{newPackageId}' {newVersion}"));
 
-            await _store.ReplaceWorkloadAsync(
-                currentEntry.PackageId,
-                currentEntry.PackageVersion,
-                newEntry,
-                cancellationToken);
+            await _store.ReplaceWorkloadAsync(currentEntry.PackageId, currentEntry.PackageVersion, newEntry, cancellationToken);
 
             string oldInstallPath = _paths.GetInstallDirectory(currentEntry.PackageId, currentEntry.PackageVersion);
             if (!string.Equals(oldInstallPath, finalInstallPath, StringComparison.Ordinal))
@@ -533,10 +524,7 @@ internal sealed class WorkloadInstaller(
         }
     }
 
-    private static async Task ExtractPackageAsync(
-        PackageArchiveReader reader,
-        string destination,
-        CancellationToken cancellationToken)
+    private static async Task ExtractPackageAsync(PackageArchiveReader reader, string destination, CancellationToken cancellationToken)
     {
         // PackageArchiveReader already filters OPC metadata and rejects
         // path-escape entries. We additionally restrict the on-disk layout

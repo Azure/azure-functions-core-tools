@@ -192,9 +192,7 @@ public class WorkloadListCommandTests
         return provider;
     }
 
-    private static IReadOnlyList<TWorkload> GetWorkloadsByPackageId<TWorkload>(
-        IReadOnlyList<WorkloadInfo> workloads,
-        string packageId)
+    private static IReadOnlyList<TWorkload> GetWorkloadsByPackageId<TWorkload>(IReadOnlyList<WorkloadInfo> workloads, string packageId)
         where TWorkload : WorkloadInfo
         => [.. workloads
             .OfType<TWorkload>()

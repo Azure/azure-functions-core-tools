@@ -35,10 +35,7 @@ internal abstract record ManagedAzuriteResult
     /// handle; the caller is responsible for disposing it when the host run
     /// ends.
     /// </summary>
-    public sealed record Started(
-        IAzuriteProcess Process,
-        AzuriteLaunchMode Mode,
-        AzuriteEndpointTuple Endpoints) : ManagedAzuriteResult;
+    public sealed record Started(IAzuriteProcess Process, AzuriteLaunchMode Mode, AzuriteEndpointTuple Endpoints) : ManagedAzuriteResult;
 
     /// <summary>
     /// Azurite cannot be made ready. <paramref name="UserMessage"/> is

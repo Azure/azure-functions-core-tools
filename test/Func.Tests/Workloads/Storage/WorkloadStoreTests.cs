@@ -202,10 +202,7 @@ public class WorkloadStoreTests : IDisposable
 
     private sealed class ThrowingSerializeStore(IWorkloadPaths paths) : WorkloadStore(paths)
     {
-        internal override Task SerializeAsync(
-            Stream stream,
-            WorkloadRegistry registry,
-            CancellationToken cancellationToken)
+        internal override Task SerializeAsync(Stream stream, WorkloadRegistry registry, CancellationToken cancellationToken)
             => throw new InvalidOperationException("boom");
     }
 }

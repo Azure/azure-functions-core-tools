@@ -39,10 +39,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
-    public WorkloadUninstallCommand(
-        IInteractionService interaction,
-        IWorkloadInstaller installer,
-        IWorkloadStore store)
+    public WorkloadUninstallCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store)
         : base("uninstall", "Uninstall a workload.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
@@ -85,8 +82,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
         if (matches.Count == 0)
         {
-            _interaction.WriteWarning(
-                $"Workload '{identifier}' is not installed; nothing to do.");
+            _interaction.WriteWarning($"Workload '{identifier}' is not installed; nothing to do.");
             return 0;
         }
 

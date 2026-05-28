@@ -21,8 +21,7 @@ internal static class WorkloadHomeResolver
     /// </summary>
     public static string Resolve()
     {
-        string? configured = System.Environment.GetEnvironmentVariable(
-            Constants.WorkloadsHomeEnvironmentVariable);
+        string? configured = System.Environment.GetEnvironmentVariable(Constants.WorkloadsHomeEnvironmentVariable);
 
         string home = string.IsNullOrWhiteSpace(configured)
             ? Path.Combine(

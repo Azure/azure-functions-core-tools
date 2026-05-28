@@ -43,9 +43,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<ManagedAzuriteResult> EnsureReadyAsync(
-        ManagedAzuriteRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ManagedAzuriteResult> EnsureReadyAsync(ManagedAzuriteRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -443,10 +441,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         return sb.ToString();
     }
 
-    private static string BuildProcessExitedMessage(
-        AzuriteLaunchMode mode,
-        AzuriteManagedPaths paths,
-        string? stderrTail)
+    private static string BuildProcessExitedMessage(AzuriteLaunchMode mode, AzuriteManagedPaths paths, string? stderrTail)
     {
         StringBuilder sb = new();
         if (mode == AzuriteLaunchMode.Native)
@@ -473,10 +468,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         return sb.ToString();
     }
 
-    private static string BuildTimeoutMessage(
-        AzuriteEndpointTuple endpoints,
-        AzuriteManagedPaths paths,
-        TimeSpan timeout)
+    private static string BuildTimeoutMessage(AzuriteEndpointTuple endpoints, AzuriteManagedPaths paths, TimeSpan timeout)
     {
         StringBuilder sb = new();
         sb.AppendLine($"Azurite did not become ready within {(int)timeout.TotalSeconds} seconds.");

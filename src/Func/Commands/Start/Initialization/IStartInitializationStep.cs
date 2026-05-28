@@ -16,7 +16,5 @@ internal interface IStartInitializationStep
 
     public StartInitializationDisplayKind DisplayKind { get; }
 
-    public Task<StartInitializationStepResult> ExecuteAsync(
-        StartInitializationStepContext context,
-        CancellationToken cancellationToken);
+    public Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken);
 }

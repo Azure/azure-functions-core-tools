@@ -526,8 +526,7 @@ public class CompactRendererFunctionBrowserTests
         Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
     }
 
-    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(
-        DashboardRunInfo? runInfo = null)
+    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
     {
         var writer = new StringWriter();
         IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings

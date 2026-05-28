@@ -573,11 +573,7 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
     private static HostLogEntry MakeOrphanWarning(Random rng)
     {
         string template = _orphanWarnings[rng.Next(_orphanWarnings.Length)];
-        return MakeLog(
-            "Host.Workers",
-            LogLevel.Warning,
-            template,
-            attrs: []);
+        return MakeLog("Host.Workers", LogLevel.Warning, template, attrs: []);
     }
 
     private static (string Type, string Message, Exception Exception) PickError(Random rng)
@@ -657,11 +653,7 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
         () => ("Microsoft.Azure.Cosmos.CosmosException", "Throughput limit exceeded (429)", new InvalidOperationException("Throughput limit exceeded (429)")),
     ];
 
-    private static HostLogEntry MakeHostEvent(
-        string state,
-        double? durationMs,
-        string message,
-        Dictionary<string, object?>? attrs = null)
+    private static HostLogEntry MakeHostEvent(string state, double? durationMs, string message, Dictionary<string, object?>? attrs = null)
     {
         attrs ??= [];
         attrs[HostLogAttributeKeys.HostState] = state;

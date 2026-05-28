@@ -33,10 +33,7 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
-    public WorkloadPruneCommand(
-        IInteractionService interaction,
-        IWorkloadInstaller installer,
-        IWorkloadStore store)
+    public WorkloadPruneCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store)
         : base("prune", "Remove inactive side-by-side workload installs.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
@@ -64,8 +61,7 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
         IReadOnlyList<WorkloadEntry> scoped = ScopeToTarget(installed, identifier, exact);
         if (scoped.Count == 0)
         {
-            _interaction.WriteWarning(
-                $"Workload '{identifier}' is not installed; nothing to prune.");
+            _interaction.WriteWarning($"Workload '{identifier}' is not installed; nothing to prune.");
             return 0;
         }
 
@@ -107,10 +103,7 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
         return 0;
     }
 
-    private static IReadOnlyList<WorkloadEntry> ScopeToTarget(
-        IReadOnlyList<WorkloadEntry> installed,
-        string? identifier,
-        bool exact)
+    private static IReadOnlyList<WorkloadEntry> ScopeToTarget(IReadOnlyList<WorkloadEntry> installed, string? identifier, bool exact)
     {
         if (string.IsNullOrWhiteSpace(identifier))
         {

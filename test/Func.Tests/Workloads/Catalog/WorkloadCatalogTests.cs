@@ -43,8 +43,7 @@ public sealed class WorkloadCatalogTests
 
         var catalog = new WorkloadCatalog(sourceProvider, source => source.Name == _defaultSource.Name ? defaultClient : overrideClient);
 
-        IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(
-            new CatalogSearchQuery { Source = _altSource.Source });
+        IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(new CatalogSearchQuery { Source = _altSource.Source });
 
         Assert.Equal("override-pkg", Assert.Single(results).PackageId);
     }
@@ -104,8 +103,7 @@ public sealed class WorkloadCatalogTests
 
         var range = VersionRange.Parse("[1.8.1, 4.1048.200)");
 
-        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync(
-            "alpha", range, includePrerelease: false);
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("alpha", range, includePrerelease: false);
 
         Assert.NotNull(resolved);
         Assert.Equal(V("4.1048.199"), resolved!.Version);

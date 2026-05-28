@@ -20,14 +20,10 @@ internal sealed record HostStateChangedEvent(
     string? Trigger)
     : DashboardEvent(Timestamp);
 
-internal sealed record FunctionDiscoveredEvent(
-    DateTimeOffset Timestamp,
-    FunctionInfo Function)
+internal sealed record FunctionDiscoveredEvent(DateTimeOffset Timestamp, FunctionInfo Function)
     : DashboardEvent(Timestamp);
 
-internal sealed record FunctionRemovedEvent(
-    DateTimeOffset Timestamp,
-    string Name)
+internal sealed record FunctionRemovedEvent(DateTimeOffset Timestamp, string Name)
     : DashboardEvent(Timestamp);
 
 internal sealed record InvocationStartedEvent(
@@ -49,11 +45,7 @@ internal sealed record InvocationCompletedEvent(
     string? ErrorMessage)
     : DashboardEvent(Timestamp);
 
-internal sealed record CliDiagnosticEvent(
-    DateTimeOffset Timestamp,
-    string Code,
-    string Message,
-    string? Recommendation)
+internal sealed record CliDiagnosticEvent(DateTimeOffset Timestamp, string Code, string Message, string? Recommendation)
     : DashboardEvent(Timestamp);
 
 internal sealed record SummaryEvent(

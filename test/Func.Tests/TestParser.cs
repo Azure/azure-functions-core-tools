@@ -52,9 +52,7 @@ internal static class TestParser
     /// Exposed for tests that need to resolve <see cref="FuncCliCommand"/> services
     /// directly without going through <see cref="Parser.CreateCommand"/>.
     /// </summary>
-    public static IServiceProvider BuildServiceProviderWith(
-        IInteractionService interaction,
-        Action<IServiceCollection>? configure = null)
+    public static IServiceProvider BuildServiceProviderWith(IInteractionService interaction, Action<IServiceCollection>? configure = null)
     {
         ServiceCollection services = BuildBaseServices(interaction);
         configure?.Invoke(services);

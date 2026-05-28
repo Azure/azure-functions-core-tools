@@ -812,11 +812,7 @@ internal sealed class CompactRenderer(
             ? "Waiting for events…"
             : $"No logs for {activeFunctionFilter}…";
 
-    private static bool MatchesLogFilters(
-        CompactLogLine line,
-        string? activeFunctionFilter,
-        bool errorsOnly,
-        LogLevel minimumLogLevel)
+    private static bool MatchesLogFilters(CompactLogLine line, string? activeFunctionFilter, bool errorsOnly, LogLevel minimumLogLevel)
     {
         if (activeFunctionFilter is not null
             && line.FunctionName is not null

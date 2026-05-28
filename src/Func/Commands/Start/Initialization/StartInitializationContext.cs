@@ -6,11 +6,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Inputs required to initialize a host run.
 /// </summary>
-internal sealed record StartInitializationContext(
-    StartCommandOptions Options,
-    string CliVersion,
-    bool IsInteractive,
-    bool CanPrompt)
+internal sealed record StartInitializationContext(StartCommandOptions Options, string CliVersion, bool IsInteractive, bool CanPrompt)
 {
     public string ProfileName => string.IsNullOrWhiteSpace(Options.RequestedProfileName)
         ? "none"

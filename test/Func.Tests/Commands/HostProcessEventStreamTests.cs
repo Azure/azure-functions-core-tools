@@ -14,10 +14,7 @@ public class HostProcessEventStreamTests
     [Fact]
     public async Task ReadAsync_BuffersProcessStartedAndOutputLinesUntilExit()
     {
-        var process = new CompletedHostProcess(
-            stdout: "stdout line",
-            stderr: "stderr line",
-            exitCode: 23);
+        var process = new CompletedHostProcess(stdout: "stdout line", stderr: "stderr line", exitCode: 23);
         var launchInfo = new HostProcessLaunchInfo(
             new ProcessStartInfo("host"),
             Port: 7071,

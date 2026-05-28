@@ -23,20 +23,13 @@ internal sealed record StartInitializationStepStartedEvent(DateTimeOffset Timest
 /// <summary>
 /// Emitted when a progress-based initialization step advances.
 /// </summary>
-internal sealed record StartInitializationProgressEvent(
-    DateTimeOffset Timestamp,
-    string StepId,
-    double Percent,
-    string? Message = null)
+internal sealed record StartInitializationProgressEvent(DateTimeOffset Timestamp, string StepId, double Percent, string? Message = null)
     : StartInitializationEvent(Timestamp);
 
 /// <summary>
 /// Emitted when an initialization step completes successfully.
 /// </summary>
-internal sealed record StartInitializationStepCompletedEvent(
-    DateTimeOffset Timestamp,
-    string StepId,
-    string? Message = null)
+internal sealed record StartInitializationStepCompletedEvent(DateTimeOffset Timestamp, string StepId, string? Message = null)
     : StartInitializationEvent(Timestamp);
 
 /// <summary>

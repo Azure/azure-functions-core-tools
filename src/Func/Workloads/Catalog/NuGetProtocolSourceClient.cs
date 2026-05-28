@@ -35,9 +35,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     public PackageSource Source => _repository.PackageSource;
 
-    public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
-        CatalogSearchQuery query,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
 
@@ -54,9 +52,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return raw is null ? [] : ParseV3Hits(raw, Source);
     }
 
-    public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(
-        string packageId,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(string packageId, CancellationToken cancellationToken)
     {
         FindPackageByIdResource findResource = await _repository.GetResourceAsync<FindPackageByIdResource>(cancellationToken);
         using var cache = new SourceCacheContext();
@@ -70,10 +66,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return versions?.ToList() ?? [];
     }
 
-    public async Task<Stream> OpenPackageAsync(
-        string packageId,
-        NuGetVersion version,
-        CancellationToken cancellationToken)
+    public async Task<Stream> OpenPackageAsync(string packageId, NuGetVersion version, CancellationToken cancellationToken)
     {
         FindPackageByIdResource findResource = await _repository.GetResourceAsync<FindPackageByIdResource>(cancellationToken);
         using var cache = new SourceCacheContext();
@@ -118,9 +111,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     /// for the source all apply. Virtual so tests can stub the JSON
     /// response without standing up an HTTP server.
     /// </summary>
-    internal virtual async Task<JObject?> FetchSearchResponseAsync(
-        Uri searchUri,
-        CancellationToken cancellationToken)
+    internal virtual async Task<JObject?> FetchSearchResponseAsync(Uri searchUri, CancellationToken cancellationToken)
     {
         HttpSourceResource httpSourceResource = await _repository.GetResourceAsync<HttpSourceResource>(cancellationToken);
         return await httpSourceResource.HttpSource.GetJObjectAsync(
@@ -135,10 +126,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     /// <c>packageType=FuncCliWorkload</c> filter. Returns null when the
     /// source has no V3 service index (e.g. local file feeds).
     /// </summary>
-    private async Task<Uri?> TryBuildV3SearchUriAsync(
-        CatalogSearchQuery query,
-        int take,
-        CancellationToken cancellationToken)
+    private async Task<Uri?> TryBuildV3SearchUriAsync(CatalogSearchQuery query, int take, CancellationToken cancellationToken)
     {
         ServiceIndexResourceV3? serviceIndex = await _repository.GetResourceAsync<ServiceIndexResourceV3>(cancellationToken);
         if (serviceIndex is null)

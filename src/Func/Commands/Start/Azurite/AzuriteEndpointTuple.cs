@@ -7,8 +7,4 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite;
 /// The set of Azurite service endpoints inferred from an
 /// <c>AzureWebJobsStorage</c> connection string.
 /// </summary>
-internal sealed record AzuriteEndpointTuple(
-    Uri BlobEndpoint,
-    Uri QueueEndpoint,
-    Uri TableEndpoint,
-    string AccountName);
+internal sealed record AzuriteEndpointTuple(Uri BlobEndpoint, Uri QueueEndpoint, Uri TableEndpoint, string AccountName);

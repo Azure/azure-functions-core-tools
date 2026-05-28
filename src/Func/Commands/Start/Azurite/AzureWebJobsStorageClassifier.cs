@@ -62,8 +62,7 @@ internal sealed class AzureWebJobsStorageClassifier : IAzureWebJobsStorageClassi
 
         if (!hasBlob && !hasQueue && !hasTable)
         {
-            return AzureWebJobsStorageReference.NotLocal(
-                "Connection string does not reference local development storage.");
+            return AzureWebJobsStorageReference.NotLocal("Connection string does not reference local development storage.");
         }
 
         Uri? blob = TryParseEndpoint(blobValue);
@@ -74,8 +73,7 @@ internal sealed class AzureWebJobsStorageClassifier : IAzureWebJobsStorageClassi
         bool anyParsed = presentEndpoints.Any(static e => e is not null);
         if (!anyParsed)
         {
-            return AzureWebJobsStorageReference.NotLocal(
-                "Connection string endpoints could not be parsed as URIs.");
+            return AzureWebJobsStorageReference.NotLocal("Connection string endpoints could not be parsed as URIs.");
         }
 
         bool anyLocal = presentEndpoints.Any(static e => e is not null && IsLocalHost(e.Host));
@@ -83,14 +81,12 @@ internal sealed class AzureWebJobsStorageClassifier : IAzureWebJobsStorageClassi
 
         if (!anyLocal)
         {
-            return AzureWebJobsStorageReference.NotLocal(
-                "Endpoints reference a non-local storage account.");
+            return AzureWebJobsStorageReference.NotLocal("Endpoints reference a non-local storage account.");
         }
 
         if (anyNonLocal)
         {
-            return AzureWebJobsStorageReference.NotLocal(
-                "Endpoints mix local and non-local hosts; treating as non-local.");
+            return AzureWebJobsStorageReference.NotLocal("Endpoints mix local and non-local hosts; treating as non-local.");
         }
 
         if (!(hasBlob && hasQueue && hasTable) || blob is null || queue is null || table is null)
@@ -152,9 +148,7 @@ internal sealed class AzureWebJobsStorageClassifier : IAzureWebJobsStorageClassi
                 reason: $"Local emulator reference uses a custom account name '{blobAccount}'.");
         }
 
-        return AzureWebJobsStorageReference.Manageable(
-            endpoints: tuple,
-            reason: "Explicit local Azurite endpoints for devstoreaccount1.");
+        return AzureWebJobsStorageReference.Manageable(endpoints: tuple, reason: "Explicit local Azurite endpoints for devstoreaccount1.");
     }
 
     private static Dictionary<string, string> Parse(string connectionString)

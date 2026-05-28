@@ -114,9 +114,7 @@ internal sealed class DefaultHostWorkloadResolver(
             ? candidates
             : [.. candidates.Where(candidate => range.Satisfies(candidate.Version))];
 
-    private async Task<ResolvedPackage> ResolveLatestInstallPackageAsync(
-        VersionRange? range,
-        CancellationToken cancellationToken)
+    private async Task<ResolvedPackage> ResolveLatestInstallPackageAsync(VersionRange? range, CancellationToken cancellationToken)
     {
         string packageId = HostWorkloadPackage.CurrentPackageId;
         ResolvedPackage? package = range is null

@@ -13,9 +13,7 @@ namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
 /// </summary>
 internal static class TestRepository
 {
-    public static SourceRepository Build(
-        PackageSource source,
-        params INuGetResource?[] resources)
+    public static SourceRepository Build(PackageSource source, params INuGetResource?[] resources)
     {
         var providers = new List<Lazy<INuGetResourceProvider>>();
         foreach (INuGetResource? resource in resources)

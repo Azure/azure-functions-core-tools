@@ -112,9 +112,7 @@ public sealed class ProjectProfileOptionsSetupTests : IDisposable
 
     private void WriteProjectConfig(string contents)
     {
-        string folder = Path.Combine(
-            _dir.FullName,
-            CliConfigurationNames.ProjectConfigFolderName);
+        string folder = Path.Combine(_dir.FullName, CliConfigurationNames.ProjectConfigFolderName);
         Directory.CreateDirectory(folder);
 
         string path = Path.Combine(folder, CliConfigurationNames.ConfigFileName);

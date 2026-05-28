@@ -102,8 +102,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             // prompt entirely. Non-interactive contexts treat the prompt as
             // a decline and exit non-zero with the same hint. Local .nupkg
             // installs bypass the check since the resolver path differs.
-            int? earlyExit = await HandleAlreadyInstalledAsync(
-                workload, exact, source, includePrerelease, cancellationToken);
+            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, cancellationToken);
             if (earlyExit is { } code)
             {
                 return code;

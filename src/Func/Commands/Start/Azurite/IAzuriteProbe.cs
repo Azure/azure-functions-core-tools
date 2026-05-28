@@ -15,7 +15,5 @@ internal interface IAzuriteProbe
     /// </summary>
     /// <param name="endpoints">Endpoint tuple to probe. Must not be null.</param>
     /// <param name="cancellationToken">Cancellation token for the overall probe.</param>
-    public Task<AzuriteProbeResult> ProbeAsync(
-        AzuriteEndpointTuple endpoints,
-        CancellationToken cancellationToken);
+    public Task<AzuriteProbeResult> ProbeAsync(AzuriteEndpointTuple endpoints, CancellationToken cancellationToken);
 }

@@ -105,10 +105,7 @@ public class HostProcessStartInfoFactoryTests : IDisposable
         IDictionary<string, string>? environmentVariables = null)
     {
         environmentVariables ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var hostRunContext = new FunctionsProjectHostRunContext(
-            _startupDirectory,
-            "dotnet-isolated",
-            environmentVariables);
+        var hostRunContext = new FunctionsProjectHostRunContext(_startupDirectory, "dotnet-isolated", environmentVariables);
 
         return new HostProcessStartContext(
             CreateHostWorkload(),

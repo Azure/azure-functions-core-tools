@@ -23,10 +23,5 @@ public static class FunctionsWorkerResolutionFailures
         string packageVersion,
         string workerConfigPath,
         string message)
-        => new FunctionsWorkerResolutionFailure.InvalidInstallation(
-            workerId,
-            packageId,
-            packageVersion,
-            workerConfigPath,
-            message);
+        => new FunctionsWorkerResolutionFailure.InvalidInstallation(workerId, packageId, packageVersion, workerConfigPath, message);
 }

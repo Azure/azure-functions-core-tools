@@ -15,8 +15,4 @@ namespace Azure.Functions.Cli.Commands;
 /// <param name="ProjectName">Project name (from <c>--name</c> or the directory name).</param>
 /// <param name="Language">Programming language (from <c>--language</c> or a prompt). May be null.</param>
 /// <param name="Force">True if <c>--force</c> was supplied.</param>
-public sealed record InitContext(
-    WorkingDirectory WorkingDirectory,
-    string? ProjectName,
-    string? Language,
-    bool Force);
+public sealed record InitContext(WorkingDirectory WorkingDirectory, string? ProjectName, string? Language, bool Force);

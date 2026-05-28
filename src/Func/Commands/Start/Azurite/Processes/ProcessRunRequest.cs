@@ -6,8 +6,4 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 /// <summary>
 /// Describes a child process invocation routed through <see cref="IProcessRunner"/>.
 /// </summary>
-internal sealed record ProcessRunRequest(
-    string FileName,
-    IReadOnlyList<string> Arguments,
-    string? WorkingDirectory,
-    TimeSpan Timeout);
+internal sealed record ProcessRunRequest(string FileName, IReadOnlyList<string> Arguments, string? WorkingDirectory, TimeSpan Timeout);

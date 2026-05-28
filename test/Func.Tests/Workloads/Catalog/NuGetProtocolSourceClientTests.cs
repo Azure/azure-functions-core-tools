@@ -167,8 +167,7 @@ public sealed class NuGetProtocolSourceClientTests
             () => client.OpenPackageAsync("workload.absent", NuGetVersion.Parse("1.0.0"), CancellationToken.None));
     }
 
-    private static NuGetProtocolSourceClient NewClient(
-        FindPackageByIdResource? findResource = null)
+    private static NuGetProtocolSourceClient NewClient(FindPackageByIdResource? findResource = null)
     {
         SourceRepository repo = TestRepository.Build(_source, findResource);
         return new NuGetProtocolSourceClient(repo);

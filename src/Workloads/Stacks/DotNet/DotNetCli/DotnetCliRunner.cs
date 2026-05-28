@@ -13,10 +13,7 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
 {
     private readonly IDotnetPathResolver _pathResolver = pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
 
-    public async Task RunAsync(
-        IReadOnlyList<string> arguments,
-        string? workingDirectory,
-        CancellationToken cancellationToken)
+    public async Task RunAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
     {
         await RunCoreAsync(arguments, workingDirectory, cancellationToken);
     }
@@ -29,10 +26,7 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
         return await RunCoreAsync(arguments, workingDirectory, cancellationToken);
     }
 
-    private async Task<string> RunCoreAsync(
-        IReadOnlyList<string> arguments,
-        string? workingDirectory,
-        CancellationToken cancellationToken)
+    private async Task<string> RunCoreAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(arguments);
 

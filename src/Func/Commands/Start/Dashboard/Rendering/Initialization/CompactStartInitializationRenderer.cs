@@ -308,9 +308,5 @@ internal sealed class CompactStartInitializationRenderer(
         public string? Result { get; internal set; }
     }
 
-    private sealed record StepSnapshot(
-        StartInitializationStep Step,
-        double Percent,
-        bool Completed,
-        string? Result);
+    private sealed record StepSnapshot(StartInitializationStep Step, double Percent, bool Completed, string? Result);
 }

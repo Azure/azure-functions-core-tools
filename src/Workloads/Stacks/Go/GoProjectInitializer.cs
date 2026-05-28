@@ -59,10 +59,7 @@ internal sealed class GoProjectInitializer : IProjectInitializer
         return [SkipGoModTidyOption, NoBundleOption, BundlesChannelOption];
     }
 
-    public async Task InitializeAsync(
-        InitContext context,
-        ParseResult parseResult,
-        CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);

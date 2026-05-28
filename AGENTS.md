@@ -88,6 +88,10 @@ the full CLI.
 - Don't leave unused `using` directives.
 - Don't run `dotnet format` across unrelated files or make drive-by formatting
   changes.
+- Prefer single-line method, constructor, record, and simple call signatures when
+  they fit comfortably (roughly 140 columns). Keep the existing wrapped style for
+  genuinely long signatures or calls with nested object creation, lambdas, or
+  several-property-deep member/method chains.
 - Follow the existing `stylecop.json` / analyzer rules. Don't disable analyzers
   to silence warnings, fix the underlying issue.
 - **Address every build warning before pushing.** CI sets

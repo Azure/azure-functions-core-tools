@@ -14,11 +14,7 @@ public abstract record ExtensionBundleResolution
     {
     }
 
-    public sealed record Resolved(
-        string BundleId,
-        string Version,
-        string Path,
-        ExtensionBundleSupportedRuntimeWarning? RuntimeWarning)
+    public sealed record Resolved(string BundleId, string Version, string Path, ExtensionBundleSupportedRuntimeWarning? RuntimeWarning)
         : ExtensionBundleResolution;
 
     /// <summary>
@@ -46,9 +42,6 @@ public abstract record ExtensionBundleResolution
     /// Bundle workloads are installed but none satisfy the host.json/profile constraint.
 
     /// </summary>
-    public sealed record NoCompatibleInstall(
-        string ConstraintRange,
-        IReadOnlyList<string> InstalledVersions,
-        string Hint)
+    public sealed record NoCompatibleInstall(string ConstraintRange, IReadOnlyList<string> InstalledVersions, string Hint)
         : ExtensionBundleResolution;
 }

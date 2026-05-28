@@ -339,8 +339,7 @@ public sealed class QuickstartManifestServiceTests
 
         public FakeHttpMessageHandler(Exception exception) => _exception = exception;
 
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (_exception is not null)
             {

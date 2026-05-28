@@ -102,9 +102,7 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         return environmentVariables;
     }
 
-    private void MergeLocalSettingsValues(
-        IReadOnlyDictionary<string, string> values,
-        Dictionary<string, string> environmentVariables)
+    private void MergeLocalSettingsValues(IReadOnlyDictionary<string, string> values, Dictionary<string, string> environmentVariables)
     {
         foreach ((string name, string value) in values)
         {

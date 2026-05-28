@@ -16,10 +16,7 @@ public abstract record FunctionsWorkerResolutionFailure
 
     public string Message { get; }
 
-    public sealed record MissingCompatibleVersion(
-        FunctionsWorkerId WorkerId,
-        string? VersionConstraint,
-        string Message)
+    public sealed record MissingCompatibleVersion(FunctionsWorkerId WorkerId, string? VersionConstraint, string Message)
         : FunctionsWorkerResolutionFailure(Message);
 
     public sealed record NotInstalled(FunctionsWorkerId WorkerId, string Message)

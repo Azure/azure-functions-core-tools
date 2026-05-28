@@ -124,9 +124,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
         return FunctionsWorkerResolutionResults.NotResolved(failure);
     }
 
-    private static FunctionsWorkerResolutionResult MissingCompatibleVersion(
-        FunctionsWorkerId workerId,
-        VersionRange? constraint)
+    private static FunctionsWorkerResolutionResult MissingCompatibleVersion(FunctionsWorkerId workerId, VersionRange? constraint)
     {
         if (constraint is null)
         {

@@ -277,10 +277,7 @@ public class DefaultFunctionsWorkerResolverTests
     private DefaultFunctionsWorkerResolver CreateResolver(IReadOnlyDictionary<string, VersionRange>? workerVersionRanges = null)
         => new(_workloads, _fileSystem, workerVersionRanges);
 
-    private static ContentWorkloadInfo CreateContentWorkload(
-        string packageId,
-        string packageVersion,
-        IReadOnlyList<string>? aliases = null)
+    private static ContentWorkloadInfo CreateContentWorkload(string packageId, string packageVersion, IReadOnlyList<string>? aliases = null)
     {
         string installDirectory = Path.Combine(Path.GetTempPath(), "workloads", packageId, packageVersion);
         return new ContentWorkloadInfo(

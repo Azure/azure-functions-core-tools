@@ -22,9 +22,7 @@ internal sealed record AzuriteProbeResult
     /// </summary>
     public string? Reason { get; init; }
 
-    public static AzuriteProbeResult From(
-        IEnumerable<AzuriteEndpointProbeOutcome> outcomes,
-        string? reason = null)
+    public static AzuriteProbeResult From(IEnumerable<AzuriteEndpointProbeOutcome> outcomes, string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(outcomes);
 
@@ -86,9 +84,7 @@ internal sealed record AzuriteProbeResult
         return AzuriteProbeStatus.Partial;
     }
 
-    private static string DescribeReason(
-        AzuriteProbeStatus status,
-        ImmutableArray<AzuriteEndpointProbeOutcome> outcomes)
+    private static string DescribeReason(AzuriteProbeStatus status, ImmutableArray<AzuriteEndpointProbeOutcome> outcomes)
     {
         return status switch
         {

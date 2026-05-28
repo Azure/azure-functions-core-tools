@@ -13,7 +13,5 @@ internal interface IManagedAzuriteOrchestrator
     /// <summary>
     /// Resolves Azurite for one <c>func start</c> invocation.
     /// </summary>
-    public Task<ManagedAzuriteResult> EnsureReadyAsync(
-        ManagedAzuriteRequest request,
-        CancellationToken cancellationToken);
+    public Task<ManagedAzuriteResult> EnsureReadyAsync(ManagedAzuriteRequest request, CancellationToken cancellationToken);
 }
