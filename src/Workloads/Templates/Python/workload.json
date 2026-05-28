@@ -2,5 +2,5 @@
   "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
   "kind": "content",
   "displayName": "Python function templates",
-  "description": "Function-scaffold templates for Python Azure Functions projects (v1 and v2 programming models). Compatible with Microsoft.Azure.Functions.ExtensionBundle (see templates-workload.json for the exact min-bundle range)."
+  "description": "Function-scaffold templates for Python Azure Functions projects (v2 programming model)."
 }
