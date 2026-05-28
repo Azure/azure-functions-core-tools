@@ -33,7 +33,7 @@ internal sealed class DotNetSourcePackage
 
 /// <summary>
 /// One DotNet template record. Mirrors templates-workload-spec.md §5.3.1 — every
-/// field needed by `func templates list` and `func new --template X --help` is
+/// field needed by `func new --list` and `func new --template X --help` is
 /// already projected at workload pack time so reads are fully offline.
 /// </summary>
 internal sealed class DotNetTemplateRecord

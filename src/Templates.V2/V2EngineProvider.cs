@@ -98,13 +98,17 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
                     null));
         }
 
-        // PR2: seed defaults from each declared prompt. PR4 replaces this
-        // with the orchestrator's stage-B parsed values so user-supplied
-        // option values override the prompt defaults.
+        // PR4: seed defaults from each declared prompt, then override the
+        // function-name prompt with the user-supplied context.FunctionName
+        // so it wins over the template's declared default. The engine reads
+        // values by paramId; the recognised function-name prompt ids match
+        // the conventions Node v4 / Python v2 bundle templates use.
         var optionValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (TemplateUserPrompt prompt in context.Template.Metadata.UserPrompts)
         {
-            optionValues[prompt.Id] = prompt.DefaultValue;
+            optionValues[prompt.Id] = _functionNamePromptIds.Contains(prompt.Id)
+                ? context.FunctionName
+                : prompt.DefaultValue;
         }
 
         return _engine.Apply(
@@ -114,6 +118,15 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
             context.WorkingDirectory.Info,
             context.Force);
     }
+
+    private static readonly HashSet<string> _functionNamePromptIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name",
+        "functionName",
+        "function-name",
+        "trigger-functionName",
+        "trigger-functionname",
+    };
 
     private static bool MatchesLanguage(FunctionTemplateInfo info, string? requestedLanguage)
     {

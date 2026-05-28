@@ -26,7 +26,9 @@ public class NewCommandTests
             new TemplateEngineProviderRegistry([]),
             new TemplateOptionHydrator(System.Array.Empty<Cli.Projects.IProjectInitializer>()),
             new TemplatePicker(_interaction),
-            new NewCommandRenderer(_interaction));
+            new NewCommandRenderer(_interaction),
+            Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>(),
+            Substitute.For<Cli.Bundles.IExtensionBundleResolver>());
     }
 
     [Fact]
