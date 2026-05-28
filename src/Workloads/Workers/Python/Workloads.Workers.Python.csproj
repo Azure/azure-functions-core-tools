@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Title>Python Worker</Title>
-    <Description>Azure Functions Python language worker.</Description>
+    <Description>Azure Functions CLI Python language worker.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:python-worker func-worker func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>

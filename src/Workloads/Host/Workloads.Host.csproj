@@ -7,7 +7,7 @@
     <RuntimeIdentifiers>$(_CliRuntimeIdentifiers)</RuntimeIdentifiers>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <Title>Functions Host</Title>
-    <Description>Azure Functions host runtime.</Description>
+    <Description>Azure Functions CLI host runtime.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:host func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
