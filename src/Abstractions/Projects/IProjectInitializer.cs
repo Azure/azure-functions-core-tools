@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Workloads;
 
@@ -33,6 +34,19 @@ public interface IProjectInitializer
     /// Maps each canonical language name to its accepted aliases (e.g. "C#" → ["csharp"]).
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
+
+    /// <summary>
+    /// Stack-default validator for function names, applied by <c>func new</c>'s
+    /// option hydrator when a template's own function-name prompt declares no
+    /// <c>ValidatorRegex</c>. Returning <c>null</c>
+    /// means "no stack default — the option accepts any string"; that is the
+    /// default and the right answer for stacks whose templates always carry
+    /// their own validators. Implementations that supply a regex should match
+    /// the canonical identifier rules for the stack's language(s) so a
+    /// missing template-level validator still rejects invalid identifiers
+    /// before any file is written.
+    /// </summary>
+    public Regex? DefaultFunctionNameValidator => null;
 
     /// <summary>
     /// Registers the options this initializer contributes to <c>func init</c> via

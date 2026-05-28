@@ -2,58 +2,76 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
-using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Templates;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Creates a new function from a template. The full implementation requires
-/// a language workload to be installed — this defines the command skeleton and options.
+/// <c>func new</c> — scaffolds a new function from an installed templates
+/// content workload, or lists available templates when <c>--list</c> is
+/// supplied. Wires the command surface and delegates to
+/// <see cref="NewCommandRunner"/>, which currently terminates at
+/// the engine-dispatch step until <see cref="ITemplateEngineProvider"/>
+/// implementations exist.
 /// </summary>
-internal class NewCommand : FuncCliCommand, IBuiltInCommand
+internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<string?> NameOption { get; } = new("--name", "-n")
     {
-        Description = "The name of the function"
+        Description = "Function name. Defaults to the template's default function name.",
     };
 
     public Option<string?> TemplateOption { get; } = new("--template", "-t")
     {
-        Description = "The function template name"
+        Description = "Template ID. Omit in an interactive shell to pick from a list.",
     };
 
     public Option<bool> ForceOption { get; } = new("--force")
     {
-        Description = "Overwrite existing files"
+        Description = "Overwrite existing files.",
     };
 
-    private readonly IWorkloadHintRenderer _hintRenderer;
+    public Option<bool> NonInteractiveOption { get; } = new("--non-interactive")
+    {
+        Description = "Refuse to prompt; exit 1 if any required input is missing.",
+    };
 
-    public NewCommand(IWorkloadHintRenderer hintRenderer)
+    public Option<bool> ListOption { get; } = new("--list", "-l")
+    {
+        Description = "List available templates for this project instead of scaffolding.",
+    };
+
+    private readonly NewCommandRunner _runner;
+
+    public NewCommand(NewCommandRunner runner)
         : base("new", "Create a new function from a template.")
     {
-        ArgumentNullException.ThrowIfNull(hintRenderer);
-        _hintRenderer = hintRenderer;
+        _runner = runner ?? throw new ArgumentNullException(nameof(runner));
 
         AddPathArgument();
         Options.Add(NameOption);
         Options.Add(TemplateOption);
         Options.Add(ForceOption);
+        Options.Add(NonInteractiveOption);
+        Options.Add(ListOption);
     }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        // Until a workload contributes templates, the only useful thing this
-        // command can do is point the user at `func workload install`. Once
-        // templates exist we'll resolve `parseResult.GetValue(PathArgument!)`
-        // and call `CreateIfNotExists()` before scaffolding.
-        _hintRenderer.Render(new WorkloadHint(
-            WorkloadHintKind.NoWorkloadsInstalled,
-            ActionDescription: "create functions from templates",
-            RequestedStack: null,
-            InstalledStacks: []));
+        ArgumentNullException.ThrowIfNull(parseResult);
 
-        return Task.FromResult(1);
+        WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
+        var invocation = new NewInvocation(
+            workingDirectory,
+            RequestedTemplate: parseResult.GetValue(TemplateOption),
+            RequestedFunctionName: parseResult.GetValue(NameOption),
+            Force: parseResult.GetValue(ForceOption),
+            NonInteractive: parseResult.GetValue(NonInteractiveOption));
+
+        return parseResult.GetValue(ListOption)
+            ? _runner.ListAsync(invocation, cancellationToken)
+            : _runner.ExecuteAsync(invocation, cancellationToken);
     }
 }
