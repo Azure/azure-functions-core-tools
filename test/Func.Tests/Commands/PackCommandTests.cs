@@ -27,7 +27,7 @@ public class PackCommandTests
         var exitCode = await parseResult.InvokeAsync();
 
         Assert.NotEqual(0, exitCode);
-        Assert.Contains("not supported in v5", _interaction.AllOutput);
+        Assert.Contains("not supported yet", _interaction.AllOutput);
         Assert.Contains("v4", _interaction.AllOutput);
         Assert.Contains("functions-run-local", _interaction.AllOutput);
     }
@@ -41,6 +41,6 @@ public class PackCommandTests
         var exitCode = await parseResult.InvokeAsync();
 
         Assert.NotEqual(0, exitCode);
-        Assert.Contains("not supported in v5", _interaction.AllOutput);
+        Assert.Contains("not supported yet", _interaction.AllOutput);
     }
 }
