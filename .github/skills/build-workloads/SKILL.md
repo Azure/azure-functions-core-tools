@@ -27,7 +27,10 @@ feed.
    `NUGET-SERVER-API-KEY`. Packages persist in a named Docker volume so reruns
    keep history.
 2. Packs every workload csproj listed in `Azure.Functions.Cli.slnx` under
-   `src/Workloads/**`, into a single output folder.
+   `src/Workloads/**`, into a single output folder. Packs with
+   `PackAllRids=true` so RID-specific packages (notably the per-RID Host
+   workload, e.g. `Azure.Functions.Cli.Workloads.Host.osx-arm64`) are
+   produced alongside the RID-less ones, matching what CI publishes.
 3. Pushes each produced `.nupkg` to the feed, skipping duplicates so a rerun
    without bumping `VersionPrefix` is idempotent.
 4. Echoes the install command the user runs from another shell:
