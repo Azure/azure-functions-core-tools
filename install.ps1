@@ -84,6 +84,7 @@ if (-not $Version) {
 
     $Version = $release.tag_name
 } else {
+    if ($Version -notlike 'v*') { $Version = "v$Version" }
     $release = Invoke-RestMethod -Uri "$apiBase/releases/tags/$Version"
 }
 

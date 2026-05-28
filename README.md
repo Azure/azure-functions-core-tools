@@ -31,9 +31,9 @@ Both scripts auto-detect your OS and architecture, download the latest 5.x relea
 
 | Option | PowerShell | Bash |
 |--------|-----------|------|
-| Include pre-releases | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Prerelease` | `PRERELEASE=true curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
-| Specific version | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Version 5.0.0` | `VERSION=5.0.0 curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
-| Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `INSTALL_DIR=~/my-tools curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
+| Include pre-releases | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Prerelease` | `curl -sSL https://aka.ms/func-cli/install.sh \| PRERELEASE=true bash` |
+| Specific version | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Version 5.0.0` | `curl -sSL https://aka.ms/func-cli/install.sh \| VERSION=5.0.0 bash` |
+| Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `curl -sSL https://aka.ms/func-cli/install.sh \| INSTALL_DIR=~/my-tools bash` |
 
 ### Unattended install
 

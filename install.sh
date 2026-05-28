@@ -79,6 +79,12 @@ if [ -z "$VERSION" ]; then
     fi
 fi
 
+# Ensure version has 'v' prefix
+case "$VERSION" in
+    v*) ;;
+    *)  VERSION="v${VERSION}" ;;
+esac
+
 echo "Installing func CLI ${VERSION} (${OS}-${ARCH})..."
 
 # --- Check existing install ---
