@@ -76,6 +76,27 @@ internal sealed class TemplateOptionHydrator
         return result;
     }
 
+    /// <summary>
+    /// Same as <see cref="Hydrate"/> but pairs each <see cref="Option"/>
+    /// with the originating prompt id. NewCommand uses this overload on
+    /// the execute path to map user-supplied values back to the
+    /// v2 paramId — <c>Option.Name</c> by then has been kebab-cased and
+    /// isn't reversible to the original id.
+    /// </summary>
+    public IReadOnlyList<HydratedTemplateOption> HydrateWithIds(FunctionTemplateInfo template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+
+        List<HydratedTemplateOption> result = [];
+        foreach (TemplateUserPrompt prompt in template.Metadata.UserPrompts)
+        {
+            Option option = BuildOption(template, prompt);
+            result.Add(new HydratedTemplateOption(option, prompt.Id));
+        }
+
+        return result;
+    }
+
     private Option BuildOption(FunctionTemplateInfo template, TemplateUserPrompt prompt)
     {
         string longName = prompt.LongAlias ?? "--" + KebabCase(prompt.Id);
@@ -243,3 +264,10 @@ internal sealed class TemplateOptionHydrator
         return sb.ToString();
     }
 }
+
+/// <summary>
+/// A hydrated CLI option paired with the v2 paramId it was projected
+/// from. Used by <c>NewCommand</c> to map user-supplied values on the
+/// execute path back to the engine's variable namespace.
+/// </summary>
+internal sealed record HydratedTemplateOption(Option Option, string PromptId);

@@ -73,6 +73,14 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
 
         rootCommand = Parser.CreateCommand(host.Services);
 
+        // Pre-parse hydration for `func new -t <id>`: the user can pass
+        // per-template options (e.g. --auth-level) that NewCommand learns
+        // about only after the hydrator runs against the chosen template.
+        // Attach them to NewCommand BEFORE the parser sees argv so SCL
+        // treats them as known options instead of erroring out via
+        // PathArgument's unrecognized-token guard.
+        NewCommandArgPreparer.PrepareIfFuncNew(args, host.Services, rootCommand);
+
         commandParseResult = rootCommand.Parse(args);
         commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);

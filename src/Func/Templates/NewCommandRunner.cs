@@ -115,7 +115,7 @@ internal sealed class NewCommandRunner
         // Step 8 / 9: stage-B hydration. Hands the engine the user's --name
         // plus each prompt's declared default (no per-option CLI parsing
         // yet); the engine reads from the supplied dictionary.
-        IReadOnlyDictionary<string, string?> optionValues = BuildPromptDefaults(template);
+        IReadOnlyDictionary<string, string?> optionValues = BuildPromptDefaults(template, invocation.UserOptionValues);
 
         // Step 10: function name resolution.
         string functionName = invocation.RequestedFunctionName
@@ -144,7 +144,8 @@ internal sealed class NewCommandRunner
             functionName,
             resolved.Language,
             invocation.Force,
-            resolved.Workload.InstallDirectory);
+            resolved.Workload.InstallDirectory,
+            invocation.UserOptionValues);
 
         ParseResult emptyParseResult = new RootCommand().Parse(string.Empty);
         TemplateApplicationResult applyResult = await provider.ApplyAsync(context, emptyParseResult, cancellationToken);
@@ -173,7 +174,15 @@ internal sealed class NewCommandRunner
             return 1;
         }
 
-        _renderer.RenderCatalogue(resolved.Stack, resolved.Language, templates);
+        if (invocation.JsonOutput)
+        {
+            _renderer.RenderCatalogueJson(resolved.Stack, resolved.Language, templates);
+        }
+        else
+        {
+            _renderer.RenderCatalogue(resolved.Stack, resolved.Language, templates);
+        }
+
         return 0;
     }
 
@@ -187,6 +196,23 @@ internal sealed class NewCommandRunner
     /// back to a built-ins-only help render or surface the failure.
     /// </summary>
     public async Task<IReadOnlyList<Option>?> HydrateOptionsForTemplateAsync(
+        NewInvocation invocation,
+        string templateId,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<HydratedTemplateOption>? paired =
+            await HydrateOptionsForTemplateWithIdsAsync(invocation, templateId, cancellationToken);
+
+        return paired?.Select(p => p.Option).ToList();
+    }
+
+    /// <summary>
+    /// Same as <see cref="HydrateOptionsForTemplateAsync"/> but also returns
+    /// the prompt id each option projects from. <c>NewCommand</c> uses this
+    /// overload on the execute path to map user-supplied values back to
+    /// the v2 paramId the engine resolves against.
+    /// </summary>
+    public async Task<IReadOnlyList<HydratedTemplateOption>?> HydrateOptionsForTemplateWithIdsAsync(
         NewInvocation invocation,
         string templateId,
         CancellationToken cancellationToken)
@@ -209,7 +235,7 @@ internal sealed class NewCommandRunner
             return null;
         }
 
-        return _optionHydrator.Hydrate(template);
+        return _optionHydrator.HydrateWithIds(template);
     }
 
     private async Task<ResolvedContext?> ResolveContextAsync(
@@ -457,13 +483,24 @@ internal sealed class NewCommandRunner
         return await _picker.PickAsync(templates, cancellationToken);
     }
 
-    private static IReadOnlyDictionary<string, string?> BuildPromptDefaults(FunctionTemplateInfo template)
+    private static IReadOnlyDictionary<string, string?> BuildPromptDefaults(
+        FunctionTemplateInfo template,
+        IReadOnlyDictionary<string, string?>? userOverrides = null)
     {
         var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (TemplateUserPrompt prompt in template.Metadata.UserPrompts)
         {
             dict[prompt.Id] = prompt.DefaultValue;
         }
+
+        if (userOverrides is not null)
+        {
+            foreach (KeyValuePair<string, string?> pair in userOverrides)
+            {
+                dict[pair.Key] = pair.Value;
+            }
+        }
+
         return dict;
     }
 
@@ -627,4 +664,6 @@ internal sealed record NewInvocation(
     string? RequestedTemplate,
     string? RequestedFunctionName,
     bool Force,
-    bool NonInteractive);
+    bool NonInteractive,
+    bool JsonOutput = false,
+    IReadOnlyDictionary<string, string?>? UserOptionValues = null);
