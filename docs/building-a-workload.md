@@ -392,16 +392,8 @@ debugger steps into them as long as the workload's PDB sits next to its DLL
 in the install directory.
 
 The `DeployForDebug` MSBuild target (in `eng/build/WorkloadDebug.targets`,
-imported by every project) handles the full loop:
-
-1. Build the workload.
-2. On first run for a given `<id>@<version>`, pack the workload and run
-   `func workload install <nupkg> --force` against the resolved home.
-3. Copy the freshly built `.dll` + `.pdb` over the install dir so subsequent
-   edits show up without another install.
-
-It's safe to invoke on any project; it no-ops for anything that isn't
-`PackageType=FuncCliWorkload`.
+imported by every project) handles the build + copy. It's safe to invoke on
+any project; it no-ops for anything that isn't `PackageType=FuncCliWorkload`.
 
 ```bash
 dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug \
@@ -411,18 +403,57 @@ dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug \
 The home is resolved as `$(FuncCliWorkloadsHome)` property, then
 `FUNC_CLI_WORKLOADS_HOME` env var, then `$(RepoRoot).debug-workloads`.
 
-VS Code's `Run func cli (debug workload)` launch config wraps this end-to-end:
-pick a workload csproj, the preLaunchTask builds Func + runs `DeployForDebug`
-(which installs on first run), then `func` launches with
-`FUNC_CLI_WORKLOADS_HOME` pointed at the same home. Breakpoints in both Func
-and the workload source bind once the workload loads.
+### Two modes
 
-> The picker only lists stack workloads (Node / Python / DotNet / Go), since
-> the content-only packages (host, workers, extension bundles) have no
-> managed entry assembly to step into.
+By default `DeployForDebug` is **deploy-only**: it errors if no install of
+`<id>@<version>` exists at the resolved home. This is intentional. The
+install state of the home is part of what you're debugging (e.g. "what does
+`func start` do when only the stack is installed and the worker is missing?"),
+so the target won't silently mutate it.
 
-> Bumping a workload's `VersionPrefix` makes the install path change, so the
-> next F5 will pack + install the new version automatically.
+Pass `-p:FuncCliEnsureWorkloadInstalled=true` to opt into a one-time pack +
+`func workload install --force` when the install is missing. Subsequent runs
+detect the install and skip straight to the copy.
+
+### VS Code launch configs
+
+Two profiles wrap the two modes:
+
+- **Run func cli (debug workload)** uses `-t:DeployForDebug` only. Expects
+  you to have set up the home you want to test against.
+- **Run func cli (debug workload, auto-install)** adds
+  `-p:FuncCliEnsureWorkloadInstalled=true`. Good for the first iteration on
+  a fresh `.debug-workloads/`.
+
+Both pick a stack csproj (Node / Python / DotNet / Go) and point
+`FUNC_CLI_WORKLOADS_HOME` at `${workspaceFolder}/.debug-workloads`.
+Breakpoints in both Func and the workload source bind once the workload
+loads.
+
+> The picker only lists stack workloads, since the content-only packages
+> (host, workers, extension bundles) have no managed entry assembly to step
+> into.
+
+### Bootstrapping richer scenarios
+
+The auto-install mode only installs the workload you picked. For end-to-end
+runs (`func start`) you also need a host and the matching language worker
+installed, since workload installs are not transitive today. Two recipes:
+
+- **Single language, file-based**: pack and install just what you need.
+  ```bash
+  dotnet pack src/Workloads/Host/Workloads.Host.csproj                -c Debug -o /tmp/funcpkgs
+  dotnet pack src/Workloads/Workers/Node/Workloads.Workers.Node.csproj -c Debug -o /tmp/funcpkgs
+  export FUNC_CLI_WORKLOADS_HOME="$PWD/.debug-workloads"
+  ./out/bin/Func/debug/func workload install /tmp/funcpkgs/Azure.Functions.Cli.Workloads.Host.*.nupkg
+  ./out/bin/Func/debug/func workload install /tmp/funcpkgs/Azure.Functions.Cli.Workloads.Workers.Node.*.nupkg
+  ```
+- **All workloads via a local feed**: see the `build-workloads` skill in
+  `.github/skills/build-workloads/`. Pack-and-pushes every workload to a
+  Dockerized NuGet feed; install with `func workload install <alias> --source <feed>`.
+
+Once bootstrapped, every F5 redeploys only the workload you're iterating on
+and leaves the rest of the home untouched.
 
 ## Solution + CI
 

@@ -1,9 +1,9 @@
 <Project>
 
   <!--
-    DeployForDebug: build + (first time) install + (always) copy the freshly
-    built workload assembly + PDB into the install dir so a single F5
-    (or `dotnet build -t:DeployForDebug`) gives you breakpoints in workload
+    DeployForDebug: build the workload and copy the freshly built assembly +
+    PDB into an installed workload home so a single F5 (or
+    `dotnet build -t:DeployForDebug`) gives you breakpoints in workload
     source.
 
     Lives at the build layer instead of in an IDE-specific script so VS Code,
@@ -14,14 +14,61 @@
       2. FUNC_CLI_WORKLOADS_HOME environment variable
       3. $(RepoRoot).debug-workloads/ (matches the VS Code launch config)
 
+    By default, fails fast if the workload isn't installed in the resolved
+    home: the install state of the home is part of what you're debugging
+    ("what does the CLI do when only X is installed?"), so we don't silently
+    mutate it. Pass -p:FuncCliEnsureWorkloadInstalled=true to opt in to a
+    one-time pack and `func workload install` step when the install is missing.
+
     No-op for non-workload projects so it's safe to invoke from a solution-wide
     build target.
   -->
-  <Target Name="DeployForDebug" DependsOnTargets="Build;_EnsureInstalledForDebug">
+  <Target Name="DeployForDebug" DependsOnTargets="Build">
 
     <Message Condition="'$(PackageType)' != 'FuncCliWorkload'"
              Importance="High"
              Text="DeployForDebug: skipping '$(MSBuildProjectName)' (PackageType='$(PackageType)', expected 'FuncCliWorkload')." />
+
+    <PropertyGroup Condition="'$(PackageType)' == 'FuncCliWorkload'">
+      <_DeployForDebugHome Condition="'$(FuncCliWorkloadsHome)' != ''">$(FuncCliWorkloadsHome)</_DeployForDebugHome>
+      <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(FUNC_CLI_WORKLOADS_HOME)</_DeployForDebugHome>
+      <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(RepoRoot).debug-workloads</_DeployForDebugHome>
+      <_DeployForDebugHome>$([System.IO.Path]::GetFullPath('$(_DeployForDebugHome)'))</_DeployForDebugHome>
+      <!-- func workload install normalises the package id to lowercase on disk. -->
+      <_DeployForDebugPackageIdLower>$(PackageId.ToLowerInvariant())</_DeployForDebugPackageIdLower>
+      <_DeployForDebugTargetDir>$(_DeployForDebugHome)/workloads/$(_DeployForDebugPackageIdLower)/$(PackageVersion)/tools/any</_DeployForDebugTargetDir>
+      <_DeployForDebugFuncDll>$(RepoRoot)out/bin/Func/debug/func.dll</_DeployForDebugFuncDll>
+      <_DeployForDebugPackOutput>$(_DeployForDebugHome)/.pack-cache</_DeployForDebugPackOutput>
+      <_DeployForDebugNupkg>$(_DeployForDebugPackOutput)/$(PackageId).$(PackageVersion).nupkg</_DeployForDebugNupkg>
+      <_DeployForDebugNeedsInstall Condition="!Exists('$(_DeployForDebugTargetDir)')">true</_DeployForDebugNeedsInstall>
+    </PropertyGroup>
+
+    <!--
+      Not installed and the caller didn't opt in: bail with a message that
+      hands them both recipes (auto-install via the property, or manual
+      install via `func workload install`).
+    -->
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' != 'true'"
+           Text="DeployForDebug: '$(PackageId)' $(PackageVersion) is not installed at '$(_DeployForDebugTargetDir)'. Either rerun with -p:FuncCliEnsureWorkloadInstalled=true to auto-install (the &quot;auto-install&quot; VS Code launch config does this), or run `func workload install &lt;nupkg-or-id&gt;` against the same home first." />
+
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugFuncDll)')"
+           Text="DeployForDebug: '$(PackageId)' isn't installed yet and func.dll wasn't found at '$(_DeployForDebugFuncDll)'. Build Func.csproj first." />
+
+    <MSBuild Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true'"
+             Projects="$(MSBuildProjectFullPath)"
+             Targets="Pack"
+             Properties="Configuration=$(Configuration);PackageOutputPath=$(_DeployForDebugPackOutput)" />
+
+    <Exec Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true'"
+          Command='dotnet "$(_DeployForDebugFuncDll)" workload install "$(_DeployForDebugNupkg)" --force'
+          EnvironmentVariables="FUNC_CLI_WORKLOADS_HOME=$(_DeployForDebugHome)" />
+
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugTargetDir)')"
+           Text="DeployForDebug: install of '$(_DeployForDebugNupkg)' didn't produce '$(_DeployForDebugTargetDir)'. Check the func workload install output above." />
+
+    <Message Condition="'$(PackageType)' == 'FuncCliWorkload' AND '$(_DeployForDebugNeedsInstall)' != 'true'"
+             Importance="High"
+             Text="DeployForDebug: '$(PackageId)' $(PackageVersion) already installed at $(_DeployForDebugTargetDir)." />
 
     <ItemGroup Condition="'$(PackageType)' == 'FuncCliWorkload'">
       <_DeployForDebugPayload Include="$(TargetPath)" />
@@ -38,50 +85,6 @@
              Text="DeployForDebug: copied @(_DeployForDebugPayload->'%(Filename)%(Extension)', ', ') -> $(_DeployForDebugTargetDir)" />
   </Target>
 
-  <!--
-    Computes the deploy paths and (on first run only) packs this workload and
-    invokes `func workload install` against the resolved home, so the user
-    never has to do a manual install before F5.
-  -->
-  <Target Name="_EnsureInstalledForDebug" Condition="'$(PackageType)' == 'FuncCliWorkload'">
-
-    <PropertyGroup>
-      <_DeployForDebugHome Condition="'$(FuncCliWorkloadsHome)' != ''">$(FuncCliWorkloadsHome)</_DeployForDebugHome>
-      <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(FUNC_CLI_WORKLOADS_HOME)</_DeployForDebugHome>
-      <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(RepoRoot).debug-workloads</_DeployForDebugHome>
-      <_DeployForDebugHome>$([System.IO.Path]::GetFullPath('$(_DeployForDebugHome)'))</_DeployForDebugHome>
-      <_DeployForDebugPackageIdLower>$(PackageId.ToLowerInvariant())</_DeployForDebugPackageIdLower>
-      <_DeployForDebugTargetDir>$(_DeployForDebugHome)/workloads/$(_DeployForDebugPackageIdLower)/$(PackageVersion)/tools/any</_DeployForDebugTargetDir>
-      <_DeployForDebugFuncDll>$(RepoRoot)out/bin/Func/debug/func.dll</_DeployForDebugFuncDll>
-      <_DeployForDebugPackOutput>$(_DeployForDebugHome)/.pack-cache</_DeployForDebugPackOutput>
-      <_DeployForDebugNupkg>$(_DeployForDebugPackOutput)/$(PackageId).$(PackageVersion).nupkg</_DeployForDebugNupkg>
-    </PropertyGroup>
-
-    <!-- Already installed? Nothing to do; DeployForDebug will just overwrite bits. -->
-    <Message Condition="Exists('$(_DeployForDebugTargetDir)')"
-             Importance="High"
-             Text="DeployForDebug: '$(PackageId)' $(PackageVersion) already installed at $(_DeployForDebugTargetDir)." />
-
-    <!-- First run for this id+version: pack ourselves and let func install us. -->
-    <PropertyGroup Condition="!Exists('$(_DeployForDebugTargetDir)')">
-      <_DeployForDebugNeedsInstall>true</_DeployForDebugNeedsInstall>
-    </PropertyGroup>
-
-    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND !Exists('$(_DeployForDebugFuncDll)')"
-           Text="DeployForDebug: '$(PackageId)' isn't installed yet and func.dll wasn't found at '$(_DeployForDebugFuncDll)'. Build Func.csproj first (the VS Code launch config's preLaunchTask does this automatically)." />
-
-    <MSBuild Condition="'$(_DeployForDebugNeedsInstall)' == 'true'"
-             Projects="$(MSBuildProjectFullPath)"
-             Targets="Pack"
-             Properties="Configuration=$(Configuration);PackageOutputPath=$(_DeployForDebugPackOutput)" />
-
-    <Exec Condition="'$(_DeployForDebugNeedsInstall)' == 'true'"
-          Command='dotnet "$(_DeployForDebugFuncDll)" workload install "$(_DeployForDebugNupkg)" --force'
-          EnvironmentVariables="FUNC_CLI_WORKLOADS_HOME=$(_DeployForDebugHome)" />
-
-    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND !Exists('$(_DeployForDebugTargetDir)')"
-           Text="DeployForDebug: install of '$(_DeployForDebugNupkg)' didn't produce '$(_DeployForDebugTargetDir)'. Check the func workload install output above." />
-  </Target>
-
 </Project>
+
 

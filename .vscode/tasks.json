@@ -50,11 +50,35 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "deploy-workload-for-debug (auto-install)",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${input:debugWorkloadProject}",
+                "-t:DeployForDebug",
+                "-p:FuncCliWorkloadsHome=${workspaceFolder}/.debug-workloads",
+                "-p:FuncCliEnsureWorkloadInstalled=true",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-and-deploy-workload",
             "dependsOrder": "sequence",
             "dependsOn": [
                 "build",
                 "deploy-workload-for-debug"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "build-and-deploy-workload (auto-install)",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "build",
+                "deploy-workload-for-debug (auto-install)"
             ],
             "problemMatcher": []
         }
