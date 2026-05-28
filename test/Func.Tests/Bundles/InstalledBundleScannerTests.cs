@@ -8,9 +8,9 @@ namespace Azure.Functions.Cli.Bundles.Tests;
 
 public class InstalledBundleScannerTests
 {
-    private const string StableId = InstalledBundleScanner.StableBundleId;
-    private const string PreviewId = InstalledBundleScanner.PreviewBundleId;
-    private const string ExperimentalId = InstalledBundleScanner.ExperimentalBundleId;
+    private const string StableId = BundleHelpers.StableBundleId;
+    private const string PreviewId = BundleHelpers.PreviewBundleId;
+    private const string ExperimentalId = BundleHelpers.ExperimentalBundleId;
 
     [Fact]
     public async Task NoRows_ReportsZeroTotal()
