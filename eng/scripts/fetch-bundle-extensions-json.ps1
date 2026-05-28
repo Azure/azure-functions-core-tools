@@ -59,6 +59,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Normalize path separators upfront. On Linux, backslashes are literal
+# filename characters, not directory separators, so any call site that
+# passes a Windows-style path produces a single mangled file under the
+# parent directory. .NET accepts forward slashes on both platforms.
+$OutputPath = $OutputPath -replace '\\', '/'
+if ($VersionOut) { $VersionOut = $VersionOut -replace '\\', '/' }
+
 $cdnRoot = 'https://cdn.functions.azure.com/public/ExtensionBundles'
 $bundleId = switch ($Channel) {
     'stable'       { 'Microsoft.Azure.Functions.ExtensionBundle' }
