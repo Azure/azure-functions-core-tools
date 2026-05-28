@@ -48,6 +48,7 @@ internal static class QuickstartRegistration
         services.AddSingleton<IManifestCache, ManifestCache>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IQuickstartManifestService, QuickstartManifestService>();
+        services.AddSingleton<IQuickstartProviderResolver, QuickstartProviderResolver>();
 
         return services;
     }

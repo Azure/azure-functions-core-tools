@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Quickstart;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads.Python;
@@ -20,6 +21,7 @@ public sealed class PythonWorkload : Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
+        builder.Services.AddSingleton<IQuickstartProvider, PythonQuickstartProvider>();
         builder.AddProjectFactory(new PythonProjectFactory());
     }
 }

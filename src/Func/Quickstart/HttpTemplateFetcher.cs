@@ -21,7 +21,7 @@ internal sealed class HttpTemplateFetcher(IHttpClientFactory httpClientFactory, 
 
     private const string ArchiveFileName = "archive.zip";
     private const string ExtractionDirectory = "extracted";
-    private const string ArchiveUrlPathSegment = "/archive/refs/tags/";
+    private const string ArchiveUrlPathSegment = "/archive/";
     private const string ArchiveUrlExtension = ".zip";
 
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
@@ -33,6 +33,8 @@ internal sealed class HttpTemplateFetcher(IHttpClientFactory httpClientFactory, 
     /// <inheritdoc />
     public async Task FetchAsync(QuickstartEntry entry, string tempDirectory, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+
         string archiveUrl = BuildArchiveUrl(entry);
         _logger.LogDebug("Downloading archive from {Url}", archiveUrl);
 
@@ -43,7 +45,7 @@ internal sealed class HttpTemplateFetcher(IHttpClientFactory httpClientFactory, 
         {
             throw new InvalidOperationException(
                 $"Tag '{entry.GitRef}' not found in repository '{entry.RepositoryUrl}'. " +
-                "The template manifest may be out of date. Try running 'func quickstart list --refresh'.");
+                "The template manifest may be out of date.");
         }
 
         response.EnsureSuccessStatusCode();
@@ -91,7 +93,7 @@ internal sealed class HttpTemplateFetcher(IHttpClientFactory httpClientFactory, 
         }
     }
 
-    private static string BuildArchiveUrl(QuickstartEntry entry)
+    internal static string BuildArchiveUrl(QuickstartEntry entry)
     {
         var uri = new Uri(entry.RepositoryUrl);
 

@@ -8,14 +8,20 @@ using Azure.Functions.Cli.Quickstart;
 namespace Azure.Functions.Cli.Commands.Quickstart;
 
 /// <summary>
-/// Lists available templates from the CDN manifest, optionally filtered by
-/// language, resource, IaC type, or keyword search.
+/// Lists available templates from the CDN manifest, filtered by the resolved
+/// stack and language. Delegates stack/language resolution to
+/// <see cref="IQuickstartProviderResolver"/>.
 /// </summary>
 internal sealed class QuickstartListCommand : FuncCliCommand
 {
+    public Option<string?> StackOption { get; } = new("--stack", "-s")
+    {
+        Description = QuickstartMessages.StackOptionDescription
+    };
+
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
-        Description = "Filter by worker runtime or language (e.g. python, node, java, dotnet)"
+        Description = "The programming language"
     };
 
     public Option<string?> ResourceOption { get; } = new("--resource", "-r")
@@ -30,37 +36,97 @@ internal sealed class QuickstartListCommand : FuncCliCommand
 
     public Option<string?> SearchOption { get; } = new("--search")
     {
-        Description = "Case-insensitive substring match against template names, IDs, resources, tags, and descriptions"
+        Description = "Case-insensitive substring match against IDs, template names, resource type, Infrastructure as Code type, and descriptions"
+    };
+
+    public Option<bool> JsonOption { get; } = new("--json")
+    {
+        Description = "Emit machine-readable JSON instead of a table."
     };
 
     private readonly IInteractionService _interaction;
-    private readonly IReadOnlyList<IQuickstartProvider> _providers;
+    private readonly IQuickstartProviderResolver _resolver;
+    private readonly IQuickstartManifestService _manifestService;
 
-    public QuickstartListCommand(IInteractionService interaction, IEnumerable<IQuickstartProvider> providers)
+    public QuickstartListCommand(
+        IInteractionService interaction,
+        IQuickstartProviderResolver resolver,
+        IQuickstartManifestService manifestService)
         : base("list", "List available templates from the catalog.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
-        ArgumentNullException.ThrowIfNull(providers);
+        ArgumentNullException.ThrowIfNull(resolver);
+        ArgumentNullException.ThrowIfNull(manifestService);
 
         _interaction = interaction;
-        _providers = providers.ToList();
+        _resolver = resolver;
+        _manifestService = manifestService;
 
+        Options.Add(StackOption);
         Options.Add(LanguageOption);
         Options.Add(ResourceOption);
         Options.Add(IacOption);
         Options.Add(SearchOption);
+        Options.Add(JsonOption);
     }
 
-    protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        if (_providers.Count == 0)
+        string? requestedStack = parseResult.GetValue(StackOption);
+        string? requestedLanguage = parseResult.GetValue(LanguageOption);
+        string? resource = parseResult.GetValue(ResourceOption);
+        string? iac = parseResult.GetValue(IacOption);
+        string? search = parseResult.GetValue(SearchOption);
+        bool json = parseResult.GetValue(JsonOption);
+
+        // 1. Resolve stack → provider
+        IQuickstartProvider? provider = await _resolver.SelectProviderAsync(requestedStack, "list quickstart templates", cancellationToken);
+        if (provider is null)
         {
-            _interaction.WriteWarning(
-                "The quickstart command is not yet available. Stack support is coming in a future release.");
-            return Task.FromResult(1);
+            return 1;
         }
 
-        _interaction.WriteWarning("The quickstart list command is not yet implemented.");
-        return Task.FromResult(1);
+        // 2. Fetch manifest
+        QuickstartManifest manifest = await _interaction.ShowStatusAsync(
+            QuickstartMessages.FetchingCatalogStatus,
+            _manifestService.GetManifestAsync,
+            cancellationToken);
+
+        // 3. Resolve language
+        (string? manifestLanguage, int? langError) = await _resolver.ResolveOrPromptLanguageAsync(
+            requestedLanguage, provider, manifest, cancellationToken);
+        if (langError is int code)
+        {
+            return code;
+        }
+
+        // 4. Filter and display
+        IReadOnlyList<QuickstartEntry> entries = manifest.Filter(manifestLanguage, resource, iac, search);
+
+        if (entries.Count == 0)
+        {
+            _interaction.WriteWarning(QuickstartMessages.NoMatchingFiltersWarning);
+            return 0;
+        }
+
+        if (json)
+        {
+            _interaction.WriteJson(entries.Select(e => new ListRow(e.Id, e.DisplayName, e.ShortDescription ?? string.Empty)).ToList());
+            return 0;
+        }
+
+        string[] columns = ["ID", "Name", "Description"];
+        IEnumerable<string[]> rows = entries.Select(e => new[]
+        {
+            e.Id,
+            e.DisplayName,
+            e.ShortDescription ?? "-"
+        });
+
+        _interaction.WriteTable(columns, rows);
+        _interaction.WriteLine(l => l.Muted($"{entries.Count} template(s) found."));
+        return 0;
     }
+
+    internal sealed record ListRow(string Id, string Name, string Description);
 }

@@ -140,7 +140,7 @@ internal sealed class QuickstartScaffolder(
         if (string.IsNullOrWhiteSpace(entry.GitRef))
         {
             throw new ArgumentException(
-                $"Template '{entry.Id}' has no GitRef. A git tag or branch reference is required.",
+                $"Template '{entry.Id}' has no GitRef. Only tag-pinned templates are supported.",
                 nameof(entry));
         }
 
@@ -148,6 +148,14 @@ internal sealed class QuickstartScaffolder(
         {
             throw new ArgumentException(
                 $"Invalid GitRef '{entry.GitRef}': must not start with '-' (potential flag injection).",
+                nameof(entry));
+        }
+
+        if (!entry.GitRef.StartsWith(QuickstartConstants.TagRefPrefix, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"Template '{entry.Id}' has GitRef '{entry.GitRef}' which is not a tag ref. "
+                + "Only refs/tags/* are accepted.",
                 nameof(entry));
         }
 

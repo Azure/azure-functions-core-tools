@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Quickstart;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
@@ -22,6 +23,7 @@ public sealed class DotNetWorkload : Workload
         builder.Services.AddSingleton<IDotnetCliRunner, DotnetCliRunner>();
         builder.Services.AddSingleton<ITemplateHivePathProvider, TemplateHivePathProvider>();
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
+        builder.Services.AddSingleton<IQuickstartProvider, DotNetQuickstartProvider>();
         builder.AddProjectFactory<DotNetProjectFactory>();
     }
 }

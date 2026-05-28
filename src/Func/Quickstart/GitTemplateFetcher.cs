@@ -12,7 +12,6 @@ namespace Azure.Functions.Cli.Quickstart;
 /// </summary>
 internal sealed class GitTemplateFetcher(IGitRunner gitRunner, ILogger<GitTemplateFetcher> logger) : ITemplateFetcher
 {
-    private const string TagRefPrefix = "refs/tags/";
 
     private readonly IGitRunner _gitRunner = gitRunner ?? throw new ArgumentNullException(nameof(gitRunner));
     private readonly ILogger<GitTemplateFetcher> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -25,26 +24,20 @@ internal sealed class GitTemplateFetcher(IGitRunner gitRunner, ILogger<GitTempla
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (string.IsNullOrWhiteSpace(entry.GitRef))
-        {
-            throw new ArgumentException(
-                $"Template '{entry.Id}' has no GitRef. Only tag-pinned templates are supported.",
-                nameof(entry));
-        }
-
-        await InitAndFetchTagAsync(entry, tempDirectory, cancellationToken);
-        await VerifyTagIntegrityAsync(entry, tempDirectory, cancellationToken);
+        string gitRef = entry.GitRef!;
+        await InitAndFetchTagAsync(entry, gitRef, tempDirectory, cancellationToken);
+        await VerifyTagIntegrityAsync(entry, gitRef, tempDirectory, cancellationToken);
     }
 
     /// <summary>
     /// Fetches a specific tag using init + remote add + fetch refspec + checkout.
     /// This avoids <c>git clone --branch</c> which could resolve a branch with the same name.
     /// </summary>
-    private async Task InitAndFetchTagAsync(QuickstartEntry entry, string tempDirectory, CancellationToken cancellationToken)
+    private async Task InitAndFetchTagAsync(QuickstartEntry entry, string gitRef, string tempDirectory, CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Fetching tag {GitRef} from {Url}", entry.GitRef, entry.RepositoryUrl);
+        _logger.LogDebug("Fetching tag {GitRef} from {Url}", gitRef, entry.RepositoryUrl);
 
-        string tagRefspec = $"{TagRefPrefix}{entry.GitRef}:{TagRefPrefix}{entry.GitRef}";
+        string tagRefspec = $"{gitRef}:{gitRef}";
 
         await _gitRunner.RunAsync(["init", tempDirectory], workingDirectory: null, cancellationToken);
 
@@ -63,13 +56,13 @@ internal sealed class GitTemplateFetcher(IGitRunner gitRunner, ILogger<GitTempla
         catch (GitRunnerException ex)
         {
             throw new InvalidOperationException(
-                $"'{entry.GitRef}' is not a tag on '{entry.RepositoryUrl}'. " +
+                $"'{gitRef}' is not a tag on '{entry.RepositoryUrl}'. " +
                 "Only tag-based git refs are supported. Branch refs (e.g. 'main') are not accepted.",
                 ex);
         }
 
         await _gitRunner.RunAsync(
-            ["-C", tempDirectory, "checkout", "--detach", $"{TagRefPrefix}{entry.GitRef}"],
+            ["-C", tempDirectory, "checkout", "--detach", gitRef],
             workingDirectory: null,
             cancellationToken);
     }
@@ -77,28 +70,28 @@ internal sealed class GitTemplateFetcher(IGitRunner gitRunner, ILogger<GitTempla
     /// <summary>
     /// Verifies the checked-out commit matches the tag's target and that the tag is annotated.
     /// </summary>
-    private async Task VerifyTagIntegrityAsync(QuickstartEntry entry, string tempDirectory, CancellationToken cancellationToken)
+    private async Task VerifyTagIntegrityAsync(QuickstartEntry entry, string gitRef, string tempDirectory, CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Verifying tag integrity for {GitRef}", entry.GitRef);
+        _logger.LogDebug("Verifying tag integrity for {GitRef}", gitRef);
 
         try
         {
             string objectType = await _gitRunner.RunWithOutputAsync(
-                ["-C", tempDirectory, "cat-file", "-t", $"{TagRefPrefix}{entry.GitRef}"],
+                ["-C", tempDirectory, "cat-file", "-t", gitRef],
                 workingDirectory: null,
                 cancellationToken);
 
             if (!string.Equals(objectType, "tag", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"Tag '{entry.GitRef}' in '{entry.RepositoryUrl}' is a lightweight tag (object type: '{objectType}'). " +
+                    $"Tag '{gitRef}' in '{entry.RepositoryUrl}' is a lightweight tag (object type: '{objectType}'). " +
                     "Only annotated tags are accepted for template integrity.");
             }
         }
         catch (GitRunnerException ex)
         {
             throw new InvalidOperationException(
-                $"Tag '{entry.GitRef}' could not be verified in '{entry.RepositoryUrl}'.",
+                $"Tag '{gitRef}' could not be verified in '{entry.RepositoryUrl}'.",
                 ex);
         }
 
@@ -108,14 +101,14 @@ internal sealed class GitTemplateFetcher(IGitRunner gitRunner, ILogger<GitTempla
             cancellationToken);
 
         string tagTarget = await _gitRunner.RunWithOutputAsync(
-            ["-C", tempDirectory, "rev-list", "-n", "1", $"{TagRefPrefix}{entry.GitRef}"],
+            ["-C", tempDirectory, "rev-list", "-n", "1", gitRef],
             workingDirectory: null,
             cancellationToken);
 
         if (!string.Equals(headCommit, tagTarget, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"Tag '{entry.GitRef}' target ({tagTarget}) does not match HEAD ({headCommit}). " +
+                $"Tag '{gitRef}' target ({tagTarget}) does not match HEAD ({headCommit}). " +
                 "The tag may have been tampered with.");
         }
     }

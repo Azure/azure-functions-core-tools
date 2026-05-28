@@ -22,7 +22,7 @@ public sealed class QuickstartManifestServiceTests
     [Fact]
     public async Task GetManifestAsync_FetchesFromCdn_WhenNoCacheExists()
     {
-        string manifest = CreateManifestJson("http-python", "Python", "http", "v1.0.0");
+        string manifest = CreateManifestJson("http-python", "Python", "http", "refs/tags/v1.0.0");
         IManifestCache cache = CreateCache(manifestJson: null, meta: null);
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.OK)
@@ -43,7 +43,7 @@ public sealed class QuickstartManifestServiceTests
     [Fact]
     public async Task GetManifestAsync_UsesCachedManifest_WhenCacheIsFresh()
     {
-        string manifest = CreateManifestJson("cached-entry", "Python", "http", "v1.0.0");
+        string manifest = CreateManifestJson("cached-entry", "Python", "http", "refs/tags/v1.0.0");
         ManifestCacheMeta meta = new("\"etag1\"", DateTimeOffset.UtcNow);
         IManifestCache cache = CreateCache(manifestJson: manifest, meta: meta);
 
@@ -59,7 +59,7 @@ public sealed class QuickstartManifestServiceTests
     [Fact]
     public async Task GetManifestAsync_RefreshesCacheTimestamp_On304()
     {
-        string manifest = CreateManifestJson("existing-entry", "Python", "http", "v1.0.0");
+        string manifest = CreateManifestJson("existing-entry", "Python", "http", "refs/tags/v1.0.0");
         ManifestCacheMeta staleMeta = new("\"etag1\"", DateTimeOffset.UtcNow.AddHours(-25));
         IManifestCache cache = CreateCache(manifestJson: manifest, meta: staleMeta);
 
@@ -76,7 +76,7 @@ public sealed class QuickstartManifestServiceTests
     [Fact]
     public async Task GetManifestAsync_FallsBackToStaleCache_OnNetworkFailure()
     {
-        string manifest = CreateManifestJson("stale-entry", "Python", "http", "v1.0.0");
+        string manifest = CreateManifestJson("stale-entry", "Python", "http", "refs/tags/v1.0.0");
         ManifestCacheMeta staleMeta = new("\"etag1\"", DateTimeOffset.UtcNow.AddHours(-25));
         IManifestCache cache = CreateCache(manifestJson: manifest, meta: staleMeta);
 
@@ -105,7 +105,7 @@ public sealed class QuickstartManifestServiceTests
     {
         string manifest = CreateManifestJsonRaw(
         [
-            CreateEntryJson("has-ref", "Python", "http", "v1.0.0"),
+            CreateEntryJson("has-ref", "Python", "http", "refs/tags/v1.0.0"),
             CreateEntryJson("no-ref", "Python", "http", null),
         ]);
         IManifestCache cache = CreateCache(manifestJson: null, meta: null);
@@ -120,12 +120,31 @@ public sealed class QuickstartManifestServiceTests
     }
 
     [Fact]
-    public async Task GetManifestAsync_FiltersOutEntriesWithNonVPrefixedGitRef()
+    public async Task GetManifestAsync_FiltersOutEntriesWithShortTagGitRef()
     {
         string manifest = CreateManifestJsonRaw(
         [
-            CreateEntryJson("tagged", "Python", "http", "v1.0.0"),
-            CreateEntryJson("branch", "Python", "http", "main"),
+            CreateEntryJson("full-ref", "Python", "http", "refs/tags/v1.0.0"),
+            CreateEntryJson("short-tag", "Python", "http", "v1.0.0"),
+        ]);
+        IManifestCache cache = CreateCache(manifestJson: null, meta: null);
+
+        QuickstartManifestService service = CreateService(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifest) }, cache);
+
+        QuickstartManifest result = await service.GetManifestAsync();
+
+        Assert.Single(result.Entries);
+        Assert.Equal("full-ref", result.Entries[0].Id);
+    }
+
+    [Fact]
+    public async Task GetManifestAsync_FiltersOutEntriesWithBranchGitRef()
+    {
+        string manifest = CreateManifestJsonRaw(
+        [
+            CreateEntryJson("tagged", "Python", "http", "refs/tags/v1.0.0"),
+            CreateEntryJson("branch", "Python", "http", "refs/heads/main"),
         ]);
         IManifestCache cache = CreateCache(manifestJson: null, meta: null);
 
@@ -144,10 +163,10 @@ public sealed class QuickstartManifestServiceTests
         string json = """
             { "templates": [
                 { "id": "trusted", "displayName": "Trusted", "language": "Python", "resource": "http",
-                  "repositoryUrl": "https://github.com/Azure-Samples/test-repo", "folderPath": ".", "gitRef": "v1.0.0",
+                  "repositoryUrl": "https://github.com/Azure-Samples/test-repo", "folderPath": ".", "gitRef": "refs/tags/v1.0.0",
                   "priority": 100 },
                 { "id": "untrusted", "displayName": "Untrusted", "language": "Python", "resource": "http",
-                  "repositoryUrl": "https://github.com/random-user/test-repo", "folderPath": ".", "gitRef": "v1.0.0",
+                  "repositoryUrl": "https://github.com/random-user/test-repo", "folderPath": ".", "gitRef": "refs/tags/v1.0.0",
                   "priority": 100 }
             ]}
             """;
@@ -167,9 +186,9 @@ public sealed class QuickstartManifestServiceTests
     {
         string manifest = CreateManifestJsonRaw(
         [
-            CreateEntryJson("python-entry", "Python", "http", "v1.0.0"),
-            CreateEntryJson("bicep-entry", "Bicep", "http", "v1.0.0"),
-            CreateEntryJson("terraform-entry", "Terraform", "http", "v1.0.0"),
+            CreateEntryJson("python-entry", "Python", "http", "refs/tags/v1.0.0"),
+            CreateEntryJson("bicep-entry", "Bicep", "http", "refs/tags/v1.0.0"),
+            CreateEntryJson("terraform-entry", "Terraform", "http", "refs/tags/v1.0.0"),
         ]);
         IManifestCache cache = CreateCache(manifestJson: null, meta: null);
 
@@ -185,7 +204,7 @@ public sealed class QuickstartManifestServiceTests
     public async Task GetManifestAsync_FallsBackToCache_WhenResponseIsMalformed()
     {
         string json = """[ { "id": "bare-entry" } ]""";
-        string cachedManifest = CreateManifestJson("cached", "Python", "http", "v1.0.0");
+        string cachedManifest = CreateManifestJson("cached", "Python", "http", "refs/tags/v1.0.0");
         ManifestCacheMeta meta = new("\"etag1\"", DateTimeOffset.UtcNow.AddHours(-25));
         IManifestCache cache = CreateCache(manifestJson: cachedManifest, meta: meta);
 
@@ -201,7 +220,7 @@ public sealed class QuickstartManifestServiceTests
     [Fact]
     public async Task GetManifestAsync_LoadsFromLocalFile_WhenOverrideIsFilePath()
     {
-        string manifest = CreateManifestJson("local-entry", "Python", "http", "v1.0.0");
+        string manifest = CreateManifestJson("local-entry", "Python", "http", "refs/tags/v1.0.0");
         string tempFile = Path.Combine(Path.GetTempPath(), $"test-manifest-{Guid.NewGuid()}.json");
         try
         {
@@ -265,7 +284,7 @@ public sealed class QuickstartManifestServiceTests
     [InlineData("//server/share/manifest.json")]
     public async Task GetManifestAsync_DoesNotTreatUncPathAsLocalFile(string uncPath)
     {
-        string manifest = CreateManifestJson("cdn-entry", "Python", "http", "v1.0.0");
+        string manifest = CreateManifestJson("cdn-entry", "Python", "http", "refs/tags/v1.0.0");
         IManifestCache cache = CreateCache(manifestJson: null, meta: null);
 
         _options.ManifestUrl = uncPath;
@@ -350,3 +369,4 @@ public sealed class QuickstartManifestServiceTests
         }
     }
 }
+

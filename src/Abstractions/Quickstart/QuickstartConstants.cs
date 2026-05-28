@@ -17,4 +17,9 @@ public static class QuickstartConstants
     /// The GitHub hostname used for URL validation and archive downloads.
     /// </summary>
     public const string GitHubHostName = "github.com";
+
+    /// <summary>
+    /// The git ref prefix required for all template entries.
+    /// </summary>
+    public const string TagRefPrefix = "refs/tags/";
 }

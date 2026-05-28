@@ -18,7 +18,7 @@ public sealed class QuickstartManifestTests
         string? longDescription = null,
         int priority = 100) =>
         new(id, displayName, language, resource, iac,
-            "https://github.com/Azure-Samples/test-repo", ".", "v1.0.0",
+            "https://github.com/Azure-Samples/test-repo", ".", "refs/tags/v1.0.0",
             shortDescription, longDescription, null, priority);
 
     [Fact]
@@ -174,3 +174,4 @@ public sealed class QuickstartManifestTests
         Assert.Empty(results);
     }
 }
+
