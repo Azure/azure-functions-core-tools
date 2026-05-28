@@ -52,6 +52,12 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     private readonly HashSet<string> _builtInOptionNames;
     private readonly Dictionary<string, string> _optionNameToPromptId = new(StringComparer.OrdinalIgnoreCase);
 
+    // Template id whose options are currently attached to this command.
+    // Set whenever AttachHydratedOptions* succeeds, cleared in
+    // DropDynamicOptions. The help renderer uses it (via
+    // GetTemplateHelpInfo) to title the "Template Options (<id>)" section.
+    private string? _attachedTemplateId;
+
     public NewCommand(NewCommandRunner runner)
         : base("new", "Create a new function from a template.")
     {
@@ -300,6 +306,8 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             Options.Add(pair.Option);
             _optionNameToPromptId[pair.Option.Name] = pair.PromptId;
         }
+
+        _attachedTemplateId = templateId;
     }
 
     private void DropDynamicOptions()
@@ -312,6 +320,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             Options.Remove(o);
         }
         _optionNameToPromptId.Clear();
+        _attachedTemplateId = null;
     }
 
     /// <summary>
@@ -390,18 +399,59 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             Options.Add(o);
         }
 
+        _attachedTemplateId = templateId;
         return Options.Count - _builtInOptionNames.Count;
+    }
+
+    /// <inheritdoc />
+    public TemplateHelpInfo? GetTemplateHelpInfo()
+    {
+        if (string.IsNullOrEmpty(_attachedTemplateId))
+        {
+            return null;
+        }
+
+        // Hydrated options are exactly those on the command whose names
+        // aren't in the original built-in snapshot. Using this diff is
+        // robust to either attach path (pre-parse or help-time) and stays
+        // correct even if the prompt-id map is ever populated lazily.
+        var hydrated = Options
+            .Where(o => !_builtInOptionNames.Contains(o.Name))
+            .ToList();
+
+        return hydrated.Count == 0
+            ? null
+            : new TemplateHelpInfo(_attachedTemplateId, hydrated);
     }
 }
 
 /// <summary>
 /// Marker for commands whose <c>--help</c> output depends on a value bound
-/// by an earlier (stage-A) parse. The Spectre help action calls
+/// before the main parse. The Spectre help action calls
 /// <see cref="AttachHydratedOptionsForHelp"/> on the matched command before
 /// rendering so the user sees the union of built-in options and any
 /// options the bound value (e.g. <c>--template &lt;id&gt;</c>) implies.
+/// <see cref="GetTemplateHelpInfo"/> then lets the renderer separate the
+/// hydrated options into their own section.
 /// </summary>
 internal interface ITemplateAwareHelpProvider
 {
     public int AttachHydratedOptionsForHelp(ParseResult parseResult);
+
+    /// <summary>
+    /// Returns the template id + the options hydrated for that template,
+    /// or <c>null</c> when no template-derived options are currently
+    /// attached. Called after <see cref="AttachHydratedOptionsForHelp"/>
+    /// so the help renderer can split a "Template Options (&lt;id&gt;)"
+    /// section out of the main "Options" section.
+    /// </summary>
+    public TemplateHelpInfo? GetTemplateHelpInfo();
 }
+
+/// <summary>
+/// A template id paired with the CLI options the template hydrates.
+/// Returned by <see cref="ITemplateAwareHelpProvider.GetTemplateHelpInfo"/>
+/// so the help renderer can render those options under their own section
+/// heading instead of mixing them with the command's built-in options.
+/// </summary>
+internal sealed record TemplateHelpInfo(string TemplateId, IReadOnlyList<Option> HydratedOptions);
