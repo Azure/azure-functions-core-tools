@@ -41,13 +41,13 @@ if [ -z "$VERSION" ]; then
     VERSION=$(echo "$RELEASES_JSON" \
         | tr ',' '\n' \
         | grep -E '"tag_name"|"prerelease"' \
-        | sed 's/.*"tag_name":"\([^"]*\)".*/tag:\1/; s/.*"prerelease":\(.*\)/pre:\1/' \
+        | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/tag:\1/; s/.*"prerelease"[[:space:]]*:[[:space:]]*([^[:space:]]+).*/pre:\1/' \
         | paste - - \
         | awk -F'\t' -v include_pre="$PRERELEASE" '
             {
-                split($1, a, ":"); tag = a[2]
-                split($2, b, ":"); pre = b[2]
-                if (tag ~ /^v5\./ && (include_pre == "true" || pre == "false")) {
+                sub(/^tag:/, "", $1); tag = $1
+                sub(/^pre:/, "", $2); pre = $2
+                if (tag ~ /^v?5\./ && (include_pre == "true" || pre == "false")) {
                     print tag; exit
                 }
             }')
@@ -57,13 +57,13 @@ if [ -z "$VERSION" ]; then
             PRE_VERSIONS=$(echo "$RELEASES_JSON" \
                 | tr ',' '\n' \
                 | grep -E '"tag_name"|"prerelease"' \
-                | sed 's/.*"tag_name":"\([^"]*\)".*/tag:\1/; s/.*"prerelease":\(.*\)/pre:\1/' \
+                | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/tag:\1/; s/.*"prerelease"[[:space:]]*:[[:space:]]*([^[:space:]]+).*/pre:\1/' \
                 | paste - - \
                 | awk -F'\t' '
                     {
-                        split($1, a, ":"); tag = a[2]
-                        split($2, b, ":"); pre = b[2]
-                        if (tag ~ /^v5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
+                        sub(/^tag:/, "", $1); tag = $1
+                        sub(/^pre:/, "", $2); pre = $2
+                        if (tag ~ /^v?5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
                     }')
 
             if [ -n "$PRE_VERSIONS" ]; then
