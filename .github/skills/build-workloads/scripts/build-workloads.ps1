@@ -121,7 +121,8 @@ if (-not $NoBuild) {
             'pack', $proj,
             '-c', $Configuration,
             '-o', $outputDir,
-            '--nologo'
+            '--nologo',
+            '-p:PackAllRids=true'
         )
         if ($VersionSuffix) { $packArgs += @('--version-suffix', $VersionSuffix) }
         Invoke-Native -File 'dotnet' -Arguments $packArgs
