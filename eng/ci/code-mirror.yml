@@ -11,6 +11,9 @@ trigger:
     - vnext
     - feature/*
     - release/*
+  tags:
+    include:
+    - '*'
 
 resources:
   repositories:
