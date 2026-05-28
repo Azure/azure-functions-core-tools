@@ -691,7 +691,7 @@ public class StartInitializationTests : IDisposable
         Assert.Contains("Install host workload", output);
         Assert.Contains(" 50%", output);
         Assert.DoesNotContain("\u001b[2J", output);
-        Assert.DoesNotContain("Preparing download", output);
+        Assert.Contains("Preparing download", output);
     }
 
     [Fact]
@@ -939,7 +939,7 @@ public class StartInitializationTests : IDisposable
     private static IManagedAzuriteOrchestrator CreateDisabledAzuriteOrchestrator()
     {
         IManagedAzuriteOrchestrator orchestrator = Substitute.For<IManagedAzuriteOrchestrator>();
-        orchestrator.EnsureReadyAsync(Arg.Any<ManagedAzuriteRequest>(), Arg.Any<CancellationToken>())
+        orchestrator.EnsureReadyAsync(Arg.Any<ManagedAzuriteRequest>(), Arg.Any<IProgress<string>?>(), Arg.Any<CancellationToken>())
             .Returns(new ManagedAzuriteResult.Disabled("Azurite skipped in tests."));
         return orchestrator;
     }

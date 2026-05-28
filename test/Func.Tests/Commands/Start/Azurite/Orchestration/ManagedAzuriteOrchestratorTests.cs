@@ -74,7 +74,7 @@ public class ManagedAzuriteOrchestratorTests
     {
         ManagedAzuriteOrchestrator sut = CreateSut();
 
-        ManagedAzuriteResult result = await sut.EnsureReadyAsync(Request(disabled: true), CancellationToken.None);
+        ManagedAzuriteResult result = await sut.EnsureReadyAsync(Request(disabled: true), progress: null, CancellationToken.None);
 
         Assert.IsType<ManagedAzuriteResult.Disabled>(result);
         await _probe.DidNotReceive().ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>());
@@ -87,7 +87,7 @@ public class ManagedAzuriteOrchestratorTests
     {
         _classifier.Classify(Arg.Any<string>()).Returns(AzureWebJobsStorageReference.NotLocal("Real Azure Storage."));
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         Assert.IsType<ManagedAzuriteResult.Disabled>(result);
         await _probe.DidNotReceive().ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>());
@@ -99,7 +99,7 @@ public class ManagedAzuriteOrchestratorTests
         _classifier.Classify(Conn).Returns(UserConfigured());
         _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         Assert.IsType<ManagedAzuriteResult.UserManaged>(result);
         await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
@@ -111,7 +111,7 @@ public class ManagedAzuriteOrchestratorTests
         _classifier.Classify(Conn).Returns(UserConfigured());
         _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeNotListening());
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
         Assert.Contains("cannot start this configuration automatically", failed.UserMessage);
@@ -124,7 +124,7 @@ public class ManagedAzuriteOrchestratorTests
         _classifier.Classify(Conn).Returns(Manageable());
         _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         Assert.IsType<ManagedAzuriteResult.UserManaged>(result);
         await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
@@ -136,7 +136,7 @@ public class ManagedAzuriteOrchestratorTests
         _classifier.Classify(Conn).Returns(Manageable());
         _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbePortConflict());
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
         Assert.Contains("another process is using the Azurite ports", failed.UserMessage);
@@ -153,7 +153,7 @@ public class ManagedAzuriteOrchestratorTests
         FakeAzuriteProcess fake = new();
         _launcher.StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>()).Returns(fake);
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         var started = Assert.IsType<ManagedAzuriteResult.Started>(result);
         Assert.Equal(AzuriteLaunchMode.Native, started.Mode);
@@ -176,7 +176,7 @@ public class ManagedAzuriteOrchestratorTests
         FakeAzuriteProcess fake = new();
         _launcher.StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>()).Returns(fake);
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         var started = Assert.IsType<ManagedAzuriteResult.Started>(result);
         Assert.Equal(AzuriteLaunchMode.Docker, started.Mode);
@@ -194,7 +194,7 @@ public class ManagedAzuriteOrchestratorTests
         _dockerProbe.ProbeAsync(Arg.Any<CancellationToken>())
             .Returns(new DockerAvailability(DockerAvailabilityStatus.ExecutableNotFound, "not found"));
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
         Assert.Contains("Azurite is not running", failed.UserMessage);
@@ -216,6 +216,7 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(
             Request(timeout: TimeSpan.FromMilliseconds(300)),
+            progress: null,
             CancellationToken.None);
 
         var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
@@ -234,7 +235,7 @@ public class ManagedAzuriteOrchestratorTests
         FakeAzuriteProcess fake = new(exitedImmediately: true, stderr: ["ENOENT: missing data dir"]);
         _launcher.StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>()).Returns(fake);
 
-        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), CancellationToken.None);
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
         var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
         Assert.Contains("Azurite exited before it was ready", failed.UserMessage);
@@ -255,12 +256,66 @@ public class ManagedAzuriteOrchestratorTests
         using var cts = new CancellationTokenSource();
         Task<ManagedAzuriteResult> resultTask = CreateSut().EnsureReadyAsync(
             Request(timeout: TimeSpan.FromSeconds(30)),
+            progress: null,
             cts.Token);
 
         await Task.Delay(100);
         cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => resultTask);
+    }
+
+    [Fact]
+    public async Task Manageable_ReportsPhaseProgress_ToCaller()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        SetupProbeSequence(ProbeNotListening(), ProbeReady());
+        _locator.FindAsync(ProjectRoot, Arg.Any<CancellationToken>())
+            .Returns(new AzuriteExecutable("/usr/bin/azurite", AzuriteExecutableSource.Path, "3.30.0"));
+
+        FakeAzuriteProcess fake = new();
+        _launcher.StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>()).Returns(fake);
+
+        List<string> messages = [];
+        IProgress<string> progress = new CapturingProgress(messages);
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress, CancellationToken.None);
+
+        Assert.IsType<ManagedAzuriteResult.Started>(result);
+        Assert.Contains(messages, m => m.Contains("checking AzureWebJobsStorage configuration", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, m => m.Contains("checking for an existing Azurite endpoint", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, m => m.Contains("looking for a local Azurite installation", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, m => m.Contains("starting Azurite (native)", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Manageable_NoExecutable_NoDocker_ReportsDockerCheck_BeforeFailing()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeNotListening());
+        _locator.FindAsync(ProjectRoot, Arg.Any<CancellationToken>()).Returns((AzuriteExecutable?)null);
+        _dockerProbe.ProbeAsync(Arg.Any<CancellationToken>())
+            .Returns(new DockerAvailability(DockerAvailabilityStatus.ExecutableNotFound, Reason: "docker not on PATH", Version: null));
+
+        List<string> messages = [];
+        IProgress<string> progress = new CapturingProgress(messages);
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress, CancellationToken.None);
+
+        Assert.IsType<ManagedAzuriteResult.Failed>(result);
+        Assert.Contains(messages, m => m.Contains("looking for a local Azurite installation", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, m => m.Contains("checking Docker availability", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed class CapturingProgress(List<string> messages) : IProgress<string>
+    {
+        public void Report(string value)
+        {
+            lock (messages)
+            {
+                messages.Add(value);
+            }
+        }
     }
 
     private void SetupProbeSequence(params AzuriteProbeResult[] results)
