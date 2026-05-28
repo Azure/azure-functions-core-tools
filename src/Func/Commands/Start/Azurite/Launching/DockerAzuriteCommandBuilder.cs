@@ -21,9 +21,7 @@ internal static class DockerAzuriteCommandBuilder
     private const string ContainerLogDirectory = "/logs";
     private const string ContainerLogPath = "/logs/azurite.log";
 
-    public static (string FileName, IReadOnlyList<string> Arguments) Build(
-        AzuriteLaunchRequest request,
-        string dockerCommand = "docker")
+    public static (string FileName, IReadOnlyList<string> Arguments) Build(AzuriteLaunchRequest request, string dockerCommand = "docker")
     {
         ArgumentNullException.ThrowIfNull(request);
 

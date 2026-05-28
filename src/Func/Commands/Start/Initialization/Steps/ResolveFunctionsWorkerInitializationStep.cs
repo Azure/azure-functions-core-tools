@@ -197,9 +197,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         return await project.WorkerReference.ResolveWorkerAsync(resolutionContext, cancellationToken);
     }
 
-    private static bool TryGetInstallableWorker(
-        FunctionsWorkerResolutionFailure failure,
-        out FunctionsWorkerId? workerId)
+    private static bool TryGetInstallableWorker(FunctionsWorkerResolutionFailure failure, out FunctionsWorkerId? workerId)
     {
         switch (failure)
         {

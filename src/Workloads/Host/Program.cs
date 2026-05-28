@@ -60,9 +60,7 @@ internal static class Program
         Environment.SetEnvironmentVariable("FUNCTIONS_CORETOOLS_ENVIRONMENT", "true");
     }
 
-    internal static Task StartStandardInputClosedMonitorAsync(
-        TextReader standardInput,
-        CancellationTokenSource shutdownTokenSource)
+    internal static Task StartStandardInputClosedMonitorAsync(TextReader standardInput, CancellationTokenSource shutdownTokenSource)
     {
         ArgumentNullException.ThrowIfNull(standardInput);
         ArgumentNullException.ThrowIfNull(shutdownTokenSource);
@@ -70,9 +68,7 @@ internal static class Program
         return Task.Run(() => CancelOnStandardInputClosedAsync(standardInput, shutdownTokenSource));
     }
 
-    private static async Task CancelOnStandardInputClosedAsync(
-        TextReader standardInput,
-        CancellationTokenSource shutdownTokenSource)
+    private static async Task CancelOnStandardInputClosedAsync(TextReader standardInput, CancellationTokenSource shutdownTokenSource)
     {
         try
         {

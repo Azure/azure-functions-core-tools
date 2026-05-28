@@ -21,9 +21,7 @@ public sealed class FunctionsProjectHostRunContextTests
             environmentVariables);
 
         Assert.Equal("dotnet-isolated", context.WorkerRuntime);
-        Assert.Equal(
-            "dotnet-isolated",
-            environmentVariables[FunctionsProjectHostRunContext.WorkerRuntimeEnvironmentVariable]);
+        Assert.Equal("dotnet-isolated", environmentVariables[FunctionsProjectHostRunContext.WorkerRuntimeEnvironmentVariable]);
     }
 
     [Fact]

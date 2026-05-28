@@ -60,10 +60,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
-    public WorkloadUpdateCommand(
-        IInteractionService interaction,
-        IWorkloadInstaller installer,
-        IWorkloadStore store)
+    public WorkloadUpdateCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store)
         : base("update", "Update an installed workload in place.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
@@ -144,10 +141,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             cancellationToken);
     }
 
-    private async Task<string> ResolveInstalledPackageIdAsync(
-        string identifier,
-        bool exact,
-        CancellationToken cancellationToken)
+    private async Task<string> ResolveInstalledPackageIdAsync(string identifier, bool exact, CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
 
@@ -214,11 +208,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         }
     }
 
-    private async Task<int> UpdateAllAsync(
-        string? source,
-        bool includePrerelease,
-        bool allowMajor,
-        CancellationToken cancellationToken)
+    private async Task<int> UpdateAllAsync(string? source, bool includePrerelease, bool allowMajor, CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<string> packageIds = [.. installed

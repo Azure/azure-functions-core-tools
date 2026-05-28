@@ -210,12 +210,7 @@ public class StartCommandTests : IDisposable
             CorsCredentials = true,
         };
         options.Get(Arg.Any<string>()).Returns(startupOptions);
-        var cmd = new StartCommand(
-            _interaction,
-            _palette,
-            _cliVersionProvider,
-            _initializationRunner,
-            options);
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options);
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --output=plain");
 
@@ -249,12 +244,7 @@ public class StartCommandTests : IDisposable
             Port = 9092,
         };
         options.CurrentValue.Returns(startupOptions);
-        var cmd = new StartCommand(
-            _interaction,
-            _palette,
-            _cliVersionProvider,
-            _initializationRunner,
-            options);
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options);
         var root = new RootCommand { cmd };
         string projectDirectory = Environment.CurrentDirectory;
         var result = root.Parse($"start \"{projectDirectory}\" --output=plain");
@@ -359,9 +349,7 @@ public class StartCommandTests : IDisposable
         Assert.Contains("WARNING: Project cleanup failed: cleanup failed", _interaction.Lines);
     }
 
-    private static StartInitializationResult CreateInitializationResult(
-        IHostEventStream eventStream,
-        TestFunctionsProject? project = null)
+    private static StartInitializationResult CreateInitializationResult(IHostEventStream eventStream, TestFunctionsProject? project = null)
     {
         project ??= new TestFunctionsProject();
         var hostRunContext = new FunctionsProjectHostRunContext(
@@ -411,9 +399,7 @@ public class StartCommandTests : IDisposable
 
         public override FunctionsWorkerReference WorkerReference => _workerReference;
 
-        public override Task CompleteHostRunAsync(
-            FunctionsProjectHostRunCompletionContext context,
-            CancellationToken cancellationToken)
+        public override Task CompleteHostRunAsync(FunctionsProjectHostRunCompletionContext context, CancellationToken cancellationToken)
         {
             CompletionContexts.Add(context);
             if (CleanupException is not null)

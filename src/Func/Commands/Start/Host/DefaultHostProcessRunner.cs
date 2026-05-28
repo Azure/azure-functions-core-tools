@@ -53,12 +53,7 @@ internal sealed class DefaultHostProcessRunner(
             throw CreateStartFailure(launchInfo, ex);
         }
 
-        IHostEventStream stream = new HostProcessEventStream(
-            process,
-            _outputParser,
-            launchInfo,
-            _shutdownTimeout,
-            _timeProvider);
+        IHostEventStream stream = new HostProcessEventStream(process, _outputParser, launchInfo, _shutdownTimeout, _timeProvider);
         return Task.FromResult(stream);
     }
 

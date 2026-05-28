@@ -145,10 +145,7 @@ internal static class Parser
         helpOption?.Action = action;
     }
 
-    private static void ConfigureRootAction(
-        FuncRootCommand rootCommand,
-        HelpCommand helpCommand,
-        VersionCommand versionCommand)
+    private static void ConfigureRootAction(FuncRootCommand rootCommand, HelpCommand helpCommand, VersionCommand versionCommand)
     {
         rootCommand.SetAction(parseResult =>
         {

@@ -11,9 +11,4 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 /// <param name="StandardError">Captured standard error, possibly empty.</param>
 /// <param name="TimedOut"><c>true</c> when the process was killed because the per-request timeout elapsed.</param>
 /// <param name="ExecutableNotFound"><c>true</c> when the executable could not be located on the host.</param>
-internal sealed record ProcessOutcome(
-    int? ExitCode,
-    string StandardOutput,
-    string StandardError,
-    bool TimedOut,
-    bool ExecutableNotFound);
+internal sealed record ProcessOutcome(int? ExitCode, string StandardOutput, string StandardError, bool TimedOut, bool ExecutableNotFound);

@@ -36,9 +36,7 @@ internal sealed class QuickstartListCommand : FuncCliCommand
     private readonly IInteractionService _interaction;
     private readonly IReadOnlyList<IQuickstartProvider> _providers;
 
-    public QuickstartListCommand(
-        IInteractionService interaction,
-        IEnumerable<IQuickstartProvider> providers)
+    public QuickstartListCommand(IInteractionService interaction, IEnumerable<IQuickstartProvider> providers)
         : base("list", "List available templates from the catalog.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -62,8 +60,7 @@ internal sealed class QuickstartListCommand : FuncCliCommand
             return Task.FromResult(1);
         }
 
-        _interaction.WriteWarning(
-            "The quickstart list command is not yet implemented.");
+        _interaction.WriteWarning("The quickstart list command is not yet implemented.");
         return Task.FromResult(1);
     }
 }

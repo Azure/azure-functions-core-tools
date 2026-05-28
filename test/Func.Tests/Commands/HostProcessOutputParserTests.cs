@@ -16,10 +16,7 @@ public class HostProcessOutputParserTests
     {
         var parser = new LineHostProcessOutputParser();
 
-        HostLogEntry entry = parser.ParseLine(
-            HostProcessStreamNames.StandardOutput,
-            "Host started",
-            DateTimeOffset.UnixEpoch);
+        HostLogEntry entry = parser.ParseLine(HostProcessStreamNames.StandardOutput, "Host started", DateTimeOffset.UnixEpoch);
 
         Assert.Equal("Host.Process", entry.Category);
         Assert.Equal(LogLevel.Information, entry.Level);
@@ -32,10 +29,7 @@ public class HostProcessOutputParserTests
     {
         var parser = new LineHostProcessOutputParser();
 
-        HostLogEntry entry = parser.ParseLine(
-            HostProcessStreamNames.StandardError,
-            "Host failed",
-            DateTimeOffset.UnixEpoch);
+        HostLogEntry entry = parser.ParseLine(HostProcessStreamNames.StandardError, "Host failed", DateTimeOffset.UnixEpoch);
 
         Assert.Equal(LogLevel.Error, entry.Level);
         Assert.Equal("Host failed", entry.Message);

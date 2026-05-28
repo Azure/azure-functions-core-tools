@@ -44,10 +44,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
-    public InitCommand(
-        IInteractionService interaction,
-        IWorkloadHintRenderer hintRenderer,
-        IEnumerable<IProjectInitializer> initializers)
+    public InitCommand(IInteractionService interaction, IWorkloadHintRenderer hintRenderer, IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -348,10 +345,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return (null, 1);
         }
 
-        string picked = await _interaction.PromptForSelectionAsync(
-            "Select a language:",
-            supported,
-            cancellationToken);
+        string picked = await _interaction.PromptForSelectionAsync("Select a language:", supported, cancellationToken);
 
         return (picked.ToLowerInvariant(), null);
     }
@@ -417,10 +411,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             i => i.DisplayName,
             i => i,
             StringComparer.Ordinal);
-        string picked = await _interaction.PromptForSelectionAsync(
-            "Select a stack:",
-            displayToInitializer.Keys,
-            cancellationToken);
+        string picked = await _interaction.PromptForSelectionAsync("Select a stack:", displayToInitializer.Keys, cancellationToken);
 
         return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }

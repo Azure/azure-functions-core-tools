@@ -27,11 +27,7 @@ internal sealed class AzuriteProcess : IAzuriteProcess
     private Task? _stopTask;
     private int _disposed;
 
-    public AzuriteProcess(
-        Process process,
-        AzuriteLaunchMode mode,
-        string? containerName = null,
-        string dockerCommand = "docker")
+    public AzuriteProcess(Process process, AzuriteLaunchMode mode, string? containerName = null, string dockerCommand = "docker")
     {
         _process = process ?? throw new ArgumentNullException(nameof(process));
         _mode = mode;
@@ -83,8 +79,7 @@ internal sealed class AzuriteProcess : IAzuriteProcess
         }
     }
 
-    public async IAsyncEnumerable<string> ReadStdoutLinesAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<string> ReadStdoutLinesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (string line in _stdout.Reader.ReadAllAsync(cancellationToken))
         {
@@ -92,8 +87,7 @@ internal sealed class AzuriteProcess : IAzuriteProcess
         }
     }
 
-    public async IAsyncEnumerable<string> ReadStderrLinesAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<string> ReadStderrLinesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (string line in _stderr.Reader.ReadAllAsync(cancellationToken))
         {

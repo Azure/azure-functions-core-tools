@@ -18,10 +18,7 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly SetupOutputMode _outputMode = outputMode;
 
-    public void SetupStarted(
-        SetupCommandOptions options,
-        SetupFeaturePlan featurePlan,
-        IReadOnlyList<SetupProfileScope> profileScopes)
+    public void SetupStarted(SetupCommandOptions options, SetupFeaturePlan featurePlan, IReadOnlyList<SetupProfileScope> profileScopes)
     {
         if (_outputMode == SetupOutputMode.Json)
         {

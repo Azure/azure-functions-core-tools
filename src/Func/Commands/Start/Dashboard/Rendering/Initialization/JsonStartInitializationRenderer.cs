@@ -165,10 +165,7 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
         writer.WriteEndObject();
     }
 
-    private static void WriteStringDictionary(
-        Utf8JsonWriter writer,
-        string propertyName,
-        IReadOnlyDictionary<string, string> values)
+    private static void WriteStringDictionary(Utf8JsonWriter writer, string propertyName, IReadOnlyDictionary<string, string> values)
     {
         writer.WriteStartObject(propertyName);
         foreach ((string key, string value) in values.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))

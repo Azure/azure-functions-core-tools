@@ -21,8 +21,7 @@ internal static class WorkloadSourceResolver
     /// </summary>
     public static string? Resolve()
     {
-        string? configured = System.Environment.GetEnvironmentVariable(
-            Constants.WorkloadsSourceEnvironmentVariable);
+        string? configured = System.Environment.GetEnvironmentVariable(Constants.WorkloadsSourceEnvironmentVariable);
 
         return string.IsNullOrWhiteSpace(configured) ? null : configured;
     }

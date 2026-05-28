@@ -33,10 +33,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         Description = "Emit machine-readable JSON instead of a table.",
     };
 
-    public WorkloadListCommand(
-        IInteractionService interaction,
-        IWorkloadProvider workloads,
-        IWorkloadStore store)
+    public WorkloadListCommand(IInteractionService interaction, IWorkloadProvider workloads, IWorkloadStore store)
         : base("list", "List installed workloads.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));

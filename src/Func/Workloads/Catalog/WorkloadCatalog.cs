@@ -20,9 +20,7 @@ internal sealed class WorkloadCatalog(
     private readonly Func<PackageSource, NuGetProtocolSourceClient> _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
-        CatalogSearchQuery query,
-        CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
         return ResolveClient(query.Source).SearchAsync(query, cancellationToken);
@@ -101,9 +99,7 @@ internal sealed class WorkloadCatalog(
         return selected is null ? null : new ResolvedPackage(packageId.ToLowerInvariant(), selected, client.Source);
     }
 
-    private static NuGetVersion? SelectLatest(
-        IEnumerable<NuGetVersion> versions,
-        Func<NuGetVersion, bool> predicate)
+    private static NuGetVersion? SelectLatest(IEnumerable<NuGetVersion> versions, Func<NuGetVersion, bool> predicate)
     {
         NuGetVersion? best = null;
         foreach (NuGetVersion candidate in versions)

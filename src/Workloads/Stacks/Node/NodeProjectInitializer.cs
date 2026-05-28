@@ -59,10 +59,7 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         return [NoBundleOption, BundlesChannelOption, SkipNpmInstallOption];
     }
 
-    public async Task InitializeAsync(
-        InitContext context,
-        ParseResult parseResult,
-        CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);

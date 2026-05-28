@@ -93,11 +93,7 @@ internal sealed class AzuriteLauncher : IAzuriteLauncher
                 ex);
         }
 
-        IAzuriteProcess handle = new AzuriteProcess(
-            process,
-            request.Mode,
-            request.ContainerName,
-            _dockerCommand);
+        IAzuriteProcess handle = new AzuriteProcess(process, request.Mode, request.ContainerName, _dockerCommand);
 
         return Task.FromResult(handle);
     }

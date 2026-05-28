@@ -10,9 +10,7 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 public static class ProjectCreationFailures
 {
-    public static ProjectCreationFailure WorkerNotResolved(
-        FunctionsWorkerResolutionFailure workerFailure,
-        string? message = null)
+    public static ProjectCreationFailure WorkerNotResolved(FunctionsWorkerResolutionFailure workerFailure, string? message = null)
     {
         ArgumentNullException.ThrowIfNull(workerFailure);
         return new ProjectCreationFailure.WorkerNotResolved(workerFailure, message ?? workerFailure.Message);

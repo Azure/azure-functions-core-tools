@@ -42,8 +42,7 @@ internal sealed class ResolveConstraintsInitializationStep : DemoInitializationS
             ? $"; {warningCount} warning(s)"
             : string.Empty;
 
-        return StartInitializationStepResult.Completed(
-            $"Host {hostRange}; bundle {bundleRange}; workers {workerSummary}{diagnostics}");
+        return StartInitializationStepResult.Completed($"Host {hostRange}; bundle {bundleRange}; workers {workerSummary}{diagnostics}");
     }
 
     private static string FormatWorkerSummary(IReadOnlyDictionary<string, VersionRange> workerRanges)

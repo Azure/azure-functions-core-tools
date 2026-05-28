@@ -19,9 +19,7 @@ public class QuickstartScaffolderTests : IDisposable
         _targetDir = Path.Combine(Path.GetTempPath(), $"func-scaffold-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_targetDir);
 
-        _gitRunner = new FakeGitRunner(
-            onRun: SimulateGitCommand,
-            onRunWithOutput: SimulateGitOutputCommand);
+        _gitRunner = new FakeGitRunner(onRun: SimulateGitCommand, onRunWithOutput: SimulateGitOutputCommand);
         ITemplateFetcher gitFetcher = new GitTemplateFetcher(_gitRunner, NullLogger<GitTemplateFetcher>.Instance);
         ITemplateFetcher httpFetcher = new HttpTemplateFetcher(
             Substitute.For<IHttpClientFactory>(),

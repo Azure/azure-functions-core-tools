@@ -48,11 +48,7 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
             attributes);
     }
 
-    private bool TryParseConsoleLogRecord(
-        string streamName,
-        string line,
-        DateTimeOffset timestamp,
-        out HostLogEntry? entry)
+    private bool TryParseConsoleLogRecord(string streamName, string line, DateTimeOffset timestamp, out HostLogEntry? entry)
     {
         entry = null;
         if (TryParseConsoleLogHeader(line, out LogLevel level, out string? category, out int eventId))
@@ -83,14 +79,7 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
             Dictionary<string, object?> attributes = CreateStreamAttributes(streamName);
             EnrichFromCategory(context.Category, attributes);
             EnrichFromMessage(message, attributes);
-            entry = new HostLogEntry(
-                timestamp,
-                context.Category,
-                context.Level,
-                context.EventId,
-                message,
-                Exception: null,
-                attributes);
+            entry = new HostLogEntry(timestamp, context.Category, context.Level, context.EventId, message, Exception: null, attributes);
             return true;
         }
 
@@ -98,11 +87,7 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
         return false;
     }
 
-    private static bool TryParseConsoleLogHeader(
-        string line,
-        out LogLevel level,
-        out string? category,
-        out int eventId)
+    private static bool TryParseConsoleLogHeader(string line, out LogLevel level, out string? category, out int eventId)
     {
         level = default;
         category = null;

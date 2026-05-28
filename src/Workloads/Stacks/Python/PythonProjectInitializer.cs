@@ -42,10 +42,7 @@ internal sealed class PythonProjectInitializer : IProjectInitializer
         return [NoBundleOption, BundlesChannelOption];
     }
 
-    public Task InitializeAsync(
-        InitContext context,
-        ParseResult parseResult,
-        CancellationToken cancellationToken = default)
+    public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);

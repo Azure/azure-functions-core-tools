@@ -380,8 +380,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Returns((ResolvedPackage?)null);
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadUpdateResult result = await installer.UpdateAsync(
-            "test.workload", null, null, false, allowMajor: false);
+        WorkloadUpdateResult result = await installer.UpdateAsync("test.workload", null, null, false, allowMajor: false);
 
         Assert.True(result.NoUpdateAvailable);
         Assert.True(result.NoCandidateOnSource);
@@ -402,8 +401,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Returns(NewResolved("test.workload", "1.5.0"));
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadUpdateResult result = await installer.UpdateAsync(
-            "test.workload", null, null, false, allowMajor: false);
+        WorkloadUpdateResult result = await installer.UpdateAsync("test.workload", null, null, false, allowMajor: false);
 
         Assert.True(result.NoUpdateAvailable);
         Assert.False(result.NoCandidateOnSource);
@@ -428,8 +426,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Returns(_ => File.OpenRead(newNupkg));
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadUpdateResult result = await installer.UpdateAsync(
-            "test.workload", null, null, false, allowMajor: false);
+        WorkloadUpdateResult result = await installer.UpdateAsync("test.workload", null, null, false, allowMajor: false);
 
         Assert.False(result.NoUpdateAvailable);
         Assert.Equal("1.0.0", result.PreviousVersion);

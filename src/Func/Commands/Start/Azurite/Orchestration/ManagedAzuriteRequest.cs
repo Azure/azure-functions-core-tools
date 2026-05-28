@@ -22,11 +22,7 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 /// <param name="StartupTimeout">
 /// Maximum time to wait for a freshly launched Azurite to become ready (§9.4).
 /// </param>
-internal sealed record ManagedAzuriteRequest(
-    string? StorageConnectionString,
-    string ProjectRoot,
-    bool Disabled,
-    TimeSpan StartupTimeout)
+internal sealed record ManagedAzuriteRequest(string? StorageConnectionString, string ProjectRoot, bool Disabled, TimeSpan StartupTimeout)
 {
     /// <summary>
     /// Default readiness timeout per design §9.4.

@@ -368,11 +368,7 @@ public class StartInitializationTests : IDisposable
             .Returns(hostResolution);
         var renderer = new RecordingStartInitializationRenderer();
         IFunctionsWorkerResolverFactory workerResolverFactory = CreateWorkerResolverFactory();
-        var runner = CreateRunner(
-            projectResolver,
-            profileResolution,
-            hostWorkloadResolver,
-            workerResolverFactory: workerResolverFactory);
+        var runner = CreateRunner(projectResolver, profileResolution, hostWorkloadResolver, workerResolverFactory: workerResolverFactory);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -795,11 +791,7 @@ public class StartInitializationTests : IDisposable
         string stackName = "dotnet-isolated",
         string stackDisplayName = ".NET",
         bool supportsExtensionBundles = false)
-        => new(
-            workingDirectory,
-            stackName,
-            stackDisplayName,
-            supportsExtensionBundles);
+        => new(workingDirectory, stackName, stackDisplayName, supportsExtensionBundles);
 
     private static FunctionsProjectHostRunContext CreateHostRunContext(WorkingDirectory workingDirectory)
         => new(
@@ -898,10 +890,7 @@ public class StartInitializationTests : IDisposable
         return workerResolverFactory;
     }
 
-    private static IFunctionsWorker CreateWorker(
-        string workerId,
-        string workerRuntime,
-        string version = "1.0.0")
+    private static IFunctionsWorker CreateWorker(string workerId, string workerRuntime, string version = "1.0.0")
         => new TestFunctionsWorker(new FunctionsWorkerId(workerId), workerRuntime, "worker.config.json", version);
 
     private static IHostProcessRunner CreateSuccessfulHostProcessRunner()
@@ -1129,9 +1118,7 @@ public class StartInitializationTests : IDisposable
 
         public override FunctionsWorkerReference WorkerReference => _workerReference;
 
-        public override Task PrepareForHostRunAsync(
-            FunctionsProjectHostRunContext context,
-            CancellationToken cancellationToken)
+        public override Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
         {
             PrepareAction?.Invoke(context);
             PreparedContexts.Add(context);

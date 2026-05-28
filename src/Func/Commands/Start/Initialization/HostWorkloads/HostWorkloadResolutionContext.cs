@@ -8,7 +8,4 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Inputs used to resolve the host workload for a start run.
 /// </summary>
-internal sealed record HostWorkloadResolutionContext(
-    string? RequestedHostVersion,
-    VersionRange? ProfileHostVersionRange,
-    bool Offline);
+internal sealed record HostWorkloadResolutionContext(string? RequestedHostVersion, VersionRange? ProfileHostVersionRange, bool Offline);

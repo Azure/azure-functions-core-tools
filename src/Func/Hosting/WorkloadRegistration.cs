@@ -161,9 +161,7 @@ internal static class WorkloadRegistration
                 .First())];
     }
 
-    private static IReadOnlyList<ContentWorkloadInfo> CreateContentWorkloads(
-        IReadOnlyList<WorkloadEntry> entries,
-        IWorkloadPaths paths)
+    private static IReadOnlyList<ContentWorkloadInfo> CreateContentWorkloads(IReadOnlyList<WorkloadEntry> entries, IWorkloadPaths paths)
     {
         return [.. entries
             .Where(e => e.Kind == WorkloadKind.Content)

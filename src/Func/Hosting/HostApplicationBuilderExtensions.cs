@@ -30,20 +30,14 @@ internal static class HostApplicationBuilderExtensions
     /// on <see cref="HostApplicationBuilder.Services"/> after
     /// <see cref="CliHostFactory.CreateBuilder"/>.
     /// </remarks>
-    public static Task RegisterWorkloadsAsync(
-        this HostApplicationBuilder builder,
-        CancellationToken cancellationToken = default)
+    public static Task RegisterWorkloadsAsync(this HostApplicationBuilder builder, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
         IInteractionService interaction = ResolveSingletonInstance<IInteractionService>(builder);
         WorkloadPathsOptions paths = TryResolveSingletonInstance<WorkloadPathsOptions>(builder)
             ?? new WorkloadPathsOptions();
-        return WorkloadRegistration.RegisterWorkloadsAsync(
-            builder.Services,
-            paths,
-            interaction,
-            cancellationToken);
+        return WorkloadRegistration.RegisterWorkloadsAsync(builder.Services, paths, interaction, cancellationToken);
     }
 
     /// <summary>

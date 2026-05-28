@@ -134,6 +134,10 @@ fire:
   a literal). When the type is hidden behind a method or property call, write
   the type explicitly. Tests opt out of this one in `.editorconfig` to reduce
   rename churn.
+- **Line wrapping**: keep method, constructor, record, and simple call
+  signatures on one line when they fit comfortably (roughly 140 columns). Use
+  the current wrapped style only for genuinely long signatures or calls with
+  nested object creation, lambdas, or several-property-deep member/method chains.
 
 ## Style
 

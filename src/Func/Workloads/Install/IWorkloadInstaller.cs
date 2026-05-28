@@ -121,8 +121,5 @@ internal interface IWorkloadInstaller
     /// (<paramref name="packageId"/>, <paramref name="version"/>). Returns
     /// <c>true</c> when an entry was removed, <c>false</c> when none existed.
     /// </summary>
-    public Task<bool> UninstallAsync(
-        string packageId,
-        string version,
-        CancellationToken cancellationToken = default);
+    public Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default);
 }

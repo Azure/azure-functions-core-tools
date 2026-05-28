@@ -12,9 +12,7 @@ namespace Azure.Functions.Cli.Tests;
 /// </summary>
 internal static class TestWorkloads
 {
-    public static RuntimeWorkloadInfo CreateInfo(
-        string packageId = "Test.Workload.A",
-        string version = "1.0.0")
+    public static RuntimeWorkloadInfo CreateInfo(string packageId = "Test.Workload.A", string version = "1.0.0")
     {
         var instance = new TestWorkload(packageId);
         return new RuntimeWorkloadInfo(
@@ -28,9 +26,7 @@ internal static class TestWorkloads
             Description: instance.Description);
     }
 
-    public static ContentWorkloadInfo CreateContentInfo(
-        string packageId = "Test.Content.A",
-        string version = "1.0.0")
+    public static ContentWorkloadInfo CreateContentInfo(string packageId = "Test.Content.A", string version = "1.0.0")
         => new(
             PackageId: packageId,
             PackageVersion: version,
@@ -89,9 +85,7 @@ internal static class TestWorkloads
 
         public override IReadOnlyList<FuncCommand> Subcommands { get; }
 
-        public override Task<int> ExecuteAsync(
-            FuncCommandInvocationContext context,
-            CancellationToken cancellationToken)
+        public override Task<int> ExecuteAsync(FuncCommandInvocationContext context, CancellationToken cancellationToken)
             => _execute(context, cancellationToken);
     }
 }

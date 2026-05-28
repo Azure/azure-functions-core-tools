@@ -45,8 +45,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         _exitTask = CompleteWhenProcessExitsAsync();
     }
 
-    public async IAsyncEnumerable<HostLogEntry> ReadAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         while (await _channel.Reader.WaitToReadAsync(cancellationToken))
         {

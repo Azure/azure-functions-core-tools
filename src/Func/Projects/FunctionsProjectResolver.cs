@@ -8,8 +8,7 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Default aggregate project resolver.
 /// </summary>
-internal sealed class FunctionsProjectResolver(
-    IEnumerable<WorkloadProjectFactoryRegistration> factories)
+internal sealed class FunctionsProjectResolver(IEnumerable<WorkloadProjectFactoryRegistration> factories)
     : IFunctionsProjectResolver
 {
     private readonly IReadOnlyList<WorkloadProjectFactoryRegistration> _factories =
@@ -38,7 +37,6 @@ internal sealed class FunctionsProjectResolver(
             }
         }
 
-        return ProjectResolutionResults.NotResolved(
-            "No installed workload recognized this directory as an Azure Functions project.");
+        return ProjectResolutionResults.NotResolved("No installed workload recognized this directory as an Azure Functions project.");
     }
 }

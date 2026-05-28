@@ -174,12 +174,7 @@ internal sealed class SetupRunner(
                 case DotNetProfileRuntime:
                     if (AddFeature(features, featureNames, DotNetFeature))
                     {
-                        AddRuntimeFeature(
-                            runtimeFeatures,
-                            runtimeFeatureNames,
-                            DotNetFeature,
-                            DotNetProfileRuntime,
-                            installWorker: false);
+                        AddRuntimeFeature(runtimeFeatures, runtimeFeatureNames, DotNetFeature, DotNetProfileRuntime, installWorker: false);
                     }
 
                     break;
@@ -337,10 +332,7 @@ internal sealed class SetupRunner(
             SetupDependency? bundleDependency = await TryCreateBundleDependencyAsync(workingDirectory, profileScope, cancellationToken);
             if (bundleDependency is null)
             {
-                var dependency = SetupDependency.Bundle(
-                    InstalledBundleScanner.StableBundleId,
-                    versionRange: null,
-                    rangeText: null);
+                var dependency = SetupDependency.Bundle(InstalledBundleScanner.StableBundleId, versionRange: null, rangeText: null);
                 failure = SetupDependencyResult.Failed(
                     dependency,
                     "The host.json extensionBundle range and profile extensionBundle range do not overlap.");
@@ -370,10 +362,7 @@ internal sealed class SetupRunner(
 
         if (hostJsonBundle is null)
         {
-            return SetupDependency.Bundle(
-                InstalledBundleScanner.StableBundleId,
-                profileRange,
-                profileRangeText);
+            return SetupDependency.Bundle(InstalledBundleScanner.StableBundleId, profileRange, profileRangeText);
         }
 
         VersionRange? effectiveRange = VersionRangeIntersection.Intersect(hostJsonBundle.Version, profileRangeText);
@@ -675,9 +664,7 @@ internal sealed record SetupProfileScope(ResolvedProfile? Profile)
     public string Name => Profile?.Name ?? "unconstrained";
 }
 
-internal sealed record SetupDependencyPlan(
-    IReadOnlyList<SetupDependency> Dependencies,
-    IReadOnlyList<SetupDependencyResult> Failures);
+internal sealed record SetupDependencyPlan(IReadOnlyList<SetupDependency> Dependencies, IReadOnlyList<SetupDependencyResult> Failures);
 
 internal sealed record SetupDependency(
     SetupDependencyKind Kind,

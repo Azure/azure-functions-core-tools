@@ -22,9 +22,7 @@ internal interface IWorkloadCatalog
     /// </summary>
     /// <param name="query">Filter, paging, and source-override bag.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
-    public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(
-        CatalogSearchQuery query,
-        CancellationToken cancellationToken = default);
+    public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the highest installable version of <paramref name="packageId"/>
@@ -93,7 +91,5 @@ internal interface IWorkloadCatalog
     /// <exception cref="WorkloadPackageNotFoundException">
     /// The package + version does not exist on the resolved source.
     /// </exception>
-    public Task<Stream> DownloadAsync(
-        ResolvedPackage package,
-        CancellationToken cancellationToken = default);
+    public Task<Stream> DownloadAsync(ResolvedPackage package, CancellationToken cancellationToken = default);
 }

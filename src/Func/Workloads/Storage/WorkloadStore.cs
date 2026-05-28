@@ -15,16 +15,13 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
     private readonly IWorkloadPaths _paths = paths
         ?? throw new ArgumentNullException(nameof(paths));
 
-    public async Task<IReadOnlyList<WorkloadEntry>> GetWorkloadsAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<WorkloadEntry>> GetWorkloadsAsync(CancellationToken cancellationToken = default)
     {
         WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
         return [.. registry.Workloads];
     }
 
-    public async Task SaveWorkloadAsync(
-        WorkloadEntry entry,
-        CancellationToken cancellationToken = default)
+    public async Task SaveWorkloadAsync(WorkloadEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.PackageId);
@@ -45,10 +42,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         await WriteRegistryAsync(registry, cancellationToken);
     }
 
-    public async Task<bool> RemoveWorkloadAsync(
-        string packageId,
-        string version,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveWorkloadAsync(string packageId, string version, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -124,13 +118,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
         try
         {
-            await using var stream = new FileStream(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 4096,
-                useAsync: true);
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
 
             WorkloadRegistry registry = await JsonSerializer.DeserializeAsync(
                 stream,
@@ -205,10 +193,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
     /// Serialize hook. Tests substitute this to exercise the failure-path
     /// cleanup (temp file removed, original registry preserved).
     /// </summary>
-    internal virtual Task SerializeAsync(
-        Stream stream,
-        WorkloadRegistry registry,
-        CancellationToken cancellationToken)
+    internal virtual Task SerializeAsync(Stream stream, WorkloadRegistry registry, CancellationToken cancellationToken)
         => JsonSerializer.SerializeAsync(
             stream,
             registry,

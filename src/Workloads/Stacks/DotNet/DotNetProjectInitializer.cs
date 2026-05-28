@@ -54,10 +54,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
         return [FrameworkOption];
     }
 
-    public async Task InitializeAsync(
-        InitContext context,
-        ParseResult parseResult,
-        CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(parseResult);
@@ -134,10 +131,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
         WriteTimestamp();
     }
 
-    private async Task RunWithTimeoutAsync(
-        IReadOnlyList<string> args,
-        string? workingDirectory,
-        CancellationToken cancellationToken)
+    private async Task RunWithTimeoutAsync(IReadOnlyList<string> args, string? workingDirectory, CancellationToken cancellationToken)
     {
         using CancellationTokenSource timeoutCts = new(OperationTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(

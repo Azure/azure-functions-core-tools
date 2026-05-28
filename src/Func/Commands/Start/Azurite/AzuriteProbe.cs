@@ -10,9 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Azure.Functions.Cli.Commands.Start.Azurite;
 
 /// <inheritdoc cref="IAzuriteProbe" />
-internal sealed class AzuriteProbe(
-    IHttpClientFactory httpClientFactory,
-    ILogger<AzuriteProbe> logger) : IAzuriteProbe
+internal sealed class AzuriteProbe(IHttpClientFactory httpClientFactory, ILogger<AzuriteProbe> logger) : IAzuriteProbe
 {
     /// <summary>
     /// Name of the <see cref="HttpClient"/> registered in DI for the probe.
@@ -42,9 +40,7 @@ internal sealed class AzuriteProbe(
     private readonly ILogger<AzuriteProbe> _logger =
         logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public async Task<AzuriteProbeResult> ProbeAsync(
-        AzuriteEndpointTuple endpoints,
-        CancellationToken cancellationToken)
+    public async Task<AzuriteProbeResult> ProbeAsync(AzuriteEndpointTuple endpoints, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
@@ -253,9 +249,7 @@ internal sealed class AzuriteProbe(
         return false;
     }
 
-    private static async Task<bool> BodyLooksLikeStorageErrorAsync(
-        HttpResponseMessage response,
-        CancellationToken cancellationToken)
+    private static async Task<bool> BodyLooksLikeStorageErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.Content is null)
         {

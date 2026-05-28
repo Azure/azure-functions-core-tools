@@ -38,8 +38,7 @@ internal sealed class InMemoryHostEventStream : IHostEventStream
 
     public void Complete() => _channel.Writer.TryComplete();
 
-    public async IAsyncEnumerable<HostLogEntry> ReadAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         while (await _channel.Reader.WaitToReadAsync(cancellationToken))
         {

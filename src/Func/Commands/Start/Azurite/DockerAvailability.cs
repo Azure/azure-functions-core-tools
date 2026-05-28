@@ -9,7 +9,4 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite;
 /// <param name="Status">High-level outcome category.</param>
 /// <param name="Reason">Short, human-readable explanation suitable for verbose logging.</param>
 /// <param name="Version">Version string from <c>docker --version</c> when available.</param>
-internal sealed record DockerAvailability(
-    DockerAvailabilityStatus Status,
-    string Reason,
-    string? Version = null);
+internal sealed record DockerAvailability(DockerAvailabilityStatus Status, string Reason, string? Version = null);

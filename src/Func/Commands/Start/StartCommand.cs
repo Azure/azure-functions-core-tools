@@ -239,14 +239,10 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         }
     }
 
-    private async Task CompleteProjectHostRunAsync(
-        StartInitializationResult initializationResult,
-        FunctionsProjectHostRunOutcome outcome)
+    private async Task CompleteProjectHostRunAsync(StartInitializationResult initializationResult, FunctionsProjectHostRunOutcome outcome)
     {
         using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var completionContext = new FunctionsProjectHostRunCompletionContext(
-            initializationResult.HostRunContext,
-            outcome);
+        var completionContext = new FunctionsProjectHostRunCompletionContext(initializationResult.HostRunContext, outcome);
 
         try
         {
