@@ -392,12 +392,18 @@ debugger steps into them as long as the workload's PDB sits next to its DLL
 in the install directory.
 
 The `DeployForDebug` MSBuild target (in `eng/build/WorkloadDebug.targets`,
-imported by every project) handles that copy. It's safe to invoke on any
-project; it no-ops for anything that isn't `PackageType=FuncCliWorkload`.
+imported by every project) handles the full loop:
+
+1. Build the workload.
+2. On first run for a given `<id>@<version>`, pack the workload and run
+   `func workload install <nupkg> --force` against the resolved home.
+3. Copy the freshly built `.dll` + `.pdb` over the install dir so subsequent
+   edits show up without another install.
+
+It's safe to invoke on any project; it no-ops for anything that isn't
+`PackageType=FuncCliWorkload`.
 
 ```bash
-# Builds the workload and copies its DLL + PDB into the matching
-# <home>/workloads/<id>/<version>/tools/any/ directory.
 dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug \
     -p:FuncCliWorkloadsHome=$PWD/.debug-workloads
 ```
@@ -405,19 +411,18 @@ dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug \
 The home is resolved as `$(FuncCliWorkloadsHome)` property, then
 `FUNC_CLI_WORKLOADS_HOME` env var, then `$(RepoRoot).debug-workloads`.
 
-VS Code's `Run func cli (debug workload)` launch config in
-`.vscode/launch.json` wraps this: it picks a workload csproj, runs
-`DeployForDebug` as a preLaunchTask, then launches `func` with
-`FUNC_CLI_WORKLOADS_HOME` pointed at the same home. F5 binds breakpoints in
-both Func and the workload source once the workload loads.
+VS Code's `Run func cli (debug workload)` launch config wraps this end-to-end:
+pick a workload csproj, the preLaunchTask builds Func + runs `DeployForDebug`
+(which installs on first run), then `func` launches with
+`FUNC_CLI_WORKLOADS_HOME` pointed at the same home. Breakpoints in both Func
+and the workload source bind once the workload loads.
 
-The workload must be installed into the chosen home once before the target
-can redeploy bits over it:
+> The picker only lists stack workloads (Node / Python / DotNet / Go), since
+> the content-only packages (host, workers, extension bundles) have no
+> managed entry assembly to step into.
 
-```pwsh
-$env:FUNC_CLI_WORKLOADS_HOME = "$PWD/.debug-workloads"
-func workload install <path-to-nupkg>
-```
+> Bumping a workload's `VersionPrefix` makes the install path change, so the
+> next F5 will pack + install the new version automatically.
 
 ## Solution + CI
 
