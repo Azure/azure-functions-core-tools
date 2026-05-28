@@ -8,8 +8,7 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite;
 /// <inheritdoc cref="IAzuriteExecutableLocator" />
 internal sealed class AzuriteExecutableLocator(
     IPlatform platform,
-    IFileExistenceChecker fileChecker,
-    IEnvironmentReader environment,
+    IAzuriteHostEnvironment hostEnvironment,
     IProcessRunner processRunner) : IAzuriteExecutableLocator
 {
     private static readonly TimeSpan _versionProbeTimeout = TimeSpan.FromSeconds(5);
@@ -17,8 +16,7 @@ internal sealed class AzuriteExecutableLocator(
     private static readonly string[] _unixCandidateNames = ["azurite"];
 
     private readonly IPlatform _platform = platform ?? throw new ArgumentNullException(nameof(platform));
-    private readonly IFileExistenceChecker _fileChecker = fileChecker ?? throw new ArgumentNullException(nameof(fileChecker));
-    private readonly IEnvironmentReader _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+    private readonly IAzuriteHostEnvironment _hostEnvironment = hostEnvironment ?? throw new ArgumentNullException(nameof(hostEnvironment));
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
 
     public async Task<AzuriteExecutable?> FindAsync(string projectRoot, CancellationToken cancellationToken)
@@ -47,12 +45,12 @@ internal sealed class AzuriteExecutableLocator(
     {
         string fileName = _platform.IsWindows ? "azurite.cmd" : "azurite";
         string candidate = Path.Combine(projectRoot, "node_modules", ".bin", fileName);
-        return _fileChecker.Exists(candidate) ? candidate : null;
+        return _hostEnvironment.ExecutableExists(candidate) ? candidate : null;
     }
 
     private string? TryFindOnPath()
     {
-        string? pathValue = _environment.GetEnvironmentVariable("PATH");
+        string? pathValue = _hostEnvironment.GetPathVariable();
         if (string.IsNullOrEmpty(pathValue))
         {
             return null;
@@ -70,7 +68,7 @@ internal sealed class AzuriteExecutableLocator(
             foreach (string entry in entries)
             {
                 string candidate = Path.Combine(entry, name);
-                if (_fileChecker.Exists(candidate))
+                if (_hostEnvironment.ExecutableExists(candidate))
                 {
                     return candidate;
                 }

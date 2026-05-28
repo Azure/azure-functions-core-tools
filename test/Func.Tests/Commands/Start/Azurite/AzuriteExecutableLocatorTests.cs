@@ -13,12 +13,11 @@ public class AzuriteExecutableLocatorTests
     private const string ProjectRoot = "/proj";
 
     private readonly IPlatform _platform = Substitute.For<IPlatform>();
-    private readonly IFileExistenceChecker _fileChecker = Substitute.For<IFileExistenceChecker>();
-    private readonly IEnvironmentReader _environment = Substitute.For<IEnvironmentReader>();
+    private readonly IAzuriteHostEnvironment _hostEnv = Substitute.For<IAzuriteHostEnvironment>();
     private readonly IProcessRunner _processRunner = Substitute.For<IProcessRunner>();
 
     private AzuriteExecutableLocator CreateSut() =>
-        new(_platform, _fileChecker, _environment, _processRunner);
+        new(_platform, _hostEnv, _processRunner);
 
     private void StubVersionProbeSuccess(string stdout = "3.30.0")
     {
@@ -45,9 +44,9 @@ public class AzuriteExecutableLocatorTests
     {
         _platform.IsWindows.Returns(true);
         string projectLocal = Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite.cmd");
-        _fileChecker.Exists(projectLocal).Returns(true);
-        _environment.GetEnvironmentVariable("PATH").Returns("/tools");
-        _fileChecker.Exists(Path.Combine("/tools", "azurite.cmd")).Returns(true);
+        _hostEnv.ExecutableExists(projectLocal).Returns(true);
+        _hostEnv.GetPathVariable().Returns("/tools");
+        _hostEnv.ExecutableExists(Path.Combine("/tools", "azurite.cmd")).Returns(true);
 
         StubVersionProbeSuccess();
 
@@ -64,9 +63,9 @@ public class AzuriteExecutableLocatorTests
     {
         _platform.IsWindows.Returns(false);
         string projectLocal = Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite");
-        _fileChecker.Exists(projectLocal).Returns(true);
-        _environment.GetEnvironmentVariable("PATH").Returns("/usr/local/bin");
-        _fileChecker.Exists("/usr/local/bin/azurite").Returns(true);
+        _hostEnv.ExecutableExists(projectLocal).Returns(true);
+        _hostEnv.GetPathVariable().Returns("/usr/local/bin");
+        _hostEnv.ExecutableExists("/usr/local/bin/azurite").Returns(true);
 
         StubVersionProbeSuccess();
 
@@ -81,11 +80,11 @@ public class AzuriteExecutableLocatorTests
     public async Task FindAsync_Windows_PathLookup_TriesCmdThenExeThenBare()
     {
         _platform.IsWindows.Returns(true);
-        _environment.GetEnvironmentVariable("PATH").Returns("/tools/a;/tools/b");
+        _hostEnv.GetPathVariable().Returns("/tools/a;/tools/b");
 
-        _fileChecker.Exists(Arg.Any<string>()).Returns(false);
+        _hostEnv.ExecutableExists(Arg.Any<string>()).Returns(false);
         string match = Path.Combine("/tools/b", "azurite");
-        _fileChecker.Exists(match).Returns(true);
+        _hostEnv.ExecutableExists(match).Returns(true);
 
         StubVersionProbeSuccess();
 
@@ -100,17 +99,17 @@ public class AzuriteExecutableLocatorTests
     public async Task FindAsync_Windows_PathLookup_PrefersCmdOverExeOverBare()
     {
         _platform.IsWindows.Returns(true);
-        _environment.GetEnvironmentVariable("PATH").Returns("/tools/a");
+        _hostEnv.GetPathVariable().Returns("/tools/a");
 
-        _fileChecker.Exists(Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite.cmd")).Returns(false);
+        _hostEnv.ExecutableExists(Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite.cmd")).Returns(false);
 
         string cmd = Path.Combine("/tools/a", "azurite.cmd");
         string exe = Path.Combine("/tools/a", "azurite.exe");
         string bare = Path.Combine("/tools/a", "azurite");
 
-        _fileChecker.Exists(cmd).Returns(true);
-        _fileChecker.Exists(exe).Returns(true);
-        _fileChecker.Exists(bare).Returns(true);
+        _hostEnv.ExecutableExists(cmd).Returns(true);
+        _hostEnv.ExecutableExists(exe).Returns(true);
+        _hostEnv.ExecutableExists(bare).Returns(true);
 
         StubVersionProbeSuccess();
 
@@ -124,10 +123,10 @@ public class AzuriteExecutableLocatorTests
     public async Task FindAsync_Unix_PathLookup_OnlyTriesBareName()
     {
         _platform.IsWindows.Returns(false);
-        _environment.GetEnvironmentVariable("PATH").Returns("/usr/local/bin:/opt/bin");
-        _fileChecker.Exists(Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite")).Returns(false);
-        _fileChecker.Exists("/usr/local/bin/azurite").Returns(false);
-        _fileChecker.Exists("/opt/bin/azurite").Returns(true);
+        _hostEnv.GetPathVariable().Returns("/usr/local/bin:/opt/bin");
+        _hostEnv.ExecutableExists(Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite")).Returns(false);
+        _hostEnv.ExecutableExists("/usr/local/bin/azurite").Returns(false);
+        _hostEnv.ExecutableExists("/opt/bin/azurite").Returns(true);
 
         StubVersionProbeSuccess();
 
@@ -137,7 +136,7 @@ public class AzuriteExecutableLocatorTests
         Assert.Equal("/opt/bin/azurite", result!.FilePath);
 
         // Ensure we never asked about .cmd/.exe variants on Unix.
-        _fileChecker.DidNotReceive().Exists(Arg.Is<string>(p =>
+        _hostEnv.DidNotReceive().ExecutableExists(Arg.Is<string>(p =>
             p.EndsWith(".cmd", StringComparison.Ordinal) || p.EndsWith(".exe", StringComparison.Ordinal)));
     }
 
@@ -145,8 +144,8 @@ public class AzuriteExecutableLocatorTests
     public async Task FindAsync_NoMatch_ReturnsNull()
     {
         _platform.IsWindows.Returns(false);
-        _environment.GetEnvironmentVariable("PATH").Returns("/usr/local/bin");
-        _fileChecker.Exists(Arg.Any<string>()).Returns(false);
+        _hostEnv.GetPathVariable().Returns("/usr/local/bin");
+        _hostEnv.ExecutableExists(Arg.Any<string>()).Returns(false);
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
@@ -159,7 +158,7 @@ public class AzuriteExecutableLocatorTests
     {
         _platform.IsWindows.Returns(false);
         string projectLocal = Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite");
-        _fileChecker.Exists(projectLocal).Returns(true);
+        _hostEnv.ExecutableExists(projectLocal).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(new ProcessOutcome(
@@ -181,7 +180,7 @@ public class AzuriteExecutableLocatorTests
     {
         _platform.IsWindows.Returns(false);
         string projectLocal = Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite");
-        _fileChecker.Exists(projectLocal).Returns(true);
+        _hostEnv.ExecutableExists(projectLocal).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns<Task<ProcessOutcome>>(_ => throw new InvalidOperationException("nope"));
@@ -197,7 +196,7 @@ public class AzuriteExecutableLocatorTests
     {
         _platform.IsWindows.Returns(false);
         string projectLocal = Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite");
-        _fileChecker.Exists(projectLocal).Returns(true);
+        _hostEnv.ExecutableExists(projectLocal).Returns(true);
 
         StubVersionProbeSuccess("Azurite-Blob 3.30.0 (build 20250101)\nextra noise");
 

@@ -42,8 +42,7 @@ internal static class AzuriteServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<IPlatform, Platform>();
-        services.TryAddSingleton<IFileExistenceChecker, FileExistenceChecker>();
-        services.TryAddSingleton<IEnvironmentReader, EnvironmentReader>();
+        services.TryAddSingleton<IAzuriteHostEnvironment, AzuriteHostEnvironment>();
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<IAzuriteExecutableLocator, AzuriteExecutableLocator>();
         services.TryAddSingleton<IDockerAvailabilityProbe, DockerAvailabilityProbe>();
