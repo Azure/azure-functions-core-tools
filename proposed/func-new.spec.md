@@ -51,12 +51,12 @@ a real `func new` command that:
   on-disk/in-memory shape (`Template` vs `NewTemplate`, `Files` map,
   `UserPrompt`s, `dotnet new` opaque handle) come straight from the templates
   workload — `func new` just consumes them.
-- **No template discovery via `func new`.** `func new --list` is **not** part
-  of this surface (decided 2026-05-27). Template discovery lives entirely on
-  the `func templates list` command, designed in §5.5. `func new` is the
-  scaffold-one-function verb; `func templates` is the inspect-the-catalog
-  verb.
-- **No `func templates show <id>` subcommand.** Per-template detail —
+- **Template discovery via `func new --list`, not `func new --list`.**
+  Discovery and scaffold share one verb. `func new --list` (alias `-l`) is
+  the catalog surface; `func new --template <id>` is the scaffold surface.
+  There is no separate `func new ...` command tree (decided
+  2026-05-28 — reverses the earlier "separate command" decision in §8 Q1).
+- **No `func new show <id>` subcommand.** Per-template detail —
   options, prompts, defaults, supported languages — surfaces via
   `func new --template <id> --help` through metadata hydration (§4.5).
   One source of truth, no duplicate rendering path.
@@ -92,7 +92,7 @@ a real `func new` command that:
 | **Active stack** | The stack pinned in `.func/config.json` (`StackOptions.Runtime`) — read once at command entry by `IFunctionsProjectResolver` ([[wcdesign §3.10]]). |
 | **NewContext** | The typed input passed to an engine provider — template id (resolved against the catalog), function name, working dir, and the resolved language already settled. |
 | **Resolved language** | The canonical language id selected for this `func new` invocation, **read via DI from `IOptionsMonitor<StackOptions>.Get(workingDirectory.FullName)`** — never by re-reading `.func/config.json` directly. `StackOptionsSetup` (registered as `IConfigureNamedOptions<StackOptions>` in `CliHostFactory`) binds the project's `stack.language` (written by `func init`) into the snapshot at host startup. For single-language stacks (Python, PowerShell, Java, Custom, Go) `stack.language` is **omitted** in the file by `InitCommand` (PR #5125) and the CLI substitutes the stack's canonical single language. For multi-language stacks (DotNet C#/F#, Node JS/TS) a missing `stack.language` is a hard error pointing at `func init`. |
-| **Active profile** | The profile resolved by `IProfileResolver` ([[wcdesign §3.17]]) at command entry — from `.func/config.json` `defaultProfile`, user prefs, or the built-in default. `func new` and `func templates list` do not accept a `--profile` override (D11); profile is a project-level pin set by `func profile set`. |
+| **Active profile** | The profile resolved by `IProfileResolver` ([[wcdesign §3.17]]) at command entry — from `.func/config.json` `defaultProfile`, user prefs, or the built-in default. `func new` and `func new --list` do not accept a `--profile` override (D11); profile is a project-level pin set by `func profile set`. |
 | **Templates content workload** | A workload package whose payload is template content (file bodies + metadata) for a single stack. Distinct from a *stack workload*, which contributes a provider (code). One stack typically has both — code and content — installed independently. Detailed in `templates-workload-spec.md`. |
 | **Templates channel** | `stable` / `preview` / `experimental`, encoded as the templates workload pkg version's prerelease label (templates-workload-spec.md §4.4.2). At `func new` time the channel is derived from the project's `host.json` `extensionBundle.id` — `func new` does not accept an explicit channel flag. Applies to Node/Python only; DotNet has no channel axis. |
 | **`minBundleVersion`** | NuGet version range a Node/Python templates workload pkg declares (in `content/templates-workload.json`) as the lowest extension-bundle version it is compatible with (templates-workload-spec.md §4.4.4). `func new` enforces this against the project's resolved bundle version (§4.8.2); a miss is a hard error in v1, not a warning. |
@@ -189,7 +189,7 @@ public interface ITemplateEngineProvider
     /// snapshots the orchestrator has produced from installed templates
     /// content workloads. The provider only sees templates whose payload
     /// directory matches its EngineId. Used for the interactive picker and
-    /// by <c>func templates list</c>.
+    /// by <c>func new --list</c>.
     /// </summary>
     Task<IReadOnlyList<FunctionTemplateInfo>> ListTemplatesAsync(
         TemplateListContext context,
@@ -282,7 +282,7 @@ dispatched against by engine identity, never by stack:
 | Project | Engine zone (workload payload dir) | Engine mechanism | Used by templates from |
 |---|---|---|---|
 | `Templates.V2` | `content/v2/` (with `templates/templates.json` + `bindings/userPrompts.json` + `resources/Resources*.json`) | Job/action DSL runner (`NewTemplate.Jobs[].Actions[]`); `$(KEY)` substitution against a variables dict; per-template files materialised from the inline `files: { "<name>": "<contents>" }` map (templates-workload-spec.md §5.2); layout encoded entirely in `TemplateAction.FilePath` — engine is layout-agnostic | Node and Python templates content workloads (templates-workload-spec.md §5.2) |
-| `Templates.DotNet` | `content/dotnet-templates.json` at content root, with `content/source.json` sibling (NuGet pin); the dotnet template hive is provisioned at `func workload install` time from `source.json` into a CLI-managed location (templates-workload-spec.md §5.3, §6.3) — **not** packed into the workload payload | Fully-hydrated declarative catalog + per-template `parameters[]` read directly from `dotnet-templates.json` for `func templates list` and `func new --template <id> --help` (offline, deterministic — no `dotnet new` invocation, no NuGet I/O on read paths); **shell-out** via `IDotnetCliRunner` (`dotnet new <shortName> …`) against the provisioned hive only for the actual apply step (D9 / Q-Eng-D) | .NET in-proc + isolated templates content workloads |
+| `Templates.DotNet` | `content/dotnet-templates.json` at content root, with `content/source.json` sibling (NuGet pin); the dotnet template hive is provisioned at `func workload install` time from `source.json` into a CLI-managed location (templates-workload-spec.md §5.3, §6.3) — **not** packed into the workload payload | Fully-hydrated declarative catalog + per-template `parameters[]` read directly from `dotnet-templates.json` for `func new --list` and `func new --template <id> --help` (offline, deterministic — no `dotnet new` invocation, no NuGet I/O on read paths); **shell-out** via `IDotnetCliRunner` (`dotnet new <shortName> …`) against the provisioned hive only for the actual apply step (D9 / Q-Eng-D) | .NET in-proc + isolated templates content workloads |
 
 **Engine identity is implicit** (D9 / Q-Eng-A). The orchestrator picks an
 engine provider by inspecting the workload payload's directory layout:
@@ -297,13 +297,13 @@ behind a template is CLI-internal dispatch.
 
 **No more programming-model knob.** Per D9 / Q-Eng-B, vnext drops every
 `programmingModel` axis: no `--programming-model` flag, no
-`FunctionTemplateInfo.ProgrammingModel` field, no `func templates list`
+`FunctionTemplateInfo.ProgrammingModel` field, no `func new --list`
 grouping by model. Workload publishers curate to ship only
 current-generation templates; "latest" is a publisher responsibility, not a
 runtime concept. (Main's `IsNewPythonProgrammingModel()` and
 `IsNewNodeJsProgrammingModel()` sniffs are dropped.)
 
-**Read vs scaffold paths (DotNet).** `func templates list` and
+**Read vs scaffold paths (DotNet).** `func new --list` and
 `func new --template <id> --help` source catalog rows **and** prompt
 definitions directly from the installed templates content workload's
 `dotnet-templates.json`, which the workload pack target hydrated at build
@@ -768,6 +768,7 @@ Built-in (declared on `NewCommand`, visible in top-level `func new --help`):
 | `--template` | `-t` | `string?` | Template id. If omitted in TTY, interactive picker. |
 | `--force` | — | `bool` | Overwrite existing files. |
 | `--non-interactive` | — | `bool` | Refuse to prompt; exit 1 if any input is missing. |
+| `--list` | `-l` | `bool` | List available templates for this project instead of scaffolding (§5.5). |
 | `--output` | — | `enum {plain, json}` | Output mode (mirrors `func setup`). |
 
 Path positional argument (inherited via `AddPathArgument()`): the project
@@ -813,7 +814,7 @@ can I scaffold?" signal in plain `func new --help`, the help renderer
 injects a per-stack **Available templates** section after the built-in
 `Options:` block. This section renders catalog rows only — no option flags,
 no per-template detail — and shares its data source with
-`func templates list` (§5.5), so the two surfaces stay in lockstep.
+`func new --list` (§5.5), so the two surfaces stay in lockstep.
 
 ```
 $ func new --help
@@ -838,13 +839,13 @@ Available templates (stack: python):
   blob        Blob trigger             Function triggered by Azure Blob Storage events.
   …
   Run 'func new --template <name> --help' for template-specific options,
-  or 'func templates list' for the full catalogue.
+  or 'func new --list' for the full catalogue.
 ```
 
 Rendering rules:
 
 - **Three columns** (short name, display name, description), truncated to
-  terminal width with `…`. Same layout as `func templates list` plain
+  terminal width with `…`. Same layout as `func new --list` plain
   output (§5.5.2) so the two read identically.
 - **Stack header** mirrors §5.5.2. `func new` requires an init'd project
   (§4.4), so the stack is always resolved — there is no stackless rendering
@@ -870,7 +871,7 @@ Rendering rules:
 Legacy: `func new HttpTrigger help` printed trigger-specific help (JS/TS/Python
 only). We **drop** that syntax. Per-template options surface via
 `func new --template HttpTrigger --help` (built-in `--help` over the
-metadata-hydrated options, §4.5) and `func templates list` for the catalogue
+metadata-hydrated options, §4.5) and `func new --list` for the catalogue
 (§5.5).
 
 (Captured as a behavioural break vs main; surfaces in §7 Migration.)
@@ -909,7 +910,7 @@ func new [path]
 │                                                       stack.language missing")
 │
 ├─ ListTemplates(selectedWorkload, language)         → aggregate across all engine providers; each template carries its EngineId
-│    (no list-and-exit branch — discovery lives on `func templates list`)
+│    (no list-and-exit branch — discovery lives on `func new --list`)
 │
 ├─ ResolveTemplate                                    (stage-A parse)
 │    --template given → match by Id (case-insensitive)
@@ -948,30 +949,41 @@ func new [path]
 └─ (post-deploy hints removed — vnext drops the programming-model concept; see §7)
 ```
 
-### 5.5 Template discovery — `func templates list`
+### 5.5 Template discovery — `func new --list`
 
-Decided 2026-05-27: discovery is a **separate top-level command**, not a flag
-on `func new`. This matches main's existing surface
-(`ListTemplatesAction` registered under `Context.Templates` →
-`func templates list`) and keeps `func new` strictly a scaffold-one-function
-verb.
+Decided 2026-05-28 (reverses the 2026-05-27 "separate command" decision in §8 Q1):
+discovery is a **switch on `func new`**, not a separate top-level command.
+One verb, two modes:
 
-`func templates list` is its own built-in command (`TemplatesListCommand`,
-sibling to `NewCommand` in `src/Func/Commands/`). It enumerates templates
-through the same engine provider registry the orchestrator uses
+| Invocation | Mode |
+|---|---|
+| `func new [options]` | Scaffold one function |
+| `func new --list [path]` | List available templates for the project |
+
+`NewCommand` exposes a `--list` / `-l` bool option. When set, the command
+dispatches to the same `NewCommandRunner.ListAsync` path that previously
+backed `func new --list`; all other options (`--template`, `--name`,
+`--force`, `--non-interactive`) are ignored. The catalog is enumerated
+through the same engine provider registry the scaffold path uses
 (`ITemplateEngineProviderRegistry` — see §4.1 and §6 step 6), aggregating
-across every engine provider for the active stack so the catalogue
-surfaced to the user is always the catalogue `func new` would actually
-scaffold from.
+across every engine provider for the active stack so the catalog the user
+sees is always the catalog `func new` would actually scaffold from.
+
+> **Why folded into `func new`.** Reviewers pointed out that a standalone
+> `func new --list` doubles the verb surface for one rendering path, and
+> users discovering `func new` expect a built-in way to see "what can I
+> scaffold here?" — matching `dotnet new --list`'s shape. Keeping the
+> catalog under `func new --list` gives one help target (`func new --help`)
+> that lists every relevant option, including `--list`.
 
 #### 5.5.1 Surface
 
 ```
-func templates list [path]
+func new --list [path]
   --output {plain|json}    output mode (default: plain)
 ```
 
-No `--stack <id>` override (§5.5.5: `func templates list` requires an
+No `--stack <id>` override (§5.5.5: `func new --list` requires an
 init'd Functions project; the stack is read from `.func/config.json`
 `stack.runtime`). No `--template <id>` filter (one-template-at-a-time
 isn't a list query — if we add per-template detail later it's a
@@ -982,7 +994,7 @@ exactly like §4.7.
 #### 5.5.2 Default output (plain)
 
 ```
-$ func templates list
+$ func new --list
 Templates for stack: python  (language: Python)
 
   NAME                     TRIGGER       DESCRIPTION
@@ -1022,7 +1034,7 @@ Layout rules:
 - **Node catalog is pre-filtered per channel at workload pack time**
   (templates-workload-spec.md §6.1). Templates whose required bindings
   aren't satisfied by the channel's authoritative bundle are dropped at
-  pack time, so the rows surfaced by `func templates list` /
+  pack time, so the rows surfaced by `func new --list` /
   `func new --help` for a Node project reflect only templates that should
   scaffold cleanly against the project's resolved bundle. Renderer-side
   hiding is therefore not needed — the workload already shipped the right
@@ -1032,8 +1044,8 @@ Layout rules:
 
 | Condition | Output | Exit |
 |---|---|---|
-| No `.func/config.json` resolvable at `<path>` (uninitialized directory; §5.5.5) | "`func templates list` needs a Functions project. Run `func init` first to choose a stack and language." | 1 |
-| `StackOptions.Runtime` is null/empty (no `stack.runtime` in `.func/config.json`) | "`func templates list` needs a stack pinned in .func/config.json. Run `func init` first." | 1 |
+| No `.func/config.json` resolvable at `<path>` (uninitialized directory; §5.5.5) | "`func new --list` needs a Functions project. Run `func init` first to choose a stack and language." | 1 |
+| `StackOptions.Runtime` is null/empty (no `stack.runtime` in `.func/config.json`) | "`func new --list` needs a stack pinned in .func/config.json. Run `func init` first." | 1 |
 | No template providers registered | "No templates available. Install a templates workload: `func workload install Azure.Functions.Cli.Workloads.Templates.<stack>`." | 1 |
 | Provider registered but content workload missing | Per-stack hint pointing at the specific package id. | 1 |
 | No installed templates workload matches project's bundle channel (Node/Python, §4.8.1) | "No installed templates workload matches this project's bundle channel (`<bundle-id>` → channel `<channel>`). Install: `func workload install Azure.Functions.Cli.Workloads.Templates.<stack> --version <ver-with-channel-suffix>`. Or change `host.json` `extensionBundle.id` if the channel was set in error." | 1 |
@@ -1084,7 +1096,7 @@ per HttpTrigger collapses on this), `classifications`, and
 
 #### 5.5.5 Resolution gates
 
-`func templates list` **requires an init'd Functions project**
+`func new --list` **requires an init'd Functions project**
 (`.func/config.json` resolvable from `[path]`, with at minimum
 `stack.runtime` set). The stack is read from `StackOptions.Runtime` via
 the same `IOptionsMonitor<StackOptions>.Get(workingDirectory.FullName)`
@@ -1111,7 +1123,7 @@ project should use `func quickstart list` (a separate command that
 ships its own catalogue, has no per-project channel concept, and
 explicitly targets the "evaluating which stack to pick" UX).
 
-If `[path]` does not resolve to an init'd project, `func templates list`
+If `[path]` does not resolve to an init'd project, `func new --list`
 exits 1 with the standard hint pointing at `func init` (see §5.5.3
 "No `.func/config.json` resolvable…" row). This matches `func new`'s
 project-gate posture (§4.4) so the two commands fail in the same way for
@@ -1217,7 +1229,7 @@ interaction surface.
 | `--csx` forces legacy CSX path | Dropped (see §8 Q6). `.csx` script-mode functions are not scaffoldable on v5. | No isolated-worker `.csx` model; in-process .NET is out of scope per vnext-design Part IX item 9. |
 | `func new <trigger> help` (positional help) | Dropped — use `func new --template <id> --help` | Two-stage parse exposes every per-template option to native `--help`. |
 | `func new <template>` (positional template id as first non-flag token) | Dropped (see §8 Q7). Template id must be supplied via `--template <id>` / `-t <id>`; the positional slot is reserved for the path. | Avoids positional-vs-path ambiguity; keeps the two-stage parse simple; matches modern System.CommandLine conventions. |
-| `func templates list` runs in any directory (v4 `ListTemplatesAction`) | Requires an init'd Functions project — uninitialised directory exits 1 with a hint pointing at `func init` (§5.5.5 / §8 Q11). No `--stack` override. | v5's channel-resolution algorithm (§4.8.1) keys off `host.json` `extensionBundle.id`; a stackless catalogue has no defined channel selection. Users browsing stacks before initialising should use `func quickstart list` (separate command, no channels). |
+| `func templates list` runs in any directory (v4 `ListTemplatesAction`) | Replaced by `func new --list`; requires an init'd Functions project — uninitialised directory exits 1 with a hint pointing at `func init` (§5.5.5 / §8 Q11). No `--stack` override. | v5's channel-resolution algorithm (§4.8.1) keys off `host.json` `extensionBundle.id`; a stackless catalogue has no defined channel selection. Folding the catalog onto `func new` keeps the verb surface flat. Users browsing stacks before initialising should use `func quickstart list` (separate command, no channels). |
 | `func function new` / `func function create` aliases | Dropped (see §5.1). Single canonical verb is `func new`. | One verb, one source of truth; legacy aliases produce a standard unknown-command hint pointing at `func new`. |
 | Installs missing NuGet extensions via `Metadata.Extensions` | Dropped — relies on extension bundles | Bundle resolver covers this in vnext. |
 | `_templatesManager.Deploy(...)` writes files directly | `provider.ApplyAsync(NewContext, ParseResult)` returns a result | Errors are typed (sealed hierarchy); writes happen behind the provider. |
@@ -1227,7 +1239,7 @@ interaction surface.
 | Language inferred from the first `--language`-like flag on `func new`; language asked anew on every invocation in some paths | Flag dropped. Language is **read** via DI from `IOptionsMonitor<StackOptions>.Get(workingDirectory.FullName).Language` — the bound view of `.func/config.json` `stack.language` (`StackOptionsSetup` is the single file-read path; `func new` consumes the snapshot). `func init` writes the value from **its** `--language` flag (PR #5125 omits the key for single-language stacks; `func new` substitutes the stack's canonical language in that case). `func new` requires an init'd project; a missing key on a multi-language stack → exit 1 pointing at `func init`. | One deterministic source of truth via the existing options pipeline; eliminates a redundant flag, the alias-resolution code path, the prompt loop, **and** any per-invocation file I/O. Matches the precedent in `ProfileResolver` / `SetupRunner` for `IOptionsMonitor<ProjectProfileOptions>`. |
 | No concept of templates-channel; bundle and templates were the same package | Templates ship as their own per-channel content workload; `func new` auto-matches the project's bundle channel (§4.8.1) with no cross-channel fallback. Missing match → `NoTemplatesWorkloadForChannel` with install hint. | Per templates-workload-spec.md §4.4.2; lets templates revisions ship independently of bundle releases. |
 | No `minBundleVersion` check at scaffold time | `func new` enforces the templates workload's `minBundleVersion` against the project's resolved bundle version (§4.8.2); violation → `MinBundleVersionTooOld` and exit 1 (no warning fallback in v1). | Per templates-workload-spec.md §4.4.4; catches binding compatibility issues before any file is written. |
-| `--profile <name>` and `--offline` mirrored from `func run` on every command | Dropped from `func new` and `func templates list`. Active profile is resolved silently from `.func/config.json defaultProfile → user prefs → built-in default`; stack-vs-profile gate still fires (pipeline step 3). Mismatch error hints at `func profile set <other>` / `func profile list`. | Scaffolds are static files — there is no scaffold-under-profile-X-then-run-under-Y use case. Profile is a project-level pin, not a per-invocation override; `--offline` only refreshed profile sources that scaffold output doesn't depend on. |
+| `--profile <name>` and `--offline` mirrored from `func run` on every command | Dropped from `func new` and `func new --list`. Active profile is resolved silently from `.func/config.json defaultProfile → user prefs → built-in default`; stack-vs-profile gate still fires (pipeline step 3). Mismatch error hints at `func profile set <other>` / `func profile list`. | Scaffolds are static files — there is no scaffold-under-profile-X-then-run-under-Y use case. Profile is a project-level pin, not a per-invocation override; `--offline` only refreshed profile sources that scaffold output doesn't depend on. |
 
 Telemetry continuity: emit `cli.new.invoked` (stack, language, template id,
 engine id) plus `cli.new.duration` histogram and `cli.new.outcome`
@@ -1239,14 +1251,18 @@ adoption without surfacing engine identity to users (D9 / Q-Eng-A).
 
 Promote to §4 once answered.
 
-- ✅ **Q1. `func new --list` vs `func templates list`. — RESOLVED 2026-05-27.**
-  Discovery lives only on `func templates list` (catalog-only — NAME / TRIGGER
-  / DESCRIPTION, §5.5). `func new --list` is **not** added. No `--detailed`
-  flag on `func templates list` either: per-template options surface on
-  `func new --template <id> --help` via two-stage hydration (§4.5). No
-  `func templates show <id>` either — `func new --template <id> --help` is
-  the per-template detail surface. Single source of truth for "what does this
-  template need."
+- ✅ **Q1. `func new --list` vs a separate `func templates list` command. — RESOLVED 2026-05-28 (revises 2026-05-27).**
+  Discovery is a **switch on `func new`** (`--list` / `-l`), not a separate
+  top-level command tree. Catalog-only (NAME / TRIGGER / DESCRIPTION, §5.5).
+  No `--detailed` flag on `func new --list` either: per-template options
+  surface on `func new --template <id> --help` via two-stage hydration
+  (§4.5). No `func templates show <id>` either — `func new --template <id>
+  --help` is the per-template detail surface. Single source of truth for
+  "what does this template need." Earlier 2026-05-27 resolution (separate
+  `func templates list` verb) reversed on reviewer feedback: one command,
+  two modes matches `dotnet new --list` and keeps `func new --help` as
+  one help target users can scan to discover both scaffold and catalog
+  paths.
 - ✅ **Q2. Are template-declared NuGet extension installs needed at all? — RESOLVED 2026-05-28.**
   **Dropped entirely.** The legacy `Template.Metadata.Extensions` path
   (which appended `<PackageReference>` entries to a project-local
@@ -1413,7 +1429,7 @@ Promote to §4 once answered.
   needs to support both generations in the same release window, they can
   ship two separate templates content workloads (different package ids,
   different channels).
-- ✅ **Q11. `func templates list --output json` envelope shape. — RESOLVED 2026-05-28.**
+- ✅ **Q11. `func new --list --output json` envelope shape. — RESOLVED 2026-05-28.**
   Single envelope `{ stack, language, templates: [ … ] }` per §5.5.4 —
   every invocation. There is no multi-stack case because §5.5.5 now
   requires an init'd project (no stackless run, no `--stack` override):
@@ -1487,7 +1503,7 @@ Promote to §4 once answered.
   authoritative — `func new` scaffolds for whatever language `func init`
   recorded. If `.func/config.json` is missing the key on a multi-language
   stack, `func new` exits 1 pointing at `func init`.
-- ✅ **Q-Lang-3 / D10. `--language` flag on `func new` and `func templates list`. — RESOLVED 2026-05-29 (revised).**
+- ✅ **Q-Lang-3 / D10. `--language` flag on `func new` and `func new --list`. — RESOLVED 2026-05-29 (revised).**
   Dropped from both commands. Language is **read via DI** from
   `IOptionsMonitor<StackOptions>.Get(workingDirectory.FullName).Language`
   — the bound view of `.func/config.json` `stack.language` that
@@ -1497,10 +1513,10 @@ Promote to §4 once answered.
   is the single file-read path, and the options pipeline caches/refreshes
   the snapshot, so per-invocation file I/O at scaffold time is avoided. A
   `func new --language` flag would either contradict the init choice
-  (drift) or be a no-op when it agrees. `func templates list` requires an
+  (drift) or be a no-op when it agrees. `func new --list` requires an
   init'd project for the same channel-resolution reasons (§5.5.5 / Q11),
   so it has no `--language` flag either.
-- ✅ **Q-Profile-1 / D11. `--profile` and `--offline` flags on `func new` and `func templates list`. — RESOLVED 2026-05-27.**
+- ✅ **Q-Profile-1 / D11. `--profile` and `--offline` flags on `func new` and `func new --list`. — RESOLVED 2026-05-27.**
   Dropped from both commands. Profile selection is a project-level pin set
   by `func profile set` (or `.func/config.json defaultProfile`, user prefs,
   or the built-in default — resolved silently by `IProfileResolver`).
@@ -1529,7 +1545,7 @@ Promote to §4 once answered.
   Publisher concern. vnext has no `programmingModel` field on templates,
   no `FunctionTemplateInfo.ProgrammingModel`, no
   `TemplateListContext.ProgrammingModelHint`, no `--programming-model`
-  flag, no `func templates list` grouping by model, no post-deploy
+  flag, no `func new --list` grouping by model, no post-deploy
   upgrade messaging. Workload publishers ship only current-generation
   templates ("latest" is what the workload version ships, not a runtime
   axis). Main-branch sniffs (`IsNewPythonProgrammingModel()`,
@@ -1549,7 +1565,7 @@ Promote to §4 once answered.
   package, templates-workload-spec.md §5.3, §6.3). At
   `func workload install` time the CLI provisions the pinned NuGet pkg
   into a CLI-managed dotnet template hive. The CLI's `DotNetEngineProvider`
-  reads the JSON for `func templates list` and `func new --template <id>
+  reads the JSON for `func new --list` and `func new --template <id>
   --help` (offline-deterministic, no `dotnet new` invocation, no NuGet
   I/O) and shells out via `IDotnetCliRunner` (`dotnet new <shortName>
   --<param> <value> …`) only for the actual apply step. Workloads stay
