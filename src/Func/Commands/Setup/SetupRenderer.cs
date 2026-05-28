@@ -213,6 +213,7 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
             SetupDependencyKind.Host => "host",
             SetupDependencyKind.Runtime => "runtime",
             SetupDependencyKind.Stack => "stack",
+            SetupDependencyKind.Templates => "templates",
             SetupDependencyKind.Worker => "worker",
             SetupDependencyKind.ExtensionBundle => "extension-bundle",
             _ => kind.ToString(),

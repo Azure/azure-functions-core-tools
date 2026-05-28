@@ -482,6 +482,34 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_FeatureForRuntime_InstallsTemplatesWorkload()
+    {
+        string workerPackageId = WorkerPackage("node");
+        const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
+        const string nodeTemplates = "Azure.Functions.Cli.Workloads.Templates.Node";
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
+            .WithLatest(workerPackageId, "1.0.0")
+            .WithLatest(nodeStack, "1.0.0")
+            .WithLatest(nodeTemplates, "1.0.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, nodeTemplates, StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunAsync_FeatureWithoutStackMapping_DoesNotInstallStack()
     {
         string workerPackageId = WorkerPackage("java");
