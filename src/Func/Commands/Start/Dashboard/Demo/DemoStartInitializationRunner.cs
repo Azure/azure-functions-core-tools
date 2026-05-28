@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Bundles;
+using Azure.Functions.Cli.Commands.Start.Azurite;
+using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Common;
@@ -34,6 +36,7 @@ internal sealed class DemoStartInitializationRunner(
     IWorkloadPaths workloadPaths,
     IHostProcessRunner hostProcessRunner,
     IProcessEnvironment processEnvironment,
+    IManagedAzuriteOrchestrator managedAzuriteOrchestrator,
     ILoggerFactory loggerFactory,
     TimeProvider? timeProvider = null)
     : IStartInitializationRunner
@@ -75,6 +78,9 @@ internal sealed class DemoStartInitializationRunner(
     private readonly IProcessEnvironment _processEnvironment = processEnvironment
         ?? throw new ArgumentNullException(nameof(processEnvironment));
 
+    private readonly IManagedAzuriteOrchestrator _managedAzuriteOrchestrator = managedAzuriteOrchestrator
+        ?? throw new ArgumentNullException(nameof(managedAzuriteOrchestrator));
+
     private readonly ILoggerFactory _loggerFactory = loggerFactory
         ?? throw new ArgumentNullException(nameof(loggerFactory));
 
@@ -110,6 +116,7 @@ internal sealed class DemoStartInitializationRunner(
                 _bundleSectionReader,
                 _loggerFactory.CreateLogger<ValidateExtensionBundleInitializationStep>()),
             new PrepareProjectHostRunInitializationStep(_localSettingsProvider, _processEnvironment, _interaction),
+            new EnsureAzuriteInitializationStep(_managedAzuriteOrchestrator, _processEnvironment),
             new StartHostInitializationStep(_hostProcessRunner, _time),
         ];
 

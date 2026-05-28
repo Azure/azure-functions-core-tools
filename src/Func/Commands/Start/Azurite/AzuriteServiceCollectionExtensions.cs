@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
+using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -8,8 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Azure.Functions.Cli.Commands.Start.Azurite;
 
 /// <summary>
-/// DI registration helpers for the managed-Azurite feature. Not wired into the
-/// CLI host yet; later slices will call this from the composition root.
+/// DI registration helpers for the managed-Azurite feature.
 /// </summary>
 internal static class AzuriteServiceCollectionExtensions
 {
@@ -62,6 +63,41 @@ internal static class AzuriteServiceCollectionExtensions
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<IAzuriteExecutableLocator, AzuriteExecutableLocator>();
         services.TryAddSingleton<IDockerAvailabilityProbe, DockerAvailabilityProbe>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="IAzuriteLauncher"/>. Kept separate from
+    /// <see cref="AddAzuriteDiscovery"/> so tests can swap the launcher
+    /// without losing the discovery helpers.
+    /// </summary>
+    public static IServiceCollection AddAzuriteLauncher(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IAzuriteLauncher, AzuriteLauncher>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers everything needed for the managed-Azurite feature: the
+    /// classifier, probe, discovery seams, launcher, paths, and the
+    /// orchestrator that wires them together. Idempotent: each call uses
+    /// <c>TryAdd</c> semantics so it is safe to invoke from both the
+    /// composition root and individual tests.
+    /// </summary>
+    public static IServiceCollection AddManagedAzurite(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddAzuriteProbe();
+        services.AddAzuriteDiscovery();
+        services.AddAzuriteLauncher();
+        services.AddAzuriteManagedPaths();
+
+        services.TryAddSingleton<IAzureWebJobsStorageClassifier, AzureWebJobsStorageClassifier>();
+        services.TryAddSingleton<IManagedAzuriteOrchestrator, ManagedAzuriteOrchestrator>();
 
         return services;
     }

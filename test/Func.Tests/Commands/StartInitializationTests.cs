@@ -4,6 +4,7 @@
 using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
+using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
@@ -866,7 +867,16 @@ public class StartInitializationTests : IDisposable
             workloadPaths,
             hostProcessRunner,
             new ProcessEnvironment(),
+            CreateDisabledAzuriteOrchestrator(),
             NullLoggerFactory.Instance);
+    }
+
+    private static IManagedAzuriteOrchestrator CreateDisabledAzuriteOrchestrator()
+    {
+        IManagedAzuriteOrchestrator orchestrator = Substitute.For<IManagedAzuriteOrchestrator>();
+        orchestrator.EnsureReadyAsync(Arg.Any<ManagedAzuriteRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new ManagedAzuriteResult.Disabled("Azurite skipped in tests."));
+        return orchestrator;
     }
 
     private static IFunctionsWorkerResolverFactory CreateWorkerResolverFactory(IFunctionsWorkerResolver? workerResolver = null)
