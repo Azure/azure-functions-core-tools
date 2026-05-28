@@ -1,0 +1,6 @@
+{
+  "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+  "kind": "content",
+  "displayName": ".NET function templates",
+  "description": "Function-scaffold templates for .NET Azure Functions projects. Templates are resolved from Microsoft.Azure.Functions.Worker.ItemTemplates at func new time."
+}

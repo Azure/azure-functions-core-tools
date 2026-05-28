@@ -17,6 +17,11 @@
     <Project Path="src/Workloads/Stacks/Node/Workloads.Node.csproj" />
     <Project Path="src/Workloads/Stacks/Python/Workloads.Python.csproj" />
   </Folder>
+  <Folder Name="/src/Workloads/Templates/">
+    <Project Path="src/Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj" />
+    <Project Path="src/Workloads/Templates/Node/Workloads.Templates.Node.csproj" />
+    <Project Path="src/Workloads/Templates/Python/Workloads.Templates.Python.csproj" />
+  </Folder>
   <Folder Name="/src/Workloads/Tools/">
     <Project Path="src/Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj" />
   </Folder>

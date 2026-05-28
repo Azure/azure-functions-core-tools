@@ -1,0 +1,57 @@
+{
+  "BlobTrigger_description": "An Azure Function that runs when a blob is added or updated in an Azure Storage container.",
+  "CosmosDBTrigger_description": "An Azure Function that runs when a document changes in an Azure Cosmos DB container.",
+  "DurableFunctionsEntity_description": "A Durable Functions entity in Node.js that manages durable state via the v4 programming model.",
+  "DurableFunctionsOrchestrator_description": "A Durable Functions orchestrator in Node.js that coordinates activity invocations via the v4 programming model.",
+  "EventGridTrigger_description": "An Azure Function that runs in response to an Event Grid event.",
+  "EventHubTrigger_description": "An Azure Function that runs when an event is received from an Azure Event Hub.",
+  "HttpTrigger_description": "An Azure Function that runs in response to HTTP requests.",
+  "QueueTrigger_description": "An Azure Function that runs when a message is added to an Azure Storage queue.",
+  "ServiceBusQueueTrigger_description": "An Azure Function that runs when a message is added to a Service Bus queue.",
+  "ServiceBusTopicTrigger_description": "An Azure Function that runs when a message is added to a Service Bus topic subscription.",
+  "TimerTrigger_description": "An Azure Function that runs on a schedule defined by a CRON expression.",
+  "DaprPublishOutputBinding_description": "An Azure Function that publishes messages to a Dapr topic via an output binding.",
+  "DaprServiceInvocationTrigger_description": "An Azure Function that handles Dapr service invocation requests.",
+  "DaprTopicTrigger_description": "An Azure Function that handles messages from a Dapr pub/sub topic.",
+  "McpToolTrigger_description": "An Azure Function that exposes a Model Context Protocol (MCP) tool endpoint.",
+  "McpResourceTrigger_description": "An Azure Function that exposes a Model Context Protocol (MCP) resource endpoint.",
+  "McpPromptTrigger_description": "An Azure Function that exposes a Model Context Protocol (MCP) prompt endpoint.",
+
+  "trigger_functionName_label": "Function name",
+  "trigger_functionName_help": "The name of the function. Must start with a letter and contain only alphanumeric characters or underscores.",
+  "trigger_functionName_errorText": "Function names must start with a letter, end with a letter or number, and contain only letters, numbers, and underscores (max 128 chars).",
+
+  "timerTrigger_schedule_label": "Schedule",
+  "timerTrigger_schedule_help": "A CRON expression that defines when the timer fires (e.g. '0 */5 * * * *' for every five minutes).",
+
+  "queueTrigger_name_label": "Queue name",
+  "queueTrigger_name_help": "The name of the Azure Storage queue the function listens to.",
+  "queueTrigger_connection_label": "Storage connection setting",
+  "queueTrigger_connection_help": "The app setting that holds the storage account connection string.",
+
+  "blobTrigger_path_label": "Blob path",
+  "blobTrigger_path_help": "The blob container path pattern (e.g. 'samples-workitems/{name}').",
+  "blobTrigger_connection_label": "Storage connection setting",
+  "blobTrigger_connection_help": "The app setting that holds the storage account connection string.",
+
+  "cosmosTrigger_connection_label": "Cosmos DB connection setting",
+  "cosmosTrigger_connection_help": "The app setting that holds the Cosmos DB connection string.",
+  "cosmosTrigger_database_label": "Database name",
+  "cosmosTrigger_database_help": "The Cosmos DB database to monitor.",
+  "cosmosTrigger_collection_label": "Collection name",
+  "cosmosTrigger_collection_help": "The Cosmos DB container (collection) to monitor.",
+  "cosmosTrigger_createLease_label": "Create lease collection if it does not exist",
+  "cosmosTrigger_createLease_help": "When true, the Cosmos DB trigger creates the lease container automatically if it is missing.",
+
+  "eventHubTrigger_name_label": "Event Hub name",
+  "eventHubTrigger_name_help": "The name of the Event Hub to consume events from.",
+
+  "serviceBusTrigger_name_label": "Queue name",
+  "serviceBusTrigger_name_help": "The name of the Service Bus queue the function listens to.",
+  "serviceBusTrigger_connection_label": "Service Bus connection setting",
+  "serviceBusTrigger_connection_help": "The app setting that holds the Service Bus connection string.",
+  "serviceBusTrigger_topic_label": "Topic name",
+  "serviceBusTrigger_topic_help": "The Service Bus topic the function subscribes to.",
+  "serviceBusTrigger_subscription_label": "Subscription name",
+  "serviceBusTrigger_subscription_help": "The Service Bus topic subscription the function reads from."
+}

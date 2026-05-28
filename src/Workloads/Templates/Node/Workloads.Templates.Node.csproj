@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>Azure Functions Node.js Templates</Title>
+    <Description>Node.js function templates for the func CLI. Compatible with Microsoft.Azure.Functions.ExtensionBundle (minBundle:$(MinBundleVersionRange)).</Description>
+    <PackageType>FuncCliWorkload</PackageType>
+    <PackageTags>kind:content alias:node-templates func-workload minBundle:$(MinBundleVersionRange)</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+
+    <!--
+      Static content source: the v2 Node templates ship as in-repo content
+      under content/v2/. No CDN download for templates happens at pack
+      time. See Templates Workload Spec §6.1.
+
+      FilterTemplatesByBundleChannel=true makes pack also fetch
+      bin/extensions.json from the latest listed bundle of
+      $(TemplatesChannel) (CDN index.json + HTTP-Range zip extraction)
+      and subset templates.json against content/v2/templates/_bindings.json
+      so the published nupkg only carries templates whose extension
+      dependencies are present in the active channel's bundle. See
+      Templates Workload Spec §4.4.2.
+    -->
+    <TemplatesContentSource>static</TemplatesContentSource>
+    <IncludeV1Templates>false</IncludeV1Templates>
+    <IncludeV2Templates>true</IncludeV2Templates>
+    <FilterTemplatesByBundleChannel>true</FilterTemplatesByBundleChannel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <Import Project="..\..\..\..\eng\build\Workloads.Templates.targets" />
+
+</Project>

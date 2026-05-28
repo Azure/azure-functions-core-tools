@@ -1,0 +1,6 @@
+{
+  "$schema": "https://aka.ms/func-workloads/package/v1/schema.json",
+  "kind": "content",
+  "displayName": "Node.js function templates",
+  "description": "Function-scaffold templates for Node.js Azure Functions projects."
+}

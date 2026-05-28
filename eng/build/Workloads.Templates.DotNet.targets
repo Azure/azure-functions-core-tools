@@ -1,0 +1,95 @@
+<Project>
+
+  <!--
+    Workloads.Templates.DotNet pack-time pipeline.
+
+    Hydrates the workload payload (tools/any/content/dotnet-templates.json
+    + tools/any/content/source.json) from the upstream
+    Microsoft.Azure.Functions.Worker.ItemTemplates NuGet package via
+    `dotnet new install` against a build-scoped template hive. See
+    proposed/templates-workload-spec.md §5.3 / §5.3.1 / §6.3 for the
+    contract and the projection rules.
+
+    Per-csproj inputs (declared in DotNet/Directory.Version.props):
+
+      $(SourceItemTemplatesPackageId)
+          Upstream NuGet template package id.
+      $(SourceItemTemplatesVersion)
+          Upstream NuGet template package version to pin (e.g. 4.0.5569).
+
+    Optional overrides:
+
+      $(SkipHydrateDotnetTemplates) = true
+          Dev / offline only — skips the install+project step. Pack will
+          carry no dotnet-templates.json and no source.json. Warning is
+          emitted; do not use for release packs.
+
+      $(DotnetTemplatesNuGetSource) = <feed url or local path>
+          Forwarded as the `add-source` flag to `dotnet new install`. Useful
+          when the upstream pkg is staged in a private feed or local
+          fallback.
+
+    All intermediate output stages under $(IntermediateOutputPath)
+    dotnet-templates\:
+        hive\        DOTNET_CLI_HOME for the dotnet new install.
+        out\         Generated dotnet-templates.json + source.json.
+        .hydrated    Sentinel file the incremental check writes after a
+                     successful hydrate; included as the target's Outputs.
+
+    $(IntermediateOutputPath) is only populated when targets execute, so
+    every dependent path is composed inline in target attributes rather
+    than in a top-level <PropertyGroup>.
+  -->
+
+  <Target Name="HydrateDotnetTemplates"
+          Condition="'$(SkipHydrateDotnetTemplates)' != 'true'"
+          BeforeTargets="GenerateNuspec;_GetPackageFiles"
+          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)..\scripts\hydrate-dotnet-templates.ps1"
+          Outputs="$(IntermediateOutputPath)dotnet-templates\.hydrated">
+
+    <Error Condition="'$(SourceItemTemplatesPackageId)' == ''"
+           Text="SourceItemTemplatesPackageId must be set (the upstream NuGet template package id, e.g. Microsoft.Azure.Functions.Worker.ItemTemplates)." />
+    <Error Condition="'$(SourceItemTemplatesVersion)' == ''"
+           Text="SourceItemTemplatesVersion must be set (the upstream NuGet template package version, e.g. 4.0.5569)." />
+
+    <PropertyGroup>
+      <_DotnetTemplatesHive>$(IntermediateOutputPath)dotnet-templates\hive</_DotnetTemplatesHive>
+      <_DotnetTemplatesOutDir>$(IntermediateOutputPath)dotnet-templates\out</_DotnetTemplatesOutDir>
+      <_DotnetTemplatesIndex>$(_DotnetTemplatesOutDir)\dotnet-templates.json</_DotnetTemplatesIndex>
+      <_DotnetTemplatesSource>$(_DotnetTemplatesOutDir)\source.json</_DotnetTemplatesSource>
+      <_DotnetTemplatesScript>$(MSBuildThisFileDirectory)..\scripts\hydrate-dotnet-templates.ps1</_DotnetTemplatesScript>
+      <_DotnetTemplatesSourceArg Condition="'$(DotnetTemplatesNuGetSource)' != ''"> -NuGetSource &quot;$(DotnetTemplatesNuGetSource)&quot;</_DotnetTemplatesSourceArg>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(_DotnetTemplatesOutDir)" />
+
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(_DotnetTemplatesScript)&quot; -PackageId &quot;$(SourceItemTemplatesPackageId)&quot; -PackageVersion &quot;$(SourceItemTemplatesVersion)&quot; -HiveRoot &quot;$(_DotnetTemplatesHive)&quot; -OutputTemplates &quot;$(_DotnetTemplatesIndex)&quot; -OutputSource &quot;$(_DotnetTemplatesSource)&quot;$(_DotnetTemplatesSourceArg)"
+          ConsoleToMSBuild="true" />
+
+    <Error Condition="!Exists('$(_DotnetTemplatesIndex)')"
+           Text="Hydrate script reported success but $(_DotnetTemplatesIndex) was not produced. Check the script output above." />
+    <Error Condition="!Exists('$(_DotnetTemplatesSource)')"
+           Text="Hydrate script reported success but $(_DotnetTemplatesSource) was not produced. Check the script output above." />
+
+    <Touch Files="$(IntermediateOutputPath)dotnet-templates\.hydrated" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="_AddDotnetTemplatesToPack"
+          DependsOnTargets="HydrateDotnetTemplates"
+          Condition="'$(SkipHydrateDotnetTemplates)' != 'true'"
+          BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(IntermediateOutputPath)dotnet-templates\out\dotnet-templates.json"
+            Pack="true" PackagePath="tools/any/content/" Visible="false" />
+      <None Include="$(IntermediateOutputPath)dotnet-templates\out\source.json"
+            Pack="true" PackagePath="tools/any/content/" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_WarnSkipHydrateDotnetTemplatesOnPack"
+          Condition="'$(SkipHydrateDotnetTemplates)' == 'true'"
+          BeforeTargets="GenerateNuspec">
+    <Warning Text="SkipHydrateDotnetTemplates=true: the $(MSBuildProjectName) pack will ship without dotnet-templates.json or source.json. Intended for offline dev builds only; do not use for release packs." />
+  </Target>
+
+</Project>

@@ -1,0 +1,26 @@
+<Project>
+
+  <!--
+    Source bundle version for the Templates workload — the
+    Microsoft.Azure.Functions.ExtensionBundle release that the templates
+    workloads snapshot StaticContent from at build time.
+
+      $(LatestExtensionBundleVersion)
+        Bare three-part SemVer of the bundle release this build targets.
+
+    Primary consumer:
+      - src/Workloads/Templates/Directory.Version.props
+        ($(SourceBundleVersion) defaults to it).
+
+    The bundles workload also imports this file and defaults
+    $(BundleVersion) to the same value so the bundle it ships matches
+    the snapshot the templates workloads were built against. Bumping
+    this property re-points both in lockstep, so the bundles workload
+    and the templates workloads can't drift across a bundle release.
+  -->
+
+  <PropertyGroup>
+    <LatestExtensionBundleVersion>4.35.0</LatestExtensionBundleVersion>
+  </PropertyGroup>
+
+</Project>
