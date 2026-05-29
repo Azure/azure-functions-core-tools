@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// </summary>
 public sealed class PythonWorkload : Workload
 {
-    public override string DisplayName => "Python";
+    public override string DisplayName => "Python Development Stack";
 
     public override string Description => "Azure Functions CLI tooling for Python projects.";
 

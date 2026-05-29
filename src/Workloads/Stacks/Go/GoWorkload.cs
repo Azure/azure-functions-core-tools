@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Workloads.Go;
 /// </summary>
 public sealed class GoWorkload : Workload
 {
-    public override string DisplayName => "Go";
+    public override string DisplayName => "Go Development Stack";
 
     public override string Description => "Azure Functions CLI tooling for Go projects.";
 
