@@ -108,4 +108,61 @@ public class BundleHelpersTests
     {
         Assert.Throws<ArgumentException>(() => BundleHelpers.GetBundleChannel(bundleId));
     }
+
+    // --- TryGetBundleChannel ---
+
+    [Theory]
+    [InlineData("Microsoft.Azure.Functions.ExtensionBundle", BundleChannel.Stable)]
+    [InlineData("Microsoft.Azure.Functions.ExtensionBundle.Preview", BundleChannel.Preview)]
+    [InlineData("Microsoft.Azure.Functions.ExtensionBundle.Experimental", BundleChannel.Experimental)]
+    public void TryGetBundleChannel_KnownId_ReturnsTrueWithChannel(string bundleId, BundleChannel expected)
+    {
+        var result = BundleHelpers.TryGetBundleChannel(bundleId, out var channel);
+        Assert.True(result);
+        Assert.Equal(expected, channel);
+    }
+
+    [Theory]
+    [InlineData("microsoft.azure.functions.extensionbundle")]
+    [InlineData("MICROSOFT.AZURE.FUNCTIONS.EXTENSIONBUNDLE.PREVIEW")]
+    public void TryGetBundleChannel_CaseInsensitive_ReturnsTrue(string bundleId)
+    {
+        Assert.True(BundleHelpers.TryGetBundleChannel(bundleId, out _));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Unknown.Bundle")]
+    public void TryGetBundleChannel_UnknownId_ReturnsFalseWithUnknown(string bundleId)
+    {
+        var result = BundleHelpers.TryGetBundleChannel(bundleId, out var channel);
+        Assert.False(result);
+        Assert.Equal(BundleChannel.Unknown, channel);
+    }
+
+    // --- ToDisplayString ---
+
+    [Theory]
+    [InlineData(BundleChannel.Unknown, "unknown")]
+    [InlineData(BundleChannel.Stable, "stable")]
+    [InlineData(BundleChannel.Preview, "preview")]
+    [InlineData(BundleChannel.Experimental, "experimental")]
+    public void ToDisplayString_ReturnsExpected(BundleChannel channel, string expected)
+    {
+        Assert.Equal(expected, channel.ToDisplayString());
+    }
+
+    [Fact]
+    public void ToDisplayString_InvalidChannel_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => ((BundleChannel)99).ToDisplayString());
+    }
+
+    // --- GetBundleChannel(NuGetVersion) null guard ---
+
+    [Fact]
+    public void GetBundleChannelByVersion_Null_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => BundleHelpers.GetBundleChannel((NuGetVersion)null!));
+    }
 }
