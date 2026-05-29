@@ -136,7 +136,7 @@ public class HostWorkloadResolverTests
         _workloadCatalog.ResolveLatestVersionInRangeAsync(
                 _hostPackageId,
                 Arg.Any<VersionRange>(),
-                true,
+                false,
                 null,
                 Arg.Any<CancellationToken>())
             .Returns(resolved);
@@ -248,7 +248,7 @@ public class HostWorkloadResolverTests
             packageId: _hostPackageId,
             version: Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "4.1000.0"),
             source: null,
-            includePrerelease: true,
+            includePrerelease: false,
             exact: true,
             force: false,
             progress: null,

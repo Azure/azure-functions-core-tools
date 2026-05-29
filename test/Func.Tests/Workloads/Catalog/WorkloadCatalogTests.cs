@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using NSubstitute;
 using NuGet.Common;
@@ -41,7 +43,10 @@ public sealed class WorkloadCatalogTests
         sourceProvider.GetSource(null).Returns(_defaultSource);
         sourceProvider.GetSource(_altSource.Source).Returns(_altSource);
 
-        var catalog = new WorkloadCatalog(sourceProvider, source => source.Name == _defaultSource.Name ? defaultClient : overrideClient);
+        var catalog = new WorkloadCatalog(
+            Options.Create(new WorkloadCatalogOptions()),
+            sourceProvider,
+            source => source.Name == _defaultSource.Name ? defaultClient : overrideClient);
 
         IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(new CatalogSearchQuery { Source = _altSource.Source });
 
@@ -70,6 +75,80 @@ public sealed class WorkloadCatalogTests
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: true);
 
         Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionAsync_IncludesPrerelease_WhenEnvironmentOverrideEnabled()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: false);
+
+        Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task SearchAsync_IncludesPrerelease_WhenEnvironmentOverrideEnabled()
+    {
+        NuGetProtocolSourceClient client = BuildClient(_defaultSource, search: [("alpha", "2.0.0-beta.1")]);
+        WorkloadCatalog catalog = NewCatalog(new WorkloadCatalogOptions { IncludePrerelease = true }, (_defaultSource, client));
+
+        await catalog.SearchAsync(new CatalogSearchQuery { IncludePrerelease = false });
+
+        var fakeClient = Assert.IsType<FakeClient>(client);
+        Assert.NotNull(fakeClient.LastSearchUri);
+        Assert.Contains("prerelease=true", fakeClient.LastSearchUri!.Query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionInRangeAsync_IncludesPrerelease_WhenEnvironmentOverrideEnabled()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
+        var range = VersionRange.Parse("[2.0.0-beta.1,2.0.0)");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("alpha", range, includePrerelease: false);
+
+        Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+    }
+
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData("true", true)]
+    [InlineData("anything", true)]
+    [InlineData("0", false)]
+    [InlineData("false", false)]
+    [InlineData("off", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Configure_ResolvesPrereleaseOverride(string? value, bool expected)
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns(value);
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.Equal(expected, options.IncludePrerelease);
+    }
+
+    [Fact]
+    public void Configure_ResolvesSourceOverride()
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns("https://source.test/v3/index.json");
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns((string?)null);
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.Equal("https://source.test/v3/index.json", options.Source);
     }
 
     [Fact]
@@ -190,8 +269,13 @@ public sealed class WorkloadCatalogTests
 
     private sealed class FakeClient(SourceRepository repo, JObject? response) : NuGetProtocolSourceClient(repo)
     {
+        public Uri? LastSearchUri { get; private set; }
+
         internal override Task<JObject?> FetchSearchResponseAsync(Uri searchUri, CancellationToken cancellationToken)
-            => Task.FromResult(response);
+        {
+            LastSearchUri = searchUri;
+            return Task.FromResult(response);
+        }
     }
 
     private static JObject SearchResponse(params (string Id, string Version)[] hits)
@@ -244,11 +328,14 @@ public sealed class WorkloadCatalogTests
     }
 
     private static WorkloadCatalog NewCatalog(params (PackageSource Source, NuGetProtocolSourceClient Client)[] entries)
+        => NewCatalog(new WorkloadCatalogOptions(), entries);
+
+    private static WorkloadCatalog NewCatalog(WorkloadCatalogOptions options, params (PackageSource Source, NuGetProtocolSourceClient Client)[] entries)
     {
         var sourceProvider = Substitute.For<IPackageSourceProvider>();
         sourceProvider.GetSource(Arg.Any<string?>()).Returns(entries[0].Source);
 
         var byName = entries.ToDictionary(e => e.Source.Name, e => e.Client, StringComparer.OrdinalIgnoreCase);
-        return new WorkloadCatalog(sourceProvider, source => byName[source.Name]);
+        return new WorkloadCatalog(Options.Create(options), sourceProvider, source => byName[source.Name]);
     }
 }

@@ -51,8 +51,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving from the catalog. Default: enabled while workloads are in preview.",
-        DefaultValueFactory = _ => true,
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable versions only.",
     };
 
     public Option<bool> ExactOption { get; } = new("--exact", "-e")

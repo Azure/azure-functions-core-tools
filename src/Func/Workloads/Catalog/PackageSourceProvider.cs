@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Microsoft.Extensions.Options;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Workloads.Catalog;
@@ -9,7 +10,7 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// Default <see cref="IPackageSourceProvider"/>. Precedence: <c>--source</c> override,
 /// then <see cref="WorkloadCatalogOptions.Source"/>, then nuget.org as a fallback.
 /// </summary>
-internal sealed class PackageSourceProvider(WorkloadCatalogOptions options) : IPackageSourceProvider
+internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> options) : IPackageSourceProvider
 {
     /// <summary>
     /// Public nuget.org v3 service index, used when no source is configured.
@@ -18,7 +19,7 @@ internal sealed class PackageSourceProvider(WorkloadCatalogOptions options) : IP
 
     private const string DefaultSourceName = "nuget.org";
 
-    private readonly WorkloadCatalogOptions _options = options ?? throw new ArgumentNullException(nameof(options));
+    private readonly WorkloadCatalogOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
     /// <inheritdoc />
     public PackageSource GetSource(string? source = null)
