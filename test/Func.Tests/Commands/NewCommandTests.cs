@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Templates;
 using NSubstitute;
@@ -60,4 +61,20 @@ public class NewCommandTests
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
     }
+
+    // Single-dash typos like `-name` must surface as unrecognized options, not "needs a project".
+    [Fact]
+    public void NewCommand_SingleDashLongOption_ReportsUnrecognizedOption()
+    {
+        var root = TestParser.CreateRoot(_interaction);
+
+        ParseResult result = root.Parse(
+            new[] { "new", "--template", "HttpTrigger-Python", "-name", "ttpt" },
+            new ParserConfiguration { EnablePosixBundling = false });
+
+        Assert.Contains(
+            result.Errors,
+            e => e.Message.Contains("Unrecognized option '-name'", System.StringComparison.Ordinal));
+    }
 }
+

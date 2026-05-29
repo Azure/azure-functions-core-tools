@@ -360,7 +360,17 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             return 0;
         }
 
-        WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
+        // PathArgument's parse error makes GetValue throw; fall back to cwd so help still renders.
+        WorkingDirectory workingDirectory;
+        try
+        {
+            workingDirectory = parseResult.GetValue(PathArgument!)!;
+        }
+        catch
+        {
+            workingDirectory = WorkingDirectory.FromCwd();
+        }
+
         var invocation = new NewInvocation(
             workingDirectory,
             RequestedTemplate: templateId,

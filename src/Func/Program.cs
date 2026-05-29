@@ -81,7 +81,9 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         // PathArgument's unrecognized-token guard.
         NewCommandArgPreparer.PrepareIfFuncNew(args, host.Services, rootCommand);
 
-        commandParseResult = rootCommand.Parse(args);
+        // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
+        var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
+        commandParseResult = rootCommand.Parse(args, parserConfiguration);
         commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);
 
