@@ -10,12 +10,17 @@ namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
 /// <c>func workload search [&lt;query&gt;]</c>. Renders matching workload
-/// packages from the configured catalog as a table.
+/// packages from the configured catalog as a stack of definition-list
+/// "cards", one per package, so that long descriptions and package ids
+/// flow naturally across the terminal width instead of wrapping inside
+/// narrow table cells.
 /// </summary>
 internal sealed class WorkloadSearchCommand : FuncCliCommand
 {
     private const int DefaultTake = 20;
-    private const int DescriptionMaxLength = 80;
+
+    // Widest label in the card layout. Used to align values across rows.
+    private const int LabelColumnWidth = 13;
 
     // Lowercased value of the `kind:` NuGet tag that marks a package as a stack
     // workload (the only kind `func init --stack` can target). Mirrors the
@@ -44,7 +49,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     public Option<bool> JsonOption { get; } = new("--json")
     {
-        Description = "Emit machine-readable JSON instead of a table.",
+        Description = "Emit machine-readable JSON instead of cards.",
     };
 
     public Option<bool> StackOption { get; } = new("--stack")
@@ -72,7 +77,6 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool json = parseResult.GetValue(JsonOption);
         bool stackOnly = parseResult.GetValue(StackOption);
-        bool verbose = IsVerbose(parseResult);
 
         if (includePrerelease && !json)
         {
@@ -123,34 +127,48 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
             return 0;
         }
 
-        if (verbose)
+        bool first = true;
+        foreach (CatalogSearchResult result in results)
         {
-            _interaction.WriteTable(
-                ["Alias", "Display Name", "Description", "Latest", "Package ID"],
-                results.Select(r => new[]
-                {
-                    PrimaryAlias(r),
-                    DisplayNameOrPackageId(r),
-                    TruncateDescription(r.Description),
-                    r.LatestVersion.ToNormalizedString(),
-                    r.PackageId,
-                }));
-        }
-        else
-        {
-            _interaction.WriteTable(
-                ["Alias", "Display Name", "Description", "Latest"],
-                results.Select(r => new[]
-                {
-                    PrimaryAlias(r),
-                    DisplayNameOrPackageId(r),
-                    TruncateDescription(r.Description),
-                    r.LatestVersion.ToNormalizedString(),
-                }));
+            if (!first)
+            {
+                _interaction.WriteBlankLine();
+            }
+
+            first = false;
+            WriteCard(result);
         }
 
         WriteFooter(results.Count);
         return 0;
+    }
+
+    private void WriteCard(CatalogSearchResult result)
+    {
+        _interaction.WriteLine(line => line.Heading(DisplayNameOrPackageId(result)));
+
+        WriteField("Version", result.LatestVersion.ToNormalizedString());
+        WriteField("Package ID", result.PackageId);
+
+        string aliases = result.Aliases.Count == 0
+            ? string.Empty
+            : string.Join(", ", result.Aliases);
+        WriteField(result.Aliases.Count > 1 ? "Aliases" : "Alias", aliases);
+
+        // Description sits on its own line(s) below the label so long copy
+        // can use the full terminal width instead of wrapping inside a
+        // narrow value column.
+        _interaction.WriteLine(line => line.Command("Description:"));
+        string description = string.IsNullOrWhiteSpace(result.Description)
+            ? "(no description)"
+            : result.Description!.Trim();
+        _interaction.WriteLine(line => line.Muted(description));
+    }
+
+    private void WriteField(string label, string value)
+    {
+        string padded = (label + ":").PadRight(LabelColumnWidth);
+        _interaction.WriteLine(line => line.Command(padded).Plain(value));
     }
 
     private void WriteFooter(int count)
@@ -166,22 +184,6 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         _interaction.WriteHint("Run 'func workload install <alias>' to install one.");
     }
 
-    private static string PrimaryAlias(CatalogSearchResult result)
-        => result.Aliases.Count == 0 ? string.Empty : result.Aliases[0];
-
     private static string DisplayNameOrPackageId(CatalogSearchResult result)
         => string.IsNullOrWhiteSpace(result.Title) ? result.PackageId : result.Title!;
-
-    private static string TruncateDescription(string? description)
-    {
-        if (string.IsNullOrWhiteSpace(description))
-        {
-            return string.Empty;
-        }
-
-        string trimmed = description.Trim();
-        return trimmed.Length <= DescriptionMaxLength
-            ? trimmed
-            : string.Concat(trimmed.AsSpan(0, DescriptionMaxLength - 1), "\u2026");
-    }
 }
