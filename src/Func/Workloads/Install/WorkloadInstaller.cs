@@ -106,15 +106,11 @@ internal sealed class WorkloadInstaller(
 
         if (Directory.Exists(installPath))
         {
-            if (!force)
-            {
-                throw new InvalidOperationException(
-                    $"Workload '{packageId}' version '{version}' is already installed at '{installPath}' " +
-                    "but is missing from the registry.");
-            }
-
-            // Drop registry and on-disk directory before extracting fresh
-            // so files dropped by the new package don't linger.
+            // The registry is the source of truth. If the directory exists
+            // but no registry entry does, it's an orphan from a prior
+            // uninstall whose directory delete was blocked (AV, indexer,
+            // briefly-held handle). Self-heal by wiping it and re-extracting
+            // instead of leaving the user stuck behind a manual cleanup.
             await _store.RemoveWorkloadAsync(packageId, version, cancellationToken);
             Directory.Delete(installPath, recursive: true);
         }
