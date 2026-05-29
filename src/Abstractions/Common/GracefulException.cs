@@ -18,6 +18,13 @@ public class GracefulException : Exception
         VerboseMessage = verboseMessage;
     }
 
+    public GracefulException(string message, Exception innerException, bool isUserError = false, string? verboseMessage = null)
+        : base(message, innerException)
+    {
+        IsUserError = isUserError;
+        VerboseMessage = verboseMessage;
+    }
+
     public GracefulException(string message, string verboseMessage)
         : base(message)
     {
