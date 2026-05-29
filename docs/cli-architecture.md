@@ -362,11 +362,24 @@ If a newer version is found, a notice is printed after the command completes.
    └── No matching initializer    → "No installed workload supports stack '<x>'." (exit 1)
 3. Detect existing project state:
    ├── .func/config.json present  → fully initialized; refuse without --force
-   ├── host.json only             → adopt: write .func/config.json, skip scaffolding
+   ├── host.json only             → adopt mode (see below); skip scaffolding
    └── empty                      → scaffold via IProjectInitializer.InitializeAsync
 4. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
 5. Delegate to IProjectInitializer.InitializeAsync(context, parseResult) (skipped in adopt mode)
 ```
+
+**Adopt mode** (host.json present, no `.func/config.json`):
+
+1. Resolve `project_runtime` = `FUNCTIONS_WORKER_RUNTIME` env (preferred, matches the host) ?? `local.settings.json` ?? null. Warn if env and `local.settings.json` disagree.
+2. Apply:
+
+   | `project_runtime` → | `--stack` omitted | `--stack X` agrees | `--stack X` conflicts |
+   |---|---|---|---|
+   | null | current behavior (prompt / auto-select / error) | adopt with `X` | n/a |
+   | installed | adopt + snap | adopt with `X` | refuse (use `--force`) |
+   | uninstalled | adopt + hint `func setup --features <stack>` | adopt with `X` | refuse (use `--force`) |
+
+3. Write `.func/config.json` with the resolved stack. Skip scaffolding so user source is untouched. `--force` always bypasses adopt mode and takes the full scaffold path.
 
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
