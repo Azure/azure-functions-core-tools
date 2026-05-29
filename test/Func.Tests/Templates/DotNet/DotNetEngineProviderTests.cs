@@ -110,7 +110,6 @@ public class DotNetEngineProviderTests : IDisposable
             Stack: "dotnet",
             EngineId: EngineIds.DotNet,
             DisplayName: "HttpTrigger",
-            TriggerKind: "http",
             Description: null,
             DefaultFunctionName: null,
             Languages: ["c#"],
@@ -153,7 +152,6 @@ public class DotNetEngineProviderTests : IDisposable
             Stack: "dotnet",
             EngineId: EngineIds.DotNet,
             DisplayName: "HttpTrigger",
-            TriggerKind: "http",
             Description: null,
             DefaultFunctionName: null,
             Languages: ["c#"],
@@ -171,6 +169,77 @@ public class DotNetEngineProviderTests : IDisposable
 
         var failed = Assert.IsType<TemplateApplicationResult.Failed>(result);
         Assert.IsType<TemplateApplicationFailure.ProviderError>(failed.Failure);
+    }
+
+    [Fact]
+    public async Task ListTemplatesAsync_Empty_Description_Falls_Back_To_Name_And_Classification()
+    {
+        // Regression: upstream Functions item-template packages ship empty
+        // <description>, leaving func new --list DESCRIPTION column blank
+        // (issue #5206). DotNetTemplateProjection must fall back to
+        // "<Name> (<classification>)" so the column is informative.
+        WriteEmptyDescriptionFixture(_installDir);
+
+        IInstalledTemplatesWorkloads installed = Substitute.For<IInstalledTemplatesWorkloads>();
+        installed.ListInstalledAsync("dotnet", Arg.Any<CancellationToken>())
+            .Returns([new InstalledTemplatesWorkload("dotnet", "1.0.0", _installDir)]);
+
+        IDotnetTemplateRunner runner = Substitute.For<IDotnetTemplateRunner>();
+        var provider = new DotNetEngineProvider(installed, runner);
+
+        IReadOnlyList<FunctionTemplateInfo> templates = await provider.ListTemplatesAsync(
+            new TemplateListContext(new Cli.Common.WorkingDirectory(new DirectoryInfo(_installDir), false), "dotnet", null),
+            CancellationToken.None);
+
+        var info = Assert.Single(templates);
+        Assert.Equal("HttpTrigger (Http)", info.Description);
+    }
+
+    [Fact]
+    public async Task ListTemplatesAsync_NonEmpty_Description_Is_Preserved()
+    {
+        WriteFixture(_installDir);
+
+        IInstalledTemplatesWorkloads installed = Substitute.For<IInstalledTemplatesWorkloads>();
+        installed.ListInstalledAsync("dotnet", Arg.Any<CancellationToken>())
+            .Returns([new InstalledTemplatesWorkload("dotnet", "1.0.0", _installDir)]);
+
+        IDotnetTemplateRunner runner = Substitute.For<IDotnetTemplateRunner>();
+        var provider = new DotNetEngineProvider(installed, runner);
+
+        IReadOnlyList<FunctionTemplateInfo> templates = await provider.ListTemplatesAsync(
+            new TemplateListContext(new Cli.Common.WorkingDirectory(new DirectoryInfo(_installDir), false), "dotnet", null),
+            CancellationToken.None);
+
+        var info = Assert.Single(templates);
+        Assert.Equal("Creates an HTTP-triggered function.", info.Description);
+    }
+
+    private static void WriteEmptyDescriptionFixture(string installDir)
+    {
+        string contentDir = Path.Combine(installDir, "tools", "any", "content");
+        Directory.CreateDirectory(contentDir);
+
+        File.WriteAllText(Path.Combine(contentDir, "dotnet-templates.json"), """
+        {
+          "$schema": "https://aka.ms/func-workloads/dotnet-templates/v1/schema.json",
+          "sourcePackage": { "id": "Microsoft.Azure.Functions.Worker.ItemTemplates.NetCore", "version": "4.0.5569" },
+          "templates": [
+            {
+              "id": "http",
+              "shortNames": ["http"],
+              "identity": "Azure.Function.CSharp.HttpTrigger.2.x",
+              "groupIdentity": "Azure.Function.HttpTrigger",
+              "name": "HttpTrigger",
+              "description": "",
+              "language": "C#",
+              "type": "item",
+              "classifications": ["Azure Function", "Trigger", "Http"],
+              "defaultName": "HttpTriggerCSharp"
+            }
+          ]
+        }
+        """);
     }
 
     private static void WriteFixture(string installDir)

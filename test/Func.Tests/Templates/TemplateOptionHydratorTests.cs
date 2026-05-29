@@ -157,7 +157,6 @@ public class TemplateOptionHydratorTests
             Stack: stack,
             EngineId: EngineIds.V2,
             DisplayName: "HTTP trigger",
-            TriggerKind: "http",
             Description: "An HTTP-triggered function.",
             DefaultFunctionName: "HttpTrigger",
             Languages: ["javascript"],

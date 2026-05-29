@@ -27,10 +27,6 @@ namespace Azure.Functions.Cli.Templates;
 /// Human-friendly name (e.g. <c>"HTTP trigger"</c>). Rendered in the
 /// interactive picker and as the second column of <c>func new --list</c>.
 /// </param>
-/// <param name="TriggerKind">
-/// Trigger / binding kind (e.g. <c>"http"</c>, <c>"timer"</c>, <c>"queue"</c>).
-/// Renders as the <c>TRIGGER</c> column of <c>func new --list</c>.
-/// </param>
 /// <param name="Description">
 /// One-line description used for <c>--help</c> and the <c>DESCRIPTION</c> column
 /// of <c>func new --list</c>. May be <c>null</c> when the template carries no
@@ -55,7 +51,6 @@ public sealed record FunctionTemplateInfo(
     string Stack,
     string EngineId,
     string DisplayName,
-    string TriggerKind,
     string? Description,
     string? DefaultFunctionName,
     IReadOnlyList<string> Languages,
