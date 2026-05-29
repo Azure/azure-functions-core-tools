@@ -58,5 +58,52 @@ public class BundleHintBuilderTests
         string hint = BundleHintBuilder.WorkloadMissing();
 
         Assert.Contains($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}", hint);
+        Assert.DoesNotContain("func setup", hint);
+    }
+
+    [Fact]
+    public void WorkloadMissing_KnownRuntime_AppendsSetupFeatureHint()
+    {
+        string hint = BundleHintBuilder.WorkloadMissing(workerRuntime: "go");
+
+        Assert.Contains("func workload install", hint);
+        Assert.Contains("func setup --features go", hint);
+    }
+
+    [Fact]
+    public void WorkloadMissing_UnknownRuntime_DoesNotAppendSetupHint()
+    {
+        string hint = BundleHintBuilder.WorkloadMissing(workerRuntime: "ruby");
+
+        Assert.Contains("func workload install", hint);
+        Assert.DoesNotContain("func setup", hint);
+    }
+
+    [Fact]
+    public void NoCompatibleInstall_KnownRuntime_AppendsSetupFeatureHint()
+    {
+        string hint = BundleHintBuilder.NoCompatibleInstall(
+            "Microsoft.Azure.Functions.ExtensionBundle",
+            "[4.22.0, 5.0.0)",
+            ["4.10.0"],
+            suggestedVersion: "4.10.0",
+            workerRuntime: "node");
+
+        Assert.Contains("func setup --features node", hint);
+    }
+
+    [Fact]
+    public void EmptyIntersection_DoesNotIncludeSetupHint()
+    {
+        // Empty-intersection is a host.json/profile mismatch, not a missing install,
+        // so `func setup` is not the right remediation and should not appear.
+        string hint = BundleHintBuilder.EmptyIntersection(
+            "Microsoft.Azure.Functions.ExtensionBundle",
+            "[3.*, 4.0.0)",
+            "[4.*, 5.0.0)",
+            highestVersionSatisfyingHostJsonOnly: "3.36.0",
+            profileName: "stable");
+
+        Assert.DoesNotContain("func setup", hint);
     }
 }
