@@ -17,10 +17,7 @@ namespace Azure.Functions.Cli.Commands.Quickstart;
 /// </summary>
 internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
 {
-    public Option<string?> StackOption { get; } = new("--stack", "-s")
-    {
-        Description = QuickstartMessages.StackOptionDescription
-    };
+    public Option<string?> StackOption { get; } = new("--stack", "-s");
 
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
@@ -86,7 +83,10 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         _manifestService = manifestService;
         _scaffolder = scaffolder;
 
-        LanguageOption.Description = BuildLanguageOptionDescription(providers.ToList());
+        var providersList = providers.ToList();
+
+        LanguageOption.Description = BuildLanguageOptionDescription(providersList);
+        StackOption.Description = QuickstartMessages.BuildStackOptionDescription(providersList);
 
         AddPathArgument();
         Options.Add(StackOption);
@@ -101,6 +101,8 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         Subcommands.Add(listCommand);
         Subcommands.Add(infoCommand);
     }
+
+    protected override string HelpFooterHint => QuickstartMessages.HelpFooterHint;
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {

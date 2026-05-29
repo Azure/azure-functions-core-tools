@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Quickstart;
+
 namespace Azure.Functions.Cli.Commands.Quickstart;
 
 /// <summary>
@@ -14,8 +16,27 @@ internal static class QuickstartMessages
 
     // Shared across commands
     internal const string FetchingCatalogStatus = "Fetching template catalog...";
-    internal const string StackOptionDescription = "The stack to use. Run `func workload list` to see what's installed.";
     internal const string TemplateNotFoundHint = "Run `func quickstart list` to see available templates.";
+    internal const string HelpFooterHint = "Looking for more stacks? Run `func workload search --stack` to list installable stack workloads.";
+
+    // Builds the help text for `--stack`. Stacks come from installed quickstart
+    // providers' Stack ids, lowercased and sorted for stable presentation.
+    // Matching in the resolver is case-insensitive, so we surface the canonical
+    // lowercase form.
+    internal static string BuildStackOptionDescription(IReadOnlyList<IQuickstartProvider> providers)
+    {
+        var stacks = providers
+            .Select(p => p.Stack)
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
+
+        return stacks.Count == 0
+            ? "The stack to use. Install a stack workload (`func workload install <id>`) to see supported values."
+            : "The stack to use. Supported values: " + string.Join(", ", stacks) + ".";
+    }
 
     // QuickstartCommand
     internal const string DirectoryNotEmptyError = "The target directory is not empty. Pass --force to overwrite, or choose a different path.";
