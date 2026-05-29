@@ -39,8 +39,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Include prerelease versions in the results. Default: enabled while workloads are in preview.",
-        DefaultValueFactory = _ => true,
+        Description = "Include prerelease versions in the results. Default: stable versions only.",
     };
 
     public Option<bool> JsonOption { get; } = new("--json")

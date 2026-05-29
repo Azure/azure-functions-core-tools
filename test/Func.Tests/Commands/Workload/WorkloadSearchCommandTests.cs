@@ -162,8 +162,7 @@ public class WorkloadSearchCommandTests
         Assert.Equal(0, exit);
         Assert.NotNull(captured);
         Assert.Null(captured!.Filter);
-        // Default while workloads are in preview: --prerelease is implicitly on.
-        Assert.True(captured.IncludePrerelease);
+        Assert.False(captured.IncludePrerelease);
         Assert.Null(captured.Source);
         Assert.Equal(20, captured.Take);
     }
