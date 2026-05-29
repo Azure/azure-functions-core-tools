@@ -116,11 +116,15 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
                 // already on the ports, treat it as user-managed and skip
                 // launching our own.
                 _logger.LogInformation("Existing Azurite endpoint detected; reusing it without launching a managed instance.");
-                _interaction.WriteLine(l => l
-                    .Muted("Using existing Azurite endpoint at ")
-                    .Path(endpoints.BlobEndpoint.ToString())
-                    .Muted("."));
-                _interaction.WriteBlankLine();
+
+                // This cannot render to the live display directly as it will introduce rendering issues.
+                // TODO: If this information needs to be surfaced beyond initialization, we can introduce a new mechanism to display this data.
+                //_interaction.WriteLine(l => l
+                //    .Muted("Using existing Azurite endpoint at ")
+                //    .Path(endpoints.BlobEndpoint.ToString())
+                //    .Muted("."));
+                //_interaction.WriteBlankLine();
+
                 return new ManagedAzuriteResult.UserManaged(endpoints, "Endpoints already responded with storage-shaped replies.");
 
             case AzuriteProbeStatus.PortConflict:
