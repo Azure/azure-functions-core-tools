@@ -18,6 +18,12 @@ namespace Azure.Functions.Cli.Commands;
 /// Each registered initializer may also contribute additional options to this
 /// command (e.g. dotnet's <c>--target-framework</c>).
 /// </summary>
+/// <remarks>
+/// When the target directory already contains a <c>host.json</c> but no
+/// <c>.func/config.json</c>, the command "adopts" the project: it writes the
+/// CLI config (stack + language) and skips scaffolding. This is how pre-v5
+/// projects opt in to the v5 CLI.
+/// </remarks>
 internal class InitCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<string?> StackOption { get; } = new("--stack", "-s");
@@ -105,14 +111,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
         string? requestedStack = parseResult.GetValue(StackOption);
 
-        // Refuse to overwrite an existing Functions project. Either host.json
-        // or .func/config.json being present is enough to count: both are
-        // Functions project skeleton files we'd otherwise rewrite. --force opts in
-        // to a re-init.
-        if (!force && IsAlreadyInitialized(workingDirectory.Info, out string existingFile))
+        InitializationState state = DetectInitializationState(workingDirectory.Info);
+
+        // .func/config.json already present means the project has been fully
+        // initialized by v5; re-running without --force would silently no-op
+        // the config write and re-scaffold on top of the user's code.
+        if (state == InitializationState.FullyInitialized && !force)
         {
             _interaction.WriteError(
-                $"This directory already contains a Functions project ('{existingFile}' is present). " +
+                $"This directory already contains a Functions project ('{CliConfigurationPathsOptions.ProjectConfigDisplayPath}' is present). " +
                 "Pass --force to re-initialize.");
             return 1;
         }
@@ -131,6 +138,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         language = resolved;
+
+        // host.json without .func/config.json means a pre-existing Functions
+        // project that predates the v5 CLI config. Adopt it: write the config
+        // so subsequent commands know the stack/language, but skip scaffolding
+        // so we don't trample the user's source. --force still means "wipe and
+        // re-scaffold" and takes the normal path.
+        bool adoptExisting = state == InitializationState.AdoptableExistingProject && !force;
 
         if (force)
         {
@@ -152,6 +166,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
         _interaction.WriteBlankLine();
 
+        if (adoptExisting)
+        {
+            _interaction.WriteLine(l => l
+                .Success("✓ ")
+                .Muted("Existing project adopted for ")
+                .Code(initializer.Stack)
+                .Muted("."));
+
+            return 0;
+        }
+
         var context = new InitContext(
             WorkingDirectory: workingDirectory,
             ProjectName: parseResult.GetValue(NameOption),
@@ -167,6 +192,20 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             .Muted("."));
 
         return 0;
+    }
+
+    private enum InitializationState
+    {
+        // No Functions project markers present; safe to scaffold from scratch.
+        Empty,
+
+        // host.json present but the v5 config (.func/config.json) is missing.
+        // Treat as a pre-v5 project we can adopt by writing the config.
+        AdoptableExistingProject,
+
+        // .func/config.json is present. Already a v5 project; refuse without
+        // --force.
+        FullyInitialized,
     }
 
     protected override string HelpFooterHint =>
@@ -241,24 +280,21 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         DirectoryGuard.ClearExceptGit(workingDirectory);
     }
 
-    private static bool IsAlreadyInitialized(DirectoryInfo workingDirectory, out string existingFile)
+    private static InitializationState DetectInitializationState(DirectoryInfo workingDirectory)
     {
-        string hostJson = Path.Combine(workingDirectory.FullName, "host.json");
-        if (File.Exists(hostJson))
-        {
-            existingFile = "host.json";
-            return true;
-        }
-
         string config = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
         if (File.Exists(config))
         {
-            existingFile = Path.GetRelativePath(workingDirectory.FullName, config);
-            return true;
+            return InitializationState.FullyInitialized;
         }
 
-        existingFile = string.Empty;
-        return false;
+        string hostJson = Path.Combine(workingDirectory.FullName, "host.json");
+        if (File.Exists(hostJson))
+        {
+            return InitializationState.AdoptableExistingProject;
+        }
+
+        return InitializationState.Empty;
     }
 
     private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
