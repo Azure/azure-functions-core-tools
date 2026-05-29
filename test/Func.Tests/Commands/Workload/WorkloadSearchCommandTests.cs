@@ -58,7 +58,7 @@ public class WorkloadSearchCommandTests
         int exit = await InvokeAsync(cmd, "--stack");
 
         Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.Contains("workloads.python"));
+        Assert.Contains(_interaction.Lines, l => l.Contains("Python"));
         Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.host"));
         Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.nokind"));
     }
@@ -76,7 +76,7 @@ public class WorkloadSearchCommandTests
     }
 
     [Fact]
-    public async Task Search_Results_WritesTableRows()
+    public async Task Search_Results_WritesDefaultTableRows()
     {
         StubSearch(
             new CatalogSearchResult(
@@ -91,23 +91,39 @@ public class WorkloadSearchCommandTests
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l =>
-            l.Contains("func.workload.python")
-            && l.Contains("python")
-            && l.Contains("Python")
-            && l.Contains("Python workload")
-            && l.Contains("1.2.3"));
-
-        Assert.Contains(_interaction.Lines, l =>
-            l.Contains("ID")
-            && l.Contains("Aliases")
-            && l.Contains("Display Name")
-            && l.Contains("Description")
-            && l.Contains("Latest"));
+        Assert.Contains("TABLE: [Alias, Display Name, Description, Latest]", _interaction.Lines);
+        Assert.Contains("  ROW: [python, Python, Python workload, 1.2.3]", _interaction.Lines);
+        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("func.workload.python"));
+        Assert.Contains("HINT: Showing 1 result.", _interaction.Lines);
+        Assert.Contains("HINT: Run 'func workload install <alias>' to install one.", _interaction.Lines);
     }
 
     [Fact]
-    public async Task Search_NoAliases_RendersPlaceholder()
+    public async Task Search_Verbose_AddsPackageIdColumn()
+    {
+        StubSearch(
+            new CatalogSearchResult(
+                "func.workload.python",
+                NuGetVersion.Parse("1.2.3"),
+                Title: "Python",
+                Description: "Python workload",
+                Aliases: ["python"],
+                Source: _stubSource));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        int exit = await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
+
+        Assert.Equal(0, exit);
+        Assert.Contains(
+            "TABLE: [Alias, Display Name, Description, Latest, Package ID]",
+            _interaction.Lines);
+        Assert.Contains(
+            "  ROW: [python, Python, Python workload, 1.2.3, func.workload.python]",
+            _interaction.Lines);
+    }
+
+    [Fact]
+    public async Task Search_NoAliasesOrTitle_RendersBlankCellsAndPackageIdFallback()
     {
         StubSearch(
             new CatalogSearchResult(
@@ -121,8 +137,30 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog);
         await InvokeAsync(cmd);
 
-        Assert.Contains(_interaction.Lines, l =>
-            l.Contains("no.alias.pkg") && l.Contains(", -, -, -, "));
+        Assert.Contains("  ROW: [, no.alias.pkg, , 1.0.0]", _interaction.Lines);
+        Assert.DoesNotContain(_interaction.Lines, l => l.Contains(", -, "));
+    }
+
+    [Fact]
+    public async Task Search_AtPageLimit_FooterAdvisesRefining()
+    {
+        var stubs = Enumerable.Range(0, 20)
+            .Select(i => new CatalogSearchResult(
+                $"pkg.{i}",
+                NuGetVersion.Parse("1.0.0"),
+                Title: $"Pkg {i}",
+                Description: null,
+                Aliases: [$"p{i}"],
+                Source: _stubSource))
+            .ToArray();
+        StubSearch(stubs);
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        await InvokeAsync(cmd);
+
+        Assert.Contains(
+            "HINT: Showing 20 results. More may be available, refine your query.",
+            _interaction.Lines);
     }
 
     [Fact]
@@ -183,7 +221,7 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog);
         await InvokeAsync(cmd);
 
-        Assert.Contains(_interaction.Lines, l => l.Contains("..."));
+        Assert.Contains(_interaction.Lines, l => l.Contains("\u2026"));
         Assert.DoesNotContain(_interaction.Lines, l => l.Contains(longDesc));
     }
 
@@ -218,8 +256,16 @@ public class WorkloadSearchCommandTests
     }
 
     private static Task<int> InvokeAsync(WorkloadSearchCommand cmd, params string[] args)
+        => InvokeAsync(cmd, includeRootVerbose: false, args);
+
+    private static Task<int> InvokeAsync(WorkloadSearchCommand cmd, bool includeRootVerbose, params string[] args)
     {
         var root = new RootCommand();
+        if (includeRootVerbose)
+        {
+            root.Options.Add(new Option<bool>("--verbose") { Recursive = true });
+        }
+
         root.Subcommands.Add(cmd);
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         return root.Parse(new[] { cmd.Name }.Concat(args).ToArray()).InvokeAsync(config);

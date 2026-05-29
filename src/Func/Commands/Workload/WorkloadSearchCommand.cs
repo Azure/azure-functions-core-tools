@@ -16,7 +16,6 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 {
     private const int DefaultTake = 20;
     private const int DescriptionMaxLength = 80;
-    private const string Placeholder = "-";
 
     // Lowercased value of the `kind:` NuGet tag that marks a package as a stack
     // workload (the only kind `func init --stack` can target). Mirrors the
@@ -72,6 +71,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool json = parseResult.GetValue(JsonOption);
         bool stackOnly = parseResult.GetValue(StackOption);
+        bool verbose = IsVerbose(parseResult);
 
         if (includePrerelease && !json)
         {
@@ -122,29 +122,65 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
             return 0;
         }
 
-        IEnumerable<string[]> rows = results.Select(r => new[]
+        if (verbose)
         {
-            r.PackageId,
-            r.Aliases.Count == 0 ? Placeholder : string.Join(", ", r.Aliases),
-            string.IsNullOrWhiteSpace(r.Title) ? Placeholder : r.Title!,
-            TruncateDescription(r.Description),
-            r.LatestVersion.ToNormalizedString(),
-        });
+            _interaction.WriteTable(
+                ["Alias", "Display Name", "Description", "Latest", "Package ID"],
+                results.Select(r => new[]
+                {
+                    PrimaryAlias(r),
+                    DisplayNameOrPackageId(r),
+                    TruncateDescription(r.Description),
+                    r.LatestVersion.ToNormalizedString(),
+                    r.PackageId,
+                }));
+        }
+        else
+        {
+            _interaction.WriteTable(
+                ["Alias", "Display Name", "Description", "Latest"],
+                results.Select(r => new[]
+                {
+                    PrimaryAlias(r),
+                    DisplayNameOrPackageId(r),
+                    TruncateDescription(r.Description),
+                    r.LatestVersion.ToNormalizedString(),
+                }));
+        }
 
-        _interaction.WriteTable(["ID", "Aliases", "Display Name", "Description", "Latest"], rows);
+        WriteFooter(results.Count);
         return 0;
     }
+
+    private void WriteFooter(int count)
+    {
+        _interaction.WriteBlankLine();
+        string countLine = $"Showing {count} {(count == 1 ? "result" : "results")}.";
+        if (count >= DefaultTake)
+        {
+            countLine += " More may be available, refine your query.";
+        }
+
+        _interaction.WriteHint(countLine);
+        _interaction.WriteHint("Run 'func workload install <alias>' to install one.");
+    }
+
+    private static string PrimaryAlias(CatalogSearchResult result)
+        => result.Aliases.Count == 0 ? string.Empty : result.Aliases[0];
+
+    private static string DisplayNameOrPackageId(CatalogSearchResult result)
+        => string.IsNullOrWhiteSpace(result.Title) ? result.PackageId : result.Title!;
 
     private static string TruncateDescription(string? description)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
-            return Placeholder;
+            return string.Empty;
         }
 
         string trimmed = description.Trim();
         return trimmed.Length <= DescriptionMaxLength
             ? trimmed
-            : string.Concat(trimmed.AsSpan(0, DescriptionMaxLength - 3), "...");
+            : string.Concat(trimmed.AsSpan(0, DescriptionMaxLength - 1), "\u2026");
     }
 }
