@@ -134,6 +134,21 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
         _interaction.WriteSuccess("Azure Functions setup is complete.");
     }
 
+    public void SetupSkippedNoSelection()
+    {
+        if (_outputMode == SetupOutputMode.Json)
+        {
+            WriteEvent("setup.skipped", new Dictionary<string, object?>
+            {
+                ["reason"] = "no-selection",
+            });
+            return;
+        }
+
+        _interaction.WriteHint(
+            "No stacks selected. Nothing to install. Run `func setup` again, or `func setup --features <name>`, when you're ready.");
+    }
+
     public void SetupFailed(int failureCount)
     {
         if (_outputMode == SetupOutputMode.Json)
