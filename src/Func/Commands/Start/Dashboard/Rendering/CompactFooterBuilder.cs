@@ -12,10 +12,9 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// <summary>
 /// Builds the compact dashboard footer and control hints.
 /// </summary>
-internal sealed class CompactFooterBuilder(ITheme theme, DashboardRunInfo runInfo)
+internal sealed class CompactFooterBuilder(ITheme theme, DashboardRunInfo runInfo, CompactDashboardShortcutLabels shortcutLabels)
 {
     private const string HelpCloseControlLabel = "?/Esc close";
-    private const string LogsNavigationControlLabel = "↑/↓, PgUp/PgDn logs";
     private const string FunctionBrowserControlLabel = "t functions";
     private const string QuitControlLabel = "q/Ctrl+C quit";
     private const string FunctionFilterToggleControlLabel = "f next";
@@ -23,6 +22,7 @@ internal sealed class CompactFooterBuilder(ITheme theme, DashboardRunInfo runInf
 
     private readonly ITheme _theme = theme ?? throw new ArgumentNullException(nameof(theme));
     private readonly DashboardRunInfo _runInfo = runInfo ?? throw new ArgumentNullException(nameof(runInfo));
+    private readonly CompactDashboardShortcutLabels _shortcutLabels = shortcutLabels ?? throw new ArgumentNullException(nameof(shortcutLabels));
 
     private string MutedTag => field ??= _theme.Muted.ToMarkup();
 
@@ -51,13 +51,14 @@ internal sealed class CompactFooterBuilder(ITheme theme, DashboardRunInfo runInf
             ? $" · Scrollback {logScrollOffset}"
             : string.Empty;
 
+        string logsNavigationLabel = _shortcutLabels.LogsNavigationControlLabel;
         string controls = (helpOpen, functionSearchOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
             (true, _, _, _) => $"{HelpCloseControlLabel} · {QuitControlLabel}",
             (_, true, _, _) => "type query · ↑/↓ select · Enter filter · Esc close",
             (_, _, true, _) => $"↑/↓ navigate · Enter filter · {FunctionFilterToggleControlLabel} · {FunctionBrowserControlLabel}",
-            (_, _, _, true) => $"{LogsNavigationControlLabel} · {FunctionFilterToggleControlLabel} · a all · {HelpControlLabel} · {QuitControlLabel}",
-            _ => $"{LogsNavigationControlLabel} · {FunctionBrowserControlLabel} · {HelpControlLabel} · {QuitControlLabel}",
+            (_, _, _, true) => $"{logsNavigationLabel} · {FunctionFilterToggleControlLabel} · a all · {HelpControlLabel} · {QuitControlLabel}",
+            _ => $"{logsNavigationLabel} · {FunctionBrowserControlLabel} · {HelpControlLabel} · {QuitControlLabel}",
         };
 
         string line = string.Create(

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands.Start.Azurite;
@@ -61,6 +62,7 @@ internal static class CliHostFactory
         // OpenTelemetry pipeline) so flush + shutdown happen via host disposal.
         HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton(interaction);
+        builder.Services.AddSingleton<IPlatform, Platform>();
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
         var localSettingsProvider = new LocalSettingsProvider();

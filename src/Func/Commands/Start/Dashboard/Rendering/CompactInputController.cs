@@ -110,11 +110,11 @@ internal sealed class CompactInputController(
                 return Handled(ScrollLogs(state, -1, maxLogScrollOffset));
 
             case ConsoleKey.PageUp when state.FunctionBrowserOpen:
-                MoveFunctionBrowserSelection(functions, state, -Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functions.Length, viewportHeight)));
+                MoveFunctionBrowserSelection(functions, state, -GetFunctionBrowserPageSize(functions.Length, viewportHeight));
                 return Handled();
 
             case ConsoleKey.PageDown when state.FunctionBrowserOpen:
-                MoveFunctionBrowserSelection(functions, state, Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functions.Length, viewportHeight)));
+                MoveFunctionBrowserSelection(functions, state, GetFunctionBrowserPageSize(functions.Length, viewportHeight));
                 return Handled();
 
             case ConsoleKey.PageUp when !state.HelpOpen:
@@ -265,6 +265,9 @@ internal sealed class CompactInputController(
 
         state.FunctionSearchSelectedIndex = Math.Clamp(state.FunctionSearchSelectedIndex + delta, 0, matches.Length - 1);
     }
+
+    private int GetFunctionBrowserPageSize(int functionCount, int viewportHeight)
+        => Math.Max(1, _functionBrowserBuilder.GetVisibleRows(functionCount, viewportHeight));
 
     private static void CycleFunctionFilter(FunctionInfo[] functions, CompactInputState state)
     {

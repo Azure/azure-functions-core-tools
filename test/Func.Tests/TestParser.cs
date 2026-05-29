@@ -66,6 +66,7 @@ internal static class TestParser
     {
         var services = new ServiceCollection();
         services.AddSingleton(interaction);
+        services.AddSingleton(Substitute.For<IPlatform>());
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddOptions<StackOptions>();
         services.AddOptions<HostStartupOptions>();

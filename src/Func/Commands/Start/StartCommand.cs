@@ -111,6 +111,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     private readonly FunctionPalette _palette;
     private readonly ICliVersionProvider _versionProvider;
     private readonly IStartInitializationRunner _initializationRunner;
+    private readonly CompactDashboardShortcutLabels _shortcutLabels;
+    private readonly IPlatform _platform;
     private readonly StartDashboardEventStreamFactory _eventStreamFactory;
     private readonly IOptionsMonitor<HostStartupOptions> _hostStartupOptions;
 
@@ -120,6 +122,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         ICliVersionProvider versionProvider,
         IStartInitializationRunner initializationRunner,
         IOptionsMonitor<HostStartupOptions> hostStartupOptions,
+        CompactDashboardShortcutLabels shortcutLabels,
+        IPlatform platform,
         StartDashboardEventStreamFactory? eventStreamFactory = null)
         : base("run", "Launch the Azure Functions host runtime.")
     {
@@ -134,11 +138,15 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(versionProvider);
         ArgumentNullException.ThrowIfNull(initializationRunner);
         ArgumentNullException.ThrowIfNull(hostStartupOptions);
+        ArgumentNullException.ThrowIfNull(shortcutLabels);
+        ArgumentNullException.ThrowIfNull(platform);
 
         _interaction = interaction;
         _palette = palette;
         _versionProvider = versionProvider;
         _initializationRunner = initializationRunner;
+        _shortcutLabels = shortcutLabels;
+        _platform = platform;
         _eventStreamFactory = eventStreamFactory ?? new StartDashboardEventStreamFactory();
         _hostStartupOptions = hostStartupOptions;
 
@@ -395,7 +403,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     {
         OutputMode.Json => new JsonRenderer(),
         OutputMode.Plain => new PlainRenderer(_interaction),
-        OutputMode.Compact => new CompactRenderer(_interaction, _palette, runInfo: runInfo),
+        OutputMode.Compact => new CompactRenderer(_interaction, _palette, _shortcutLabels, _platform, runInfo: runInfo),
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 
