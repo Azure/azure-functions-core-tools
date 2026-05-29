@@ -11,14 +11,12 @@ namespace Azure.Functions.Cli.Workers;
 /// </summary>
 internal sealed class DefaultFunctionsWorkerResolver(
     IWorkloadProvider workloadProvider,
-    IWorkerConfigFileSystem workerConfigFileSystem,
+    IFunctionsWorkerContentResolver workerContentResolver,
     IReadOnlyDictionary<string, VersionRange>? activeWorkerConstraints = null) : IFunctionsWorkerResolver
 {
-    private const string WorkerConfigFileName = "worker.config.json";
-
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
-    private readonly IWorkerConfigFileSystem _workerConfigFileSystem = workerConfigFileSystem
-        ?? throw new ArgumentNullException(nameof(workerConfigFileSystem));
+    private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
+        ?? throw new ArgumentNullException(nameof(workerContentResolver));
     private readonly IReadOnlyDictionary<string, VersionRange> _activeWorkerConstraints =
         activeWorkerConstraints is null
             ? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase)
@@ -32,48 +30,7 @@ internal sealed class DefaultFunctionsWorkerResolver(
         _activeWorkerConstraints.TryGetValue(workerId.Value, out VersionRange? constraint);
 
         IReadOnlyList<ContentWorkloadInfo> installedWorkers = GetWorkerWorkloads(workerId);
-        if (installedWorkers.Count == 0)
-        {
-            return Task.FromResult(NotInstalled(workerId));
-        }
-
-        List<InstalledWorkerCandidate> candidates = [];
-
-        foreach (ContentWorkloadInfo workload in installedWorkers)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (!NuGetVersion.TryParse(workload.PackageVersion, out NuGetVersion? version)
-                || !SatisfiesConstraint(version, constraint))
-            {
-                continue;
-            }
-
-            candidates.Add(new InstalledWorkerCandidate(workload, version));
-        }
-
-        if (candidates.Count == 0)
-        {
-            return Task.FromResult(MissingCompatibleVersion(workerId, constraint));
-        }
-
-        InstalledWorkerCandidate selected = candidates
-            .OrderByDescending(c => c.Version)
-            .First();
-
-        string workerConfigPath = Path.Combine(selected.Workload.ContentRoot, WorkerConfigFileName);
-        if (!_workerConfigFileSystem.FileExists(workerConfigPath))
-        {
-            return Task.FromResult(InvalidInstallation(workerId, selected, workerConfigPath));
-        }
-
-        IFunctionsWorker resolvedWorker = new ResolvedFunctionsWorker(
-            workerId,
-            workerId.Value,
-            workerConfigPath,
-            selected.Version.ToNormalizedString());
-
-        return Task.FromResult(FunctionsWorkerResolutionResults.Resolved(resolvedWorker));
+        return Task.FromResult(_workerContentResolver.ResolveWorker(workerId, installedWorkers, constraint, cancellationToken));
     }
 
     private IReadOnlyList<ContentWorkloadInfo> GetWorkerWorkloads(FunctionsWorkerId workerId)
@@ -107,67 +64,5 @@ internal sealed class DefaultFunctionsWorkerResolver(
         }
     }
 
-    private static bool SatisfiesConstraint(NuGetVersion version, VersionRange? constraint)
-        => constraint is null || constraint.Satisfies(version);
-
     private static string GetWorkerAlias(FunctionsWorkerId workerId) => workerId.Value + "-worker";
-
-    private static FunctionsWorkerResolutionResult NotInstalled(FunctionsWorkerId workerId)
-        => NotInstalledResult(
-            workerId,
-            $"No installed Azure Functions worker was found for '{workerId.Value}'. "
-            + $"Run '{FunctionsWorkerWorkloadPackages.GetInstallCommand(workerId)}' to install it.");
-
-    private static FunctionsWorkerResolutionResult NotInstalledResult(FunctionsWorkerId workerId, string message)
-    {
-        FunctionsWorkerResolutionFailure failure = FunctionsWorkerResolutionFailures.NotInstalled(workerId, message);
-        return FunctionsWorkerResolutionResults.NotResolved(failure);
-    }
-
-    private static FunctionsWorkerResolutionResult MissingCompatibleVersion(FunctionsWorkerId workerId, VersionRange? constraint)
-    {
-        if (constraint is null)
-        {
-            FunctionsWorkerResolutionFailure invalidVersionFailure =
-                FunctionsWorkerResolutionFailures.MissingCompatibleVersion(
-                    workerId,
-                    versionConstraint: null,
-                    $"Installed Azure Functions worker workloads for '{workerId.Value}' do not include a valid package version. "
-                    + $"Run '{FunctionsWorkerWorkloadPackages.GetRepairCommand(workerId)}' to repair the install.");
-
-            return FunctionsWorkerResolutionResults.NotResolved(invalidVersionFailure);
-        }
-
-        string rangeText = RangeText(constraint);
-        FunctionsWorkerResolutionFailure failure = FunctionsWorkerResolutionFailures.MissingCompatibleVersion(
-            workerId,
-            rangeText,
-            $"Installed Azure Functions worker workloads for '{workerId.Value}' do not satisfy version range '{rangeText}'. "
-            + $"Run '{FunctionsWorkerWorkloadPackages.GetInstallCommand(workerId)}' to install a compatible worker.");
-
-        return FunctionsWorkerResolutionResults.NotResolved(failure);
-    }
-
-    private static FunctionsWorkerResolutionResult InvalidInstallation(
-        FunctionsWorkerId workerId,
-        InstalledWorkerCandidate selected,
-        string workerConfigPath)
-    {
-        FunctionsWorkerResolutionFailure failure = FunctionsWorkerResolutionFailures.InvalidInstallation(
-            workerId,
-            selected.Workload.PackageId,
-            selected.Version.ToNormalizedString(),
-            workerConfigPath,
-            $"Installed Azure Functions worker '{workerId.Value}' package '{selected.Workload.PackageId}' "
-            + $"{selected.Version.ToNormalizedString()} is missing '{workerConfigPath}'. "
-            + $"Run '{FunctionsWorkerWorkloadPackages.GetRepairCommand(workerId)}' to repair the install.");
-
-        return FunctionsWorkerResolutionResults.NotResolved(failure);
-    }
-
-    private static string RangeText(VersionRange range) => range.OriginalString ?? range.ToString();
-
-    private sealed record InstalledWorkerCandidate(ContentWorkloadInfo Workload, NuGetVersion Version);
-
-    private sealed record ResolvedFunctionsWorker(FunctionsWorkerId Id, string WorkerRuntime, string WorkerConfigPath, string Version) : IFunctionsWorker;
 }

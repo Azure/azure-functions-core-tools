@@ -252,13 +252,19 @@ public class DefaultFunctionsWorkerResolverTests
     [Fact]
     public void Ctor_NullWorkloadProvider_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerResolver(null!, _fileSystem));
+        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerResolver(null!, CreateContentResolver()));
     }
 
     [Fact]
-    public void Ctor_NullWorkerConfigFileSystem_Throws()
+    public void Ctor_NullContentResolver_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerResolver(_workloads, null!));
+    }
+
+    [Fact]
+    public void ContentResolverCtor_NullWorkerConfigFileSystem_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerContentResolver(null!));
     }
 
     private void UseContentWorkloads(params ContentWorkloadInfo[] workloads)
@@ -275,7 +281,9 @@ public class DefaultFunctionsWorkerResolverTests
     }
 
     private DefaultFunctionsWorkerResolver CreateResolver(IReadOnlyDictionary<string, VersionRange>? workerVersionRanges = null)
-        => new(_workloads, _fileSystem, workerVersionRanges);
+        => new(_workloads, CreateContentResolver(), workerVersionRanges);
+
+    private DefaultFunctionsWorkerContentResolver CreateContentResolver() => new(_fileSystem);
 
     private static ContentWorkloadInfo CreateContentWorkload(string packageId, string packageVersion, IReadOnlyList<string>? aliases = null)
     {

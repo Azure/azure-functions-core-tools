@@ -12,7 +12,6 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
-using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Logging;
@@ -29,7 +28,7 @@ internal sealed class DemoStartInitializationRunner(
     IProfileResolver profileResolver,
     IHostWorkloadResolver hostWorkloadResolver,
     IFunctionsWorkerResolverFactory workerResolverFactory,
-    IWorkloadCatalog workloadCatalog,
+    IFunctionsWorkerInstaller workerInstaller,
     IWorkloadInstaller workloadInstaller,
     IInteractionService interaction,
     ILocalSettingsProvider localSettingsProvider,
@@ -59,7 +58,7 @@ internal sealed class DemoStartInitializationRunner(
     private readonly IFunctionsWorkerResolverFactory _workerResolverFactory = workerResolverFactory
         ?? throw new ArgumentNullException(nameof(workerResolverFactory));
 
-    private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
+    private readonly IFunctionsWorkerInstaller _workerInstaller = workerInstaller ?? throw new ArgumentNullException(nameof(workerInstaller));
 
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller
         ?? throw new ArgumentNullException(nameof(workloadInstaller));
@@ -110,7 +109,7 @@ internal sealed class DemoStartInitializationRunner(
             new ResolveConstraintsInitializationStep(),
             new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller, _workloadPaths),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
-            new ResolveFunctionsWorkerInitializationStep(_workerResolverFactory, _workloadCatalog, _workloadInstaller),
+            new ResolveFunctionsWorkerInitializationStep(_workerResolverFactory, _workerInstaller),
             new ValidateExtensionBundleInitializationStep(
                 _bundleResolver,
                 _bundleSectionReader,
