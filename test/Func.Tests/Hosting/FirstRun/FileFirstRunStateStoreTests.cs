@@ -48,6 +48,32 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task GetStateAsync_ReturnsNeverPrompted_WhenMarkerMissingAndNoWorkloads()
+    {
+        Assert.Equal(FirstRunState.NeverPrompted, await _store.GetStateAsync());
+    }
+
+    [Fact]
+    public async Task GetStateAsync_ReturnsMarkerWithoutWorkloads_WhenMarkerExistsAndNoWorkloads()
+    {
+        await _store.MarkCompleteAsync(CancellationToken.None);
+
+        Assert.Equal(FirstRunState.MarkerWithoutWorkloads, await _store.GetStateAsync());
+    }
+
+    [Fact]
+    public async Task GetStateAsync_ReturnsWorkloadsInstalled_WhenWorkloadsPresent_RegardlessOfMarker()
+    {
+        _workloadStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[] { new WorkloadEntry { PackageId = "Azure.Functions.Cli.Workloads.Node", PackageVersion = "4.0.0" } });
+
+        Assert.Equal(FirstRunState.WorkloadsInstalled, await _store.GetStateAsync());
+
+        await _store.MarkCompleteAsync(CancellationToken.None);
+        Assert.Equal(FirstRunState.WorkloadsInstalled, await _store.GetStateAsync());
+    }
+
+    [Fact]
     public async Task MarkCompleteAsync_CreatesMarker_AndIsFirstRunReturnsFalse()
     {
         await _store.MarkCompleteAsync(CancellationToken.None);

@@ -24,20 +24,21 @@ internal sealed class FileFirstRunStateStore(
     private string MarkerPath => Path.Combine(_paths.Home, MarkerFileName);
 
     public async Task<bool> IsFirstRunAsync(CancellationToken cancellationToken = default)
+        => await GetStateAsync(cancellationToken) == FirstRunState.NeverPrompted;
+
+    public async Task<FirstRunState> GetStateAsync(CancellationToken cancellationToken = default)
     {
-        if (File.Exists(MarkerPath))
-        {
-            return false;
-        }
+        bool markerExists = File.Exists(MarkerPath);
 
         // Existing users may have installed workloads through `func setup`
         // or `func workload install` before this marker was introduced, or
         // before we wrote it on success. Treat any installed workload as
         // "not first run" so we don't re-prompt them.
+        bool hasWorkloads;
         try
         {
             IReadOnlyList<WorkloadEntry> installed = await _workloadStore.GetWorkloadsAsync(cancellationToken);
-            return installed.Count == 0;
+            hasWorkloads = installed.Count > 0;
         }
         catch (OperationCanceledException)
         {
@@ -45,10 +46,19 @@ internal sealed class FileFirstRunStateStore(
         }
         catch (Exception)
         {
-            // If we can't read the workload registry for any reason, fall
-            // back to "first run = true" so the user still sees the prompt.
-            return true;
+            // If we can't read the workload registry, lean toward the
+            // marker: it's the user's explicit signal. Treat as no
+            // workloads so the prompt still surfaces when there's no
+            // marker either.
+            hasWorkloads = false;
         }
+
+        if (hasWorkloads)
+        {
+            return FirstRunState.WorkloadsInstalled;
+        }
+
+        return markerExists ? FirstRunState.MarkerWithoutWorkloads : FirstRunState.NeverPrompted;
     }
 
     public async Task MarkCompleteAsync(CancellationToken cancellationToken)

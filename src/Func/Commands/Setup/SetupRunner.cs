@@ -266,10 +266,24 @@ internal sealed class SetupRunner(
 
         if (!options.NonInteractive && _interaction.IsInteractive)
         {
-            IReadOnlyList<MultiSelectionChoice> choices = await BuildStackChoicesAsync(cancellationToken);
+            StackChoicesResult choices = await BuildStackChoicesAsync(cancellationToken);
+
+            if (choices.AlreadyInstalled.Count > 0)
+            {
+                _interaction.WriteHint($"Already installed: {string.Join(", ", choices.AlreadyInstalled)}");
+            }
+
+            if (choices.Available.Count == 0)
+            {
+                // Every supported stack is already installed; nothing to
+                // offer. Treat as a clean opt-out so the caller marks the
+                // first-run flag and exits without prompting.
+                return null;
+            }
+
             IReadOnlyList<string> picked = await _interaction.PromptForMultiSelectionAsync(
                 "Select stacks to install (SPACE to toggle, ENTER to confirm; ENTER with no selection exits):",
-                choices,
+                choices.Available,
                 cancellationToken);
 
             // No selection = user opted out. Signal that with null so the
@@ -281,7 +295,7 @@ internal sealed class SetupRunner(
         return ["runtime"];
     }
 
-    private async Task<IReadOnlyList<MultiSelectionChoice>> BuildStackChoicesAsync(CancellationToken cancellationToken)
+    private async Task<StackChoicesResult> BuildStackChoicesAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<string> stacks = SetupDependency.Stacks;
         HashSet<string> installedStackPackageIds;
@@ -298,20 +312,32 @@ internal sealed class SetupRunner(
         }
         catch (Exception)
         {
-            // Surfacing the installed indicator is a hint, not a contract.
-            // If we can't read the store we still want the user to pick.
+            // Filtering installed stacks is a UX hint, not a contract.
+            // If we can't read the store, fall back to showing every stack
+            // so the user can still make a selection.
             installedStackPackageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        return [.. stacks
-            .OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase)
-            .Select(stack =>
+        List<MultiSelectionChoice> available = [];
+        List<string> alreadyInstalled = [];
+        foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
+        {
+            if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
             {
-                bool installed = installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId);
-                string label = installed ? $"{stack}  (installed)" : stack;
-                return new MultiSelectionChoice(stack, label);
-            })];
+                alreadyInstalled.Add(stack);
+            }
+            else
+            {
+                available.Add(new MultiSelectionChoice(stack, stack));
+            }
+        }
+
+        return new StackChoicesResult(available, alreadyInstalled);
     }
+
+    private readonly record struct StackChoicesResult(
+        IReadOnlyList<MultiSelectionChoice> Available,
+        IReadOnlyList<string> AlreadyInstalled);
 
     private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(SetupCommandOptions options, SetupRenderer renderer, CancellationToken cancellationToken)
     {
