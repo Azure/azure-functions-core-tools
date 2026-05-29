@@ -119,7 +119,7 @@ internal class HelpCommand : FuncCliCommand
     {
         string commandPath = BuildCommandPath(command);
 
-        WriteHeader(commandPath, command.Description);
+        WriteHeader(command, commandPath, command.Description);
         WriteUsageSection(command, commandPath);
         WriteArgumentsSection(command);
         WriteSubcommandsSection(command);
@@ -136,7 +136,7 @@ internal class HelpCommand : FuncCliCommand
     /// Exposed so custom help actions can compose their own output using
     /// the same header style as the default renderer.
     /// </summary>
-    internal void WriteHeader(string commandPath, string? description)
+    internal void WriteHeader(Command command, string commandPath, string? description)
     {
         _interaction.WriteBlankLine();
         _interaction.WriteTitle(commandPath);
