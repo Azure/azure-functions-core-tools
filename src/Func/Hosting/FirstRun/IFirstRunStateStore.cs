@@ -11,14 +11,16 @@ namespace Azure.Functions.Cli.Hosting.FirstRun;
 internal interface IFirstRunStateStore
 {
     /// <summary>
-    /// Returns true when no first-run marker exists yet, meaning the
-    /// user has not yet been offered the setup prompt.
+    /// Returns true when no first-run marker exists yet AND the user has no
+    /// installed workloads, meaning the user has not yet been offered the
+    /// setup prompt and has nothing on disk that would make the prompt
+    /// redundant.
     /// </summary>
-    public bool IsFirstRun();
+    public Task<bool> IsFirstRunAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Records that the first-run prompt has been handled. Subsequent
-    /// calls to <see cref="IsFirstRun"/> will return false.
+    /// calls to <see cref="IsFirstRunAsync"/> will return false.
     /// </summary>
     public Task MarkCompleteAsync(CancellationToken cancellationToken);
 }
