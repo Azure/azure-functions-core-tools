@@ -92,7 +92,9 @@ internal static class CliHostFactory
 
         builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
+        builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();
         builder.Services.AddSingleton<IFunctionsWorkerResolverFactory, DefaultFunctionsWorkerResolverFactory>();
+        builder.Services.AddSingleton<IFunctionsWorkerInstaller, DefaultFunctionsWorkerInstaller>();
         builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         builder.Services.AddSingleton<IInstalledBundleWorkloads, InstalledBundleWorkloads>();
         builder.Services.AddSingleton<InstalledBundleScanner>();

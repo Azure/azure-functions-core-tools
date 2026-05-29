@@ -20,12 +20,10 @@ using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
-using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using NuGet.Configuration;
 using NuGet.Versioning;
 using Spectre.Console;
 using Xunit;
@@ -395,7 +393,7 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
-    public async Task DemoRunner_ProfiledMissingWorkerInstallsConventionPackageAndRetries()
+    public async Task DemoRunner_ProfiledMissingWorkerUsesInstalledWorkerWithoutRetryingResolver()
     {
         IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
         TestFunctionsProject project = CreateProject(
@@ -408,35 +406,26 @@ public class StartInitializationTests : IDisposable
         FunctionsWorkerResolutionFailure failure = CreateNotInstalledWorkerFailure("node");
         IFunctionsWorkerResolver workerResolver = Substitute.For<IFunctionsWorkerResolver>();
         workerResolver.ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>())
-            .Returns(
-                FunctionsWorkerResolutionResults.NotResolved(failure),
-                FunctionsWorkerResolutionResults.Resolved(CreateWorker("node", "node", "3.13.0")));
+            .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
         IFunctionsWorkerResolverFactory workerResolverFactory = CreateWorkerResolverFactory(workerResolver);
         var workerRange = VersionRange.Parse("[3.13.0]");
         Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase)
         {
             ["node"] = workerRange,
         };
-        IWorkloadCatalog workloadCatalog = Substitute.For<IWorkloadCatalog>();
-        workloadCatalog.ResolveLatestVersionInRangeAsync(
-                FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
-                workerRange,
-                includePrerelease: true,
-                source: null,
-                Arg.Any<CancellationToken>())
-            .Returns(new ResolvedPackage(
-                FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
-                NuGetVersion.Parse("3.13.0"),
-                new PackageSource("https://example.test/v3/index.json")));
-        IWorkloadInstaller workloadInstaller = CreateSuccessfulInstaller();
+        IFunctionsWorker installedWorker = CreateWorker("node", "node", "3.13.0");
+        IFunctionsWorkerInstaller workerInstaller = Substitute.For<IFunctionsWorkerInstaller>();
+        WorkloadInstallResult workloadInstallResult = new(CreateWorkerEntry(FunctionsWorkerWorkloadPackages.GetPackageId(workerId), "3.13.0"), AlreadyInstalled: false);
+        workerInstaller.InstallAsync(workerId, Arg.Is<IReadOnlyDictionary<string, VersionRange>>(ranges => HasWorkerRange(ranges, workerRange)), Arg.Any<CancellationToken>())
+            .Returns(new FunctionsWorkerInstallResult(installedWorker, workloadInstallResult));
         var renderer = new RecordingStartInitializationRenderer();
         var runner = CreateRunner(
             projectResolver,
             CreateResolvedProfile(workerRanges),
             CreateInstalledHostWorkloadResolver(),
-            workloadInstaller,
-            workerResolverFactory,
-            workloadCatalog);
+            workerInstaller: workerInstaller,
+            workerResolverFactory: workerResolverFactory,
+            hostProcessRunner: CreateSuccessfulHostProcessRunner());
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -451,18 +440,10 @@ public class StartInitializationTests : IDisposable
 
         Assert.Equal("node", result.Worker.WorkerRuntime);
         Assert.Equal("3.13.0", result.Worker.Version);
-        Assert.Contains(
-            $"The Functions worker workload '{FunctionsWorkerWorkloadPackages.GetPackageId(workerId)}' is required. Install it now?",
-            renderer.ConfirmPrompts);
-        await workloadInstaller.Received(1).InstallFromCatalogAsync(
-            FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
-            NuGetVersion.Parse("3.13.0"),
-            "https://example.test/v3/index.json",
-            includePrerelease: true,
-            exact: true,
-            force: false,
-            progress: null,
-            cancellationToken: Arg.Any<CancellationToken>());
+        Assert.Same(installedWorker, result.Worker);
+        await workerResolver.Received(1).ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>());
+        await workerInstaller.Received(1)
+            .InstallAsync(workerId, Arg.Is<IReadOnlyDictionary<string, VersionRange>>(ranges => HasWorkerRange(ranges, workerRange)), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -890,7 +871,7 @@ public class StartInitializationTests : IDisposable
         IHostWorkloadResolver? hostWorkloadResolver = null,
         IWorkloadInstaller? workloadInstaller = null,
         IFunctionsWorkerResolverFactory? workerResolverFactory = null,
-        IWorkloadCatalog? workloadCatalog = null,
+        IFunctionsWorkerInstaller? workerInstaller = null,
         IInteractionService? interaction = null,
         IHostProcessRunner? hostProcessRunner = null)
     {
@@ -909,7 +890,7 @@ public class StartInitializationTests : IDisposable
 
         workloadInstaller ??= CreateSuccessfulInstaller();
         workerResolverFactory ??= CreateWorkerResolverFactory();
-        workloadCatalog ??= Substitute.For<IWorkloadCatalog>();
+        workerInstaller ??= CreateSuccessfulWorkerInstaller();
         interaction ??= Substitute.For<IInteractionService>();
         interaction.ConfirmAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(true);
@@ -925,7 +906,7 @@ public class StartInitializationTests : IDisposable
             profileResolver,
             hostWorkloadResolver,
             workerResolverFactory,
-            workloadCatalog,
+            workerInstaller,
             workloadInstaller,
             interaction,
             new LocalSettingsProvider(),
@@ -1008,6 +989,26 @@ public class StartInitializationTests : IDisposable
             });
 
         return workloadInstaller;
+    }
+
+    private static IFunctionsWorkerInstaller CreateSuccessfulWorkerInstaller()
+    {
+        IFunctionsWorkerInstaller workerInstaller = Substitute.For<IFunctionsWorkerInstaller>();
+        workerInstaller.InstallAsync(
+                Arg.Any<FunctionsWorkerId>(),
+                Arg.Any<IReadOnlyDictionary<string, VersionRange>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                FunctionsWorkerId workerId = callInfo.ArgAt<FunctionsWorkerId>(0);
+                string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
+                string packageVersion = DefaultInstallVersion(packageId);
+                var workloadInstallResult = new WorkloadInstallResult(CreateWorkerEntry(packageId, packageVersion), AlreadyInstalled: false);
+                IFunctionsWorker worker = CreateWorker(workerId.Value, workerId.Value, packageVersion);
+                return new FunctionsWorkerInstallResult(worker, workloadInstallResult);
+            });
+
+        return workerInstaller;
     }
 
     private static string DefaultInstallVersion(string packageId)

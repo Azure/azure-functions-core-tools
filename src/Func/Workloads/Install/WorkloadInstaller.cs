@@ -171,9 +171,7 @@ internal sealed class WorkloadInstaller(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
-        progress?.Report(new WorkloadInstallProgress(
-            WorkloadInstallPhase.Resolving,
-            $"Resolving workload '{packageId}'"));
+        progress?.Report(new WorkloadInstallProgress(WorkloadInstallPhase.Resolving, $"Resolving workload '{packageId}'"));
 
         string resolvedId = exact
             ? packageId

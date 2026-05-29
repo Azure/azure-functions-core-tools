@@ -14,25 +14,24 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Resolves the Functions worker required by the project.
 /// </summary>
-internal sealed class ResolveFunctionsWorkerInitializationStep(IFunctionsWorkerResolverFactory workerResolverFactory, IWorkloadCatalog workloadCatalog, IWorkloadInstaller workloadInstaller) : DemoInitializationStep
+internal sealed class ResolveFunctionsWorkerInitializationStep(
+    IFunctionsWorkerResolverFactory workerResolverFactory,
+    IFunctionsWorkerInstaller workerInstaller) : DemoInitializationStep
 {
     public const string StepId = "resolve_worker";
 
     private readonly IFunctionsWorkerResolverFactory _workerResolverFactory = workerResolverFactory
         ?? throw new ArgumentNullException(nameof(workerResolverFactory));
 
-    private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
-    private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller ?? throw new ArgumentNullException(nameof(workloadInstaller));
+    private readonly IFunctionsWorkerInstaller _workerInstaller = workerInstaller ?? throw new ArgumentNullException(nameof(workerInstaller));
 
     public override string Id => StepId;
 
     public override string Title => "Resolve worker";
 
-    public override StartInitializationDisplayKind DisplayKind => StartInitializationDisplayKind.Progress;
+    public override StartInitializationDisplayKind DisplayKind => StartInitializationDisplayKind.Status;
 
-    public override async Task<StartInitializationStepResult> ExecuteAsync(
-        StartInitializationStepContext context,
-        CancellationToken cancellationToken)
+    public override async Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -49,7 +48,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(IFunctionsWorkerR
             && TryGetInstallableWorker(notResolved.Failure, out FunctionsWorkerId? workerId)
             && workerId is not null)
         {
-            result = await TryInstallAndResolveWorkerAsync(context, project, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
+            result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
         }
 
         if (result is not FunctionsWorkerResolutionResult.Resolved resolved)
@@ -64,6 +63,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(IFunctionsWorkerR
         string completionMessage = string.IsNullOrWhiteSpace(resolved.Worker.Version)
             ? resolved.Worker.WorkerRuntime
             : $"{resolved.Worker.WorkerRuntime} {resolved.Worker.Version}";
+
         await context.ReportProgressAsync(100, $"Resolved worker {completionMessage}", cancellationToken);
 
         return StartInitializationStepResult.Completed(completionMessage);
@@ -71,7 +71,6 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(IFunctionsWorkerR
 
     private async Task<FunctionsWorkerResolutionResult> TryInstallAndResolveWorkerAsync(
         StartInitializationStepContext context,
-        FunctionsProject project,
         FunctionsWorkerId workerId,
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges,
         FunctionsWorkerResolutionFailure failure,
@@ -88,67 +87,26 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(IFunctionsWorkerR
         }
 
         string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
+        await context.ReportProgressAsync(0, $"Installing worker workload {packageId}", cancellationToken);
+        FunctionsWorkerInstallResult installResult = await InstallWorkerAsync(workerId, workerVersionRanges, cancellationToken);
 
-        bool shouldInstall = await context.ConfirmAsync(
-            $"The Functions worker workload '{packageId}' is required. Install it now?",
-            defaultValue: true,
-            cancellationToken);
+        WorkloadInstallResult workloadInstallResult = installResult.WorkloadInstallResult;
+        string completionMessage = workloadInstallResult.AlreadyInstalled
+            ? $"Worker {workloadInstallResult.Entry.PackageVersion} already installed"
+            : $"Installed worker {workloadInstallResult.Entry.PackageVersion}";
+        await context.ReportProgressAsync(50, completionMessage, cancellationToken);
 
-        if (!shouldInstall)
-        {
-            return FunctionsWorkerResolutionResults.NotResolved(failure);
-        }
-
-        await InstallWorkerAsync(context, workerId, workerVersionRanges, cancellationToken);
-
-        return await ResolveWorkerAsync(project, workerVersionRanges, cancellationToken);
+        return FunctionsWorkerResolutionResults.Resolved(installResult.Worker);
     }
 
-    private async Task InstallWorkerAsync(
-        StartInitializationStepContext context,
+    private async Task<FunctionsWorkerInstallResult> InstallWorkerAsync(
         FunctionsWorkerId workerId,
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges,
         CancellationToken cancellationToken)
     {
-        string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
-        workerVersionRanges.TryGetValue(workerId.Value, out VersionRange? versionRange);
-
-        await context.ReportProgressAsync(0, $"Installing worker workload {packageId}", cancellationToken);
-
-        NuGetVersion? version = null;
-        string? source = null;
-        if (versionRange is not null)
-        {
-            ResolvedPackage? package = await _workloadCatalog.ResolveLatestVersionInRangeAsync(
-                packageId,
-                versionRange,
-                includePrerelease: true,
-                source: null,
-                cancellationToken);
-
-            if (package is null)
-            {
-                string rangeText = versionRange.OriginalString ?? versionRange.ToString();
-                string message = $"No worker workload package '{packageId}' satisfies profile range '{rangeText}'.";
-                throw new GracefulException(message, isUserError: true);
-            }
-
-            version = package.Version;
-            source = package.Source.Source;
-        }
-
-        WorkloadInstallResult result;
         try
         {
-            result = await _workloadInstaller.InstallFromCatalogAsync(
-                packageId,
-                version,
-                source,
-                includePrerelease: true,
-                exact: true,
-                force: false,
-                progress: null,
-                cancellationToken);
+            return await _workerInstaller.InstallAsync(workerId, workerVersionRanges, cancellationToken);
         }
         catch (WorkloadPackageNotFoundException ex)
         {
@@ -171,12 +129,6 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(IFunctionsWorkerR
             string message = $"{ex.Message} Run '{FunctionsWorkerWorkloadPackages.GetRepairCommand(workerId)}' to repair the install.";
             throw new GracefulException(message, isUserError: true, verboseMessage: ex.ToString());
         }
-
-        string completionMessage = result.AlreadyInstalled
-            ? $"Worker {result.Entry.PackageVersion} already installed"
-            : $"Installed worker {result.Entry.PackageVersion}";
-
-        await context.ReportProgressAsync(50, completionMessage, cancellationToken);
     }
 
     private async Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(

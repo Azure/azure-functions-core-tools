@@ -11,11 +11,11 @@ namespace Azure.Functions.Cli.Workers;
 /// </summary>
 internal sealed class DefaultFunctionsWorkerResolverFactory(
     IWorkloadProvider workloadProvider,
-    IWorkerConfigFileSystem workerConfigFileSystem) : IFunctionsWorkerResolverFactory
+    IFunctionsWorkerContentResolver workerContentResolver) : IFunctionsWorkerResolverFactory
 {
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
-    private readonly IWorkerConfigFileSystem _workerConfigFileSystem = workerConfigFileSystem
-        ?? throw new ArgumentNullException(nameof(workerConfigFileSystem));
+    private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
+        ?? throw new ArgumentNullException(nameof(workerContentResolver));
 
     public IFunctionsWorkerResolver Create(IReadOnlyDictionary<string, VersionRange> workerVersionRanges)
     {
@@ -23,7 +23,7 @@ internal sealed class DefaultFunctionsWorkerResolverFactory(
 
         return new DefaultFunctionsWorkerResolver(
             _workloadProvider,
-            _workerConfigFileSystem,
+            _workerContentResolver,
             workerVersionRanges);
     }
 }
