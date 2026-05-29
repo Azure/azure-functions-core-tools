@@ -81,7 +81,18 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         // PathArgument's unrecognized-token guard.
         NewCommandArgPreparer.PrepareIfFuncNew(args, host.Services, rootCommand);
 
-        commandParseResult = rootCommand.Parse(args);
+        // POSIX bundling silently re-interprets a single-dash multi-char
+        // token like `-name` as the short alias `-n` with a bundled value
+        // `ame`. That collapses obvious long-option typos (e.g. the user
+        // typing `-name X` when they meant `--name X`) into a parse where
+        // `-n` quietly consumes a stray value and the next positional
+        // token wanders into the path argument. Turning bundling off
+        // routes the typo through PathArgument's
+        // "Unrecognized option '<token>'." path instead, matching the UX
+        // the user already sees for `func start -no-build`. Long-option
+        // `=value` and space-separated short-option values are unaffected.
+        var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
+        commandParseResult = rootCommand.Parse(args, parserConfiguration);
         commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);
 
