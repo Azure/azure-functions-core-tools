@@ -58,7 +58,9 @@ public class WorkloadSearchCommandTests
         int exit = await InvokeAsync(cmd, "--stack");
 
         Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.Contains("Python"));
+        // Stack workload's display name appears as a card heading.
+        Assert.Contains("Python", _interaction.Lines);
+        // Filtered-out packages don't appear anywhere.
         Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.host"));
         Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.nokind"));
     }
@@ -76,7 +78,7 @@ public class WorkloadSearchCommandTests
     }
 
     [Fact]
-    public async Task Search_Results_WritesDefaultTableRows()
+    public async Task Search_Results_RenderCardWithFields()
     {
         StubSearch(
             new CatalogSearchResult(
@@ -91,39 +93,39 @@ public class WorkloadSearchCommandTests
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
-        Assert.Contains("TABLE: [Alias, Display Name, Description, Latest]", _interaction.Lines);
-        Assert.Contains("  ROW: [python, Python, Python workload, 1.2.3]", _interaction.Lines);
-        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("func.workload.python"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        Assert.Contains("Python", _interaction.Lines);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.2.3"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Package ID:") && l.EndsWith("func.workload.python"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Alias:") && l.EndsWith("python"));
+        Assert.Contains("Description:", _interaction.Lines);
+        Assert.Contains("Python workload", _interaction.Lines);
         Assert.Contains("HINT: Showing 1 result.", _interaction.Lines);
         Assert.Contains("HINT: Run 'func workload install <alias>' to install one.", _interaction.Lines);
     }
 
     [Fact]
-    public async Task Search_Verbose_AddsPackageIdColumn()
+    public async Task Search_MultipleAliases_UsesPluralLabelAndJoinsValues()
     {
         StubSearch(
             new CatalogSearchResult(
-                "func.workload.python",
-                NuGetVersion.Parse("1.2.3"),
-                Title: "Python",
-                Description: "Python workload",
-                Aliases: ["python"],
+                "func.workload.dotnet",
+                NuGetVersion.Parse("1.0.0"),
+                Title: ".NET",
+                Description: "C# workload",
+                Aliases: ["dotnet", "dotnet-isolated"],
                 Source: _stubSource));
 
         var cmd = new WorkloadSearchCommand(_interaction, _catalog);
-        int exit = await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
+        await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
         Assert.Contains(
-            "TABLE: [Alias, Display Name, Description, Latest, Package ID]",
-            _interaction.Lines);
-        Assert.Contains(
-            "  ROW: [python, Python, Python workload, 1.2.3, func.workload.python]",
-            _interaction.Lines);
+            _interaction.Lines,
+            l => l.StartsWith("Aliases:") && l.EndsWith("dotnet, dotnet-isolated"));
     }
 
     [Fact]
-    public async Task Search_NoAliasesOrTitle_RendersBlankCellsAndPackageIdFallback()
+    public async Task Search_NoAliases_OmitsAliasValue()
     {
         StubSearch(
             new CatalogSearchResult(
@@ -137,8 +139,51 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog);
         await InvokeAsync(cmd);
 
-        Assert.Contains("  ROW: [, no.alias.pkg, , 1.0.0]", _interaction.Lines);
-        Assert.DoesNotContain(_interaction.Lines, l => l.Contains(", -, "));
+        // Title missing: heading falls back to package id.
+        Assert.Contains("no.alias.pkg", _interaction.Lines);
+        // Alias line present, value empty.
+        string aliasLine = _interaction.Lines.Single(l => l.StartsWith("Alias:"));
+        Assert.Equal("Alias:", aliasLine.TrimEnd());
+        // No description -> placeholder.
+        Assert.Contains("(no description)", _interaction.Lines);
+    }
+
+    [Fact]
+    public async Task Search_RendersBlankLineBetweenCards()
+    {
+        StubSearch(
+            new CatalogSearchResult("pkg.a", NuGetVersion.Parse("1.0.0"), "A", "first", ["a"], _stubSource),
+            new CatalogSearchResult("pkg.b", NuGetVersion.Parse("1.0.0"), "B", "second", ["b"], _stubSource));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        await InvokeAsync(cmd);
+
+        int firstHeading = _interaction.Lines.ToList().FindIndex(l => l == "A");
+        int secondHeading = _interaction.Lines.ToList().FindIndex(l => l == "B");
+        Assert.InRange(firstHeading, 0, secondHeading - 1);
+        // Blank line separator between cards.
+        Assert.Equal(string.Empty, _interaction.Lines[secondHeading - 1]);
+    }
+
+    [Fact]
+    public async Task Search_LongDescription_RenderedInFullOnItsOwnLine()
+    {
+        string longDesc = new('x', 500);
+        StubSearch(
+            new CatalogSearchResult(
+                "test.workload",
+                NuGetVersion.Parse("1.0.0"),
+                Title: "Test",
+                Description: longDesc,
+                Aliases: ["test"],
+                Source: _stubSource));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        await InvokeAsync(cmd);
+
+        // The card layout gives description the full terminal width on its
+        // own line, so we keep the full string verbatim instead of truncating.
+        Assert.Contains(longDesc, _interaction.Lines);
     }
 
     [Fact]
@@ -206,27 +251,7 @@ public class WorkloadSearchCommandTests
     }
 
     [Fact]
-    public async Task Search_LongDescription_TruncatedWithEllipsis()
-    {
-        string longDesc = new('x', 500);
-        StubSearch(
-            new CatalogSearchResult(
-                "test.workload",
-                NuGetVersion.Parse("1.0.0"),
-                Title: null,
-                Description: longDesc,
-                Aliases: [],
-                Source: _stubSource));
-
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
-        await InvokeAsync(cmd);
-
-        Assert.Contains(_interaction.Lines, l => l.Contains("\u2026"));
-        Assert.DoesNotContain(_interaction.Lines, l => l.Contains(longDesc));
-    }
-
-    [Fact]
-    public async Task Search_JsonOption_EmitsJsonAndSkipsTable()
+    public async Task Search_JsonOption_EmitsJsonAndSkipsCards()
     {
         StubSearch(
             new CatalogSearchResult(
@@ -243,6 +268,7 @@ public class WorkloadSearchCommandTests
         Assert.Equal(0, exit);
         Assert.Contains(_interaction.Lines, l => l.StartsWith("JSON:"));
         Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Version:"));
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
         Assert.Contains("\"packageId\":\"func.workload.python\"", jsonLine);
         Assert.Contains("\"latestVersion\":\"1.2.3\"", jsonLine);
@@ -256,16 +282,8 @@ public class WorkloadSearchCommandTests
     }
 
     private static Task<int> InvokeAsync(WorkloadSearchCommand cmd, params string[] args)
-        => InvokeAsync(cmd, includeRootVerbose: false, args);
-
-    private static Task<int> InvokeAsync(WorkloadSearchCommand cmd, bool includeRootVerbose, params string[] args)
     {
         var root = new RootCommand();
-        if (includeRootVerbose)
-        {
-            root.Options.Add(new Option<bool>("--verbose") { Recursive = true });
-        }
-
         root.Subcommands.Add(cmd);
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         return root.Parse(new[] { cmd.Name }.Concat(args).ToArray()).InvokeAsync(config);
