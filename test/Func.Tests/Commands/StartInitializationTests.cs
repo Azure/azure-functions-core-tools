@@ -193,7 +193,7 @@ public class StartInitializationTests : IDisposable
         IDictionary<string, string> env = result.HostRunContext.EnvironmentVariables;
         Assert.Equal("yes", env["FROM_LOCAL"]);
         Assert.Equal("node", env["FUNCTIONS_WORKER_RUNTIME"]);
-        Assert.Equal(workerDir, env["languageWorkers:node:workerDirectory"]);
+        Assert.Equal(workerDir, env["languageWorkers__node__workerDirectory"]);
     }
 
     [Fact]

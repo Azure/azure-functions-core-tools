@@ -90,7 +90,7 @@ internal sealed class PrepareProjectHostRunInitializationStep(
             // The host scans `languageWorkers:<runtime>:workerDirectory` for a worker.config.json.
             // Pointing it at the resolved workload content folder lets installed workers light up
             // without copying assets into the project.
-            string key = $"languageWorkers:{worker.WorkerRuntime}:workerDirectory";
+            string key = $"languageWorkers__{worker.WorkerRuntime}__workerDirectory";
             environmentVariables[key] = workerDirectory;
         }
 
