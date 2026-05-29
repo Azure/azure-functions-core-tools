@@ -148,6 +148,88 @@ if (-not $cache.ContainsKey('TemplateInfo')) {
     throw "templatecache.json has no TemplateInfo array at $cachePath."
 }
 
+# ── 3a. Build identity → host description map from the installed nupkg ──
+#
+# templatecache.json does not surface the per-template `description` field
+# from Visual Studio host files (e.g. `vs-2017.3.host.json`), which is the
+# only place upstream Microsoft.Azure.Functions.Worker.ItemTemplates
+# populates a human-readable one-line description per template. We crack
+# the installed nupkg open and read those host files directly so the
+# DESCRIPTION column of `func new --list` is informative.
+function Get-HostDescriptionByIdentity([string]$nupkgPath) {
+    $map = @{}
+    if (-not (Test-Path -LiteralPath $nupkgPath)) {
+        Write-Host "Host descriptions: nupkg not found at $nupkgPath, skipping enrichment."
+        return $map
+    }
+
+    $expandDir = Join-Path ([System.IO.Path]::GetDirectoryName($nupkgPath)) '_host_metadata_expanded'
+    if (Test-Path -LiteralPath $expandDir) { Remove-Item -LiteralPath $expandDir -Recurse -Force }
+    New-Item -ItemType Directory -Path $expandDir -Force | Out-Null
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($nupkgPath, $expandDir)
+
+    $cfgDirs = Get-ChildItem -LiteralPath (Join-Path $expandDir 'content') -Recurse -Directory -Filter '.template.config' -ErrorAction SilentlyContinue
+    foreach ($cfg in $cfgDirs) {
+        $tplJsonPath = Join-Path $cfg.FullName 'template.json'
+        if (-not (Test-Path -LiteralPath $tplJsonPath)) { continue }
+
+        try {
+            $tpl = Get-Content -LiteralPath $tplJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        } catch { continue }
+        if (-not $tpl.identity) { continue }
+
+        $description = $null
+        # Prefer dotnetcli.host.json (CLI-targeted) over IDE host files, then
+        # fall back to any *.host.json sibling. Each can carry description.text.
+        $hostCandidates = @(
+            (Join-Path $cfg.FullName 'dotnetcli.host.json'),
+            (Join-Path $cfg.FullName 'ide.host.json')
+        ) + (Get-ChildItem -LiteralPath $cfg.FullName -Filter '*.host.json' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+
+        $hostCandidates = $hostCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+        foreach ($hp in $hostCandidates) {
+            try {
+                $h = Get-Content -LiteralPath $hp -Raw -Encoding UTF8 | ConvertFrom-Json
+            } catch { continue }
+            if ($h.description -and $h.description.text -and -not [string]::IsNullOrWhiteSpace([string]$h.description.text)) {
+                $description = [string]$h.description.text
+                break
+            }
+        }
+
+        if ($description) {
+            $map[[string]$tpl.identity] = $description
+        }
+    }
+
+    # Clean up the expanded copy; we have everything in-memory now.
+    Remove-Item -LiteralPath $expandDir -Recurse -Force -ErrorAction SilentlyContinue
+
+    Write-Host "Host descriptions: hydrated $($map.Count) entries from $nupkgPath."
+    return $map
+}
+
+$packagesDir = Join-Path $HiveRoot '.templateengine/packages'
+$installedNupkg = Get-ChildItem -LiteralPath $packagesDir -Filter "$PackageId.$PackageVersion.nupkg" -File -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+if (-not $installedNupkg) {
+    # Some flows resolve a different concrete version (e.g. when caller
+    # passes "*" or omits version). Fall back to any nupkg matching the
+    # package id prefix.
+    $installedNupkg = Get-ChildItem -LiteralPath $packagesDir -Filter "$PackageId.*.nupkg" -File -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+}
+
+$hostDescriptionsByIdentity = @{}
+if ($installedNupkg) {
+    $hostDescriptionsByIdentity = Get-HostDescriptionByIdentity $installedNupkg.FullName
+} else {
+    Write-Host "Host descriptions: no nupkg found under $packagesDir, projection will fall back to engine cache description (typically empty)."
+}
+
 # ── 4. Filter to Functions item templates ────────────────────────────────
 $entries = @($cache['TemplateInfo'] | Where-Object {
     $classifications = @()
@@ -305,7 +387,24 @@ function Convert-Entry([hashtable]$t) {
         identity        = [string]$t['Identity']
         groupIdentity   = if ($t['GroupIdentity']) { [string]$t['GroupIdentity'] } else { $null }
         name            = [string]$t['Name']
-        description     = if ($t.ContainsKey('Description') -and [string]$t['Description']) { [string]$t['Description'] } else { $null }
+        description     = & {
+            # Preference order:
+            #   1. Host file description.text (only inserted into the map
+            #      when non-empty by Get-HostDescriptionByIdentity, so a
+            #      ContainsKey hit always yields a real string).
+            #   2. Cache Description (template.json <description>; empty
+            #      for 0/36 Functions item templates today, kept as a
+            #      forward-compat backstop).
+            #   3. null -> column renders blank.
+            $identity = [string]$t['Identity']
+            if ($hostDescriptionsByIdentity.ContainsKey($identity)) {
+                return $hostDescriptionsByIdentity[$identity]
+            }
+            if ($t.ContainsKey('Description') -and [string]$t['Description']) {
+                return [string]$t['Description']
+            }
+            return $null
+        }
         author          = if ($t.ContainsKey('Author') -and [string]$t['Author']) { [string]$t['Author'] } else { $null }
         language        = $language
         type            = $type
