@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
@@ -468,14 +469,14 @@ public class WorkloadInstallCommandTests
         Assert.Contains(_interaction.Lines, l => l == "PROGRESS: Registering workload 'test.workload' 1.0.0");
     }
 
-    private void StubCatalogResult(bool alreadyInstalled = false) =>
+    private void StubCatalogResult(bool alreadyInstalled = false, string packageId = "test.workload") =>
         _installer.InstallFromCatalogAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
                 Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(
                 new WorkloadEntry
                 {
-                    PackageId = "test.workload",
+                    PackageId = packageId,
                     PackageVersion = "1.0.0",
                     EntryPoint = new EntryPointSpec { AssemblyPath = "x.dll", Type = "T" },
                 },
@@ -487,5 +488,120 @@ public class WorkloadInstallCommandTests
         root.Subcommands.Add(cmd);
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         return root.Parse(new[] { cmd.Name }.Concat(args).ToArray()).InvokeAsync(config);
+    }
+}
+
+// Separate fixture so the IsInteractive override doesn't bleed into the
+// other tests that rely on the default (non-interactive) behavior.
+public class WorkloadInstallNextStepsHintTests
+{
+    private readonly InteractiveTestInteractionService _interaction = new();
+    private readonly IWorkloadInstaller _installer = Substitute.For<IWorkloadInstaller>();
+    private readonly IWorkloadStore _store = Substitute.For<IWorkloadStore>();
+
+    private WorkloadInstallCommand NewInstall() => new(_interaction, _installer, _store, new WorkloadUpdateCommand(_interaction, _installer, _store));
+
+    [Theory]
+    [InlineData("Azure.Functions.Cli.Workloads.Workers.go", "go")]
+    [InlineData("Azure.Functions.Cli.Workloads.Workers.node", "node")]
+    [InlineData("Azure.Functions.Cli.Workloads.Go", "go")]
+    [InlineData("Azure.Functions.Cli.Workloads.Python", "python")]
+    [InlineData("Azure.Functions.Cli.Workloads.Templates.Node", "node")]
+    public async Task Install_KnownFeaturePackage_PrintsSetupHint(string packageId, string expectedFeature)
+    {
+        StubInstall(packageId);
+
+        await InvokeAsync(NewInstall(), packageId);
+
+        Assert.Contains(_interaction.Lines, l =>
+            l.StartsWith("HINT:", StringComparison.Ordinal)
+            && l.Contains("Next steps:", StringComparison.Ordinal)
+            && l.Contains($"func setup --features {expectedFeature}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_BundlePackage_SuggestsRuntimeFeature()
+    {
+        StubInstall(IInstalledBundleWorkloads.BundleWorkloadPackageId);
+
+        await InvokeAsync(NewInstall(), IInstalledBundleWorkloads.BundleWorkloadPackageId);
+
+        Assert.Contains(_interaction.Lines, l =>
+            l.StartsWith("HINT:", StringComparison.Ordinal)
+            && l.Contains("func setup --features runtime", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_HostPackage_SuggestsHostFeature()
+    {
+        const string hostPackageId = "Azure.Functions.Cli.Workloads.Host.osx-arm64";
+        StubInstall(hostPackageId);
+
+        await InvokeAsync(NewInstall(), hostPackageId);
+
+        Assert.Contains(_interaction.Lines, l =>
+            l.StartsWith("HINT:", StringComparison.Ordinal)
+            && l.Contains("func setup --features host", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_UnknownPackage_DoesNotPrintHint()
+    {
+        StubInstall("Third.Party.Workload");
+
+        await InvokeAsync(NewInstall(), "Third.Party.Workload");
+
+        Assert.DoesNotContain(_interaction.Lines, l =>
+            l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Next steps:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalled_DoesNotPrintHint()
+    {
+        StubInstall("Azure.Functions.Cli.Workloads.Workers.go", alreadyInstalled: true);
+
+        await InvokeAsync(NewInstall(), "Azure.Functions.Cli.Workloads.Workers.go");
+
+        Assert.DoesNotContain(_interaction.Lines, l =>
+            l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Next steps:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_NonInteractive_DoesNotPrintHint()
+    {
+        var nonInteractive = new TestInteractionService();
+        StubInstall("Azure.Functions.Cli.Workloads.Workers.go");
+        var cmd = new WorkloadInstallCommand(nonInteractive, _installer, _store, new WorkloadUpdateCommand(nonInteractive, _installer, _store));
+
+        await InvokeAsync(cmd, "Azure.Functions.Cli.Workloads.Workers.go");
+
+        Assert.DoesNotContain(nonInteractive.Lines, l =>
+            l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Next steps:", StringComparison.Ordinal));
+    }
+
+    private void StubInstall(string packageId, bool alreadyInstalled = false) =>
+        _installer.InstallFromCatalogAsync(
+                Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
+            .Returns(new WorkloadInstallResult(
+                new WorkloadEntry
+                {
+                    PackageId = packageId,
+                    PackageVersion = "1.0.0",
+                    EntryPoint = new EntryPointSpec { AssemblyPath = "x.dll", Type = "T" },
+                },
+                alreadyInstalled));
+
+    private static Task<int> InvokeAsync(WorkloadInstallCommand cmd, params string[] args)
+    {
+        var root = new RootCommand();
+        root.Subcommands.Add(cmd);
+        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+        return root.Parse(new[] { cmd.Name }.Concat(args).ToArray()).InvokeAsync(config);
+    }
+
+    private sealed class InteractiveTestInteractionService : TestInteractionService
+    {
+        public override bool IsInteractive => true;
     }
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads;
@@ -141,6 +142,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             else
             {
                 _interaction.WriteSuccess(message);
+                WriteNextStepsHintIfApplicable(result.Entry);
             }
             return 0;
         }
@@ -267,6 +269,36 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                 => $"{verb} (content at '{entry.Source}').",
             _ => $"{verb}.",
         };
+    }
+
+    // Surfaces the higher-level `func setup --features <name>` command after a
+    // single-component install so users who reached for `func workload install`
+    // by mistake (e.g. issue #5214) discover the planner. Suppressed in
+    // non-interactive contexts to keep CI / JSON output clean and only fires
+    // when the installed package id maps to a known feature group.
+    private void WriteNextStepsHintIfApplicable(WorkloadEntry entry)
+    {
+        if (!_interaction.IsInteractive)
+        {
+            return;
+        }
+
+        if (!SetupFeatureCatalog.TryGetFeatureForPackageId(entry.PackageId, out string feature))
+        {
+            return;
+        }
+
+        string scope = feature switch
+        {
+            SetupFeatureCatalog.RuntimeFeature => "the Functions host and the extension bundle",
+            SetupFeatureCatalog.HostFeature => "the Functions host",
+            _ => $"the full {feature} dev environment (host, worker, stack, templates, bundle)",
+        };
+
+        _interaction.WriteHint(
+            "Next steps:" + Environment.NewLine
+            + $"  This installs a single workload. To install {scope}, run:" + Environment.NewLine
+            + $"    func setup --features {feature}");
     }
 
     /// <summary>

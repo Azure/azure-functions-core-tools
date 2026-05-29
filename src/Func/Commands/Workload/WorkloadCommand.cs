@@ -21,7 +21,11 @@ internal sealed class WorkloadCommand : FuncCliCommand, IBuiltInCommand
         WorkloadUpdateCommand updateCommand,
         WorkloadSearchCommand searchCommand,
         WorkloadPruneCommand pruneCommand)
-        : base("workload", "Manage Func CLI workloads.")
+        : base(
+            "workload",
+            "Manage Func CLI workloads. "
+            + "Each subcommand acts on a single workload package (install, uninstall, list, update, search, prune). "
+            + "For setting up a full dev environment for a stack, see 'func setup'.")
     {
         ArgumentNullException.ThrowIfNull(listCommand);
         ArgumentNullException.ThrowIfNull(installCommand);

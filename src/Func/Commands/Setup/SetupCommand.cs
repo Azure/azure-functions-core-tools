@@ -72,7 +72,11 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
     private readonly ISetupRunner _runner;
 
     public SetupCommand(ISetupRunner runner)
-        : base("setup", "Prepare local Azure Functions dependencies.")
+        : base(
+            "setup",
+            "Prepare local Azure Functions CLI dependencies. "
+            + "Installs everything needed to develop and run a Functions app for the chosen stack(s) (host, worker, stack, templates, extension bundle). "
+            + "For installing individual workload packages, see 'func workload'.")
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
 

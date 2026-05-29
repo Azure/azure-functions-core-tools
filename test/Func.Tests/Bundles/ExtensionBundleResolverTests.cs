@@ -64,6 +64,25 @@ public class ExtensionBundleResolverTests
     }
 
     [Fact]
+    public async Task NoInstalledRows_KnownRuntime_HintIncludesFuncSetup()
+    {
+        ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)", workerRuntime: "go"));
+
+        ExtensionBundleResolution.WorkloadMissing missing = Assert.IsType<ExtensionBundleResolution.WorkloadMissing>(result);
+        Assert.Contains("func setup --features go", missing.Hint);
+    }
+
+    [Fact]
+    public async Task NoInstalledMatch_KnownRuntime_HintIncludesFuncSetup()
+    {
+        ExtensionBundleResolution result = await Build([Row("4.10.0")])
+            .ResolveAsync(Context(host: "[5.0.0, 6.0.0)", workerRuntime: "node"));
+
+        ExtensionBundleResolution.NoCompatibleInstall none = Assert.IsType<ExtensionBundleResolution.NoCompatibleInstall>(result);
+        Assert.Contains("func setup --features node", none.Hint);
+    }
+
+    [Fact]
     public async Task TelemetryReason_IsOkOnResolved()
     {
         var telemetry = new RecordingTelemetry();
@@ -116,8 +135,8 @@ public class ExtensionBundleResolverTests
     private static InstalledBundleWorkload Row(string version)
         => new(version, "/install/" + version);
 
-    private static ExtensionBundleProjectContext Context(string host, string? profile = null) =>
-        new(BundleId, host, "dotnet", ProfileName: profile is null ? null : "stable", ProfileBundleVersionRange: profile);
+    private static ExtensionBundleProjectContext Context(string host, string? profile = null, string workerRuntime = "dotnet") =>
+        new(BundleId, host, workerRuntime, ProfileName: profile is null ? null : "stable", ProfileBundleVersionRange: profile);
 
     private sealed class RecordingTelemetry : IBundleResolveTelemetry
     {
