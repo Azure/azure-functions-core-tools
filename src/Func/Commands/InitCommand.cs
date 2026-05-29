@@ -21,8 +21,11 @@ namespace Azure.Functions.Cli.Commands;
 /// <remarks>
 /// When the target directory already contains a <c>host.json</c> but no
 /// <c>.func/config.json</c>, the command "adopts" the project: it writes the
-/// CLI config (stack + language) and skips scaffolding. This is how pre-v5
-/// projects opt in to the v5 CLI.
+/// CLI config and skips scaffolding. The stack is taken from
+/// <c>FUNCTIONS_WORKER_RUNTIME</c> (env or <c>local.settings.json</c>) when set,
+/// otherwise the user is prompted as usual. An explicit <c>--stack</c> that
+/// conflicts with the project's declared runtime is refused unless
+/// <c>--force</c> is passed.
 /// </remarks>
 internal class InitCommand : FuncCliCommand, IBuiltInCommand
 {
@@ -45,17 +48,28 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
+    private readonly ILocalSettingsProvider _localSettingsProvider;
+    private readonly IProcessEnvironment _processEnvironment;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
-    public InitCommand(IInteractionService interaction, IWorkloadHintRenderer hintRenderer, IEnumerable<IProjectInitializer> initializers)
+    public InitCommand(
+        IInteractionService interaction,
+        IWorkloadHintRenderer hintRenderer,
+        ILocalSettingsProvider localSettingsProvider,
+        IProcessEnvironment processEnvironment,
+        IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);
+        ArgumentNullException.ThrowIfNull(localSettingsProvider);
+        ArgumentNullException.ThrowIfNull(processEnvironment);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
         _hintRenderer = hintRenderer;
+        _localSettingsProvider = localSettingsProvider;
+        _processEnvironment = processEnvironment;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -124,27 +138,80 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return 1;
         }
 
-        IProjectInitializer? initializer = await SelectInitializerAsync(requestedStack, cancellationToken);
-
-        if (initializer is null)
-        {
-            return 1;
-        }
-
-        (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
-        if (errorCode is int code)
-        {
-            return code;
-        }
-
-        language = resolved;
-
         // host.json without .func/config.json means a pre-existing Functions
         // project that predates the v5 CLI config. Adopt it: write the config
         // so subsequent commands know the stack/language, but skip scaffolding
         // so we don't trample the user's source. --force still means "wipe and
         // re-scaffold" and takes the normal path.
         bool adoptExisting = state == InitializationState.AdoptableExistingProject && !force;
+
+        // For adoption we try to honour what the project already declares.
+        // Resolution order matches the Functions host: env wins over
+        // local.settings.json. On conflict we warn (host doesn't refuse)
+        // but use the env value.
+        string? projectRuntime = adoptExisting ? ResolveProjectRuntime(workingDirectory.Info) : null;
+
+        if (adoptExisting && projectRuntime is not null)
+        {
+            // Explicit --stack that disagrees with the project's declared
+            // runtime is almost certainly a mistake (it would produce a
+            // .func/config.json that doesn't match what `func start` would
+            // run). --force is the existing escape hatch.
+            if (!string.IsNullOrWhiteSpace(requestedStack)
+                && !string.Equals(requestedStack, projectRuntime, StringComparison.OrdinalIgnoreCase))
+            {
+                _interaction.WriteError(
+                    $"--stack '{requestedStack}' conflicts with the project's runtime '{projectRuntime}'. " +
+                    "Re-run with the matching stack, or pass --force to override.");
+                return 1;
+            }
+
+            // Snap when the user didn't specify --stack: the project already
+            // declared its runtime, no point re-asking.
+            requestedStack ??= projectRuntime;
+        }
+
+        // For adoption with a known runtime we look up the matching
+        // initializer directly; we never prompt or auto-select because we
+        // already have a project signal. SelectInitializerAsync's prompt /
+        // workload-hint path is only for fresh inits or adoption with no
+        // runtime signal.
+        IProjectInitializer? initializer;
+        if (adoptExisting && projectRuntime is not null)
+        {
+            initializer = _initializers.FirstOrDefault(i =>
+                string.Equals(i.Stack, requestedStack, StringComparison.OrdinalIgnoreCase));
+
+            if (initializer is null)
+            {
+                // Stack named by the project isn't installed. Still adopt
+                // (write the config so other commands see the right stack),
+                // and point the user at the one command that closes the gap.
+                return AdoptWithUninstalledStack(workingDirectory.Info, requestedStack!);
+            }
+        }
+        else
+        {
+            initializer = await SelectInitializerAsync(requestedStack, cancellationToken);
+            if (initializer is null)
+            {
+                return 1;
+            }
+        }
+
+        // For adoption with no explicit --language, skip language resolution
+        // entirely: the user already has code, and prompting / erroring for
+        // a language they're not changing is just noise.
+        if (!(adoptExisting && string.IsNullOrWhiteSpace(language)))
+        {
+            (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
+            if (errorCode is int code)
+            {
+                return code;
+            }
+
+            language = resolved;
+        }
 
         if (force)
         {
@@ -295,6 +362,48 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         return InitializationState.Empty;
+    }
+
+    // Looks up the project's worker runtime, matching the precedence the
+    // Functions host applies at run time: process env beats local.settings.json.
+    // When both are set and disagree we keep the env value (host behaviour) and
+    // warn so the user can reconcile.
+    private string? ResolveProjectRuntime(DirectoryInfo workingDirectory)
+    {
+        string? envRaw = _processEnvironment.Get(CliConfigurationNames.WorkerRuntimeSettingName);
+        string? localRaw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
+
+        string? env = string.IsNullOrWhiteSpace(envRaw) ? null : envRaw.Trim();
+        string? local = string.IsNullOrWhiteSpace(localRaw) ? null : localRaw.Trim();
+
+        if (env is not null && local is not null
+            && !string.Equals(env, local, StringComparison.OrdinalIgnoreCase))
+        {
+            _interaction.WriteWarning(
+                $"FUNCTIONS_WORKER_RUNTIME env variable '{env}' overrides local.settings.json value '{local}'.");
+        }
+
+        return env ?? local;
+    }
+
+    // Adopt-mode path for a runtime whose stack workload isn't installed.
+    // We still write .func/config.json so subsequent commands know the stack,
+    // and we point the user at `func setup --features` to install the bits.
+    // The raw runtime value is written verbatim; if a workload normalises
+    // the stack name on first read it can rewrite the config then.
+    private int AdoptWithUninstalledStack(DirectoryInfo workingDirectory, string runtime)
+    {
+        WriteCliConfigurationFile(workingDirectory, runtime, language: null, force: false);
+        _interaction.WriteBlankLine();
+        _interaction.WriteWarning(
+            $"The '{runtime}' stack is not installed. Run `func setup --features {runtime}` to install it.");
+        _interaction.WriteLine(l => l
+            .Success("✓ ")
+            .Muted("Existing project adopted for ")
+            .Code(runtime)
+            .Muted("."));
+
+        return 0;
     }
 
     private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
