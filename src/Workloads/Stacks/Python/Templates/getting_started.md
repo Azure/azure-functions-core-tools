@@ -1,7 +1,7 @@
 # Getting started with Azure Functions for Python
 
 This project was scaffolded by `func init --stack python`. It uses the
-[v2 Python programming model](https://aka.ms/azure-functions/python/v2),
+[v2 Python programming model](https://aka.ms/pythonprogrammingmodel),
 where functions are decorated on a `FunctionApp` instance in
 `function_app.py`.
 

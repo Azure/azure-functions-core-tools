@@ -94,6 +94,10 @@ public class PythonProjectInitializerTests : IDisposable
         Assert.Contains("azure-functions", File.ReadAllText(Path.Combine(_projectDir.FullName, "requirements.txt")));
 
         Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "getting_started.md")));
+        string gettingStarted = File.ReadAllText(Path.Combine(_projectDir.FullName, "getting_started.md"));
+        Assert.Contains("https://aka.ms/pythonprogrammingmodel", gettingStarted);
+        Assert.DoesNotContain("aka.ms/azure-functions/python/v2", gettingStarted);
+
         Assert.True(File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")));
 
         Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "local.settings.json")));
