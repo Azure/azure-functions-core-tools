@@ -360,14 +360,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             return 0;
         }
 
-        // PathArgument's CustomParser short-circuits with a parser error
-        // (and a sentinel return value) when the user typed something like
-        // `func new -name ttpt`: the `-name` token gets bound to <path>
-        // and PathArgument flags it as an unrecognized option. SCL's
-        // ArgumentConverter then throws when we call GetValue here, even
-        // though help-time hydration only needs a directory to probe.
-        // Fall back to cwd so the user still sees the template's option
-        // surface alongside the real parse-error diagnostic.
+        // PathArgument's parse error makes GetValue throw; fall back to cwd so help still renders.
         WorkingDirectory workingDirectory;
         try
         {

@@ -62,20 +62,7 @@ public class NewCommandTests
         Assert.Equal("path", cmd.Arguments[0].Name);
     }
 
-    /// <summary>
-    /// Regression guard for a misleading-error UX bug: typing
-    /// <c>func new --template HttpTrigger-Python -name ttpt</c> used to
-    /// collapse <c>-name</c> into the short alias <c>-n</c> with bundled
-    /// value <c>ame</c> (POSIX bundling), then bind <c>ttpt</c> to the
-    /// path argument. Project resolution would fail against the non-
-    /// existent <c>ttpt</c> directory and the user saw a confusing
-    /// <c>"needs a Functions project"</c> message instead of the typo
-    /// diagnostic <c>func start -no-build</c> already produced.
-    ///
-    /// Fix: disable POSIX bundling at the root parse level so single-dash
-    /// multi-character typos fall through to PathArgument's
-    /// <c>"Unrecognized option '&lt;token&gt;'."</c> path.
-    /// </summary>
+    // Single-dash typos like `-name` must surface as unrecognized options, not "needs a project".
     [Fact]
     public void NewCommand_SingleDashLongOption_ReportsUnrecognizedOption()
     {
