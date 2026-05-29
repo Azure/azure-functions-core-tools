@@ -88,10 +88,16 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         activity?.SetCommandName(commandName);
 
         IFirstRunCoordinator firstRunCoordinator = host.Services.GetRequiredService<IFirstRunCoordinator>();
-        await firstRunCoordinator.EnsureFirstRunPromptedAsync(commandName, commandParseResult, cts.Token);
-
-        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-        exitCode = await commandParseResult.InvokeAsync(config, cts.Token);
+        int? firstRunExitCode = await firstRunCoordinator.EnsureFirstRunPromptedAsync(commandName, commandParseResult, cts.Token);
+        if (firstRunExitCode is int firstRunResult)
+        {
+            exitCode = firstRunResult;
+        }
+        else
+        {
+            var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+            exitCode = await commandParseResult.InvokeAsync(config, cts.Token);
+        }
     }
     catch (OperationCanceledException)
     {

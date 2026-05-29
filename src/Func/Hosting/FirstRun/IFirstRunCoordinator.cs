@@ -13,8 +13,11 @@ internal interface IFirstRunCoordinator
 {
     /// <summary>
     /// Offers to run setup when this looks like the user's first
-    /// invocation. Always returns once the prompt has been handled
-    /// (or skipped); the caller continues with the user's command.
+    /// invocation, or surfaces the muted breadcrumb hint when the user
+    /// has already opted out. Returns <c>null</c> when the caller should
+    /// continue with the user's command, or an exit code when the
+    /// coordinator handled the invocation itself (currently only used for
+    /// the post-setup "re-run `func init`" short-circuit).
     /// </summary>
-    public Task EnsureFirstRunPromptedAsync(string commandName, ParseResult parseResult, CancellationToken cancellationToken);
+    public Task<int?> EnsureFirstRunPromptedAsync(string commandName, ParseResult parseResult, CancellationToken cancellationToken);
 }
