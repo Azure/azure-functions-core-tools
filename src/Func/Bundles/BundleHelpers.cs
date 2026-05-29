@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics.CodeAnalysis;
 using Azure.Functions.Cli.Projects;
 using NuGet.Versioning;
 
@@ -15,6 +16,7 @@ internal static class BundleHelpers
     public const string PreviewBundleId = "Microsoft.Azure.Functions.ExtensionBundle.Preview";
     public const string ExperimentalBundleId = "Microsoft.Azure.Functions.ExtensionBundle.Experimental";
 
+    public const string StableLabel = "stable";
     public const string PreviewLabel = "preview";
     public const string ExperimentalLabel = "experimental";
 
@@ -34,13 +36,45 @@ internal static class BundleHelpers
         };
 
     /// <summary>
+    /// Converts a bundle channel to its display string.
+    /// </summary>
+    /// <param name="channel">The channel to convert.</param>
+    /// <returns>The display string for the channel.</returns>
+    public static string ToDisplayString(this BundleChannel channel) =>
+        channel switch
+        {
+            BundleChannel.Unknown => "unknown",
+            BundleChannel.Stable => StableLabel,
+            BundleChannel.Preview => PreviewLabel,
+            BundleChannel.Experimental => ExperimentalLabel,
+            _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
+        };
+
+    /// <summary>
+    /// Gets the channel label for a given bundle ID.
+    /// </summary>
+    /// <param name="bundleId">The bundle ID.</param>
+    /// <param name="channelLabel">The channel label.</param>
+    /// <returns>True if the channel label is found, false otherwise.</returns>
+    public static bool TryGetBundleChannel(string bundleId, out BundleChannel channel)
+    {
+        if (_bundleIdToChannelMap.TryGetValue(bundleId, out channel))
+        {
+            return true;
+        }
+
+        channel = BundleChannel.Unknown;
+        return false;
+    }
+
+    /// <summary>
     /// Determines the channel of a bundle based on its ID.
     /// </summary>
     /// <param name="bundleId">The bundle ID.</param>
     /// <returns>The channel of the bundle.</returns>
     public static BundleChannel GetBundleChannel(string bundleId)
     {
-        if (_bundleIdToChannelMap.TryGetValue(bundleId, out BundleChannel channel))
+        if (TryGetBundleChannel(bundleId, out BundleChannel channel))
         {
             return channel;
         }
