@@ -17,9 +17,16 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 internal sealed class PrepareProjectHostRunInitializationStep(
     ILocalSettingsProvider localSettingsProvider,
     IProcessEnvironment processEnvironment,
-    IInteractionService interaction) : DemoInitializationStep
+    IInteractionService interaction,
+    TimeProvider? timeProvider = null,
+    TimeSpan? heartbeatInterval = null) : DemoInitializationStep
 {
     public const string StepId = "prepare_host_run";
+
+    // How often to emit a "still working" heartbeat while the underlying
+    // project preparation runs. Long enough not to spam the dashboard,
+    // short enough that the user can tell the CLI hasn't hung.
+    internal static readonly TimeSpan DefaultHeartbeatInterval = TimeSpan.FromSeconds(3);
 
     private readonly ILocalSettingsProvider _localSettingsProvider = localSettingsProvider
         ?? throw new ArgumentNullException(nameof(localSettingsProvider));
@@ -29,6 +36,10 @@ internal sealed class PrepareProjectHostRunInitializationStep(
 
     private readonly IInteractionService _interaction = interaction
         ?? throw new ArgumentNullException(nameof(interaction));
+
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
+    private readonly TimeSpan _heartbeatInterval = heartbeatInterval ?? DefaultHeartbeatInterval;
 
     public override string Id => StepId;
 
@@ -56,11 +67,87 @@ internal sealed class PrepareProjectHostRunInitializationStep(
             environmentVariables,
             skipBuild: context.Options.NoBuild);
 
-        await project.PrepareForHostRunAsync(hostRunContext, cancellationToken);
+        await PrepareWithHeartbeatAsync(context, project, hostRunContext, cancellationToken);
 
         context.State.HostRunContext = hostRunContext;
 
         return StartInitializationStepResult.Completed(hostRunContext.StartupDirectory.FullName);
+    }
+
+    // The underlying PrepareForHostRunAsync is opaque (it shells out to `dotnet build`
+    // for .NET projects, which can take 30s+ on a cold cache). Without a periodic
+    // status update users can't tell the CLI from a hang. We tee a periodic
+    // "still working (Ns elapsed)" message into the renderer's status slot while
+    // the prepare task runs, then stop the timer in `finally` so a thrown
+    // build error still surfaces normally.
+    private async Task PrepareWithHeartbeatAsync(
+        StartInitializationStepContext context,
+        FunctionsProject project,
+        FunctionsProjectHostRunContext hostRunContext,
+        CancellationToken cancellationToken)
+    {
+        string initialMessage = BuildInitialMessage(project, hostRunContext.SkipBuild);
+        long startTimestamp = _timeProvider.GetTimestamp();
+
+        await context.ReportProgressAsync(percent: 0, message: initialMessage, cancellationToken);
+
+        using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task heartbeatTask = RunHeartbeatAsync(context, initialMessage, startTimestamp, heartbeatCts.Token);
+
+        try
+        {
+            await project.PrepareForHostRunAsync(hostRunContext, cancellationToken);
+        }
+        finally
+        {
+            heartbeatCts.Cancel();
+            try
+            {
+                await heartbeatTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected: we cancel the heartbeat once the prepare task completes.
+            }
+        }
+    }
+
+    private async Task RunHeartbeatAsync(
+        StartInitializationStepContext context,
+        string baseMessage,
+        long startTimestamp,
+        CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_heartbeatInterval, _timeProvider, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            TimeSpan elapsed = _timeProvider.GetElapsedTime(startTimestamp);
+            string message = $"{baseMessage} ({(int)elapsed.TotalSeconds}s elapsed)";
+            await context.ReportProgressAsync(percent: 0, message: message, cancellationToken);
+        }
+    }
+
+    private static string BuildInitialMessage(FunctionsProject project, bool skipBuild)
+    {
+        string projectKind = project.GetType().Name;
+        bool isDotNetSource = projectKind.Contains("DotNetSource", StringComparison.Ordinal);
+
+        if (skipBuild)
+        {
+            return "Preparing project (build skipped)...";
+        }
+
+        return isDotNetSource
+            ? "Building .NET project..."
+            : "Preparing project...";
     }
 
     private Dictionary<string, string> BuildEnvironmentVariables(StartInitializationStepContext context, FunctionsProject project, IFunctionsWorker worker)

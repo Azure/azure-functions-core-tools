@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using NSubstitute;
+using NSubstitute.Core;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Initialization;
@@ -145,6 +146,41 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         Assert.False(env.ContainsKey("MyKey"));
     }
 
+    [Fact]
+    public async Task HeartbeatEmitsPeriodicProgressMessages()
+    {
+        SetLocalSettings([]);
+        StartInitializationStepContext context = NewContext(out IStartInitializationRenderer renderer, project: new SlowFakeProject(_projectDir, TimeSpan.FromMilliseconds(200)));
+
+        var step = new PrepareProjectHostRunInitializationStep(
+            _localSettings,
+            _processEnv,
+            _interaction,
+            timeProvider: null,
+            heartbeatInterval: TimeSpan.FromMilliseconds(30));
+
+        await step.ExecuteAsync(context, CancellationToken.None);
+
+        List<StartInitializationProgressEvent> progressEvents = [];
+        foreach (ICall call in renderer.ReceivedCalls())
+        {
+            if (call.GetMethodInfo().Name != nameof(IStartInitializationRenderer.OnEventAsync))
+            {
+                continue;
+            }
+
+            if (call.GetArguments().FirstOrDefault() is StartInitializationProgressEvent progress
+                && progress.StepId == PrepareProjectHostRunInitializationStep.StepId)
+            {
+                progressEvents.Add(progress);
+            }
+        }
+
+        Assert.NotEmpty(progressEvents);
+        Assert.Contains(progressEvents, e => e.Message is not null && e.Message.Contains("Preparing project", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(progressEvents, e => e.Message is not null && e.Message.Contains("elapsed", StringComparison.OrdinalIgnoreCase));
+    }
+
     private void SetLocalSettings(Dictionary<string, string> values)
     {
         var snapshot = new LocalSettingsSnapshot { Values = values };
@@ -155,6 +191,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         => new(_localSettings, _processEnv, _interaction);
 
     private StartInitializationStepContext NewContext()
+        => NewContext(out _);
+
+    private StartInitializationStepContext NewContext(out IStartInitializationRenderer renderer, FunctionsProject? project = null)
     {
         var options = new StartCommandOptions(
             WorkingDirectory.FromExplicit(_projectDir),
@@ -166,13 +205,13 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         var init = new StartInitializationContext(options, "5.0.0-test", IsInteractive: false, CanPrompt: false);
         var state = new StartInitializationState
         {
-            Project = new FakeProject(_projectDir),
+            Project = project ?? new FakeProject(_projectDir),
             Worker = CreateWorker(),
             ProfileName = "none",
         };
-        IStartInitializationRenderer renderer = Substitute.For<IStartInitializationRenderer>();
+        renderer = Substitute.For<IStartInitializationRenderer>();
         IStartInitializationStep stepStub = Substitute.For<IStartInitializationStep>();
-        stepStub.Id.Returns("test");
+        stepStub.Id.Returns(PrepareProjectHostRunInitializationStep.StepId);
         return new StartInitializationStepContext(init, state, stepStub, renderer, TimeProvider.System);
     }
 
@@ -195,5 +234,21 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         public override bool SupportsExtensionBundles => true;
 
         public override FunctionsWorkerReference WorkerReference { get; } = FunctionsWorkerReference.FromWorkload("node");
+    }
+
+    private sealed class SlowFakeProject(string directory, TimeSpan delay) : FunctionsProject
+    {
+        public override WorkingDirectory WorkingDirectory { get; } = WorkingDirectory.FromExplicit(directory);
+
+        public override string StackName => "node";
+
+        public override string StackDisplayName => "Node.js";
+
+        public override bool SupportsExtensionBundles => true;
+
+        public override FunctionsWorkerReference WorkerReference { get; } = FunctionsWorkerReference.FromWorkload("node");
+
+        public override Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
+            => Task.Delay(delay, cancellationToken);
     }
 }
