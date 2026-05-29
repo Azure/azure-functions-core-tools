@@ -1,5 +1,5 @@
 ---
-name: setup-cli
+name: setup-local-cli
 description: 'Use when a contributor wants a ready-to-use local v5 CLI build: publishes func for the host RID to artifacts/func-cli, refreshes the local workloads feed, and prints a paste-ready shell snippet that aliases f5 to the binary and exports the workload + quickstart manifest env vars.'
 ---
 
@@ -32,7 +32,7 @@ Use this skill when the user says things like:
 From the repo root:
 
 ```pwsh
-pwsh ./.github/skills/setup-cli/scripts/setup-cli.ps1
+pwsh ./.github/skills/setup-local-cli/scripts/setup-local-cli.ps1
 ```
 
 Flags worth knowing (see script header for the full list):
