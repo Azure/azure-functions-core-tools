@@ -85,7 +85,7 @@ internal sealed class QuickstartManifestService(
         if (response.StatusCode == HttpStatusCode.NotModified)
         {
             _logger.LogDebug("Manifest not modified (304); refreshing cache timestamp.");
-            _cache.WriteMeta(new ManifestCacheMeta(etag ?? string.Empty, _timeProvider.GetUtcNow()));
+            _cache.WriteMeta(new ManifestCacheMeta(etag ?? string.Empty, _timeProvider.GetUtcNow(), _options.ManifestUrl));
             return LoadCachedManifest();
         }
 
@@ -101,7 +101,7 @@ internal sealed class QuickstartManifestService(
         }
 
         _cache.WriteManifest(content);
-        _cache.WriteMeta(new ManifestCacheMeta(newEtag ?? string.Empty, _timeProvider.GetUtcNow()));
+        _cache.WriteMeta(new ManifestCacheMeta(newEtag ?? string.Empty, _timeProvider.GetUtcNow(), _options.ManifestUrl));
         return BuildManifest(entries);
     }
 
@@ -232,6 +232,7 @@ internal sealed class QuickstartManifestService(
 
     private bool IsCacheFresh(ManifestCacheMeta meta) =>
         _timeProvider.GetUtcNow() - meta.CachedAt < _options.CacheTtl
+        && meta.SourceUrl == _options.ManifestUrl
         && _cache.ManifestExists();
 
     private QuickstartManifest LoadCachedManifest() =>
