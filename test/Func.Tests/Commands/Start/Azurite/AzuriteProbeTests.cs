@@ -46,6 +46,26 @@ public class AzuriteProbeTests : IAsyncLifetime
     }
 
     [Fact]
+    public void AddAzuriteProbe_PrimaryHandler_DisablesProxy()
+    {
+        // Regression for #5200: a configured HTTP_PROXY / system proxy must
+        // not be in the path of the probe, since Azurite always runs on the
+        // loopback interface. If the proxy is used, probes fail with
+        // Connection refused and the orchestrator launches a second Azurite
+        // on top of the already-running one.
+        var factory = _services!.GetRequiredService<IHttpMessageHandlerFactory>();
+        HttpMessageHandler handler = factory.CreateHandler(AzuriteProbe.HttpClientName);
+
+        while (handler is DelegatingHandler dh && dh.InnerHandler is { } inner)
+        {
+            handler = inner;
+        }
+
+        var sockets = Assert.IsType<SocketsHttpHandler>(handler);
+        Assert.False(sockets.UseProxy);
+    }
+
+    [Fact]
     public async Task ProbeAsync_AllEndpointsReady_ViaRequestIdHeader_ReturnsReady()
     {
         var (blob, blobUri) = StartServer(static ctx =>

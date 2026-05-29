@@ -27,6 +27,17 @@ internal static class AzuriteServiceCollectionExtensions
             // probe itself also enforces a per-request timeout via a linked
             // CancellationTokenSource so callers can preempt sooner.
             client.Timeout = AzuriteProbe.PerRequestTimeout;
+        })
+        .ConfigurePrimaryHttpMessageHandler(static () => new SocketsHttpHandler
+        {
+            // Azurite always runs on the loopback interface, so a system or
+            // environment proxy (HTTP_PROXY, WinHTTP, WPAD) must never be in
+            // the path. Without this, a configured proxy intercepts the probe
+            // and returns Connection refused / timeout, the probe reports
+            // NotListening, and the orchestrator launches a second Azurite
+            // that fails to bind the already-occupied ports (issue #5200).
+            UseProxy = false,
+            AllowAutoRedirect = false,
         });
 
         services.AddSingleton<IAzuriteProbe, AzuriteProbe>();
