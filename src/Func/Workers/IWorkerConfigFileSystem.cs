@@ -9,4 +9,9 @@ namespace Azure.Functions.Cli.Workers;
 internal interface IWorkerConfigFileSystem
 {
     public bool FileExists(string path);
+
+    /// <summary>
+    /// Reads the file at <paramref name="path"/>, returning <c>null</c> if it cannot be read.
+    /// </summary>
+    public string? TryReadAllText(string path);
 }

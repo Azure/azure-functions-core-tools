@@ -44,11 +44,13 @@ public class GoFunctionsProjectTests : IDisposable
             return Task.FromResult((0, string.Empty));
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(), default);
+        FunctionsProjectHostRunContext context = CreateContext();
+        await project.PrepareForHostRunAsync(context, default);
 
         string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
         Assert.Equal(_projectDir.FullName, observedRoot);
         Assert.Equal(Path.Combine(_projectDir.FullName, "bin", expectedName), observedOutput);
+        Assert.Equal(Path.Combine(_projectDir.FullName, "bin"), context.StartupDirectory.FullName);
     }
 
     [Fact]
@@ -74,9 +76,11 @@ public class GoFunctionsProjectTests : IDisposable
             return Task.FromResult((0, string.Empty));
         });
 
-        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+        FunctionsProjectHostRunContext context = CreateContext(skipBuild: true);
+        await project.PrepareForHostRunAsync(context, default);
 
         Assert.False(invoked);
+        Assert.Equal(Path.Combine(_projectDir.FullName, "bin"), context.StartupDirectory.FullName);
     }
 
     [Fact]

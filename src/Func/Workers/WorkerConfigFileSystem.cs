@@ -9,4 +9,20 @@ namespace Azure.Functions.Cli.Workers;
 internal sealed class WorkerConfigFileSystem : IWorkerConfigFileSystem
 {
     public bool FileExists(string path) => File.Exists(path);
+
+    public string? TryReadAllText(string path)
+    {
+        try
+        {
+            return File.ReadAllText(path);
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 }

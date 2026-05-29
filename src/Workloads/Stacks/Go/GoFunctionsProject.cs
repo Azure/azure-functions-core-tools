@@ -54,10 +54,18 @@ internal sealed class GoFunctionsProject : FunctionsProject
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
+        string root = _workingDirectory.Info.FullName;
+        string executableName = OperatingSystem.IsWindows() ? DefaultExecutableName + ".exe" : DefaultExecutableName;
+        string binDirectory = Path.Combine(root, ExecutableRelativeFolder);
+        string outputPath = Path.Combine(binDirectory, executableName);
+
         if (context.SkipBuild)
         {
             // Go projects compile to bin/app; with --no-build the user is
-            // asserting that binary already exists. Trust them and skip.
+            // asserting that binary already exists. Trust them, skip the build,
+            // but still point the host at bin/ so it can find the executable
+            // and the function metadata generated alongside it.
+            context.StartupDirectory = new DirectoryInfo(binDirectory);
             return;
         }
 
@@ -77,10 +85,6 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
-        string root = _workingDirectory.Info.FullName;
-        string executableName = OperatingSystem.IsWindows() ? DefaultExecutableName + ".exe" : DefaultExecutableName;
-        string outputPath = Path.Combine(root, ExecutableRelativeFolder, executableName);
-
         (int exitCode, string stderr) = await RunGoBuild(root, outputPath, cancellationToken).ConfigureAwait(false);
         if (exitCode != 0)
         {
@@ -89,6 +93,8 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 $"'go build' failed (exit {exitCode}). {detail}",
                 isUserError: true);
         }
+
+        context.StartupDirectory = new DirectoryInfo(binDirectory);
     }
 
     private static async Task<(int Major, int Minor)?> DefaultReadGoVersion(CancellationToken cancellationToken)
