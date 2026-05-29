@@ -73,8 +73,6 @@ internal static class DotNetTemplateProjection
             .Distinct(StringComparer.Ordinal)
             .OrderBy(l => l, StringComparer.Ordinal)];
 
-        string triggerKindFromClassifications = ResolveTriggerKindFromClassifications(head.Classifications);
-        string? description = ResolveDescription(head, triggerKindFromClassifications);
         TemplateMetadata metadata = new(
             UserPrompts: head.Parameters?.Where(p => !p.IsHidden).Select(ProjectParameter).ToList() ?? [],
             RequiresExtensionBundle: false,
@@ -85,7 +83,7 @@ internal static class DotNetTemplateProjection
             Stack: stack,
             EngineId: EngineIds.DotNet,
             DisplayName: head.Name ?? head.Id,
-            Description: description,
+            Description: head.Description,
             DefaultFunctionName: head.DefaultName,
             Languages: languages,
             Metadata: metadata);
@@ -110,49 +108,5 @@ internal static class DotNetTemplateProjection
             ValidatorRegex: null,
             ShortAlias: parameter.ShortNameOverride is { Length: > 0 } s ? "-" + s : null,
             LongAlias: parameter.LongNameOverride is { Length: > 0 } l ? "--" + l : null);
-    }
-
-    private static string? ResolveDescription(DotNetTemplateRecord head, string triggerKindFromClassifications)
-    {
-        // Upstream Functions item-template packages ship empty <description>
-        // in their template.json files, leaving the DESCRIPTION column blank.
-        // Fall back to "<Name> (<classification>)" or just "<Name>" so the
-        // column is informative until upstream populates real descriptions.
-        if (!string.IsNullOrWhiteSpace(head.Description))
-        {
-            return head.Description;
-        }
-
-        if (!string.IsNullOrWhiteSpace(head.Name))
-        {
-            return string.IsNullOrWhiteSpace(triggerKindFromClassifications)
-                ? head.Name
-                : $"{head.Name} ({triggerKindFromClassifications})";
-        }
-
-        return null;
-    }
-
-    private static string ResolveTriggerKindFromClassifications(IReadOnlyList<string>? classifications)
-    {
-        if (classifications is null)
-        {
-            return string.Empty;
-        }
-
-        // Convention: the last meaningful classification entry tends to be
-        // the trigger specialisation (e.g. ["Azure Function", "Trigger", "Http"]).
-        for (int i = classifications.Count - 1; i >= 0; i--)
-        {
-            string entry = classifications[i];
-            if (!string.IsNullOrWhiteSpace(entry)
-                && !entry.Equals("Azure Function", StringComparison.OrdinalIgnoreCase)
-                && !entry.Equals("Trigger", StringComparison.OrdinalIgnoreCase))
-            {
-                return entry;
-            }
-        }
-
-        return string.Empty;
     }
 }
