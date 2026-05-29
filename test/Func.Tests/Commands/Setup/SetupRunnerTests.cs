@@ -647,7 +647,7 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_InteractiveEmptyFolder_LabelsInstalledStacks()
+    public async Task RunAsync_InteractiveEmptyFolder_FiltersInstalledStacks_AndShowsAlreadyInstalledHint()
     {
         const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
         FakeCatalog catalog = Catalog()
@@ -684,7 +684,8 @@ public sealed class SetupRunnerTests : IDisposable
                 SetupOutputMode.Plain),
             CancellationToken.None);
 
-        Assert.Contains(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node  (installed)", StringComparison.Ordinal));
+        Assert.Contains(interactive.Lines, line => line.StartsWith("HINT:", StringComparison.Ordinal) && line.Contains("Already installed: node", StringComparison.Ordinal));
+        Assert.DoesNotContain(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node", StringComparison.Ordinal));
     }
 
     [Fact]
