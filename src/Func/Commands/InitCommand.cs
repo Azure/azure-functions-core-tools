@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Commands;
 /// When the target directory already contains a <c>host.json</c> but no
 /// <c>.func/config.json</c>, the command "adopts" the project: it writes the
 /// CLI config and skips scaffolding. The stack is taken from
-/// <c>FUNCTIONS_WORKER_RUNTIME</c> (env or <c>local.settings.json</c>) when set,
+/// <c>local.settings.json</c>'s <c>FUNCTIONS_WORKER_RUNTIME</c> when set,
 /// otherwise the user is prompted as usual. An explicit <c>--stack</c> that
 /// conflicts with the project's declared runtime is refused unless
 /// <c>--force</c> is passed.
@@ -49,27 +49,23 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
-    private readonly IProcessEnvironment _processEnvironment;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
     public InitCommand(
         IInteractionService interaction,
         IWorkloadHintRenderer hintRenderer,
         ILocalSettingsProvider localSettingsProvider,
-        IProcessEnvironment processEnvironment,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);
         ArgumentNullException.ThrowIfNull(localSettingsProvider);
-        ArgumentNullException.ThrowIfNull(processEnvironment);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
         _hintRenderer = hintRenderer;
         _localSettingsProvider = localSettingsProvider;
-        _processEnvironment = processEnvironment;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -364,26 +360,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return InitializationState.Empty;
     }
 
-    // Looks up the project's worker runtime, matching the precedence the
-    // Functions host applies at run time: process env beats local.settings.json.
-    // When both are set and disagree we keep the env value (host behaviour) and
-    // warn so the user can reconcile.
+    // Looks up the project's worker runtime from local.settings.json. The CLI
+    // intentionally does not consult the FUNCTIONS_WORKER_RUNTIME process env
+    // var here: adoption is about the on-disk project shape, and an env var
+    // that happens to be set in the user's shell shouldn't change what we
+    // write into .func/config.json.
     private string? ResolveProjectRuntime(DirectoryInfo workingDirectory)
     {
-        string? envRaw = _processEnvironment.Get(CliConfigurationNames.WorkerRuntimeSettingName);
-        string? localRaw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
-
-        string? env = string.IsNullOrWhiteSpace(envRaw) ? null : envRaw.Trim();
-        string? local = string.IsNullOrWhiteSpace(localRaw) ? null : localRaw.Trim();
-
-        if (env is not null && local is not null
-            && !string.Equals(env, local, StringComparison.OrdinalIgnoreCase))
-        {
-            _interaction.WriteWarning(
-                $"FUNCTIONS_WORKER_RUNTIME env variable '{env}' overrides local.settings.json value '{local}'.");
-        }
-
-        return env ?? local;
+        string? raw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
+        return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
     }
 
     // Adopt-mode path for a runtime whose stack workload isn't installed.

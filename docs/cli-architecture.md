@@ -370,7 +370,7 @@ If a newer version is found, a notice is printed after the command completes.
 
 **Adopt mode** (host.json present, no `.func/config.json`):
 
-1. Resolve `project_runtime` = `FUNCTIONS_WORKER_RUNTIME` env (preferred, matches the host) ?? `local.settings.json` ?? null. Warn if env and `local.settings.json` disagree.
+1. Resolve `project_runtime` from `local.settings.json`'s `FUNCTIONS_WORKER_RUNTIME`. The process env var is intentionally ignored: adoption is about the on-disk project shape.
 2. Apply:
 
    | `project_runtime` → | `--stack` omitted | `--stack X` agrees | `--stack X` conflicts |
