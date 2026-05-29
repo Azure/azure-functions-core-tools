@@ -56,12 +56,6 @@ jobs:
           folderPath: $(drop_path)
           signPatterns: '**/win-*/func.exe'
 
-      - template: /eng/ci/templates/steps/sign-app.yml@self
-        parameters:
-          platform: linux
-          folderPath: $(drop_path)
-          signPatterns: '**/linux-*/func'
-
       # macOS hardened runtime requires every loaded Mach-O to be signed. ESRP's MacAppDeveloperSign
       # requires the payload to be a .zip or .dmg, so we zip each osx-* rid folder, sign the zips,
       # then expand them back over the drop output.
@@ -96,18 +90,49 @@ jobs:
           Remove-Item -Recurse -Force -Path $stage
         displayName: 'Restore signed macOS runtimes'
 
+    # Archive all runtimes before Linux PGP signing. Linux PGP produces detached
+    # signatures (.sig), so we sign the final .tar.gz archives rather than the
+    # raw binaries.
     - ${{ each runtime in parameters.runtimes }}:
 
       - ${{ if not(startsWith(runtime, 'win')) }}:
         - pwsh: |
+            $ErrorActionPreference = 'Stop'
             $dropDir = '$(drop_path)/${{ runtime }}'
+            $archivePath = '$(release_path)/func-${{ runtime }}.tar.gz'
             New-Item -ItemType Directory -Path '$(release_path)' -Force | Out-Null
+
+            $source = Get-Item "$dropDir/func"
             chmod +x "$dropDir/func"
-            tar -czf '$(release_path)/func-${{ runtime }}.tar.gz' -C $dropDir func
+            tar -czf $archivePath -C $dropDir func
+            $archive = Get-Item $archivePath
+
+            [PSCustomObject]@{ File = $source.Name; 'Size (MB)' = '{0:N2}' -f ($source.Length / 1MB) },
+            [PSCustomObject]@{ File = $archive.Name; 'Size (MB)' = '{0:N2}' -f ($archive.Length / 1MB) } |
+              Format-Table -AutoSize | Out-String | Write-Host
           displayName: 'Archive ${{ runtime }}'
 
       - ${{ if startsWith(runtime, 'win') }}:
         - pwsh: |
+            $ErrorActionPreference = 'Stop'
+            $dropDir = '$(drop_path)/${{ runtime }}'
+            $archivePath = '$(release_path)/func-${{ runtime }}.zip'
             New-Item -ItemType Directory -Path '$(release_path)' -Force | Out-Null
-            Compress-Archive -Path '$(drop_path)/${{ runtime }}/func.exe' -DestinationPath '$(release_path)/func-${{ runtime }}.zip'
+
+            $source = Get-Item "$dropDir/func.exe"
+            Compress-Archive -Path $source.FullName -DestinationPath $archivePath
+            $archive = Get-Item $archivePath
+
+            [PSCustomObject]@{ File = $source.Name; 'Size (MB)' = '{0:N2}' -f ($source.Length / 1MB) },
+            [PSCustomObject]@{ File = $archive.Name; 'Size (MB)' = '{0:N2}' -f ($archive.Length / 1MB) } |
+              Format-Table -AutoSize | Out-String | Write-Host
           displayName: 'Archive ${{ runtime }}'
+
+    # PGP-sign the Linux/macOS archives post-archive. Produces detached .sig files
+    # alongside each .tar.gz in the release directory.
+    - ${{ if eq(parameters.sign, true) }}:
+      - template: /eng/ci/templates/steps/sign-app.yml@self
+        parameters:
+          platform: linux
+          folderPath: $(release_path)
+          signPatterns: 'func-linux-*.tar.gz'

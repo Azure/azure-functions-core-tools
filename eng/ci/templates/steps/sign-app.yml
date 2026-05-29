@@ -24,7 +24,12 @@ steps:
           {
             "keyCode": "CP-450779-Pgp",
             "operationSetCode": "LinuxSign",
-            "parameters": [],
+            "parameters": [
+              {
+                "parameterName": "SigDataType",
+                "parameterValue": "detach"
+              }
+            ],
             "toolName": "sign",
             "toolVersion": "1.0"
           }
