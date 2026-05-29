@@ -145,7 +145,9 @@ internal sealed class FirstRunCoordinator(
         {
             // Ctrl+C at the prompt = "stop pestering me". Write the marker
             // so we don't ask again next time, then propagate the cancel.
-            await TryMarkCompleteAsync(cancellationToken);
+            // Use None: the inbound token is already cancelled, and the
+            // intent here is precisely to persist *despite* cancellation.
+            await TryMarkCompleteAsync(CancellationToken.None);
             throw;
         }
 

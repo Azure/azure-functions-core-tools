@@ -151,8 +151,11 @@ public sealed class FirstRunCoordinatorTests
             () => coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), cts.Token));
 
         // Ctrl+C at the prompt should still write the marker so the user
-        // is not re-prompted next time.
-        await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+        // is not re-prompted next time. The token passed to MarkCompleteAsync
+        // must NOT be the cancelled one, otherwise the real file-backed
+        // store's File.WriteAllTextAsync would throw and the marker would
+        // never land on disk.
+        await _stateStore.Received(1).MarkCompleteAsync(Arg.Is<CancellationToken>(t => !t.IsCancellationRequested));
     }
 
     [Fact]
