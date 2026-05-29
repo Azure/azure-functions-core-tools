@@ -360,8 +360,12 @@ If a newer version is found, a notice is printed after the command completes.
 2. Resolve the matching IProjectInitializer via CanHandle(stack)
    ├── No initializers installed  → "No language workloads installed." (exit 1)
    └── No matching initializer    → "No installed workload supports stack '<x>'." (exit 1)
-3. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
-4. Delegate to IProjectInitializer.InitializeAsync(context, parseResult)
+3. Detect existing project state:
+   ├── .func/config.json present  → fully initialized; refuse without --force
+   ├── host.json only             → adopt: write .func/config.json, skip scaffolding
+   └── empty                      → scaffold via IProjectInitializer.InitializeAsync
+4. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
+5. Delegate to IProjectInitializer.InitializeAsync(context, parseResult) (skipped in adopt mode)
 ```
 
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.

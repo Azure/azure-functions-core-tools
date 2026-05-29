@@ -348,8 +348,11 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_PreservesExistingHostJson_WhenForceIsNotSet()
+    public async Task InitCommand_AdoptsExistingProject_WhenOnlyHostJsonPresent()
     {
+        // host.json without .func/config.json means a pre-v5 project. `func init`
+        // should adopt it: write .func/config.json, preserve host.json and any
+        // user source, and skip scaffolding.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -357,15 +360,19 @@ public class InitCommandTests
             string hostPath = Path.Combine(newDir, "host.json");
             const string existingContent = "{\"version\":\"2.0\",\"customMarker\":true}";
             File.WriteAllText(hostPath, existingContent);
+            string userFile = Path.Combine(newDir, "MyFunction.cs");
+            File.WriteAllText(userFile, "// user code");
 
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
-            // host.json present means the folder is already a Functions project;
-            // command refuses without --force, initializer never runs.
-            Assert.Equal(1, exitCode);
+            Assert.Equal(0, exitCode);
+            // Scaffolding is skipped: existing files survive untouched and the
+            // initializer is not invoked.
             Assert.False(initializer.WasInvoked);
             Assert.Equal(existingContent, File.ReadAllText(hostPath));
+            Assert.True(File.Exists(userFile));
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
         }
         finally
         {
@@ -374,22 +381,22 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_RefusesEarly_WhenAlreadyInitialized()
+    public async Task InitCommand_RefusesEarly_WhenFullyInitialized()
     {
-        // A directory that already has a host.json is treated as initialized:
-        // no config write, exit 1.
+        // A directory that already has .func/config.json (a v5 project) is
+        // refused without --force: no overwrite, no scaffolding, exit 1.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
-            Directory.CreateDirectory(newDir);
-            File.WriteAllText(Path.Combine(newDir, "host.json"), "{\"version\":\"2.0\"}");
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(Path.Combine(newDir, ".func", "config.json"), "{}");
 
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
             Assert.Equal(1, exitCode);
             Assert.False(initializer.WasInvoked);
-            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Equal("{}", File.ReadAllText(Path.Combine(newDir, ".func", "config.json")));
         }
         finally
         {
