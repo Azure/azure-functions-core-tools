@@ -23,10 +23,15 @@ internal sealed class FirstRunCoordinator(
 
     private const string PromptMessage = "Run `func setup` now?";
 
-    // Commands that should not trigger the first-run prompt: the user is
-    // either already setting up, just inspecting the CLI, or hit a typo.
+    // Commands that should not trigger the first-run prompt. We deliberately
+    // do NOT skip on "help" / "unknown" here: those are what the resolver
+    // returns for a bare `func` invocation, which is the canonical first-run
+    // trigger. Explicit `--help`/`-h` invocations are handled by the token
+    // check below. "version" stays because it only arises from `func --verbose`
+    // with no subcommand, which is a CLI-inspection gesture, not a real
+    // first command.
     private static readonly HashSet<string> _skippedCommandNames =
-        new(StringComparer.OrdinalIgnoreCase) { "setup", "help", "version", "unknown" };
+        new(StringComparer.OrdinalIgnoreCase) { "setup", "version" };
 
     private static readonly HashSet<string> _skippedTokens =
         new(StringComparer.OrdinalIgnoreCase) { "--help", "-h", "-?", "/?", "--version", "-v" };
@@ -56,17 +61,22 @@ internal sealed class FirstRunCoordinator(
             return;
         }
 
-        if (parseResult.Errors.Count > 0)
-        {
-            return;
-        }
-
         foreach (System.CommandLine.Parsing.Token token in parseResult.Tokens)
         {
             if (_skippedTokens.Contains(token.Value))
             {
                 return;
             }
+        }
+
+        // Bare `func` (no args) produces a "Required command was not provided"
+        // parse error but no tokens; that's the canonical first-run trigger
+        // and we still want to prompt. For any other parse error (typo, bad
+        // option), stay quiet until the user fixes their command line.
+        bool isBareInvocation = parseResult.Tokens.Count == 0;
+        if (!isBareInvocation && parseResult.Errors.Count > 0)
+        {
+            return;
         }
 
         _interaction.WriteBlankLine();
