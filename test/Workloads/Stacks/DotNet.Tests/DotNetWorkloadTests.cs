@@ -12,13 +12,13 @@ namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 public class DotNetWorkloadTests
 {
     [Fact]
-    public void DisplayName_ReturnsDotNet()
+    public void DisplayName_ReturnsDotNetDevelopmentStack()
     {
         // Arrange
         var workload = new DotNetWorkload();
 
         // Act & Assert
-        Assert.Equal(".NET", workload.DisplayName);
+        Assert.Equal(".NET Development Stack", workload.DisplayName);
     }
 
     [Fact]

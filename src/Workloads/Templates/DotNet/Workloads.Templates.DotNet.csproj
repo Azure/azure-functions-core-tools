@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Azure Functions .NET Templates</Title>
+    <Title>.NET Function Templates</Title>
     <Description>.NET function templates for the func CLI. Resolves templates from Microsoft.Azure.Functions.Worker.ItemTemplates at func new time.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:dotnet-templates func-workload</PackageTags>
