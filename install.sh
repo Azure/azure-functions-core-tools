@@ -10,6 +10,20 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/.azure-functions}"
 VERSION="${VERSION:-}"
 PRERELEASE="${PRERELEASE:-false}"
 FORCE="${FORCE:-false}"
+BUGBASH="${BUGBASH:-false}"
+
+# --- Parse flags ---
+
+for arg in "$@"; do
+    case "$arg" in
+        --bugbash) BUGBASH="true" ;;
+        --prerelease) PRERELEASE="true" ;;
+        --force) FORCE="true" ;;
+    esac
+done
+
+BUGBASH_WORKLOADS_SOURCE="https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
+BUGBASH_QUICKSTART_MANIFEST_URL="https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
 
 # --- Detect platform ---
 
@@ -126,3 +140,41 @@ fi
 
 echo "func CLI ${VERSION} installed to ${INSTALL_DIR}"
 func --version
+
+# --- Bug bash env vars ---
+
+if [ "$BUGBASH" = "true" ]; then
+    SHELL_NAME=$(basename "${SHELL:-bash}")
+    case "$SHELL_NAME" in
+        zsh)  BUGBASH_PROFILE="$HOME/.zshrc" ;;
+        bash) BUGBASH_PROFILE="$HOME/.bashrc" ;;
+        *)    BUGBASH_PROFILE="$HOME/.profile" ;;
+    esac
+
+    {
+        echo ""
+        echo "# Azure Functions CLI bug bash env vars"
+        echo "export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
+        echo "export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
+        echo "export FUNC_CLI_WORKLOADS_PRERELEASE=true"
+    } >> "$BUGBASH_PROFILE"
+
+    export FUNC_CLI_WORKLOADS_SOURCE="${BUGBASH_WORKLOADS_SOURCE}"
+    export FUNC_CLI_QUICKSTART_MANIFEST_URL="${BUGBASH_QUICKSTART_MANIFEST_URL}"
+    export FUNC_CLI_WORKLOADS_PRERELEASE=true
+
+    echo ""
+    echo -e "\033[33m========================================================================\033[0m"
+    echo -e "\033[33m  BUG BASH MODE: required environment variables have been set\033[0m"
+    echo -e "\033[33m========================================================================\033[0m"
+    echo -e "\033[33mAdded to current session and appended to ${BUGBASH_PROFILE}:\033[0m"
+    echo ""
+    echo "  export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
+    echo "  export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
+    echo "  export FUNC_CLI_WORKLOADS_PRERELEASE=true"
+    echo ""
+    echo -e "\033[33mWARNING: these env vars MUST be set in your shell for the bug bash.\033[0m"
+    echo -e "\033[33mIf you open a new terminal session (or a shell that doesn't load\033[0m"
+    echo -e "\033[33m${BUGBASH_PROFILE}), re-run the three exports above before using func.\033[0m"
+    echo -e "\033[33m========================================================================\033[0m"
+fi

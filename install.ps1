@@ -20,12 +20,17 @@
 
 .PARAMETER Force
     Overwrite an existing installation.
+
+.PARAMETER BugBash
+    After installing, set the FUNC_CLI_WORKLOADS_SOURCE, FUNC_CLI_QUICKSTART_MANIFEST_URL,
+    and FUNC_CLI_WORKLOADS_PRERELEASE environment variables required for the bug bash.
 #>
 
 param(
     [string] $Version,
     [switch] $Prerelease,
     [switch] $Force,
+    [switch] $BugBash,
     [string] $Source = 'Azure/azure-functions-core-tools',
     [string] $InstallDir = (Join-Path $HOME '.azure-functions')
 )
@@ -140,3 +145,46 @@ if ($os -eq 'win') {
 }
 
 Write-Host "func CLI $Version installed to $InstallDir"
+
+# --- Bug bash env vars ---
+
+if ($BugBash) {
+    $bugBashWorkloadsSource = 'https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json'
+    $bugBashQuickstartManifestUrl = 'https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json'
+
+    $env:FUNC_CLI_WORKLOADS_SOURCE = $bugBashWorkloadsSource
+    $env:FUNC_CLI_QUICKSTART_MANIFEST_URL = $bugBashQuickstartManifestUrl
+    $env:FUNC_CLI_WORKLOADS_PRERELEASE = 'true'
+
+    if ($os -eq 'win') {
+        [Environment]::SetEnvironmentVariable('FUNC_CLI_WORKLOADS_SOURCE', $bugBashWorkloadsSource, 'User')
+        [Environment]::SetEnvironmentVariable('FUNC_CLI_QUICKSTART_MANIFEST_URL', $bugBashQuickstartManifestUrl, 'User')
+        [Environment]::SetEnvironmentVariable('FUNC_CLI_WORKLOADS_PRERELEASE', 'true', 'User')
+        $persistedLocation = 'user environment variables'
+    } else {
+        $bugBashProfile = if ($env:SHELL -like '*zsh*') { "$HOME/.zshrc" } else { "$HOME/.bashrc" }
+        @(
+            '',
+            '# Azure Functions CLI bug bash env vars',
+            "export FUNC_CLI_WORKLOADS_SOURCE=`"$bugBashWorkloadsSource`"",
+            "export FUNC_CLI_QUICKSTART_MANIFEST_URL=`"$bugBashQuickstartManifestUrl`"",
+            'export FUNC_CLI_WORKLOADS_PRERELEASE=true'
+        ) | Add-Content -Path $bugBashProfile
+        $persistedLocation = $bugBashProfile
+    }
+
+    Write-Host ''
+    Write-Host '========================================================================' -ForegroundColor Yellow
+    Write-Host '  BUG BASH MODE: required environment variables have been set' -ForegroundColor Yellow
+    Write-Host '========================================================================' -ForegroundColor Yellow
+    Write-Host "Added to current session and persisted to: $persistedLocation" -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host "  `$env:FUNC_CLI_WORKLOADS_SOURCE = `"$bugBashWorkloadsSource`""
+    Write-Host "  `$env:FUNC_CLI_QUICKSTART_MANIFEST_URL = `"$bugBashQuickstartManifestUrl`""
+    Write-Host "  `$env:FUNC_CLI_WORKLOADS_PRERELEASE = `"true`""
+    Write-Host ''
+    Write-Host 'WARNING: these env vars MUST be set in your shell for the bug bash.' -ForegroundColor Yellow
+    Write-Host 'If you open a new terminal session that does not inherit these values,' -ForegroundColor Yellow
+    Write-Host 're-run the three assignments above before using func.' -ForegroundColor Yellow
+    Write-Host '========================================================================' -ForegroundColor Yellow
+}
