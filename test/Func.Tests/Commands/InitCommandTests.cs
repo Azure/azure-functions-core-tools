@@ -4,7 +4,6 @@
 using System.CommandLine;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
@@ -18,7 +17,6 @@ public class InitCommandTests
     private readonly TestInteractionService _interaction;
     private readonly RecordingWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettings;
-    private readonly IProcessEnvironment _processEnvironment;
 
     public InitCommandTests()
     {
@@ -26,11 +24,10 @@ public class InitCommandTests
         _hintRenderer = new RecordingWorkloadHintRenderer();
         _localSettings = Substitute.For<ILocalSettingsProvider>();
         _localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
-        _processEnvironment = Substitute.For<IProcessEnvironment>();
     }
 
     private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _processEnvironment, initializers);
+        new(_interaction, _hintRenderer, _localSettings, initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -489,16 +486,17 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_SnapsStackFromEnvVar()
+    public async Task InitCommand_Adopt_SnapsStackFromLocalSettings()
     {
-        // host.json only + FUNCTIONS_WORKER_RUNTIME=python in process env → snap to python,
-        // initializer is not invoked (existing project), config records python.
+        // host.json + local.settings.json FUNCTIONS_WORKER_RUNTIME=python → snap
+        // to python, initializer is not invoked (existing project), config
+        // records python.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
-            _processEnvironment.Get("FUNCTIONS_WORKER_RUNTIME").Returns("python");
+            StubLocalSettingsRuntime("python");
 
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, [python], language: null, stack: null);
@@ -514,57 +512,6 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_SnapsStackFromLocalSettings()
-    {
-        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
-        try
-        {
-            Directory.CreateDirectory(newDir);
-            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
-            StubLocalSettingsRuntime("node");
-
-            var node = new FakeProjectInitializer("node");
-            int exitCode = await RunInitAsync(newDir, [node], language: null, stack: null);
-
-            Assert.Equal(0, exitCode);
-            Assert.False(node.WasInvoked);
-            AssertConfigJsonHasShape(newDir, expectedStack: "node", expectedLanguage: null);
-        }
-        finally
-        {
-            CleanupDirectory(newDir);
-        }
-    }
-
-    [Fact]
-    public async Task InitCommand_Adopt_EnvVarOverridesLocalSettings_WithWarning()
-    {
-        // When env and local.settings.json disagree, env wins (matches the host)
-        // and the user gets a warning so they can reconcile.
-        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
-        try
-        {
-            Directory.CreateDirectory(newDir);
-            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
-            _processEnvironment.Get("FUNCTIONS_WORKER_RUNTIME").Returns("python");
-            StubLocalSettingsRuntime("node");
-
-            var python = new FakeProjectInitializer("python");
-            var node = new FakeProjectInitializer("node");
-            int exitCode = await RunInitAsync(newDir, [python, node], language: null, stack: null);
-
-            Assert.Equal(0, exitCode);
-            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
-            Assert.Contains(_interaction.Lines, l =>
-                l.StartsWith("WARNING:") && l.Contains("python") && l.Contains("node"));
-        }
-        finally
-        {
-            CleanupDirectory(newDir);
-        }
-    }
-
-    [Fact]
     public async Task InitCommand_Adopt_UninstalledStack_WritesConfigAndSuggestsSetup()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
@@ -572,7 +519,7 @@ public class InitCommandTests
         {
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
-            _processEnvironment.Get("FUNCTIONS_WORKER_RUNTIME").Returns("ruby");
+            StubLocalSettingsRuntime("ruby");
 
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, [python], language: null, stack: null);
@@ -598,7 +545,7 @@ public class InitCommandTests
         {
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
-            _processEnvironment.Get("FUNCTIONS_WORKER_RUNTIME").Returns("python");
+            StubLocalSettingsRuntime("python");
 
             var python = new FakeProjectInitializer("python");
             var node = new FakeProjectInitializer("node");
@@ -624,7 +571,7 @@ public class InitCommandTests
         {
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
-            _processEnvironment.Get("FUNCTIONS_WORKER_RUNTIME").Returns("python");
+            StubLocalSettingsRuntime("python");
 
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, python, language: null, stack: "python");
@@ -642,7 +589,7 @@ public class InitCommandTests
     [Fact]
     public async Task InitCommand_Adopt_NoProjectSignal_FallsBackToCurrentBehavior()
     {
-        // host.json only with no env / local.settings.json signal: single installed
+        // host.json only with no local.settings.json signal: single installed
         // workload is still auto-selected, but scaffolding is skipped (adoption).
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
@@ -673,7 +620,7 @@ public class InitCommandTests
         {
             Directory.CreateDirectory(newDir);
             File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
-            _processEnvironment.Get("FUNCTIONS_WORKER_RUNTIME").Returns("python");
+            StubLocalSettingsRuntime("python");
 
             var node = new FakeProjectInitializer("node");
             int exitCode = await RunInitAsync(newDir, node, language: null, stack: "node", force: true);
