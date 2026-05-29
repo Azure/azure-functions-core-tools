@@ -55,7 +55,7 @@ internal sealed class TemplateAwareHelpAction : SynchronousCommandLineAction
 
         string commandPath = HelpCommand.BuildCommandPath(command);
 
-        _helpCommand.WriteHeader(commandPath, command.Description);
+        _helpCommand.WriteHeader(command, commandPath, command.Description);
         _helpCommand.WriteUsageSection(command, commandPath);
         _helpCommand.WriteArgumentsSection(command);
         _helpCommand.WriteSubcommandsSection(command);

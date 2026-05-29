@@ -31,6 +31,16 @@ internal sealed class WorkloadInstaller(
     public const string AliasTagPrefix = "alias:";
 
     /// <summary>
+    /// NuGet-tag prefix that flags a workload's package shape. Mirrors the
+    /// <c>kind</c> field in <c>workload.json</c>: <c>kind:workload</c> for a
+    /// stack, <c>kind:content</c> for a payload-only package, <c>kind:meta</c>
+    /// for a meta package. Surfaced in catalog responses so the CLI can filter
+    /// search results (e.g. <c>func workload search --stack</c>) without
+    /// downloading the package.
+    /// </summary>
+    public const string KindTagPrefix = "kind:";
+
+    /// <summary>
     /// Package-type name a workload package must declare in its .nuspec so
     /// the installer can refuse arbitrary .nupkgs. Mirrors dotnet's
     /// <c>DotnetTool</c> convention.
@@ -96,15 +106,11 @@ internal sealed class WorkloadInstaller(
 
         if (Directory.Exists(installPath))
         {
-            if (!force)
-            {
-                throw new InvalidOperationException(
-                    $"Workload '{packageId}' version '{version}' is already installed at '{installPath}' " +
-                    "but is missing from the registry.");
-            }
-
-            // Drop registry and on-disk directory before extracting fresh
-            // so files dropped by the new package don't linger.
+            // The registry is the source of truth. If the directory exists
+            // but no registry entry does, it's an orphan from a prior
+            // uninstall whose directory delete was blocked (AV, indexer,
+            // briefly-held handle). Self-heal by wiping it and re-extracting
+            // instead of leaving the user stuck behind a manual cleanup.
             await _store.RemoveWorkloadAsync(packageId, version, cancellationToken);
             Directory.Delete(installPath, recursive: true);
         }

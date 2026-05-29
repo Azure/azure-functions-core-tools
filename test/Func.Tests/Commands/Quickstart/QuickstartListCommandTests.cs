@@ -15,7 +15,8 @@ public class QuickstartListCommandTests
     private readonly IQuickstartProviderResolver _resolver = Substitute.For<IQuickstartProviderResolver>();
     private readonly IQuickstartManifestService _manifestService = Substitute.For<IQuickstartManifestService>();
 
-    private QuickstartListCommand CreateCommand() => new(_interaction, _resolver, _manifestService);
+    private QuickstartListCommand CreateCommand(params IQuickstartProvider[] providers) =>
+        new(_interaction, _resolver, _manifestService, providers);
 
     [Fact]
     public void QuickstartListCommand_HasExpectedOptions()
@@ -29,6 +30,37 @@ public class QuickstartListCommandTests
         Assert.Contains("--iac", optionNames);
         Assert.Contains("--search", optionNames);
         Assert.Contains("--json", optionNames);
+    }
+
+    [Fact]
+    public void QuickstartListCommand_StackOptionDescription_NoProviders_PointsAtWorkloadInstall()
+    {
+        QuickstartListCommand cmd = CreateCommand();
+        Option<string?> stackOption = cmd.StackOption;
+        string description = stackOption.Description ?? string.Empty;
+
+        Assert.Contains("Install a stack workload", description);
+        Assert.Contains("func workload install", description);
+    }
+
+    [Fact]
+    public void QuickstartListCommand_StackOptionDescription_ListsInstalledStacks_SortedAndLowercased()
+    {
+        QuickstartListCommand cmd = CreateCommand(
+            QuickstartTestHelpers.CreateProvider(stack: "Python"),
+            QuickstartTestHelpers.CreateProvider(stack: "dotnet"),
+            QuickstartTestHelpers.CreateProvider(stack: "node"));
+        string description = cmd.StackOption.Description ?? string.Empty;
+
+        Assert.Contains("Supported values: dotnet, node, python.", description);
+    }
+
+    [Fact]
+    public void QuickstartListCommand_HelpFooterHint_PointsAtWorkloadSearch()
+    {
+        QuickstartListCommand cmd = CreateCommand();
+
+        Assert.Contains("func workload search --stack", cmd.GetHelpFooterHint() ?? string.Empty);
     }
 
     [Fact]

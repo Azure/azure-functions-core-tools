@@ -34,6 +34,36 @@ public class InitCommandTests
     }
 
     [Fact]
+    public void InitCommand_StackOptionDescription_NoInitializers_PointsAtWorkloadInstall()
+    {
+        var cmd = new InitCommand(_interaction, _hintRenderer, []);
+        string description = cmd.StackOption.Description ?? string.Empty;
+
+        Assert.Contains("Install a stack workload", description);
+        Assert.Contains("func workload install", description);
+    }
+
+    [Fact]
+    public void InitCommand_StackOptionDescription_ListsInstalledStacks_SortedAndLowercased()
+    {
+        var cmd = new InitCommand(
+            _interaction,
+            _hintRenderer,
+            [new FakeProjectInitializer("Python"), new FakeProjectInitializer("dotnet"), new FakeProjectInitializer("node")]);
+        string description = cmd.StackOption.Description ?? string.Empty;
+
+        Assert.Contains("Supported values: dotnet, node, python.", description);
+    }
+
+    [Fact]
+    public void InitCommand_HelpFooterHint_PointsAtWorkloadSearch()
+    {
+        var cmd = new InitCommand(_interaction, _hintRenderer, []);
+
+        Assert.Contains("func workload search --stack", cmd.GetHelpFooterHint() ?? string.Empty);
+    }
+
+    [Fact]
     public void InitCommand_RegisteredInParser()
     {
         var root = TestParser.CreateRoot(_interaction);

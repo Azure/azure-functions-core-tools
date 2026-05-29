@@ -299,8 +299,13 @@ internal class SpectreInteractionService : IInteractionService
             return defaultValue;
         }
 
+        // Render to _stdout (the same IAnsiConsole the dashboard renderers
+        // use) so the prompt aligns with whatever Live region preceded it.
+        // Mixing _stderr here was leaving prompts rendered next to in-place
+        // progress bars because each IAnsiConsole tracks the cursor on its
+        // own (see #5173).
         return await new ConfirmationPrompt(prompt) { DefaultValue = defaultValue }
-            .ShowAsync(_stderr, cancellationToken);
+            .ShowAsync(_stdout, cancellationToken);
     }
 
     public async Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)

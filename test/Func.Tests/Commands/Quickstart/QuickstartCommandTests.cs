@@ -18,7 +18,7 @@ public class QuickstartCommandTests
 
     private QuickstartCommand CreateCommand(params IQuickstartProvider[] providers)
     {
-        var listCmd = new QuickstartListCommand(_interaction, _resolver, _manifestService);
+        var listCmd = new QuickstartListCommand(_interaction, _resolver, _manifestService, providers);
         var infoCmd = new QuickstartInfoCommand(_interaction, _resolver, _manifestService);
         return new QuickstartCommand(listCmd, infoCmd, _interaction, _resolver, _manifestService, _scaffolder, providers);
     }
@@ -38,6 +38,36 @@ public class QuickstartCommandTests
         Assert.Contains("--search", optionNames);
         Assert.Contains("--fetch", optionNames);
         Assert.Contains("--force", optionNames);
+    }
+
+    [Fact]
+    public void QuickstartCommand_StackOptionDescription_NoProviders_PointsAtWorkloadInstall()
+    {
+        QuickstartCommand cmd = CreateCommand();
+        string description = cmd.StackOption.Description ?? string.Empty;
+
+        Assert.Contains("Install a stack workload", description);
+        Assert.Contains("func workload install", description);
+    }
+
+    [Fact]
+    public void QuickstartCommand_StackOptionDescription_ListsInstalledStacks_SortedAndLowercased()
+    {
+        QuickstartCommand cmd = CreateCommand(
+            QuickstartTestHelpers.CreateProvider(stack: "Python"),
+            QuickstartTestHelpers.CreateProvider(stack: "dotnet"),
+            QuickstartTestHelpers.CreateProvider(stack: "node"));
+        string description = cmd.StackOption.Description ?? string.Empty;
+
+        Assert.Contains("Supported values: dotnet, node, python.", description);
+    }
+
+    [Fact]
+    public void QuickstartCommand_HelpFooterHint_PointsAtWorkloadSearch()
+    {
+        QuickstartCommand cmd = CreateCommand();
+
+        Assert.Contains("func workload search --stack", cmd.GetHelpFooterHint() ?? string.Empty);
     }
 
     [Fact]

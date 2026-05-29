@@ -186,13 +186,17 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
                 continue;
             }
 
+            string? tagsString = GetTagsString(hit["tags"]);
             results.Add(new CatalogSearchResult(
                 PackageId: id.ToLowerInvariant(),
                 LatestVersion: version,
                 Title: (string?)hit["title"],
                 Description: (string?)hit["description"],
-                Aliases: ParseAliases(GetTagsString(hit["tags"])),
-                Source: source));
+                Aliases: ParseAliases(tagsString),
+                Source: source)
+            {
+                Kind = ParseKind(tagsString),
+            });
         }
 
         return results;
@@ -203,7 +207,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         // V3 search responses represent tags either as a space-delimited
         // string or as a JSON array of individual tag strings, depending
         // on the source implementation. Normalise both to the
-        // space-delimited form ParseAliases expects.
+        // space-delimited form the tag parsers expect.
         if (tags is JArray array)
         {
             return string.Join(' ', array.Select(t => (string?)t).Where(t => !string.IsNullOrWhiteSpace(t)));
@@ -238,5 +242,31 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         }
 
         return aliases;
+    }
+
+    // Last kind:<value> tag wins if a package is mis-tagged with more than one;
+    // returning null when the tag is absent means callers can distinguish
+    // "not declared" from a typo'd value.
+    private static string? ParseKind(string? tags)
+    {
+        if (string.IsNullOrWhiteSpace(tags))
+        {
+            return null;
+        }
+
+        string? kind = null;
+        foreach (string token in tags.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (token.StartsWith(WorkloadInstaller.KindTagPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                string value = token[WorkloadInstaller.KindTagPrefix.Length..].Trim();
+                if (value.Length > 0)
+                {
+                    kind = value.ToLowerInvariant();
+                }
+            }
+        }
+
+        return kind;
     }
 }

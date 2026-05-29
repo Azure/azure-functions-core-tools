@@ -50,7 +50,15 @@ internal sealed class EnsureAzuriteInitializationStep(
             Disabled: context.Options.NoAzurite,
             StartupTimeout: ManagedAzuriteRequest.DefaultStartupTimeout);
 
-        ManagedAzuriteResult result = await _orchestrator.EnsureReadyAsync(request, cancellationToken);
+        // Forward orchestrator phase messages through the step's progress
+        // channel so dashboards can surface them as sub-status while the
+        // long-running probe / locate / launch / poll phases are in flight.
+        // Reports are fire-and-forget; ordering is loose and the renderer
+        // shows the latest message, which is exactly the desired behaviour.
+        IProgress<string> progress = new CallbackProgress<string>(message =>
+            _ = context.ReportProgressAsync(percent: 0, message, cancellationToken));
+
+        ManagedAzuriteResult result = await _orchestrator.EnsureReadyAsync(request, progress, cancellationToken);
 
         switch (result)
         {
@@ -87,5 +95,12 @@ internal sealed class EnsureAzuriteInitializationStep(
         return hostRunContext.EnvironmentVariables.TryGetValue(AzureWebJobsStorageName, out string? value)
             ? value
             : null;
+    }
+
+    private sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        private readonly Action<T> _callback = callback ?? throw new ArgumentNullException(nameof(callback));
+
+        public void Report(T value) => _callback(value);
     }
 }

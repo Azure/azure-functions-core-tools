@@ -21,7 +21,16 @@ internal sealed record CatalogSearchResult(
     string? Title,
     string? Description,
     IReadOnlyList<string> Aliases,
-    PackageSource Source);
+    PackageSource Source)
+{
+    /// <summary>
+    /// Lowercased value parsed from the <c>kind:</c> NuGet tag (e.g. <c>workload</c>,
+    /// <c>content</c>, <c>meta</c>). <see langword="null"/> when the package omits the
+    /// tag. Lets callers filter results to a particular package shape, e.g.
+    /// <c>func workload search --stack</c> keeps only <c>kind:workload</c> entries.
+    /// </summary>
+    public string? Kind { get; init; }
+}
 
 /// <summary>
 /// A package id + version pinned to the source it was discovered on. Returned
