@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>.NET Tools</Title>
+    <Title>.NET Stack</Title>
     <Description>Azure Functions CLI tooling for .NET (C#, F#) projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:dotnet func-workload</PackageTags>
