@@ -5,6 +5,8 @@ using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
@@ -609,6 +611,143 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task RunAsync_InteractiveEmptySelection_ExitsCleanlyWithSkippedHint()
+    {
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0");
+        EmptyPickInteractionService interactive = new();
+        SetupRunner runner = new(
+            interactive,
+            _store,
+            catalog,
+            _installer,
+            _profileCatalog,
+            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
+            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
+            _bundleReader);
+
+        SetupRunResult result = await runner.RunAsync(
+            new SetupCommandOptions(
+                new DirectoryInfo(_tempDir),
+                Features: [],
+                ProfileNames: [],
+                Source: null,
+                SetupInstallPolicy.LatestCompatible,
+                IncludePrerelease: false,
+                NonInteractive: false,
+                AssumeYes: true,
+                Check: false,
+                SetupOutputMode.Plain),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(interactive.Lines, line => line.StartsWith("HINT:", StringComparison.Ordinal) && line.Contains("No stacks selected", StringComparison.Ordinal));
+        await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(default!, default, default, default, default, default, default, default);
+    }
+
+    [Fact]
+    public async Task RunAsync_InteractiveEmptyFolder_LabelsInstalledStacks()
+    {
+        const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
+            .WithLatest(WorkerPackage("node"), "1.0.0")
+            .WithLatest(nodeStack, "1.0.0");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns([Entry(nodeStack, "1.0.0")]);
+
+        InteractiveTestInteractionService interactive = new();
+        SetupRunner runner = new(
+            interactive,
+            _store,
+            catalog,
+            _installer,
+            _profileCatalog,
+            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
+            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
+            _bundleReader);
+
+        _ = await runner.RunAsync(
+            new SetupCommandOptions(
+                new DirectoryInfo(_tempDir),
+                Features: [],
+                ProfileNames: [],
+                Source: null,
+                SetupInstallPolicy.LatestCompatible,
+                IncludePrerelease: false,
+                NonInteractive: false,
+                AssumeYes: true,
+                Check: false,
+                SetupOutputMode.Plain),
+            CancellationToken.None);
+
+        Assert.Contains(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node  (installed)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_MarksFirstRunComplete_OnSuccess()
+    {
+        IFirstRunStateStore firstRunStore = Substitute.For<IFirstRunStateStore>();
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = new(
+            _interaction,
+            _store,
+            catalog,
+            _installer,
+            _profileCatalog,
+            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
+            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
+            _bundleReader,
+            firstRunStore);
+
+        SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await firstRunStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_MarksFirstRunComplete_WhenInteractiveSelectionEmpty()
+    {
+        IFirstRunStateStore firstRunStore = Substitute.For<IFirstRunStateStore>();
+        EmptyPickInteractionService interactive = new();
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0");
+        SetupRunner runner = new(
+            interactive,
+            _store,
+            catalog,
+            _installer,
+            _profileCatalog,
+            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
+            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
+            _bundleReader,
+            firstRunStore);
+
+        SetupRunResult result = await runner.RunAsync(
+            new SetupCommandOptions(
+                new DirectoryInfo(_tempDir),
+                Features: [],
+                ProfileNames: [],
+                Source: null,
+                SetupInstallPolicy.LatestCompatible,
+                IncludePrerelease: false,
+                NonInteractive: false,
+                AssumeYes: true,
+                Check: false,
+                SetupOutputMode.Plain),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await firstRunStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
     private SetupRunner CreateRunner(
         IWorkloadCatalog catalog,
         IReadOnlyDictionary<string, string?>? projectConfig = null,
@@ -790,6 +929,27 @@ public sealed class SetupRunnerTests : IDisposable
             string? first = picks.FirstOrDefault(c => string.Equals(c, "node", StringComparison.OrdinalIgnoreCase))
                 ?? picks.FirstOrDefault();
             return Task.FromResult<IReadOnlyList<string>>(first is null ? [] : [first]);
+        }
+
+        public override Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default)
+        {
+            var picks = choices.ToList();
+            base.PromptForMultiSelectionAsync(title, picks, cancellationToken).GetAwaiter().GetResult();
+            MultiSelectionChoice? first = picks.FirstOrDefault(c => string.Equals(c.Value, "node", StringComparison.OrdinalIgnoreCase))
+                ?? picks.FirstOrDefault();
+            return Task.FromResult<IReadOnlyList<string>>(first is null ? [] : [first.Value]);
+        }
+    }
+
+    private sealed class EmptyPickInteractionService : TestInteractionService
+    {
+        public override bool IsInteractive => true;
+
+        public override Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default)
+        {
+            var picks = choices.ToList();
+            base.PromptForMultiSelectionAsync(title, picks, cancellationToken).GetAwaiter().GetResult();
+            return Task.FromResult<IReadOnlyList<string>>([]);
         }
     }
 

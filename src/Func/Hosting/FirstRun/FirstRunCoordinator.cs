@@ -44,7 +44,7 @@ internal sealed class FirstRunCoordinator(
     {
         ArgumentNullException.ThrowIfNull(parseResult);
 
-        if (!_stateStore.IsFirstRun())
+        if (!await _stateStore.IsFirstRunAsync(cancellationToken))
         {
             return;
         }
