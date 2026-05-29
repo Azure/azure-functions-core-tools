@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -41,6 +42,16 @@ public sealed class CliHostFactoryTests : IDisposable
                 // Best-effort cleanup; the OS will reap %TEMP% eventually.
             }
         }
+    }
+
+    [Fact]
+    public void CreateBuilder_RegistersPlatform()
+    {
+        var interaction = new TestInteractionService();
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        using ServiceProvider provider = builder.Services.BuildServiceProvider();
+
+        Assert.NotNull(provider.GetRequiredService<IPlatform>());
     }
 
     [Fact]

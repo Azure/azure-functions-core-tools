@@ -2,12 +2,14 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
+using NSubstitute;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using Xunit;
@@ -43,6 +45,8 @@ public class CompactRendererFunctionBrowserTests
         string output = writer.ToString();
         Assert.Contains("12 functions", output);
         Assert.Contains("↑/↓, PgUp/PgDn logs", output);
+        Assert.DoesNotContain("Fn+↑/↓", output);
+        Assert.DoesNotContain("Ctrl+U/D", output);
         Assert.Contains("L:info", output);
         Assert.Contains("q/Ctrl+C", output);
     }
@@ -80,6 +84,9 @@ public class CompactRendererFunctionBrowserTests
         Assert.Contains("Toggle errors-only log view", output);
         Assert.Contains("Set visible log level", output);
         Assert.Contains("Scroll logs", output);
+        Assert.Contains("PgUp/PgDn", output);
+        Assert.DoesNotContain("Fn+↑/↓", output);
+        Assert.DoesNotContain("Ctrl+U/D", output);
         Assert.DoesNotContain("Open the configured log file", output);
         Assert.DoesNotContain("Coming soon", output);
         Assert.DoesNotContain("c clear logs", output);
@@ -526,21 +533,102 @@ public class CompactRendererFunctionBrowserTests
         Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
     }
 
-    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(DashboardRunInfo? runInfo = null)
+    [Fact]
+    public void BuildFooter_OnMacOS_ShowsMacOSNavigationControls()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer(isMacOS: true);
+        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
+
+        string output = writer.ToString();
+        Assert.Contains("↑/↓, Fn+↑/↓ logs", output);
+        Assert.DoesNotContain("PgUp/PgDn", output);
+        Assert.DoesNotContain("Ctrl+U/D", output);
+    }
+
+    [Fact]
+    public void BuildHeader_WhenHelpOpenOnMacOS_ShowsMacOSNavigationControls()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer(isMacOS: true);
+        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
+        SetPrivate(renderer, "_helpOpen", true);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
+
+        string output = writer.ToString();
+        Assert.Contains("Fn+↑/↓", output);
+        Assert.DoesNotContain("PgUp/PgDn", output);
+        Assert.DoesNotContain("Ctrl+U/D", output);
+    }
+
+    [Fact]
+    public async Task OnStartAsync_WhenMacOSAndAlternateBufferSupported_UsesAlternateScreen()
+    {
+        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: true, ansi: true, alternateBuffer: true);
+
+        await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
+        await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
+
+        string output = writer.ToString();
+        int enterIndex = output.IndexOf("\u001b[?1049h\u001b[H", StringComparison.Ordinal);
+        int exitIndex = output.IndexOf("\u001b[?1049l", StringComparison.Ordinal);
+        Assert.NotEqual(-1, enterIndex);
+        Assert.NotEqual(-1, exitIndex);
+        Assert.True(enterIndex < exitIndex);
+    }
+
+    [Fact]
+    public async Task OnStartAsync_WhenNotMacOS_DoesNotUseAlternateScreen()
+    {
+        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: false, ansi: true, alternateBuffer: true);
+
+        await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
+        await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
+
+        string output = writer.ToString();
+        Assert.DoesNotContain("\u001b[?1049h", output);
+        Assert.DoesNotContain("\u001b[?1049l", output);
+    }
+
+    [Fact]
+    public async Task OnStartAsync_WhenMacOSWithoutAlternateBuffer_DoesNotUseAlternateScreen()
+    {
+        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: true, ansi: true, alternateBuffer: false);
+
+        await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
+        await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
+
+        string output = writer.ToString();
+        Assert.DoesNotContain("\u001b[?1049h", output);
+        Assert.DoesNotContain("\u001b[?1049l", output);
+    }
+
+    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(
+        DashboardRunInfo? runInfo = null,
+        bool isMacOS = false,
+        bool ansi = false,
+        bool alternateBuffer = false)
     {
         var writer = new StringWriter();
         IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
         {
-            Ansi = AnsiSupport.No,
+            Ansi = ansi ? AnsiSupport.Yes : AnsiSupport.No,
             ColorSystem = ColorSystemSupport.NoColors,
             Interactive = InteractionSupport.No,
             Out = new AnsiConsoleOutput(writer),
         });
         console.Profile.Width = 120;
         console.Profile.Height = 24;
+        console.Profile.Capabilities.Ansi = ansi;
+        console.Profile.Capabilities.AlternateBuffer = alternateBuffer;
 
         IInteractionService interaction = new SpectreInteractionService(new DefaultTheme(), console, console);
-        return (new CompactRenderer(interaction, new FunctionPalette(), console, runInfo), console, writer);
+        IPlatform platform = Substitute.For<IPlatform>();
+        platform.IsMacOS.Returns(isMacOS);
+        CompactDashboardShortcutLabels shortcutLabels = new(platform);
+        var renderer = new CompactRenderer(interaction, new FunctionPalette(), shortcutLabels, platform, console, runInfo);
+        return (renderer, console, writer);
     }
 
     private static void Render(IAnsiConsole console, StringWriter writer, IRenderable renderable)
@@ -559,6 +647,17 @@ public class CompactRendererFunctionBrowserTests
 
     private static DashboardSnapshot BuildSnapshot(int functionCount)
         => BuildState(functionCount).Snapshot();
+
+    private static SummaryEvent CreateSummary()
+        => new(
+            DateTimeOffset.UtcNow,
+            "stopped",
+            UptimeSeconds: 1,
+            FunctionCount: 1,
+            TotalInvocations: 0,
+            SucceededInvocations: 0,
+            FailedInvocations: 0,
+            ErrorCount: 0);
 
     private static DashboardState BuildStateWithPriorityFunctions()
     {

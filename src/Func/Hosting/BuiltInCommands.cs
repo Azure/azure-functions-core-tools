@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
@@ -54,6 +55,7 @@ internal static class BuiltInCommands
         // are constructed inline by StartCommand so cancellation flows
         // cleanly through System.CommandLine's invocation scope).
         services.AddSingleton<Hosting.Dashboard.FunctionPalette>();
+        services.AddSingleton<CompactDashboardShortcutLabels>();
 
         // WorkloadCommand has WorkloadListCommand as a subcommand. Register
         // the list command as its own concrete type (not as FuncCliCommand) so

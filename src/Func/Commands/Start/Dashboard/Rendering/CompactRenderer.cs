@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Events;
@@ -22,21 +23,26 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 internal sealed class CompactRenderer(
     IInteractionService interaction,
     FunctionPalette palette,
+    CompactDashboardShortcutLabels shortcutLabels,
+    IPlatform platform,
     IAnsiConsole? console = null,
     DashboardRunInfo? runInfo = null) : IDashboardRenderer, IDashboardShutdownRequester
 {
     private const int MaxLogTailLines = CompactLogBuffer.DefaultCapacity;
     private const int HelpOverlayCommandRows = 15;
     private const int HelpOverlayLines = HelpOverlayCommandRows + 3;
+    private const string EnterAlternateScreenSequence = "\u001b[?1049h\u001b[H";
+    private const string ExitAlternateScreenSequence = "\u001b[?1049l";
 
     private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
 
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
+    private readonly IPlatform _platform = platform ?? throw new ArgumentNullException(nameof(platform));
     private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
     private readonly CompactHeaderBuilder _headerBuilder = new(interaction.Theme, runInfo ?? new());
-    private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, runInfo ?? new());
-    private readonly CompactHelpOverlayBuilder _helpOverlayBuilder = new(interaction.Theme);
+    private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, runInfo ?? new(), shortcutLabels);
+    private readonly CompactHelpOverlayBuilder _helpOverlayBuilder = new(interaction.Theme, shortcutLabels);
     private readonly CompactFunctionSearchBuilder _functionSearchBuilder = new(interaction.Theme, palette);
     private readonly CompactFunctionBrowserBuilder _functionBrowserBuilder = new(interaction.Theme, palette);
     private readonly Lock _uiLock = new();
@@ -83,7 +89,7 @@ internal sealed class CompactRenderer(
         _redrawSignal = new SemaphoreSlim(initialCount: 1, maxCount: int.MaxValue);
         _liveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _console.Cursor.Hide();
-        _liveTask = Task.Run(() => RunLiveLoopAsync(_liveCts.Token));
+        _liveTask = Task.Run(() => RunLiveLoopInTerminalModeAsync(_liveCts.Token));
 
         if (_interaction.IsInteractive)
         {
@@ -345,6 +351,30 @@ internal sealed class CompactRenderer(
             _console.Write(new ControlCode("\u001b[3J"));
         }
     }
+
+    private async Task RunLiveLoopInTerminalModeAsync(CancellationToken cancellationToken)
+    {
+        if (!ShouldUseAlternateScreen())
+        {
+            await RunLiveLoopAsync(cancellationToken);
+            return;
+        }
+
+        _console.Write(new ControlCode(EnterAlternateScreenSequence));
+        _console.Cursor.Hide();
+
+        try
+        {
+            await RunLiveLoopAsync(cancellationToken);
+        }
+        finally
+        {
+            _console.Write(new ControlCode(ExitAlternateScreenSequence));
+        }
+    }
+
+    private bool ShouldUseAlternateScreen()
+        => _platform.IsMacOS && _console.Profile.Capabilities.Ansi && _console.Profile.Capabilities.AlternateBuffer;
 
     private IRenderable BuildLayout()
     {

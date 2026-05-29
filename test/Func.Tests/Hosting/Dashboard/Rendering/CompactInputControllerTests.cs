@@ -118,6 +118,33 @@ public class CompactInputControllerTests
         Assert.Equal(2, state.LogScrollOffset);
     }
 
+    [Fact]
+    public void HandleKey_PageUpAndPageDown_ScrollLogTailByConfiguredStep()
+    {
+        CompactInputController controller = CreateController();
+        var state = new CompactInputState { LogScrollOffset = 2 };
+
+        CompactInputResult pageUpResult = controller.HandleKey(
+            Key('\0', ConsoleKey.PageUp),
+            [],
+            state,
+            viewportHeight: 24,
+            logScrollStep: 3,
+            maxLogScrollOffset: 200);
+
+        CompactInputResult pageDownResult = controller.HandleKey(
+            Key('\0', ConsoleKey.PageDown),
+            [],
+            state,
+            viewportHeight: 24,
+            logScrollStep: 3,
+            maxLogScrollOffset: 200);
+
+        Assert.True(pageUpResult.Handled);
+        Assert.True(pageDownResult.Handled);
+        Assert.Equal(2, state.LogScrollOffset);
+    }
+
     private static CompactInputController CreateController()
     {
         var theme = new DefaultTheme();

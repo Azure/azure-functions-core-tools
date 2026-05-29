@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
@@ -65,6 +66,7 @@ public class AzuriteServiceCollectionExtensionsTests
         services.AddLogging();
         services.AddSingleton(new CliConfigurationPathsOptions(Path.GetTempPath()));
         services.AddSingleton(Substitute.For<IInteractionService>());
+        services.AddSingleton(Substitute.For<IPlatform>());
         return services;
     }
 }

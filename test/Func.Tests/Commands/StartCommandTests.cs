@@ -27,12 +27,15 @@ public class StartCommandTests : IDisposable
     private readonly FunctionPalette _palette = new();
     private readonly IStartInitializationRunner _initializationRunner = Substitute.For<IStartInitializationRunner>();
     private readonly ICliVersionProvider _cliVersionProvider = Substitute.For<ICliVersionProvider>();
+    private readonly IPlatform _platform = Substitute.For<IPlatform>();
+    private readonly CompactDashboardShortcutLabels _shortcutLabels;
 
     public StartCommandTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"func-start-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
         _cliVersionProvider.Version.Returns("5.0.0-test");
+        _shortcutLabels = new CompactDashboardShortcutLabels(_platform);
     }
 
     public void Dispose()
@@ -48,7 +51,9 @@ public class StartCommandTests : IDisposable
     {
         var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider,
             _initializationRunner,
-            Substitute.For<IOptionsMonitor<HostStartupOptions>>());
+            Substitute.For<IOptionsMonitor<HostStartupOptions>>(),
+            _shortcutLabels,
+            _platform);
 
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
@@ -178,7 +183,9 @@ public class StartCommandTests : IDisposable
             _palette,
             _cliVersionProvider,
             _initializationRunner,
-            CreateHostStartupOptions());
+            CreateHostStartupOptions(),
+            _shortcutLabels,
+            _platform);
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --output=plain --demo");
 
@@ -210,7 +217,7 @@ public class StartCommandTests : IDisposable
             CorsCredentials = true,
         };
         options.Get(Arg.Any<string>()).Returns(startupOptions);
-        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options);
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options, _shortcutLabels, _platform);
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --output=plain");
 
@@ -244,7 +251,7 @@ public class StartCommandTests : IDisposable
             Port = 9092,
         };
         options.CurrentValue.Returns(startupOptions);
-        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options);
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options, _shortcutLabels, _platform);
         var root = new RootCommand { cmd };
         string projectDirectory = Environment.CurrentDirectory;
         var result = root.Parse($"start \"{projectDirectory}\" --output=plain");
@@ -275,7 +282,9 @@ public class StartCommandTests : IDisposable
             _palette,
             _cliVersionProvider,
             _initializationRunner,
-            CreateHostStartupOptions());
+            CreateHostStartupOptions(),
+            _shortcutLabels,
+            _platform);
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --output=plain");
 
@@ -305,7 +314,9 @@ public class StartCommandTests : IDisposable
             _palette,
             _cliVersionProvider,
             _initializationRunner,
-            CreateHostStartupOptions());
+            CreateHostStartupOptions(),
+            _shortcutLabels,
+            _platform);
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --output=plain");
 
@@ -339,7 +350,9 @@ public class StartCommandTests : IDisposable
             _palette,
             _cliVersionProvider,
             _initializationRunner,
-            CreateHostStartupOptions());
+            CreateHostStartupOptions(),
+            _shortcutLabels,
+            _platform);
         var root = new RootCommand { cmd };
         var result = root.Parse($"start \"{_tempDir}\" --output=plain");
 

@@ -58,7 +58,6 @@ internal static class AzuriteServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.TryAddSingleton<IPlatform, Platform>();
         services.TryAddSingleton<IAzuriteHostEnvironment, AzuriteHostEnvironment>();
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<IAzuriteExecutableLocator, AzuriteExecutableLocator>();

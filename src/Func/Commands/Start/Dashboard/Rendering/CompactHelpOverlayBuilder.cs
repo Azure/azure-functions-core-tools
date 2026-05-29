@@ -10,9 +10,10 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// <summary>
 /// Builds the compact dashboard help overlay.
 /// </summary>
-internal sealed class CompactHelpOverlayBuilder(ITheme theme)
+internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardShortcutLabels shortcutLabels)
 {
     private readonly ITheme _theme = theme ?? throw new ArgumentNullException(nameof(theme));
+    private readonly CompactDashboardShortcutLabels _shortcutLabels = shortcutLabels ?? throw new ArgumentNullException(nameof(shortcutLabels));
 
     private string CommandTag => field ??= _theme.Command.ToMarkup();
     private string MutedTag => field ??= _theme.Muted.ToMarkup();
@@ -30,7 +31,7 @@ internal sealed class CompactHelpOverlayBuilder(ITheme theme)
         AddHelpRow(table, "t", "Open the function browser.");
         AddHelpRow(table, "/", "Search functions by name, trigger, or route.");
         AddHelpRow(table, "↑/↓", "Scroll logs line by line; in overlays, move selection.");
-        AddHelpRow(table, "PgUp/PgDn", "Scroll logs; in the function browser, jump through functions.");
+        AddHelpRow(table, _shortcutLabels.PageNavigationHelpKey, "Scroll logs; in the function browser, jump through functions.");
         AddHelpRow(table, "Home/End", "Jump to oldest logs / latest logs, or first / last function in the browser.");
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
         AddHelpRow(table, "a", "Clear the active function filter.");

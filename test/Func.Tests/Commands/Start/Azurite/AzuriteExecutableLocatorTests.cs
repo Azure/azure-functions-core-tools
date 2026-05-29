@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 using NSubstitute;
@@ -125,15 +126,16 @@ public class AzuriteExecutableLocatorTests
         _platform.IsWindows.Returns(false);
         _hostEnv.GetPathVariable().Returns("/usr/local/bin:/opt/bin");
         _hostEnv.ExecutableExists(Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite")).Returns(false);
-        _hostEnv.ExecutableExists("/usr/local/bin/azurite").Returns(false);
-        _hostEnv.ExecutableExists("/opt/bin/azurite").Returns(true);
+        string match = Path.Combine("/opt/bin", "azurite");
+        _hostEnv.ExecutableExists(Path.Combine("/usr/local/bin", "azurite")).Returns(false);
+        _hostEnv.ExecutableExists(match).Returns(true);
 
         StubVersionProbeSuccess();
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal("/opt/bin/azurite", result!.FilePath);
+        Assert.Equal(match, result!.FilePath);
 
         // Ensure we never asked about .cmd/.exe variants on Unix.
         _hostEnv.DidNotReceive().ExecutableExists(Arg.Is<string>(p =>
