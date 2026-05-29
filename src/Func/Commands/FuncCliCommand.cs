@@ -91,4 +91,33 @@ internal abstract class FuncCliCommand : Command
         PathArgument = new PathArgument();
         Arguments.Add(PathArgument);
     }
+
+    /// <summary>
+    /// Returns true when the CLI's global <c>--verbose</c> flag was set for
+    /// this invocation. The flag lives on <c>FuncRootCommand</c> as a
+    /// recursive option, so this walks from the invoked command up through
+    /// its parents to find it. Commands constructed under a bare
+    /// <see cref="RootCommand"/> in tests, without the flag wired up, see
+    /// the default of <see langword="false"/>.
+    /// </summary>
+    protected static bool IsVerbose(ParseResult parseResult)
+    {
+        ArgumentNullException.ThrowIfNull(parseResult);
+
+        Command? current = parseResult.CommandResult.Command;
+        while (current is not null)
+        {
+            Option<bool>? verbose = current.Options
+                .OfType<Option<bool>>()
+                .FirstOrDefault(o => string.Equals(o.Name, "--verbose", StringComparison.Ordinal));
+            if (verbose is not null)
+            {
+                return parseResult.GetValue(verbose);
+            }
+
+            current = current.Parents.OfType<Command>().FirstOrDefault();
+        }
+
+        return false;
+    }
 }

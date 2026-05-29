@@ -223,30 +223,6 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             })];
     }
 
-    private static bool IsVerbose(ParseResult parseResult)
-    {
-        // Walk from the invoked command up to the root looking for a bool
-        // option named "--verbose". The CLI's global verbose flag lives on
-        // FuncRootCommand and is recursive, so it surfaces here; tests that
-        // construct the command under a bare RootCommand without that option
-        // simply see the default of false.
-        Command? current = parseResult.CommandResult.Command;
-        while (current is not null)
-        {
-            Option<bool>? verbose = current.Options
-                .OfType<Option<bool>>()
-                .FirstOrDefault(o => string.Equals(o.Name, "--verbose", StringComparison.Ordinal));
-            if (verbose is not null)
-            {
-                return parseResult.GetValue(verbose);
-            }
-
-            current = current.Parents.OfType<Command>().FirstOrDefault();
-        }
-
-        return false;
-    }
-
     private static string PrimaryAlias(ListRow row)
         => row.Aliases.Count == 0 ? string.Empty : row.Aliases[0];
 
