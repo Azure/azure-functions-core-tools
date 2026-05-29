@@ -105,12 +105,12 @@ public class WorkloadListCommandTests
     }
 
     [Fact]
-    public async Task Verbose_AddsPackageIdAndDescriptionColumns()
+    public async Task Verbose_RendersCardWithFields()
     {
         var workloads = new[]
         {
             NewInfo(
-                instance: new FakeWorkload(displayName: ".NET", description: "C# / F# workload."),
+                instance: new FakeWorkload(displayName: ".NET Development Stack", description: "C# / F# workload."),
                 packageId: "Azure.Functions.Cli.Workloads.Dotnet",
                 packageVersion: "1.0.0",
                 aliases: ["dotnet"]),
@@ -120,16 +120,17 @@ public class WorkloadListCommandTests
         int exit = await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
 
         Assert.Equal(0, exit);
-        Assert.Contains(
-            "TABLE: [Alias, Display Name, Version, Package ID, Description]",
-            _interaction.Lines);
-        Assert.Contains(
-            "  ROW: [dotnet, .NET, 1.0.0, Azure.Functions.Cli.Workloads.Dotnet, C# / F# workload.]",
-            _interaction.Lines);
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        Assert.Contains(".NET Development Stack", _interaction.Lines);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.0.0"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Package ID:") && l.EndsWith("Azure.Functions.Cli.Workloads.Dotnet"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Alias:") && l.EndsWith("dotnet"));
+        Assert.Contains("Description:", _interaction.Lines);
+        Assert.Contains("C# / F# workload.", _interaction.Lines);
     }
 
     [Fact]
-    public async Task Verbose_TruncatesLongDescription()
+    public async Task Verbose_RendersFullDescriptionOnItsOwnLine()
     {
         string longDescription = new string('x', 200);
         var workloads = new[]
@@ -144,9 +145,29 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
 
-        string rowLine = _interaction.Lines.Single(l => l.StartsWith("  ROW:"));
-        Assert.Contains("\u2026", rowLine);
-        Assert.DoesNotContain(longDescription, rowLine);
+        // Card layout owns the full terminal width, so the description is
+        // emitted verbatim rather than truncated like the legacy table cell.
+        Assert.Contains(longDescription, _interaction.Lines);
+    }
+
+    [Fact]
+    public async Task Verbose_MultipleAliases_UsesPluralLabel()
+    {
+        var workloads = new[]
+        {
+            NewInfo(
+                instance: new FakeWorkload(displayName: ".NET Development Stack"),
+                packageId: "Pkg.Dotnet",
+                packageVersion: "1.0.0",
+                aliases: ["dotnet", "dotnet-isolated"]),
+        };
+
+        var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
+        await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
+
+        Assert.Contains(
+            _interaction.Lines,
+            l => l.StartsWith("Aliases:") && l.EndsWith("dotnet, dotnet-isolated"));
     }
 
     [Fact]
