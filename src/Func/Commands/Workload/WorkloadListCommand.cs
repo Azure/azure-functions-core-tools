@@ -12,10 +12,11 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// <summary>
 /// <c>func workload list [--all-versions|-a] [--json] [--verbose]</c>.
 /// Default view is a compact 3-column table (Alias, Display Name, Version)
-/// showing only the loaded version per workload. <c>--verbose</c> adds the
-/// Package ID and Description columns. <c>--all-versions</c> switches to a
-/// grouped layout that lists every installed side-by-side version and marks
-/// the loaded one.
+/// showing only the loaded version per workload. <c>--verbose</c> switches
+/// to the same definition-list "card" layout as <c>func workload search</c>
+/// so package id and full description get their own lines. <c>--all-versions</c>
+/// switches to a grouped layout that lists every installed side-by-side
+/// version and marks the loaded one.
 /// </summary>
 internal sealed class WorkloadListCommand : FuncCliCommand
 {
@@ -73,33 +74,22 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         {
             RenderGroupedView(rows, verbose);
         }
+        else if (verbose)
+        {
+            RenderLoadedCards(rows);
+        }
         else
         {
-            RenderLoadedTable(rows, verbose);
+            RenderLoadedTable(rows);
         }
 
         RenderSummary(rows, allVersions);
         return 0;
     }
 
-    private void RenderLoadedTable(IReadOnlyList<ListRow> rows, bool verbose)
+    private void RenderLoadedTable(IReadOnlyList<ListRow> rows)
     {
         IEnumerable<ListRow> sorted = rows.OrderBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase);
-
-        if (verbose)
-        {
-            _interaction.WriteTable(
-                ["Alias", "Display Name", "Version", "Package ID", "Description"],
-                sorted.Select(r => new[]
-                {
-                    PrimaryAlias(r),
-                    DisplayNameOrPackageId(r),
-                    r.PackageVersion,
-                    r.PackageId,
-                    Truncate(r.Description, DescriptionMaxWidth),
-                }));
-            return;
-        }
 
         _interaction.WriteTable(
             ["Alias", "Display Name", "Version"],
@@ -109,6 +99,27 @@ internal sealed class WorkloadListCommand : FuncCliCommand
                 DisplayNameOrPackageId(r),
                 r.PackageVersion,
             }));
+    }
+
+    private void RenderLoadedCards(IReadOnlyList<ListRow> rows)
+    {
+        var card = new WorkloadCardWriter(_interaction);
+        bool first = true;
+        foreach (ListRow row in rows.OrderBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!first)
+            {
+                card.WriteSeparator();
+            }
+
+            first = false;
+
+            card.WriteHeading(DisplayNameOrPackageId(row));
+            card.WriteField("Version", row.PackageVersion);
+            card.WriteField("Package ID", row.PackageId);
+            card.WriteAliases(row.Aliases);
+            card.WriteDescription(row.Description);
+        }
     }
 
     private void RenderGroupedView(IReadOnlyList<ListRow> rows, bool verbose)

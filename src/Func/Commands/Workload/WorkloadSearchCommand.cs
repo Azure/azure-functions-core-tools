@@ -19,9 +19,6 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 {
     private const int DefaultTake = 20;
 
-    // Widest label in the card layout. Used to align values across rows.
-    private const int LabelColumnWidth = 13;
-
     // Lowercased value of the `kind:` NuGet tag that marks a package as a stack
     // workload (the only kind `func init --stack` can target). Mirrors the
     // `kind:workload` PackageTag stack csprojs emit.
@@ -126,48 +123,30 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
             return 0;
         }
 
+        var card = new WorkloadCardWriter(_interaction);
         bool first = true;
         foreach (CatalogSearchResult result in results)
         {
             if (!first)
             {
-                _interaction.WriteBlankLine();
+                card.WriteSeparator();
             }
 
             first = false;
-            WriteCard(result);
+            WriteCard(card, result);
         }
 
         WriteFooter(results.Count);
         return 0;
     }
 
-    private void WriteCard(CatalogSearchResult result)
+    private static void WriteCard(WorkloadCardWriter card, CatalogSearchResult result)
     {
-        _interaction.WriteLine(line => line.Heading(DisplayNameOrPackageId(result)));
-
-        WriteField("Version", result.LatestVersion.ToNormalizedString());
-        WriteField("Package ID", result.PackageId);
-
-        string aliases = result.Aliases.Count == 0
-            ? string.Empty
-            : string.Join(", ", result.Aliases);
-        WriteField(result.Aliases.Count > 1 ? "Aliases" : "Alias", aliases);
-
-        // Description sits on its own line(s) below the label so long copy
-        // can use the full terminal width instead of wrapping inside a
-        // narrow value column.
-        _interaction.WriteLine(line => line.Command("Description:"));
-        string description = string.IsNullOrWhiteSpace(result.Description)
-            ? "(no description)"
-            : result.Description!.Trim();
-        _interaction.WriteLine(line => line.Muted(description));
-    }
-
-    private void WriteField(string label, string value)
-    {
-        string padded = (label + ":").PadRight(LabelColumnWidth);
-        _interaction.WriteLine(line => line.Command(padded).Plain(value));
+        card.WriteHeading(DisplayNameOrPackageId(result));
+        card.WriteField("Version", result.LatestVersion.ToNormalizedString());
+        card.WriteField("Package ID", result.PackageId);
+        card.WriteAliases(result.Aliases);
+        card.WriteDescription(result.Description);
     }
 
     private void WriteFooter(int count)
