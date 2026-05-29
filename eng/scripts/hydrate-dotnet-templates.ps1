@@ -388,6 +388,14 @@ function Convert-Entry([hashtable]$t) {
         groupIdentity   = if ($t['GroupIdentity']) { [string]$t['GroupIdentity'] } else { $null }
         name            = [string]$t['Name']
         description     = & {
+            # Preference order:
+            #   1. Host file description.text (only inserted into the map
+            #      when non-empty by Get-HostDescriptionByIdentity, so a
+            #      ContainsKey hit always yields a real string).
+            #   2. Cache Description (template.json <description>; empty
+            #      for 0/36 Functions item templates today, kept as a
+            #      forward-compat backstop).
+            #   3. null -> column renders blank.
             $identity = [string]$t['Identity']
             if ($hostDescriptionsByIdentity.ContainsKey($identity)) {
                 return $hostDescriptionsByIdentity[$identity]
