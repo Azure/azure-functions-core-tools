@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using NuGet.Frameworks;
@@ -338,6 +339,26 @@ public sealed class WorkloadInstallerTests : IDisposable
     }
 
     [Fact]
+    public async Task InstallFromCatalog_NoCandidateWithPrereleaseOverride_UsesPrereleaseAndOmitsHint()
+    {
+        _catalog.ResolveLatestVersionAsync(
+                "test.workload", true, null, true, null, Arg.Any<CancellationToken>())
+            .Returns((ResolvedPackage?)null);
+
+        WorkloadInstaller installer = NewInstaller(includePrerelease: true);
+        WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
+            () => installer.InstallFromCatalogAsync(
+                "test.workload", version: null, source: null,
+                includePrerelease: false, exact: true, force: false));
+
+        Assert.Contains("test.workload", ex.Message);
+        Assert.DoesNotContain("--prerelease", ex.Message);
+        await _catalog.Received(1).ResolveLatestVersionAsync(
+            "test.workload", true, null, true, null, Arg.Any<CancellationToken>());
+        await _catalog.DidNotReceive().DownloadAsync(Arg.Any<ResolvedPackage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task InstallFromCatalog_ExplicitVersion_RoutesToExactResolution()
     {
         string nupkg = BuildNupkg();
@@ -641,7 +662,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         NuGetVersion.Parse(version),
         new PackageSource("https://example/v3/index.json", "test"));
 
-    private WorkloadInstaller NewInstaller() => new(_paths, _store, _metadataReader, _catalog);
+    private WorkloadInstaller NewInstaller(bool includePrerelease = false)
+        => new(_paths, _store, _metadataReader, _catalog, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
 
     [Fact]
     public async Task InstallFromPackage_HostPackage_SetsExecutableBitOnHostBinary_OnUnix()
