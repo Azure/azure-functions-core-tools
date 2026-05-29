@@ -30,7 +30,9 @@ internal sealed class GoFunctionsProject : FunctionsProject
     public GoFunctionsProject(WorkingDirectory workingDirectory)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        _workerReference = FunctionsWorkerReference.FromWorkload("go");
+        // The Go worker's worker.config.json declares language "native"; the host indexes WorkerConfig
+        // by that language. The workload id stays "go" (matches the package and install command).
+        _workerReference = FunctionsWorkerReference.FromWorkload("go", workerRuntime: "native");
     }
 
     // Internal seam so tests can stub out the `go build` invocation

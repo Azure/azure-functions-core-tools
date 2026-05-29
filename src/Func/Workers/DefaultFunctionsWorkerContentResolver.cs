@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Text.Json;
 using Azure.Functions.Cli.Workloads;
 using NuGet.Versioning;
 
@@ -63,45 +62,11 @@ internal sealed class DefaultFunctionsWorkerContentResolver(IWorkerConfigFileSys
 
         IFunctionsWorker resolvedWorker = new ResolvedFunctionsWorker(
             workerId,
-            ReadWorkerRuntime(workerConfigPath) ?? workerId.Value,
+            workerId.Value,
             workerConfigPath,
             selected.Version.ToNormalizedString());
 
         return FunctionsWorkerResolutionResults.Resolved(resolvedWorker);
-    }
-
-    // The Functions host indexes workers by the `description.language` declared in worker.config.json,
-    // not the workload's worker id. For example, the Go worker workload's id is "go" but its config
-    // declares language "native"; sending FUNCTIONS_WORKER_RUNTIME=go would leave the host without a
-    // matching WorkerConfig. Falling back to the worker id keeps older configs without a language field
-    // (and the mocked file systems in unit tests) working unchanged.
-    private string? ReadWorkerRuntime(string workerConfigPath)
-    {
-        string? content = _workerConfigFileSystem.TryReadAllText(workerConfigPath);
-        if (string.IsNullOrEmpty(content))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(content);
-            if (document.RootElement.ValueKind != JsonValueKind.Object
-                || !document.RootElement.TryGetProperty("description", out JsonElement description)
-                || description.ValueKind != JsonValueKind.Object
-                || !description.TryGetProperty("language", out JsonElement language)
-                || language.ValueKind != JsonValueKind.String)
-            {
-                return null;
-            }
-
-            string? value = language.GetString();
-            return string.IsNullOrWhiteSpace(value) ? null : value;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 
     private static bool SatisfiesConstraint(NuGetVersion version, VersionRange? constraint)

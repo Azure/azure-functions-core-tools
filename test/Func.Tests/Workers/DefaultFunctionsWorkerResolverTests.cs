@@ -267,59 +267,6 @@ public class DefaultFunctionsWorkerResolverTests
         Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerContentResolver(null!));
     }
 
-    [Fact]
-    public async Task ResolveWorkerAsync_WorkerConfigDeclaresLanguage_UsesLanguageAsRuntime()
-    {
-        ContentWorkloadInfo workload = CreateContentWorkload(GoWorkerPackageId, "1.0.0");
-        UseContentWorkloads(workload);
-        string workerConfigPath = Path.Combine(workload.ContentRoot, "worker.config.json");
-        _fileSystem.TryReadAllText(workerConfigPath).Returns(
-            """{ "description": { "language": "native", "defaultExecutablePath": "bin/app" } }""");
-        DefaultFunctionsWorkerResolver resolver = CreateResolver();
-
-        FunctionsWorkerResolutionResult result = await resolver.ResolveWorkerAsync(
-            new FunctionsWorkerId("go"),
-            CancellationToken.None);
-
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("go", resolved.Worker.Id.Value);
-        Assert.Equal("native", resolved.Worker.WorkerRuntime);
-    }
-
-    [Fact]
-    public async Task ResolveWorkerAsync_WorkerConfigMissingLanguage_FallsBackToWorkerId()
-    {
-        ContentWorkloadInfo workload = CreateContentWorkload(NodeWorkerPackageId, "3.13.0");
-        UseContentWorkloads(workload);
-        string workerConfigPath = Path.Combine(workload.ContentRoot, "worker.config.json");
-        _fileSystem.TryReadAllText(workerConfigPath).Returns("""{ "description": { "defaultWorkerPath": "x" } }""");
-        DefaultFunctionsWorkerResolver resolver = CreateResolver();
-
-        FunctionsWorkerResolutionResult result = await resolver.ResolveWorkerAsync(
-            new FunctionsWorkerId("node"),
-            CancellationToken.None);
-
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("node", resolved.Worker.WorkerRuntime);
-    }
-
-    [Fact]
-    public async Task ResolveWorkerAsync_WorkerConfigUnparseable_FallsBackToWorkerId()
-    {
-        ContentWorkloadInfo workload = CreateContentWorkload(NodeWorkerPackageId, "3.13.0");
-        UseContentWorkloads(workload);
-        string workerConfigPath = Path.Combine(workload.ContentRoot, "worker.config.json");
-        _fileSystem.TryReadAllText(workerConfigPath).Returns("not json");
-        DefaultFunctionsWorkerResolver resolver = CreateResolver();
-
-        FunctionsWorkerResolutionResult result = await resolver.ResolveWorkerAsync(
-            new FunctionsWorkerId("node"),
-            CancellationToken.None);
-
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("node", resolved.Worker.WorkerRuntime);
-    }
-
     private void UseContentWorkloads(params ContentWorkloadInfo[] workloads)
     {
         _workloads.GetContentWorkloads().Returns(workloads);

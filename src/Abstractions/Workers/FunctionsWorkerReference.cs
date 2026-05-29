@@ -15,10 +15,20 @@ public abstract class FunctionsWorkerReference
     public static FunctionsWorkerReference FromWorkload(string workerId)
         => FromWorkload(new FunctionsWorkerId(workerId));
 
+    public static FunctionsWorkerReference FromWorkload(string workerId, string workerRuntime)
+        => FromWorkload(new FunctionsWorkerId(workerId), workerRuntime);
+
     public static FunctionsWorkerReference FromWorkload(FunctionsWorkerId workerId)
     {
         ArgumentNullException.ThrowIfNull(workerId);
-        return new WorkloadReference(workerId);
+        return new WorkloadReference(workerId, workerRuntimeOverride: null);
+    }
+
+    public static FunctionsWorkerReference FromWorkload(FunctionsWorkerId workerId, string workerRuntime)
+    {
+        ArgumentNullException.ThrowIfNull(workerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workerRuntime);
+        return new WorkloadReference(workerId, workerRuntime);
     }
 
     public static FunctionsWorkerReference FromWorkerInfo(string workerId, string workerRuntime, string workerConfigPath, string version = "")
@@ -37,14 +47,31 @@ public abstract class FunctionsWorkerReference
 
     public abstract Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(FunctionsWorkerResolutionContext context, CancellationToken cancellationToken);
 
-    private sealed class WorkloadReference(FunctionsWorkerId workerId) : FunctionsWorkerReference
+    private sealed class WorkloadReference(FunctionsWorkerId workerId, string? workerRuntimeOverride) : FunctionsWorkerReference
     {
         private readonly FunctionsWorkerId _workerId = workerId ?? throw new ArgumentNullException(nameof(workerId));
+        private readonly string? _workerRuntimeOverride = workerRuntimeOverride;
 
         public override async Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(FunctionsWorkerResolutionContext context, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(context);
-            return await context.Resolver.ResolveWorkerAsync(_workerId, cancellationToken);
+            FunctionsWorkerResolutionResult result = await context.Resolver.ResolveWorkerAsync(_workerId, cancellationToken);
+
+            // The stack knows how the worker registers with the host (worker.config.json's `language` field).
+            // The resolver only sees the workload id, so when they differ (e.g. Go workload id "go" vs language
+            // "native") the stack overrides here. Without this, FUNCTIONS_WORKER_RUNTIME would carry the workload
+            // id and the host wouldn't find a matching WorkerConfig.
+            if (_workerRuntimeOverride is not null && result is FunctionsWorkerResolutionResult.Resolved resolved)
+            {
+                IFunctionsWorker overridden = new ReferencedFunctionsWorker(
+                    resolved.Worker.Id,
+                    _workerRuntimeOverride,
+                    resolved.Worker.WorkerConfigPath,
+                    resolved.Worker.Version);
+                return FunctionsWorkerResolutionResults.Resolved(overridden);
+            }
+
+            return result;
         }
     }
 

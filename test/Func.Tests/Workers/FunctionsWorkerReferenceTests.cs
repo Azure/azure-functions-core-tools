@@ -28,6 +28,73 @@ public class FunctionsWorkerReferenceTests
     }
 
     [Fact]
+    public async Task ResolveWorkerAsync_WorkloadReferenceWithRuntimeOverride_ReplacesWorkerRuntime()
+    {
+        IFunctionsWorkerResolver resolver = Substitute.For<IFunctionsWorkerResolver>();
+        IFunctionsWorker worker = FunctionsWorkerReferenceTestHelpers.Worker(
+            id: "go", runtime: "go", configPath: "/workloads/go/worker.config.json", version: "1.0.0");
+        resolver.ResolveWorkerAsync(
+                Arg.Is<FunctionsWorkerId>(workerId => workerId.Value == "go"),
+                Arg.Any<CancellationToken>())
+            .Returns(FunctionsWorkerResolutionResults.Resolved(worker));
+        var reference = FunctionsWorkerReference.FromWorkload("go", workerRuntime: "native");
+        var context = new FunctionsWorkerResolutionContext(resolver);
+
+        FunctionsWorkerResolutionResult result = await reference.ResolveWorkerAsync(context, CancellationToken.None);
+
+        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        Assert.Equal("go", resolved.Worker.Id.Value);
+        Assert.Equal("native", resolved.Worker.WorkerRuntime);
+        Assert.Equal("/workloads/go/worker.config.json", resolved.Worker.WorkerConfigPath);
+        Assert.Equal("1.0.0", resolved.Worker.Version);
+    }
+
+    [Fact]
+    public async Task ResolveWorkerAsync_WorkloadReferenceWithRuntimeOverride_PassesThroughFailure()
+    {
+        IFunctionsWorkerResolver resolver = Substitute.For<IFunctionsWorkerResolver>();
+        FunctionsWorkerResolutionResult expected = FunctionsWorkerResolutionResults.NotResolved(
+            FunctionsWorkerResolutionFailures.NotInstalled(new FunctionsWorkerId("go"), "missing"));
+        resolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
+            .Returns(expected);
+        var reference = FunctionsWorkerReference.FromWorkload("go", workerRuntime: "native");
+        var context = new FunctionsWorkerResolutionContext(resolver);
+
+        FunctionsWorkerResolutionResult result = await reference.ResolveWorkerAsync(context, CancellationToken.None);
+
+        Assert.Same(expected, result);
+    }
+
+    [Fact]
+    public void FromWorkload_WithRuntimeOverride_RejectsNullWorkerId()
+    {
+        Assert.Throws<ArgumentNullException>(() => FunctionsWorkerReference.FromWorkload(
+            (FunctionsWorkerId)null!,
+            workerRuntime: "native"));
+    }
+
+    [Fact]
+    public void FromWorkload_WithRuntimeOverride_RejectsBlankRuntime()
+    {
+        Assert.Throws<ArgumentException>(() => FunctionsWorkerReference.FromWorkload(
+            new FunctionsWorkerId("go"),
+            workerRuntime: "   "));
+    }
+
+    private static class FunctionsWorkerReferenceTestHelpers
+    {
+        public static IFunctionsWorker Worker(string id, string runtime, string configPath, string version)
+        {
+            IFunctionsWorker worker = Substitute.For<IFunctionsWorker>();
+            worker.Id.Returns(new FunctionsWorkerId(id));
+            worker.WorkerRuntime.Returns(runtime);
+            worker.WorkerConfigPath.Returns(configPath);
+            worker.Version.Returns(version);
+            return worker;
+        }
+    }
+
+    [Fact]
     public async Task ResolveWorkerAsync_WorkerInfoReference_ReturnsWorkerInfo()
     {
         const string WorkerConfigPath = "worker.config.json";
