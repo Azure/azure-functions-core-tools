@@ -9,6 +9,7 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 public enum BundleChannel
 {
+    Unknown,
     Stable,
     Preview,
     Experimental,
@@ -32,6 +33,7 @@ public static class ExtensionBundle
     {
         BundleChannel.Preview => "Microsoft.Azure.Functions.ExtensionBundle.Preview",
         BundleChannel.Experimental => "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
-        _ => "Microsoft.Azure.Functions.ExtensionBundle",
+        BundleChannel.Stable => "Microsoft.Azure.Functions.ExtensionBundle",
+        _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null),
     };
 }
