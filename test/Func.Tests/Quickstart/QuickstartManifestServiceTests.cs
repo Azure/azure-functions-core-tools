@@ -44,7 +44,7 @@ public sealed class QuickstartManifestServiceTests
     public async Task GetManifestAsync_UsesCachedManifest_WhenCacheIsFresh()
     {
         string manifest = CreateManifestJson("cached-entry", "Python", "http", "refs/tags/v1.0.0");
-        ManifestCacheMeta meta = new("\"etag1\"", DateTimeOffset.UtcNow);
+        ManifestCacheMeta meta = new("\"etag1\"", DateTimeOffset.UtcNow, _options.ManifestUrl);
         IManifestCache cache = CreateCache(manifestJson: manifest, meta: meta);
 
         QuickstartManifestService service = CreateService(
@@ -54,6 +54,29 @@ public sealed class QuickstartManifestServiceTests
 
         Assert.Single(result.Entries);
         Assert.Equal("cached-entry", result.Entries[0].Id);
+    }
+
+    [Fact]
+    public async Task GetManifestAsync_BypassesCache_WhenManifestUrlChanges()
+    {
+        string cachedManifest = CreateManifestJson("cached-entry", "Python", "http", "refs/tags/v1.0.0");
+        ManifestCacheMeta meta = new("\"etag1\"", DateTimeOffset.UtcNow, "https://cdn.functions.azure.com/original/manifest.json");
+        IManifestCache cache = CreateCache(manifestJson: cachedManifest, meta: meta);
+
+        string freshManifest = CreateManifestJson("fresh-entry", "Python", "http", "refs/tags/v2.0.0");
+        QuickstartManifestService service = CreateService(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(freshManifest),
+                Headers = { ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"etag2\"") },
+            },
+            cache);
+
+        QuickstartManifest result = await service.GetManifestAsync();
+
+        Assert.Single(result.Entries);
+        Assert.Equal("fresh-entry", result.Entries[0].Id);
+        cache.Received(1).WriteManifest(freshManifest);
     }
 
     [Fact]
