@@ -120,10 +120,21 @@ internal interface IInteractionService
 
     /// <summary>
     /// Prompts the user to select one or more values from a list of choices, using
-    /// SPACE to toggle and ENTER to confirm. Returns an empty list in non-interactive
-    /// mode. Throws <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// SPACE to toggle and ENTER to confirm. Selection is optional: pressing ENTER
+    /// with nothing selected returns an empty list. Returns an empty list in
+    /// non-interactive mode. Throws <see cref="OperationCanceledException"/> on Ctrl+C.
     /// </summary>
     public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Prompts the user to select one or more values from a list of labelled choices.
+    /// Each <see cref="MultiSelectionChoice"/> carries a <see cref="MultiSelectionChoice.Label"/>
+    /// shown to the user and a <see cref="MultiSelectionChoice.Value"/> returned in the
+    /// result. Selection is optional: pressing ENTER with nothing selected returns
+    /// an empty list. Returns an empty list in non-interactive mode. Throws
+    /// <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// </summary>
+    public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Prompts the user for free-form text with an optional default. Returns
