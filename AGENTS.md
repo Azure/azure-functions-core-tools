@@ -287,6 +287,8 @@ task matches:
   skill.
 - **Building all workloads and publishing to a local NuGet feed for testing** →
   `build-workloads` skill.
+- **Setting up a ready-to-use local v5 CLI build (binary + workloads feed + `f5` alias snippet)** →
+  `setup-cli` skill.
 - **Reviewing a design** → `dotnet-design-pattern-review` skill.
 
 ## Build & Test Commands
@@ -339,6 +341,9 @@ via symlinks under `.claude/skills/`. Available skills:
 - `create-workload` — scaffolding a new workload (Node, Python, Java, ...).
 - `build-workloads` — pack every workload and publish to a local NuGet feed
   (Docker) for end-to-end `func workload install` testing.
+- `setup-cli` — publish func for the host RID + refresh the local workloads
+  feed, then print a paste-ready `f5` alias / env-var snippet for hand
+  testing.
 - `dotnet-design-pattern-review` — design pattern review checklist.
 
 The **Design Principles**, **CLI Conventions**, and **.NET / C# Practices**
