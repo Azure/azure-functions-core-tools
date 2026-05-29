@@ -19,14 +19,20 @@ public sealed class FirstRunCoordinatorTests
     private readonly ISetupRunner _setupRunner = Substitute.For<ISetupRunner>();
     private readonly PromptingInteractionService _interaction = new();
 
-    [Fact]
-    public async Task SkipsAndDoesNotMark_WhenAlreadyComplete()
+    public FirstRunCoordinatorTests()
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(false);
+        _stateStore.GetStateAsync(Arg.Any<CancellationToken>()).Returns(FirstRunState.NeverPrompted);
+    }
+
+    [Fact]
+    public async Task SkipsAndDoesNotMark_WhenWorkloadsInstalled()
+    {
+        _stateStore.GetStateAsync(Arg.Any<CancellationToken>()).Returns(FirstRunState.WorkloadsInstalled);
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(0, _interaction.ConfirmCalls);
         await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
         await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
@@ -35,12 +41,12 @@ public sealed class FirstRunCoordinatorTests
     [Fact]
     public async Task SkipsAndDoesNotMark_WhenNonInteractive()
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         _interaction.InteractiveOverride = false;
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(0, _interaction.ConfirmCalls);
         await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
         await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
@@ -51,11 +57,11 @@ public sealed class FirstRunCoordinatorTests
     [InlineData("version")]
     public async Task SkipsAndDoesNotMark_ForExcludedCommands(string commandName)
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync(commandName, Parse(commandName), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync(commandName, Parse(commandName), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(0, _interaction.ConfirmCalls);
         await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
     }
@@ -67,11 +73,11 @@ public sealed class FirstRunCoordinatorTests
     [InlineData("-v")]
     public async Task SkipsAndDoesNotMark_WhenHelpOrVersionTokenPresent(string token)
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("start", Parse($"start {token}"), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse($"start {token}"), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(0, _interaction.ConfirmCalls);
         await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
     }
@@ -82,12 +88,12 @@ public sealed class FirstRunCoordinatorTests
         // Bare `func` produces a "Required command was not provided" parse
         // error and the resolver labels it "unknown", but it's the canonical
         // first-run trigger and must still prompt.
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         _interaction.ConfirmResponse = false;
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("unknown", Parse(string.Empty), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("unknown", Parse(string.Empty), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(1, _interaction.ConfirmCalls);
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
     }
@@ -95,13 +101,11 @@ public sealed class FirstRunCoordinatorTests
     [Fact]
     public async Task SkipsAndDoesNotMark_WhenParseHasErrorsAndTokensPresent()
     {
-        // A typo like `func startt` produces tokens and parse errors; we stay
-        // quiet until the user fixes the command line.
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("unknown", Parse("startt"), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("unknown", Parse("startt"), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(0, _interaction.ConfirmCalls);
         await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
     }
@@ -109,14 +113,14 @@ public sealed class FirstRunCoordinatorTests
     [Fact]
     public async Task RunsSetupAndMarks_WhenUserConfirms()
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         _interaction.ConfirmResponse = true;
         _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
             .Returns(new SetupRunResult(0));
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(1, _interaction.ConfirmCalls);
         await _setupRunner.Received(1).RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>());
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
@@ -125,21 +129,20 @@ public sealed class FirstRunCoordinatorTests
     [Fact]
     public async Task SkipsSetupButMarks_WhenUserDeclines()
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         _interaction.ConfirmResponse = false;
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Equal(1, _interaction.ConfirmCalls);
         await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task PropagatesCancellation_FromPrompt()
+    public async Task PropagatesCancellation_FromPrompt_AndWritesMarker()
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         FirstRunCoordinator coordinator = CreateCoordinator();
@@ -147,22 +150,107 @@ public sealed class FirstRunCoordinatorTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), cts.Token));
 
-        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+        // Ctrl+C at the prompt should still write the marker so the user
+        // is not re-prompted next time.
+        await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task SetupFailureIsSwallowed_ButMarkerStillWritten()
     {
-        _stateStore.IsFirstRunAsync(Arg.Any<CancellationToken>()).Returns(true);
         _interaction.ConfirmResponse = true;
         _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
             .Returns<Task<SetupRunResult>>(_ => throw new InvalidOperationException("boom"));
         FirstRunCoordinator coordinator = CreateCoordinator();
 
-        await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
 
+        Assert.Null(result);
         Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:", StringComparison.Ordinal) && l.Contains("boom"));
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("init")]
+    [InlineData("new")]
+    public async Task ShortCircuitsWithReRunHint_AfterSetupForInitOrNew(string commandName)
+    {
+        _interaction.ConfirmResponse = true;
+        _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupRunResult(0));
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync(commandName, Parse(commandName), CancellationToken.None);
+
+        Assert.Equal(0, result);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains($"Re-run `func {commandName}`"));
+        await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DoesNotShortCircuit_WhenInitDeclinesSetup()
+    {
+        _interaction.ConfirmResponse = false;
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("init", Parse("init"), CancellationToken.None);
+
+        Assert.Null(result);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
+        await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DoesNotShortCircuit_WhenInitSetupFails()
+    {
+        _interaction.ConfirmResponse = true;
+        _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupRunResult(1));
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("init", Parse("init"), CancellationToken.None);
+
+        Assert.Null(result);
+        await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ShowsBreadcrumb_WhenMarkerPresentButNoWorkloads()
+    {
+        _stateStore.GetStateAsync(Arg.Any<CancellationToken>()).Returns(FirstRunState.MarkerWithoutWorkloads);
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("`func setup`"));
+        Assert.Equal(0, _interaction.ConfirmCalls);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+    }
+
+    [Fact]
+    public async Task DoesNotShowBreadcrumb_ForSkippedCommands()
+    {
+        _stateStore.GetStateAsync(Arg.Any<CancellationToken>()).Returns(FirstRunState.MarkerWithoutWorkloads);
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("setup", Parse("setup"), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("`func setup`"));
+    }
+
+    [Fact]
+    public async Task DoesNotShowBreadcrumb_WhenNonInteractive()
+    {
+        _stateStore.GetStateAsync(Arg.Any<CancellationToken>()).Returns(FirstRunState.MarkerWithoutWorkloads);
+        _interaction.InteractiveOverride = false;
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("`func setup`"));
     }
 
     private FirstRunCoordinator CreateCoordinator() => new(_interaction, _stateStore, _setupRunner);
@@ -176,6 +264,8 @@ public sealed class FirstRunCoordinatorTests
         root.Subcommands.Add(new Command("help"));
         root.Subcommands.Add(new Command("version"));
         root.Subcommands.Add(new Command("start"));
+        root.Subcommands.Add(new Command("init"));
+        root.Subcommands.Add(new Command("new"));
 
         return root.Parse(args);
     }

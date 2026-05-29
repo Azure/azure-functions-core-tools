@@ -66,9 +66,11 @@ Behaviour:
 
 ### Interactive
 
-- Multi-select shows all stacks (`node`, `python`, `dotnet`, `go`).
-- Stacks already installed are **disabled and grayed out**, with an
-  `(installed)` suffix. They cannot be re-toggled.
+- Multi-select shows the stacks that are not already installed.
+- Stacks already installed are filtered out of the choice list. When any
+  are filtered, a single muted line above the prompt records them:
+  `Already installed: node, python`. If every supported stack is already
+  installed, the prompt is skipped and the run exits cleanly.
 - ENTER with nothing selected is a clean opt-out: exit 0, marker written,
   hint shown ("No stacks selected").
 
@@ -96,15 +98,12 @@ These commands trigger the first-run prompt with two refinements:
 1. **Skip the prompt if any workloads are already installed.** Re-uses the
    same "workloads present ⇒ not first run" check, so existing users go
    straight to init.
-2. **After setup succeeds inside an init/new flow, refresh the workload
-   loader** before resuming. The loader currently snapshots `workloads.json`
-   at host build time; we need an explicit reload hook on `IWorkloadStore` /
-   the loader registration so the freshly installed stack is visible to the
-   same process that will run init.
-
-Without (2), `func init` would have to relaunch the CLI to pick up the new
-workload, which is a worse UX than just telling the user "setup done,
-re-run `func init`".
+2. **After setup succeeds inside an init/new flow, ask the user to re-run.**
+   The workload loader currently snapshots `workloads.json` at host build
+   time, so the freshly installed stack is not visible to the in-process
+   init/new flow. The coordinator prints "Setup complete. Re-run
+   `func init`/`func new` to use the new stacks." and exits 0. A proper
+   in-process reload hook is tracked as follow-up work.
 
 ## Subsequent-run breadcrumb
 
@@ -140,13 +139,23 @@ Rules:
 | Marker at `~/.azure-functions/.first-run-complete` | Done |
 | Workload-aware first-run check | Done (PR #5220) |
 | Marker written on `func setup` success and opt-out | Done (PR #5220) |
-| Multi-select labels installed stacks with `(installed)` | Done (PR #5220) |
+| Multi-select labels installed stacks with `(installed)` | Superseded |
 | Empty selection exits cleanly | Done (PR #5220) |
-| Bare `func` triggers the prompt | **Pending** |
-| New, longer prompt copy with `--features` hint | **Pending** |
-| Ctrl+C writes the marker | **Pending** |
-| Already-installed stacks are disabled (not just labelled) | **Pending** |
-| `func init` / `func new` trigger prompt + workload loader reload | **Pending** |
-| Subsequent-run breadcrumb | **Pending** |
+| Bare `func` triggers the prompt | Done |
+| New, longer prompt copy with `--features` hint | Done |
+| Ctrl+C writes the marker | Done |
+| Already-installed stacks are disabled (not just labelled) | Done (filtered out; shown above the prompt) |
+| `func init` / `func new` trigger prompt | Done |
+| `func init` / `func new` workload loader reload | Deferred (re-run hint shown; tracking follow-up) |
+| Subsequent-run breadcrumb | Done |
 
-Pending items are tracked in the follow-up implementation PR.
+### Notes on the deferred reload
+
+`IWorkloadStore.GetWorkloadsAsync` reads `workloads.json` from disk on every
+call, so the store itself stays fresh after an in-process install. The
+problem is the templates/bundles loader stack that snapshots workload
+metadata at host build time. Rather than audit and rewire every consumer,
+the coordinator currently short-circuits with a "Setup complete. Re-run
+`func init`/`func new` to use the new stacks." hint and exits 0 when first-
+run setup runs inside an `init` / `new` invocation. Replacing this with a
+proper in-process reload is tracked as follow-up work.
