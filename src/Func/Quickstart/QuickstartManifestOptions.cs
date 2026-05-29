@@ -1,7 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
+using Azure.Functions.Cli.Abstractions.Common;
 
 namespace Azure.Functions.Cli.Quickstart;
 
@@ -32,8 +32,5 @@ internal sealed class QuickstartManifestOptions
     public TimeSpan HttpTimeout { get; set; } = TimeSpan.FromSeconds(15);
 
     private static string DefaultCacheDirectory() =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            AbstractionsConstants.FuncHomeDirectoryName,
-            "quickstart");
+        Path.Combine(FuncHomeResolver.Resolve(), "quickstart");
 }

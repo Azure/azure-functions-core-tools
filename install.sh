@@ -10,6 +10,20 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/.azure-functions}"
 VERSION="${VERSION:-}"
 PRERELEASE="${PRERELEASE:-false}"
 FORCE="${FORCE:-false}"
+BUGBASH="${BUGBASH:-false}"
+
+# --- Parse flags ---
+
+for arg in "$@"; do
+    case "$arg" in
+        --bugbash) BUGBASH="true" ;;
+        --prerelease) PRERELEASE="true" ;;
+        --force) FORCE="true" ;;
+    esac
+done
+
+BUGBASH_WORKLOADS_SOURCE="https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
+BUGBASH_QUICKSTART_MANIFEST_URL="https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
 
 # --- Detect platform ---
 
@@ -41,13 +55,13 @@ if [ -z "$VERSION" ]; then
     VERSION=$(echo "$RELEASES_JSON" \
         | tr ',' '\n' \
         | grep -E '"tag_name"|"prerelease"' \
-        | sed 's/.*"tag_name":"\([^"]*\)".*/tag:\1/; s/.*"prerelease":\(.*\)/pre:\1/' \
+        | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/tag:\1/; s/.*"prerelease"[[:space:]]*:[[:space:]]*([^[:space:]]+).*/pre:\1/' \
         | paste - - \
         | awk -F'\t' -v include_pre="$PRERELEASE" '
             {
-                split($1, a, ":"); tag = a[2]
-                split($2, b, ":"); pre = b[2]
-                if (tag ~ /^v5\./ && (include_pre == "true" || pre == "false")) {
+                sub(/^tag:/, "", $1); tag = $1
+                sub(/^pre:/, "", $2); pre = $2
+                if (tag ~ /^v?5\./ && (include_pre == "true" || pre == "false")) {
                     print tag; exit
                 }
             }')
@@ -57,13 +71,13 @@ if [ -z "$VERSION" ]; then
             PRE_VERSIONS=$(echo "$RELEASES_JSON" \
                 | tr ',' '\n' \
                 | grep -E '"tag_name"|"prerelease"' \
-                | sed 's/.*"tag_name":"\([^"]*\)".*/tag:\1/; s/.*"prerelease":\(.*\)/pre:\1/' \
+                | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/tag:\1/; s/.*"prerelease"[[:space:]]*:[[:space:]]*([^[:space:]]+).*/pre:\1/' \
                 | paste - - \
                 | awk -F'\t' '
                     {
-                        split($1, a, ":"); tag = a[2]
-                        split($2, b, ":"); pre = b[2]
-                        if (tag ~ /^v5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
+                        sub(/^tag:/, "", $1); tag = $1
+                        sub(/^pre:/, "", $2); pre = $2
+                        if (tag ~ /^v?5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
                     }')
 
             if [ -n "$PRE_VERSIONS" ]; then
@@ -78,6 +92,12 @@ if [ -z "$VERSION" ]; then
         exit 1
     fi
 fi
+
+# Ensure version has 'v' prefix
+case "$VERSION" in
+    v*) ;;
+    *)  VERSION="v${VERSION}" ;;
+esac
 
 echo "Installing func CLI ${VERSION} (${OS}-${ARCH})..."
 
@@ -120,3 +140,41 @@ fi
 
 echo "func CLI ${VERSION} installed to ${INSTALL_DIR}"
 func --version
+
+# --- Bug bash env vars ---
+
+if [ "$BUGBASH" = "true" ]; then
+    SHELL_NAME=$(basename "${SHELL:-bash}")
+    case "$SHELL_NAME" in
+        zsh)  BUGBASH_PROFILE="$HOME/.zshrc" ;;
+        bash) BUGBASH_PROFILE="$HOME/.bashrc" ;;
+        *)    BUGBASH_PROFILE="$HOME/.profile" ;;
+    esac
+
+    {
+        echo ""
+        echo "# Azure Functions CLI bug bash env vars"
+        echo "export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
+        echo "export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
+        echo "export FUNC_CLI_WORKLOADS_PRERELEASE=true"
+    } >> "$BUGBASH_PROFILE"
+
+    export FUNC_CLI_WORKLOADS_SOURCE="${BUGBASH_WORKLOADS_SOURCE}"
+    export FUNC_CLI_QUICKSTART_MANIFEST_URL="${BUGBASH_QUICKSTART_MANIFEST_URL}"
+    export FUNC_CLI_WORKLOADS_PRERELEASE=true
+
+    echo ""
+    echo -e "\033[33m========================================================================\033[0m"
+    echo -e "\033[33m  BUG BASH MODE: required environment variables have been set\033[0m"
+    echo -e "\033[33m========================================================================\033[0m"
+    echo -e "\033[33mAdded to current session and appended to ${BUGBASH_PROFILE}:\033[0m"
+    echo ""
+    echo "  export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
+    echo "  export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
+    echo "  export FUNC_CLI_WORKLOADS_PRERELEASE=true"
+    echo ""
+    echo -e "\033[33mWARNING: these env vars MUST be set in your shell for the bug bash.\033[0m"
+    echo -e "\033[33mIf you open a new terminal session (or a shell that doesn't load\033[0m"
+    echo -e "\033[33m${BUGBASH_PROFILE}), re-run the three exports above before using func.\033[0m"
+    echo -e "\033[33m========================================================================\033[0m"
+fi

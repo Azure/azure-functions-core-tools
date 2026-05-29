@@ -25,6 +25,42 @@ public class WorkloadSearchCommandTests
         Assert.Single(cmd.Arguments, a => a.Name == "query");
         Assert.Contains(cmd.Options, o => o.Name == "--source");
         Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
+        Assert.Contains(cmd.Options, o => o.Name == "--stack");
+    }
+
+    [Fact]
+    public async Task Search_StackOption_FiltersToWorkloadKind()
+    {
+        StubSearch(
+            new CatalogSearchResult(
+                "workloads.python",
+                NuGetVersion.Parse("1.0.0"),
+                Title: "Python",
+                Description: null,
+                Aliases: ["python"],
+                Source: _stubSource) { Kind = "workload" },
+            new CatalogSearchResult(
+                "workloads.host",
+                NuGetVersion.Parse("1.0.0"),
+                Title: "Host",
+                Description: null,
+                Aliases: ["host"],
+                Source: _stubSource) { Kind = "content" },
+            new CatalogSearchResult(
+                "workloads.nokind",
+                NuGetVersion.Parse("1.0.0"),
+                Title: "NoKind",
+                Description: null,
+                Aliases: [],
+                Source: _stubSource));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        int exit = await InvokeAsync(cmd, "--stack");
+
+        Assert.Equal(0, exit);
+        Assert.Contains(_interaction.Lines, l => l.Contains("workloads.python"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.host"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.nokind"));
     }
 
     [Fact]

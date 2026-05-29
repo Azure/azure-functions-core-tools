@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads.Catalog;
@@ -15,11 +14,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Resolves the Functions worker required by the project.
 /// </summary>
-internal sealed class ResolveFunctionsWorkerInitializationStep(
-    IFunctionsWorkerResolverFactory workerResolverFactory,
-    IWorkloadCatalog workloadCatalog,
-    IWorkloadInstaller workloadInstaller,
-    IInteractionService interaction) : DemoInitializationStep
+internal sealed class ResolveFunctionsWorkerInitializationStep(IFunctionsWorkerResolverFactory workerResolverFactory, IWorkloadCatalog workloadCatalog, IWorkloadInstaller workloadInstaller) : DemoInitializationStep
 {
     public const string StepId = "resolve_worker";
 
@@ -28,7 +23,6 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
 
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller ?? throw new ArgumentNullException(nameof(workloadInstaller));
-    private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
 
     public override string Id => StepId;
 
@@ -95,10 +89,8 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
 
         string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
 
-        // Live progress region is owned by the Spectre Progress task; leading
-        // newline keeps the prompt off the spinner's line.
-        bool shouldInstall = await _interaction.ConfirmAsync(
-            $"{Environment.NewLine}The Functions worker workload '{packageId}' is required. Install it now?",
+        bool shouldInstall = await context.ConfirmAsync(
+            $"The Functions worker workload '{packageId}' is required. Install it now?",
             defaultValue: true,
             cancellationToken);
 

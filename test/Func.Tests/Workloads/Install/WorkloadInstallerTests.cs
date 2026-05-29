@@ -181,22 +181,27 @@ public sealed class WorkloadInstallerTests : IDisposable
     }
 
     [Fact]
-    public async Task InstallFromPackage_AlreadyInstalled_DirOnly_NoRegistryEntry_Throws()
+    public async Task InstallFromPackage_AlreadyInstalled_DirOnly_NoRegistryEntry_SelfHealsAndInstalls()
     {
-        // Half-installed leftover (directory exists but registry has no
-        // matching row) is treated as a broken install. The remedy
-        // ("pass --force") is the command's responsibility, not the
-        // service's, so we only assert on the state description here.
+        // Orphaned directory (registry doesn't know about it, e.g. a prior
+        // uninstall whose Directory.Delete was blocked by AV) used to block
+        // reinstall. The installer now treats it as stale, wipes it, and
+        // extracts fresh so the user can recover without manual cleanup.
         string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
         Directory.CreateDirectory(installDir);
+        string stalePath = Path.Combine(installDir, "stale.txt");
+        File.WriteAllText(stalePath, "leftover from blocked uninstall");
 
         string nupkg = BuildNupkg();
 
         WorkloadInstaller installer = NewInstaller();
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => installer.InstallFromPackageAsync(nupkg));
-        Assert.Contains("missing from the registry", ex.Message);
-        Assert.DoesNotContain("--force", ex.Message);
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
+
+        Assert.False(result.AlreadyInstalled);
+        Assert.False(File.Exists(stalePath));
+        await _store.Received(1).SaveWorkloadAsync(
+            Arg.Is<WorkloadEntry>(e => e.PackageId == "test.workload" && e.PackageVersion == "1.0.0"),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

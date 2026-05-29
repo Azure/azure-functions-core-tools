@@ -14,10 +14,7 @@ namespace Azure.Functions.Cli.Commands.Quickstart;
 /// </summary>
 internal sealed class QuickstartListCommand : FuncCliCommand
 {
-    public Option<string?> StackOption { get; } = new("--stack", "-s")
-    {
-        Description = QuickstartMessages.StackOptionDescription
-    };
+    public Option<string?> StackOption { get; } = new("--stack", "-s");
 
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
@@ -51,16 +48,20 @@ internal sealed class QuickstartListCommand : FuncCliCommand
     public QuickstartListCommand(
         IInteractionService interaction,
         IQuickstartProviderResolver resolver,
-        IQuickstartManifestService manifestService)
+        IQuickstartManifestService manifestService,
+        IEnumerable<IQuickstartProvider> providers)
         : base("list", "List available templates from the catalog.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(manifestService);
+        ArgumentNullException.ThrowIfNull(providers);
 
         _interaction = interaction;
         _resolver = resolver;
         _manifestService = manifestService;
+
+        StackOption.Description = QuickstartMessages.BuildStackOptionDescription(providers.ToList());
 
         Options.Add(StackOption);
         Options.Add(LanguageOption);
@@ -69,6 +70,8 @@ internal sealed class QuickstartListCommand : FuncCliCommand
         Options.Add(SearchOption);
         Options.Add(JsonOption);
     }
+
+    protected override string HelpFooterHint => QuickstartMessages.HelpFooterHint;
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {

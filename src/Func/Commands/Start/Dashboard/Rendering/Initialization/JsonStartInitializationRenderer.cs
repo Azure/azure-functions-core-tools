@@ -111,6 +111,12 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
         return Task.CompletedTask;
     }
 
+    public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new InvalidOperationException("JSON initialization renderer cannot prompt for input.");
+    }
+
     public ValueTask DisposeAsync()
     {
         Flush();

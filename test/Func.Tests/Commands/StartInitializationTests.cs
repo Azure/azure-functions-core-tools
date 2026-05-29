@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
@@ -428,17 +429,14 @@ public class StartInitializationTests : IDisposable
                 NuGetVersion.Parse("3.13.0"),
                 new PackageSource("https://example.test/v3/index.json")));
         IWorkloadInstaller workloadInstaller = CreateSuccessfulInstaller();
-        IInteractionService interaction = Substitute.For<IInteractionService>();
-        interaction.ConfirmAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(true);
+        var renderer = new RecordingStartInitializationRenderer();
         var runner = CreateRunner(
             projectResolver,
             CreateResolvedProfile(workerRanges),
             CreateInstalledHostWorkloadResolver(),
             workloadInstaller,
             workerResolverFactory,
-            workloadCatalog,
-            interaction);
+            workloadCatalog);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -448,11 +446,14 @@ public class StartInitializationTests : IDisposable
 
         StartInitializationResult result = await runner.RunAsync(
             context,
-            new RecordingStartInitializationRenderer(),
+            renderer,
             CancellationToken.None);
 
         Assert.Equal("node", result.Worker.WorkerRuntime);
         Assert.Equal("3.13.0", result.Worker.Version);
+        Assert.Contains(
+            $"The Functions worker workload '{FunctionsWorkerWorkloadPackages.GetPackageId(workerId)}' is required. Install it now?",
+            renderer.ConfirmPrompts);
         await workloadInstaller.Received(1).InstallFromCatalogAsync(
             FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
             NuGetVersion.Parse("3.13.0"),
@@ -690,7 +691,7 @@ public class StartInitializationTests : IDisposable
         Assert.Contains("Install host workload", output);
         Assert.Contains(" 50%", output);
         Assert.DoesNotContain("\u001b[2J", output);
-        Assert.DoesNotContain("Preparing download", output);
+        Assert.Contains("Preparing download", output);
     }
 
     [Fact]
@@ -746,6 +747,61 @@ public class StartInitializationTests : IDisposable
         }
         finally
         {
+            await renderer.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CompactRenderer_ConfirmAsync_PreservesStatusBeforePromptAndPausesLiveDisplay()
+    {
+        using var writer = new StringWriter();
+        IAnsiConsole console = CreateInteractiveConsole(writer);
+        IInteractionService interaction = Substitute.For<IInteractionService>();
+        interaction.Theme.Returns(new DefaultTheme());
+        TaskCompletionSource<bool> promptStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> promptResult = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        interaction.ConfirmAsync("Install?", true, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                writer.WriteLine("Install?");
+                promptStarted.TrySetResult(true);
+                return promptResult.Task;
+            });
+        var renderer = new CompactStartInitializationRenderer(interaction, "5.0.0-test", console);
+
+        try
+        {
+            var initializationStartedEvent = new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none");
+            var step = new StartInitializationStep(
+                ResolveFunctionsWorkerInitializationStep.StepId,
+                "Resolve worker",
+                DisplayKind: StartInitializationDisplayKind.Progress);
+            var stepStartedEvent = new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step);
+
+            await renderer.OnEventAsync(initializationStartedEvent, CancellationToken.None);
+            await renderer.OnEventAsync(stepStartedEvent, CancellationToken.None);
+            await WaitForOutputAsync(writer, output => output.Contains("Resolve worker", StringComparison.Ordinal));
+
+            Task<bool> confirmTask = renderer.ConfirmAsync("Install?", defaultValue: true, CancellationToken.None);
+            await promptStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            string outputDuringPrompt = writer.ToString();
+            int statusIndex = outputDuringPrompt.LastIndexOf("Resolve worker", StringComparison.Ordinal);
+            int promptIndex = outputDuringPrompt.LastIndexOf("Install?", StringComparison.Ordinal);
+
+            await Task.Delay(300);
+
+            Assert.True(statusIndex >= 0, $"Expected status output before prompt. Output: {outputDuringPrompt}");
+            Assert.True(promptIndex > statusIndex, $"Expected prompt to render after status output. Output: {outputDuringPrompt}");
+            Assert.DoesNotContain("\r\u001b[2K", outputDuringPrompt[statusIndex..promptIndex]);
+            Assert.Equal(outputDuringPrompt, writer.ToString());
+
+            promptResult.SetResult(true);
+            Assert.True(await confirmTask);
+            await WaitForOutputAsync(writer, output => output.Length > outputDuringPrompt.Length);
+        }
+        finally
+        {
+            promptResult.TrySetResult(true);
             await renderer.DisposeAsync();
         }
     }
@@ -811,6 +867,23 @@ public class StartInitializationTests : IDisposable
             Out = new TestTerminalOutput(writer),
         });
 
+    private static async Task WaitForOutputAsync(StringWriter writer, Func<string, bool> predicate)
+    {
+        string output = string.Empty;
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            output = writer.ToString();
+            if (predicate(output))
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        Assert.True(predicate(output), $"Expected output condition was not met. Output: {output}");
+    }
+
     private static DemoStartInitializationRunner CreateRunner(
         IFunctionsProjectResolver projectResolver,
         ProfileResolution? profileResolution = null,
@@ -866,7 +939,7 @@ public class StartInitializationTests : IDisposable
     private static IManagedAzuriteOrchestrator CreateDisabledAzuriteOrchestrator()
     {
         IManagedAzuriteOrchestrator orchestrator = Substitute.For<IManagedAzuriteOrchestrator>();
-        orchestrator.EnsureReadyAsync(Arg.Any<ManagedAzuriteRequest>(), Arg.Any<CancellationToken>())
+        orchestrator.EnsureReadyAsync(Arg.Any<ManagedAzuriteRequest>(), Arg.Any<IProgress<string>?>(), Arg.Any<CancellationToken>())
             .Returns(new ManagedAzuriteResult.Disabled("Azurite skipped in tests."));
         return orchestrator;
     }
@@ -1068,10 +1141,21 @@ public class StartInitializationTests : IDisposable
     {
         public List<StartInitializationEvent> Events { get; } = [];
 
+        public List<string> ConfirmPrompts { get; } = [];
+
+        public bool ConfirmResult { get; set; } = true;
+
         public Task OnEventAsync(StartInitializationEvent initializationEvent, CancellationToken cancellationToken)
         {
             Events.Add(initializationEvent);
             return Task.CompletedTask;
+        }
+
+        public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ConfirmPrompts.Add(prompt);
+            return Task.FromResult(ConfirmResult);
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

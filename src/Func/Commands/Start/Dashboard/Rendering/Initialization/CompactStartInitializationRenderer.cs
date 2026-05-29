@@ -72,6 +72,56 @@ internal sealed class CompactStartInitializationRenderer(
             : StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, cancellationToken);
     }
 
+    public async Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        Task? liveTaskToStop;
+        CancellationTokenSource? liveCtsToStop;
+        bool restartLiveDisplay;
+        lock (_stateLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            liveTaskToStop = _liveTask;
+            liveCtsToStop = _liveCts;
+            restartLiveDisplay = liveTaskToStop is not null;
+            _liveTask = null;
+            _liveCts = null;
+        }
+
+        if (liveTaskToStop is not null)
+        {
+            await StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, cancellationToken);
+            WritePromptContext();
+        }
+
+        try
+        {
+            return await _interaction.ConfirmAsync(prompt, defaultValue, cancellationToken);
+        }
+        finally
+        {
+            if (restartLiveDisplay && !cancellationToken.IsCancellationRequested)
+            {
+                lock (_stateLock)
+                {
+                    if (!_disposed)
+                    {
+                        EnsureLiveDisplayStarted();
+                    }
+                }
+
+                SignalRedraw();
+            }
+        }
+    }
+
+    private void WritePromptContext()
+    {
+        _console.Write(BuildLayout());
+        _console.WriteLine();
+    }
+
     private void EnsureLiveDisplayStarted()
     {
         if (_liveTask is not null)
@@ -100,6 +150,10 @@ internal sealed class CompactStartInitializationRenderer(
         }
 
         step.Percent = Math.Clamp(progress.Percent, 0, 100);
+        if (!string.IsNullOrWhiteSpace(progress.Message))
+        {
+            step.Message = progress.Message;
+        }
     }
 
     private void CompleteStep(StartInitializationStepCompletedEvent completed)
@@ -178,7 +232,7 @@ internal sealed class CompactStartInitializationRenderer(
             spinnerFrameIndex = _spinnerFrameIndex;
             steps =
             [
-                .. _steps.Select(static step => new StepSnapshot(step.Step, step.Percent, step.Completed, step.Result))
+                .. _steps.Select(static step => new StepSnapshot(step.Step, step.Percent, step.Completed, step.Message, step.Result))
             ];
         }
 
@@ -219,7 +273,11 @@ internal sealed class CompactStartInitializationRenderer(
         }
         else
         {
-            return $"{icon} [dim]{title}[/]{progress}";
+            string message = string.IsNullOrWhiteSpace(step.Message)
+                ? string.Empty
+                : $" [dim]({Markup.Escape(step.Message)})[/]";
+
+            return $"{icon} [dim]{title}[/]{progress}{message}";
         }
     }
 
@@ -305,8 +363,11 @@ internal sealed class CompactStartInitializationRenderer(
         public double Percent { get; set; }
 
         public bool Completed { get; set; }
+
+        public string? Message { get; set; }
+
         public string? Result { get; internal set; }
     }
 
-    private sealed record StepSnapshot(StartInitializationStep Step, double Percent, bool Completed, string? Result);
+    private sealed record StepSnapshot(StartInitializationStep Step, double Percent, bool Completed, string? Message, string? Result);
 }

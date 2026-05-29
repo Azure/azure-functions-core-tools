@@ -31,9 +31,12 @@ Both scripts auto-detect your OS and architecture, download the latest 5.x relea
 
 | Option | PowerShell | Bash |
 |--------|-----------|------|
-| Include pre-releases | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Prerelease` | `PRERELEASE=true curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
-| Specific version | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Version 5.0.0` | `VERSION=5.0.0 curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
-| Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `INSTALL_DIR=~/my-tools curl -sSL https://aka.ms/func-cli/install.sh \| bash` |
+| Include pre-releases | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Prerelease` | `curl -sSL https://aka.ms/func-cli/install.sh \| PRERELEASE=true bash` |
+| Specific version | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Version 5.0.0` | `curl -sSL https://aka.ms/func-cli/install.sh \| VERSION=5.0.0 bash` |
+| Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `curl -sSL https://aka.ms/func-cli/install.sh \| INSTALL_DIR=~/my-tools bash` |
+| Bug bash env vars | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -BugBash` | `curl -sSL https://aka.ms/func-cli/install.sh \| BUGBASH=true bash` |
+
+The `-BugBash` / `BUGBASH=true` option installs the CLI and then sets the pre-release workloads feed and quickstart manifest env vars (`FUNC_CLI_WORKLOADS_SOURCE`, `FUNC_CLI_QUICKSTART_MANIFEST_URL`, `FUNC_CLI_WORKLOADS_PRERELEASE`) required for bug bash testing. The values are exported in the current session and persisted (to your shell profile on Linux/macOS, or user environment variables on Windows). The installer prints the exact assignments so you can re-set them if you switch terminals.
 
 ### Unattended install
 

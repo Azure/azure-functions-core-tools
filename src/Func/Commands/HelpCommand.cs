@@ -119,50 +119,112 @@ internal class HelpCommand : FuncCliCommand
     {
         string commandPath = BuildCommandPath(command);
 
-        _interaction.WriteBlankLine();
-        _interaction.WriteTitle(commandPath);
-        _interaction.WriteBlankLine();
-
-        if (!string.IsNullOrEmpty(command.Description))
-        {
-            _interaction.WriteHint(command.Description);
-            _interaction.WriteBlankLine();
-        }
-
-        _interaction.WriteSectionHeader("Usage");
-        _interaction.WriteBlankLine();
-        WriteUsageLine(command, commandPath);
-        _interaction.WriteBlankLine();
-
-        var args = command.Arguments.Where(a => !a.Hidden).ToList();
-        if (args.Count > 0)
-        {
-            _interaction.WriteSectionHeader("Arguments");
-            _interaction.WriteBlankLine();
-            _interaction.WriteDefinitionList(
-                args.Select(a => new DefinitionItem($"<{a.Name}>", a.Description ?? string.Empty)));
-            _interaction.WriteBlankLine();
-        }
-
-        var subcommands = command.Subcommands.Where(c => !c.Hidden).ToList();
-        if (subcommands.Count > 0)
-        {
-            _interaction.WriteSectionHeader("Commands");
-            _interaction.WriteBlankLine();
-            _interaction.WriteDefinitionList(
-                subcommands.Select(c => new DefinitionItem(c.Name, c.Description ?? string.Empty)));
-            _interaction.WriteBlankLine();
-        }
+        WriteHeader(command, commandPath, command.Description);
+        WriteUsageSection(command, commandPath);
+        WriteArgumentsSection(command);
+        WriteSubcommandsSection(command);
 
         var options = command.Options.Where(o => !o.Hidden && o is not HelpOption).ToList();
         if (options.Count > 0)
         {
-            _interaction.WriteSectionHeader("Options");
-            _interaction.WriteBlankLine();
-            _interaction.WriteDefinitionList(
-                options.Select(o => new DefinitionItem(FormatOptionName(o), o.Description ?? string.Empty)));
+            WriteOptionsSection("Options", options);
+        }
+    }
+
+    /// <summary>
+    /// Writes the command title and (when present) description block.
+    /// Exposed so custom help actions can compose their own output using
+    /// the same header style as the default renderer.
+    /// </summary>
+    internal void WriteHeader(Command command, string commandPath, string? description)
+    {
+        _interaction.WriteBlankLine();
+        _interaction.WriteTitle(commandPath);
+        _interaction.WriteBlankLine();
+
+        if (!string.IsNullOrEmpty(description))
+        {
+            _interaction.WriteHint(description);
             _interaction.WriteBlankLine();
         }
+
+        if (command is FuncCliCommand func && func.GetHelpFooterHint() is { Length: > 0 } hint)
+        {
+            _interaction.WriteSectionHeader("Tips");
+            _interaction.WriteBlankLine();
+            _interaction.WriteHint(hint);
+            _interaction.WriteBlankLine();
+        }
+    }
+
+    /// <summary>
+    /// Writes the "Usage" section for <paramref name="command"/>. Exposed
+    /// for reuse by custom help actions that need the same layout but a
+    /// different options section.
+    /// </summary>
+    internal void WriteUsageSection(Command command, string commandPath)
+    {
+        _interaction.WriteSectionHeader("Usage");
+        _interaction.WriteBlankLine();
+        WriteUsageLine(command, commandPath);
+        _interaction.WriteBlankLine();
+    }
+
+    /// <summary>
+    /// Writes the "Arguments" section when the command has any non-hidden
+    /// arguments. No-op otherwise. Exposed for reuse by custom help actions.
+    /// </summary>
+    internal void WriteArgumentsSection(Command command)
+    {
+        var args = command.Arguments.Where(a => !a.Hidden).ToList();
+        if (args.Count == 0)
+        {
+            return;
+        }
+
+        _interaction.WriteSectionHeader("Arguments");
+        _interaction.WriteBlankLine();
+        _interaction.WriteDefinitionList(
+            args.Select(a => new DefinitionItem($"<{a.Name}>", a.Description ?? string.Empty)));
+        _interaction.WriteBlankLine();
+    }
+
+    /// <summary>
+    /// Writes the "Commands" section when the command has any non-hidden
+    /// subcommands. No-op otherwise. Exposed for reuse by custom help actions.
+    /// </summary>
+    internal void WriteSubcommandsSection(Command command)
+    {
+        var subcommands = command.Subcommands.Where(c => !c.Hidden).ToList();
+        if (subcommands.Count == 0)
+        {
+            return;
+        }
+
+        _interaction.WriteSectionHeader("Commands");
+        _interaction.WriteBlankLine();
+        _interaction.WriteDefinitionList(
+            subcommands.Select(c => new DefinitionItem(c.Name, c.Description ?? string.Empty)));
+        _interaction.WriteBlankLine();
+    }
+
+    /// <summary>
+    /// Writes a titled options section with the standard option-name +
+    /// description layout. Exposed so custom help actions can render
+    /// multiple option groups under different titles (e.g. "Options" plus
+    /// "Template Options (&lt;id&gt;)") while keeping the formatting
+    /// identical to the default single-section renderer.
+    /// </summary>
+    internal void WriteOptionsSection(string title, IEnumerable<Option> options)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(title);
+        ArgumentNullException.ThrowIfNull(options);
+
+        _interaction.WriteSectionHeader(title);
+        _interaction.WriteBlankLine();
+        _interaction.WriteDefinitionList(
+            options.Select(o => new DefinitionItem(FormatOptionName(o), o.Description ?? string.Empty)));
+        _interaction.WriteBlankLine();
     }
 
     /// <summary>
@@ -203,8 +265,9 @@ internal class HelpCommand : FuncCliCommand
     /// <summary>
     /// Builds the full command path from the root, e.g. <c>func workload install</c>
     /// for a nested subcommand. Falls back to <c>func</c> for the root command.
+    /// Exposed for reuse by custom help actions.
     /// </summary>
-    private static string BuildCommandPath(Command command)
+    internal static string BuildCommandPath(Command command)
     {
         if (command is RootCommand)
         {

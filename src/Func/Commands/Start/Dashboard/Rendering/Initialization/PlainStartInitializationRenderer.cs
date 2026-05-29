@@ -40,6 +40,9 @@ internal sealed class PlainStartInitializationRenderer(IInteractionService inter
         return Task.CompletedTask;
     }
 
+    public async Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+        => await _interaction.ConfirmAsync(prompt, defaultValue, cancellationToken);
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static string FormatMessage(string? message)

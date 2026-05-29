@@ -58,6 +58,27 @@ public sealed class NuGetProtocolSourceClientTests
     }
 
     [Fact]
+    public void ParseV3Hits_ParsesKindTag()
+    {
+        var response = JObject.Parse("""
+            {
+              "data": [
+                { "id": "Workloads.Python", "version": "1.0.0", "tags": "alias:python kind:workload" },
+                { "id": "Workloads.Host",   "version": "1.0.0", "tags": [ "alias:host", "kind:content" ] },
+                { "id": "Workloads.NoKind", "version": "1.0.0", "tags": "alias:misc" }
+              ]
+            }
+            """);
+
+        var results = NuGetProtocolSourceClient.ParseV3Hits(response, _source);
+
+        Assert.Equal(3, results.Count);
+        Assert.Equal("workload", results.Single(r => r.PackageId == "workloads.python").Kind);
+        Assert.Equal("content", results.Single(r => r.PackageId == "workloads.host").Kind);
+        Assert.Null(results.Single(r => r.PackageId == "workloads.nokind").Kind);
+    }
+
+    [Fact]
     public void ParseV3Hits_SkipsEntriesMissingIdOrVersion()
     {
         var response = JObject.Parse("""

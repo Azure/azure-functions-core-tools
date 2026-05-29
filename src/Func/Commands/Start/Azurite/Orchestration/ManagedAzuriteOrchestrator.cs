@@ -43,7 +43,10 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<ManagedAzuriteResult> EnsureReadyAsync(ManagedAzuriteRequest request, CancellationToken cancellationToken)
+    public async Task<ManagedAzuriteResult> EnsureReadyAsync(
+        ManagedAzuriteRequest request,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -53,6 +56,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
             return new ManagedAzuriteResult.Disabled("--no-azurite was specified.");
         }
 
+        progress?.Report("checking AzureWebJobsStorage configuration");
         AzureWebJobsStorageReference classification = _classifier.Classify(request.StorageConnectionString);
         _logger.LogInformation(
             "AzureWebJobsStorage classified as {Classification}: {Reason}",
@@ -65,10 +69,10 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
                 return new ManagedAzuriteResult.Disabled(classification.Reason);
 
             case AzureWebJobsStorageClassification.UserConfiguredAzurite:
-                return await EnsureUserConfiguredAsync(classification, cancellationToken);
+                return await EnsureUserConfiguredAsync(classification, progress, cancellationToken);
 
             case AzureWebJobsStorageClassification.ManageableAzurite:
-                return await EnsureManageableAsync(request, classification, cancellationToken);
+                return await EnsureManageableAsync(request, classification, progress, cancellationToken);
 
             default:
                 return new ManagedAzuriteResult.Failed(
@@ -78,9 +82,11 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
 
     private async Task<ManagedAzuriteResult> EnsureUserConfiguredAsync(
         AzureWebJobsStorageReference classification,
+        IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         AzuriteEndpointTuple endpoints = classification.Endpoints ?? DefaultEndpoints();
+        progress?.Report("probing configured Azurite endpoints");
         AzuriteProbeResult probe = await _probe.ProbeAsync(endpoints, cancellationToken);
 
         if (probe.Status == AzuriteProbeStatus.Ready)
@@ -96,10 +102,12 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
     private async Task<ManagedAzuriteResult> EnsureManageableAsync(
         ManagedAzuriteRequest request,
         AzureWebJobsStorageReference classification,
+        IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         AzuriteEndpointTuple endpoints = classification.Endpoints ?? DefaultEndpoints();
 
+        progress?.Report("checking for an existing Azurite endpoint");
         AzuriteProbeResult probe = await _probe.ProbeAsync(endpoints, cancellationToken);
         switch (probe.Status)
         {
@@ -125,18 +133,22 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
                 break;
         }
 
+        progress?.Report("looking for a local Azurite installation");
         AzuriteExecutable? executable = await _executableLocator.FindAsync(request.ProjectRoot, cancellationToken);
         if (executable is not null)
         {
+            progress?.Report("starting Azurite (native)");
             return await LaunchAsync(
                 request,
                 endpoints,
                 AzuriteLaunchMode.Native,
                 executable.FilePath,
                 executable.Version,
+                progress,
                 cancellationToken);
         }
 
+        progress?.Report("checking Docker availability");
         DockerAvailability docker = await _dockerProbe.ProbeAsync(cancellationToken);
         if (docker.Status != DockerAvailabilityStatus.Available)
         {
@@ -145,12 +157,14 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
                 docker.Reason);
         }
 
+        progress?.Report("starting Azurite (Docker)");
         return await LaunchAsync(
             request,
             endpoints,
             AzuriteLaunchMode.Docker,
             executablePath: null,
             executableVersion: docker.Version,
+            progress,
             cancellationToken);
     }
 
@@ -160,6 +174,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         AzuriteLaunchMode mode,
         string? executablePath,
         string? executableVersion,
+        IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         AzuriteManagedPaths paths = _pathsProvider.GetPaths();
@@ -190,7 +205,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
                 ex.ToString());
         }
 
-        PollOutcome poll = await PollReadyAsync(process, endpoints, request.StartupTimeout, cancellationToken);
+        PollOutcome poll = await PollReadyAsync(process, endpoints, request.StartupTimeout, progress, cancellationToken);
         switch (poll.Kind)
         {
             case PollOutcomeKind.Ready:
@@ -216,6 +231,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         IAzuriteProcess process,
         AzuriteEndpointTuple endpoints,
         TimeSpan timeout,
+        IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         using CancellationTokenSource timeoutCts = new(timeout);
@@ -224,12 +240,24 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
 
         long startTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
         Task<int> exitTask = process.WaitForExitAsync(linkedCts.Token);
+        long lastHeartbeatTimestamp = startTimestamp;
 
         while (true)
         {
             if (cancellationToken.IsCancellationRequested)
             {
                 throw new OperationCanceledException(cancellationToken);
+            }
+
+            if (progress is not null)
+            {
+                TimeSpan sinceHeartbeat = System.Diagnostics.Stopwatch.GetElapsedTime(lastHeartbeatTimestamp);
+                if (sinceHeartbeat >= TimeSpan.FromSeconds(2))
+                {
+                    TimeSpan totalElapsed = System.Diagnostics.Stopwatch.GetElapsedTime(startTimestamp);
+                    progress.Report($"waiting for Azurite to be ready ({totalElapsed.TotalSeconds:0}s)");
+                    lastHeartbeatTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+                }
             }
 
             if (exitTask.IsCompleted)

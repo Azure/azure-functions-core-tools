@@ -7,6 +7,8 @@
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
+    <Project Path="src/Templates.V2/Templates.V2.csproj" />
+    <Project Path="src/Templates.DotNet/Templates.DotNet.csproj" />
   </Folder>
   <Folder Name="/src/Workloads/">
     <Project Path="src/Workloads/Host/Workloads.Host.csproj" />

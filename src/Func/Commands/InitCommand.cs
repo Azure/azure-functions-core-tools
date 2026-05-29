@@ -20,10 +20,7 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal class InitCommand : FuncCliCommand, IBuiltInCommand
 {
-    public Option<string?> StackOption { get; } = new("--stack", "-s")
-    {
-        Description = "The stack to use. Run `func workload list` to see what's installed."
-    };
+    public Option<string?> StackOption { get; } = new("--stack", "-s");
 
     public Option<string?> NameOption { get; } = new("--name", "-n")
     {
@@ -55,6 +52,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _hintRenderer = hintRenderer;
         _initializers = initializers.ToList();
 
+        StackOption.Description = BuildStackOptionDescription(_initializers);
         LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
 
         AddPathArgument();
@@ -169,6 +167,28 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             .Muted("."));
 
         return 0;
+    }
+
+    protected override string HelpFooterHint =>
+        "Looking for more stacks? Run `func workload search --stack` to list installable stack workloads.";
+
+    // Builds the help text for `--stack`. Stacks come from installed
+    // initializers' Stack ids, lowercased and sorted for a stable
+    // presentation. Matching in SelectInitializerAsync is already
+    // case-insensitive, so we surface the canonical lowercase form.
+    private static string BuildStackOptionDescription(IReadOnlyList<IProjectInitializer> initializers)
+    {
+        var stacks = initializers
+            .Select(i => i.Stack)
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
+
+        return stacks.Count == 0
+            ? "The stack to use. Install a stack workload (`func workload install <id>`) to see supported values."
+            : "The stack to use. Supported values: " + string.Join(", ", stacks) + ".";
     }
 
     // Builds the help text for `--language`. Languages are pulled from

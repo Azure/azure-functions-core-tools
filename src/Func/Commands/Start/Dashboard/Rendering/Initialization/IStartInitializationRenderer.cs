@@ -11,4 +11,6 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 internal interface IStartInitializationRenderer : IAsyncDisposable
 {
     public Task OnEventAsync(StartInitializationEvent initializationEvent, CancellationToken cancellationToken);
+
+    public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken);
 }
