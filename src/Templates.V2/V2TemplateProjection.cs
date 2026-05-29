@@ -56,7 +56,6 @@ internal static class V2TemplateProjection
 
         string? description = ResolveResource(template.Description, payload.Resources);
         string displayName = ResolveResource(template.Name, payload.Resources) ?? template.Id;
-        string triggerKind = template.TriggerType ?? template.CategoryStyle ?? "function";
 
         IReadOnlyList<string> languages = string.IsNullOrWhiteSpace(template.Language)
             ? []
@@ -69,7 +68,6 @@ internal static class V2TemplateProjection
             Stack: stack,
             EngineId: EngineIds.V2,
             DisplayName: displayName,
-            TriggerKind: triggerKind,
             Description: description,
             DefaultFunctionName: null,
             Languages: languages,

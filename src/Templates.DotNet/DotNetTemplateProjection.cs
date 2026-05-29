@@ -73,7 +73,6 @@ internal static class DotNetTemplateProjection
             .Distinct(StringComparer.Ordinal)
             .OrderBy(l => l, StringComparer.Ordinal)];
 
-        string triggerKind = ResolveTriggerKind(head.Classifications) ?? "function";
         TemplateMetadata metadata = new(
             UserPrompts: head.Parameters?.Where(p => !p.IsHidden).Select(ProjectParameter).ToList() ?? [],
             RequiresExtensionBundle: false,
@@ -84,7 +83,6 @@ internal static class DotNetTemplateProjection
             Stack: stack,
             EngineId: EngineIds.DotNet,
             DisplayName: head.Name ?? head.Id,
-            TriggerKind: triggerKind,
             Description: head.Description,
             DefaultFunctionName: head.DefaultName,
             Languages: languages,
@@ -110,29 +108,5 @@ internal static class DotNetTemplateProjection
             ValidatorRegex: null,
             ShortAlias: parameter.ShortNameOverride is { Length: > 0 } s ? "-" + s : null,
             LongAlias: parameter.LongNameOverride is { Length: > 0 } l ? "--" + l : null);
-    }
-
-    private static string? ResolveTriggerKind(IReadOnlyList<string>? classifications)
-    {
-        if (classifications is null)
-        {
-            return null;
-        }
-
-        // Convention: the last classification entry tends to be the trigger
-        // specialisation (e.g. ["Azure Function", "Trigger", "Http"]).
-        // Surfaces "http" / "timer" / etc. as the trigger column.
-        for (int i = classifications.Count - 1; i >= 0; i--)
-        {
-            string entry = classifications[i];
-            if (!string.IsNullOrWhiteSpace(entry)
-                && !entry.Equals("Azure Function", StringComparison.OrdinalIgnoreCase)
-                && !entry.Equals("Trigger", StringComparison.OrdinalIgnoreCase))
-            {
-                return entry.ToLowerInvariant();
-            }
-        }
-
-        return null;
     }
 }

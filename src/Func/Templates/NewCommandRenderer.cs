@@ -107,11 +107,10 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
             return;
         }
 
-        string[] columns = ["NAME", "TRIGGER", "DESCRIPTION"];
+        string[] columns = ["NAME", "DESCRIPTION"];
         IEnumerable<string[]> rows = templates.Select(t => new[]
         {
             t.Id,
-            t.TriggerKind,
             t.Description ?? string.Empty,
         });
 
@@ -141,7 +140,6 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
             {
                 id = t.Id,
                 displayName = t.DisplayName,
-                triggerKind = t.TriggerKind,
                 description = t.Description,
                 defaultFunctionName = t.DefaultFunctionName,
                 languages = t.Languages,
