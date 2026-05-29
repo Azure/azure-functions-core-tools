@@ -22,9 +22,4 @@ public static class QuickstartConstants
     /// The git ref prefix required for all template entries.
     /// </summary>
     public const string TagRefPrefix = "refs/tags/";
-
-    /// <summary>
-    /// Filename of the Functions host configuration file.
-    /// </summary>
-    public const string HostJsonFileName = "host.json";
 }

@@ -199,11 +199,9 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             _interaction.WriteBlankLine();
             _interaction.WriteHint("Next steps:");
 
-            string hostJsonPath = ResolveHostJsonPath(workingDirectory);
             foreach (string step in steps)
             {
-                string resolved = step.Replace("[path]", hostJsonPath, StringComparison.OrdinalIgnoreCase);
-                _interaction.WriteLine(l => l.Muted($"{QuickstartMessages.StepBullet}{resolved}"));
+                _interaction.WriteLine(l => l.Muted($"{QuickstartMessages.StepBullet}{step}"));
             }
         }
 
@@ -300,68 +298,6 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         }
 
         return await _interaction.ConfirmAsync("Continue?", defaultValue: false, cancellationToken);
-    }
-
-    private static readonly StringComparison _pathComparison =
-        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-
-    /// <summary>
-    /// Resolves the path to the directory containing <c>host.json</c> in the
-    /// scaffolded output, expressed relative to the user's original path argument.
-    /// Falls back to the scaffold root when <c>host.json</c> is not found.
-    /// </summary>
-    private static string ResolveHostJsonPath(WorkingDirectory workingDirectory)
-    {
-        string scaffoldDir = workingDirectory.Info.FullName;
-        string basePath = workingDirectory.OriginalPath ?? scaffoldDir;
-        string? hostDir = FindHostJsonDirectory(scaffoldDir);
-
-        if (hostDir is null || string.Equals(hostDir, scaffoldDir, _pathComparison))
-        {
-            return NormalizeSeparators(basePath);
-        }
-
-        string relativeSuffix = Path.GetRelativePath(scaffoldDir, hostDir);
-        return NormalizeSeparators(Path.Combine(basePath, relativeSuffix));
-    }
-
-    /// <summary>
-    /// Replaces alternate directory separators (forward slashes on Windows)
-    /// with the platform-native separator to avoid mixed-slash paths in hints.
-    /// </summary>
-    private static string NormalizeSeparators(string path) =>
-        path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-
-    /// <summary>
-    /// Searches for <c>host.json</c> at the scaffold root and one level of
-    /// subdirectories. Returns the containing directory, or <c>null</c> if
-    /// not found.
-    /// </summary>
-    private static string? FindHostJsonDirectory(string scaffoldRoot)
-    {
-        try
-        {
-            // Check root first.
-            if (File.Exists(Path.Combine(scaffoldRoot, QuickstartConstants.HostJsonFileName)))
-            {
-                return scaffoldRoot;
-            }
-
-            // Check immediate subdirectories only.
-            foreach (string subDir in Directory.GetDirectories(scaffoldRoot))
-            {
-                if (File.Exists(Path.Combine(subDir, QuickstartConstants.HostJsonFileName)))
-                {
-                    return subDir;
-                }
-            }
-
-            return null;
-        }
-        catch (IOException)
-        {
-            return null;
-        }
     }
 
     private static string BuildLanguageOptionDescription(IReadOnlyList<IQuickstartProvider> providers)

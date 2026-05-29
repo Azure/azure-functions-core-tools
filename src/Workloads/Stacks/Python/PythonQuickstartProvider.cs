@@ -27,6 +27,6 @@ internal sealed class PythonQuickstartProvider : IQuickstartProvider
     public IReadOnlyList<string> GetNextSteps(string manifestLanguage) =>
     [
         "Run `pip install -r requirements.txt` to install dependencies",
-        "Run `func run [path]` to launch the app"
+        "Run `func run [path]` where path is folder containing host.json to launch the app"
     ];
 }
