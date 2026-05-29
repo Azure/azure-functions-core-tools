@@ -497,3 +497,6 @@ $RECYCLE.BIN/
 
 # func init scratch dir in the worktree
 MyTestApp/
+
+# Azurite
+__azurite_*
