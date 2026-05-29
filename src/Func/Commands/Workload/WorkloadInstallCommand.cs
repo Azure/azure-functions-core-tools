@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// </summary>
 internal sealed class WorkloadInstallCommand : FuncCliCommand
 {
-    internal const string PrereleasePreviewHint = "Including prerelease workload versions (workloads are in preview). Pass --prerelease false to disable.";
+    internal const string PrereleasePreviewHint = "Including prerelease workload versions.";
 
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
@@ -44,8 +44,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
     public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving from the catalog. Default: enabled while workloads are in preview.",
-        DefaultValueFactory = _ => true,
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable versions only.",
     };
 
     public Option<bool> ForceOption { get; } = new("--force", "-f")

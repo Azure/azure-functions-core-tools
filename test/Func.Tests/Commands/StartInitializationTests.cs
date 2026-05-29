@@ -420,7 +420,7 @@ public class StartInitializationTests : IDisposable
         workloadCatalog.ResolveLatestVersionInRangeAsync(
                 FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
                 workerRange,
-                includePrerelease: true,
+                includePrerelease: false,
                 source: null,
                 Arg.Any<CancellationToken>())
             .Returns(new ResolvedPackage(
@@ -457,7 +457,7 @@ public class StartInitializationTests : IDisposable
             FunctionsWorkerWorkloadPackages.GetPackageId(workerId),
             NuGetVersion.Parse("3.13.0"),
             "https://example.test/v3/index.json",
-            includePrerelease: true,
+            includePrerelease: false,
             exact: true,
             force: false,
             progress: null,

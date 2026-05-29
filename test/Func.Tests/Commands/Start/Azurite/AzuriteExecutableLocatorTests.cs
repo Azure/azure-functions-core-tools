@@ -126,14 +126,18 @@ public class AzuriteExecutableLocatorTests
         _hostEnv.GetPathVariable().Returns("/usr/local/bin:/opt/bin");
         _hostEnv.ExecutableExists(Path.Combine(ProjectRoot, "node_modules", ".bin", "azurite")).Returns(false);
         _hostEnv.ExecutableExists("/usr/local/bin/azurite").Returns(false);
-        _hostEnv.ExecutableExists("/opt/bin/azurite").Returns(true);
+
+        // We use path combine here, which is ultimately platform-aware and will not honor the mocked platform for this test,
+        // but this currently matches the product code and  since we're only looking for the bare name on Unix, it won't affect the test outcome.
+        string expectedPath = Path.Combine("/opt/bin", "azurite");
+        _hostEnv.ExecutableExists(expectedPath).Returns(true);
 
         StubVersionProbeSuccess();
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal("/opt/bin/azurite", result!.FilePath);
+        Assert.Equal(expectedPath, result!.FilePath);
 
         // Ensure we never asked about .cmd/.exe variants on Unix.
         _hostEnv.DidNotReceive().ExecutableExists(Arg.Is<string>(p =>

@@ -49,7 +49,7 @@ public class WorkloadInstallCommandTests
 
         Assert.Equal(0, exit);
         await _installer.Received(1).InstallFromCatalogAsync(
-            "Test.Workload", null, null, true, false, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+            "Test.Workload", null, null, false, false, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class WorkloadInstallCommandTests
             "Test.Workload",
             Arg.Is<NuGetVersion>(v => v != null && v.ToNormalizedString() == "1.2.3"),
             null,
-            true,
+            false,
             false,
             true,
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
@@ -109,7 +109,7 @@ public class WorkloadInstallCommandTests
 
         Assert.Equal(0, exit);
         await _installer.Received(1).InstallFromCatalogAsync(
-            "test.workload", null, null, true, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+            "test.workload", null, null, false, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class WorkloadInstallCommandTests
 
         Assert.Equal(0, exit);
         await _installer.Received(1).InstallFromCatalogAsync(
-            "Test.Workload", null, "/tmp/local-feed", true, false, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+            "Test.Workload", null, "/tmp/local-feed", false, false, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -402,7 +402,7 @@ public class WorkloadInstallCommandTests
 
         Assert.Equal(0, exit);
         await _installer.Received(1).InstallFromCatalogAsync(
-            "alias1", null, null, true, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+            "alias1", null, null, false, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -424,7 +424,7 @@ public class WorkloadInstallCommandTests
 
         Assert.Equal(0, exit);
         await _installer.Received(1).InstallFromCatalogAsync(
-            "Test.Workload", null, null, true, false, true, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+            "Test.Workload", null, null, false, false, true, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
         await _store.DidNotReceive().GetWorkloadsAsync(Arg.Any<CancellationToken>());
     }
 

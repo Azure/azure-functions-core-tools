@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 
 namespace Azure.Functions.Cli.Commands.Start.Azurite;
@@ -44,6 +45,9 @@ internal sealed class AzuriteExecutableLocator(
     private string? TryFindProjectLocal(string projectRoot)
     {
         string fileName = _platform.IsWindows ? "azurite.cmd" : "azurite";
+        // TODO: This is OS sensitive and does not honor the platform check.
+        // Needs to be revisited to ensure path concatenation is consitent with the platform injected to ensure tests
+        // behave as expected.
         string candidate = Path.Combine(projectRoot, "node_modules", ".bin", fileName);
         return _hostEnvironment.ExecutableExists(candidate) ? candidate : null;
     }

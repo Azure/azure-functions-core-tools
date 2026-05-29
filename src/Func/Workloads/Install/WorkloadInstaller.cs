@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Options;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
@@ -21,7 +22,8 @@ internal sealed class WorkloadInstaller(
     IWorkloadPaths paths,
     IWorkloadStore store,
     IWorkloadMetadataReader metadataReader,
-    IWorkloadCatalog catalog) : IWorkloadInstaller
+    IWorkloadCatalog catalog,
+    IOptions<WorkloadCatalogOptions> catalogOptions) : IWorkloadInstaller
 {
     /// <summary>
     /// Prefix on nuspec tags that marks the tag as a CLI-facing alias, so
@@ -41,6 +43,7 @@ internal sealed class WorkloadInstaller(
     private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IWorkloadMetadataReader _metadataReader = metadataReader ?? throw new ArgumentNullException(nameof(metadataReader));
     private readonly IWorkloadCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+    private readonly WorkloadCatalogOptions _catalogOptions = catalogOptions?.Value ?? throw new ArgumentNullException(nameof(catalogOptions));
 
     /// <inheritdoc />
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(
@@ -164,6 +167,7 @@ internal sealed class WorkloadInstaller(
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        bool effectiveIncludePrerelease = IncludePrerelease(includePrerelease);
 
         progress?.Report(new WorkloadInstallProgress(
             WorkloadInstallPhase.Resolving,
@@ -171,9 +175,9 @@ internal sealed class WorkloadInstaller(
 
         string resolvedId = exact
             ? packageId
-            : await ResolveAliasOrIdAsync(packageId, source, includePrerelease, cancellationToken);
+            : await ResolveAliasOrIdAsync(packageId, source, effectiveIncludePrerelease, cancellationToken);
 
-        ResolvedPackage resolved = await ResolveCatalogPackageAsync(resolvedId, version, source, includePrerelease, cancellationToken);
+        ResolvedPackage resolved = await ResolveCatalogPackageAsync(resolvedId, version, source, effectiveIncludePrerelease, cancellationToken);
 
         string tempPath = Path.Combine(
             Path.GetTempPath(),
@@ -222,6 +226,7 @@ internal sealed class WorkloadInstaller(
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        bool effectiveIncludePrerelease = IncludePrerelease(includePrerelease);
 
         progress?.Report(new WorkloadInstallProgress(
             WorkloadInstallPhase.Resolving,
@@ -242,7 +247,7 @@ internal sealed class WorkloadInstaller(
 
         ResolvedPackage? resolved = await _catalog.ResolveLatestVersionAsync(
             currentEntry.PackageId,
-            includePrerelease,
+            effectiveIncludePrerelease,
             currentVersion,
             allowMajor,
             source,
@@ -363,6 +368,8 @@ internal sealed class WorkloadInstaller(
 
         return resolved;
     }
+
+    private bool IncludePrerelease(bool includePrerelease) => includePrerelease || _catalogOptions.IncludePrerelease;
 
     private static WorkloadEntry ResolveUpdateTarget(
         string packageId,

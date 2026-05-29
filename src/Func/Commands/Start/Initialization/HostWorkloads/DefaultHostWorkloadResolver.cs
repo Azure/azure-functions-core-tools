@@ -119,9 +119,9 @@ internal sealed class DefaultHostWorkloadResolver(
         string packageId = HostWorkloadPackage.CurrentPackageId;
         ResolvedPackage? package = range is null
             ? await _workloadCatalog.ResolveLatestVersionAsync(
-                packageId, includePrerelease: true, currentVersion: null, allowMajor: true, source: null, cancellationToken)
+                packageId, includePrerelease: false, currentVersion: null, allowMajor: true, source: null, cancellationToken)
             : await _workloadCatalog.ResolveLatestVersionInRangeAsync(
-                packageId, range, includePrerelease: true, source: null, cancellationToken);
+                packageId, range, includePrerelease: false, source: null, cancellationToken);
 
         if (package is not null)
         {
