@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Go Stack</Title>
+    <Title>Go Development Stack</Title>
     <Description>Azure Functions CLI tooling for Go projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:workload alias:go func-workload</PackageTags>
