@@ -48,9 +48,7 @@ public sealed class FirstRunCoordinatorTests
 
     [Theory]
     [InlineData("setup")]
-    [InlineData("help")]
     [InlineData("version")]
-    [InlineData("unknown")]
     public async Task SkipsAndDoesNotMark_ForExcludedCommands(string commandName)
     {
         _stateStore.IsFirstRun().Returns(true);
@@ -73,6 +71,36 @@ public sealed class FirstRunCoordinatorTests
         FirstRunCoordinator coordinator = CreateCoordinator();
 
         await coordinator.EnsureFirstRunPromptedAsync("start", Parse($"start {token}"), CancellationToken.None);
+
+        Assert.Equal(0, _interaction.ConfirmCalls);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+    }
+
+    [Fact]
+    public async Task PromptsOnBareFunc_WhenNoSubcommandGiven()
+    {
+        // Bare `func` produces a "Required command was not provided" parse
+        // error and the resolver labels it "unknown", but it's the canonical
+        // first-run trigger and must still prompt.
+        _stateStore.IsFirstRun().Returns(true);
+        _interaction.ConfirmResponse = false;
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        await coordinator.EnsureFirstRunPromptedAsync("unknown", Parse(string.Empty), CancellationToken.None);
+
+        Assert.Equal(1, _interaction.ConfirmCalls);
+        await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SkipsAndDoesNotMark_WhenParseHasErrorsAndTokensPresent()
+    {
+        // A typo like `func startt` produces tokens and parse errors; we stay
+        // quiet until the user fixes the command line.
+        _stateStore.IsFirstRun().Returns(true);
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        await coordinator.EnsureFirstRunPromptedAsync("unknown", Parse("startt"), CancellationToken.None);
 
         Assert.Equal(0, _interaction.ConfirmCalls);
         await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
