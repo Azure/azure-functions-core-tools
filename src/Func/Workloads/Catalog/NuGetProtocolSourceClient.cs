@@ -162,11 +162,12 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     /// <summary>
     /// Parses the V3 search response and applies a defensive client-side
-    /// filter on each hit's <c>packageTypes</c> array. Feeds that honour
-    /// <c>packageType=</c> server-side return a pre-filtered set; feeds that
-    /// don't (older or non-conforming implementations) get filtered here.
-    /// Hits that omit <c>packageTypes</c> are kept, since the server filter
-    /// already had its chance.
+    /// filter on each hit's <c>packageTypes</c> array. nuget.org honours
+    /// <c>packageType=</c> only when the query string is non-empty; an
+    /// unfiltered <c>func workload search</c> otherwise leaks arbitrary
+    /// matches like <c>Azure.Functions.Cli.Abstractions</c> (see
+    /// azure-functions-core-tools#5198). Hits that omit <c>packageTypes</c>
+    /// are kept, since some V3 feeds don't surface the field.
     /// </summary>
     internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject response, PackageSource source)
     {
@@ -182,6 +183,11 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             string? versionString = (string?)hit["version"];
             if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(versionString) ||
                 !NuGetVersion.TryParse(versionString, out NuGetVersion? version))
+            {
+                continue;
+            }
+
+            if (!HitMatchesWorkloadPackageType(hit["packageTypes"]))
             {
                 continue;
             }
@@ -268,5 +274,31 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         }
 
         return kind;
+    }
+
+    // Hits without a `packageTypes` array fall through (kept): V3 search
+    // responses don't guarantee the field, and dropping silent hits would
+    // empty out compliant feeds. When the array is present, require the
+    // FuncCliWorkload entry so arbitrary nuget.org packages don't leak
+    // through when the server-side `packageType=` filter is ignored (e.g.
+    // for empty queries).
+    private static bool HitMatchesWorkloadPackageType(JToken? packageTypes)
+    {
+        if (packageTypes is not JArray array || array.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (JToken entry in array)
+        {
+            string? name = (string?)entry["name"] ?? (entry as JValue)?.Value as string;
+            if (!string.IsNullOrEmpty(name)
+                && string.Equals(name, FuncCliWorkloadPackageType, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
