@@ -280,6 +280,8 @@ internal sealed class SetupRunner(
                 {
                     _interaction.WriteLine(l => l.Muted($"   [✓] {stack}"));
                 }
+
+                _interaction.WriteBlankLine();
             }
 
             if (choices.PromptChoices.Count == 0)
