@@ -5,17 +5,21 @@ namespace Azure.Functions.Cli.Console;
 
 /// <summary>
 /// One option for <see cref="IInteractionService.PromptForMultiSelectionAsync(string, IEnumerable{MultiSelectionChoice}, CancellationToken)"/>.
-/// <see cref="Value"/> is what callers receive back; <see cref="Label"/> is what the user sees.
+/// <see cref="Value"/> is what callers receive back; <see cref="Label"/> is what the
+/// user sees (Spectre markup allowed). Set <see cref="IsPreselected"/> to render the
+/// choice checked when the prompt opens. Set <see cref="IsDisabled"/> to surface a
+/// read-only entry: it still renders in the list (and is dropped from the result),
+/// so callers can show "already-done" items in context without offering them as
+/// actionable choices.
 /// </summary>
-/// <remarks>
-/// Splitting display text from the underlying value lets callers decorate
-/// choices (for example, with an "(installed)" suffix) without leaking
-/// presentation concerns into the value the caller acts on.
-/// </remarks>
 internal sealed record MultiSelectionChoice(string Value, string Label)
 {
     public MultiSelectionChoice(string value)
         : this(value, value)
     {
     }
+
+    public bool IsPreselected { get; init; }
+
+    public bool IsDisabled { get; init; }
 }
