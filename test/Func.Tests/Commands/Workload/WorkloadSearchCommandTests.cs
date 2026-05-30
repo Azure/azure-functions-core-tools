@@ -98,8 +98,7 @@ public class WorkloadSearchCommandTests
         Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.2.3"));
         Assert.Contains(_interaction.Lines, l => l.StartsWith("Package ID:") && l.EndsWith("func.workload.python"));
         Assert.Contains(_interaction.Lines, l => l.StartsWith("Alias:") && l.EndsWith("python"));
-        Assert.Contains("Description:", _interaction.Lines);
-        Assert.Contains("Python workload", _interaction.Lines);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith("Python workload"));
         Assert.Contains("HINT: Showing 1 result.", _interaction.Lines);
         Assert.Contains("HINT: Run 'func workload install <alias>' to install one.", _interaction.Lines);
     }
@@ -144,8 +143,8 @@ public class WorkloadSearchCommandTests
         // Alias line present, value empty.
         string aliasLine = _interaction.Lines.Single(l => l.StartsWith("Alias:"));
         Assert.Equal("Alias:", aliasLine.TrimEnd());
-        // No description -> placeholder.
-        Assert.Contains("(no description)", _interaction.Lines);
+        // No description -> placeholder shown on the Description: line.
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith("(no description)"));
     }
 
     [Fact]
@@ -166,7 +165,7 @@ public class WorkloadSearchCommandTests
     }
 
     [Fact]
-    public async Task Search_LongDescription_RenderedInFullOnItsOwnLine()
+    public async Task Search_LongDescription_RenderedInFullOnDescriptionLine()
     {
         string longDesc = new('x', 500);
         StubSearch(
@@ -181,9 +180,9 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog);
         await InvokeAsync(cmd);
 
-        // The card layout gives description the full terminal width on its
-        // own line, so we keep the full string verbatim instead of truncating.
-        Assert.Contains(longDesc, _interaction.Lines);
+        // Card layout keeps the description on its own Description: line and
+        // emits the full string verbatim rather than truncating it.
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith(longDesc));
     }
 
     [Fact]

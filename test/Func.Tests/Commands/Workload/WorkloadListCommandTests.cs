@@ -125,8 +125,7 @@ public class WorkloadListCommandTests
         Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.0.0"));
         Assert.Contains(_interaction.Lines, l => l.StartsWith("Package ID:") && l.EndsWith("Azure.Functions.Cli.Workloads.Dotnet"));
         Assert.Contains(_interaction.Lines, l => l.StartsWith("Alias:") && l.EndsWith("dotnet"));
-        Assert.Contains("Description:", _interaction.Lines);
-        Assert.Contains("C# / F# workload.", _interaction.Lines);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith("C# / F# workload."));
     }
 
     [Fact]
@@ -145,9 +144,9 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
 
-        // Card layout owns the full terminal width, so the description is
-        // emitted verbatim rather than truncated like the legacy table cell.
-        Assert.Contains(longDescription, _interaction.Lines);
+        // Card now puts description inline next to its label, so the full
+        // string lands at the end of that line verbatim.
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith(longDescription));
     }
 
     [Fact]
