@@ -268,7 +268,21 @@ internal sealed class SetupRunner(
         {
             StackChoicesResult choices = await BuildStackChoicesAsync(cancellationToken);
 
-            if (!choices.HasAvailable)
+            // Render installed stacks as static "fake checkbox" lines above
+            // the prompt so they're visible in context but cannot be toggled
+            // (Spectre's MultiSelectionPrompt has no read-only items, and a
+             // toggle visually implies an uninstall that `func setup` doesn't do).
+            if (choices.InstalledStacks.Count > 0)
+            {
+                _interaction.WriteBlankLine();
+                _interaction.WriteLine(l => l.Muted("Already installed (use `func workload uninstall <name>` to remove):"));
+                foreach (string stack in choices.InstalledStacks)
+                {
+                    _interaction.WriteLine(l => l.Muted($"   [✓] {stack}"));
+                }
+            }
+
+            if (choices.PromptChoices.Count == 0)
             {
                 // Every supported stack is already installed; nothing to
                 // offer. Treat as a clean opt-out so the caller marks the
@@ -307,44 +321,32 @@ internal sealed class SetupRunner(
         }
         catch (Exception)
         {
-            // Filtering installed stacks is a UX hint, not a contract.
-            // If we can't read the store, fall back to showing every stack
-            // so the user can still make a selection.
+            // Surfacing installed stacks is a UX hint, not a contract. If we
+            // can't read the store, fall back to showing every stack as
+            // available so the user can still make a selection.
             installedStackPackageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        List<MultiSelectionChoice> available = [];
-        List<MultiSelectionChoice> installedChoices = [];
-        int availableCount = 0;
+        List<MultiSelectionChoice> promptChoices = [];
+        List<string> installedStacks = [];
         foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
         {
             if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
             {
-                installedChoices.Add(new MultiSelectionChoice(stack, $"[grey]{stack} (installed)[/]")
-                {
-                    IsPreselected = true,
-                    IsDisabled = true,
-                });
+                installedStacks.Add(stack);
             }
             else
             {
-                available.Add(new MultiSelectionChoice(stack, stack));
-                availableCount++;
+                promptChoices.Add(new MultiSelectionChoice(stack, stack));
             }
         }
 
-        // Render available stacks first so the user's cursor lands on something
-        // actionable; installed stacks trail as muted, read-only entries.
-        List<MultiSelectionChoice> promptChoices = [.. available, .. installedChoices];
-        return new StackChoicesResult(promptChoices, availableCount);
+        return new StackChoicesResult(promptChoices, installedStacks);
     }
 
     private readonly record struct StackChoicesResult(
         IReadOnlyList<MultiSelectionChoice> PromptChoices,
-        int AvailableCount)
-    {
-        public bool HasAvailable => AvailableCount > 0;
-    }
+        IReadOnlyList<string> InstalledStacks);
 
     private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(SetupCommandOptions options, SetupRenderer renderer, CancellationToken cancellationToken)
     {

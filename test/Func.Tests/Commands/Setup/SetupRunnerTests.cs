@@ -647,7 +647,7 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_InteractiveEmptyFolder_RendersInstalledStacksAsDisabledChoices()
+    public async Task RunAsync_InteractiveEmptyFolder_RendersInstalledStacksAsStaticLines_AboveThePrompt()
     {
         const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
         FakeCatalog catalog = Catalog()
@@ -684,11 +684,14 @@ public sealed class SetupRunnerTests : IDisposable
                 SetupOutputMode.Plain),
             CancellationToken.None);
 
-        // The stand-alone "Already installed: node" hint is gone; installed stacks
-        // now surface inline in the prompt as muted, read-only entries.
-        Assert.DoesNotContain(interactive.Lines, line => line.StartsWith("HINT:", StringComparison.Ordinal) && line.Contains("Already installed", StringComparison.Ordinal));
-        Assert.Contains(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node (installed)", StringComparison.Ordinal));
-        Assert.Contains(interactive.MultiSelectionChoices, group => group.Any(c => c.Value == "node" && c.IsDisabled && c.IsPreselected));
+        // Installed stacks render as static "fake checkbox" lines above the
+        // prompt with the uninstall hint, and are kept out of the multi-select
+        // entirely so the user can't toggle them.
+        Assert.Contains(interactive.Lines, line => line.Contains("Already installed", StringComparison.Ordinal)
+            && line.Contains("func workload uninstall", StringComparison.Ordinal));
+        Assert.Contains(interactive.Lines, line => line.Contains("[✓] node", StringComparison.Ordinal));
+        Assert.DoesNotContain(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node", StringComparison.Ordinal));
+        Assert.DoesNotContain(interactive.MultiSelectionChoices.SelectMany(g => g), c => c.Value == "node");
     }
 
     [Fact]
@@ -939,11 +942,8 @@ public sealed class SetupRunnerTests : IDisposable
         {
             var picks = choices.ToList();
             base.PromptForMultiSelectionAsync(title, picks, cancellationToken).GetAwaiter().GetResult();
-            // Mirror the Spectre service: disabled choices are read-only decoration
-            // and never appear in the user's selection.
-            List<MultiSelectionChoice> selectable = [.. picks.Where(c => !c.IsDisabled)];
-            MultiSelectionChoice? first = selectable.FirstOrDefault(c => string.Equals(c.Value, "node", StringComparison.OrdinalIgnoreCase))
-                ?? selectable.FirstOrDefault();
+            MultiSelectionChoice? first = picks.FirstOrDefault(c => string.Equals(c.Value, "node", StringComparison.OrdinalIgnoreCase))
+                ?? picks.FirstOrDefault();
             return Task.FromResult<IReadOnlyList<string>>(first is null ? [] : [first.Value]);
         }
     }
