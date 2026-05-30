@@ -64,10 +64,10 @@ internal sealed class GoFunctionsProject : FunctionsProject
         if (context.SkipBuild)
         {
             // Go projects compile to bin/app; with --no-build the user is
-            // asserting that binary already exists. Trust them, skip the build,
-            // but still point the host at bin/ so it can find the executable
-            // and the function metadata generated alongside it.
-            context.StartupDirectory = new DirectoryInfo(binDirectory);
+            // asserting that binary already exists. Trust them and skip the
+            // build. Leave StartupDirectory at the project root so host.json
+            // is found there and the worker's `defaultExecutablePath = bin/app`
+            // resolves to <project>/bin/app.
             return;
         }
 
@@ -96,7 +96,10 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
-        context.StartupDirectory = new DirectoryInfo(binDirectory);
+        // StartupDirectory stays at the project root: host.json lives there, and the Go
+        // worker's `defaultExecutablePath = bin/app` is resolved relative to the script
+        // root, so AzureWebJobsScriptRoot pointing at the project root yields the
+        // correct <project>/bin/app launch path.
     }
 
     private static async Task<(int Major, int Minor)?> DefaultReadGoVersion(CancellationToken cancellationToken)
