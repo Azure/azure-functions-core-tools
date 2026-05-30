@@ -50,7 +50,9 @@ public class GoFunctionsProjectTests : IDisposable
         string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
         Assert.Equal(_projectDir.FullName, observedRoot);
         Assert.Equal(Path.Combine(_projectDir.FullName, "bin", expectedName), observedOutput);
-        Assert.Equal(Path.Combine(_projectDir.FullName, "bin"), context.StartupDirectory.FullName);
+        // StartupDirectory must remain the project root so the host finds host.json
+        // and the worker's `defaultExecutablePath = bin/app` resolves correctly.
+        Assert.Equal(_projectDir.FullName, context.StartupDirectory.FullName);
     }
 
     [Fact]
@@ -80,7 +82,7 @@ public class GoFunctionsProjectTests : IDisposable
         await project.PrepareForHostRunAsync(context, default);
 
         Assert.False(invoked);
-        Assert.Equal(Path.Combine(_projectDir.FullName, "bin"), context.StartupDirectory.FullName);
+        Assert.Equal(_projectDir.FullName, context.StartupDirectory.FullName);
     }
 
     [Fact]
