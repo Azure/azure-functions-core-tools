@@ -42,6 +42,8 @@ namespace Azure.Functions.Cli.Templates.V2;
 /// </remarks>
 internal sealed class V2TemplateEngine
 {
+    private const string FunctionNameVariable = "FUNCTION_NAME_INPUT";
+
     private static readonly Regex _substitutionPattern = new(@"\$\(([A-Za-z_][A-Za-z0-9_]*)\)", RegexOptions.Compiled);
 
     public TemplateApplicationResult Apply(
@@ -60,7 +62,7 @@ internal sealed class V2TemplateEngine
 
         var variables = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["FUNCTION_NAME_INPUT"] = functionName,
+            [FunctionNameVariable] = SanitizeFunctionIdentifier(functionName),
         };
 
         if (job?.Inputs is { Count: > 0 })
@@ -89,7 +91,15 @@ internal sealed class V2TemplateEngine
 
                 if (value is not null)
                 {
-                    variables[varName] = value;
+                    // The function name token is rendered as a Python `def`
+                    // or JS/TS function identifier in generated source, so
+                    // sanitize it here too. Without this, a name like
+                    // "HttpTrigger-Python" passed through the prompt
+                    // pipeline would emit `def HttpTrigger-Python(...)` and
+                    // fail at parse time with SyntaxError.
+                    variables[varName] = varName == FunctionNameVariable
+                        ? SanitizeFunctionIdentifier(value)
+                        : value;
                 }
             }
         }
@@ -341,4 +351,33 @@ internal sealed class V2TemplateEngine
 
     private static TemplateApplicationResult.Failed Failed(string message)
         => new(new TemplateApplicationFailure.ProviderError(message, null));
+
+    /// <summary>
+    /// Sanitizes a user-supplied function name so it is safe to emit as a Python
+    /// or JavaScript/TypeScript identifier in generated template code. Replaces
+    /// any character outside <c>[A-Za-z0-9_]</c> with <c>_</c> and prefixes a
+    /// leading <c>_</c> when the first character is a digit.
+    /// </summary>
+    internal static string SanitizeFunctionIdentifier(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return name;
+        }
+
+        var sanitized = new System.Text.StringBuilder(name.Length + 1);
+        foreach (char c in name)
+        {
+            bool isAsciiLetter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+            bool isAsciiDigit = c >= '0' && c <= '9';
+            sanitized.Append(isAsciiLetter || isAsciiDigit || c == '_' ? c : '_');
+        }
+
+        if (sanitized[0] >= '0' && sanitized[0] <= '9')
+        {
+            sanitized.Insert(0, '_');
+        }
+
+        return sanitized.ToString();
+    }
 }
