@@ -149,13 +149,27 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IProjectInitializer? initializer;
         if (adoptExisting)
         {
+            // Resolve both signals to a concrete initializer (or null) using
+            // alias-aware matching, so e.g. "dotnet-isolated" in
+            // local.settings.json maps to the dotnet initializer and
+            // `--stack dotnet` is recognized as agreeing with it.
+            IProjectInitializer? requested = !string.IsNullOrWhiteSpace(requestedStack)
+                ? FindInitializerForCandidate(requestedStack)
+                : null;
+            IProjectInitializer? declared = projectRuntime is not null
+                ? FindInitializerForCandidate(projectRuntime)
+                : null;
+
             // Explicit --stack that disagrees with the project's declared
             // runtime is almost certainly a mistake (it would produce a
             // .func/config.json that doesn't match what `func start` would
-            // run). --force is the existing escape hatch.
-            if (!string.IsNullOrWhiteSpace(requestedStack)
-                && projectRuntime is not null
-                && !string.Equals(requestedStack, projectRuntime, StringComparison.OrdinalIgnoreCase))
+            // run). --force is the existing escape hatch. We only block on a
+            // genuine conflict: when both signals resolve to known stacks
+            // and those stacks differ. An uninstalled-vs-installed mismatch
+            // is handled below by the "not installed" path.
+            if (requested is not null
+                && declared is not null
+                && !string.Equals(requested.Stack, declared.Stack, StringComparison.OrdinalIgnoreCase))
             {
                 _interaction.WriteError(
                     $"--stack '{requestedStack}' conflicts with the project's runtime '{projectRuntime}'. " +
@@ -166,29 +180,24 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             // Pick a candidate: explicit --stack wins, else snap to the
             // project's declared runtime.
             string? candidate = !string.IsNullOrWhiteSpace(requestedStack) ? requestedStack : projectRuntime;
+            initializer = requested ?? declared;
 
-            if (candidate is not null)
+            if (candidate is not null && initializer is null)
             {
-                initializer = _initializers.FirstOrDefault(i =>
-                    string.Equals(i.Stack, candidate, StringComparison.OrdinalIgnoreCase));
-
-                if (initializer is null)
-                {
-                    // Candidate isn't an installed stack. Refuse rather than
-                    // write a config we can't validate. The hint uses a
-                    // `<stack>` placeholder on purpose: the candidate string
-                    // may itself be unknown (e.g. a typo, or "native" for
-                    // Go) and echoing it would promise a `func setup`
-                    // command that won't necessarily work.
-                    _interaction.WriteError(
-                        $"The '{candidate}' stack is not installed. " +
-                        "Run `func setup --features <stack>` to setup your dev environment, then re-run `func init`.");
-                    return 1;
-                }
-
-                requestedStack = initializer.Stack;
+                // Candidate isn't an installed stack (and isn't an alias of
+                // one). Refuse rather than write a config we can't validate.
+                // The hint uses a `<stack>` placeholder on purpose: the
+                // candidate string may itself be unknown (e.g. a typo or a
+                // runtime value with no installed alias owner) and echoing
+                // it would promise a `func setup` command that won't
+                // necessarily work.
+                _interaction.WriteError(
+                    $"The '{candidate}' stack is not installed. " +
+                    "Run `func setup --features <stack>` to setup your dev environment, then re-run `func init`.");
+                return 1;
             }
-            else
+
+            if (initializer is null)
             {
                 // No project signal and no --stack. Don't auto-select: even
                 // when only one initializer is installed, writing the wrong
@@ -199,9 +208,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 {
                     return 1;
                 }
-
-                requestedStack = initializer.Stack;
             }
+
+            requestedStack = initializer.Stack;
         }
         else
         {
@@ -386,6 +395,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     {
         string? raw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
         return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+    }
+
+    // Resolves a candidate string (from --stack or local.settings.json) to
+    // an installed initializer. Matches against each initializer's canonical
+    // Stack id first, then its WorkerRuntimeAliases (e.g. "dotnet-isolated"
+    // → dotnet, "native" → go). Case-insensitive.
+    private IProjectInitializer? FindInitializerForCandidate(string candidate)
+    {
+        return _initializers.FirstOrDefault(i =>
+            string.Equals(i.Stack, candidate, StringComparison.OrdinalIgnoreCase)
+            || i.WorkerRuntimeAliases.Any(a => string.Equals(a, candidate, StringComparison.OrdinalIgnoreCase)));
     }
 
     // Adoption-mode stack picker for the "no project signal" case. We never

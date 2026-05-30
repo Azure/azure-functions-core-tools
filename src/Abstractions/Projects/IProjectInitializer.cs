@@ -22,6 +22,16 @@ public interface IProjectInitializer
     public string Stack { get; }
 
     /// <summary>
+    /// Additional <c>FUNCTIONS_WORKER_RUNTIME</c> values that should resolve
+    /// to this stack. Used during <c>func init</c> adoption to map the
+    /// runtime string in <c>local.settings.json</c> (e.g. "dotnet-isolated",
+    /// "native") to the canonical <see cref="Stack"/> id. Matching is
+    /// case-insensitive. Defaults to an empty list, which means
+    /// "<see cref="Stack"/> is the only accepted runtime value".
+    /// </summary>
+    public IReadOnlyList<string> WorkerRuntimeAliases => [];
+
+    /// <summary>
     /// Human-friendly name for this stack shown in interactive prompts and help text
     /// (e.g. ".NET", "Node.js"). Defaults to <see cref="Stack"/> when not overridden.
     /// </summary>

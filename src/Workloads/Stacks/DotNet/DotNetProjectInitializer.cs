@@ -31,6 +31,8 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
     public string DisplayName => ".NET";
 
+    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["dotnet-isolated"];
+
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
     {
         { "C#", ["csharp"] },
