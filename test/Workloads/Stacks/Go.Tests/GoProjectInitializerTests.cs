@@ -61,7 +61,7 @@ public class GoProjectInitializerTests : IDisposable
         string goMod = File.ReadAllText(Path.Combine(_projectDir.FullName, "go.mod"));
         Assert.Contains("module my-go-app", goMod);
         Assert.Contains("go 1.24", goMod);
-        Assert.Contains("github.com/azure/azure-functions-golang-worker", goMod);
+        Assert.Contains($"{GoFunctionsProject.WorkerModulePath} {GoFunctionsProject.WorkerModuleVersion}", goMod);
 
         string mainGo = File.ReadAllText(Path.Combine(_projectDir.FullName, "main.go"));
         Assert.Contains("github.com/azure/azure-functions-golang-worker/sdk", mainGo);

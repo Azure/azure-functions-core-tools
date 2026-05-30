@@ -111,11 +111,66 @@ public class GoFunctionsProjectTests : IDisposable
         Assert.Contains("Go 1.21 is not supported", ex.Message);
     }
 
+    [Fact]
+    public async Task PrepareForHostRun_syncs_modules_before_building()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n\ngo 1.24\n");
+
+        var calls = new List<string>();
+        GoFunctionsProject project = CreateProject((_, _, _) =>
+        {
+            calls.Add("build");
+            return Task.FromResult((0, string.Empty));
+        });
+        project.SyncGoModules = (root, modulePath, moduleVersion, _) =>
+        {
+            calls.Add($"sync:{root}:{modulePath}@{moduleVersion}");
+            return Task.FromResult((0, string.Empty));
+        };
+
+        await project.PrepareForHostRunAsync(CreateContext(), default);
+
+        Assert.Equal(2, calls.Count);
+        Assert.Equal($"sync:{_projectDir.FullName}:{GoFunctionsProject.WorkerModulePath}@{GoFunctionsProject.WorkerModuleVersion}", calls[0]);
+        Assert.Equal("build", calls[1]);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_throws_graceful_when_sync_fails()
+    {
+        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        project.SyncGoModules = (_, _, _, _) => Task.FromResult((1, "module not found"));
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => project.PrepareForHostRunAsync(CreateContext(), default));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("sync Go modules", ex.Message);
+        Assert.Contains("module not found", ex.Message);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_skips_sync_when_SkipBuild()
+    {
+        bool syncInvoked = false;
+        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        project.SyncGoModules = (_, _, _, _) =>
+        {
+            syncInvoked = true;
+            return Task.FromResult((0, string.Empty));
+        };
+
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+
+        Assert.False(syncInvoked);
+    }
+
     private GoFunctionsProject CreateProject(Func<string, string, CancellationToken, Task<(int, string)>> runner)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
             RunGoBuild = runner,
             ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 24)),
+            SyncGoModules = (_, _, _, _) => Task.FromResult((0, string.Empty)),
         };
 
     private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
