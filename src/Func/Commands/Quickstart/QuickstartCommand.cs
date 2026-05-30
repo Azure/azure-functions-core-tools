@@ -310,7 +310,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             .ToList();
 
         return languages.Count == 0
-            ? "The programming language. Install a stack workload (`func workload install <id>`) to see supported values."
+            ? "The programming language. Set up a stack (`func setup --features <id>`) to see supported values."
             : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
     }
 }

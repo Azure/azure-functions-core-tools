@@ -34,7 +34,7 @@ public class InitCommandTests
     }
 
     [Fact]
-    public void InitCommand_StackOptionDescription_NoInitializers_PointsAtWorkloadInstall()
+    public void InitCommand_StackOptionDescription_NoInitializers_PointsAtSetup()
     {
         var cmd = new InitCommand(_interaction, _hintRenderer, []);
         string description = cmd.StackOption.Description ?? string.Empty;
