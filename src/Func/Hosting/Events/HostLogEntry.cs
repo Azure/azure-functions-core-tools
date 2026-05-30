@@ -33,6 +33,8 @@ internal sealed record HostLogEntry(
     public static IReadOnlyDictionary<string, object?> EmptyAttributes { get; } =
         new Dictionary<string, object?>(0);
 
+    public HostLogExceptionDetails? ExceptionDetails { get; init; } = Exception is not null ? HostLogExceptionDetails.FromException(Exception) : null;
+
     /// <summary>
     /// Convenience accessor: returns the attribute value as <typeparamref name="T"/>
     /// when present and assignable, otherwise <paramref name="fallback"/>.

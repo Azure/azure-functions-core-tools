@@ -107,7 +107,7 @@ internal sealed class RawHostLogCaptureProvider : ILoggerProvider, ISupportExter
             WriteScopes(writer);
             if (exception is not null)
             {
-                WriteException(writer, exception);
+                HostStructuredEventWriter.WriteException(writer, exception);
             }
 
             writer.WriteEndObject();
@@ -189,19 +189,6 @@ internal sealed class RawHostLogCaptureProvider : ILoggerProvider, ISupportExter
         {
             writer.WriteString("type", scope.GetType().FullName);
             writer.WriteString("text", Convert.ToString(scope, CultureInfo.InvariantCulture));
-        }
-
-        writer.WriteEndObject();
-    }
-
-    private static void WriteException(Utf8JsonWriter writer, Exception exception)
-    {
-        writer.WriteStartObject("exception");
-        writer.WriteString("type", exception.GetType().FullName ?? exception.GetType().Name);
-        writer.WriteString("message", exception.Message);
-        if (!string.IsNullOrEmpty(exception.StackTrace))
-        {
-            writer.WriteString("stack", exception.StackTrace);
         }
 
         writer.WriteEndObject();

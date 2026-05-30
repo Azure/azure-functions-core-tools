@@ -132,7 +132,15 @@ for every entry the host produces.
   "event_id": 1,
   "event_name": "InvocationStarted",
   "message": "Executing 'HttpTrigger1' (Reason='HTTP', Id=…)",
-  "exception": null,
+  "exception": {
+    "type": "System.InvalidOperationException",
+    "message": "Access denied",
+    "stack": "at Functions.HttpTrigger1.Run(...)",
+    "inner_exception": {
+      "type": "Worker.UserException",
+      "message": "Underlying worker failure"
+    }
+  },
   "attributes": {
     "function.name": "HttpTrigger1",
     "function.invocation_id": "8f2a1c92-3d04-4e1f-9a55-2e4f7a9e8b01",
@@ -148,7 +156,7 @@ for every entry the host produces.
 | `event_id` | number | Numeric EventId (often `0` if unspecified). |
 | `event_name` | string \| absent | Friendly EventId name when present. |
 | `message` | string | The rendered log message. |
-| `exception` | object \| `null` | `{ type, message, stack? }` when the entry carried an exception. |
+| `exception` | object \| absent | `{ type, message, stack?, inner_exception? }` when the entry carried an exception. `inner_exception` repeats the same shape recursively. |
 | `attributes` | object | Free-form key-value bag. Well-known keys listed in *Attribute conventions* below. |
 
 ### `host_state_changed`
@@ -258,7 +266,12 @@ duration; carries `error` details if the invocation failed.
   "duration_ms": 38,
   "error": {
     "type": "System.IO.IOException",
-    "message": "Access denied"
+    "message": "Access denied",
+    "stack": "at Functions.HttpTrigger1.Run(...)",
+    "inner_exception": {
+      "type": "Worker.UserException",
+      "message": "Underlying worker failure"
+    }
   }
 }
 ```
@@ -267,7 +280,7 @@ duration; carries `error` details if the invocation failed.
 |-------|------|-------|
 | `result` | string | `succeeded` or `failed`. |
 | `duration_ms` | number \| absent | Wall-clock execution time. |
-| `error` | object \| absent | `{ type, message }` when `result == "failed"`. |
+| `error` | object \| absent | `{ type, message, stack?, inner_exception? }` when `result == "failed"`. `inner_exception` repeats the same shape recursively. |
 
 ### `cli_diagnostic`
 

@@ -303,8 +303,7 @@ internal sealed class DashboardState
             _succeededInvocations++;
         }
 
-        string? errorType = null;
-        string? errorMessage = null;
+        HostLogExceptionDetails? error = failed ? entry.ExceptionDetails : null;
 
         if (_functions.TryGetValue(name, out FunctionEntry? f))
         {
@@ -320,12 +319,7 @@ internal sealed class DashboardState
             {
                 f.TotalErrors++;
                 f.Status = FunctionStatus.Error;
-                if (entry.Exception is not null)
-                {
-                    errorType = entry.Exception.GetType().FullName;
-                    errorMessage = entry.Exception.Message;
-                    f.LastErrorMessage = errorMessage;
-                }
+                f.LastErrorMessage = error?.FormatSummary();
             }
             else if (f.ActiveInvocations == 0 && f.Status != FunctionStatus.Error)
             {
@@ -334,7 +328,7 @@ internal sealed class DashboardState
         }
 
         string? trace = entry.GetAttribute<string>(HostLogAttributeKeys.TraceId);
-        return new InvocationCompletedEvent(entry.Timestamp, name, id, trace, result, duration, errorType, errorMessage);
+        return new InvocationCompletedEvent(entry.Timestamp, name, id, trace, result, duration, error);
     }
 
     private static bool IsImplicitFunctionDiscovery(HostLogEntry entry, string? kind)

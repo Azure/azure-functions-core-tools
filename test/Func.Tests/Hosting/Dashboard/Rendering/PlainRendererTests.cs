@@ -72,6 +72,86 @@ public class PlainRendererTests
         Assert.DoesNotContain("\u001b]8;", output);
     }
 
+    [Fact]
+    public async Task FailedInvocation_RendersExceptionSummaryOnce()
+    {
+        (PlainRenderer renderer, StringWriter writer, _) = NewRenderer();
+        var state = new DashboardState();
+        var exceptionDetails = new HostLogExceptionDetails(
+            "Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException",
+            "Language worker process exited.",
+            Stack: null,
+            InnerException: new HostLogExceptionDetails("System.InvalidOperationException", "A connection string was not found.", null, null));
+        HostLogEntry entry = MakeEntry(
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.CliEventKind] = CliEventKinds.InvocationCompleted,
+                [HostLogAttributeKeys.FunctionName] = "HttpTrigger1",
+                [HostLogAttributeKeys.FunctionInvocationId] = "11111111-1111-1111-1111-111111111111",
+                [HostLogAttributeKeys.FunctionResult] = "failed",
+                [HostLogAttributeKeys.DurationMs] = 10d,
+            },
+            category: "Function.HttpTrigger1",
+            level: LogLevel.Error,
+            message: "Executed 'Functions.HttpTrigger1' (Failed, Id=11111111-1111-1111-1111-111111111111, Duration=10ms)",
+            exceptionDetails: exceptionDetails);
+
+        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+
+        string output = writer.ToString();
+        Assert.Contains("[invocation end]", output);
+        Assert.Contains("WorkerProcessExitException", output);
+        Assert.Equal(1, CountOccurrences(output, "A connection string was not found."));
+    }
+
+    [Fact]
+    public async Task LogEnvelope_WithExceptionDetails_RendersSummaryAndKeepsShortCategory()
+    {
+        (PlainRenderer renderer, StringWriter writer, _) = NewRenderer();
+        var state = new DashboardState();
+        var exceptionDetails = new HostLogExceptionDetails(
+            "Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException",
+            "Language worker process exited.",
+            Stack: null,
+            InnerException: new HostLogExceptionDetails("System.InvalidOperationException", "A connection string was not found.", null, null));
+        HostLogEntry entry = MakeEntry(
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.CliEventKind] = CliEventKinds.Log,
+            },
+            category: "Grpc",
+            level: LogLevel.Error,
+            message: "Executed 'Functions.HttpTrigger1' (Failed, Id=11111111-1111-1111-1111-111111111111, Duration=10ms)",
+            exceptionDetails: exceptionDetails);
+
+        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+
+        string output = writer.ToString();
+        Assert.Contains("Grpc", output);
+        Assert.DoesNotContain("Microsoft.Azure.WebJobs.Script.Grpc", output);
+        Assert.Contains("WorkerProcessExitException", output);
+        Assert.Contains("A connection string was not found.", output);
+    }
+
+    [Fact]
+    public async Task Log_WithExceptionDetailsOnly_RendersSummary()
+    {
+        (PlainRenderer renderer, StringWriter writer, _) = NewRenderer();
+        var state = new DashboardState();
+        HostLogEntry entry = MakeEntry(
+            [],
+            category: "Grpc",
+            level: LogLevel.Error,
+            message: string.Empty,
+            exceptionDetails: new HostLogExceptionDetails("System.InvalidOperationException", "A connection string was not found.", null, null));
+
+        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+
+        string output = writer.ToString();
+        Assert.Contains("Grpc", output);
+        Assert.Contains("A connection string was not found.", output);
+    }
+
     private static async Task PumpScenarioAsync(PlainRenderer renderer)
     {
         var state = new DashboardState();
@@ -110,10 +190,23 @@ public class PlainRendererTests
             Interactive = InteractionSupport.No,
             Out = new AnsiConsoleOutput(writer),
         });
+        console.Profile.Width = 240;
+
         var interaction = new SpectreInteractionService(new DefaultTheme(), console, console);
         return (new PlainRenderer(interaction, console), writer, console);
     }
 
-    private static HostLogEntry MakeEntry(Dictionary<string, object?> attrs)
-        => new(DateTimeOffset.UtcNow, "Host.Lifecycle", LogLevel.Information, default, "msg", null, attrs);
+    private static HostLogEntry MakeEntry(
+        Dictionary<string, object?> attrs,
+        string category = "Host.Lifecycle",
+        LogLevel level = LogLevel.Information,
+        string message = "msg",
+        HostLogExceptionDetails? exceptionDetails = null)
+    {
+        var entry = new HostLogEntry(DateTimeOffset.UtcNow, category, level, default, message, null, attrs);
+        return exceptionDetails is not null ? entry with { ExceptionDetails = exceptionDetails } : entry;
+    }
+
+    private static int CountOccurrences(string value, string search)
+        => (value.Length - value.Replace(search, string.Empty, StringComparison.Ordinal).Length) / search.Length;
 }

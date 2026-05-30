@@ -58,7 +58,12 @@ public class HostProcessOutputParserTests
               "exception": {
                 "type": "System.InvalidOperationException",
                 "message": "boom",
-                "stack": "remote stack"
+                "stack": "remote stack",
+                "inner_exception": {
+                  "type": "Worker.UserException",
+                  "message": "inner boom",
+                  "stack": "inner stack"
+                }
               }
             }
             """;
@@ -82,6 +87,13 @@ public class HostProcessOutputParserTests
         Assert.NotNull(methods);
         Assert.Equal(["get", "post"], methods);
         Assert.Equal("boom", entry.Exception?.Message);
+        Assert.NotNull(entry.ExceptionDetails);
+        Assert.Equal("System.InvalidOperationException", entry.ExceptionDetails.Type);
+        Assert.Equal("remote stack", entry.ExceptionDetails.Stack);
+        Assert.NotNull(entry.ExceptionDetails.InnerException);
+        Assert.Equal("Worker.UserException", entry.ExceptionDetails.InnerException.Type);
+        Assert.Equal("inner boom", entry.ExceptionDetails.InnerException.Message);
+        Assert.Equal("inner stack", entry.ExceptionDetails.InnerException.Stack);
     }
 
     [Fact]

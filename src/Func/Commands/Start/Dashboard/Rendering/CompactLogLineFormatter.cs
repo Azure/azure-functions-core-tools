@@ -99,7 +99,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                     bool failed = string.Equals(inv.Result, "failed", StringComparison.OrdinalIgnoreCase);
                     string arrow = failed ? $"[{ErrorTag}]✗[/]" : $"[{SuccessTag}]←[/]";
                     string suffix = failed
-                        ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorType ?? string.Empty)}: {Markup.Escape(inv.ErrorMessage ?? string.Empty)}[/]"
+                        ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorSummary ?? string.Empty)}[/]"
                         : $"[{MutedTag}]{(inv.DurationMs.HasValue ? ((long)inv.DurationMs.Value).ToString(CultureInfo.InvariantCulture) + "ms" : string.Empty)}[/]";
 
                     return CreateSingleLine(
@@ -127,11 +127,24 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
 
         string prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
         int prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
-        return CreateWrappedLine(prefix, prefixWidth, entry.Message, functionName, isError, effectiveLogLevel);
+        return CreateWrappedLine(prefix, prefixWidth, FormatMessage(entry), functionName, isError, effectiveLogLevel);
     }
 
     private static CompactLogLine CreateSingleLine(string markup, string? functionName, bool isError, LogLevel level)
         => new(new Markup(markup), functionName, isError, level);
+
+    private static string FormatMessage(HostLogEntry entry)
+    {
+        string? exceptionSummary = entry.ExceptionDetails?.FormatSummary();
+        if (string.IsNullOrEmpty(exceptionSummary))
+        {
+            return entry.Message;
+        }
+
+        return string.IsNullOrWhiteSpace(entry.Message)
+            ? exceptionSummary
+            : entry.Message + Environment.NewLine + exceptionSummary;
+    }
 
     private static CompactLogLine CreateWrappedLine(
         string prefixMarkup,
@@ -211,8 +224,9 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             return true;
         }
 
-        return string.IsNullOrWhiteSpace(entry.Message)
-            || IsFunctionsInvocationEnvelope(entry.Message);
+        return entry.ExceptionDetails is null
+            && (string.IsNullOrWhiteSpace(entry.Message)
+                || IsFunctionsInvocationEnvelope(entry.Message));
     }
 
     private static bool IsFunctionsInvocationEnvelope(string message)
