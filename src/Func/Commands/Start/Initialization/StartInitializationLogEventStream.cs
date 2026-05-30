@@ -4,6 +4,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -44,6 +45,12 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
                 case StartInitializationStepCompletedEvent completed:
                     entries.Add(CreateEntry(completed, stepsById));
                     break;
+                case StartInitializationStepFailedEvent failed:
+                    entries.Add(CreateEntry(failed, stepsById));
+                    break;
+                case StartInitializationLogEvent log:
+                    entries.Add(CreateEntry(log));
+                    break;
             }
         }
 
@@ -73,6 +80,57 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
             Exception: null,
             attributes);
     }
+
+    private static HostLogEntry CreateEntry(
+        StartInitializationStepFailedEvent failed,
+        IReadOnlyDictionary<string, StartInitializationStep> stepsById)
+    {
+        string title = stepsById.TryGetValue(failed.StepId, out StartInitializationStep? step)
+            ? step.Title
+            : failed.StepId;
+
+        Dictionary<string, object?> attributes = new()
+        {
+            [HostLogAttributeKeys.CliEventKind] = CliEventKinds.StartInitializationStepFailed,
+            ["start.initialization.step"] = failed.StepId,
+        };
+
+        return new HostLogEntry(
+            failed.Timestamp,
+            StartupCategory,
+            LogLevel.Error,
+            default,
+            FormatMessage(title, failed.Message),
+            Exception: null,
+            attributes);
+    }
+
+    private static HostLogEntry CreateEntry(StartInitializationLogEvent log)
+    {
+        Dictionary<string, object?> attributes = new()
+        {
+            [HostLogAttributeKeys.CliEventKind] = CliEventKinds.StartInitializationLog,
+            ["start.initialization.step"] = log.StepId,
+            ["start.initialization.severity"] = log.Severity.ToString().ToLowerInvariant(),
+        };
+
+        return new HostLogEntry(
+            log.Timestamp,
+            StartupCategory,
+            ToLogLevel(log.Severity),
+            default,
+            log.Line,
+            Exception: null,
+            attributes);
+    }
+
+    private static LogLevel ToLogLevel(FunctionsProjectReportSeverity severity)
+        => severity switch
+        {
+            FunctionsProjectReportSeverity.Warning => LogLevel.Warning,
+            FunctionsProjectReportSeverity.Error => LogLevel.Error,
+            _ => LogLevel.Information,
+        };
 
     private static string FormatMessage(string title, string? message)
         => string.IsNullOrWhiteSpace(message)

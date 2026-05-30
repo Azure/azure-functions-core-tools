@@ -320,12 +320,17 @@ public class StartInitializationTests : IDisposable
             demoSpeedMultiplier: 0.001,
             demoAutoExit: true,
             demoMode: false);
+        var renderer = new RecordingStartInitializationRenderer();
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None));
+            () => runner.RunAsync(context, renderer, CancellationToken.None));
 
         Assert.Contains(ValidateHostWorkloadInitializationStep.HostContentRootEnvironmentVariable, ex.Message);
         Assert.Contains("host executable was not found", ex.Message);
+        Assert.Contains(renderer.Events, ev => ev is StartInitializationStepFailedEvent failed
+            && failed.StepId == ValidateHostWorkloadInitializationStep.StepId
+            && failed.Message is not null
+            && failed.Message.Contains("host executable was not found", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -553,6 +558,43 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
+    public async Task JsonRenderer_EmitsInitializationLogAndFailureRecords()
+    {
+        using var stream = new MemoryStream();
+        var renderer = new JsonStartInitializationRenderer(stream, ownsStream: false);
+        var logEvent = new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "npm output", FunctionsProjectReportSeverity.Warning);
+        var failedEvent = new StartInitializationStepFailedEvent(DateTimeOffset.UnixEpoch, "prepare", "build failed");
+
+        await renderer.OnEventAsync(logEvent, CancellationToken.None);
+        await renderer.OnEventAsync(failedEvent, CancellationToken.None);
+        await renderer.DisposeAsync();
+
+        string[] lines = Encoding.UTF8.GetString(stream.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(2, lines.Length);
+        using var log = JsonDocument.Parse(lines[0]);
+        Assert.Equal("start_initialization_log", log.RootElement.GetProperty("kind").GetString());
+        Assert.Equal("prepare", log.RootElement.GetProperty("step").GetString());
+        Assert.Equal("npm output", log.RootElement.GetProperty("line").GetString());
+        Assert.Equal("warning", log.RootElement.GetProperty("severity").GetString());
+        using var failed = JsonDocument.Parse(lines[1]);
+        Assert.Equal("start_initialization_step_failed", failed.RootElement.GetProperty("kind").GetString());
+        Assert.Equal("build failed", failed.RootElement.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task PlainRenderer_EmitsInitializationLogRecords()
+    {
+        var interaction = new TestInteractionService();
+        var renderer = new PlainStartInitializationRenderer(interaction);
+        var logEvent = new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "npm output", FunctionsProjectReportSeverity.Info);
+
+        await renderer.OnEventAsync(logEvent, CancellationToken.None);
+
+        Assert.Contains("[init] prepare  npm output", interaction.Lines);
+    }
+
+    [Fact]
     public async Task JsonRenderer_EmitsProfileDetailsOnCompletion()
     {
         using var stream = new MemoryStream();
@@ -673,6 +715,61 @@ public class StartInitializationTests : IDisposable
         Assert.Contains(" 50%", output);
         Assert.DoesNotContain("\u001b[2J", output);
         Assert.Contains("Preparing download", output);
+    }
+
+    [Fact]
+    public async Task CompactRenderer_RendersBoundedLogTailAndCollapsesOnSuccess()
+    {
+        using var writer = new StringWriter();
+        IAnsiConsole console = CreateInteractiveConsole(writer);
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
+
+        await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationProgressEvent(DateTimeOffset.UnixEpoch, "prepare", double.NaN, "running npm install"), CancellationToken.None);
+        for (int i = 1; i <= 12; i++)
+        {
+            await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"entry {i:00}", FunctionsProjectReportSeverity.Info), CancellationToken.None);
+        }
+
+        await WaitForOutputAsync(writer, output => output.Contains("entry 12", StringComparison.Ordinal));
+        string runningOutput = writer.ToString();
+
+        Assert.Contains("running npm install", runningOutput);
+        Assert.DoesNotContain("entry 01", runningOutput);
+        Assert.DoesNotContain("entry 02", runningOutput);
+        Assert.Contains("entry 03", runningOutput);
+        Assert.Contains("entry 12", runningOutput);
+
+        await renderer.OnEventAsync(new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, "prepare", "ready"), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, CreateResult()), CancellationToken.None);
+        await renderer.DisposeAsync();
+
+        string completedOutput = writer.ToString();
+        Assert.Contains("12 lines", completedOutput);
+        Assert.Contains("ready", completedOutput);
+    }
+
+    [Fact]
+    public async Task CompactRenderer_RetainsLogTailOnFailure()
+    {
+        using var writer = new StringWriter();
+        IAnsiConsole console = CreateInteractiveConsole(writer);
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
+
+        await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "error tail", FunctionsProjectReportSeverity.Error), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationStepFailedEvent(DateTimeOffset.UnixEpoch, "prepare", "build failed"), CancellationToken.None);
+        await renderer.DisposeAsync();
+
+        string output = writer.ToString();
+
+        Assert.Contains("build failed", output);
+        Assert.Contains("error tail", output);
+        Assert.DoesNotContain("1 lines", output);
     }
 
     [Fact]
@@ -838,6 +935,24 @@ public class StartInitializationTests : IDisposable
             {
                 ["FUNCTIONS_WORKER_RUNTIME"] = "dotnet-isolated",
             });
+
+    private static StartInitializationResult CreateResult()
+    {
+        var runInfo = new DashboardRunInfo(CliVersion: "5.0.0-test", ProfileName: "none", StackName: ".NET");
+        var eventStream = new InMemoryHostEventStream();
+        FunctionsProject project = CreateProject(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
+        FunctionsProjectHostRunContext hostRunContext = CreateHostRunContext(WorkingDirectory.FromExplicit(Environment.CurrentDirectory));
+        IFunctionsWorker worker = CreateWorker("dotnet-isolated", "dotnet-isolated");
+        return new StartInitializationResult(
+            runInfo,
+            eventStream,
+            HostVersion: "4.834.0",
+            BundleRequired: false,
+            BundleVersion: null,
+            project,
+            worker,
+            hostRunContext);
+    }
 
     private static IAnsiConsole CreateInteractiveConsole(TextWriter writer)
         => AnsiConsole.Create(new AnsiConsoleSettings

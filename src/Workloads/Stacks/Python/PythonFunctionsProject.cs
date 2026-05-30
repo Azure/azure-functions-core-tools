@@ -70,7 +70,9 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 
         if (!venvAlreadyExisted)
         {
+            context.Reporter.ReportStatus($"Creating Python virtual environment in {Path.GetFileName(venvPath)}");
             (int exitCode, string stderr) = await RunCreateVenv(root, venvPath, cancellationToken).ConfigureAwait(false);
+            WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
             if (exitCode != 0)
             {
                 string detail = string.IsNullOrWhiteSpace(stderr) ? "see output above." : stderr.Trim();
@@ -84,7 +86,9 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         if (File.Exists(requirementsPath))
         {
             string pipPath = GetVenvExecutablePath(venvPath, "pip");
+            context.Reporter.ReportStatus($"Installing Python dependencies from {RequirementsFileName}");
             (int exitCode, string stderr) = await RunPipInstall(root, pipPath, requirementsPath, cancellationToken).ConfigureAwait(false);
+            WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
             if (exitCode != 0)
             {
                 string detail = string.IsNullOrWhiteSpace(stderr) ? "see output above." : stderr.Trim();
@@ -110,6 +114,14 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         if (!string.IsNullOrEmpty(majorMinor))
         {
             context.EnvironmentVariables[WorkerRuntimeVersionEnvVar] = majorMinor;
+        }
+    }
+
+    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
+    {
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            reporter.WriteLog(line, severity);
         }
     }
 

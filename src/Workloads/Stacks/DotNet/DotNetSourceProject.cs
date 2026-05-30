@@ -36,10 +36,12 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
 
         string targetName = context.SkipBuild ? "GetTargetPath" : "Build";
 
-        context.StartupDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, targetName, context.SkipBuild, cancellationToken);
+        context.Reporter.ReportStatus(context.SkipBuild ? "Resolving .NET build output" : "Running dotnet build");
+
+        context.StartupDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, targetName, context.SkipBuild, context.Reporter, cancellationToken);
     }
 
-    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, CancellationToken cancellationToken)
+    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
     {
         string json;
         try
@@ -51,6 +53,8 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         }
         catch (DotnetCliException ex)
         {
+            WriteLogLines(reporter, ex.StandardOutput, FunctionsProjectReportSeverity.Info);
+            WriteLogLines(reporter, ex.StandardError, FunctionsProjectReportSeverity.Error);
             string detail = string.IsNullOrWhiteSpace(ex.StandardError) ? "see build output above." : ex.StandardError.Trim();
 
             throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}). {detail}", isUserError: true);
@@ -108,5 +112,13 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         throw new GracefulException(
             $"Could not determine output directory for project '{Path.GetFileName(ProjectFilePath)}'. The '{targetName}' target result did not contain expected output paths.",
             isUserError: true);
+    }
+
+    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
+    {
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            reporter.WriteLog(line, severity);
+        }
     }
 }

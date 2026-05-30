@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
-using NuGet.Protocol.Plugins;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -40,6 +40,24 @@ internal sealed class StartInitializationStepContext(
         var progressEvent = new StartInitializationProgressEvent(_timeProvider.GetUtcNow(), _step.Id, percent, message);
 
         await _renderer.OnEventAsync(progressEvent, cancellationToken);
+    }
+
+    public async Task ReportStatusAsync(string message, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+
+        var progressEvent = new StartInitializationProgressEvent(_timeProvider.GetUtcNow(), _step.Id, double.NaN, message);
+
+        await _renderer.OnEventAsync(progressEvent, cancellationToken);
+    }
+
+    public async Task ReportLogAsync(string line, FunctionsProjectReportSeverity severity, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+
+        var logEvent = new StartInitializationLogEvent(_timeProvider.GetUtcNow(), _step.Id, line, severity);
+
+        await _renderer.OnEventAsync(logEvent, cancellationToken);
     }
 
     public async Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)

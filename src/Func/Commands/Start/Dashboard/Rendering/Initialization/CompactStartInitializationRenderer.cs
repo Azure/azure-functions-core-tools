@@ -53,8 +53,14 @@ internal sealed class CompactStartInitializationRenderer(
                 case StartInitializationProgressEvent progress:
                     UpdateProgress(progress);
                     break;
+                case StartInitializationLogEvent log:
+                    WriteLog(log);
+                    break;
                 case StartInitializationStepCompletedEvent completed:
                     CompleteStep(completed);
+                    break;
+                case StartInitializationStepFailedEvent failed:
+                    FailStep(failed);
                     break;
                 case StartInitializationCompletedEvent:
                     liveTaskToStop = _liveTask;
@@ -149,10 +155,30 @@ internal sealed class CompactStartInitializationRenderer(
             return;
         }
 
-        step.Percent = Math.Clamp(progress.Percent, 0, 100);
+        if (!double.IsNaN(progress.Percent))
+        {
+            step.Percent = Math.Clamp(progress.Percent, 0, 100);
+            step.HasProgress = true;
+        }
+
         if (!string.IsNullOrWhiteSpace(progress.Message))
         {
             step.Message = progress.Message;
+        }
+    }
+
+    private void WriteLog(StartInitializationLogEvent log)
+    {
+        if (FindStep(log.StepId) is not { } step)
+        {
+            return;
+        }
+
+        step.TotalLogLineCount++;
+        step.LogLines.Enqueue(log.Line);
+        while (step.LogLines.Count > StepState.LogTailCapacity)
+        {
+            step.LogLines.Dequeue();
         }
     }
 
@@ -165,7 +191,23 @@ internal sealed class CompactStartInitializationRenderer(
 
         step.Completed = true;
         step.Percent = 100;
+        step.HasProgress = true;
         step.Result = completed.Message;
+        if (ReferenceEquals(_activeStep, step))
+        {
+            _activeStep = null;
+        }
+    }
+
+    private void FailStep(StartInitializationStepFailedEvent failed)
+    {
+        if (FindStep(failed.StepId) is not { } step)
+        {
+            return;
+        }
+
+        step.Failed = true;
+        step.Result = failed.Message;
         if (ReferenceEquals(_activeStep, step))
         {
             _activeStep = null;
@@ -232,7 +274,16 @@ internal sealed class CompactStartInitializationRenderer(
             spinnerFrameIndex = _spinnerFrameIndex;
             steps =
             [
-                .. _steps.Select(static step => new StepSnapshot(step.Step, step.Percent, step.Completed, step.Message, step.Result))
+                .. _steps.Select(static step => new StepSnapshot(
+                    step.Step,
+                    step.Percent,
+                    step.HasProgress,
+                    step.Completed,
+                    step.Failed,
+                    step.Message,
+                    step.Result,
+                    step.TotalLogLineCount,
+                    [.. step.LogLines]))
             ];
         }
 
@@ -246,6 +297,10 @@ internal sealed class CompactStartInitializationRenderer(
         foreach (StepSnapshot step in steps)
         {
             rows.Add(new Markup(BuildStepMarkup(step, spinnerFrameIndex)));
+            foreach (string logRow in BuildLogRows(step))
+            {
+                rows.Add(new Markup(logRow));
+            }
         }
 
         return new Rows(rows);
@@ -255,15 +310,17 @@ internal sealed class CompactStartInitializationRenderer(
     {
         string icon = step.Completed
             ? Styled(CompletedIcon, Theme.Success)
+            : step.Failed
+            ? Styled(FailedIcon, Theme.Error)
             : Styled(GetSpinnerFrame(spinnerFrameIndex), Theme.Active);
 
         string title = Markup.Escape(FormatStepTitle(step));
 
-        string progress = step.Step.DisplayKind == StartInitializationDisplayKind.Progress && !step.Completed
+        string progress = step.Step.DisplayKind == StartInitializationDisplayKind.Progress && !step.Completed && !step.Failed && step.HasProgress
             ? $" {FormatProgress(step.Percent)}"
             : string.Empty;
 
-        if (step.Completed)
+        if (step.Completed || step.Failed)
         {
             string result = step.Result is null
                 ? string.Empty
@@ -278,6 +335,25 @@ internal sealed class CompactStartInitializationRenderer(
                 : $" [dim]({Markup.Escape(step.Message)})[/]";
 
             return $"{icon} [dim]{title}[/]{progress}{message}";
+        }
+    }
+
+    private IEnumerable<string> BuildLogRows(StepSnapshot step)
+    {
+        if (step.TotalLogLineCount == 0)
+        {
+            yield break;
+        }
+
+        if (step.Completed && !step.Failed)
+        {
+            yield return $"  [dim]{LogSummaryPrefix} {step.TotalLogLineCount:0} lines\u2026[/]";
+            yield break;
+        }
+
+        foreach (string line in step.LogLines)
+        {
+            yield return $"  [dim]{LogGutter} {Markup.Escape(line)}[/]";
         }
     }
 
@@ -299,6 +375,12 @@ internal sealed class CompactStartInitializationRenderer(
     }
 
     private string CompletedIcon => _console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
+
+    private string FailedIcon => _console.Profile.Capabilities.Unicode ? "\u00d7" : "[!]";
+
+    private string LogGutter => _console.Profile.Capabilities.Unicode ? "\u2502" : "|";
+
+    private string LogSummaryPrefix => _console.Profile.Capabilities.Unicode ? "\u2514" : "`";
 
     private char ProgressCompleteCharacter => _console.Profile.Capabilities.Unicode ? '\u2501' : '=';
 
@@ -358,16 +440,35 @@ internal sealed class CompactStartInitializationRenderer(
 
     private sealed class StepState(StartInitializationStep step)
     {
+        public const int LogTailCapacity = 10;
+
         public StartInitializationStep Step { get; } = step;
 
         public double Percent { get; set; }
 
+        public bool HasProgress { get; set; }
+
         public bool Completed { get; set; }
+
+        public bool Failed { get; set; }
 
         public string? Message { get; set; }
 
         public string? Result { get; internal set; }
+
+        public Queue<string> LogLines { get; } = [];
+
+        public int TotalLogLineCount { get; set; }
     }
 
-    private sealed record StepSnapshot(StartInitializationStep Step, double Percent, bool Completed, string? Message, string? Result);
+    private sealed record StepSnapshot(
+        StartInitializationStep Step,
+        double Percent,
+        bool HasProgress,
+        bool Completed,
+        bool Failed,
+        string? Message,
+        string? Result,
+        int TotalLogLineCount,
+        IReadOnlyList<string> LogLines);
 }
