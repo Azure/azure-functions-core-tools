@@ -55,6 +55,12 @@ public sealed class FirstRunCoordinatorTests
     [Theory]
     [InlineData("setup")]
     [InlineData("version")]
+    [InlineData("workload")]
+    [InlineData("workload install")]
+    [InlineData("workload list")]
+    [InlineData("workload search")]
+    [InlineData("workload update")]
+    [InlineData("workload uninstall")]
     public async Task SkipsAndDoesNotMark_ForExcludedCommands(string commandName)
     {
         FirstRunCoordinator coordinator = CreateCoordinator();
