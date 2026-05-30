@@ -28,6 +28,8 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
     public string DisplayName => "Go";
 
+    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["native"];
+
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
         new Dictionary<string, IReadOnlyList<string>>()
         {

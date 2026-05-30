@@ -379,7 +379,7 @@ If a newer version is found, a notice is printed after the command completes.
    | installed | adopt + snap | adopt with `X` | refuse (use `--force`) |
    | uninstalled | refuse with `func setup --features <stack>` hint | refuse (same hint) | refuse |
 
-   Any candidate stack (from `--stack` or `local.settings.json`) that doesn't match an installed initializer is refused. The hint uses a literal `<stack>` placeholder rather than the raw runtime value, because the value itself may not be a valid feature id (e.g. typos, or `native` for Go).
+   Any candidate stack (from `--stack` or `local.settings.json`) that doesn't match an installed initializer (by canonical `Stack` id or by one of its `WorkerRuntimeAliases`) is refused. Aliases let runtime values like `dotnet-isolated` resolve to the `dotnet` stack and `native` to `go`. The hint uses a literal `<stack>` placeholder rather than the raw runtime value, because the value itself may not be a valid feature id (e.g. typos).
 
 3. Write `.func/config.json` with the resolved stack. Skip scaffolding so user source is untouched. `--force` always bypasses adopt mode and takes the full scaffold path.
 

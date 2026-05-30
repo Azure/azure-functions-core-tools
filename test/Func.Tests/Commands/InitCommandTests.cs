@@ -486,6 +486,87 @@ public class InitCommandTests
     }
 
     [Fact]
+    public async Task InitCommand_Adopt_SnapsViaRuntimeAlias()
+    {
+        // local.settings.json declares "dotnet-isolated" but the dotnet
+        // initializer owns that runtime as an alias. We should snap to the
+        // initializer's canonical stack id ("dotnet"), not error.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("dotnet-isolated");
+
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            int exitCode = await RunInitAsync(newDir, [dotnet], language: null, stack: null);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_StackOptionAgreesViaRuntimeAlias()
+    {
+        // --stack dotnet against a project whose local.settings.json says
+        // "dotnet-isolated" should resolve via the alias and adopt
+        // (not flag a phantom conflict).
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("dotnet-isolated");
+
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_StackOptionAlias_Recognized()
+    {
+        // The reverse direction: --stack dotnet-isolated (an alias) should
+        // resolve to the dotnet initializer when adopting an empty
+        // local.settings.json project.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var interactive = new InteractiveTestInteractionService();
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, [dotnet]);
+            var root = new RootCommand { command };
+
+            int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
     public async Task InitCommand_Adopt_SnapsStackFromLocalSettings()
     {
         // host.json + local.settings.json FUNCTIONS_WORKER_RUNTIME=python → snap
@@ -909,7 +990,8 @@ public class InitCommandTests
         IReadOnlyList<string>? supportedLanguages = null,
         IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null,
         Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
-        Action<FakeProjectInitializer, ParseResult>? onInitialize = null) : IProjectInitializer
+        Action<FakeProjectInitializer, ParseResult>? onInitialize = null,
+        IReadOnlyList<string>? workerRuntimeAliases = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
@@ -917,6 +999,8 @@ public class InitCommandTests
 
         public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
             aliases ?? new Dictionary<string, IReadOnlyList<string>>();
+
+        public IReadOnlyList<string> WorkerRuntimeAliases { get; } = workerRuntimeAliases ?? [];
 
         public bool WasInvoked { get; private set; }
 
