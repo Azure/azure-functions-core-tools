@@ -111,7 +111,7 @@ public class CompactLogComponentsTests
     }
 
     [Fact]
-    public void Format_WithExceptionDetails_RendersSummaryAndKeepsShortCategory()
+    public void Format_WithExceptionDetails_RendersSummaryWithoutCategory()
     {
         var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
         var exceptionDetails = new HostLogExceptionDetails(
@@ -137,8 +137,7 @@ public class CompactLogComponentsTests
         Assert.Null(line.FunctionName);
         Assert.True(line.IsError);
         Assert.Equal(LogLevel.Error, line.Level);
-        Assert.Contains("Grpc", output);
-        Assert.DoesNotContain("Microsoft.Azure.WebJobs.Script.Grpc", output);
+        Assert.DoesNotContain("Grpc", output);
         Assert.Contains("Language Worker Process exited.", output);
         Assert.Contains("Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException", output);
         Assert.Contains("A connection string was not found.", output);

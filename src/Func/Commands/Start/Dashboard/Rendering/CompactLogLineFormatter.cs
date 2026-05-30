@@ -112,12 +112,6 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             }
         }
 
-        string source = functionName ?? entry.Category;
-        int sourceWidth = Math.Max(SourceColumnWidth, source.Length);
-        string nameMarkup = functionName is not null
-            ? $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-SourceColumnWidth}[/]"
-            : $"[{MutedTag}]{Markup.Escape(entry.Category),-SourceColumnWidth}[/]";
-
         string levelMarkup = entry.Level switch
         {
             LogLevel.Error or LogLevel.Critical => $"[{ErrorTag}]✗[/]",
@@ -125,8 +119,22 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             _ => $"[{MutedTag}]·[/]",
         };
 
-        string prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
-        int prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
+        string prefix;
+        int prefixWidth;
+        if (functionName is not null)
+        {
+            int sourceWidth = Math.Max(SourceColumnWidth, functionName.Length);
+            string nameMarkup = $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-SourceColumnWidth}[/]";
+            prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
+            prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
+        }
+        else
+        {
+            // Host/system logs no longer surface their category; keep just the timestamp and level marker.
+            prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {levelMarkup}  ");
+            prefixWidth = 1 + ts.Length + 2 + 1 + 2;
+        }
+
         return CreateWrappedLine(prefix, prefixWidth, FormatMessage(entry), functionName, isError, effectiveLogLevel);
     }
 

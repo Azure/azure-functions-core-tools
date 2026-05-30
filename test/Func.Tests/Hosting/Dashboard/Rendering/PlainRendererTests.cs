@@ -105,7 +105,7 @@ public class PlainRendererTests
     }
 
     [Fact]
-    public async Task LogEnvelope_WithExceptionDetails_RendersSummaryAndKeepsShortCategory()
+    public async Task LogEnvelope_WithExceptionDetails_RendersSummaryWithoutCategory()
     {
         (PlainRenderer renderer, StringWriter writer, _) = NewRenderer();
         var state = new DashboardState();
@@ -127,8 +127,7 @@ public class PlainRendererTests
         await renderer.OnEventAsync(entry, state.Observe(entry), default);
 
         string output = writer.ToString();
-        Assert.Contains("Grpc", output);
-        Assert.DoesNotContain("Microsoft.Azure.WebJobs.Script.Grpc", output);
+        Assert.DoesNotContain("Grpc", output);
         Assert.Contains("WorkerProcessExitException", output);
         Assert.Contains("A connection string was not found.", output);
     }
@@ -148,7 +147,7 @@ public class PlainRendererTests
         await renderer.OnEventAsync(entry, state.Observe(entry), default);
 
         string output = writer.ToString();
-        Assert.Contains("Grpc", output);
+        Assert.DoesNotContain("Grpc", output);
         Assert.Contains("A connection string was not found.", output);
     }
 

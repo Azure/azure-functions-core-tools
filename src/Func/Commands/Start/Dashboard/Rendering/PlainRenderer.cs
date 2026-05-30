@@ -69,14 +69,17 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
                 return Task.CompletedTask;
             }
 
-            string function = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName) ?? entry.Category;
+            string? function = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName);
             string tag = entry.Level switch
             {
                 LogLevel.Error or LogLevel.Critical => "[error]",
                 LogLevel.Warning => "[warn]",
                 _ => "[log]",
             };
-            _interaction.WriteLine($"{FormatTimestamp(entry.Timestamp)}  {tag,-18} {function}  {message}");
+            string line = function is not null
+                ? $"{FormatTimestamp(entry.Timestamp)}  {tag,-18} {function}  {message}"
+                : $"{FormatTimestamp(entry.Timestamp)}  {tag,-18} {message}";
+            _interaction.WriteLine(line);
             if (!string.IsNullOrWhiteSpace(entry.Message) && entry.ExceptionDetails is not null)
             {
                 _interaction.WriteLine($"                                 {entry.ExceptionDetails.FormatSummary()}");
