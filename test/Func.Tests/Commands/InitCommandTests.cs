@@ -512,8 +512,12 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_UninstalledStack_WritesConfigAndSuggestsSetup()
+    public async Task InitCommand_Adopt_UninstalledStack_RefusesAndSuggestsSetup()
     {
+        // project_runtime points at a stack with no installed initializer:
+        // refuse rather than write a config we can't validate. The setup
+        // hint uses a `<stack>` placeholder (not the raw runtime value),
+        // because the runtime string may itself not be a valid feature id.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -524,12 +528,13 @@ public class InitCommandTests
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, [python], language: null, stack: null);
 
-            Assert.Equal(0, exitCode);
+            Assert.Equal(1, exitCode);
             Assert.False(python.WasInvoked);
-            // Config is still written so subsequent commands see the right stack.
-            AssertConfigJsonHasShape(newDir, expectedStack: "ruby", expectedLanguage: null);
+            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
             Assert.Contains(_interaction.Lines, l =>
-                l.StartsWith("WARNING:") && l.Contains("func setup --features ruby"));
+                l.StartsWith("ERROR:")
+                && l.Contains("'ruby' stack is not installed")
+                && l.Contains("func setup --features <stack>"));
         }
         finally
         {
@@ -587,10 +592,13 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_Adopt_NoProjectSignal_FallsBackToCurrentBehavior()
+    public async Task InitCommand_Adopt_NoProjectSignal_NonInteractive_Refuses()
     {
-        // host.json only with no local.settings.json signal: single installed
-        // workload is still auto-selected, but scaffolding is skipped (adoption).
+        // In adopt mode with no --stack and no FUNCTIONS_WORKER_RUNTIME, we
+        // don't auto-select even when only one initializer is installed:
+        // writing the wrong stack into an existing project's config is worse
+        // than failing fast. Non-interactive callers (CI, piped) get an
+        // actionable error.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -600,9 +608,71 @@ public class InitCommandTests
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, python, language: null);
 
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Contains(_interaction.Lines, l =>
+                l.StartsWith("ERROR:") && l.Contains("Couldn't detect the project's stack"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_NoProjectSignal_Interactive_PromptsForStack()
+    {
+        // Interactive callers get a prompt that names adoption explicitly so
+        // they know what they're answering for. The prompt's first choice is
+        // selected by the test interaction service.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var interactive = new InteractiveTestInteractionService();
+            var python = new FakeProjectInitializer("python");
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, [python]);
+            var root = new RootCommand { command };
+
+            int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
+
             Assert.Equal(0, exitCode);
             Assert.False(python.WasInvoked);
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
+            Assert.Contains(interactive.Lines, l =>
+                l.StartsWith("SELECT:") && l.Contains("Adopting an existing project"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_StackOption_UninstalledStack_Refuses()
+    {
+        // --stack X where X isn't installed should be refused just like the
+        // uninstalled local.settings.json case. Same hint, same exit code,
+        // no config written.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var python = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, [python], language: null, stack: "ruby");
+
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Contains(_interaction.Lines, l =>
+                l.StartsWith("ERROR:")
+                && l.Contains("'ruby' stack is not installed")
+                && l.Contains("func setup --features <stack>"));
         }
         finally
         {
@@ -864,5 +934,10 @@ public class InitCommandTests
             onInitialize?.Invoke(this, parseResult);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class InteractiveTestInteractionService : TestInteractionService
+    {
+        public override bool IsInteractive => true;
     }
 }

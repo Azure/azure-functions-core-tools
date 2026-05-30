@@ -373,11 +373,13 @@ If a newer version is found, a notice is printed after the command completes.
 1. Resolve `project_runtime` from `local.settings.json`'s `FUNCTIONS_WORKER_RUNTIME`. The process env var is intentionally ignored: adoption is about the on-disk project shape.
 2. Apply:
 
-   | `project_runtime` → | `--stack` omitted | `--stack X` agrees | `--stack X` conflicts |
+   | `project_runtime` → | `--stack` omitted | `--stack X` (installed) agrees | `--stack X` conflicts |
    |---|---|---|---|
-   | null | current behavior (prompt / auto-select / error) | adopt with `X` | n/a |
+   | null | interactive: prompt "Adopting an existing project. Which stack is it?". Non-interactive: refuse with "Couldn't detect the project's stack". | adopt with `X` | n/a |
    | installed | adopt + snap | adopt with `X` | refuse (use `--force`) |
-   | uninstalled | adopt + hint `func setup --features <stack>` | adopt with `X` | refuse (use `--force`) |
+   | uninstalled | refuse with `func setup --features <stack>` hint | refuse (same hint) | refuse |
+
+   Any candidate stack (from `--stack` or `local.settings.json`) that doesn't match an installed initializer is refused. The hint uses a literal `<stack>` placeholder rather than the raw runtime value, because the value itself may not be a valid feature id (e.g. typos, or `native` for Go).
 
 3. Write `.func/config.json` with the resolved stack. Skip scaffolding so user source is untouched. `--force` always bypasses adopt mode and takes the full scaffold path.
 
