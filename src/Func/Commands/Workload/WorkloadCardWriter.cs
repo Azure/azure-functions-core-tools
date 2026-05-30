@@ -30,14 +30,10 @@ internal sealed class WorkloadCardWriter(IInteractionService interaction)
 
     public void WriteDescription(string? description)
     {
-        // Description sits on its own line(s) below the label so long copy
-        // can use the full terminal width instead of wrapping inside a
-        // narrow value column.
-        _interaction.WriteLine(line => line.Command("Description:"));
         string text = string.IsNullOrWhiteSpace(description)
             ? "(no description)"
             : description!.Trim();
-        _interaction.WriteLine(line => line.Muted(text));
+        WriteField("Description", text);
     }
 
     public void WriteAliases(IReadOnlyList<string> aliases)
