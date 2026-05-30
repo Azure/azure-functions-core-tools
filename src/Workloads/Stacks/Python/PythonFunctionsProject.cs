@@ -21,7 +21,7 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 {
     internal const string DefaultVenvFolderName = ".venv";
     internal const string IsolateWorkerDepsEnvVar = "PYTHON_ISOLATE_WORKER_DEPENDENCIES";
-    internal const string WorkerExecutablePathEnvVar = "languageWorkers:python:defaultExecutablePath";
+    internal const string WorkerExecutablePathEnvVar = "languageWorkers__python__defaultExecutablePath";
     internal const string WorkerRuntimeVersionEnvVar = "FUNCTIONS_WORKER_RUNTIME_VERSION";
     internal const string VirtualEnvEnvVar = "VIRTUAL_ENV";
     private const string RequirementsFileName = "requirements.txt";
