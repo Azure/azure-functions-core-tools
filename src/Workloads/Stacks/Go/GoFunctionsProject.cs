@@ -22,6 +22,13 @@ internal sealed class GoFunctionsProject : FunctionsProject
     internal const string DefaultExecutableName = "app";
     internal const int MinimumGoMajorVersion = 1;
     internal const int MinimumGoMinorVersion = 24;
+
+    // Pinned Go worker SDK package + version. Templates substitute these into
+    // the scaffolded go.mod, and the start hook re-pins via `go get` so apps
+    // scaffolded against an older preview pick up the matching SDK release.
+    internal const string WorkerModulePath = "github.com/azure/azure-functions-golang-worker";
+    internal const string WorkerModuleVersion = "v0.6.0-preview";
+
     private const string ExecutableRelativeFolder = "bin";
 
     private readonly WorkingDirectory _workingDirectory;
@@ -40,6 +47,10 @@ internal sealed class GoFunctionsProject : FunctionsProject
     internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoBuild { get; set; } = DefaultRunGoBuild;
 
     internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersion;
+
+    // Sync the user's go.mod with the pinned worker SDK version (`go get <module>@<version>`)
+    // and clean up dependencies (`go mod tidy`). Internal seam for tests.
+    internal Func<string, string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> SyncGoModules { get; set; } = DefaultSyncGoModules;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -84,6 +95,17 @@ internal sealed class GoFunctionsProject : FunctionsProject
         {
             throw new GracefulException(
                 $"Go {major}.{minor} is not supported. Go {MinimumGoMajorVersion}.{MinimumGoMinorVersion} or later is required. Update Go from https://go.dev/dl/.",
+                isUserError: true);
+        }
+
+        // Re-pin the worker SDK before building. Apps scaffolded against an older preview
+        // would otherwise compile against a stale SDK version on the next `func start`.
+        (int syncExit, string syncStderr) = await SyncGoModules(root, WorkerModulePath, WorkerModuleVersion, cancellationToken).ConfigureAwait(false);
+        if (syncExit != 0)
+        {
+            string detail = string.IsNullOrWhiteSpace(syncStderr) ? "see output above." : syncStderr.Trim();
+            throw new GracefulException(
+                $"Failed to sync Go modules (exit {syncExit}). {detail}",
                 isUserError: true);
         }
 
@@ -180,6 +202,60 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
             // Drain stdout and stderr in parallel: if either pipe buffer (~64KB) fills
             // while we're only reading the other, go blocks on write and we deadlock.
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return (-1, ex.Message);
+        }
+    }
+
+    private static async Task<(int ExitCode, string Stderr)> DefaultSyncGoModules(
+        string workingDirectory,
+        string modulePath,
+        string moduleVersion,
+        CancellationToken cancellationToken)
+    {
+        (int getExit, string getStderr) = await RunGo(workingDirectory, ["get", $"{modulePath}@{moduleVersion}"], cancellationToken).ConfigureAwait(false);
+        if (getExit != 0)
+        {
+            return (getExit, getStderr);
+        }
+
+        return await RunGo(workingDirectory, ["mod", "tidy"], cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<(int ExitCode, string Stderr)> RunGo(
+        string workingDirectory,
+        string[] arguments,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("go")
+            {
+                WorkingDirectory = workingDirectory,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            foreach (string arg in arguments)
+            {
+                psi.ArgumentList.Add(arg);
+            }
+
+            using var process = Process.Start(psi);
+            if (process is null)
+            {
+                return (-1, "Failed to start 'go' process.");
+            }
+
+            // Drain both pipes in parallel to avoid deadlocking on a full pipe buffer.
             Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
             Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
             await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
