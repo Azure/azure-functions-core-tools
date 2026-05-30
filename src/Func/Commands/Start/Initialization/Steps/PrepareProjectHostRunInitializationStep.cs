@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 internal sealed class PrepareProjectHostRunInitializationStep(
     ILocalSettingsProvider localSettingsProvider,
     IProcessEnvironment processEnvironment,
-    IInteractionService interaction) : DemoInitializationStep
+    IInteractionService interaction) : FuncStartInitializationStep
 {
     public const string StepId = "prepare_host_run";
 
@@ -34,13 +34,9 @@ internal sealed class PrepareProjectHostRunInitializationStep(
 
     public override string Title => "Prepare project";
 
-    public override async Task<StartInitializationStepResult> ExecuteAsync(
-        StartInitializationStepContext context,
-        CancellationToken cancellationToken)
+    public override async Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-
-        await SimulateWorkAsync(context, cancellationToken);
 
         FunctionsProject project = context.State.Project
             ?? throw new InvalidOperationException("Functions project was not resolved.");

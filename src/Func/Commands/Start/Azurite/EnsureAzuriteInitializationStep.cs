@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Commands.Start.Azurite;
 /// </summary>
 internal sealed class EnsureAzuriteInitializationStep(
     IManagedAzuriteOrchestrator orchestrator,
-    IProcessEnvironment processEnvironment) : DemoInitializationStep
+    IProcessEnvironment processEnvironment) : FuncStartInitializationStep
 {
     public const string StepId = "ensure_azurite";
     private const string AzureWebJobsStorageName = "AzureWebJobsStorage";

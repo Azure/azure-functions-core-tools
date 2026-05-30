@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Resolves version constraints from the active start profile.
 /// </summary>
-internal sealed class ResolveConstraintsInitializationStep : DemoInitializationStep
+internal sealed class ResolveConstraintsInitializationStep : FuncStartInitializationStep
 {
     public const string StepId = "resolve_constraints";
 
@@ -17,13 +17,9 @@ internal sealed class ResolveConstraintsInitializationStep : DemoInitializationS
 
     public override string Title => "Resolve profile version constraints";
 
-    public override async Task<StartInitializationStepResult> ExecuteAsync(
-        StartInitializationStepContext context,
-        CancellationToken cancellationToken)
+    public override async Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-
-        await SimulateWorkAsync(context, cancellationToken);
 
         if (context.State.ResolvedProfile is not { } profile)
         {
