@@ -34,13 +34,13 @@ public class InitCommandTests
     }
 
     [Fact]
-    public void InitCommand_StackOptionDescription_NoInitializers_PointsAtWorkloadInstall()
+    public void InitCommand_StackOptionDescription_NoInitializers_PointsAtSetup()
     {
         var cmd = new InitCommand(_interaction, _hintRenderer, []);
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        Assert.Contains("Install a stack workload", description);
-        Assert.Contains("func workload install", description);
+        Assert.Contains("Set up a stack", description);
+        Assert.Contains("func setup --features", description);
     }
 
     [Fact]
