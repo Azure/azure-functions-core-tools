@@ -20,12 +20,13 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// When the target directory already contains a <c>host.json</c> but no
-/// <c>.func/config.json</c>, the command "adopts" the project: it writes the
-/// CLI config and skips scaffolding. The stack is taken from
-/// <c>local.settings.json</c>'s <c>FUNCTIONS_WORKER_RUNTIME</c> when set,
-/// otherwise the user is prompted as usual. An explicit <c>--stack</c> that
-/// conflicts with the project's declared runtime is refused unless
-/// <c>--force</c> is passed.
+/// <c>.func/config.json</c>, the command "adopts" the project: it writes
+/// the CLI config and skips scaffolding. The stack is taken from
+/// <c>--stack</c> if provided, otherwise from <c>local.settings.json</c>'s
+/// <c>FUNCTIONS_WORKER_RUNTIME</c>. If the resolved stack isn't installed,
+/// adoption is refused with a pointer to <c>func setup</c>. When neither
+/// signal is available the user is prompted interactively, or the command
+/// refuses non-interactively. <c>--force</c> bypasses adopt mode entirely.
 /// </remarks>
 internal class InitCommand : FuncCliCommand, IBuiltInCommand
 {
@@ -141,19 +142,19 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // re-scaffold" and takes the normal path.
         bool adoptExisting = state == InitializationState.AdoptableExistingProject && !force;
 
-        // For adoption we try to honour what the project already declares.
-        // Resolution order matches the Functions host: env wins over
-        // local.settings.json. On conflict we warn (host doesn't refuse)
-        // but use the env value.
+        // For adoption we honour what the project already declares.
+        // Source: local.settings.json's FUNCTIONS_WORKER_RUNTIME.
         string? projectRuntime = adoptExisting ? ResolveProjectRuntime(workingDirectory.Info) : null;
 
-        if (adoptExisting && projectRuntime is not null)
+        IProjectInitializer? initializer;
+        if (adoptExisting)
         {
             // Explicit --stack that disagrees with the project's declared
             // runtime is almost certainly a mistake (it would produce a
             // .func/config.json that doesn't match what `func start` would
             // run). --force is the existing escape hatch.
             if (!string.IsNullOrWhiteSpace(requestedStack)
+                && projectRuntime is not null
                 && !string.Equals(requestedStack, projectRuntime, StringComparison.OrdinalIgnoreCase))
             {
                 _interaction.WriteError(
@@ -162,28 +163,44 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 return 1;
             }
 
-            // Snap when the user didn't specify --stack: the project already
-            // declared its runtime, no point re-asking.
-            requestedStack ??= projectRuntime;
-        }
+            // Pick a candidate: explicit --stack wins, else snap to the
+            // project's declared runtime.
+            string? candidate = !string.IsNullOrWhiteSpace(requestedStack) ? requestedStack : projectRuntime;
 
-        // For adoption with a known runtime we look up the matching
-        // initializer directly; we never prompt or auto-select because we
-        // already have a project signal. SelectInitializerAsync's prompt /
-        // workload-hint path is only for fresh inits or adoption with no
-        // runtime signal.
-        IProjectInitializer? initializer;
-        if (adoptExisting && projectRuntime is not null)
-        {
-            initializer = _initializers.FirstOrDefault(i =>
-                string.Equals(i.Stack, requestedStack, StringComparison.OrdinalIgnoreCase));
-
-            if (initializer is null)
+            if (candidate is not null)
             {
-                // Stack named by the project isn't installed. Still adopt
-                // (write the config so other commands see the right stack),
-                // and point the user at the one command that closes the gap.
-                return AdoptWithUninstalledStack(workingDirectory.Info, requestedStack!);
+                initializer = _initializers.FirstOrDefault(i =>
+                    string.Equals(i.Stack, candidate, StringComparison.OrdinalIgnoreCase));
+
+                if (initializer is null)
+                {
+                    // Candidate isn't an installed stack. Refuse rather than
+                    // write a config we can't validate. The hint uses a
+                    // `<stack>` placeholder on purpose: the candidate string
+                    // may itself be unknown (e.g. a typo, or "native" for
+                    // Go) and echoing it would promise a `func setup`
+                    // command that won't necessarily work.
+                    _interaction.WriteError(
+                        $"The '{candidate}' stack is not installed. " +
+                        "Run `func setup --features <stack>` to setup your dev environment, then re-run `func init`.");
+                    return 1;
+                }
+
+                requestedStack = initializer.Stack;
+            }
+            else
+            {
+                // No project signal and no --stack. Don't auto-select: even
+                // when only one initializer is installed, writing the wrong
+                // stack to an existing project's .func/config.json is worse
+                // than asking. Prompt when we can, refuse when we can't.
+                initializer = await PromptForAdoptionStackAsync(cancellationToken);
+                if (initializer is null)
+                {
+                    return 1;
+                }
+
+                requestedStack = initializer.Stack;
             }
         }
         else
@@ -371,24 +388,39 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
     }
 
-    // Adopt-mode path for a runtime whose stack workload isn't installed.
-    // We still write .func/config.json so subsequent commands know the stack,
-    // and we point the user at `func setup --features` to install the bits.
-    // The raw runtime value is written verbatim; if a workload normalises
-    // the stack name on first read it can rewrite the config then.
-    private int AdoptWithUninstalledStack(DirectoryInfo workingDirectory, string runtime)
+    // Adoption-mode stack picker for the "no project signal" case. We never
+    // auto-select here: in adoption, picking the wrong stack would write a
+    // bad .func/config.json into a real project. Prompt when we're talking
+    // to a human, refuse with an actionable error otherwise.
+    private async Task<IProjectInitializer?> PromptForAdoptionStackAsync(CancellationToken cancellationToken)
     {
-        WriteCliConfigurationFile(workingDirectory, runtime, language: null, force: false);
-        _interaction.WriteBlankLine();
-        _interaction.WriteWarning(
-            $"The '{runtime}' stack is not installed. Run `func setup --features {runtime}` to install it.");
-        _interaction.WriteLine(l => l
-            .Success("✓ ")
-            .Muted("Existing project adopted for ")
-            .Code(runtime)
-            .Muted("."));
+        string[] installed = [.. _initializers.Select(i => i.Stack)];
 
-        return 0;
+        if (_initializers.Count == 0)
+        {
+            _hintRenderer.Render(new WorkloadHint(
+                WorkloadHintKind.NoWorkloadsInstalled, "initialize a project", null, installed));
+            return null;
+        }
+
+        if (!_interaction.IsInteractive)
+        {
+            _interaction.WriteError(
+                "Couldn't detect the project's stack from local.settings.json. " +
+                "Re-run with --stack <stack> to tell `func init` which stack to adopt.");
+            return null;
+        }
+
+        var displayToInitializer = _initializers.ToDictionary(
+            i => i.DisplayName,
+            i => i,
+            StringComparer.Ordinal);
+        string picked = await _interaction.PromptForSelectionAsync(
+            "Adopting an existing project. Which stack is it?",
+            displayToInitializer.Keys,
+            cancellationToken);
+
+        return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
 
     private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
