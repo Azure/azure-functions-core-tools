@@ -130,9 +130,14 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
         }
         else
         {
-            // Host/system logs no longer surface their category; keep just the timestamp and level marker.
-            prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {levelMarkup}  ");
-            prefixWidth = 1 + ts.Length + 2 + 1 + 2;
+            // Host/system logs no longer surface their category. Reserve the source column so the level
+            // marker and message stay aligned with function lines; logs replayed from the CLI's startup
+            // initialization steps get an "Initialization" label so that phase reads as a coherent group.
+            string sourceMarkup = IsInitializationStep(entry)
+                ? $"[{MutedTag}]{"Initialization",-SourceColumnWidth}[/]"
+                : new string(' ', SourceColumnWidth);
+            prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {sourceMarkup}  {levelMarkup}  ");
+            prefixWidth = 1 + ts.Length + 2 + SourceColumnWidth + 2 + 1 + 2;
         }
 
         return CreateWrappedLine(prefix, prefixWidth, FormatMessage(entry), functionName, isError, effectiveLogLevel);
@@ -247,6 +252,12 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
         return message.StartsWith("Executing '", StringComparison.Ordinal)
             || message.StartsWith("Executed '", StringComparison.Ordinal);
     }
+
+    private static bool IsInitializationStep(HostLogEntry entry)
+        => string.Equals(
+            entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind),
+            CliEventKinds.StartInitializationStepCompleted,
+            StringComparison.Ordinal);
 
     private static string? GetFunctionName(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
     {

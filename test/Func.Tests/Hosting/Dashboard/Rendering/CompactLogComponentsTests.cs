@@ -201,6 +201,51 @@ public class CompactLogComponentsTests
         Assert.Null(line);
     }
 
+    [Fact]
+    public void Format_WithInitializationStepLog_LabelsSourceAsInitialization()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "[startup]",
+            LogLevel.Information,
+            default,
+            "Resolving host workload",
+            Exception: null,
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.CliEventKind] = CliEventKinds.StartInitializationStepCompleted,
+            });
+
+        CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
+
+        string output = RenderRows(line);
+        Assert.Null(line.FunctionName);
+        Assert.Contains("Initialization", output);
+        Assert.Contains("Resolving host workload", output);
+    }
+
+    [Fact]
+    public void Format_WithPlainHostLog_DoesNotLabelInitialization()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Host.Startup",
+            LogLevel.Information,
+            default,
+            "Reading host configuration",
+            Exception: null,
+            HostLogEntry.EmptyAttributes);
+
+        CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
+
+        string output = RenderRows(line);
+        Assert.Null(line.FunctionName);
+        Assert.DoesNotContain("Initialization", output);
+        Assert.Contains("Reading host configuration", output);
+    }
+
     private static string Render(IRenderable renderable)
     {
         using var writer = new StringWriter();
