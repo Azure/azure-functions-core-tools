@@ -6,17 +6,17 @@ using System.Collections.Frozen;
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Static catalog of workloads the CLI knows how to suggest installing when no
+/// Static catalog of stacks the CLI knows how to suggest setting up when no
 /// suitable workload is registered at runtime. This is **not** the registry of
-/// what is currently installed — that comes from DI'd workload contributions.
-/// It exists purely to power install hints (\"Install a stack to do X: <code>func workload install dotnet</code>\")
+/// what is currently installed, that comes from DI'd workload contributions.
+/// It exists purely to power setup hints (e.g. <c>func setup --features dotnet</c>)
 /// and will be replaced by the workload loader's manifest once that lands.
 /// </summary>
 internal static class KnownInstallableWorkloads
 {
     /// <summary>
-    /// Map of workload identifier (the value passed to <c>func workload install</c>)
-    /// to the human-readable language list shown in install hints.
+    /// Map of stack identifier (the value passed to <c>func setup --features</c>)
+    /// to the human-readable language list shown in setup hints.
     /// </summary>
     public static readonly FrozenDictionary<string, string[]> LanguageMap =
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
@@ -24,7 +24,6 @@ internal static class KnownInstallableWorkloads
             ["dotnet"] = ["C#", "F#"],
             ["node"] = ["JavaScript", "TypeScript"],
             ["python"] = ["Python"],
-            ["java"] = ["Java"],
-            ["powershell"] = ["PowerShell"],
+            ["go"] = ["Go"],
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 }
