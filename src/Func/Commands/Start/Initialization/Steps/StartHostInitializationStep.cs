@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Starts the host event stream.
 /// </summary>
-internal sealed class StartHostInitializationStep(IHostProcessRunner hostProcessRunner, TimeProvider? timeProvider = null) : DemoInitializationStep
+internal sealed class StartHostInitializationStep(IHostProcessRunner hostProcessRunner, TimeProvider? timeProvider = null) : FuncStartInitializationStep
 {
     public const string StepId = "start_host";
 
@@ -27,8 +27,6 @@ internal sealed class StartHostInitializationStep(IHostProcessRunner hostProcess
         StartInitializationStepContext context,
         CancellationToken cancellationToken)
     {
-        await SimulateWorkAsync(context, cancellationToken);
-
         FunctionsProjectHostRunContext hostRunContext = context.State.HostRunContext
             ?? throw new InvalidOperationException("Host run context was not prepared.");
 

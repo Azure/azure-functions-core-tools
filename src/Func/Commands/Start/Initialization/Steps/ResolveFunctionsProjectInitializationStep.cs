@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Resolves the Functions project.
 /// </summary>
-internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjectResolver projectResolver) : DemoInitializationStep
+internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjectResolver projectResolver) : FuncStartInitializationStep
 {
     public const string StepId = "resolve_project";
 
@@ -22,8 +22,6 @@ internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjec
 
     public override async Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
-        await SimulateWorkAsync(context, cancellationToken);
-
         var projectResolutionContext = new ProjectResolutionContext(context.Options.WorkingDirectory);
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(projectResolutionContext, cancellationToken);
 

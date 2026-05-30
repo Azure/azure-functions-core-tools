@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Bundles;
 /// <summary>
 /// Resolves the project's extension bundle via <see cref="IExtensionBundleResolver"/> and stages the host env vars.
 /// </summary>
-internal sealed class ValidateExtensionBundleInitializationStep : DemoInitializationStep
+internal sealed class ValidateExtensionBundleInitializationStep : FuncStartInitializationStep
 {
     public const string StepId = "resolve_bundle";
 

@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// Validates that the requested host workload is available.
 /// </summary>
 internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolver resolver, IWorkloadInstaller installer, IWorkloadPaths workloadPaths)
-    : DemoInitializationStep
+    : FuncStartInitializationStep
 {
     public const string StepId = "resolve_host_workload";
     public const string HostContentRootEnvironmentVariable = "FUNC_HOST_CONTENT_ROOT";
@@ -35,8 +35,6 @@ internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolv
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-
-        await SimulateWorkAsync(context, cancellationToken);
 
         string? localContentRoot = Environment.GetEnvironmentVariable(HostContentRootEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(localContentRoot))

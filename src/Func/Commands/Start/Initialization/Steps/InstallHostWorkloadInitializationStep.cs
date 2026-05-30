@@ -18,7 +18,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
     IWorkloadInstaller installer,
     IWorkloadPaths workloadPaths,
     string? packageId,
-    string hostVersion) : DemoInitializationStep
+    string hostVersion) : FuncStartInitializationStep
 {
     public const string StepId = "install_host_workload";
 

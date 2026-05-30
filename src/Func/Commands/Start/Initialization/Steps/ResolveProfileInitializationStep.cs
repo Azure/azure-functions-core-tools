@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Resolves the active start profile.
 /// </summary>
-internal sealed class ResolveProfileInitializationStep(IProfileResolver resolver) : DemoInitializationStep
+internal sealed class ResolveProfileInitializationStep(IProfileResolver resolver) : FuncStartInitializationStep
 {
     public const string StepId = "resolve_profile";
 

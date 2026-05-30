@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// </summary>
 internal sealed class ResolveFunctionsWorkerInitializationStep(
     IFunctionsWorkerResolverFactory workerResolverFactory,
-    IFunctionsWorkerInstaller workerInstaller) : DemoInitializationStep
+    IFunctionsWorkerInstaller workerInstaller) : FuncStartInitializationStep
 {
     public const string StepId = "resolve_worker";
 
@@ -34,8 +34,6 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
     public override async Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-
-        await SimulateWorkAsync(context, cancellationToken);
 
         FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges =
