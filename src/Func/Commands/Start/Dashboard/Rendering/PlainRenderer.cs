@@ -96,11 +96,6 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
 
     private static bool ShouldRenderPlainLog(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
     {
-        if (IsSuppressedLogCategory(entry.Category))
-        {
-            return false;
-        }
-
         string? kind = entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind);
         if (kind is not (null or CliEventKinds.Log))
         {
@@ -132,9 +127,6 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
 
         return entry.ExceptionDetails?.FormatSummary() ?? string.Empty;
     }
-
-    private static bool IsSuppressedLogCategory(string category)
-        => string.Equals(category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal);
 
     private void PrintBanner()
     {

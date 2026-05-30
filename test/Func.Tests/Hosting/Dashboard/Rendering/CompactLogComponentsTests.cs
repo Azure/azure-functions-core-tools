@@ -184,24 +184,6 @@ public class CompactLogComponentsTests
     }
 
     [Fact]
-    public void Format_WithOptionsLoggingService_SuppressesLine()
-    {
-        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
-        var entry = new HostLogEntry(
-            DateTimeOffset.UnixEpoch,
-            "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService",
-            LogLevel.Information,
-            new EventId(0),
-            "ConcurrencyOptions",
-            Exception: null,
-            HostLogEntry.EmptyAttributes);
-
-        CompactLogLine? line = formatter.Format(entry, [], listenUri: null);
-
-        Assert.Null(line);
-    }
-
-    [Fact]
     public void Format_WithInitializationStepLog_LabelsSourceAsInitialization()
     {
         var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());

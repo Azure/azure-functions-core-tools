@@ -19,6 +19,7 @@ internal static class HostStructuredLoggingBuilderExtensions
         new("Azure.", LogLevel.Error),
         new("Yarp.", LogLevel.None),
         new("Microsoft.AspNetCore.", LogLevel.None),
+        new("Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", LogLevel.None),
         new("Microsoft.Azure.WebJobs.Script.DependencyInjection.ScriptStartupTypeLocator", LogLevel.Error),
         new("Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor", LogLevel.Error),
     ];

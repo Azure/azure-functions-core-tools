@@ -50,7 +50,7 @@ internal sealed class JsonRenderer : IDashboardRenderer
     {
         if (events.Count == 0
             && entry.ExceptionDetails is null
-            && (string.IsNullOrWhiteSpace(entry.Message) || IsSuppressedLogCategory(entry.Category)))
+            && string.IsNullOrWhiteSpace(entry.Message))
         {
             return Task.CompletedTask;
         }
@@ -117,9 +117,6 @@ internal sealed class JsonRenderer : IDashboardRenderer
             WriteAttributes(writer, entry.Attributes);
         });
     }
-
-    private static bool IsSuppressedLogCategory(string category)
-        => string.Equals(category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal);
 
     private void WriteEvent(DashboardEvent ev)
     {
