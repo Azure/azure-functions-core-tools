@@ -23,12 +23,6 @@ internal sealed class GoFunctionsProject : FunctionsProject
     internal const int MinimumGoMajorVersion = 1;
     internal const int MinimumGoMinorVersion = 24;
 
-    // Pinned Go worker SDK package + version. Templates substitute these into
-    // the scaffolded go.mod, and the start hook re-pins via `go get` so apps
-    // scaffolded against an older preview pick up the matching SDK release.
-    internal const string WorkerModulePath = "github.com/azure/azure-functions-golang-worker";
-    internal const string WorkerModuleVersion = "v0.6.0-preview";
-
     private const string ExecutableRelativeFolder = "bin";
 
     private readonly WorkingDirectory _workingDirectory;
@@ -48,9 +42,10 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
     internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersion;
 
-    // Sync the user's go.mod with the pinned worker SDK version (`go get <module>@<version>`)
-    // and clean up dependencies (`go mod tidy`). Internal seam for tests.
-    internal Func<string, string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> SyncGoModules { get; set; } = DefaultSyncGoModules;
+    // Run `go mod tidy` before building so missing/stale module entries are resolved
+    // (especially for apps scaffolded from the version-less go.mod template). Internal
+    // seam for tests.
+    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoModTidy { get; set; } = DefaultRunGoModTidy;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -98,14 +93,15 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
-        // Re-pin the worker SDK before building. Apps scaffolded against an older preview
-        // would otherwise compile against a stale SDK version on the next `func start`.
-        (int syncExit, string syncStderr) = await SyncGoModules(root, WorkerModulePath, WorkerModuleVersion, cancellationToken).ConfigureAwait(false);
-        if (syncExit != 0)
+        // Tidy modules before building: the scaffold's go.mod omits the worker SDK
+        // require line on purpose, so `go mod tidy` resolves the latest tag from the
+        // imports in main.go. Also rescues apps whose go.sum has drifted.
+        (int tidyExit, string tidyStderr) = await RunGoModTidy(root, cancellationToken).ConfigureAwait(false);
+        if (tidyExit != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(syncStderr) ? "see output above." : syncStderr.Trim();
+            string detail = string.IsNullOrWhiteSpace(tidyStderr) ? "see output above." : tidyStderr.Trim();
             throw new GracefulException(
-                $"Failed to sync Go modules (exit {syncExit}). {detail}",
+                $"'go mod tidy' failed (exit {tidyExit}). {detail}",
                 isUserError: true);
         }
 
@@ -214,20 +210,8 @@ internal sealed class GoFunctionsProject : FunctionsProject
         }
     }
 
-    private static async Task<(int ExitCode, string Stderr)> DefaultSyncGoModules(
-        string workingDirectory,
-        string modulePath,
-        string moduleVersion,
-        CancellationToken cancellationToken)
-    {
-        (int getExit, string getStderr) = await RunGo(workingDirectory, ["get", $"{modulePath}@{moduleVersion}"], cancellationToken).ConfigureAwait(false);
-        if (getExit != 0)
-        {
-            return (getExit, getStderr);
-        }
-
-        return await RunGo(workingDirectory, ["mod", "tidy"], cancellationToken).ConfigureAwait(false);
-    }
+    private static Task<(int ExitCode, string Stderr)> DefaultRunGoModTidy(string workingDirectory, CancellationToken cancellationToken)
+        => RunGo(workingDirectory, ["mod", "tidy"], cancellationToken);
 
     private static async Task<(int ExitCode, string Stderr)> RunGo(
         string workingDirectory,

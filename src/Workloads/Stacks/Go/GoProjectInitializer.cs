@@ -17,8 +17,6 @@ namespace Azure.Functions.Cli.Workloads.Go;
 internal sealed class GoProjectInitializer : IProjectInitializer
 {
     private const string ModuleNamePlaceholder = "{ModuleName}";
-    private const string WorkerModulePathPlaceholder = "{WorkerModulePath}";
-    private const string WorkerModuleVersionPlaceholder = "{WorkerModuleVersion}";
     private const string DefaultModuleName = "app";
     private static readonly Assembly _assembly = typeof(GoProjectInitializer).Assembly;
 
@@ -89,13 +87,11 @@ internal sealed class GoProjectInitializer : IProjectInitializer
 
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "go.mod"),
-            // The exact worker SDK version is owned by GoFunctionsProject. `func start` re-pins
-            // via `go get` + `go mod tidy`, so apps scaffolded against an older preview pick up
-            // the matching SDK on the next run.
-            ProjectFiles.ReadTemplate(_assembly, "go.mod")
-                .Replace(ModuleNamePlaceholder, moduleName)
-                .Replace(WorkerModulePathPlaceholder, GoFunctionsProject.WorkerModulePath)
-                .Replace(WorkerModuleVersionPlaceholder, GoFunctionsProject.WorkerModuleVersion),
+            // go.mod intentionally omits a require line for azure-functions-golang-worker;
+            // `go mod tidy` (here on init, and again on every `func start`) resolves the
+            // latest available tag from the imports in main.go, so users pick up new SDK
+            // releases without contributors having to bump a pinned version.
+            ProjectFiles.ReadTemplate(_assembly, "go.mod").Replace(ModuleNamePlaceholder, moduleName),
             force);
 
         ProjectFiles.WriteIfMissing(
