@@ -187,7 +187,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             .ToList();
 
         return stacks.Count == 0
-            ? "The stack to use. Install a stack workload (`func workload install <id>`) to see supported values."
+            ? "The stack to use. Set up a stack (`func setup --features <id>`) to see supported values."
             : "The stack to use. Supported values: " + string.Join(", ", stacks) + ".";
     }
 
@@ -206,7 +206,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             .ToList();
 
         return languages.Count == 0
-            ? "The programming language. Install a stack workload (`func workload install <id>`) to see supported values."
+            ? "The programming language. Set up a stack (`func setup --features <id>`) to see supported values."
             : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
     }
 

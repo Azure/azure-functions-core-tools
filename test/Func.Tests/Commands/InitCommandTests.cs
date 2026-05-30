@@ -39,8 +39,8 @@ public class InitCommandTests
         var cmd = new InitCommand(_interaction, _hintRenderer, []);
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        Assert.Contains("Install a stack workload", description);
-        Assert.Contains("func workload install", description);
+        Assert.Contains("Set up a stack", description);
+        Assert.Contains("func setup --features", description);
     }
 
     [Fact]
