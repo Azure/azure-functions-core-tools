@@ -126,7 +126,11 @@ public sealed class FirstRunCoordinatorTests
 
         int? result = await coordinator.EnsureFirstRunPromptedAsync("start", Parse("start"), CancellationToken.None);
 
-        Assert.Null(result);
+        // After a successful setup we always short-circuit the user's command,
+        // regardless of which one they typed, because the workload loader
+        // snapshot is stale until the next process.
+        Assert.Equal(0, result);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Re-run `func start`"));
         Assert.Equal(1, _interaction.ConfirmCalls);
         await _setupRunner.Received(1).RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>());
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
@@ -182,7 +186,10 @@ public sealed class FirstRunCoordinatorTests
     [Theory]
     [InlineData("init")]
     [InlineData("new")]
-    public async Task ShortCircuitsWithReRunHint_AfterSetupForInitOrNew(string commandName)
+    [InlineData("start")]
+    [InlineData("run")]
+    [InlineData("quickstart")]
+    public async Task ShortCircuitsWithReRunHint_AfterSuccessfulSetup(string commandName)
     {
         _interaction.ConfirmResponse = true;
         _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
@@ -275,6 +282,8 @@ public sealed class FirstRunCoordinatorTests
         root.Subcommands.Add(new Command("start"));
         root.Subcommands.Add(new Command("init"));
         root.Subcommands.Add(new Command("new"));
+        root.Subcommands.Add(new Command("run"));
+        root.Subcommands.Add(new Command("quickstart"));
 
         return root.Parse(args);
     }
