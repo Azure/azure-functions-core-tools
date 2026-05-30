@@ -141,6 +141,16 @@ fi
 echo "func CLI ${VERSION} installed to ${INSTALL_DIR}"
 func --version
 
+# --- Telemetry notice ---
+
+echo ""
+echo "Telemetry"
+echo "---------"
+echo "The Azure Functions CLI collects usage data in order to help us improve your experience."
+echo "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
+echo ""
+echo "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+
 # --- Bug bash env vars ---
 
 if [ "$BUGBASH" = "true" ]; then
