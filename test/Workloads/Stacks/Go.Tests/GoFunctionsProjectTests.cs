@@ -112,7 +112,7 @@ public class GoFunctionsProjectTests : IDisposable
     }
 
     [Fact]
-    public async Task PrepareForHostRun_syncs_modules_before_building()
+    public async Task PrepareForHostRun_runs_go_mod_tidy_before_building()
     {
         File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n\ngo 1.24\n");
 
@@ -122,47 +122,47 @@ public class GoFunctionsProjectTests : IDisposable
             calls.Add("build");
             return Task.FromResult((0, string.Empty));
         });
-        project.SyncGoModules = (root, modulePath, moduleVersion, _) =>
+        project.RunGoModTidy = (root, _) =>
         {
-            calls.Add($"sync:{root}:{modulePath}@{moduleVersion}");
+            calls.Add($"tidy:{root}");
             return Task.FromResult((0, string.Empty));
         };
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
         Assert.Equal(2, calls.Count);
-        Assert.Equal($"sync:{_projectDir.FullName}:{GoFunctionsProject.WorkerModulePath}@{GoFunctionsProject.WorkerModuleVersion}", calls[0]);
+        Assert.Equal($"tidy:{_projectDir.FullName}", calls[0]);
         Assert.Equal("build", calls[1]);
     }
 
     [Fact]
-    public async Task PrepareForHostRun_throws_graceful_when_sync_fails()
+    public async Task PrepareForHostRun_throws_graceful_when_tidy_fails()
     {
         GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
-        project.SyncGoModules = (_, _, _, _) => Task.FromResult((1, "module not found"));
+        project.RunGoModTidy = (_, _) => Task.FromResult((1, "module not found"));
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => project.PrepareForHostRunAsync(CreateContext(), default));
 
         Assert.True(ex.IsUserError);
-        Assert.Contains("sync Go modules", ex.Message);
+        Assert.Contains("go mod tidy", ex.Message);
         Assert.Contains("module not found", ex.Message);
     }
 
     [Fact]
-    public async Task PrepareForHostRun_skips_sync_when_SkipBuild()
+    public async Task PrepareForHostRun_skips_tidy_when_SkipBuild()
     {
-        bool syncInvoked = false;
+        bool tidyInvoked = false;
         GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
-        project.SyncGoModules = (_, _, _, _) =>
+        project.RunGoModTidy = (_, _) =>
         {
-            syncInvoked = true;
+            tidyInvoked = true;
             return Task.FromResult((0, string.Empty));
         };
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
 
-        Assert.False(syncInvoked);
+        Assert.False(tidyInvoked);
     }
 
     private GoFunctionsProject CreateProject(Func<string, string, CancellationToken, Task<(int, string)>> runner)
@@ -170,7 +170,7 @@ public class GoFunctionsProjectTests : IDisposable
         {
             RunGoBuild = runner,
             ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 24)),
-            SyncGoModules = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            RunGoModTidy = (_, _) => Task.FromResult((0, string.Empty)),
         };
 
     private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
