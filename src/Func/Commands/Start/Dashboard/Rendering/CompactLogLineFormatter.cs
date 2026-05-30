@@ -114,9 +114,9 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
 
         string levelMarkup = entry.Level switch
         {
-            LogLevel.Error or LogLevel.Critical => $"[{ErrorTag}]✗[/]",
-            LogLevel.Warning => $"[{WarningTag}]![/]",
-            _ => $"[{MutedTag}]·[/]",
+            LogLevel.Error or LogLevel.Critical => $"[{ErrorTag}]●[/]",
+            LogLevel.Warning => $"[{WarningTag}]●[/]",
+            _ => $"[{MutedTag}]●[/]",
         };
 
         string prefix;
