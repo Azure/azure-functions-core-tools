@@ -180,6 +180,7 @@ internal class SpectreInteractionService : IInteractionService
         T result = default!;
         await _stderr.Progress()
             .AutoRefresh(true)
+            .AutoClear(true)
             .HideCompleted(true)
             .Columns(
                 new TaskDescriptionColumn { Alignment = Justify.Left },
