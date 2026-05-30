@@ -268,12 +268,7 @@ internal sealed class SetupRunner(
         {
             StackChoicesResult choices = await BuildStackChoicesAsync(cancellationToken);
 
-            if (choices.AlreadyInstalled.Count > 0)
-            {
-                _interaction.WriteHint($"Already installed: {string.Join(", ", choices.AlreadyInstalled)}");
-            }
-
-            if (choices.Available.Count == 0)
+            if (!choices.HasAvailable)
             {
                 // Every supported stack is already installed; nothing to
                 // offer. Treat as a clean opt-out so the caller marks the
@@ -283,7 +278,7 @@ internal sealed class SetupRunner(
 
             IReadOnlyList<string> picked = await _interaction.PromptForMultiSelectionAsync(
                 "Select stacks to install (SPACE to toggle, ENTER to confirm; ENTER with no selection exits):",
-                choices.Available,
+                choices.PromptChoices,
                 cancellationToken);
 
             // No selection = user opted out. Signal that with null so the
@@ -319,25 +314,37 @@ internal sealed class SetupRunner(
         }
 
         List<MultiSelectionChoice> available = [];
-        List<string> alreadyInstalled = [];
+        List<MultiSelectionChoice> installedChoices = [];
+        int availableCount = 0;
         foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
         {
             if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
             {
-                alreadyInstalled.Add(stack);
+                installedChoices.Add(new MultiSelectionChoice(stack, $"[grey]{stack} (installed)[/]")
+                {
+                    IsPreselected = true,
+                    IsDisabled = true,
+                });
             }
             else
             {
                 available.Add(new MultiSelectionChoice(stack, stack));
+                availableCount++;
             }
         }
 
-        return new StackChoicesResult(available, alreadyInstalled);
+        // Render available stacks first so the user's cursor lands on something
+        // actionable; installed stacks trail as muted, read-only entries.
+        List<MultiSelectionChoice> promptChoices = [.. available, .. installedChoices];
+        return new StackChoicesResult(promptChoices, availableCount);
     }
 
     private readonly record struct StackChoicesResult(
-        IReadOnlyList<MultiSelectionChoice> Available,
-        IReadOnlyList<string> AlreadyInstalled);
+        IReadOnlyList<MultiSelectionChoice> PromptChoices,
+        int AvailableCount)
+    {
+        public bool HasAvailable => AvailableCount > 0;
+    }
 
     private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(SetupCommandOptions options, SetupRenderer renderer, CancellationToken cancellationToken)
     {
