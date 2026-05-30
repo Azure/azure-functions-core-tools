@@ -52,14 +52,6 @@ internal sealed class FirstRunCoordinator(
     private static readonly HashSet<string> _skippedTokens =
         new(StringComparer.OrdinalIgnoreCase) { "--help", "-h", "-?", "/?", "--version", "-v" };
 
-    // Commands that need workload-aware metadata (templates, bundles) loaded
-    // at host build time. If we install workloads inside the first-run flow
-    // for one of these, the in-process loader is still pointing at the
-    // pre-install snapshot, so we ask the user to re-run instead of letting
-    // the original command fail in confusing ways.
-    private static readonly HashSet<string> _workloadDependentCommands =
-        new(StringComparer.OrdinalIgnoreCase) { "init", "new" };
-
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IFirstRunStateStore _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
     private readonly ISetupRunner _setupRunner = setupRunner ?? throw new ArgumentNullException(nameof(setupRunner));
@@ -170,11 +162,14 @@ internal sealed class FirstRunCoordinator(
 
         await _stateStore.MarkCompleteAsync(cancellationToken);
 
-        // The workload loader snapshots templates/bundles at host build
-        // time, so the in-process `init` / `new` flow won't see the
-        // freshly installed stacks. Ask the user to re-run instead of
-        // letting them hit a confusing "no templates found" error.
-        if (setupRan && commandName is not null && _workloadDependentCommands.Contains(commandName))
+        // After a successful setup we always short-circuit the user's original
+        // command. The workload loader snapshots templates/bundles/host metadata
+        // at host build time, so anything the user typed (init, new, run,
+        // start, quickstart, ...) is operating against the pre-install view
+        // and would either fail outright ("no project here") or silently use
+        // stale metadata. Asking them to re-run is the only safe answer until
+        // we add an in-process reload.
+        if (setupRan && !string.IsNullOrEmpty(commandName))
         {
             _interaction.WriteBlankLine();
             _interaction.WriteHint($"Setup complete. Re-run `func {commandName.ToLowerInvariant()}` to use the new stacks.");
