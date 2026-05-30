@@ -333,15 +333,28 @@ internal class SpectreInteractionService : IInteractionService
         // the prompt cleanly. Callers treat an empty result as "no selection",
         // which (for `func setup`) is the documented escape hatch from the
         // stack picker.
-        List<MultiSelectionChoice> selected = await new MultiSelectionPrompt<MultiSelectionChoice>()
+        MultiSelectionPrompt<MultiSelectionChoice> prompt = new MultiSelectionPrompt<MultiSelectionChoice>()
             .Title(title)
             .NotRequired()
             .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm; ENTER with no selection exits)[/]")
             .UseConverter(static choice => choice.Label)
-            .AddChoices(choiceList)
-            .ShowAsync(_stderr, cancellationToken);
+            .AddChoices(choiceList);
 
-        return [.. selected.Select(static choice => choice.Value)];
+        foreach (MultiSelectionChoice choice in choiceList)
+        {
+            if (choice.IsPreselected)
+            {
+                prompt.Select(choice);
+            }
+        }
+
+        List<MultiSelectionChoice> selected = await prompt.ShowAsync(_stderr, cancellationToken);
+
+        // Disabled entries are decorative: they render so the user can see them
+        // in context, but toggling them has no effect. Strip them from the
+        // result so callers never act on values they didn't intend to expose
+        // as selectable.
+        return [.. selected.Where(static choice => !choice.IsDisabled).Select(static choice => choice.Value)];
     }
 
     public async Task<string> PromptForInputAsync(string prompt, string? defaultValue = null, CancellationToken cancellationToken = default)
