@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
@@ -27,55 +28,38 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
                 $"Could not determine directory for project file '{ProjectFilePath}'.",
                 isUserError: true);
 
-        DirectoryInfo outputDirectory;
+        // Both paths run `dotnet build` and read an MSBuild target result as JSON; only the requested
+        // target differs. The default build runs the "Build" target (compiles, then reports the actual
+        // output even when targets adjust OutputPath/OutDir dynamically); --no-build runs "GetTargetPath"
+        // to resolve the existing output without compiling. The output JSON shape is the same, so a single
+        // code path handles both.
 
-        if (!context.SkipBuild)
-        {
-            // Build and resolve output in one shot so the output path reflects the actual build result,
-            // even when targets modify OutputPath/OutDir dynamically during the build.
-            outputDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, cancellationToken);
-        }
-        else
-        {
-            // No build requested; resolve the target path from the existing project state.
-            outputDirectory = await GetTargetPathAsync(projectDir, cancellationToken);
-        }
+        string targetName = context.SkipBuild ? "GetTargetPath" : "Build";
 
-        context.StartupDirectory = outputDirectory;
+        context.StartupDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, targetName, context.SkipBuild, cancellationToken);
     }
 
-    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, CancellationToken cancellationToken)
+    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, CancellationToken cancellationToken)
     {
         string json;
         try
         {
             json = await _dotnetCli.RunWithOutputAsync(
-                ["build", ProjectFilePath, "--getTargetResult:Build"],
+                ["build", ProjectFilePath, $"--getTargetResult:{targetName}"],
                 projectDir,
                 cancellationToken);
         }
         catch (DotnetCliException ex)
         {
             string detail = string.IsNullOrWhiteSpace(ex.StandardError) ? "see build output above." : ex.StandardError.Trim();
-            throw new GracefulException(
-                $"'dotnet build' failed (exit {ex.ExitCode}). {detail}",
-                isUserError: true);
+
+            throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}). {detail}", isUserError: true);
         }
 
-        return ParseTargetResult(json.Trim(), "Build");
+        return ParseTargetResult(json.Trim(), targetName, requireAssemblyExists);
     }
 
-    private async Task<DirectoryInfo> GetTargetPathAsync(string projectDir, CancellationToken cancellationToken)
-    {
-        string json = await _dotnetCli.RunWithOutputAsync(
-            ["build", ProjectFilePath, "--getTargetResult:GetTargetPath"],
-            projectDir,
-            cancellationToken);
-
-        return ParseTargetResult(json.Trim(), "GetTargetPath");
-    }
-
-    internal DirectoryInfo ParseTargetResult(string json, string targetName)
+    internal DirectoryInfo ParseTargetResult(string json, string targetName, bool requireAssemblyExists = false)
     {
         if (string.IsNullOrWhiteSpace(json))
         {
@@ -86,25 +70,30 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            JsonElement root = doc.RootElement;
+            var root = JsonNode.Parse(json);
+            JsonArray? items = root?["TargetResults"]?[targetName]?["Items"]?.AsArray();
 
-            if (root.TryGetProperty("TargetResults", out JsonElement targetResults)
-                && targetResults.TryGetProperty(targetName, out JsonElement target)
-                && target.TryGetProperty("Items", out JsonElement items)
-                && items.GetArrayLength() > 0)
+            if (items is { Count: > 0 })
             {
-                JsonElement firstItem = items[0];
-
-                // Both Build and GetTargetPath targets return the assembly's full path as the item identity.
-                string assemblyPath = firstItem.TryGetProperty("FullPath", out JsonElement fullPathElement)
-                    ? fullPathElement.GetString() ?? string.Empty
-                    : firstItem.GetProperty("Identity").GetString() ?? string.Empty;
+                JsonNode firstItem = items[0]!;
+                string assemblyPath =
+                    firstItem["FullPath"]?.GetValue<string>()
+                    ?? firstItem["Identity"]?.GetValue<string>()
+                    ?? string.Empty;
 
                 if (!string.IsNullOrWhiteSpace(assemblyPath))
                 {
-                    string dir = Path.GetDirectoryName(assemblyPath)!;
-                    return new DirectoryInfo(dir);
+                    // With --no-build we only resolve the target path; nothing compiled it. If the
+                    // assembly isn't actually present, fail here with an actionable message instead of
+                    // letting the host fail later with a more cryptic "worker/app not found" error.
+                    if (requireAssemblyExists && !File.Exists(assemblyPath))
+                    {
+                        throw new GracefulException(
+                            $"Could not find the build output for project '{Path.GetFileName(ProjectFilePath)}' at '{assemblyPath}'. Build the project before running with --no-build, or omit --no-build to build automatically.",
+                            isUserError: true);
+                    }
+
+                    return new DirectoryInfo(Path.GetDirectoryName(assemblyPath)!);
                 }
             }
         }

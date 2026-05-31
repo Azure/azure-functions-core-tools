@@ -8,29 +8,21 @@ namespace Azure.Functions.Cli.Common;
 /// </summary>
 public class GracefulException : Exception
 {
-    public bool IsUserError { get; }
-    public string? VerboseMessage { get; }
-
     public GracefulException(string message, bool isUserError = false, string? verboseMessage = null)
-        : base(message)
+        : this(message, null, isUserError, verboseMessage)
     {
-        IsUserError = isUserError;
-        VerboseMessage = verboseMessage;
     }
 
-    public GracefulException(string message, Exception innerException, bool isUserError = false, string? verboseMessage = null)
+    public GracefulException(string message, Exception? innerException, bool isUserError = false, string? verboseMessage = null)
         : base(message, innerException)
     {
         IsUserError = isUserError;
         VerboseMessage = verboseMessage;
     }
 
-    public GracefulException(string message, string verboseMessage)
-        : base(message)
-    {
-        IsUserError = true;
-        VerboseMessage = verboseMessage;
-    }
+    public bool IsUserError { get; }
+
+    public string? VerboseMessage { get; }
 }
 
 /// <summary>
