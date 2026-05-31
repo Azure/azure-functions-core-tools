@@ -90,12 +90,13 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
         context.Reporter.ReportStatus("Running go build");
         (int exitCode, string stderr) = await RunGoBuild(root, outputPath, cancellationToken).ConfigureAwait(false);
+
         WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+
         if (exitCode != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? "see build output above." : stderr.Trim();
             throw new GracefulException(
-                $"'go build' failed (exit {exitCode}). {detail}",
+                $"'go build' failed (exit {exitCode}). {stderr?.Trim()}",
                 isUserError: true);
         }
 

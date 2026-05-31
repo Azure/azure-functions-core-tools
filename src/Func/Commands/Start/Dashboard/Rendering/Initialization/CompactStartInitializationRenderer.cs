@@ -28,6 +28,7 @@ internal sealed class CompactStartInitializationRenderer(
     private CancellationTokenSource? _liveCts;
     private Task? _liveTask;
     private int _spinnerFrameIndex;
+    private bool _hasFailure;
     private bool _disposed;
 
     private ITheme Theme => _interaction.Theme;
@@ -208,6 +209,7 @@ internal sealed class CompactStartInitializationRenderer(
 
         step.Failed = true;
         step.Result = failed.Message;
+        _hasFailure = true;
         if (ReferenceEquals(_activeStep, step))
         {
             _activeStep = null;
@@ -334,7 +336,7 @@ internal sealed class CompactStartInitializationRenderer(
                 ? string.Empty
                 : $" [dim]({Markup.Escape(step.Message)})[/]";
 
-            return $"{icon} [dim]{title}[/]{progress}{message}";
+            return $"{icon} {title}{progress}{message}";
         }
     }
 
@@ -345,16 +347,45 @@ internal sealed class CompactStartInitializationRenderer(
             yield break;
         }
 
+        // On success the step's title line already carries the curated result, so collapse the log area
+        // entirely (including the line-count footer) to keep the completed checklist to one line per step.
         if (step.Completed && !step.Failed)
         {
-            yield return $"  [dim]{LogSummaryPrefix} {step.TotalLogLineCount:0} lines{Ellipsis}[/]";
             yield break;
         }
 
+        // While the step is still running (or has failed), show the tail of the log with a connecting
+        // gutter and anchor it with a corner-glyph footer carrying the running line count.
         foreach (string line in step.LogLines)
         {
-            yield return $"  [dim]{LogGutter} {Markup.Escape(line)}[/]";
+            yield return $"  [dim]{LogGutter} {Markup.Escape(TruncateToWidth(line))}[/]";
         }
+
+        yield return $"  [dim]{LogSummaryPrefix} {FormatLineCount(step.TotalLogLineCount)}[/]";
+    }
+
+    private static string FormatLineCount(int count)
+        => count == 1 ? "1 line" : $"{count} lines";
+
+    private string TruncateToWidth(string line)
+    {
+        // Account for the two-space indent, the gutter glyph, and the trailing space before the text so a
+        // long line is clipped instead of wrapping onto the next row, which would break the gutter column.
+        const int gutterWidth = 4;
+        int available = _console.Profile.Width - gutterWidth;
+        if (available <= 0)
+        {
+            return string.Empty;
+        }
+
+        if (line.Length <= available)
+        {
+            return line;
+        }
+
+        string ellipsis = Ellipsis;
+        int keep = Math.Max(0, available - ellipsis.Length);
+        return string.Concat(line.AsSpan(0, keep), ellipsis);
     }
 
     private string FormatProgress(double percent)
@@ -407,11 +438,13 @@ internal sealed class CompactStartInitializationRenderer(
 
         Task? liveTaskToStop;
         CancellationTokenSource? liveCtsToStop;
+        bool hasFailure;
         lock (_stateLock)
         {
             _disposed = true;
             liveTaskToStop = _liveTask;
             liveCtsToStop = _liveCts;
+            hasFailure = _hasFailure;
             _liveTask = null;
             _liveCts = null;
         }
@@ -419,6 +452,14 @@ internal sealed class CompactStartInitializationRenderer(
         if (liveTaskToStop is not null)
         {
             await StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, CancellationToken.None);
+
+            // The live display is configured with AutoClear, so stopping it erases the rendered frame.
+            // When a step failed there is no completion hand-off to the dashboard, so re-render the final
+            // frame statically to keep the failed checklist and its log tail on screen for the user.
+            if (hasFailure)
+            {
+                WritePromptContext();
+            }
         }
 
         _redrawSignal.Dispose();

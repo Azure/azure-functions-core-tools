@@ -95,21 +95,18 @@ internal sealed class NodeFunctionsProject : FunctionsProject
         }
     }
 
-    private async Task RunAsync(
-        string root,
-        IReadOnlyList<string> args,
-        string display,
-        IFunctionsProjectHostRunReporter reporter,
-        CancellationToken cancellationToken)
+    private async Task RunAsync(string root, IReadOnlyList<string> args, string display, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
     {
         reporter.ReportStatus($"Running {display}");
+
         (int exitCode, string stderr) = await RunNpm(root, args, cancellationToken).ConfigureAwait(false);
+
         WriteLogLines(reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+
         if (exitCode != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? "see output above." : stderr.Trim();
             throw new GracefulException(
-                $"'{display}' failed (exit {exitCode}). {detail}",
+                $"'{display}' failed (exit {exitCode}). {stderr?.Trim()}",
                 isUserError: true);
         }
     }

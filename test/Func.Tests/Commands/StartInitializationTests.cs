@@ -718,7 +718,7 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
-    public async Task CompactRenderer_RendersBoundedLogTailAndCollapsesOnSuccess()
+    public async Task CompactRenderer_RendersBoundedLogTailAndFullyCollapsesOnSuccess()
     {
         using var writer = new StringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
@@ -747,8 +747,61 @@ public class StartInitializationTests : IDisposable
         await renderer.DisposeAsync();
 
         string completedOutput = writer.ToString();
-        Assert.Contains("12 lines", completedOutput);
         Assert.Contains("ready", completedOutput);
+
+        // On success the log area collapses entirely. The old collapsed summary row was the only place a
+        // line count was followed by an ellipsis ("N lines…"), so its absence guards the full collapse.
+        string ellipsis = console.Profile.Capabilities.Unicode ? "\u2026" : "...";
+        Assert.DoesNotContain($"lines{ellipsis}", completedOutput);
+    }
+
+    [Fact]
+    public async Task CompactRenderer_ShowsRunningLineCountWhileStreaming()
+    {
+        using var writer = new StringWriter();
+        IAnsiConsole console = CreateInteractiveConsole(writer);
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
+
+        await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
+        for (int i = 1; i <= 3; i++)
+        {
+            await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", $"line {i}", FunctionsProjectReportSeverity.Info), CancellationToken.None);
+        }
+
+        await WaitForOutputAsync(writer, output => output.Contains("3 lines", StringComparison.Ordinal));
+
+        await renderer.DisposeAsync();
+
+        string output = writer.ToString();
+        Assert.Contains("3 lines", output);
+        Assert.Contains("line 3", output);
+    }
+
+    [Fact]
+    public async Task CompactRenderer_TruncatesLongLogLinesToWidth()
+    {
+        using var writer = new StringWriter();
+        IAnsiConsole console = CreateInteractiveConsole(writer);
+        string longLine = new('x', console.Profile.Width * 2);
+        var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
+        var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
+
+        await renderer.OnEventAsync(new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none"), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
+        await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", longLine, FunctionsProjectReportSeverity.Info), CancellationToken.None);
+
+        string ellipsis = console.Profile.Capabilities.Unicode ? "\u2026" : "...";
+        await WaitForOutputAsync(writer, output => output.Contains(ellipsis, StringComparison.Ordinal));
+
+        await renderer.DisposeAsync();
+
+        string output = writer.ToString();
+
+        // No single rendered line should reach the untruncated length, so the full run never appears.
+        Assert.DoesNotContain(longLine, output);
+        Assert.Contains(ellipsis, output);
     }
 
     [Fact]
