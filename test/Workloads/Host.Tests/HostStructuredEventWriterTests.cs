@@ -95,6 +95,31 @@ public sealed class HostStructuredEventWriterTests
     }
 
     [Fact]
+    public void WriteLog_WithNestedException_WritesInnerExceptionDetails()
+    {
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        var exception = new InvalidOperationException("outer failure", new Exception("inner failure"));
+
+        HostStructuredEventWriter.WriteLog(
+            "Function.HttpTrigger1.User",
+            LogLevel.Error,
+            new EventId(0),
+            "Invocation failed",
+            new Dictionary<string, object?>(StringComparer.Ordinal),
+            exception,
+            writer: writer);
+
+        using var document = JsonDocument.Parse(writer.ToString());
+        JsonElement exceptionJson = document.RootElement.GetProperty("exception");
+        Assert.Equal(typeof(InvalidOperationException).FullName, exceptionJson.GetProperty("type").GetString());
+        Assert.Equal("outer failure", exceptionJson.GetProperty("message").GetString());
+
+        JsonElement innerExceptionJson = exceptionJson.GetProperty("inner_exception");
+        Assert.Equal(typeof(Exception).FullName, innerExceptionJson.GetProperty("type").GetString());
+        Assert.Equal("inner failure", innerExceptionJson.GetProperty("message").GetString());
+    }
+
+    [Fact]
     public void WriteFunctionDiscovered_EmitsDashboardMetadata()
     {
         using var writer = new StringWriter(CultureInfo.InvariantCulture);

@@ -17,6 +17,7 @@ public sealed class HostStructuredScriptLoggingBuilderTests
     private const string SharedMemoryWarningCategory =
         "Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor";
     private const string SystemTraceMiddlewareCategory = "Microsoft.Azure.WebJobs.Script.WebHost.Middleware.SystemTraceMiddleware";
+    private const string OptionsLoggingCategory = "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService";
 
     [Fact]
     public void Configure_RegistersStructuredLoggerProvider()
@@ -39,6 +40,9 @@ public sealed class HostStructuredScriptLoggingBuilderTests
     [InlineData(AppInsightsExtensionWarningCategory, LogLevel.Error, true)]
     [InlineData(SharedMemoryWarningCategory, LogLevel.Warning, false)]
     [InlineData(SharedMemoryWarningCategory, LogLevel.Error, true)]
+    [InlineData(OptionsLoggingCategory, LogLevel.Warning, false)]
+    [InlineData(OptionsLoggingCategory, LogLevel.Error, false)]
+    [InlineData(OptionsLoggingCategory, LogLevel.Critical, false)]
     public void Configure_AppliesCategoryLogLevelFilters(string category, LogLevel logLevel, bool expected)
     {
         var services = new ServiceCollection();

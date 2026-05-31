@@ -107,8 +107,13 @@ public class DashboardStateTests
     {
         var state = new DashboardState();
         state.Observe(DiscoverHttp("HttpTrigger1"));
+        var exceptionDetails = new HostLogExceptionDetails(
+            "Microsoft.Azure.WebJobs.Host.FunctionInvocationException",
+            "Exception while executing function",
+            "outer stack",
+            new HostLogExceptionDetails("Worker.UserException", "inner boom", "inner stack", null));
 
-        state.Observe(MakeEntry(
+        IReadOnlyList<DashboardEvent> events = state.Observe(MakeEntry(
             "Function.HttpTrigger1",
             LogLevel.Error,
             "Executed 'HttpTrigger1' (Failed)",
@@ -120,12 +125,23 @@ public class DashboardStateTests
                 [HostLogAttributeKeys.FunctionResult] = "failed",
                 [HostLogAttributeKeys.DurationMs] = 38.0,
             },
-            exception: new InvalidOperationException("boom")));
+            exception: new InvalidOperationException("placeholder"),
+            exceptionDetails: exceptionDetails));
+
+        var completed = Assert.Single(events.OfType<InvocationCompletedEvent>());
+        Assert.Equal("Microsoft.Azure.WebJobs.Host.FunctionInvocationException", completed.ErrorType);
+        Assert.Equal("Exception while executing function", completed.ErrorMessage);
+        Assert.Equal("Worker.UserException", completed.Error?.InnerException?.Type);
+        Assert.Equal("inner boom", completed.Error?.InnerException?.Message);
 
         DashboardSnapshot snap = state.Snapshot();
         Assert.Equal(FunctionStatus.Error, snap.Functions[0].Status);
         Assert.Equal(1, snap.Functions[0].TotalErrors);
         Assert.Equal(1, snap.FailedInvocations);
+        const string ExpectedLastErrorMessage =
+            "Microsoft.Azure.WebJobs.Host.FunctionInvocationException: Exception while executing function" +
+            " ---> Worker.UserException: inner boom";
+        Assert.Equal(ExpectedLastErrorMessage, snap.Functions[0].LastErrorMessage);
         Assert.True(snap.ErrorCount > 0);
     }
 
@@ -201,6 +217,10 @@ public class DashboardStateTests
         LogLevel level,
         string message,
         Dictionary<string, object?> attributes,
-        Exception? exception = null)
-        => new(DateTimeOffset.UtcNow, category, level, default, message, exception, attributes);
+        Exception? exception = null,
+        HostLogExceptionDetails? exceptionDetails = null)
+    {
+        var entry = new HostLogEntry(DateTimeOffset.UtcNow, category, level, default, message, exception, attributes);
+        return exceptionDetails is not null ? entry with { ExceptionDetails = exceptionDetails } : entry;
+    }
 }

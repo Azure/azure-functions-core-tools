@@ -192,7 +192,8 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
                 LogLevel level = ParseLevel(ReadString(root, "level"), streamName);
                 EventId eventId = ReadEventId(root);
                 string message = ReadString(root, "message") ?? line;
-                Exception? exception = ReadException(root);
+                HostLogExceptionDetails? exceptionDetails = ReadException(root);
+                Exception? exception = exceptionDetails is not null ? new HostProcessException(exceptionDetails) : null;
                 Dictionary<string, object?> attributes = root.TryGetProperty("attributes", out JsonElement attributesElement)
                     && attributesElement.ValueKind == JsonValueKind.Object
                         ? ReadAttributes(attributesElement)
@@ -202,7 +203,10 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
                 EnrichFromCategory(category, attributes);
                 EnrichFromMessage(message, attributes);
 
-                entry = new HostLogEntry(timestamp, category, level, eventId, message, exception, attributes);
+                entry = new HostLogEntry(timestamp, category, level, eventId, message, exception, attributes)
+                {
+                    ExceptionDetails = exceptionDetails,
+                };
                 return true;
             }
         }
@@ -242,15 +246,27 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
         return new EventId(id, name);
     }
 
-    private static Exception? ReadException(JsonElement root)
+    private static HostLogExceptionDetails? ReadException(JsonElement root)
     {
         if (!root.TryGetProperty("exception", out JsonElement exception) || exception.ValueKind != JsonValueKind.Object)
         {
             return null;
         }
 
+        return ReadExceptionObject(exception);
+    }
+
+    private static HostLogExceptionDetails ReadExceptionObject(JsonElement exception)
+    {
+        string type = ReadString(exception, "type") ?? typeof(Exception).FullName!;
         string message = ReadString(exception, "message") ?? "Host process exception.";
-        return new HostProcessException(message, ReadString(exception, "type"), ReadString(exception, "stack"));
+        string? stack = ReadString(exception, "stack");
+        HostLogExceptionDetails? innerException = exception.TryGetProperty("inner_exception", out JsonElement inner)
+            && inner.ValueKind == JsonValueKind.Object
+                ? ReadExceptionObject(inner)
+                : null;
+
+        return new HostLogExceptionDetails(type, message, stack, innerException);
     }
 
     private static Dictionary<string, object?> ReadAttributes(JsonElement attributesElement)
@@ -492,11 +508,11 @@ internal sealed class LineHostProcessOutputParser : IHostProcessOutputParser
         return end > start ? value[start..end].Trim('\'', '"') : null;
     }
 
-    private sealed class HostProcessException(string message, string? type, string? remoteStack) : Exception(message)
+    private sealed class HostProcessException(HostLogExceptionDetails details) : Exception(details.Message)
     {
-        public string? RemoteType { get; } = type;
+        public string RemoteType => details.Type;
 
-        public string? RemoteStack { get; } = remoteStack;
+        public string? RemoteStack => details.Stack;
     }
 
     private readonly record struct ConsoleLogContext(string Category, LogLevel Level, EventId EventId);
