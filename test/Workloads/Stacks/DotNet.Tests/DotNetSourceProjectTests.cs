@@ -67,6 +67,10 @@ public class DotNetSourceProjectTests : IDisposable
         string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
         string json = BuildTargetResultJson(assemblyPath, "GetTargetPath");
 
+        // --no-build trusts existing output, so the assembly must actually be on disk.
+        Directory.CreateDirectory(Path.GetDirectoryName(assemblyPath)!);
+        File.WriteAllText(assemblyPath, string.Empty);
+
         _dotnetCli.RunWithOutputAsync(
                 Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
                 Arg.Any<string?>(),
@@ -86,6 +90,56 @@ public class DotNetSourceProjectTests : IDisposable
 
         string expectedDir = Path.GetDirectoryName(assemblyPath)!;
         Assert.Equal(expectedDir, context.StartupDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar));
+    }
+
+    [Fact]
+    public async Task PrepareForHostRunAsync_skip_build_throws_when_assembly_missing()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        File.WriteAllText(projectFile, "<Project></Project>");
+
+        // Resolve a valid target path, but never create the assembly on disk.
+        string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
+        string json = BuildTargetResultJson(assemblyPath, "GetTargetPath");
+
+        _dotnetCli.RunWithOutputAsync(
+                Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(json);
+
+        DotNetSourceProject project = CreateProject(projectFile);
+        FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => project.PrepareForHostRunAsync(context, default));
+
+        Assert.Contains("--no-build", ex.Message);
+        Assert.Contains("MyApp", ex.Message);
+        Assert.True(ex.IsUserError);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRunAsync_skip_build_propagates_cli_failure()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        File.WriteAllText(projectFile, "<Project></Project>");
+
+        _dotnetCli.RunWithOutputAsync(
+                Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Throws(new DotnetCliException(1, "Target path resolution failed", "", "build MyApp.csproj"));
+
+        DotNetSourceProject project = CreateProject(projectFile);
+        FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => project.PrepareForHostRunAsync(context, default));
+
+        Assert.Contains("dotnet build", ex.Message);
+        Assert.Contains("exit 1", ex.Message);
+        Assert.True(ex.IsUserError);
     }
 
     [Fact]
