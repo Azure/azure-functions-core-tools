@@ -347,7 +347,7 @@ internal sealed class CompactStartInitializationRenderer(
 
         if (step.Completed && !step.Failed)
         {
-            yield return $"  [dim]{LogSummaryPrefix} {step.TotalLogLineCount:0} lines\u2026[/]";
+            yield return $"  [dim]{LogSummaryPrefix} {step.TotalLogLineCount:0} lines{Ellipsis}[/]";
             yield break;
         }
 
@@ -381,6 +381,8 @@ internal sealed class CompactStartInitializationRenderer(
     private string LogGutter => _console.Profile.Capabilities.Unicode ? "\u2502" : "|";
 
     private string LogSummaryPrefix => _console.Profile.Capabilities.Unicode ? "\u2514" : "`";
+
+    private string Ellipsis => _console.Profile.Capabilities.Unicode ? "\u2026" : "...";
 
     private char ProgressCompleteCharacter => _console.Profile.Capabilities.Unicode ? '\u2501' : '=';
 

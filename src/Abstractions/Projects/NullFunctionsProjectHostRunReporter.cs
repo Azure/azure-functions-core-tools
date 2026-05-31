@@ -18,10 +18,6 @@ public sealed class NullFunctionsProjectHostRunReporter : IFunctionsProjectHostR
     {
     }
 
-    public void ReportProgress(double percent, string? message = null)
-    {
-    }
-
     public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
     {
     }

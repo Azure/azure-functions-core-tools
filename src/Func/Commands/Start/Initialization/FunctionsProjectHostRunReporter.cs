@@ -38,9 +38,6 @@ internal sealed class FunctionsProjectHostRunReporter : IFunctionsProjectHostRun
         Enqueue(ct => _context.ReportStatusAsync(message, ct));
     }
 
-    public void ReportProgress(double percent, string? message = null)
-        => Enqueue(ct => _context.ReportProgressAsync(percent, message, ct));
-
     public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
     {
         if (line is null)

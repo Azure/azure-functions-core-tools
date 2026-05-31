@@ -93,7 +93,6 @@ public sealed class FunctionsProjectHostRunContextTests
         IFunctionsProjectHostRunReporter reporter = NullFunctionsProjectHostRunReporter.Instance;
 
         reporter.ReportStatus("working");
-        reporter.ReportProgress(50, "halfway");
         reporter.WriteLog("line", FunctionsProjectReportSeverity.Warning);
     }
 

@@ -160,10 +160,6 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
             && progress.StepId == PrepareProjectHostRunInitializationStep.StepId
             && double.IsNaN(progress.Percent)
             && progress.Message == "running npm install");
-        Assert.Contains(renderer.Events, ev => ev is StartInitializationProgressEvent progress
-            && progress.StepId == PrepareProjectHostRunInitializationStep.StepId
-            && progress.Percent == 25
-            && progress.Message == "installing");
         Assert.Contains(renderer.Events, ev => ev is StartInitializationLogEvent log
             && log.StepId == PrepareProjectHostRunInitializationStep.StepId
             && log.Line == "npm install output"
@@ -171,14 +167,13 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     }
 
     [Fact]
-    public async Task Reporter_ForwardsStatusProgressAndLog()
+    public async Task Reporter_ForwardsStatusAndLog()
     {
         var renderer = new RecordingRenderer();
         StartInitializationStepContext context = NewContext(renderer: renderer, stepId: "adapter_step");
         await using var reporter = new FunctionsProjectHostRunReporter(context, CancellationToken.None);
 
         reporter.ReportStatus("building");
-        reporter.ReportProgress(75, "almost done");
         reporter.WriteLog("build output", FunctionsProjectReportSeverity.Error);
         await reporter.CompleteAsync();
 
@@ -186,10 +181,6 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
             && progress.StepId == "adapter_step"
             && double.IsNaN(progress.Percent)
             && progress.Message == "building");
-        Assert.Contains(renderer.Events, ev => ev is StartInitializationProgressEvent progress
-            && progress.StepId == "adapter_step"
-            && progress.Percent == 75
-            && progress.Message == "almost done");
         Assert.Contains(renderer.Events, ev => ev is StartInitializationLogEvent log
             && log.StepId == "adapter_step"
             && log.Line == "build output"
@@ -256,7 +247,6 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         public override Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
         {
             context.Reporter.ReportStatus("running npm install");
-            context.Reporter.ReportProgress(25, "installing");
             context.Reporter.WriteLog("npm install output", FunctionsProjectReportSeverity.Warning);
             return Task.CompletedTask;
         }

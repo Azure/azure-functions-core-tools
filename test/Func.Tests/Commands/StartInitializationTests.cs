@@ -763,6 +763,8 @@ public class StartInitializationTests : IDisposable
         await renderer.OnEventAsync(new StartInitializationStepStartedEvent(DateTimeOffset.UnixEpoch, step), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationLogEvent(DateTimeOffset.UnixEpoch, "prepare", "error tail", FunctionsProjectReportSeverity.Error), CancellationToken.None);
         await renderer.OnEventAsync(new StartInitializationStepFailedEvent(DateTimeOffset.UnixEpoch, "prepare", "build failed"), CancellationToken.None);
+        await WaitForOutputAsync(writer, output => output.Contains("build failed", StringComparison.Ordinal)
+            && output.Contains("error tail", StringComparison.Ordinal));
         await renderer.DisposeAsync();
 
         string output = writer.ToString();
