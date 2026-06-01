@@ -56,8 +56,9 @@ internal sealed class InstallHostWorkloadInitializationStep(
                 includePrerelease: true,
                 exact: true,
                 force: false,
+                allowUntrusted: false,
                 progress: null,
-                cancellationToken);
+                cancellationToken: cancellationToken);
         }
         catch (WorkloadPackageNotFoundException ex)
         {

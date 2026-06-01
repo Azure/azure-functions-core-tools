@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Install.Trust;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Hosting;
@@ -17,6 +18,8 @@ internal static class WorkloadInstallRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<ITrustAnchorStore, EmbeddedTrustAnchorStore>();
+        services.AddSingleton<IWorkloadTrustVerifier, WorkloadTrustVerifier>();
         services.AddSingleton<IWorkloadInstaller, WorkloadInstaller>();
 
         return services;

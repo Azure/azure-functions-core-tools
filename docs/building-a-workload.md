@@ -63,7 +63,7 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 4. Inside `Configure`, register an `IProjectInitializer`, an `IProjectDetector` (so the resolver can claim directories owned by your workload), and/or top-level commands via `builder.RegisterCommand(...)` plus any supporting services
 5. Add a `workload.json` next to your csproj describing the entry-point assembly and type
 6. Add a `README.md` next to the csproj — `Release.props` auto-includes it as `<PackageReadmeFile>` so it surfaces on NuGet feeds and in `func workload list`
-7. Build, package, and install with `func workload install <path-to-nupkg>`
+7. Build, package, and install with `func workload install <path-to-nupkg> --allow-untrusted` (local unsigned packs require the opt-out flag)
 
 ## Step 1: Create the Project
 

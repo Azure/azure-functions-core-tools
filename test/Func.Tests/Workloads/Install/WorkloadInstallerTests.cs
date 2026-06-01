@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Install.Trust;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -147,6 +148,41 @@ public sealed class WorkloadInstallerTests : IDisposable
         FileNotFoundException ex = await Assert.ThrowsAsync<FileNotFoundException>(
             () => installer.InstallFromPackageAsync(Path.Combine(_root, "missing.nupkg")));
         Assert.Contains("does not exist", ex.Message);
+    }
+
+    [Fact]
+    public async Task InstallFromPackage_VerifierUntrusted_Throws_AndNoFilesWritten()
+    {
+        string nupkg = BuildNupkg();
+        var verifier = Substitute.For<IWorkloadTrustVerifier>();
+        verifier.VerifyAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(TrustVerificationResult.Untrusted("publisher not trusted"));
+
+        WorkloadInstaller installer = NewInstaller(verifier);
+        UntrustedWorkloadException ex = await Assert.ThrowsAsync<UntrustedWorkloadException>(
+            () => installer.InstallFromPackageAsync(nupkg));
+
+        Assert.Equal("publisher not trusted", ex.Message);
+        Assert.False(Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")));
+        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromPackage_AllowUntrusted_ForwardsToVerifier()
+    {
+        string nupkg = BuildNupkg();
+        var verifier = Substitute.For<IWorkloadTrustVerifier>();
+        verifier.VerifyAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(TrustVerificationResult.Trusted);
+
+        WorkloadInstaller installer = NewInstaller(verifier);
+        await installer.InstallFromPackageAsync(nupkg, force: false, allowUntrusted: true);
+
+        await verifier.Received(1).VerifyAsync(
+            Arg.Any<string>(),
+            "test.workload",
+            allowUntrusted: true,
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -573,7 +609,7 @@ public sealed class WorkloadInstallerTests : IDisposable
         var progress = new RecordingProgress(reports);
 
         WorkloadInstaller installer = NewInstaller();
-        await installer.InstallFromPackageAsync(nupkg, force: false, progress);
+        await installer.InstallFromPackageAsync(nupkg, force: false, allowUntrusted: false, progress: progress);
 
         Assert.Collection(
             reports,
@@ -641,7 +677,16 @@ public sealed class WorkloadInstallerTests : IDisposable
         NuGetVersion.Parse(version),
         new PackageSource("https://example/v3/index.json", "test"));
 
-    private WorkloadInstaller NewInstaller() => new(_paths, _store, _metadataReader, _catalog);
+    private WorkloadInstaller NewInstaller(IWorkloadTrustVerifier? trustVerifier = null)
+    {
+        if (trustVerifier is null)
+        {
+            trustVerifier = Substitute.For<IWorkloadTrustVerifier>();
+            trustVerifier.VerifyAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                .Returns(TrustVerificationResult.Trusted);
+        }
+        return new(_paths, _store, _metadataReader, _catalog, trustVerifier);
+    }
 
     [Fact]
     public async Task InstallFromPackage_HostPackage_SetsExecutableBitOnHostBinary_OnUnix()
