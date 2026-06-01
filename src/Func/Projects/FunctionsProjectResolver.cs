@@ -37,6 +37,7 @@ internal sealed class FunctionsProjectResolver(IEnumerable<WorkloadProjectFactor
             }
         }
 
-        return ProjectResolutionResults.NotResolved("No installed workload recognized this directory as an Azure Functions project.");
+        return ProjectResolutionResults.NotResolved(
+            "No installed workload recognized this directory as an Azure Functions project. Run 'func setup' to set up your local environment for your chosen stack.");
     }
 }

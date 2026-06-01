@@ -23,6 +23,7 @@
         }
       },
       "supportedRuntimes": [
+        "go",
         "node",
         "python",
         "java",

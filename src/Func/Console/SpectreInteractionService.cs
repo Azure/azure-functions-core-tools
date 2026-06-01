@@ -329,14 +329,12 @@ internal class SpectreInteractionService : IInteractionService
             return [];
         }
 
-        // NotRequired() lets the user press ENTER with nothing selected to exit
-        // the prompt cleanly. Callers treat an empty result as "no selection",
-        // which (for `func setup`) is the documented escape hatch from the
-        // stack picker.
+        // The prompt requires at least one selection; users cancel with CTRL+C
+        // (which surfaces as OperationCanceledException up the call stack).
         List<MultiSelectionChoice> selected = await new MultiSelectionPrompt<MultiSelectionChoice>()
             .Title(title)
-            .NotRequired()
-            .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm; [green]<enter>[/] with no selection exits)[/]")
+            .Required()
+            .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm; [red]<ctrl+c>[/] to cancel)[/]")
             .UseConverter(static choice => choice.Label)
             .AddChoices(choiceList)
             .ShowAsync(_stderr, cancellationToken);
