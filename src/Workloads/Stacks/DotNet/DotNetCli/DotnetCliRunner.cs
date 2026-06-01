@@ -1,8 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
@@ -15,21 +15,110 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
 
     public async Task RunAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
     {
-        await RunCoreAsync(arguments, workingDirectory, cancellationToken);
+        // Output is captured so it can be attached to the exception on failure, but is otherwise discarded.
+        StringBuilder stdout = new();
+        StringBuilder stderr = new();
+
+        // Each callback is invoked only from its own stream's thread (serialized per stream), so the two
+        // builders are never touched concurrently and need no synchronization.
+        int exitCode = await ExecuteAsync(
+            arguments,
+            workingDirectory,
+            line => stdout.AppendLine(line),
+            line => stderr.AppendLine(line),
+            cancellationToken);
+
+        if (exitCode != 0)
+        {
+            throw new DotnetCliException(exitCode, stderr.ToString(), stdout.ToString(), string.Join(' ', arguments));
+        }
     }
 
-    public async Task<string> RunWithOutputAsync(
+    public async Task RunStreamingAsync(IReadOnlyList<string> arguments, string? workingDirectory, Action<string>? onOutputLine,
+        Action<string>? onErrorLine, CancellationToken cancellationToken)
+    {
+        int exitCode = await ExecuteAsync(arguments, workingDirectory, onOutputLine, onErrorLine, cancellationToken);
+
+        if (exitCode != 0)
+        {
+            // Output has already been surfaced live through the callbacks, so the exception only needs
+            // to carry the exit code and command.
+            throw new DotnetCliException(exitCode, string.Empty, string.Empty, string.Join(' ', arguments));
+        }
+    }
+
+    /// <summary>
+    /// Starts <c>dotnet</c>, streams each line of standard output and standard error to the supplied
+    /// callbacks as it is produced, waits for exit, and returns the process exit code.
+    /// </summary>
+    private async Task<int> ExecuteAsync(
         IReadOnlyList<string> arguments,
         string? workingDirectory,
+        Action<string>? onOutputLine,
+        Action<string>? onErrorLine,
         CancellationToken cancellationToken)
-    {
-        return await RunCoreAsync(arguments, workingDirectory, cancellationToken);
-    }
-
-    private async Task<string> RunCoreAsync(IReadOnlyList<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(arguments);
 
+        using Process process = new() { StartInfo = CreateStartInfo(arguments, workingDirectory) };
+
+        // stdout and stderr are delivered on separate thread-pool threads, so each stream gets its own
+        // completion signal. The handlers share no mutable state, so the two threads never race each other;
+        // each line callback is invoked only from its own stream's thread (serialized per stream).
+        TaskCompletionSource stdoutComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource stderrComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stdoutComplete.TrySetResult();
+            }
+            else
+            {
+                onOutputLine?.Invoke(e.Data);
+            }
+        };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stderrComplete.TrySetResult();
+            }
+            else
+            {
+                onErrorLine?.Invoke(e.Data);
+            }
+        };
+
+        if (!process.Start())
+        {
+            throw new InvalidOperationException("Failed to start dotnet process.");
+        }
+
+        try
+        {
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            await process.WaitForExitAsync(cancellationToken);
+
+            // WaitForExitAsync does not guarantee the async stream readers have drained, so wait for the
+            // trailing (null Data) sentinel on both streams to ensure every line has been delivered.
+            await stdoutComplete.Task;
+            await stderrComplete.Task;
+
+            return process.ExitCode;
+        }
+        finally
+        {
+            KillProcess(process);
+        }
+    }
+
+    private ProcessStartInfo CreateStartInfo(IReadOnlyList<string> arguments, string? workingDirectory)
+    {
         ProcessStartInfo psi = new()
         {
             FileName = _pathResolver.Resolve(),
@@ -49,37 +138,7 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
             psi.ArgumentList.Add(arg);
         }
 
-        using Process process = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to start dotnet process.");
-
-        try
-        {
-            // Read both streams concurrently to avoid deadlock when either
-            // buffer fills while the other is being awaited.
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-
-            await Task.WhenAll(stdoutTask, stderrTask);
-            await process.WaitForExitAsync(cancellationToken);
-
-            string stdout = await stdoutTask;
-            string stderr = await stderrTask;
-
-            if (process.ExitCode != 0)
-            {
-                throw new DotnetCliException(
-                    process.ExitCode,
-                    stderr,
-                    stdout,
-                    string.Join(' ', arguments));
-            }
-
-            return stdout;
-        }
-        finally
-        {
-            KillProcess(process);
-        }
+        return psi;
     }
 
     private static void KillProcess(Process process)

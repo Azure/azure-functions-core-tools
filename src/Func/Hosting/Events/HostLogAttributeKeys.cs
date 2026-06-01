@@ -116,7 +116,11 @@ internal static class CliEventKinds
 
     public const string StartInitializationProgress = "start_initialization_progress";
 
+    public const string StartInitializationLog = "start_initialization_log";
+
     public const string StartInitializationStepCompleted = "start_initialization_step_completed";
+
+    public const string StartInitializationStepFailed = "start_initialization_step_failed";
 
     public const string StartInitializationCompleted = "start_initialization_completed";
 }

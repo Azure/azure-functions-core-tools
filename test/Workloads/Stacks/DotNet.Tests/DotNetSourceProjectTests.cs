@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using NSubstitute;
-using NSubstitute.ExceptionExtensions;
 using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
@@ -43,11 +42,7 @@ public class DotNetSourceProjectTests : IDisposable
         string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
         string json = BuildTargetResultJson(assemblyPath, "Build");
 
-        _dotnetCli.RunWithOutputAsync(
-                Arg.Is<IReadOnlyList<string>>(args => args[0] == "build" && args.Contains("--getTargetResult:Build")),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(json);
+        SetupStreamingBuild("--getTargetResult:Build", json);
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
@@ -56,6 +51,36 @@ public class DotNetSourceProjectTests : IDisposable
 
         string expectedDir = Path.GetDirectoryName(assemblyPath)!;
         Assert.Equal(expectedDir, context.StartupDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar));
+    }
+
+    [Fact]
+    public async Task PrepareForHostRunAsync_streams_build_output_to_reporter()
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        File.WriteAllText(projectFile, "<Project></Project>");
+
+        string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
+        string json = BuildTargetResultJson(assemblyPath, "Build");
+
+        SetupStreamingBuild(
+            "--getTargetResult:Build",
+            json,
+            outputLines: ["  MyApp -> MyApp.dll", "Build succeeded."],
+            errorLines: ["warning XYZ: heads up"]);
+
+        var reporter = new CapturingReporter();
+        DotNetSourceProject project = CreateProject(projectFile);
+        FunctionsProjectHostRunContext context = CreateHostRunContext();
+        context.Reporter = reporter;
+
+        await project.PrepareForHostRunAsync(context, default);
+
+        Assert.Contains(
+            reporter.Logs,
+            entry => entry.Severity == FunctionsProjectReportSeverity.Info && entry.Line == "Build succeeded.");
+        Assert.Contains(
+            reporter.Logs,
+            entry => entry.Severity == FunctionsProjectReportSeverity.Error && entry.Line == "warning XYZ: heads up");
     }
 
     [Fact]
@@ -71,11 +96,7 @@ public class DotNetSourceProjectTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(assemblyPath)!);
         File.WriteAllText(assemblyPath, string.Empty);
 
-        _dotnetCli.RunWithOutputAsync(
-                Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(json);
+        SetupStreamingBuild("--getTargetResult:GetTargetPath", json);
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
@@ -83,9 +104,11 @@ public class DotNetSourceProjectTests : IDisposable
         await project.PrepareForHostRunAsync(context, default);
 
         // Should NOT have called the build target
-        await _dotnetCli.DidNotReceive().RunWithOutputAsync(
+        await _dotnetCli.DidNotReceive().RunStreamingAsync(
             Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:Build")),
             Arg.Any<string?>(),
+            Arg.Any<Action<string>?>(),
+            Arg.Any<Action<string>?>(),
             Arg.Any<CancellationToken>());
 
         string expectedDir = Path.GetDirectoryName(assemblyPath)!;
@@ -102,11 +125,7 @@ public class DotNetSourceProjectTests : IDisposable
         string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
         string json = BuildTargetResultJson(assemblyPath, "GetTargetPath");
 
-        _dotnetCli.RunWithOutputAsync(
-                Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(json);
+        SetupStreamingBuild("--getTargetResult:GetTargetPath", json);
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
@@ -125,11 +144,9 @@ public class DotNetSourceProjectTests : IDisposable
         string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
         File.WriteAllText(projectFile, "<Project></Project>");
 
-        _dotnetCli.RunWithOutputAsync(
-                Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Throws(new DotnetCliException(1, "Target path resolution failed", "", "build MyApp.csproj"));
+        SetupStreamingFailure(
+            "--getTargetResult:GetTargetPath",
+            new DotnetCliException(1, "Target path resolution failed", "", "build MyApp.csproj"));
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
@@ -148,11 +165,7 @@ public class DotNetSourceProjectTests : IDisposable
         string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
         File.WriteAllText(projectFile, "<Project></Project>");
 
-        _dotnetCli.RunWithOutputAsync(
-                Arg.Is<IReadOnlyList<string>>(args => args[0] == "build" && args.Contains("--getTargetResult:Build")),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns("   \n");
+        SetupStreamingBuild("--getTargetResult:Build", "   \n");
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
@@ -170,11 +183,9 @@ public class DotNetSourceProjectTests : IDisposable
         string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
         File.WriteAllText(projectFile, "<Project></Project>");
 
-        _dotnetCli.RunWithOutputAsync(
-                Arg.Is<IReadOnlyList<string>>(args => args[0] == "build" && args.Contains("--getTargetResult:Build")),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Throws(new DotnetCliException(1, "Build failed", "", "build MyApp.csproj"));
+        SetupStreamingFailure(
+            "--getTargetResult:Build",
+            new DotnetCliException(1, "Build failed", "", "build MyApp.csproj"));
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
@@ -260,6 +271,85 @@ public class DotNetSourceProjectTests : IDisposable
 
     private FunctionsProjectHostRunContext CreateHostRunContext(bool skipBuild = false)
         => new(_projectDir, "dotnet", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);
+
+    private void SetupStreamingBuild(string targetResultArg, string json, string[]? outputLines = null, string[]? errorLines = null)
+    {
+        _dotnetCli
+            .When(x => x.RunStreamingAsync(
+                Arg.Is<IReadOnlyList<string>>(args => args.Contains(targetResultArg)),
+                Arg.Any<string?>(),
+                Arg.Any<Action<string>?>(),
+                Arg.Any<Action<string>?>(),
+                Arg.Any<CancellationToken>()))
+            .Do(callInfo =>
+            {
+                IReadOnlyList<string> args = callInfo.ArgAt<IReadOnlyList<string>>(0);
+                Action<string>? onOutput = callInfo.ArgAt<Action<string>?>(2);
+                Action<string>? onError = callInfo.ArgAt<Action<string>?>(3);
+
+                foreach (string line in outputLines ?? [])
+                {
+                    onOutput?.Invoke(line);
+                }
+
+                foreach (string line in errorLines ?? [])
+                {
+                    onError?.Invoke(line);
+                }
+
+                // Mirror MSBuild's --getResultOutputFile behavior: the structured result is written to the
+                // file path supplied in the arguments rather than to stdout.
+                File.WriteAllText(GetResultFilePath(args), json);
+            });
+    }
+
+    private void SetupStreamingFailure(string targetResultArg, Exception exception)
+    {
+        _dotnetCli
+            .When(x => x.RunStreamingAsync(
+                Arg.Is<IReadOnlyList<string>>(args => args.Contains(targetResultArg)),
+                Arg.Any<string?>(),
+                Arg.Any<Action<string>?>(),
+                Arg.Any<Action<string>?>(),
+                Arg.Any<CancellationToken>()))
+            .Do(_ => throw exception);
+    }
+
+    private static string GetResultFilePath(IReadOnlyList<string> args)
+    {
+        const string prefix = "--getResultOutputFile:";
+        string arg = args.First(a => a.StartsWith(prefix, StringComparison.Ordinal));
+        return arg[prefix.Length..];
+    }
+
+    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    {
+        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly object _gate = new();
+
+        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _logs.ToArray();
+                }
+            }
+        }
+
+        public void ReportStatus(string message)
+        {
+        }
+
+        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        {
+            lock (_gate)
+            {
+                _logs.Add((line, severity));
+            }
+        }
+    }
 
     private static string BuildTargetResultJson(string assemblyFullPath, string targetName)
     {

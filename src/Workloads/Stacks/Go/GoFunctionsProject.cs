@@ -71,6 +71,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
             return;
         }
 
+        context.Reporter.ReportStatus("Checking Go toolchain");
         (int Major, int Minor)? version = await ReadGoVersion(cancellationToken).ConfigureAwait(false);
         if (version is null)
         {
@@ -87,16 +88,27 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
+        context.Reporter.ReportStatus("Running go build");
         (int exitCode, string stderr) = await RunGoBuild(root, outputPath, cancellationToken).ConfigureAwait(false);
+
+        WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+
         if (exitCode != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? "see build output above." : stderr.Trim();
             throw new GracefulException(
-                $"'go build' failed (exit {exitCode}). {detail}",
+                $"'go build' failed (exit {exitCode}). {stderr?.Trim()}",
                 isUserError: true);
         }
 
         context.StartupDirectory = new DirectoryInfo(binDirectory);
+    }
+
+    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
+    {
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            reporter.WriteLog(line, severity);
+        }
     }
 
     private static async Task<(int Major, int Minor)?> DefaultReadGoVersion(CancellationToken cancellationToken)

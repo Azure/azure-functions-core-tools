@@ -70,12 +70,16 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 
         if (!venvAlreadyExisted)
         {
+            context.Reporter.ReportStatus($"Creating Python virtual environment in {Path.GetFileName(venvPath)}");
+
             (int exitCode, string stderr) = await RunCreateVenv(root, venvPath, cancellationToken).ConfigureAwait(false);
+
+            WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+
             if (exitCode != 0)
             {
-                string detail = string.IsNullOrWhiteSpace(stderr) ? "see output above." : stderr.Trim();
                 throw new GracefulException(
-                    $"'python -m venv {Path.GetFileName(venvPath)}' failed (exit {exitCode}). {detail}",
+                    $"'python -m venv {Path.GetFileName(venvPath)}' failed (exit {exitCode}). {stderr?.Trim()}",
                     isUserError: true);
             }
         }
@@ -83,13 +87,17 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         string requirementsPath = Path.Combine(root, RequirementsFileName);
         if (File.Exists(requirementsPath))
         {
+            context.Reporter.ReportStatus($"Installing Python dependencies from {RequirementsFileName}");
+
             string pipPath = GetVenvExecutablePath(venvPath, "pip");
             (int exitCode, string stderr) = await RunPipInstall(root, pipPath, requirementsPath, cancellationToken).ConfigureAwait(false);
+
+            WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+
             if (exitCode != 0)
             {
-                string detail = string.IsNullOrWhiteSpace(stderr) ? "see output above." : stderr.Trim();
                 throw new GracefulException(
-                    $"'pip install -r {RequirementsFileName}' failed (exit {exitCode}). {detail}",
+                    $"'pip install -r {RequirementsFileName}' failed (exit {exitCode}). {stderr?.Trim()}",
                     isUserError: true);
             }
         }
@@ -110,6 +118,14 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         if (!string.IsNullOrEmpty(majorMinor))
         {
             context.EnvironmentVariables[WorkerRuntimeVersionEnvVar] = majorMinor;
+        }
+    }
+
+    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
+    {
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            reporter.WriteLog(line, severity);
         }
     }
 
@@ -148,10 +164,7 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         return (Path.Combine(projectRoot, DefaultVenvFolderName), false);
     }
 
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunCreateVenv(
-        string workingDirectory,
-        string venvPath,
-        CancellationToken cancellationToken)
+    private static async Task<(int ExitCode, string Stderr)> DefaultRunCreateVenv(string workingDirectory, string venvPath, CancellationToken cancellationToken)
     {
         // Prefer `python3` on POSIX so we don't pick up a Python 2 shim. If the
         // interpreter isn't on PATH (Win32Exception from Process.Start), retry
@@ -181,11 +194,7 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         return last;
     }
 
-    private static Task<(int ExitCode, string Stderr)> DefaultRunPipInstall(
-        string workingDirectory,
-        string pipPath,
-        string requirementsPath,
-        CancellationToken cancellationToken)
+    private static Task<(int ExitCode, string Stderr)> DefaultRunPipInstall(string workingDirectory, string pipPath, string requirementsPath, CancellationToken cancellationToken)
     {
         return RunProcessAsync(pipPath, ["install", "-r", requirementsPath], workingDirectory, cancellationToken);
     }

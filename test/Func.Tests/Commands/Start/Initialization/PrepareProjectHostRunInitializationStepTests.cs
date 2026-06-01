@@ -145,6 +145,48 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         Assert.False(env.ContainsKey("MyKey"));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WiresReporterToProjectContext()
+    {
+        SetLocalSettings([]);
+        var renderer = new RecordingRenderer();
+        var project = new ReportingProject(_projectDir);
+        StartInitializationStepContext context = NewContext(project, renderer);
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        Assert.NotNull(context.State.HostRunContext!.Reporter);
+        Assert.Contains(renderer.Events, ev => ev is StartInitializationProgressEvent progress
+            && progress.StepId == PrepareProjectHostRunInitializationStep.StepId
+            && double.IsNaN(progress.Percent)
+            && progress.Message == "running npm install");
+        Assert.Contains(renderer.Events, ev => ev is StartInitializationLogEvent log
+            && log.StepId == PrepareProjectHostRunInitializationStep.StepId
+            && log.Line == "npm install output"
+            && log.Severity == FunctionsProjectReportSeverity.Warning);
+    }
+
+    [Fact]
+    public async Task Reporter_ForwardsStatusAndLog()
+    {
+        var renderer = new RecordingRenderer();
+        StartInitializationStepContext context = NewContext(renderer: renderer, stepId: "adapter_step");
+        await using var reporter = new FunctionsProjectHostRunReporter(context, CancellationToken.None);
+
+        reporter.ReportStatus("building");
+        reporter.WriteLog("build output", FunctionsProjectReportSeverity.Error);
+        await reporter.CompleteAsync();
+
+        Assert.Contains(renderer.Events, ev => ev is StartInitializationProgressEvent progress
+            && progress.StepId == "adapter_step"
+            && double.IsNaN(progress.Percent)
+            && progress.Message == "building");
+        Assert.Contains(renderer.Events, ev => ev is StartInitializationLogEvent log
+            && log.StepId == "adapter_step"
+            && log.Line == "build output"
+            && log.Severity == FunctionsProjectReportSeverity.Error);
+    }
+
     private void SetLocalSettings(Dictionary<string, string> values)
     {
         var snapshot = new LocalSettingsSnapshot { Values = values };
@@ -154,7 +196,10 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     private PrepareProjectHostRunInitializationStep NewStep()
         => new(_localSettings, _processEnv, _interaction);
 
-    private StartInitializationStepContext NewContext()
+    private StartInitializationStepContext NewContext(
+        FunctionsProject? project = null,
+        IStartInitializationRenderer? renderer = null,
+        string? stepId = null)
     {
         var options = new StartCommandOptions(
             WorkingDirectory.FromExplicit(_projectDir),
@@ -166,13 +211,13 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         var init = new StartInitializationContext(options, "5.0.0-test", IsInteractive: false, CanPrompt: false);
         var state = new StartInitializationState
         {
-            Project = new FakeProject(_projectDir),
+            Project = project ?? new FakeProject(_projectDir),
             Worker = CreateWorker(),
             ProfileName = "none",
         };
-        IStartInitializationRenderer renderer = Substitute.For<IStartInitializationRenderer>();
+        renderer ??= Substitute.For<IStartInitializationRenderer>();
         IStartInitializationStep stepStub = Substitute.For<IStartInitializationStep>();
-        stepStub.Id.Returns("test");
+        stepStub.Id.Returns(stepId ?? PrepareProjectHostRunInitializationStep.StepId);
         return new StartInitializationStepContext(init, state, stepStub, renderer, TimeProvider.System);
     }
 
@@ -184,7 +229,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         return worker;
     }
 
-    private sealed class FakeProject(string directory) : FunctionsProject
+    private class FakeProject(string directory) : FunctionsProject
     {
         public override WorkingDirectory WorkingDirectory { get; } = WorkingDirectory.FromExplicit(directory);
 
@@ -195,5 +240,31 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         public override bool SupportsExtensionBundles => true;
 
         public override FunctionsWorkerReference WorkerReference { get; } = FunctionsWorkerReference.FromWorkload("node");
+    }
+
+    private sealed class ReportingProject(string directory) : FakeProject(directory)
+    {
+        public override Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
+        {
+            context.Reporter.ReportStatus("running npm install");
+            context.Reporter.WriteLog("npm install output", FunctionsProjectReportSeverity.Warning);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingRenderer : IStartInitializationRenderer
+    {
+        public List<StartInitializationEvent> Events { get; } = [];
+
+        public Task OnEventAsync(StartInitializationEvent initializationEvent, CancellationToken cancellationToken)
+        {
+            Events.Add(initializationEvent);
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
+            => Task.FromResult(defaultValue);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

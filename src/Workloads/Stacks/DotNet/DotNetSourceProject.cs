@@ -24,9 +24,7 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         cancellationToken.ThrowIfCancellationRequested();
 
         string projectDir = Path.GetDirectoryName(ProjectFilePath)
-            ?? throw new GracefulException(
-                $"Could not determine directory for project file '{ProjectFilePath}'.",
-                isUserError: true);
+            ?? throw new GracefulException($"Could not determine directory for project file '{ProjectFilePath}'.", isUserError: true);
 
         // Both paths run `dotnet build` and read an MSBuild target result as JSON; only the requested
         // target differs. The default build runs the "Build" target (compiles, then reports the actual
@@ -36,27 +34,47 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
 
         string targetName = context.SkipBuild ? "GetTargetPath" : "Build";
 
-        context.StartupDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, targetName, context.SkipBuild, cancellationToken);
+        context.Reporter.ReportStatus(context.SkipBuild ? "Resolving .NET build output" : "Running dotnet build");
+
+        context.StartupDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, targetName, context.SkipBuild, context.Reporter, cancellationToken);
     }
 
-    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, CancellationToken cancellationToken)
+    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
     {
-        string json;
+        // Stream the build output live (stdout as informational, stderr as error) while MSBuild writes the
+        // structured target result to a temp file via --getResultOutputFile. In this mode the human-readable
+        // build console output (including compiler errors) goes to stdout, leaving stdout free of the JSON we
+        // need for path resolution.
+        string resultFile = Path.Combine(Path.GetTempPath(), $"func-dotnet-build-{Guid.NewGuid():N}.json");
+
         try
         {
-            json = await _dotnetCli.RunWithOutputAsync(
-                ["build", ProjectFilePath, $"--getTargetResult:{targetName}"],
-                projectDir,
-                cancellationToken);
+            try
+            {
+                await _dotnetCli.RunStreamingAsync(
+                    ["build", ProjectFilePath, $"--getTargetResult:{targetName}", $"--getResultOutputFile:{resultFile}"],
+                    projectDir,
+                    line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+                    line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                    cancellationToken);
+            }
+            catch (DotnetCliException ex)
+            {
+                // The build output has already been streamed live through the callbacks above, so point the
+                // user there instead of repeating it in the message.
+                throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}).", isUserError: true);
+            }
+
+            string json = File.Exists(resultFile)
+                ? await File.ReadAllTextAsync(resultFile, cancellationToken)
+                : string.Empty;
+
+            return ParseTargetResult(json.Trim(), targetName, requireAssemblyExists);
         }
-        catch (DotnetCliException ex)
+        finally
         {
-            string detail = string.IsNullOrWhiteSpace(ex.StandardError) ? "see build output above." : ex.StandardError.Trim();
-
-            throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}). {detail}", isUserError: true);
+            TryDeleteFile(resultFile);
         }
-
-        return ParseTargetResult(json.Trim(), targetName, requireAssemblyExists);
     }
 
     internal DirectoryInfo ParseTargetResult(string json, string targetName, bool requireAssemblyExists = false)
@@ -108,5 +126,19 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         throw new GracefulException(
             $"Could not determine output directory for project '{Path.GetFileName(ProjectFilePath)}'. The '{targetName}' target result did not contain expected output paths.",
             isUserError: true);
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 }
