@@ -444,15 +444,28 @@ internal sealed class SetupRunner(
 
         try
         {
-            WorkloadInstallResult installResult = await _workloadInstaller.InstallFromCatalogAsync(
-                package.PackageId,
-                package.Version,
-                options.Source,
-                includePrerelease: options.IncludePrerelease,
-                exact: true,
-                force: false,
-                progress: null,
-                cancellationToken);
+            WorkloadInstallResult installResult = options.OutputMode == SetupOutputMode.Json
+                ? await _workloadInstaller.InstallFromCatalogAsync(
+                    package.PackageId,
+                    package.Version,
+                    options.Source,
+                    includePrerelease: options.IncludePrerelease,
+                    exact: true,
+                    force: false,
+                    progress: null,
+                    cancellationToken)
+                : await _interaction.RunWithProgressAsync(
+                    $"Installing {dependency.DisplayName} {targetVersion}",
+                    async (ctx, ct) => await _workloadInstaller.InstallFromCatalogAsync(
+                        package.PackageId,
+                        package.Version,
+                        options.Source,
+                        includePrerelease: options.IncludePrerelease,
+                        exact: true,
+                        force: false,
+                        new WorkloadInstallProgressAdapter(ctx),
+                        ct),
+                    cancellationToken);
 
             string installedVersion = installResult.Entry.PackageVersion;
             return installResult.AlreadyInstalled

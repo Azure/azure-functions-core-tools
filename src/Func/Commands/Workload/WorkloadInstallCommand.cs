@@ -118,7 +118,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                     : $"Installing workload '{workload}'",
                 async (ctx, ct) =>
                 {
-                    var progress = new ProgressAdapter(ctx);
+                    var progress = new WorkloadInstallProgressAdapter(ctx);
 
                     return LooksLikeLocalPackagePath(workload)
                         ? await _installer.InstallFromPackageAsync(workload, force, progress, ct)
@@ -301,18 +301,4 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             + $"    func setup --features {feature}");
     }
 
-    /// <summary>
-    /// Bridges <see cref="IProgress{T}"/> calls from the installer onto the
-    /// <see cref="IProgressContext"/> backing the progress bar.
-    /// </summary>
-    private sealed class ProgressAdapter(IProgressContext context) : IProgress<WorkloadInstallProgress>
-    {
-        private readonly IProgressContext _context = context;
-
-        public void Report(WorkloadInstallProgress value)
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            _context.SetDescription(value.Description);
-        }
-    }
 }
