@@ -58,7 +58,7 @@ internal sealed class V2TemplateEngine
         ArgumentNullException.ThrowIfNull(workingDirectory);
         ArgumentException.ThrowIfNullOrWhiteSpace(functionName);
 
-        V2Job? job = template.Jobs?.FirstOrDefault();
+        V2Job? job = PickJob(template, workingDirectory);
 
         var variables = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -222,6 +222,16 @@ internal sealed class V2TemplateEngine
 
                         try
                         {
+                            // Ensure the snippet starts on a fresh line:
+                            // append-actions in real-world templates (python
+                            // function_body.py) carry neither a leading nor
+                            // trailing newline, so back-to-back appends to a
+                            // file whose tail isn't already a newline run the
+                            // previous function's closing token into the next
+                            // decorator (e.g. ")@app.route(...)") and yield
+                            // syntactically broken output. Probe a small tail
+                            // window rather than read the entire file.
+                            EnsureTrailingNewline(fullPath);
                             File.AppendAllText(fullPath, snippet);
                             if (!writtenFiles.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
                             {
@@ -351,6 +361,111 @@ internal sealed class V2TemplateEngine
 
     private static TemplateApplicationResult.Failed Failed(string message)
         => new(new TemplateApplicationFailure.ProviderError(message, null));
+
+    // Multi-job v2 templates (e.g. python) expose CreateNewApp and
+    // AppendToFile as alternatives for the same outcome — make a new
+    // function_app.py, or append a decorator to the user's existing one.
+    // Pick AppendToFile when the create-job's target already exists on
+    // disk, so `func new` after `func init` appends rather than failing
+    // with AlreadyExists (#5209). Falls back to jobs[0] for single-job
+    // templates and for any template that doesn't declare both alternatives,
+    // preserving existing behaviour.
+    private static V2Job? PickJob(NewTemplate template, DirectoryInfo workingDirectory)
+    {
+        if (template.Jobs is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        if (template.Jobs.Count == 1)
+        {
+            return template.Jobs[0];
+        }
+
+        V2Job? createJob = template.Jobs.FirstOrDefault(j =>
+            string.Equals(j.Type, "CreateNewApp", StringComparison.OrdinalIgnoreCase));
+        V2Job? appendJob = template.Jobs.FirstOrDefault(j =>
+            string.Equals(j.Type, "AppendToFile", StringComparison.OrdinalIgnoreCase));
+
+        if (createJob is null)
+        {
+            return template.Jobs[0];
+        }
+
+        if (appendJob is null)
+        {
+            return createJob;
+        }
+
+        return CreateTargetExists(template, createJob, workingDirectory) ? appendJob : createJob;
+    }
+
+    // Resolves the create-job's first WriteToFile target against the job's
+    // own input defaults, then checks whether the file already exists in
+    // the working directory. Uses defaults rather than user-supplied
+    // option values because the relevant filename inputs in real-world
+    // templates are gated to non-CLI clients (VS Code), so the CLI always
+    // sees the schema default at this point.
+    private static bool CreateTargetExists(NewTemplate template, V2Job createJob, DirectoryInfo workingDirectory)
+    {
+        IReadOnlyList<V2Action> sequence = ResolveActionSequence(template, createJob);
+        V2Action? writeAction = sequence.FirstOrDefault(a =>
+            string.Equals(a.Type, "WriteToFile", StringComparison.OrdinalIgnoreCase));
+        if (writeAction?.FilePath is null)
+        {
+            return false;
+        }
+
+        Dictionary<string, string> defaults = BuildInputDefaults(createJob);
+        string? resolved = Substitute(writeAction.FilePath, defaults);
+        if (string.IsNullOrWhiteSpace(resolved))
+        {
+            return false;
+        }
+
+        string fullPath = Path.GetFullPath(Path.Combine(workingDirectory.FullName, resolved));
+        return File.Exists(fullPath);
+    }
+
+    private static Dictionary<string, string> BuildInputDefaults(V2Job job)
+    {
+        var vars = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (job.Inputs is null)
+        {
+            return vars;
+        }
+
+        foreach (V2Input input in job.Inputs)
+        {
+            string? varName = ExtractVarName(input.AssignTo);
+            if (varName is not null && input.DefaultValue is not null)
+            {
+                vars[varName] = input.DefaultValue;
+            }
+        }
+
+        return vars;
+    }
+
+    private static void EnsureTrailingNewline(string fullPath)
+    {
+        using FileStream stream = new(fullPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+        if (stream.Length == 0)
+        {
+            return;
+        }
+
+        stream.Seek(-1, SeekOrigin.End);
+        int lastByte = stream.ReadByte();
+        if (lastByte == '\n')
+        {
+            return;
+        }
+
+        stream.Seek(0, SeekOrigin.End);
+        byte[] newline = System.Text.Encoding.UTF8.GetBytes(Environment.NewLine);
+        stream.Write(newline, 0, newline.Length);
+    }
 
     /// <summary>
     /// Sanitizes a user-supplied function name so it is safe to emit as a Python
