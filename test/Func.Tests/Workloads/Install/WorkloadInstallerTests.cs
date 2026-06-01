@@ -675,15 +675,21 @@ public sealed class WorkloadInstallerTests : IDisposable
         // a generic "package not found" or alias ambiguity error.
         var source = new PackageSource("https://example/v3/index.json", "test");
 
+        // Use two RIDs that definitely aren't the current host so we exercise
+        // the "no pack for current RID" branch on every test environment.
+        string currentRid = WorkloadRuntimeIdentifier.Current.ToLowerInvariant();
+        string ridA = currentRid == "fake-rid-a" ? "fake-rid-c" : "fake-rid-a";
+        string ridB = currentRid == "fake-rid-b" ? "fake-rid-d" : "fake-rid-b";
+
         _catalog.SearchAsync(
                 Arg.Is<CatalogSearchQuery>(q => q.Filter == "python-worker"),
                 Arg.Any<CancellationToken>())
             .Returns(new List<CatalogSearchResult>
             {
-                new("azure.functions.cli.workloads.workers.python.osx-x64", NuGetVersion.Parse("1.0.0"),
-                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = "osx-x64" },
-                new("azure.functions.cli.workloads.workers.python.linux-x64", NuGetVersion.Parse("1.0.0"),
-                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = "linux-x64" },
+                new($"azure.functions.cli.workloads.workers.python.{ridA}", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = ridA },
+                new($"azure.functions.cli.workloads.workers.python.{ridB}", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = ridB },
             });
 
         WorkloadInstaller installer = NewInstaller();
@@ -693,8 +699,8 @@ public sealed class WorkloadInstallerTests : IDisposable
                 includePrerelease: true, exact: false, force: false));
 
         Assert.Contains("python-worker", ex.Message);
-        Assert.Contains("linux-x64", ex.Message);
-        Assert.Contains("osx-x64", ex.Message);
+        Assert.Contains(ridA, ex.Message);
+        Assert.Contains(ridB, ex.Message);
     }
 
     [Fact]
