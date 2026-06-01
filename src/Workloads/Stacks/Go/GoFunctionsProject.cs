@@ -22,6 +22,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
     internal const string DefaultExecutableName = "app";
     internal const int MinimumGoMajorVersion = 1;
     internal const int MinimumGoMinorVersion = 24;
+
     private const string ExecutableRelativeFolder = "bin";
 
     private readonly WorkingDirectory _workingDirectory;
@@ -37,9 +38,14 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
     // Internal seam so tests can stub out the `go build` invocation
     // without spawning real processes.
-    internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoBuild { get; set; } = DefaultRunGoBuild;
+    internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoBuild { get; set; } = DefaultRunGoBuildAsync;
 
-    internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersion;
+    internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersionAsync;
+
+    // Run `go mod tidy` before building so missing/stale module entries are resolved
+    // (especially for apps scaffolded from the version-less go.mod template). Internal
+    // seam for tests.
+    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoModTidy { get; set; } = DefaultRunGoModTidyAsync;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -64,10 +70,10 @@ internal sealed class GoFunctionsProject : FunctionsProject
         if (context.SkipBuild)
         {
             // Go projects compile to bin/app; with --no-build the user is
-            // asserting that binary already exists. Trust them, skip the build,
-            // but still point the host at bin/ so it can find the executable
-            // and the function metadata generated alongside it.
-            context.StartupDirectory = new DirectoryInfo(binDirectory);
+            // asserting that binary already exists. Trust them and skip the
+            // build. Leave StartupDirectory at the project root so host.json
+            // is found there and the worker's `defaultExecutablePath = bin/app`
+            // resolves to <project>/bin/app.
             return;
         }
 
@@ -88,6 +94,19 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
+        // Tidy modules before building: the scaffold's go.mod omits the worker SDK
+        // require line on purpose, so `go mod tidy` resolves the latest tag from the
+        // imports in main.go. Also rescues apps whose go.sum has drifted.
+        context.Reporter.ReportStatus("Running go mod tidy");
+        (int tidyExit, string tidyStderr) = await RunGoModTidy(root, cancellationToken).ConfigureAwait(false);
+        if (tidyExit != 0)
+        {
+            string detail = string.IsNullOrWhiteSpace(tidyStderr) ? "see output above." : tidyStderr.Trim();
+            throw new GracefulException(
+                $"'go mod tidy' failed (exit {tidyExit}). {detail}",
+                isUserError: true);
+        }
+
         context.Reporter.ReportStatus("Running go build");
         (int exitCode, string stderr) = await RunGoBuild(root, outputPath, cancellationToken).ConfigureAwait(false);
 
@@ -100,7 +119,10 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
-        context.StartupDirectory = new DirectoryInfo(binDirectory);
+        // StartupDirectory stays at the project root: host.json lives there, and the Go
+        // worker's `defaultExecutablePath = bin/app` is resolved relative to the script
+        // root, so AzureWebJobsScriptRoot pointing at the project root yields the
+        // correct <project>/bin/app launch path.
     }
 
     private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
@@ -111,7 +133,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
         }
     }
 
-    private static async Task<(int Major, int Minor)?> DefaultReadGoVersion(CancellationToken cancellationToken)
+    private static async Task<(int Major, int Minor)?> DefaultReadGoVersionAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -155,7 +177,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
         }
     }
 
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunGoBuild(
+    private static async Task<(int ExitCode, string Stderr)> DefaultRunGoBuildAsync(
         string workingDirectory,
         string outputPath,
         CancellationToken cancellationToken)
@@ -189,6 +211,48 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
             // Drain stdout and stderr in parallel: if either pipe buffer (~64KB) fills
             // while we're only reading the other, go blocks on write and we deadlock.
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return (-1, ex.Message);
+        }
+    }
+
+    private static Task<(int ExitCode, string Stderr)> DefaultRunGoModTidyAsync(string workingDirectory, CancellationToken cancellationToken)
+        => RunGoAsync(workingDirectory, ["mod", "tidy"], cancellationToken);
+
+    private static async Task<(int ExitCode, string Stderr)> RunGoAsync(
+        string workingDirectory,
+        string[] arguments,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("go")
+            {
+                WorkingDirectory = workingDirectory,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            foreach (string arg in arguments)
+            {
+                psi.ArgumentList.Add(arg);
+            }
+
+            using var process = Process.Start(psi);
+            if (process is null)
+            {
+                return (-1, "Failed to start 'go' process.");
+            }
+
+            // Drain both pipes in parallel to avoid deadlocking on a full pipe buffer.
             Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
             Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
             await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);

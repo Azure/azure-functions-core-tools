@@ -50,7 +50,9 @@ public class GoFunctionsProjectTests : IDisposable
         string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
         Assert.Equal(_projectDir.FullName, observedRoot);
         Assert.Equal(Path.Combine(_projectDir.FullName, "bin", expectedName), observedOutput);
-        Assert.Equal(Path.Combine(_projectDir.FullName, "bin"), context.StartupDirectory.FullName);
+        // StartupDirectory must remain the project root so the host finds host.json
+        // and the worker's `defaultExecutablePath = bin/app` resolves correctly.
+        Assert.Equal(_projectDir.FullName, context.StartupDirectory.FullName);
     }
 
     [Fact]
@@ -80,7 +82,7 @@ public class GoFunctionsProjectTests : IDisposable
         await project.PrepareForHostRunAsync(context, default);
 
         Assert.False(invoked);
-        Assert.Equal(Path.Combine(_projectDir.FullName, "bin"), context.StartupDirectory.FullName);
+        Assert.Equal(_projectDir.FullName, context.StartupDirectory.FullName);
     }
 
     [Fact]
@@ -109,11 +111,66 @@ public class GoFunctionsProjectTests : IDisposable
         Assert.Contains("Go 1.21 is not supported", ex.Message);
     }
 
+    [Fact]
+    public async Task PrepareForHostRun_runs_go_mod_tidy_before_building()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n\ngo 1.24\n");
+
+        var calls = new List<string>();
+        GoFunctionsProject project = CreateProject((_, _, _) =>
+        {
+            calls.Add("build");
+            return Task.FromResult((0, string.Empty));
+        });
+        project.RunGoModTidy = (root, _) =>
+        {
+            calls.Add($"tidy:{root}");
+            return Task.FromResult((0, string.Empty));
+        };
+
+        await project.PrepareForHostRunAsync(CreateContext(), default);
+
+        Assert.Equal(2, calls.Count);
+        Assert.Equal($"tidy:{_projectDir.FullName}", calls[0]);
+        Assert.Equal("build", calls[1]);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_throws_graceful_when_tidy_fails()
+    {
+        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        project.RunGoModTidy = (_, _) => Task.FromResult((1, "module not found"));
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => project.PrepareForHostRunAsync(CreateContext(), default));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("go mod tidy", ex.Message);
+        Assert.Contains("module not found", ex.Message);
+    }
+
+    [Fact]
+    public async Task PrepareForHostRun_skips_tidy_when_SkipBuild()
+    {
+        bool tidyInvoked = false;
+        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        project.RunGoModTidy = (_, _) =>
+        {
+            tidyInvoked = true;
+            return Task.FromResult((0, string.Empty));
+        };
+
+        await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
+
+        Assert.False(tidyInvoked);
+    }
+
     private GoFunctionsProject CreateProject(Func<string, string, CancellationToken, Task<(int, string)>> runner)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
             RunGoBuild = runner,
             ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 24)),
+            RunGoModTidy = (_, _) => Task.FromResult((0, string.Empty)),
         };
 
     private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
