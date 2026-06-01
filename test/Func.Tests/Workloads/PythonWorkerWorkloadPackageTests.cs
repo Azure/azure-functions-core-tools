@@ -36,4 +36,18 @@ public sealed class PythonWorkerWorkloadPackageTests
     {
         Assert.StartsWith(PythonWorkerWorkloadPackage.PackageIdPrefix, PythonWorkerWorkloadPackage.CurrentPackageId);
     }
+
+    [Theory]
+    [InlineData("win-x64", true)]
+    [InlineData("linux-x64", true)]
+    [InlineData("linux-arm64", true)]
+    [InlineData("osx-x64", true)]
+    [InlineData("osx-arm64", true)]
+    [InlineData("WIN-X64", true)]
+    [InlineData("win-arm64", false)]
+    [InlineData("freebsd-x64", false)]
+    public void IsSupported_MatchesPublishedRids(string runtimeIdentifier, bool expected)
+    {
+        Assert.Equal(expected, PythonWorkerWorkloadPackage.IsSupported(runtimeIdentifier));
+    }
 }

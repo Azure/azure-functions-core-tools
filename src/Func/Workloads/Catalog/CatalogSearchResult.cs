@@ -30,6 +30,14 @@ internal sealed record CatalogSearchResult(
     /// <c>func workload search --stack</c> keeps only <c>kind:workload</c> entries.
     /// </summary>
     public string? Kind { get; init; }
+
+    /// <summary>
+    /// Lowercased value parsed from the <c>rid:&lt;rid&gt;</c> NuGet tag, set on
+    /// per-RID workload packages (host, python worker). <see langword="null"/>
+    /// for single-RID packages. Lets the alias resolver pick the variant that
+    /// matches the current platform when an alias spans multiple per-RID packs.
+    /// </summary>
+    public string? Rid { get; init; }
 }
 
 /// <summary>
