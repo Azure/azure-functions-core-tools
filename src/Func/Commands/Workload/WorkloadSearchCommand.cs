@@ -10,13 +10,14 @@ namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
 /// <c>func workload search [&lt;query&gt;]</c>. Renders matching workload
-/// packages from the configured catalog as a table.
+/// packages from the configured catalog as a stack of definition-list
+/// "cards", one per package, so that long descriptions and package ids
+/// flow naturally across the terminal width instead of wrapping inside
+/// narrow table cells.
 /// </summary>
 internal sealed class WorkloadSearchCommand : FuncCliCommand
 {
     private const int DefaultTake = 20;
-    private const int DescriptionMaxLength = 80;
-    private const string Placeholder = "-";
 
     // Lowercased value of the `kind:` NuGet tag that marks a package as a stack
     // workload (the only kind `func init --stack` can target). Mirrors the
@@ -45,7 +46,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     public Option<bool> JsonOption { get; } = new("--json")
     {
-        Description = "Emit machine-readable JSON instead of a table.",
+        Description = "Emit machine-readable JSON instead of cards.",
     };
 
     public Option<bool> StackOption { get; } = new("--stack")
@@ -123,29 +124,45 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
             return 0;
         }
 
-        IEnumerable<string[]> rows = results.Select(r => new[]
+        var card = new WorkloadCardWriter(_interaction);
+        bool first = true;
+        foreach (CatalogSearchResult result in results)
         {
-            r.PackageId,
-            r.Aliases.Count == 0 ? Placeholder : string.Join(", ", r.Aliases),
-            string.IsNullOrWhiteSpace(r.Title) ? Placeholder : r.Title!,
-            TruncateDescription(r.Description),
-            r.LatestVersion.ToNormalizedString(),
-        });
+            if (!first)
+            {
+                card.WriteSeparator();
+            }
 
-        _interaction.WriteTable(["ID", "Aliases", "Display Name", "Description", "Latest"], rows);
+            first = false;
+            WriteCard(card, result);
+        }
+
+        WriteFooter(results.Count);
         return 0;
     }
 
-    private static string TruncateDescription(string? description)
+    private static void WriteCard(WorkloadCardWriter card, CatalogSearchResult result)
     {
-        if (string.IsNullOrWhiteSpace(description))
+        card.WriteHeading(DisplayNameOrPackageId(result));
+        card.WriteField("Version", result.LatestVersion.ToNormalizedString());
+        card.WriteField("Package ID", result.PackageId);
+        card.WriteAliases(result.Aliases);
+        card.WriteDescription(result.Description);
+    }
+
+    private void WriteFooter(int count)
+    {
+        _interaction.WriteBlankLine();
+        string countLine = $"Showing {count} {(count == 1 ? "result" : "results")}.";
+        if (count >= DefaultTake)
         {
-            return Placeholder;
+            countLine += " More may be available, refine your query.";
         }
 
-        string trimmed = description.Trim();
-        return trimmed.Length <= DescriptionMaxLength
-            ? trimmed
-            : string.Concat(trimmed.AsSpan(0, DescriptionMaxLength - 3), "...");
+        _interaction.WriteHint(countLine);
+        _interaction.WriteHint("Run 'func workload install <alias>' to install one.");
     }
+
+    private static string DisplayNameOrPackageId(CatalogSearchResult result)
+        => string.IsNullOrWhiteSpace(result.Title) ? result.PackageId : result.Title!;
 }

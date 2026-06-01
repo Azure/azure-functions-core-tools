@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Title>Azure Functions Python Templates</Title>
+    <Title>Python Function Templates</Title>
     <Description>Python function templates for the func CLI. Compatible with Microsoft.Azure.Functions.ExtensionBundle (minBundle:$(MinBundleVersionRange)).</Description>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:python-templates func-workload minBundle:$(MinBundleVersionRange)</PackageTags>
