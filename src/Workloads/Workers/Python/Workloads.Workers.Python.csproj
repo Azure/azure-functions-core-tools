@@ -1,15 +1,20 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project>
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Title>Python Worker</Title>
     <Description>Azure Functions CLI content workload that ships the Python language worker.</Description>
+
+    <!-- No win-arm64 for python worker. -->
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <PackageType>FuncCliWorkload</PackageType>
     <PackageTags>kind:content alias:python-worker func-worker func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <NoWarn>$(NoWarn);NU5128;NU5100;NU5123</NoWarn>
+    <PackAllRids>$(CI)</PackAllRids>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,15 +24,10 @@
       it wire up its content/None items via its build targets), then have a
       target here transform those items and repack them under tools/any/. For
       now we glob the restored package payload directly, which is brittle if
-      the upstream layout changes.
-
-      GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_PythonWorker)
-      pointing at the restored package root. IncludeAssets=none keeps the
-      package's build targets and tools/ files from affecting this project.
+      the upstream layout changes.is project.
     -->
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" GeneratePathProperty="true" VersionOverride="$(WorkerVersion)">
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" VersionOverride="$(WorkerVersion)">
       <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>none</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
@@ -35,16 +35,20 @@
     <None Include="workload.json" Pack="true" PackagePath="/" />
   </ItemGroup>
 
-  <Target Name="IncludePythonWorkerContentInPack" BeforeTargets="_GetPackageFiles">
-    <Error Condition="'$(PkgMicrosoft_Azure_Functions_PythonWorker)' == ''"
-           Text="Microsoft.Azure.Functions.PythonWorker package path not resolved. Run 'dotnet restore' first." />
+  <Target Name="IncludePythonWorkerContentInPack" AfterTargets="AssignTargetPaths" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <_PythonWorkerFile Include="$(PkgMicrosoft_Azure_Functions_PythonWorker)/tools/**/*" />
-      <None Include="@(_PythonWorkerFile)"
-            TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
-            Pack="true"
-            PackagePath="tools/any/" />
+      <None Update="@(None)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)" Pack="true" PackagePath="tools/any/"
+         Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers/python/'))" />
     </ItemGroup>
   </Target>
+
+  <!--
+    In CI, we want to build and pack the host workload for each runtime identifier.
+    We use 'PackAllRids' as an intermediate property so local dev can still pack with -p:PackAllRids=true
+    (and not needing to set the full CI=true).
+  -->
+  <Import Project="Build.Inner.targets" Condition="'$(RuntimeIdentifier)' != ''" />
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
+  <Import Project="Build.Outer.targets" Condition="$(PackAllRids) AND '$(RuntimeIdentifier)' == ''" />
 
 </Project>
