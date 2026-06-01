@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Workloads.Storage;
-using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.FirstRun;
@@ -12,16 +11,16 @@ namespace Azure.Functions.Cli.Tests.Hosting.FirstRun;
 public sealed class FileFirstRunStateStoreTests : IDisposable
 {
     private readonly string _tempHome;
-    private readonly IWorkloadStore _workloadStore;
+    private readonly string _workloadHome;
+    private readonly WorkloadPathsOptions _workloadPaths;
     private readonly FileFirstRunStateStore _store;
 
     public FileFirstRunStateStoreTests()
     {
         _tempHome = Path.Combine(Path.GetTempPath(), $"func-first-run-{Guid.NewGuid():N}");
-        _workloadStore = Substitute.For<IWorkloadStore>();
-        _workloadStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<WorkloadEntry>());
-        _store = new FileFirstRunStateStore(new CliConfigurationPathsOptions(_tempHome), _workloadStore);
+        _workloadHome = Path.Combine(Path.GetTempPath(), $"func-first-run-workloads-{Guid.NewGuid():N}");
+        _workloadPaths = new WorkloadPathsOptions(_workloadHome);
+        _store = new FileFirstRunStateStore(new CliConfigurationPathsOptions(_tempHome), _workloadPaths);
     }
 
     public void Dispose()
@@ -29,6 +28,11 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
         if (Directory.Exists(_tempHome))
         {
             Directory.Delete(_tempHome, recursive: true);
+        }
+
+        if (Directory.Exists(_workloadHome))
+        {
+            Directory.Delete(_workloadHome, recursive: true);
         }
     }
 
@@ -41,8 +45,7 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     [Fact]
     public async Task IsFirstRunAsync_ReturnsFalse_WhenWorkloadsInstalled()
     {
-        _workloadStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(new[] { new WorkloadEntry { PackageId = "Azure.Functions.Cli.Workloads.Node", PackageVersion = "4.0.0" } });
+        WriteEmptyWorkloadRegistry();
 
         Assert.False(await _store.IsFirstRunAsync());
     }
@@ -64,8 +67,7 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     [Fact]
     public async Task GetStateAsync_ReturnsWorkloadsInstalled_WhenWorkloadsPresent_RegardlessOfMarker()
     {
-        _workloadStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
-            .Returns(new[] { new WorkloadEntry { PackageId = "Azure.Functions.Cli.Workloads.Node", PackageVersion = "4.0.0" } });
+        WriteEmptyWorkloadRegistry();
 
         Assert.Equal(FirstRunState.WorkloadsInstalled, await _store.GetStateAsync());
 
@@ -95,12 +97,18 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     [Fact]
     public void Constructor_ThrowsArgumentNullException_ForNullPaths()
     {
-        Assert.Throws<ArgumentNullException>(() => new FileFirstRunStateStore(null!, _workloadStore));
+        Assert.Throws<ArgumentNullException>(() => new FileFirstRunStateStore(null!, _workloadPaths));
     }
 
     [Fact]
-    public void Constructor_ThrowsArgumentNullException_ForNullWorkloadStore()
+    public void Constructor_ThrowsArgumentNullException_ForNullWorkloadPaths()
     {
         Assert.Throws<ArgumentNullException>(() => new FileFirstRunStateStore(new CliConfigurationPathsOptions(_tempHome), null!));
+    }
+
+    private void WriteEmptyWorkloadRegistry()
+    {
+        Directory.CreateDirectory(_workloadHome);
+        File.WriteAllText(_workloadPaths.WorkloadRegistryPath, "{}");
     }
 }

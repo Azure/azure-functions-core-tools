@@ -337,7 +337,7 @@ internal class SpectreInteractionService : IInteractionService
         List<MultiSelectionChoice> selected = await new MultiSelectionPrompt<MultiSelectionChoice>()
             .Title(title)
             .NotRequired()
-            .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm; ENTER with no selection exits)[/]")
+            .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm; [green]<enter>[/] with no selection exits)[/]")
             .UseConverter(static choice => choice.Label)
             .AddChoices(choiceList)
             .ShowAsync(_stderr, cancellationToken);

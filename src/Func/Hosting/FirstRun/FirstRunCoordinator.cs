@@ -52,6 +52,14 @@ internal sealed class FirstRunCoordinator(
     private static readonly HashSet<string> _skippedTokens =
         new(StringComparer.OrdinalIgnoreCase) { "--help", "-h", "-?", "/?", "--version", "-v" };
 
+    // CommandNameResolver returns these when the user didn't actually type a
+    // command name: "help" for bare `func`, "version" for `func --verbose`,
+    // "unknown" when the parse failed. We still want to prompt + run setup in
+    // those cases, but the post-setup "Re-run `func <name>`" hint doesn't make
+    // sense (re-run what?), so we short-circuit with a generic message instead.
+    private static readonly HashSet<string> _commandNameSentinels =
+        new(StringComparer.OrdinalIgnoreCase) { "help", "version", "unknown" };
+
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IFirstRunStateStore _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
     private readonly ISetupRunner _setupRunner = setupRunner ?? throw new ArgumentNullException(nameof(setupRunner));
@@ -169,10 +177,23 @@ internal sealed class FirstRunCoordinator(
         // and would either fail outright ("no project here") or silently use
         // stale metadata. Asking them to re-run is the only safe answer until
         // we add an in-process reload.
-        if (setupRan && !string.IsNullOrEmpty(commandName))
+        //
+        // "help" (bare `func`), "version" (`func --verbose`), and "unknown"
+        // (parse error) aren't real commands the user typed, so the generic
+        // "setup complete" line is enough; we don't want to print
+        // "Re-run `func help`".
+        if (setupRan)
         {
             _interaction.WriteBlankLine();
-            _interaction.WriteHint($"Setup complete. Re-run `func {commandName.ToLowerInvariant()}` to use the new stacks.");
+            if (string.IsNullOrEmpty(commandName) || _commandNameSentinels.Contains(commandName))
+            {
+                _interaction.WriteHint("Setup complete. Run `func <command>` to use the new stacks.");
+            }
+            else
+            {
+                _interaction.WriteHint($"Setup complete. Re-run `func {commandName.ToLowerInvariant()}` to use the new stacks.");
+            }
+
             return 0;
         }
 

@@ -12,53 +12,46 @@ namespace Azure.Functions.Cli.Hosting.FirstRun;
 /// as "not first run", so users who already set up the CLI in a previous
 /// session don't see the prompt again even when the marker is missing.
 /// </summary>
+/// <remarks>
+/// This runs on every CLI invocation, before the user's command starts, so
+/// the hot path must stay cheap. We deliberately use a file-existence probe
+/// on the workload registry rather than loading and deserializing it: the
+/// registry is only written when at least one workload has been installed,
+/// so its presence is a reliable "user has workloads" signal without any
+/// JSON parsing. The corner case (user installed workloads then uninstalled
+/// every one, leaving an empty registry file) only costs us a missing
+/// breadcrumb hint, never a wrong prompt.
+/// </remarks>
 internal sealed class FileFirstRunStateStore(
     CliConfigurationPathsOptions paths,
-    IWorkloadStore workloadStore) : IFirstRunStateStore
+    IWorkloadPaths workloadPaths) : IFirstRunStateStore
 {
     internal const string MarkerFileName = ".first-run-complete";
 
     private readonly CliConfigurationPathsOptions _paths = paths ?? throw new ArgumentNullException(nameof(paths));
-    private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
+    private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
 
     private string MarkerPath => Path.Combine(_paths.Home, MarkerFileName);
 
-    public async Task<bool> IsFirstRunAsync(CancellationToken cancellationToken = default)
-        => await GetStateAsync(cancellationToken) == FirstRunState.NeverPrompted;
+    public Task<bool> IsFirstRunAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(GetStateCore() == FirstRunState.NeverPrompted);
 
-    public async Task<FirstRunState> GetStateAsync(CancellationToken cancellationToken = default)
+    public Task<FirstRunState> GetStateAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(GetStateCore());
+
+    private FirstRunState GetStateCore()
     {
-        bool markerExists = File.Exists(MarkerPath);
-
-        // Existing users may have installed workloads through `func setup`
-        // or `func workload install` before this marker was introduced, or
-        // before we wrote it on success. Treat any installed workload as
-        // "not first run" so we don't re-prompt them.
-        bool hasWorkloads;
-        try
-        {
-            IReadOnlyList<WorkloadEntry> installed = await _workloadStore.GetWorkloadsAsync(cancellationToken);
-            hasWorkloads = installed.Count > 0;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // If we can't read the workload registry, lean toward the
-            // marker: it's the user's explicit signal. Treat as no
-            // workloads so the prompt still surfaces when there's no
-            // marker either.
-            hasWorkloads = false;
-        }
-
+        // Two cheap file-existence probes; no I/O beyond stat(2). The
+        // workload registry exists if and only if SaveWorkloadAsync has
+        // run at least once, which is the signal we actually care about
+        // (an established user, marker or not).
+        bool hasWorkloads = File.Exists(_workloadPaths.WorkloadRegistryPath);
         if (hasWorkloads)
         {
             return FirstRunState.WorkloadsInstalled;
         }
 
-        return markerExists ? FirstRunState.MarkerWithoutWorkloads : FirstRunState.NeverPrompted;
+        return File.Exists(MarkerPath) ? FirstRunState.MarkerWithoutWorkloads : FirstRunState.NeverPrompted;
     }
 
     public async Task MarkCompleteAsync(CancellationToken cancellationToken)

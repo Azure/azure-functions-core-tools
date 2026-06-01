@@ -203,6 +203,26 @@ public sealed class FirstRunCoordinatorTests
         await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("help")]
+    [InlineData("unknown")]
+    public async Task ShortCircuitsWithGenericHint_AfterSuccessfulSetup_ForSentinelCommandNames(string commandName)
+    {
+        _interaction.ConfirmResponse = true;
+        _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupRunResult(0));
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        // Sentinel names come from bare/unparseable invocations, so pass an
+        // empty parse result rather than parsing the sentinel as a token.
+        int? result = await coordinator.EnsureFirstRunPromptedAsync(commandName, Parse(string.Empty), CancellationToken.None);
+
+        Assert.Equal(0, result);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Run `func <command>`"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.Contains($"Re-run `func {commandName}`"));
+        await _stateStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task DoesNotShortCircuit_WhenInitDeclinesSetup()
     {
