@@ -36,7 +36,7 @@ public sealed class SetupCommandTests : IDisposable
     [Fact]
     public void SetupCommand_HasExpectedOptions()
     {
-        var cmd = new SetupCommand(Substitute.For<ISetupRunner>());
+        var cmd = new SetupCommand(Substitute.For<ISetupRunner>(), Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions()));
         IReadOnlyList<string> optionNames = cmd.Options.Select(o => o.Name).ToArray();
 
         Assert.Contains("--features", optionNames);
@@ -54,7 +54,7 @@ public sealed class SetupCommandTests : IDisposable
     [Fact]
     public void SetupCommand_FeaturesHelp_UsesDotnetFeatureName()
     {
-        var cmd = new SetupCommand(Substitute.For<ISetupRunner>());
+        var cmd = new SetupCommand(Substitute.For<ISetupRunner>(), Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions()));
         string description = cmd.FeaturesOption.Description ?? string.Empty;
 
         Assert.Contains("dotnet", description);

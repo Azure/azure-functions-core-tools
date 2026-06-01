@@ -84,7 +84,7 @@ public sealed class WorkloadCatalogTests
             new WorkloadCatalogOptions { IncludePrerelease = true },
             (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
 
-        ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: false);
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: null);
 
         Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
     }
@@ -95,7 +95,7 @@ public sealed class WorkloadCatalogTests
         NuGetProtocolSourceClient client = BuildClient(_defaultSource, search: [("alpha", "2.0.0-beta.1")]);
         WorkloadCatalog catalog = NewCatalog(new WorkloadCatalogOptions { IncludePrerelease = true }, (_defaultSource, client));
 
-        await catalog.SearchAsync(new CatalogSearchQuery { IncludePrerelease = false });
+        await catalog.SearchAsync(new CatalogSearchQuery { IncludePrerelease = null });
 
         var fakeClient = Assert.IsType<FakeClient>(client);
         Assert.NotNull(fakeClient.LastSearchUri);
@@ -110,31 +110,113 @@ public sealed class WorkloadCatalogTests
             (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
         var range = VersionRange.Parse("[2.0.0-beta.1,2.0.0)");
 
-        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("alpha", range, includePrerelease: false);
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("alpha", range, includePrerelease: null);
 
         Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionInRangeAsync_ExactStableRange_MatchesPrereleaseCandidate_WhenIncludePrereleaseTrue()
+    {
+        // Regression: the published profile pins node "[3.13.0]" exact but
+        // only a "3.13.0-preview.1" candidate exists upstream. NuGet's
+        // VersionRange.Satisfies rejects prerelease candidates inside a
+        // stable range, so the resolver must apply a prerelease-aware
+        // bounds check when IncludePrerelease is on.
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("3.13.0-preview.1")])));
+        var range = VersionRange.Parse("[3.13.0]");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("node", range, includePrerelease: null);
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("3.13.0-preview.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionInRangeAsync_ExplicitFalse_OverridesOptions()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("3.13.0-preview.1")])));
+        var range = VersionRange.Parse("[3.13.0]");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("node", range, includePrerelease: false);
+
+        Assert.Null(resolved);
     }
 
     [Theory]
     [InlineData("1", true)]
     [InlineData("true", true)]
-    [InlineData("anything", true)]
+    [InlineData("yes", true)]
+    [InlineData("on", true)]
     [InlineData("0", false)]
     [InlineData("false", false)]
     [InlineData("off", false)]
-    [InlineData("", false)]
-    [InlineData(null, false)]
-    public void Configure_ResolvesPrereleaseOverride(string? value, bool expected)
+    public void Configure_EnvOverride_WinsBothDirections(string value, bool expected)
     {
         IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
         processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
         processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns(value);
-        WorkloadCatalogOptionsSetup setup = new(processEnvironment);
+        // CLI version is intentionally prerelease to prove the env value, not auto-detect, wins.
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0-preview.1");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
         WorkloadCatalogOptions options = new();
 
         setup.Configure(options);
 
         Assert.Equal(expected, options.IncludePrerelease);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("anything")]
+    public void Configure_NoEnvOverride_AutoDetectsFromCliPrerelease(string? value)
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns(value);
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0-preview.1");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.True(options.IncludePrerelease);
+    }
+
+    [Fact]
+    public void Configure_StableCli_DefaultsToFalse()
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns((string?)null);
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.False(options.IncludePrerelease);
+    }
+
+    [Fact]
+    public void Configure_PrereleaseCli_EnvDisablesOverride()
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns("false");
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0-preview.1");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.False(options.IncludePrerelease);
     }
 
     [Fact]
@@ -143,7 +225,7 @@ public sealed class WorkloadCatalogTests
         IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
         processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns("https://source.test/v3/index.json");
         processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns((string?)null);
-        WorkloadCatalogOptionsSetup setup = new(processEnvironment);
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, StubCliVersion("5.0.0"));
         WorkloadCatalogOptions options = new();
 
         setup.Configure(options);
@@ -337,5 +419,13 @@ public sealed class WorkloadCatalogTests
 
         var byName = entries.ToDictionary(e => e.Source.Name, e => e.Client, StringComparer.OrdinalIgnoreCase);
         return new WorkloadCatalog(Options.Create(options), sourceProvider, source => byName[source.Name]);
+    }
+
+    private static ICliVersionProvider StubCliVersion(string informational)
+    {
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.InformationalVersion.Returns(informational);
+        provider.Version.Returns(informational.Split('-', '+')[0]);
+        return provider;
     }
 }

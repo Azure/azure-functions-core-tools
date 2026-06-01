@@ -152,7 +152,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             "q=" + Uri.EscapeDataString(query.Filter ?? string.Empty),
             "skip=" + query.Skip.ToString(CultureInfo.InvariantCulture),
             "take=" + take.ToString(CultureInfo.InvariantCulture),
-            "prerelease=" + query.IncludePrerelease.ToString(CultureInfo.InvariantCulture).ToLowerInvariant(),
+            "prerelease=" + (query.IncludePrerelease ?? false).ToString(CultureInfo.InvariantCulture).ToLowerInvariant(),
             "semVerLevel=2.0.0",
             $"{PackageTypeQueryParam}=" + Uri.EscapeDataString(FuncCliWorkloadPackageType),
         };

@@ -349,7 +349,7 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
             () => installer.InstallFromCatalogAsync(
                 "test.workload", version: null, source: null,
-                includePrerelease: false, exact: true, force: false));
+                includePrerelease: null, exact: true, force: false));
 
         Assert.Contains("test.workload", ex.Message);
         Assert.DoesNotContain("--prerelease", ex.Message);
@@ -392,7 +392,7 @@ public sealed class WorkloadInstallerTests : IDisposable
 
         Assert.Contains("not installed", ex.Message);
         await _catalog.DidNotReceive().ResolveLatestVersionAsync(
-            Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<NuGetVersion?>(),
+            Arg.Any<string>(), Arg.Any<bool?>(), Arg.Any<NuGetVersion?>(),
             Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 

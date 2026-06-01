@@ -29,7 +29,12 @@ internal interface IWorkloadCatalog
     /// from the configured source, or <c>null</c> when no version matches.
     /// </summary>
     /// <param name="packageId">NuGet package id; case-insensitive.</param>
-    /// <param name="includePrerelease"><c>true</c> to allow prerelease versions in the result.</param>
+    /// <param name="includePrerelease">
+    /// <c>true</c> to allow prerelease versions; <c>false</c> to forbid them;
+    /// <c>null</c> to use the catalog's configured default (typically driven
+    /// by <c>FUNC_CLI_WORKLOADS_PRERELEASE</c> or by auto-detection of a
+    /// prerelease CLI build).
+    /// </param>
     /// <param name="currentVersion">
     /// Optional currently-installed version. When non-null and
     /// <paramref name="allowMajor"/> is <c>false</c>, candidates are
@@ -44,7 +49,7 @@ internal interface IWorkloadCatalog
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
     public Task<ResolvedPackage?> ResolveLatestVersionAsync(
         string packageId,
-        bool includePrerelease,
+        bool? includePrerelease,
         NuGetVersion? currentVersion = null,
         bool allowMajor = true,
         string? source = null,
@@ -56,13 +61,16 @@ internal interface IWorkloadCatalog
     /// </summary>
     /// <param name="packageId">NuGet package id; case-insensitive.</param>
     /// <param name="versionRange">Allowed package version range.</param>
-    /// <param name="includePrerelease"><c>true</c> to allow prerelease versions in the result.</param>
+    /// <param name="includePrerelease">
+    /// <c>true</c> to allow prerelease versions; <c>false</c> to forbid them;
+    /// <c>null</c> to use the catalog's configured default.
+    /// </param>
     /// <param name="source">Optional <c>--source</c> override.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
     public Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(
         string packageId,
         VersionRange versionRange,
-        bool includePrerelease,
+        bool? includePrerelease,
         string? source = null,
         CancellationToken cancellationToken = default);
 

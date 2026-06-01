@@ -14,8 +14,8 @@ internal sealed record CatalogSearchQuery
     /// <summary>Free-form search filter, or <c>null</c> for "all matching packages".</summary>
     public string? Filter { get; init; }
 
-    /// <summary>Whether to include prerelease versions in results.</summary>
-    public bool IncludePrerelease { get; init; }
+    /// <summary>Whether to include prerelease versions in results. <c>null</c> defers to the catalog default.</summary>
+    public bool? IncludePrerelease { get; init; }
 
     /// <summary>Number of results to skip; defaults to 0.</summary>
     public int Skip { get; init; }

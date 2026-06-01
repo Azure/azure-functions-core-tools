@@ -53,7 +53,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
                 _packageId,
                 _hostVersion,
                 source: null,
-                includePrerelease: false,
+                includePrerelease: null,
                 exact: true,
                 force: false,
                 progress: null,

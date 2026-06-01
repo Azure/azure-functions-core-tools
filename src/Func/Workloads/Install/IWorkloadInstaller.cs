@@ -61,7 +61,10 @@ internal interface IWorkloadInstaller
     /// <paramref name="includePrerelease"/> is selected.
     /// </param>
     /// <param name="source">Optional <c>--source</c> override forwarded to the catalog.</param>
-    /// <param name="includePrerelease"><c>true</c> to allow prerelease versions when resolving.</param>
+    /// <param name="includePrerelease">
+    /// <c>true</c> to allow prerelease versions; <c>false</c> to forbid them;
+    /// <c>null</c> to use the catalog's configured default.
+    /// </param>
     /// <param name="exact">
     /// <c>true</c> to disable alias matching and treat
     /// <paramref name="packageId"/> as a literal package id.
@@ -79,7 +82,7 @@ internal interface IWorkloadInstaller
         string packageId,
         NuGetVersion? version,
         string? source,
-        bool includePrerelease,
+        bool? includePrerelease,
         bool exact,
         bool force,
         IProgress<WorkloadInstallProgress>? progress = null,
@@ -96,7 +99,10 @@ internal interface IWorkloadInstaller
     /// installed semver is targeted.
     /// </param>
     /// <param name="source">Optional <c>--source</c> override.</param>
-    /// <param name="includePrerelease"><c>true</c> to allow prerelease candidates.</param>
+    /// <param name="includePrerelease">
+    /// <c>true</c> to allow prerelease versions; <c>false</c> to forbid them;
+    /// <c>null</c> to use the catalog's configured default.
+    /// </param>
     /// <param name="allowMajor">
     /// <c>true</c> to allow the new version to cross a major boundary.
     /// Default is <c>false</c> per spec; <c>--major</c> on the command sets
@@ -111,7 +117,7 @@ internal interface IWorkloadInstaller
         string packageId,
         NuGetVersion? targetInstalledVersion,
         string? source,
-        bool includePrerelease,
+        bool? includePrerelease,
         bool allowMajor,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);

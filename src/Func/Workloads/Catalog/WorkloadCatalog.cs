@@ -24,15 +24,13 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        CatalogSearchQuery effectiveQuery = _options.IncludePrerelease
-            ? query with { IncludePrerelease = true }
-            : query;
+        CatalogSearchQuery effectiveQuery = query with { IncludePrerelease = IncludePrerelease(query.IncludePrerelease) };
 
         return ResolveClient(effectiveQuery.Source).SearchAsync(effectiveQuery, cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<ResolvedPackage?> ResolveLatestVersionAsync(string packageId, bool includePrerelease, NuGetVersion? currentVersion = null,
+    public async Task<ResolvedPackage?> ResolveLatestVersionAsync(string packageId, bool? includePrerelease, NuGetVersion? currentVersion = null,
         bool allowMajor = true, string? source = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
@@ -49,7 +47,7 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
     }
 
     /// <inheritdoc />
-    public async Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(string packageId, VersionRange versionRange, bool includePrerelease, string? source = null,
+    public async Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(string packageId, VersionRange versionRange, bool? includePrerelease, string? source = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
@@ -57,7 +55,7 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
         bool effectiveIncludePrerelease = IncludePrerelease(includePrerelease);
 
         return await ResolveMatchingVersionAsync(packageId, source, cancellationToken,
-            versions => SelectLatest(versions, candidate => (effectiveIncludePrerelease || !candidate.IsPrerelease) && versionRange.Satisfies(candidate)));
+            versions => SelectLatest(versions, candidate => SatisfiesRange(versionRange, candidate, effectiveIncludePrerelease)));
     }
 
     /// <inheritdoc />
@@ -80,7 +78,7 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
     private NuGetProtocolSourceClient ResolveClient(string? source)
         => _clientFactory(_sourceProvider.GetSource(source));
 
-    private bool IncludePrerelease(bool includePrerelease) => includePrerelease || _options.IncludePrerelease;
+    private bool IncludePrerelease(bool? includePrerelease) => includePrerelease ?? _options.IncludePrerelease;
 
     private async Task<ResolvedPackage?> ResolveMatchingVersionAsync(string packageId, string? source, CancellationToken cancellationToken,
         Func<IReadOnlyList<NuGetVersion>, NuGetVersion?> selectVersion)
@@ -109,5 +107,27 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
         }
 
         return best;
+    }
+
+    // NuGet's VersionRange.Satisfies rejects prerelease candidates when the
+    // range itself has no prerelease in its bounds (e.g. a range pinned to
+    // "[3.13.0]" rejects "3.13.0-preview.1" even though both share the same
+    // numeric version). When prerelease is enabled, re-check the candidate's
+    // numeric portion against the range so prerelease versions whose numeric
+    // version is inside the bounds are accepted.
+    private static bool SatisfiesRange(VersionRange range, NuGetVersion candidate, bool includePrerelease)
+    {
+        if (range.Satisfies(candidate))
+        {
+            return true;
+        }
+
+        if (!includePrerelease || !candidate.IsPrerelease)
+        {
+            return false;
+        }
+
+        var numeric = new NuGetVersion(candidate.Major, candidate.Minor, candidate.Patch, candidate.Revision);
+        return range.Satisfies(numeric);
     }
 }

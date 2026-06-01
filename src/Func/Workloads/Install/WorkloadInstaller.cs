@@ -166,7 +166,7 @@ internal sealed class WorkloadInstaller(
         string packageId,
         NuGetVersion? version,
         string? source,
-        bool includePrerelease,
+        bool? includePrerelease,
         bool exact,
         bool force,
         IProgress<WorkloadInstallProgress>? progress = null,
@@ -224,7 +224,7 @@ internal sealed class WorkloadInstaller(
         string packageId,
         NuGetVersion? targetInstalledVersion,
         string? source,
-        bool includePrerelease,
+        bool? includePrerelease,
         bool allowMajor,
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
@@ -373,7 +373,7 @@ internal sealed class WorkloadInstaller(
         return resolved;
     }
 
-    private bool IncludePrerelease(bool includePrerelease) => includePrerelease || _catalogOptions.IncludePrerelease;
+    private bool IncludePrerelease(bool? includePrerelease) => includePrerelease ?? _catalogOptions.IncludePrerelease;
 
     private static WorkloadEntry ResolveUpdateTarget(
         string packageId,

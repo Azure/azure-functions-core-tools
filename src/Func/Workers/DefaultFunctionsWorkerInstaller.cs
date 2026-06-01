@@ -44,7 +44,7 @@ internal sealed class DefaultFunctionsWorkerInstaller(
             ResolvedPackage? package = await _workloadCatalog.ResolveLatestVersionInRangeAsync(
                 packageId,
                 versionRange,
-                includePrerelease: true,
+                includePrerelease: null,
                 source: null,
                 cancellationToken);
 
@@ -62,7 +62,7 @@ internal sealed class DefaultFunctionsWorkerInstaller(
             packageId,
             version,
             source,
-            includePrerelease: true,
+            includePrerelease: null,
             exact: true,
             force: false,
             progress: null,

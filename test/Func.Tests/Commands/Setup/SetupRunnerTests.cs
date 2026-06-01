@@ -854,7 +854,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         public Task<ResolvedPackage?> ResolveLatestVersionAsync(
             string packageId,
-            bool includePrerelease,
+            bool? includePrerelease,
             NuGetVersion? currentVersion = null,
             bool allowMajor = true,
             string? source = null,
@@ -869,7 +869,7 @@ public sealed class SetupRunnerTests : IDisposable
         public Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(
             string packageId,
             VersionRange versionRange,
-            bool includePrerelease,
+            bool? includePrerelease,
             string? source = null,
             CancellationToken cancellationToken = default)
         {

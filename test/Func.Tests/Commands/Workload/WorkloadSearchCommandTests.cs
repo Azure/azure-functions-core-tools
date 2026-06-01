@@ -16,12 +16,15 @@ public class WorkloadSearchCommandTests
     private readonly TestInteractionService _interaction = new();
     private readonly IWorkloadCatalog _catalog = Substitute.For<IWorkloadCatalog>();
 
+    private static readonly Microsoft.Extensions.Options.IOptions<Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions> _testCatalogOptions
+        = Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions());
+
     private static readonly PackageSource _stubSource = new("https://example/v3/index.json", "test");
 
     [Fact]
     public void Search_HasExpectedArgsAndOptions()
     {
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         Assert.Single(cmd.Arguments, a => a.Name == "query");
         Assert.Contains(cmd.Options, o => o.Name == "--source");
         Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
@@ -54,7 +57,7 @@ public class WorkloadSearchCommandTests
                 Aliases: [],
                 Source: _stubSource));
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--stack");
 
         Assert.Equal(0, exit);
@@ -70,7 +73,7 @@ public class WorkloadSearchCommandTests
     {
         StubSearch();
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -89,7 +92,7 @@ public class WorkloadSearchCommandTests
                 Aliases: ["python"],
                 Source: _stubSource));
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -115,7 +118,7 @@ public class WorkloadSearchCommandTests
                 Aliases: ["dotnet", "dotnet-isolated"],
                 Source: _stubSource));
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
         Assert.Contains(
@@ -135,7 +138,7 @@ public class WorkloadSearchCommandTests
                 Aliases: [],
                 Source: _stubSource));
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
         // Title missing: heading falls back to package id.
@@ -154,7 +157,7 @@ public class WorkloadSearchCommandTests
             new CatalogSearchResult("pkg.a", NuGetVersion.Parse("1.0.0"), "A", "first", ["a"], _stubSource),
             new CatalogSearchResult("pkg.b", NuGetVersion.Parse("1.0.0"), "B", "second", ["b"], _stubSource));
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
         int firstHeading = _interaction.Lines.ToList().FindIndex(l => l == "A");
@@ -177,7 +180,7 @@ public class WorkloadSearchCommandTests
                 Aliases: ["test"],
                 Source: _stubSource));
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
         // Card layout keeps the description on its own Description: line and
@@ -199,7 +202,7 @@ public class WorkloadSearchCommandTests
             .ToArray();
         StubSearch(stubs);
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
         Assert.Contains(
@@ -214,7 +217,7 @@ public class WorkloadSearchCommandTests
         _catalog.SearchAsync(Arg.Do<CatalogSearchQuery>(q => captured = q), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<CatalogSearchResult>());
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(
             cmd,
             "python",
@@ -238,7 +241,7 @@ public class WorkloadSearchCommandTests
         _catalog.SearchAsync(Arg.Do<CatalogSearchQuery>(q => captured = q), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<CatalogSearchResult>());
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd);
 
         Assert.Equal(0, exit);
@@ -261,7 +264,7 @@ public class WorkloadSearchCommandTests
                 Aliases: ["python"],
                 Source: _stubSource));
 
-        var cmd = new WorkloadSearchCommand(_interaction, _catalog);
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--json");
 
         Assert.Equal(0, exit);

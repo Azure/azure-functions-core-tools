@@ -9,12 +9,26 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// <summary>
 /// Configures workload catalog options from supported process environment variables.
 /// </summary>
-internal sealed class WorkloadCatalogOptionsSetup(IProcessEnvironment processEnvironment) : IConfigureOptions<WorkloadCatalogOptions>
+/// <remarks>
+/// Resolution order for <see cref="WorkloadCatalogOptions.IncludePrerelease"/>:
+/// 1. <c>FUNC_CLI_WORKLOADS_PRERELEASE</c> when set to a recognised true/false token.
+/// 2. Auto-detected from the running CLI's informational version: a build whose
+///    version contains a <c>-</c> (e.g. <c>5.0.0-preview.1</c>) opts in so customers
+///    on prerelease CLI builds can resolve matching prerelease workload packages
+///    without setting any environment variable.
+/// </remarks>
+internal sealed class WorkloadCatalogOptionsSetup(
+    IProcessEnvironment processEnvironment,
+    ICliVersionProvider cliVersionProvider) : IConfigureOptions<WorkloadCatalogOptions>
 {
+    private static readonly HashSet<string> _trueEnvironmentValues =
+        new(StringComparer.OrdinalIgnoreCase) { "1", "true", "t", "y", "yes", "on" };
+
     private static readonly HashSet<string> _falseEnvironmentValues =
-        new(StringComparer.OrdinalIgnoreCase) { "0", "false", "n", "no", "off" };
+        new(StringComparer.OrdinalIgnoreCase) { "0", "false", "f", "n", "no", "off" };
 
     private readonly IProcessEnvironment _processEnvironment = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
+    private readonly ICliVersionProvider _cliVersionProvider = cliVersionProvider ?? throw new ArgumentNullException(nameof(cliVersionProvider));
 
     public void Configure(WorkloadCatalogOptions options)
     {
@@ -34,7 +48,25 @@ internal sealed class WorkloadCatalogOptionsSetup(IProcessEnvironment processEnv
     private bool ResolveIncludePrerelease()
     {
         string? configured = _processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            string trimmed = configured.Trim();
+            if (_trueEnvironmentValues.Contains(trimmed))
+            {
+                return true;
+            }
 
-        return !string.IsNullOrWhiteSpace(configured) && !_falseEnvironmentValues.Contains(configured.Trim());
+            if (_falseEnvironmentValues.Contains(trimmed))
+            {
+                return false;
+            }
+        }
+
+        // Auto-detect: a prerelease CLI build resolves prerelease workload
+        // packages by default. SemVer prerelease suffixes are delimited with
+        // '-' (e.g. "5.0.0-preview.1"), so the presence of a dash in the
+        // informational version is a reliable, build-agnostic signal.
+        string informational = _cliVersionProvider.InformationalVersion;
+        return !string.IsNullOrEmpty(informational) && informational.Contains('-');
     }
 }
