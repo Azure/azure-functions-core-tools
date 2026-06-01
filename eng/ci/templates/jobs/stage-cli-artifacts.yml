@@ -128,11 +128,6 @@ jobs:
               Format-Table -AutoSize | Out-String | Write-Host
           displayName: 'Archive ${{ runtime }}'
 
-    # PGP-sign the Linux/macOS archives post-archive. Produces detached .sig files
-    # alongside each .tar.gz in the release directory.
-    - ${{ if eq(parameters.sign, true) }}:
-      - template: /eng/ci/templates/steps/sign-app.yml@self
-        parameters:
-          platform: linux
-          folderPath: $(release_path)
-          signPatterns: 'func-linux-*.tar.gz'
+    # TODO: Add Linux PGP signing post-archive. ESRP's LinuxSign replaces the
+    # input file with the signature; need to resolve detached .sig output before
+    # re-enabling.
