@@ -235,9 +235,15 @@ internal static class HostStructuredEventWriter
         writer.WriteEndObject();
     }
 
-    private static void WriteException(Utf8JsonWriter writer, Exception exception)
+    internal static void WriteException(Utf8JsonWriter writer, Exception exception)
     {
         writer.WriteStartObject("exception");
+        WriteExceptionProperties(writer, exception);
+        writer.WriteEndObject();
+    }
+
+    private static void WriteExceptionProperties(Utf8JsonWriter writer, Exception exception)
+    {
         writer.WriteString("type", exception.GetType().FullName ?? exception.GetType().Name);
         writer.WriteString("message", exception.Message);
         if (!string.IsNullOrEmpty(exception.StackTrace))
@@ -245,7 +251,12 @@ internal static class HostStructuredEventWriter
             writer.WriteString("stack", exception.StackTrace);
         }
 
-        writer.WriteEndObject();
+        if (exception.InnerException is not null)
+        {
+            writer.WriteStartObject("inner_exception");
+            WriteExceptionProperties(writer, exception.InnerException);
+            writer.WriteEndObject();
+        }
     }
 
     private static void WriteProperty(Utf8JsonWriter writer, string name, object? value)

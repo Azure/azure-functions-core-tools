@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Hosting.Events;
+
 namespace Azure.Functions.Cli.Hosting.Dashboard;
 
 /// <summary>
@@ -41,9 +43,15 @@ internal sealed record InvocationCompletedEvent(
     string? TraceId,
     string Result,
     double? DurationMs,
-    string? ErrorType,
-    string? ErrorMessage)
-    : DashboardEvent(Timestamp);
+    HostLogExceptionDetails? Error)
+    : DashboardEvent(Timestamp)
+{
+    public string? ErrorType => Error?.Type;
+
+    public string? ErrorMessage => Error?.Message;
+
+    public string? ErrorSummary => Error?.FormatSummary();
+}
 
 internal sealed record CliDiagnosticEvent(DateTimeOffset Timestamp, string Code, string Message, string? Recommendation)
     : DashboardEvent(Timestamp);

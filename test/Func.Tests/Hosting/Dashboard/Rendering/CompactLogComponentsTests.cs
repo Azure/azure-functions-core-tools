@@ -97,8 +97,7 @@ public class CompactLogComponentsTests
                 TraceId: null,
                 Result: "failed",
                 DurationMs: 42,
-                ErrorType: "InvalidOperationException",
-                ErrorMessage: "Boom"),
+                Error: new HostLogExceptionDetails("InvalidOperationException", "Boom", null, null)),
         ];
 
         CompactLogLine line = formatter.Format(entry, events, listenUri: null)!;
@@ -109,6 +108,61 @@ public class CompactLogComponentsTests
         string output = Render(line.Renderable);
         Assert.Contains("InvalidOperationException", output);
         Assert.Contains("Boom", output);
+    }
+
+    [Fact]
+    public void Format_WithExceptionDetails_RendersSummaryWithoutCategory()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var exceptionDetails = new HostLogExceptionDetails(
+            "Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException",
+            "Language worker process exited.",
+            Stack: null,
+            InnerException: new HostLogExceptionDetails("System.InvalidOperationException", "A connection string was not found.", null, null));
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Grpc",
+            LogLevel.Error,
+            default,
+            "Language Worker Process exited.",
+            Exception: null,
+            HostLogEntry.EmptyAttributes)
+        {
+            ExceptionDetails = exceptionDetails,
+        };
+
+        CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
+
+        string output = RenderRows(line);
+        Assert.Null(line.FunctionName);
+        Assert.True(line.IsError);
+        Assert.Equal(LogLevel.Error, line.Level);
+        Assert.DoesNotContain("Grpc", output);
+        Assert.Contains("Language Worker Process exited.", output);
+        Assert.Contains("Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException", output);
+        Assert.Contains("A connection string was not found.", output);
+    }
+
+    [Fact]
+    public void Format_WithExceptionDetailsOnly_RendersSummary()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Grpc",
+            LogLevel.Error,
+            default,
+            string.Empty,
+            Exception: null,
+            HostLogEntry.EmptyAttributes)
+        {
+            ExceptionDetails = new HostLogExceptionDetails("System.InvalidOperationException", "A connection string was not found.", null, null),
+        };
+
+        CompactLogLine? line = formatter.Format(entry, [], listenUri: null);
+
+        Assert.NotNull(line);
+        Assert.Contains("A connection string was not found.", RenderRows(line));
     }
 
     [Fact]
@@ -130,21 +184,48 @@ public class CompactLogComponentsTests
     }
 
     [Fact]
-    public void Format_WithOptionsLoggingService_SuppressesLine()
+    public void Format_WithInitializationStepLog_LabelsSourceAsInitialization()
     {
         var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
         var entry = new HostLogEntry(
             DateTimeOffset.UnixEpoch,
-            "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService",
+            "[startup]",
             LogLevel.Information,
-            new EventId(0),
-            "ConcurrencyOptions",
+            default,
+            "Resolving host workload",
+            Exception: null,
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.CliEventKind] = CliEventKinds.StartInitializationStepCompleted,
+            });
+
+        CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
+
+        string output = RenderRows(line);
+        Assert.Null(line.FunctionName);
+        Assert.Contains("Initialization", output);
+        Assert.Contains("Resolving host workload", output);
+    }
+
+    [Fact]
+    public void Format_WithPlainHostLog_DoesNotLabelInitialization()
+    {
+        var formatter = new CompactLogLineFormatter(new DefaultTheme(), new FunctionPalette());
+        var entry = new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Host.Startup",
+            LogLevel.Information,
+            default,
+            "Reading host configuration",
             Exception: null,
             HostLogEntry.EmptyAttributes);
 
-        CompactLogLine? line = formatter.Format(entry, [], listenUri: null);
+        CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
 
-        Assert.Null(line);
+        string output = RenderRows(line);
+        Assert.Null(line.FunctionName);
+        Assert.DoesNotContain("Initialization", output);
+        Assert.Contains("Reading host configuration", output);
     }
 
     private static string Render(IRenderable renderable)
@@ -157,8 +238,12 @@ public class CompactLogComponentsTests
             Interactive = InteractionSupport.No,
             Out = new AnsiConsoleOutput(writer),
         });
+        console.Profile.Width = 240;
 
         console.Write(renderable);
         return writer.ToString();
     }
+
+    private static string RenderRows(CompactLogLine line)
+        => string.Join(Environment.NewLine, line.RenderRows(width: 240).Select(Render));
 }

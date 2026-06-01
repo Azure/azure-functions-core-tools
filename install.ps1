@@ -146,6 +146,16 @@ if ($os -eq 'win') {
 
 Write-Host "func CLI $Version installed to $InstallDir"
 
+# --- Telemetry notice ---
+
+Write-Host ''
+Write-Host 'Telemetry'
+Write-Host '---------'
+Write-Host 'The Azure Functions CLI collects usage data in order to help us improve your experience.'
+Write-Host "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
+Write-Host ''
+Write-Host "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+
 # --- Bug bash env vars ---
 
 if ($BugBash) {

@@ -28,6 +28,7 @@ internal sealed class CompactStartInitializationRenderer(
     private CancellationTokenSource? _liveCts;
     private Task? _liveTask;
     private int _spinnerFrameIndex;
+    private bool _hasFailure;
     private bool _disposed;
 
     private ITheme Theme => _interaction.Theme;
@@ -53,8 +54,14 @@ internal sealed class CompactStartInitializationRenderer(
                 case StartInitializationProgressEvent progress:
                     UpdateProgress(progress);
                     break;
+                case StartInitializationLogEvent log:
+                    WriteLog(log);
+                    break;
                 case StartInitializationStepCompletedEvent completed:
                     CompleteStep(completed);
+                    break;
+                case StartInitializationStepFailedEvent failed:
+                    FailStep(failed);
                     break;
                 case StartInitializationCompletedEvent:
                     liveTaskToStop = _liveTask;
@@ -149,10 +156,30 @@ internal sealed class CompactStartInitializationRenderer(
             return;
         }
 
-        step.Percent = Math.Clamp(progress.Percent, 0, 100);
+        if (!double.IsNaN(progress.Percent))
+        {
+            step.Percent = Math.Clamp(progress.Percent, 0, 100);
+            step.HasProgress = true;
+        }
+
         if (!string.IsNullOrWhiteSpace(progress.Message))
         {
             step.Message = progress.Message;
+        }
+    }
+
+    private void WriteLog(StartInitializationLogEvent log)
+    {
+        if (FindStep(log.StepId) is not { } step)
+        {
+            return;
+        }
+
+        step.TotalLogLineCount++;
+        step.LogLines.Enqueue(log.Line);
+        while (step.LogLines.Count > StepState.LogTailCapacity)
+        {
+            step.LogLines.Dequeue();
         }
     }
 
@@ -165,7 +192,24 @@ internal sealed class CompactStartInitializationRenderer(
 
         step.Completed = true;
         step.Percent = 100;
+        step.HasProgress = true;
         step.Result = completed.Message;
+        if (ReferenceEquals(_activeStep, step))
+        {
+            _activeStep = null;
+        }
+    }
+
+    private void FailStep(StartInitializationStepFailedEvent failed)
+    {
+        if (FindStep(failed.StepId) is not { } step)
+        {
+            return;
+        }
+
+        step.Failed = true;
+        step.Result = failed.Message;
+        _hasFailure = true;
         if (ReferenceEquals(_activeStep, step))
         {
             _activeStep = null;
@@ -232,7 +276,16 @@ internal sealed class CompactStartInitializationRenderer(
             spinnerFrameIndex = _spinnerFrameIndex;
             steps =
             [
-                .. _steps.Select(static step => new StepSnapshot(step.Step, step.Percent, step.Completed, step.Message, step.Result))
+                .. _steps.Select(static step => new StepSnapshot(
+                    step.Step,
+                    step.Percent,
+                    step.HasProgress,
+                    step.Completed,
+                    step.Failed,
+                    step.Message,
+                    step.Result,
+                    step.TotalLogLineCount,
+                    [.. step.LogLines]))
             ];
         }
 
@@ -246,6 +299,10 @@ internal sealed class CompactStartInitializationRenderer(
         foreach (StepSnapshot step in steps)
         {
             rows.Add(new Markup(BuildStepMarkup(step, spinnerFrameIndex)));
+            foreach (string logRow in BuildLogRows(step))
+            {
+                rows.Add(new Markup(logRow));
+            }
         }
 
         return new Rows(rows);
@@ -255,15 +312,17 @@ internal sealed class CompactStartInitializationRenderer(
     {
         string icon = step.Completed
             ? Styled(CompletedIcon, Theme.Success)
+            : step.Failed
+            ? Styled(FailedIcon, Theme.Error)
             : Styled(GetSpinnerFrame(spinnerFrameIndex), Theme.Active);
 
         string title = Markup.Escape(FormatStepTitle(step));
 
-        string progress = step.Step.DisplayKind == StartInitializationDisplayKind.Progress && !step.Completed
+        string progress = step.Step.DisplayKind == StartInitializationDisplayKind.Progress && !step.Completed && !step.Failed && step.HasProgress
             ? $" {FormatProgress(step.Percent)}"
             : string.Empty;
 
-        if (step.Completed)
+        if (step.Completed || step.Failed)
         {
             string result = step.Result is null
                 ? string.Empty
@@ -277,8 +336,56 @@ internal sealed class CompactStartInitializationRenderer(
                 ? string.Empty
                 : $" [dim]({Markup.Escape(step.Message)})[/]";
 
-            return $"{icon} [dim]{title}[/]{progress}{message}";
+            return $"{icon} {title}{progress}{message}";
         }
+    }
+
+    private IEnumerable<string> BuildLogRows(StepSnapshot step)
+    {
+        if (step.TotalLogLineCount == 0)
+        {
+            yield break;
+        }
+
+        // On success the step's title line already carries the curated result, so collapse the log area
+        // entirely (including the line-count footer) to keep the completed checklist to one line per step.
+        if (step.Completed && !step.Failed)
+        {
+            yield break;
+        }
+
+        // While the step is still running (or has failed), show the tail of the log with a connecting
+        // gutter and anchor it with a corner-glyph footer carrying the running line count.
+        foreach (string line in step.LogLines)
+        {
+            yield return $"  [dim]{LogGutter} {Markup.Escape(TruncateToWidth(line))}[/]";
+        }
+
+        yield return $"  [dim]{LogSummaryPrefix} {FormatLineCount(step.TotalLogLineCount)}[/]";
+    }
+
+    private static string FormatLineCount(int count)
+        => count == 1 ? "1 line" : $"{count} lines";
+
+    private string TruncateToWidth(string line)
+    {
+        // Account for the two-space indent, the gutter glyph, and the trailing space before the text so a
+        // long line is clipped instead of wrapping onto the next row, which would break the gutter column.
+        const int gutterWidth = 4;
+        int available = _console.Profile.Width - gutterWidth;
+        if (available <= 0)
+        {
+            return string.Empty;
+        }
+
+        if (line.Length <= available)
+        {
+            return line;
+        }
+
+        string ellipsis = Ellipsis;
+        int keep = Math.Max(0, available - ellipsis.Length);
+        return string.Concat(line.AsSpan(0, keep), ellipsis);
     }
 
     private string FormatProgress(double percent)
@@ -299,6 +406,14 @@ internal sealed class CompactStartInitializationRenderer(
     }
 
     private string CompletedIcon => _console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
+
+    private string FailedIcon => _console.Profile.Capabilities.Unicode ? "\u00d7" : "[!]";
+
+    private string LogGutter => _console.Profile.Capabilities.Unicode ? "\u2502" : "|";
+
+    private string LogSummaryPrefix => _console.Profile.Capabilities.Unicode ? "\u2514" : "`";
+
+    private string Ellipsis => _console.Profile.Capabilities.Unicode ? "\u2026" : "...";
 
     private char ProgressCompleteCharacter => _console.Profile.Capabilities.Unicode ? '\u2501' : '=';
 
@@ -323,11 +438,13 @@ internal sealed class CompactStartInitializationRenderer(
 
         Task? liveTaskToStop;
         CancellationTokenSource? liveCtsToStop;
+        bool hasFailure;
         lock (_stateLock)
         {
             _disposed = true;
             liveTaskToStop = _liveTask;
             liveCtsToStop = _liveCts;
+            hasFailure = _hasFailure;
             _liveTask = null;
             _liveCts = null;
         }
@@ -335,6 +452,14 @@ internal sealed class CompactStartInitializationRenderer(
         if (liveTaskToStop is not null)
         {
             await StopLiveDisplayAsync(liveTaskToStop, liveCtsToStop!, CancellationToken.None);
+
+            // The live display is configured with AutoClear, so stopping it erases the rendered frame.
+            // When a step failed there is no completion hand-off to the dashboard, so re-render the final
+            // frame statically to keep the failed checklist and its log tail on screen for the user.
+            if (hasFailure)
+            {
+                WritePromptContext();
+            }
         }
 
         _redrawSignal.Dispose();
@@ -358,16 +483,35 @@ internal sealed class CompactStartInitializationRenderer(
 
     private sealed class StepState(StartInitializationStep step)
     {
+        public const int LogTailCapacity = 10;
+
         public StartInitializationStep Step { get; } = step;
 
         public double Percent { get; set; }
 
+        public bool HasProgress { get; set; }
+
         public bool Completed { get; set; }
+
+        public bool Failed { get; set; }
 
         public string? Message { get; set; }
 
         public string? Result { get; internal set; }
+
+        public Queue<string> LogLines { get; } = [];
+
+        public int TotalLogLineCount { get; set; }
     }
 
-    private sealed record StepSnapshot(StartInitializationStep Step, double Percent, bool Completed, string? Message, string? Result);
+    private sealed record StepSnapshot(
+        StartInitializationStep Step,
+        double Percent,
+        bool HasProgress,
+        bool Completed,
+        bool Failed,
+        string? Message,
+        string? Result,
+        int TotalLogLineCount,
+        IReadOnlyList<string> LogLines);
 }

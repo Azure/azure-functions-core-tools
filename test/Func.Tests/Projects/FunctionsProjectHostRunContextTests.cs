@@ -65,6 +65,38 @@ public sealed class FunctionsProjectHostRunContextTests
     }
 
     [Fact]
+    public void Constructor_ProvidesNonNullReporter()
+    {
+        var context = new FunctionsProjectHostRunContext(
+            new DirectoryInfo(Environment.CurrentDirectory),
+            "dotnet-isolated",
+            new Dictionary<string, string>());
+
+        Assert.NotNull(context.Reporter);
+        Assert.IsType<NullFunctionsProjectHostRunReporter>(context.Reporter);
+    }
+
+    [Fact]
+    public void Reporter_SetToNull_Throws()
+    {
+        var context = new FunctionsProjectHostRunContext(
+            new DirectoryInfo(Environment.CurrentDirectory),
+            "dotnet-isolated",
+            new Dictionary<string, string>());
+
+        Assert.Throws<ArgumentNullException>(() => context.Reporter = null!);
+    }
+
+    [Fact]
+    public void NullFunctionsProjectHostRunReporter_Methods_DoNotThrow()
+    {
+        IFunctionsProjectHostRunReporter reporter = NullFunctionsProjectHostRunReporter.Instance;
+
+        reporter.ReportStatus("working");
+        reporter.WriteLog("line", FunctionsProjectReportSeverity.Warning);
+    }
+
+    [Fact]
     public async Task FunctionsProject_DefaultLifecycleHooks_CompleteSuccessfully()
     {
         var project = new TestFunctionsProject();

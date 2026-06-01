@@ -89,6 +89,92 @@ public class JsonRendererTests
         Assert.Equal("host_state_changed", records[1].RootElement.GetProperty("kind").GetString());
     }
 
+    [Fact]
+    public async Task EmitsRemoteExceptionDetailsForLogsAndInvocationEvents()
+    {
+        var (renderer, stream) = NewRenderer();
+        var state = new DashboardState();
+        await renderer.OnStartAsync(state, default);
+        var exceptionDetails = new HostLogExceptionDetails(
+            "Microsoft.Azure.WebJobs.Host.FunctionInvocationException",
+            "Exception while executing function",
+            "outer stack",
+            new HostLogExceptionDetails("Worker.UserException", "inner boom", "inner stack", null));
+        var entry = new HostLogEntry(
+            DateTimeOffset.UtcNow,
+            "Function.HttpTrigger1.User",
+            LogLevel.Error,
+            default,
+            "Executed 'Functions.HttpTrigger1' (Failed, Id=id-1, Duration=10ms)",
+            new InvalidOperationException("placeholder"),
+            new Dictionary<string, object?>
+            {
+                [HostLogAttributeKeys.CliEventKind] = CliEventKinds.InvocationCompleted,
+                [HostLogAttributeKeys.FunctionName] = "HttpTrigger1",
+                [HostLogAttributeKeys.FunctionInvocationId] = "id-1",
+                [HostLogAttributeKeys.FunctionResult] = "failed",
+                [HostLogAttributeKeys.DurationMs] = 10.0,
+            })
+        {
+            ExceptionDetails = exceptionDetails,
+        };
+
+        await renderer.OnEventAsync(entry, state.Observe(entry), default);
+        await renderer.DisposeAsync();
+
+        IReadOnlyList<JsonDocument> records = ReadAll(stream);
+        JsonElement logException = records
+            .Single(doc => doc.RootElement.GetProperty("kind").GetString() == "log")
+            .RootElement
+            .GetProperty("exception");
+        Assert.Equal("Microsoft.Azure.WebJobs.Host.FunctionInvocationException", logException.GetProperty("type").GetString());
+        Assert.Equal("outer stack", logException.GetProperty("stack").GetString());
+        Assert.Equal("Worker.UserException", logException.GetProperty("inner_exception").GetProperty("type").GetString());
+        Assert.Equal("inner stack", logException.GetProperty("inner_exception").GetProperty("stack").GetString());
+
+        JsonElement eventError = records
+            .Single(doc => doc.RootElement.GetProperty("kind").GetString() == "invocation_completed")
+            .RootElement
+            .GetProperty("error");
+        Assert.Equal("Microsoft.Azure.WebJobs.Host.FunctionInvocationException", eventError.GetProperty("type").GetString());
+        Assert.Equal("Exception while executing function", eventError.GetProperty("message").GetString());
+        Assert.Equal("outer stack", eventError.GetProperty("stack").GetString());
+        Assert.Equal("Worker.UserException", eventError.GetProperty("inner_exception").GetProperty("type").GetString());
+        Assert.Equal("inner boom", eventError.GetProperty("inner_exception").GetProperty("message").GetString());
+        Assert.Equal("inner stack", eventError.GetProperty("inner_exception").GetProperty("stack").GetString());
+    }
+
+    [Fact]
+    public async Task EmitsExceptionOnlyLogRecords()
+    {
+        var (renderer, stream) = NewRenderer();
+        var exceptionDetails = new HostLogExceptionDetails(
+            "Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException",
+            "A connection string was not found. Please set your connection string.",
+            null,
+            null);
+        var entry = new HostLogEntry(
+            DateTimeOffset.UtcNow,
+            "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService",
+            LogLevel.Error,
+            default,
+            string.Empty,
+            null,
+            new Dictionary<string, object?>())
+        {
+            ExceptionDetails = exceptionDetails,
+        };
+
+        await renderer.OnEventAsync(entry, [], default);
+        await renderer.DisposeAsync();
+
+        JsonElement exception = Assert.Single(ReadAll(stream))
+            .RootElement
+            .GetProperty("exception");
+        Assert.Equal("Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException", exception.GetProperty("type").GetString());
+        Assert.Equal("A connection string was not found. Please set your connection string.", exception.GetProperty("message").GetString());
+    }
+
     private static (JsonRenderer renderer, MemoryStream stream) NewRenderer()
     {
         var stream = new MemoryStream();

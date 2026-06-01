@@ -102,6 +102,60 @@ public sealed class NuGetProtocolSourceClientTests
         Assert.Empty(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
     }
 
+    [Fact]
+    public void ParseV3Hits_FiltersHitsLackingFuncCliWorkloadPackageType()
+    {
+        // nuget.org ignores `packageType=` when q is empty, so an unfiltered
+        // `func workload search` leaks arbitrary packages (issue #5198).
+        // Defensive filter keeps hits that omit packageTypes (some feeds
+        // don't include the field) but drops hits that declare other types.
+        var response = JObject.Parse("""
+            {
+              "data": [
+                {
+                  "id": "Workloads.Python",
+                  "version": "1.0.0",
+                  "packageTypes": [ { "name": "FuncCliWorkload" } ]
+                },
+                {
+                  "id": "Azure.Functions.Cli.Abstractions",
+                  "version": "5.0.0",
+                  "packageTypes": [ { "name": "Dependency" } ]
+                },
+                {
+                  "id": "Workloads.NoPackageTypes",
+                  "version": "1.0.0"
+                }
+              ]
+            }
+            """);
+
+        var results = NuGetProtocolSourceClient.ParseV3Hits(response, _source);
+
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.PackageId == "workloads.python");
+        Assert.Contains(results, r => r.PackageId == "workloads.nopackagetypes");
+        Assert.DoesNotContain(results, r => r.PackageId == "azure.functions.cli.abstractions");
+    }
+
+    [Fact]
+    public void ParseV3Hits_PackageTypeMatchIsCaseInsensitive()
+    {
+        var response = JObject.Parse("""
+            {
+              "data": [
+                {
+                  "id": "Workloads.Host",
+                  "version": "1.0.0",
+                  "packageTypes": [ { "name": "funccliworkload" } ]
+                }
+              ]
+            }
+            """);
+
+        Assert.Single(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
+    }
+
 
     [Fact]
     public async Task ListVersionsAsync_ReturnsResolvedVersions()

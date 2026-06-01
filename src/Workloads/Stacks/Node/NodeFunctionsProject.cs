@@ -58,13 +58,13 @@ internal sealed class NodeFunctionsProject : FunctionsProject
 
         if (!Directory.Exists(Path.Combine(root, NodeModulesFolderName)))
         {
-            await RunAsync(root, ["install"], "npm install", cancellationToken).ConfigureAwait(false);
+            await RunAsync(root, ["install"], "npm install", context.Reporter, cancellationToken).ConfigureAwait(false);
         }
 
         // --no-build skips compilation only; npm install above is restore, not build.
         if (!context.SkipBuild && HasBuildScript(packageJsonPath))
         {
-            await RunAsync(root, ["run", "build"], "npm run build", cancellationToken).ConfigureAwait(false);
+            await RunAsync(root, ["run", "build"], "npm run build", context.Reporter, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -95,15 +95,27 @@ internal sealed class NodeFunctionsProject : FunctionsProject
         }
     }
 
-    private async Task RunAsync(string root, IReadOnlyList<string> args, string display, CancellationToken cancellationToken)
+    private async Task RunAsync(string root, IReadOnlyList<string> args, string display, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
     {
+        reporter.ReportStatus($"Running {display}");
+
         (int exitCode, string stderr) = await RunNpm(root, args, cancellationToken).ConfigureAwait(false);
+
+        WriteLogLines(reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+
         if (exitCode != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? "see output above." : stderr.Trim();
             throw new GracefulException(
-                $"'{display}' failed (exit {exitCode}). {detail}",
+                $"'{display}' failed (exit {exitCode}). {stderr?.Trim()}",
                 isUserError: true);
+        }
+    }
+
+    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
+    {
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            reporter.WriteLog(line, severity);
         }
     }
 

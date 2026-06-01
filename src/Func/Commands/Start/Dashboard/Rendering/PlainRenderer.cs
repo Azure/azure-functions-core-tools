@@ -58,30 +58,31 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
 
         // Plain log lines (no synthetic kind matched, no `cli.event_kind`
         // marker) are still useful — surface them as a generic [log] line.
-        // Suppress the WebJobs invocation envelope ("Executing '...'" /
-        // "Executed '...'") because the synthetic events already convey it.
-        string? kind = entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind);
-        if (events.Count == 0
-            && kind is null or CliEventKinds.Log
-            && !IsSuppressedLogCategory(entry.Category)
-            && !IsWebJobsInvocationEnvelope(entry.Message))
+        // Suppress the WebJobs invocation envelope only when it has no
+        // attached exception details; otherwise the legacy experience showed
+        // those details and we need to preserve them.
+        if (ShouldRenderPlainLog(entry, events))
         {
-            if (string.IsNullOrWhiteSpace(entry.Message))
+            string message = FormatLogMessage(entry);
+            if (string.IsNullOrWhiteSpace(message))
             {
                 return Task.CompletedTask;
             }
 
-            string function = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName) ?? entry.Category;
+            string? function = entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName);
             string tag = entry.Level switch
             {
                 LogLevel.Error or LogLevel.Critical => "[error]",
                 LogLevel.Warning => "[warn]",
                 _ => "[log]",
             };
-            _interaction.WriteLine($"{FormatTimestamp(entry.Timestamp)}  {tag,-18} {function}  {entry.Message}");
-            if (entry.Exception is not null)
+            string line = function is not null
+                ? $"{FormatTimestamp(entry.Timestamp)}  {tag,-18} {function}  {message}"
+                : $"{FormatTimestamp(entry.Timestamp)}  {tag,-18} {message}";
+            _interaction.WriteLine(line);
+            if (!string.IsNullOrWhiteSpace(entry.Message) && entry.ExceptionDetails is not null)
             {
-                _interaction.WriteLine($"                                 {entry.Exception.GetType().FullName}: {entry.Exception.Message}");
+                _interaction.WriteLine($"                                 {entry.ExceptionDetails.FormatSummary()}");
             }
         }
 
@@ -93,8 +94,39 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
             message.StartsWith("Executing '", StringComparison.Ordinal) ||
             message.StartsWith("Executed '", StringComparison.Ordinal));
 
-    private static bool IsSuppressedLogCategory(string category)
-        => string.Equals(category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal);
+    private static bool ShouldRenderPlainLog(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
+    {
+        string? kind = entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind);
+        if (kind is not (null or CliEventKinds.Log))
+        {
+            return false;
+        }
+
+        if (events.Count > 0)
+        {
+            return entry.ExceptionDetails is not null && !HasRenderedExceptionDetails(events);
+        }
+
+        if (entry.ExceptionDetails is null && IsWebJobsInvocationEnvelope(entry.Message))
+        {
+            return false;
+        }
+
+        return entry.ExceptionDetails is not null || !string.IsNullOrWhiteSpace(entry.Message);
+    }
+
+    private static bool HasRenderedExceptionDetails(IReadOnlyList<DashboardEvent> events)
+        => events.Any(static ev => ev is InvocationCompletedEvent { Error: not null });
+
+    private static string FormatLogMessage(HostLogEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.Message))
+        {
+            return entry.Message;
+        }
+
+        return entry.ExceptionDetails?.FormatSummary() ?? string.Empty;
+    }
 
     private void PrintBanner()
     {
@@ -194,9 +226,9 @@ internal sealed class PlainRenderer(IInteractionService interaction, IAnsiConsol
                     : "?";
                 string verb = string.Equals(inv.Result, "failed", StringComparison.OrdinalIgnoreCase) ? "failed" : "succeeded";
                 _interaction.WriteLine($"{FormatTimestamp(inv.Timestamp)}  [invocation end]   {inv.Function}  {verb} in {dur} (id={ShortId(inv.InvocationId)})");
-                if (verb == "failed" && !string.IsNullOrEmpty(inv.ErrorMessage))
+                if (verb == "failed" && !string.IsNullOrEmpty(inv.ErrorSummary))
                 {
-                    _interaction.WriteLine($"                                 {inv.ErrorType}: {inv.ErrorMessage}");
+                    _interaction.WriteLine($"                                 {inv.ErrorSummary}");
                 }
                 break;
             }

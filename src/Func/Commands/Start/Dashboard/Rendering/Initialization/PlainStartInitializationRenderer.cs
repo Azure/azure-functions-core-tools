@@ -26,10 +26,16 @@ internal sealed class PlainStartInitializationRenderer(IInteractionService inter
                 _interaction.WriteLine($"[init] {step.Step.Title}");
                 break;
             case StartInitializationProgressEvent progress:
-                _interaction.WriteLine($"[init] {progress.StepId} {progress.Percent:0}% {progress.Message}".TrimEnd());
+                _interaction.WriteLine(FormatProgress(progress));
+                break;
+            case StartInitializationLogEvent log:
+                _interaction.WriteLine($"[init] {log.StepId}  {log.Line}");
                 break;
             case StartInitializationStepCompletedEvent completed:
                 _interaction.WriteLine($"[init] {completed.StepId} complete{FormatMessage(completed.Message)}");
+                break;
+            case StartInitializationStepFailedEvent failed:
+                _interaction.WriteLine($"[init] {failed.StepId} failed{FormatMessage(failed.Message)}");
                 break;
             case StartInitializationCompletedEvent completed:
                 _interaction.WriteLine(
@@ -47,6 +53,11 @@ internal sealed class PlainStartInitializationRenderer(IInteractionService inter
 
     private static string FormatMessage(string? message)
         => string.IsNullOrWhiteSpace(message) ? string.Empty : $": {message}";
+
+    private static string FormatProgress(StartInitializationProgressEvent progress)
+        => double.IsNaN(progress.Percent)
+            ? $"[init] {progress.StepId} {progress.Message}".TrimEnd()
+            : $"[init] {progress.StepId} {progress.Percent:0}% {progress.Message}".TrimEnd();
 
     private static string FormatProfile(StartInitializationProfileInfo? profile)
         => profile is null

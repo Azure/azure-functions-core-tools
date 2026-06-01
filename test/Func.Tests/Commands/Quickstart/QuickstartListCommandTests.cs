@@ -33,14 +33,14 @@ public class QuickstartListCommandTests
     }
 
     [Fact]
-    public void QuickstartListCommand_StackOptionDescription_NoProviders_PointsAtWorkloadInstall()
+    public void QuickstartListCommand_StackOptionDescription_NoProviders_PointsAtSetup()
     {
         QuickstartListCommand cmd = CreateCommand();
         Option<string?> stackOption = cmd.StackOption;
         string description = stackOption.Description ?? string.Empty;
 
-        Assert.Contains("Install a stack workload", description);
-        Assert.Contains("func workload install", description);
+        Assert.Contains("Set up a stack", description);
+        Assert.Contains("func setup --features", description);
     }
 
     [Fact]

@@ -113,7 +113,17 @@ internal sealed class CompactRenderer(
         {
             if (_logScrollOffset > 0 && MatchesLogFilters(line, _activeFunctionFilter, _errorsOnly, _minimumLogLevel))
             {
-                _logScrollOffset = Math.Min(MaxLogTailLines, _logScrollOffset + line.RenderRows(GetViewportWidth()).Count);
+                int width = GetViewportWidth();
+                int addedRows = line.RenderRows(width).Count;
+
+                // Account for the blank separator row that BuildLogVisualRows inserts
+                // before a multi-line entry so a held scrollback position stays anchored.
+                if (SeparatorPrecedesNewEntry(line, width))
+                {
+                    addedRows++;
+                }
+
+                _logScrollOffset = Math.Min(MaxLogTailLines, _logScrollOffset + addedRows);
             }
         }
 
@@ -442,12 +452,44 @@ internal sealed class CompactRenderer(
         }
 
         var rows = new List<IRenderable>();
-        foreach (CompactLogLine line in tail)
+        bool previousWasMultiline = false;
+        for (int i = 0; i < tail.Length; i++)
         {
-            rows.AddRange(line.RenderRows(viewportWidth));
+            IReadOnlyList<IRenderable> lineRows = tail[i].RenderRows(viewportWidth);
+            bool multiline = lineRows.Count > 1;
+
+            // Only separate multi-line entries (wrapped messages or exception
+            // summaries) so they read as a distinct block. Consecutive single-line
+            // entries stay dense to keep the live tail compact. A single space (not
+            // string.Empty) is required: Spectre's Rows collapses an empty Markup.
+            if (i > 0 && (previousWasMultiline || multiline))
+            {
+                rows.Add(new Markup(" "));
+            }
+
+            rows.AddRange(lineRows);
+            previousWasMultiline = multiline;
         }
 
         return rows;
+    }
+
+    private static bool IsMultiline(CompactLogLine line, int viewportWidth) => line.RenderRows(viewportWidth).Count > 1;
+
+    private bool SeparatorPrecedesNewEntry(CompactLogLine current, int viewportWidth)
+    {
+        CompactLogLine[] snapshot = _logBuffer.Snapshot();
+        CompactLogLine? previous = null;
+        for (int i = snapshot.Length - 2; i >= 0; i--)
+        {
+            if (MatchesLogFilters(snapshot[i], _activeFunctionFilter, _errorsOnly, _minimumLogLevel))
+            {
+                previous = snapshot[i];
+                break;
+            }
+        }
+
+        return previous is not null && (IsMultiline(previous, viewportWidth) || IsMultiline(current, viewportWidth));
     }
 
     private static IRenderable BuildLogRows(List<IRenderable> visualRows, int logBudget)

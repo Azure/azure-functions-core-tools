@@ -38,14 +38,14 @@ internal sealed class GoFunctionsProject : FunctionsProject
 
     // Internal seam so tests can stub out the `go build` invocation
     // without spawning real processes.
-    internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoBuild { get; set; } = DefaultRunGoBuild;
+    internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoBuild { get; set; } = DefaultRunGoBuildAsync;
 
-    internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersion;
+    internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersionAsync;
 
     // Run `go mod tidy` before building so missing/stale module entries are resolved
     // (especially for apps scaffolded from the version-less go.mod template). Internal
     // seam for tests.
-    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoModTidy { get; set; } = DefaultRunGoModTidy;
+    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoModTidy { get; set; } = DefaultRunGoModTidyAsync;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -77,6 +77,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
             return;
         }
 
+        context.Reporter.ReportStatus("Checking Go toolchain");
         (int Major, int Minor)? version = await ReadGoVersion(cancellationToken).ConfigureAwait(false);
         if (version is null)
         {
@@ -96,6 +97,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
         // Tidy modules before building: the scaffold's go.mod omits the worker SDK
         // require line on purpose, so `go mod tidy` resolves the latest tag from the
         // imports in main.go. Also rescues apps whose go.sum has drifted.
+        context.Reporter.ReportStatus("Running go mod tidy");
         (int tidyExit, string tidyStderr) = await RunGoModTidy(root, cancellationToken).ConfigureAwait(false);
         if (tidyExit != 0)
         {
@@ -105,12 +107,15 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
+        context.Reporter.ReportStatus("Running go build");
         (int exitCode, string stderr) = await RunGoBuild(root, outputPath, cancellationToken).ConfigureAwait(false);
+
+        WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+
         if (exitCode != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(stderr) ? "see build output above." : stderr.Trim();
             throw new GracefulException(
-                $"'go build' failed (exit {exitCode}). {detail}",
+                $"'go build' failed (exit {exitCode}). {stderr?.Trim()}",
                 isUserError: true);
         }
 
@@ -120,7 +125,15 @@ internal sealed class GoFunctionsProject : FunctionsProject
         // correct <project>/bin/app launch path.
     }
 
-    private static async Task<(int Major, int Minor)?> DefaultReadGoVersion(CancellationToken cancellationToken)
+    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
+    {
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            reporter.WriteLog(line, severity);
+        }
+    }
+
+    private static async Task<(int Major, int Minor)?> DefaultReadGoVersionAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -164,7 +177,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
         }
     }
 
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunGoBuild(
+    private static async Task<(int ExitCode, string Stderr)> DefaultRunGoBuildAsync(
         string workingDirectory,
         string outputPath,
         CancellationToken cancellationToken)
@@ -210,10 +223,10 @@ internal sealed class GoFunctionsProject : FunctionsProject
         }
     }
 
-    private static Task<(int ExitCode, string Stderr)> DefaultRunGoModTidy(string workingDirectory, CancellationToken cancellationToken)
-        => RunGo(workingDirectory, ["mod", "tidy"], cancellationToken);
+    private static Task<(int ExitCode, string Stderr)> DefaultRunGoModTidyAsync(string workingDirectory, CancellationToken cancellationToken)
+        => RunGoAsync(workingDirectory, ["mod", "tidy"], cancellationToken);
 
-    private static async Task<(int ExitCode, string Stderr)> RunGo(
+    private static async Task<(int ExitCode, string Stderr)> RunGoAsync(
         string workingDirectory,
         string[] arguments,
         CancellationToken cancellationToken)

@@ -131,7 +131,16 @@ internal sealed class DemoStartInitializationRunner(
             await EmitAsync(renderer, new StartInitializationStepStartedEvent(Now(), new StartInitializationStep(step)), cancellationToken);
 
             var stepContext = new StartInitializationStepContext(context, state, step, renderer, _time);
-            StartInitializationStepResult result = await step.ExecuteAsync(stepContext, cancellationToken);
+            StartInitializationStepResult result;
+            try
+            {
+                result = await step.ExecuteAsync(stepContext, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await EmitAsync(renderer, new StartInitializationStepFailedEvent(Now(), step.Id, ex.Message), cancellationToken);
+                throw;
+            }
 
             await EmitAsync(renderer, new StartInitializationStepCompletedEvent(Now(), step.Id, result.Message), cancellationToken);
 

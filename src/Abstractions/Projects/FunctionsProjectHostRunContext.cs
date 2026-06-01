@@ -11,6 +11,7 @@ public sealed class FunctionsProjectHostRunContext
     public const string WorkerRuntimeEnvironmentVariable = "FUNCTIONS_WORKER_RUNTIME";
 
     private DirectoryInfo _startupDirectory;
+    private IFunctionsProjectHostRunReporter _reporter = NullFunctionsProjectHostRunReporter.Instance;
 
     public FunctionsProjectHostRunContext(
         DirectoryInfo startupDirectory,
@@ -34,6 +35,12 @@ public sealed class FunctionsProjectHostRunContext
     }
 
     public IDictionary<string, string> EnvironmentVariables { get; }
+
+    public IFunctionsProjectHostRunReporter Reporter
+    {
+        get => _reporter;
+        set => _reporter = value ?? throw new ArgumentNullException(nameof(value));
+    }
 
     /// <summary>
     /// When <c>true</c>, project pre-run hooks should skip optional build/restore steps

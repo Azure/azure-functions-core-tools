@@ -34,6 +34,8 @@ internal sealed class PrepareProjectHostRunInitializationStep(
 
     public override string Title => "Prepare project";
 
+    public override StartInitializationDisplayKind DisplayKind => StartInitializationDisplayKind.Progress;
+
     public override async Task<StartInitializationStepResult> ExecuteAsync(StartInitializationStepContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -52,7 +54,11 @@ internal sealed class PrepareProjectHostRunInitializationStep(
             environmentVariables,
             skipBuild: context.Options.NoBuild);
 
+        await using var reporter = new FunctionsProjectHostRunReporter(context, cancellationToken);
+        hostRunContext.Reporter = reporter;
+
         await project.PrepareForHostRunAsync(hostRunContext, cancellationToken);
+        await reporter.CompleteAsync();
 
         context.State.HostRunContext = hostRunContext;
 
@@ -119,4 +125,3 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         }
     }
 }
-

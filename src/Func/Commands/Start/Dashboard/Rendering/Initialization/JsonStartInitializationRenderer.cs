@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 
@@ -65,11 +66,23 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
                 WriteRecord(CliEventKinds.StartInitializationProgress, progress.Timestamp, writer =>
                 {
                     writer.WriteString("step", progress.StepId);
-                    writer.WriteNumber("percent", Math.Round(progress.Percent, 3));
+                    if (!double.IsNaN(progress.Percent))
+                    {
+                        writer.WriteNumber("percent", Math.Round(progress.Percent, 3));
+                    }
+
                     if (!string.IsNullOrWhiteSpace(progress.Message))
                     {
                         writer.WriteString("message", progress.Message);
                     }
+                });
+                break;
+            case StartInitializationLogEvent log:
+                WriteRecord(CliEventKinds.StartInitializationLog, log.Timestamp, writer =>
+                {
+                    writer.WriteString("step", log.StepId);
+                    writer.WriteString("line", log.Line);
+                    writer.WriteString("severity", FormatSeverity(log.Severity));
                 });
                 break;
             case StartInitializationStepCompletedEvent completed:
@@ -79,6 +92,16 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
                     if (!string.IsNullOrWhiteSpace(completed.Message))
                     {
                         writer.WriteString("message", completed.Message);
+                    }
+                });
+                break;
+            case StartInitializationStepFailedEvent failed:
+                WriteRecord(CliEventKinds.StartInitializationStepFailed, failed.Timestamp, writer =>
+                {
+                    writer.WriteString("step", failed.StepId);
+                    if (!string.IsNullOrWhiteSpace(failed.Message))
+                    {
+                        writer.WriteString("message", failed.Message);
                     }
                 });
                 break;
@@ -130,6 +153,9 @@ internal sealed class JsonStartInitializationRenderer : IStartInitializationRend
 
     private static string FormatDisplayKind(StartInitializationDisplayKind kind)
         => kind.ToString().ToLowerInvariant();
+
+    private static string FormatSeverity(FunctionsProjectReportSeverity severity)
+        => severity.ToString().ToLowerInvariant();
 
     private static void WriteProfile(Utf8JsonWriter writer, StartInitializationProfileInfo profile)
     {

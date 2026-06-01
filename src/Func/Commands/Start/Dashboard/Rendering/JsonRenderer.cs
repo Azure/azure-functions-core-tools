@@ -49,7 +49,8 @@ internal sealed class JsonRenderer : IDashboardRenderer
     public Task OnEventAsync(HostLogEntry entry, IReadOnlyList<DashboardEvent> events, CancellationToken cancellationToken)
     {
         if (events.Count == 0
-            && (string.IsNullOrWhiteSpace(entry.Message) || IsSuppressedLogCategory(entry.Category)))
+            && entry.ExceptionDetails is null
+            && string.IsNullOrWhiteSpace(entry.Message))
         {
             return Task.CompletedTask;
         }
@@ -108,17 +109,14 @@ internal sealed class JsonRenderer : IDashboardRenderer
             }
 
             writer.WriteString("message", entry.Message);
-            if (entry.Exception is not null)
+            if (entry.ExceptionDetails is not null)
             {
-                WriteException(writer, "exception", entry.Exception);
+                WriteException(writer, "exception", entry.ExceptionDetails);
             }
 
             WriteAttributes(writer, entry.Attributes);
         });
     }
-
-    private static bool IsSuppressedLogCategory(string category)
-        => string.Equals(category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal);
 
     private void WriteEvent(DashboardEvent ev)
     {
@@ -206,20 +204,9 @@ internal sealed class JsonRenderer : IDashboardRenderer
                         writer.WriteNumber("duration_ms", Math.Round(d, 3));
                     }
 
-                    if (!string.IsNullOrEmpty(inv.ErrorType) || !string.IsNullOrEmpty(inv.ErrorMessage))
+                    if (inv.Error is not null)
                     {
-                        writer.WriteStartObject("error");
-                        if (!string.IsNullOrEmpty(inv.ErrorType))
-                        {
-                            writer.WriteString("type", inv.ErrorType);
-                        }
-
-                        if (!string.IsNullOrEmpty(inv.ErrorMessage))
-                        {
-                            writer.WriteString("message", inv.ErrorMessage);
-                        }
-
-                        writer.WriteEndObject();
+                        WriteException(writer, "error", inv.Error);
                     }
                 });
                 break;
@@ -326,14 +313,26 @@ internal sealed class JsonRenderer : IDashboardRenderer
         }
     }
 
-    private static void WriteException(Utf8JsonWriter writer, string propertyName, Exception ex)
+    private static void WriteException(Utf8JsonWriter writer, string propertyName, HostLogExceptionDetails exception)
     {
-        writer.WriteStartObject(propertyName);
-        writer.WriteString("type", ex.GetType().FullName ?? ex.GetType().Name);
-        writer.WriteString("message", ex.Message);
-        if (!string.IsNullOrEmpty(ex.StackTrace))
+        writer.WritePropertyName(propertyName);
+        WriteExceptionObject(writer, exception);
+    }
+
+    private static void WriteExceptionObject(Utf8JsonWriter writer, HostLogExceptionDetails exception)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("type", exception.Type);
+        writer.WriteString("message", exception.Message);
+        if (!string.IsNullOrEmpty(exception.Stack))
         {
-            writer.WriteString("stack", ex.StackTrace);
+            writer.WriteString("stack", exception.Stack);
+        }
+
+        if (exception.InnerException is not null)
+        {
+            writer.WritePropertyName("inner_exception");
+            WriteExceptionObject(writer, exception.InnerException);
         }
 
         writer.WriteEndObject();

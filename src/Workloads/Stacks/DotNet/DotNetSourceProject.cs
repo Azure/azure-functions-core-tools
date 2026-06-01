@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 
@@ -22,57 +24,121 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
         cancellationToken.ThrowIfCancellationRequested();
 
         string projectDir = Path.GetDirectoryName(ProjectFilePath)
-            ?? throw new GracefulException(
-                $"Could not determine directory for project file '{ProjectFilePath}'.",
-                isUserError: true);
+            ?? throw new GracefulException($"Could not determine directory for project file '{ProjectFilePath}'.", isUserError: true);
 
-        if (!context.SkipBuild)
-        {
-            await BuildAsync(projectDir, cancellationToken);
-        }
+        // Both paths run `dotnet build` and read an MSBuild target result as JSON; only the requested
+        // target differs. The default build runs the "Build" target (compiles, then reports the actual
+        // output even when targets adjust OutputPath/OutDir dynamically); --no-build runs "GetTargetPath"
+        // to resolve the existing output without compiling. The output JSON shape is the same, so a single
+        // code path handles both.
 
-        DirectoryInfo outputDirectory = await GetOutputDirectoryAsync(projectDir, cancellationToken);
-        context.StartupDirectory = outputDirectory;
+        string targetName = context.SkipBuild ? "GetTargetPath" : "Build";
+
+        context.Reporter.ReportStatus(context.SkipBuild ? "Resolving .NET build output" : "Running dotnet build");
+
+        context.StartupDirectory = await BuildAndGetOutputDirectoryAsync(projectDir, targetName, context.SkipBuild, context.Reporter, cancellationToken);
     }
 
-    private async Task<DirectoryInfo> GetOutputDirectoryAsync(string projectDir, CancellationToken cancellationToken)
+    private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
     {
-        string output = await _dotnetCli.RunWithOutputAsync(
-            ["msbuild", ProjectFilePath, "--getProperty:OutputPath"],
-            projectDir,
-            cancellationToken);
+        // Stream the build output live (stdout as informational, stderr as error) while MSBuild writes the
+        // structured target result to a temp file via --getResultOutputFile. In this mode the human-readable
+        // build console output (including compiler errors) goes to stdout, leaving stdout free of the JSON we
+        // need for path resolution.
+        string resultFile = Path.Combine(Path.GetTempPath(), $"func-dotnet-build-{Guid.NewGuid():N}.json");
 
-        string outputPath = output.Trim();
-        if (string.IsNullOrEmpty(outputPath))
+        try
+        {
+            try
+            {
+                await _dotnetCli.RunStreamingAsync(
+                    ["build", ProjectFilePath, $"--getTargetResult:{targetName}", $"--getResultOutputFile:{resultFile}"],
+                    projectDir,
+                    line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+                    line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                    cancellationToken);
+            }
+            catch (DotnetCliException ex)
+            {
+                // The build output has already been streamed live through the callbacks above, so point the
+                // user there instead of repeating it in the message.
+                throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}).", isUserError: true);
+            }
+
+            string json = File.Exists(resultFile)
+                ? await File.ReadAllTextAsync(resultFile, cancellationToken)
+                : string.Empty;
+
+            return ParseTargetResult(json.Trim(), targetName, requireAssemblyExists);
+        }
+        finally
+        {
+            TryDeleteFile(resultFile);
+        }
+    }
+
+    internal DirectoryInfo ParseTargetResult(string json, string targetName, bool requireAssemblyExists = false)
+    {
+        if (string.IsNullOrWhiteSpace(json))
         {
             throw new GracefulException(
-                $"Could not determine OutputPath for project '{Path.GetFileName(ProjectFilePath)}'. Ensure the project has been built or has a valid OutputPath configured.",
+                $"Could not determine output directory for project '{Path.GetFileName(ProjectFilePath)}'. The '{targetName}' target produced no output.",
                 isUserError: true);
         }
 
-        // OutputPath may be relative to the project directory.
-        string fullPath = Path.IsPathRooted(outputPath)
-            ? outputPath
-            : Path.GetFullPath(outputPath, projectDir);
+        try
+        {
+            var root = JsonNode.Parse(json);
+            JsonArray? items = root?["TargetResults"]?[targetName]?["Items"]?.AsArray();
 
-        return new DirectoryInfo(fullPath);
+            if (items is { Count: > 0 })
+            {
+                JsonNode firstItem = items[0]!;
+                string assemblyPath =
+                    firstItem["FullPath"]?.GetValue<string>()
+                    ?? firstItem["Identity"]?.GetValue<string>()
+                    ?? string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(assemblyPath))
+                {
+                    // With --no-build we only resolve the target path; nothing compiled it. If the
+                    // assembly isn't actually present, fail here with an actionable message instead of
+                    // letting the host fail later with a more cryptic "worker/app not found" error.
+                    if (requireAssemblyExists && !File.Exists(assemblyPath))
+                    {
+                        throw new GracefulException(
+                            $"Could not find the build output for project '{Path.GetFileName(ProjectFilePath)}' at '{assemblyPath}'. Build the project before running with --no-build, or omit --no-build to build automatically.",
+                            isUserError: true);
+                    }
+
+                    return new DirectoryInfo(Path.GetDirectoryName(assemblyPath)!);
+                }
+            }
+        }
+        catch (JsonException ex)
+        {
+            throw new GracefulException(
+                $"Could not parse '{targetName}' target result for project '{Path.GetFileName(ProjectFilePath)}'. The output was not valid JSON.",
+                ex,
+                isUserError: true);
+        }
+
+        throw new GracefulException(
+            $"Could not determine output directory for project '{Path.GetFileName(ProjectFilePath)}'. The '{targetName}' target result did not contain expected output paths.",
+            isUserError: true);
     }
 
-    private async Task BuildAsync(string projectDir, CancellationToken cancellationToken)
+    private static void TryDeleteFile(string path)
     {
         try
         {
-            await _dotnetCli.RunAsync(
-                ["build", ProjectFilePath],
-                projectDir,
-                cancellationToken);
+            File.Delete(path);
         }
-        catch (DotnetCliException ex)
+        catch (IOException)
         {
-            string detail = string.IsNullOrWhiteSpace(ex.StandardError) ? "see build output above." : ex.StandardError.Trim();
-            throw new GracefulException(
-                $"'dotnet build' failed (exit {ex.ExitCode}). {detail}",
-                isUserError: true);
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 }

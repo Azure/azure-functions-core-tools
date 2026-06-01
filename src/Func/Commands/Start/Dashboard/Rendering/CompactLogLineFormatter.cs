@@ -99,7 +99,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                     bool failed = string.Equals(inv.Result, "failed", StringComparison.OrdinalIgnoreCase);
                     string arrow = failed ? $"[{ErrorTag}]✗[/]" : $"[{SuccessTag}]←[/]";
                     string suffix = failed
-                        ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorType ?? string.Empty)}: {Markup.Escape(inv.ErrorMessage ?? string.Empty)}[/]"
+                        ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorSummary ?? string.Empty)}[/]"
                         : $"[{MutedTag}]{(inv.DurationMs.HasValue ? ((long)inv.DurationMs.Value).ToString(CultureInfo.InvariantCulture) + "ms" : string.Empty)}[/]";
 
                     return CreateSingleLine(
@@ -112,26 +112,52 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             }
         }
 
-        string source = functionName ?? entry.Category;
-        int sourceWidth = Math.Max(SourceColumnWidth, source.Length);
-        string nameMarkup = functionName is not null
-            ? $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-SourceColumnWidth}[/]"
-            : $"[{MutedTag}]{Markup.Escape(entry.Category),-SourceColumnWidth}[/]";
-
         string levelMarkup = entry.Level switch
         {
-            LogLevel.Error or LogLevel.Critical => $"[{ErrorTag}]✗[/]",
-            LogLevel.Warning => $"[{WarningTag}]![/]",
-            _ => $"[{MutedTag}]·[/]",
+            LogLevel.Error or LogLevel.Critical => $"[{ErrorTag}]●[/]",
+            LogLevel.Warning => $"[{WarningTag}]●[/]",
+            _ => $"[{MutedTag}]●[/]",
         };
 
-        string prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
-        int prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
-        return CreateWrappedLine(prefix, prefixWidth, entry.Message, functionName, isError, effectiveLogLevel);
+        string prefix;
+        int prefixWidth;
+        if (functionName is not null)
+        {
+            int sourceWidth = Math.Max(SourceColumnWidth, functionName.Length);
+            string nameMarkup = $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-SourceColumnWidth}[/]";
+            prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
+            prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
+        }
+        else
+        {
+            // Host/system logs no longer surface their category. Reserve the source column so the level
+            // marker and message stay aligned with function lines; logs replayed from the CLI's startup
+            // initialization steps get an "Initialization" label so that phase reads as a coherent group.
+            string sourceMarkup = IsInitializationStep(entry)
+                ? $"[{MutedTag}]{"Initialization",-SourceColumnWidth}[/]"
+                : new string(' ', SourceColumnWidth);
+            prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {sourceMarkup}  {levelMarkup}  ");
+            prefixWidth = 1 + ts.Length + 2 + SourceColumnWidth + 2 + 1 + 2;
+        }
+
+        return CreateWrappedLine(prefix, prefixWidth, FormatMessage(entry), functionName, isError, effectiveLogLevel);
     }
 
     private static CompactLogLine CreateSingleLine(string markup, string? functionName, bool isError, LogLevel level)
         => new(new Markup(markup), functionName, isError, level);
+
+    private static string FormatMessage(HostLogEntry entry)
+    {
+        string? exceptionSummary = entry.ExceptionDetails?.FormatSummary();
+        if (string.IsNullOrEmpty(exceptionSummary))
+        {
+            return entry.Message;
+        }
+
+        return string.IsNullOrWhiteSpace(entry.Message)
+            ? exceptionSummary
+            : entry.Message + Environment.NewLine + exceptionSummary;
+    }
 
     private static CompactLogLine CreateWrappedLine(
         string prefixMarkup,
@@ -206,13 +232,9 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             return false;
         }
 
-        if (string.Equals(entry.Category, "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        return string.IsNullOrWhiteSpace(entry.Message)
-            || IsFunctionsInvocationEnvelope(entry.Message);
+        return entry.ExceptionDetails is null
+            && (string.IsNullOrWhiteSpace(entry.Message)
+                || IsFunctionsInvocationEnvelope(entry.Message));
     }
 
     private static bool IsFunctionsInvocationEnvelope(string message)
@@ -225,6 +247,12 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
         return message.StartsWith("Executing '", StringComparison.Ordinal)
             || message.StartsWith("Executed '", StringComparison.Ordinal);
     }
+
+    private static bool IsInitializationStep(HostLogEntry entry)
+        => string.Equals(
+            entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind),
+            CliEventKinds.StartInitializationStepCompleted,
+            StringComparison.Ordinal);
 
     private static string? GetFunctionName(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
     {
