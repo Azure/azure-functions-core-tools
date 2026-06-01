@@ -103,10 +103,7 @@ internal sealed class DemoStartInitializationRunner(
         }
         catch
         {
-            // If a step (or ToResult) fails after the host was started, the
-            // caller never gets a chance to take ownership of the event
-            // stream. Tear it down here so the spawned host process doesn't
-            // outlive `func run`.
+            // Ensure the host process doesn't outlive a failed startup before the caller takes ownership.
             if (state.EventStream is { } eventStream)
             {
                 try
@@ -115,7 +112,7 @@ internal sealed class DemoStartInitializationRunner(
                 }
                 catch
                 {
-                    // Best effort: keep the original failure primary.
+                    // Best effort.
                 }
             }
 

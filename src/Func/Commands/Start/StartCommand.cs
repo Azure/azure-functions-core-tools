@@ -210,10 +210,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             initializationEvents = [.. initializationRenderer.Events];
         }
 
-        // The init runner already started the host process. Take ownership of
-        // the event stream here so any failure between this point and
-        // pipeline completion (renderer construction, log-file sink, summary
-        // emission, etc.) still tears the host PID down.
+        // Take ownership of the host stream now so any failure before pipeline completion still tears the process down.
         await using IHostEventStream hostEventStream = initializationResult.EventStream;
 
         var state = new DashboardState();

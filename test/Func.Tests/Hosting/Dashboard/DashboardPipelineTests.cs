@@ -109,9 +109,7 @@ public class DashboardPipelineTests
         var renderer = new ThrowingRenderer();
         var pipeline = new DashboardPipeline(state, source, renderer);
 
-        // Push an entry the renderer will choke on so ReadAsync throws a
-        // non-OperationCanceledException — the path that previously left
-        // the host PID running because shutdown only ran from the OCE catch.
+        // Triggers a non-OCE throw from the renderer, the path that previously skipped shutdown.
         source.PushEntry(new HostLogEntry(
             DateTimeOffset.UnixEpoch,
             "Function.HttpTrigger1",

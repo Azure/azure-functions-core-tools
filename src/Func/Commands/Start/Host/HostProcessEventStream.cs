@@ -83,10 +83,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         => _exitTask.WaitAsync(cancellationToken);
 
     /// <summary>
-    /// Ensures the host process is shut down (gracefully if it cooperates,
-    /// killed otherwise) before returning. Idempotent and best-effort, so
-    /// it's safe to call from <c>await using</c> on every code path,
-    /// including ones that already drove the pipeline to completion.
+    /// Idempotent, best-effort shutdown safe to call from <c>await using</c> on any exit path.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -101,16 +98,14 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         }
         catch
         {
-            // RequestShutdownAsync is best-effort during disposal; the
-            // process is killed below regardless. Swallowing here keeps the
-            // outer failure (which is why we're disposing) primary.
+            // Graceful shutdown failed; force-kill below.
             try
             {
                 _process.KillTree();
             }
             catch
             {
-                // Process may already be gone; nothing more we can do.
+                // Process already gone.
             }
 
             await _process.DisposeAsync();

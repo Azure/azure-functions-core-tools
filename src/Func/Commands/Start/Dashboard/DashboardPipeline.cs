@@ -62,11 +62,7 @@ internal sealed class DashboardPipeline(
         }
         finally
         {
-            // Belt-and-braces: every exit path (clean source completion,
-            // sigint, or an unexpected exception from a renderer / sink)
-            // must signal the underlying host to shut down. RequestShutdown
-            // is idempotent and a no-op once the process has already
-            // exited.
+            // Signal shutdown on every exit path; StartCommand's await using disposes the stream as a fallback.
             if (_source is IHostEventStreamLifecycle lifecycle)
             {
                 try
@@ -75,9 +71,7 @@ internal sealed class DashboardPipeline(
                 }
                 catch
                 {
-                    // Best effort. The owning command will dispose the
-                    // stream which kills the process tree if shutdown
-                    // signalling failed.
+                    // Best effort.
                 }
             }
 
