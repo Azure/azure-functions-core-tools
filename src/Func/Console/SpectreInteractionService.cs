@@ -184,8 +184,7 @@ internal class SpectreInteractionService : IInteractionService
             .HideCompleted(true)
             .Columns(
                 new TaskDescriptionColumn { Alignment = Justify.Left },
-                new ProgressBarColumn(),
-                new PercentageColumn(),
+                new ProgressBarColumn { Width = 30 },
                 new SpinnerColumn(Spinner.Known.Dots))
             .StartAsync(async ctx =>
             {
