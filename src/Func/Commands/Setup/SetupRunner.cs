@@ -900,7 +900,10 @@ internal sealed record SetupDependency(
             _ => stack,
         };
 
-    private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
+    private static string SetupRunnerWorkerPackageId(string runtime)
+        => string.Equals(runtime, "python", StringComparison.OrdinalIgnoreCase)
+            ? PythonWorkerWorkloadPackage.CurrentPackageId
+            : WorkerPackagePrefix + runtime;
 
     private static string? SetupRunnerRangeText(VersionRange? range)
         => range is null ? null : range.OriginalString ?? range.ToString();
