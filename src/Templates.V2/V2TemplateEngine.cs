@@ -58,7 +58,7 @@ internal sealed class V2TemplateEngine
         ArgumentNullException.ThrowIfNull(workingDirectory);
         ArgumentException.ThrowIfNullOrWhiteSpace(functionName);
 
-        V2Job? job = template.Jobs?.FirstOrDefault();
+        V2Job? job = PickJob(template, workingDirectory);
 
         var variables = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -222,6 +222,10 @@ internal sealed class V2TemplateEngine
 
                         try
                         {
+                            // Function-body snippets carry no leading or trailing
+                            // newline, so guard against the previous append's
+                            // closing token running into the next decorator.
+                            EnsureTrailingNewline(fullPath);
                             File.AppendAllText(fullPath, snippet);
                             if (!writtenFiles.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
                             {
@@ -351,6 +355,104 @@ internal sealed class V2TemplateEngine
 
     private static TemplateApplicationResult.Failed Failed(string message)
         => new(new TemplateApplicationFailure.ProviderError(message, null));
+
+    // Multi-job templates expose CreateNewApp and AppendToFile as alternatives
+    // for the same target. Pick the append job when the create-target already
+    // exists, so `func new` after `func init` appends instead of failing with
+    // AlreadyExists (#5209).
+    private static V2Job? PickJob(NewTemplate template, DirectoryInfo workingDirectory)
+    {
+        if (template.Jobs is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        if (template.Jobs.Count == 1)
+        {
+            return template.Jobs[0];
+        }
+
+        V2Job? createJob = template.Jobs.FirstOrDefault(j =>
+            string.Equals(j.Type, "CreateNewApp", StringComparison.OrdinalIgnoreCase));
+        V2Job? appendJob = template.Jobs.FirstOrDefault(j =>
+            string.Equals(j.Type, "AppendToFile", StringComparison.OrdinalIgnoreCase));
+
+        if (createJob is null)
+        {
+            return template.Jobs[0];
+        }
+
+        if (appendJob is null)
+        {
+            return createJob;
+        }
+
+        return CreateTargetExists(template, createJob, workingDirectory) ? appendJob : createJob;
+    }
+
+    // Resolves against input defaults rather than user-supplied values: the
+    // relevant filename prompts (app-fileName, app-selectedFileName) are gated
+    // to VS Code clients, so the CLI always sees the schema default here.
+    private static bool CreateTargetExists(NewTemplate template, V2Job createJob, DirectoryInfo workingDirectory)
+    {
+        IReadOnlyList<V2Action> sequence = ResolveActionSequence(template, createJob);
+        V2Action? writeAction = sequence.FirstOrDefault(a =>
+            string.Equals(a.Type, "WriteToFile", StringComparison.OrdinalIgnoreCase));
+        if (writeAction?.FilePath is null)
+        {
+            return false;
+        }
+
+        Dictionary<string, string> defaults = BuildInputDefaults(createJob);
+        string? resolved = Substitute(writeAction.FilePath, defaults);
+        if (string.IsNullOrWhiteSpace(resolved))
+        {
+            return false;
+        }
+
+        string fullPath = Path.GetFullPath(Path.Combine(workingDirectory.FullName, resolved));
+        return File.Exists(fullPath);
+    }
+
+    private static Dictionary<string, string> BuildInputDefaults(V2Job job)
+    {
+        var vars = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (job.Inputs is null)
+        {
+            return vars;
+        }
+
+        foreach (V2Input input in job.Inputs)
+        {
+            string? varName = ExtractVarName(input.AssignTo);
+            if (varName is not null && input.DefaultValue is not null)
+            {
+                vars[varName] = input.DefaultValue;
+            }
+        }
+
+        return vars;
+    }
+
+    private static void EnsureTrailingNewline(string fullPath)
+    {
+        using FileStream stream = new(fullPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+        if (stream.Length == 0)
+        {
+            return;
+        }
+
+        stream.Seek(-1, SeekOrigin.End);
+        int lastByte = stream.ReadByte();
+        if (lastByte == '\n')
+        {
+            return;
+        }
+
+        stream.Seek(0, SeekOrigin.End);
+        byte[] newline = System.Text.Encoding.UTF8.GetBytes(Environment.NewLine);
+        stream.Write(newline, 0, newline.Length);
+    }
 
     /// <summary>
     /// Sanitizes a user-supplied function name so it is safe to emit as a Python

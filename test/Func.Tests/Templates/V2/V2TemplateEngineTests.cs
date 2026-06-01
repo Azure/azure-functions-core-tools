@@ -385,4 +385,200 @@ public class V2TemplateEngineTests : IDisposable
         Assert.Contains("handler: HttpTrigger_Python", content);
         Assert.DoesNotContain("HttpTrigger-Python", content);
     }
+
+    [Fact]
+    public void Apply_MultiJob_PicksCreateNewApp_When_Target_Missing()
+    {
+        NewTemplate template = MakeCreateOrAppendTemplate();
+
+        var engine = new V2TemplateEngine();
+        TemplateApplicationResult result = engine.Apply(
+            template,
+            functionName: "MyFn",
+            optionValuesByPromptId: new Dictionary<string, string?>(),
+            workingDirectory: new DirectoryInfo(_workingDir),
+            force: false);
+
+        var created = Assert.IsType<TemplateApplicationResult.Created>(result);
+        string target = Path.GetFullPath(Path.Combine(_workingDir, "function_app.py"));
+        Assert.Equal(target, created.Files.Single());
+
+        string content = File.ReadAllText(target);
+        Assert.StartsWith("# fresh app skeleton", content);
+        Assert.DoesNotContain("@app.route", content);
+    }
+
+    [Fact]
+    public void Apply_MultiJob_PicksAppendToFile_When_Target_Exists()
+    {
+        string target = Path.Combine(_workingDir, "function_app.py");
+        File.WriteAllText(target, "# preexisting\n");
+
+        NewTemplate template = MakeCreateOrAppendTemplate();
+
+        var engine = new V2TemplateEngine();
+        TemplateApplicationResult result = engine.Apply(
+            template,
+            functionName: "MyFn",
+            optionValuesByPromptId: new Dictionary<string, string?>(),
+            workingDirectory: new DirectoryInfo(_workingDir),
+            force: false);
+
+        var created = Assert.IsType<TemplateApplicationResult.Created>(result);
+        Assert.Equal(Path.GetFullPath(target), created.Files.Single());
+
+        string content = File.ReadAllText(target);
+        Assert.StartsWith("# preexisting", content);
+        Assert.Contains("@app.route(MyFn)", content);
+    }
+
+    [Fact]
+    public void Apply_MultiJob_AppendToFile_Inserts_Newline_When_Tail_Missing()
+    {
+        // Models the state left behind by a prior AppendToFile whose snippet
+        // had no trailing newline (the real python function_body.py shape).
+        string target = Path.Combine(_workingDir, "function_app.py");
+        File.WriteAllText(target, "prior_no_newline");
+
+        NewTemplate template = MakeCreateOrAppendTemplate();
+
+        var engine = new V2TemplateEngine();
+        TemplateApplicationResult result = engine.Apply(
+            template,
+            functionName: "Next",
+            optionValuesByPromptId: new Dictionary<string, string?>(),
+            workingDirectory: new DirectoryInfo(_workingDir),
+            force: false);
+
+        Assert.IsType<TemplateApplicationResult.Created>(result);
+        string content = File.ReadAllText(target);
+        Assert.DoesNotContain("prior_no_newline@app.route", content);
+        Assert.Matches(@"prior_no_newline\r?\n@app\.route\(Next\)", content);
+    }
+
+    [Fact]
+    public void Apply_MultiJob_With_No_CreateNewApp_Falls_Back_To_First_Job()
+    {
+        NewTemplate template = new()
+        {
+            Id = "BlueprintOnly",
+            Jobs =
+            [
+                new V2Job
+                {
+                    Type = "CreateNewBlueprint",
+                    Actions = ["write_blueprint"],
+                },
+                new V2Job
+                {
+                    Type = "AppendToBlueprint",
+                    Actions = ["append_blueprint"],
+                },
+            ],
+            Actions =
+            [
+                new V2Action
+                {
+                    Name = "write_blueprint",
+                    Type = "WriteToFile",
+                    FilePath = "blueprint.py",
+                    FileContent = "blueprint body",
+                },
+                new V2Action
+                {
+                    Name = "append_blueprint",
+                    Type = "AppendToFile",
+                    FilePath = "blueprint.py",
+                    FileContent = "extra",
+                },
+            ],
+        };
+
+        var engine = new V2TemplateEngine();
+        TemplateApplicationResult result = engine.Apply(
+            template,
+            functionName: "MyFn",
+            optionValuesByPromptId: new Dictionary<string, string?>(),
+            workingDirectory: new DirectoryInfo(_workingDir),
+            force: false);
+
+        Assert.IsType<TemplateApplicationResult.Created>(result);
+        Assert.Equal("blueprint body", File.ReadAllText(Path.Combine(_workingDir, "blueprint.py")));
+    }
+
+    private static NewTemplate MakeCreateOrAppendTemplate() => new()
+    {
+        Id = "HttpTrigger-Python",
+        ProgrammingModel = "v2",
+        Language = "python",
+        Jobs =
+        [
+            new V2Job
+            {
+                Type = "CreateNewApp",
+                Inputs =
+                [
+                    new V2Input
+                    {
+                        ParamId = "app-fileName",
+                        AssignTo = "$(APP_FILENAME)",
+                        DefaultValue = "function_app.py",
+                        Required = true,
+                    },
+                ],
+                Actions = ["read_app", "write_app"],
+            },
+            new V2Job
+            {
+                Type = "AppendToFile",
+                Inputs =
+                [
+                    new V2Input
+                    {
+                        ParamId = "app-selectedFileName",
+                        AssignTo = "$(SELECTED_FILEPATH)",
+                        DefaultValue = "function_app.py",
+                        Required = true,
+                    },
+                ],
+                Actions = ["read_body", "append_body"],
+            },
+        ],
+        Actions =
+        [
+            new V2Action
+            {
+                Name = "read_app",
+                Type = "GetTemplateFileContent",
+                FilePath = "function_app.py",
+                AssignTo = "$(APP_CONTENT)",
+            },
+            new V2Action
+            {
+                Name = "write_app",
+                Type = "WriteToFile",
+                FilePath = "$(APP_FILENAME)",
+                Source = "$(APP_CONTENT)",
+            },
+            new V2Action
+            {
+                Name = "read_body",
+                Type = "GetTemplateFileContent",
+                FilePath = "function_body.py",
+                AssignTo = "$(BODY_CONTENT)",
+            },
+            new V2Action
+            {
+                Name = "append_body",
+                Type = "AppendToFile",
+                FilePath = "$(SELECTED_FILEPATH)",
+                Source = "$(BODY_CONTENT)",
+            },
+        ],
+        Files = new Dictionary<string, string>
+        {
+            ["function_app.py"] = "# fresh app skeleton",
+            ["function_body.py"] = "@app.route($(FUNCTION_NAME_INPUT))",
+        },
+    };
 }
