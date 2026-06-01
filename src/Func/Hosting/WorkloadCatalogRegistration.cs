@@ -1,9 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using PackageSource = NuGet.Configuration.PackageSource;
@@ -12,12 +12,6 @@ namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
 /// Registers the workload catalog services in DI.
-/// <see cref="WorkloadCatalogOptions"/> is constructed directly (no
-/// <see cref="Microsoft.Extensions.Configuration.IConfiguration"/> binding):
-/// the only supported override for <c>Source</c> is the
-/// <see cref="Constants.WorkloadsSourceEnvironmentVariable"/> env var, read
-/// inside the options constructor via
-/// <see cref="WorkloadSourceResolver.Resolve"/>.
 /// </summary>
 internal static class WorkloadCatalogRegistration
 {
@@ -25,7 +19,8 @@ internal static class WorkloadCatalogRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSingleton<WorkloadCatalogOptions>(_ => new WorkloadCatalogOptions());
+        services.AddOptions<WorkloadCatalogOptions>();
+        services.AddSingleton<IConfigureOptions<WorkloadCatalogOptions>, WorkloadCatalogOptionsSetup>();
 
         services.AddSingleton<IPackageSourceProvider, PackageSourceProvider>();
         services.AddSingleton<Func<PackageSource, NuGetProtocolSourceClient>>(_ => CreateSourceClient);

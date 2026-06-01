@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Options;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Workload;
@@ -21,12 +22,13 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// </summary>
 internal sealed class WorkloadInstallCommand : FuncCliCommand
 {
-    internal const string PrereleasePreviewHint = "Including prerelease workload versions (workloads are in preview). Pass --prerelease false to disable.";
+    internal const string PrereleasePreviewHint = "Including prerelease workload versions.";
 
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
     private readonly IWorkloadStore _store;
     private readonly WorkloadUpdateCommand _updateCommand;
+    private readonly WorkloadCatalogOptions _catalogOptions;
 
     public Argument<string> WorkloadArgument { get; } = new("id")
     {
@@ -43,10 +45,9 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
     };
 
-    public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
+    public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving from the catalog. Default: enabled while workloads are in preview.",
-        DefaultValueFactory = _ => true,
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build.",
     };
 
     public Option<bool> ForceOption { get; } = new("--force", "-f")
@@ -63,13 +64,15 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         IInteractionService interaction,
         IWorkloadInstaller installer,
         IWorkloadStore store,
-        WorkloadUpdateCommand updateCommand)
+        WorkloadUpdateCommand updateCommand,
+        IOptions<WorkloadCatalogOptions> catalogOptions)
         : base("install", "Install a workload.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _updateCommand = updateCommand ?? throw new ArgumentNullException(nameof(updateCommand));
+        _catalogOptions = catalogOptions?.Value ?? throw new ArgumentNullException(nameof(catalogOptions));
 
         WorkloadArgument.AddRequiredIdValidator();
         VersionOption.AddSemVerValidator();
@@ -87,11 +90,11 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string workload = parseResult.GetValue(WorkloadArgument)!;
         string? versionText = parseResult.GetValue(VersionOption);
         string? source = parseResult.GetValue(SourceOption);
-        bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
+        bool? includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
         bool force = parseResult.GetValue(ForceOption);
 
-        if (includePrerelease)
+        if (EffectivePrerelease(includePrerelease))
         {
             _interaction.WriteHint(PrereleasePreviewHint);
         }
@@ -184,7 +187,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string identifier,
         bool exact,
         string? source,
-        bool includePrerelease,
+        bool? includePrerelease,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
@@ -237,7 +240,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     private async Task<int> DispatchToUpdateAsync(
         string packageId,
         string? source,
-        bool includePrerelease,
+        bool? includePrerelease,
         CancellationToken cancellationToken)
     {
         var args = new List<string> { packageId };
@@ -246,9 +249,10 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             args.Add("--source");
             args.Add(source);
         }
-        if (includePrerelease)
+        if (includePrerelease is { } pre)
         {
             args.Add("--prerelease");
+            args.Add(pre ? "true" : "false");
         }
 
         return await _updateCommand.Parse(args.ToArray()).InvokeAsync(configuration: null, cancellationToken);
@@ -300,5 +304,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             + $"  This installs a single workload. To install {scope}, run:" + Environment.NewLine
             + $"    func setup --features {feature}");
     }
+
+    private bool EffectivePrerelease(bool? userOverride) => userOverride ?? _catalogOptions.IncludePrerelease;
 
 }

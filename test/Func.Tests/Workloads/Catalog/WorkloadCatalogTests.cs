@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using NSubstitute;
 using NuGet.Common;
@@ -41,7 +43,10 @@ public sealed class WorkloadCatalogTests
         sourceProvider.GetSource(null).Returns(_defaultSource);
         sourceProvider.GetSource(_altSource.Source).Returns(_altSource);
 
-        var catalog = new WorkloadCatalog(sourceProvider, source => source.Name == _defaultSource.Name ? defaultClient : overrideClient);
+        var catalog = new WorkloadCatalog(
+            Options.Create(new WorkloadCatalogOptions()),
+            sourceProvider,
+            source => source.Name == _defaultSource.Name ? defaultClient : overrideClient);
 
         IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(new CatalogSearchQuery { Source = _altSource.Source });
 
@@ -70,6 +75,162 @@ public sealed class WorkloadCatalogTests
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: true);
 
         Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionAsync_IncludesPrerelease_WhenEnvironmentOverrideEnabled()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: null);
+
+        Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task SearchAsync_IncludesPrerelease_WhenEnvironmentOverrideEnabled()
+    {
+        NuGetProtocolSourceClient client = BuildClient(_defaultSource, search: [("alpha", "2.0.0-beta.1")]);
+        WorkloadCatalog catalog = NewCatalog(new WorkloadCatalogOptions { IncludePrerelease = true }, (_defaultSource, client));
+
+        await catalog.SearchAsync(new CatalogSearchQuery { IncludePrerelease = null });
+
+        var fakeClient = Assert.IsType<FakeClient>(client);
+        Assert.NotNull(fakeClient.LastSearchUri);
+        Assert.Contains("prerelease=true", fakeClient.LastSearchUri!.Query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionInRangeAsync_IncludesPrerelease_WhenEnvironmentOverrideEnabled()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-beta.1"), V("1.5.0")])));
+        var range = VersionRange.Parse("[2.0.0-beta.1,2.0.0)");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("alpha", range, includePrerelease: null);
+
+        Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionInRangeAsync_ExactStableRange_MatchesPrereleaseCandidate_WhenIncludePrereleaseTrue()
+    {
+        // Regression: the published profile pins node "[3.13.0]" exact but
+        // only a "3.13.0-preview.1" candidate exists upstream. NuGet's
+        // VersionRange.Satisfies rejects prerelease candidates inside a
+        // stable range, so the resolver must apply a prerelease-aware
+        // bounds check when IncludePrerelease is on.
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("3.13.0-preview.1")])));
+        var range = VersionRange.Parse("[3.13.0]");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("node", range, includePrerelease: null);
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("3.13.0-preview.1"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionInRangeAsync_ExplicitFalse_OverridesOptions()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            new WorkloadCatalogOptions { IncludePrerelease = true },
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("3.13.0-preview.1")])));
+        var range = VersionRange.Parse("[3.13.0]");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("node", range, includePrerelease: false);
+
+        Assert.Null(resolved);
+    }
+
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData("true", true)]
+    [InlineData("yes", true)]
+    [InlineData("on", true)]
+    [InlineData("0", false)]
+    [InlineData("false", false)]
+    [InlineData("off", false)]
+    public void Configure_EnvOverride_WinsBothDirections(string value, bool expected)
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns(value);
+        // CLI version is intentionally prerelease to prove the env value, not auto-detect, wins.
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0-preview.1");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.Equal(expected, options.IncludePrerelease);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("anything")]
+    public void Configure_NoEnvOverride_AutoDetectsFromCliPrerelease(string? value)
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns(value);
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0-preview.1");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.True(options.IncludePrerelease);
+    }
+
+    [Fact]
+    public void Configure_StableCli_DefaultsToFalse()
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns((string?)null);
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.False(options.IncludePrerelease);
+    }
+
+    [Fact]
+    public void Configure_PrereleaseCli_EnvDisablesOverride()
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns((string?)null);
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns("false");
+        ICliVersionProvider cliVersionProvider = StubCliVersion("5.0.0-preview.1");
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, cliVersionProvider);
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.False(options.IncludePrerelease);
+    }
+
+    [Fact]
+    public void Configure_ResolvesSourceOverride()
+    {
+        IProcessEnvironment processEnvironment = Substitute.For<IProcessEnvironment>();
+        processEnvironment.Get(Constants.WorkloadsSourceEnvironmentVariable).Returns("https://source.test/v3/index.json");
+        processEnvironment.Get(Constants.WorkloadsPrereleaseEnvironmentVariable).Returns((string?)null);
+        WorkloadCatalogOptionsSetup setup = new(processEnvironment, StubCliVersion("5.0.0"));
+        WorkloadCatalogOptions options = new();
+
+        setup.Configure(options);
+
+        Assert.Equal("https://source.test/v3/index.json", options.Source);
     }
 
     [Fact]
@@ -190,8 +351,13 @@ public sealed class WorkloadCatalogTests
 
     private sealed class FakeClient(SourceRepository repo, JObject? response) : NuGetProtocolSourceClient(repo)
     {
+        public Uri? LastSearchUri { get; private set; }
+
         internal override Task<JObject?> FetchSearchResponseAsync(Uri searchUri, CancellationToken cancellationToken)
-            => Task.FromResult(response);
+        {
+            LastSearchUri = searchUri;
+            return Task.FromResult(response);
+        }
     }
 
     private static JObject SearchResponse(params (string Id, string Version)[] hits)
@@ -244,11 +410,22 @@ public sealed class WorkloadCatalogTests
     }
 
     private static WorkloadCatalog NewCatalog(params (PackageSource Source, NuGetProtocolSourceClient Client)[] entries)
+        => NewCatalog(new WorkloadCatalogOptions(), entries);
+
+    private static WorkloadCatalog NewCatalog(WorkloadCatalogOptions options, params (PackageSource Source, NuGetProtocolSourceClient Client)[] entries)
     {
         var sourceProvider = Substitute.For<IPackageSourceProvider>();
         sourceProvider.GetSource(Arg.Any<string?>()).Returns(entries[0].Source);
 
         var byName = entries.ToDictionary(e => e.Source.Name, e => e.Client, StringComparer.OrdinalIgnoreCase);
-        return new WorkloadCatalog(sourceProvider, source => byName[source.Name]);
+        return new WorkloadCatalog(Options.Create(options), sourceProvider, source => byName[source.Name]);
+    }
+
+    private static ICliVersionProvider StubCliVersion(string informational)
+    {
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.InformationalVersion.Returns(informational);
+        provider.Version.Returns(informational.Split('-', '+')[0]);
+        return provider;
     }
 }

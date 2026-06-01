@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Options;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Workload;
@@ -22,6 +23,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
     private readonly IWorkloadStore _store;
+    private readonly WorkloadCatalogOptions _catalogOptions;
 
     public Argument<string?> WorkloadArgument { get; } = new("id")
     {
@@ -49,10 +51,9 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
     };
 
-    public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
+    public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving from the catalog. Default: enabled while workloads are in preview.",
-        DefaultValueFactory = _ => true,
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build.",
     };
 
     public Option<bool> ExactOption { get; } = new("--exact", "-e")
@@ -60,12 +61,13 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
-    public WorkloadUpdateCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store)
+    public WorkloadUpdateCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store, IOptions<WorkloadCatalogOptions> catalogOptions)
         : base("update", "Update an installed workload in place.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _catalogOptions = catalogOptions?.Value ?? throw new ArgumentNullException(nameof(catalogOptions));
 
         WorkloadArgument.AddOptionalIdValidator();
         VersionOption.AddSemVerValidator();
@@ -117,10 +119,10 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? versionText = parseResult.GetValue(VersionOption);
         bool allowMajor = parseResult.GetValue(MajorOption);
         string? source = parseResult.GetValue(SourceOption);
-        bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
+        bool? includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
 
-        if (includePrerelease)
+        if (EffectivePrerelease(includePrerelease))
         {
             _interaction.WriteHint(WorkloadInstallCommand.PrereleasePreviewHint);
         }
@@ -173,7 +175,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string packageId,
         NuGetVersion? targetVersion,
         string? source,
-        bool includePrerelease,
+        bool? includePrerelease,
         bool allowMajor,
         CancellationToken cancellationToken)
     {
@@ -208,7 +210,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         }
     }
 
-    private async Task<int> UpdateAllAsync(string? source, bool includePrerelease, bool allowMajor, CancellationToken cancellationToken)
+    private async Task<int> UpdateAllAsync(string? source, bool? includePrerelease, bool allowMajor, CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<string> packageIds = [.. installed
@@ -282,5 +284,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         _interaction.WriteSuccess(
             $"Updated workload '{display}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
     }
+
+    private bool EffectivePrerelease(bool? userOverride) => userOverride ?? _catalogOptions.IncludePrerelease;
 
 }

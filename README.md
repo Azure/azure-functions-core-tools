@@ -36,7 +36,7 @@ Both scripts auto-detect your OS and architecture, download the latest 5.x relea
 | Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `curl -sSL https://aka.ms/func-cli/install.sh \| INSTALL_DIR=~/my-tools bash` |
 | Bug bash env vars | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -BugBash` | `curl -sSL https://aka.ms/func-cli/install.sh \| BUGBASH=true bash` |
 
-The `-BugBash` / `BUGBASH=true` option installs the CLI and then sets the pre-release workloads feed and quickstart manifest env vars (`FUNC_CLI_WORKLOADS_SOURCE`, `FUNC_CLI_QUICKSTART_MANIFEST_URL`, `FUNC_CLI_WORKLOADS_PRERELEASE`) required for bug bash testing. The values are exported in the current session and persisted (to your shell profile on Linux/macOS, or user environment variables on Windows). The installer prints the exact assignments so you can re-set them if you switch terminals.
+The `-BugBash` / `BUGBASH=true` option installs the CLI and then sets the pre-release workloads feed and quickstart manifest env vars (`FUNC_CLI_WORKLOADS_SOURCE`, `FUNC_CLI_QUICKSTART_MANIFEST_URL`) required for bug bash testing. The values are exported in the current session and persisted (to your shell profile on Linux/macOS, or user environment variables on Windows). The installer prints the exact assignments so you can re-set them if you switch terminals. Prerelease workload packages resolve automatically when the installed CLI is itself a prerelease build; the optional `FUNC_CLI_WORKLOADS_PRERELEASE=true|false` env var (or `--prerelease`/`--prerelease false` on `setup` / `workload install|update|search`) overrides that auto-detection in either direction.
 
 ### Unattended install
 

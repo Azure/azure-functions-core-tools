@@ -4,6 +4,8 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Commands.Setup;
 
@@ -43,10 +45,9 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         Description = "NuGet package source to use for workload resolution and installation.",
     };
 
-    public Option<bool> PrereleaseOption { get; } = new("--prerelease")
+    public Option<bool?> PrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease workload versions when resolving from the catalog. Default: enabled while workloads are in preview.",
-        DefaultValueFactory = _ => true,
+        Description = "Allow prerelease workload versions when resolving from the catalog. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build.",
     };
 
     public Option<bool> NonInteractiveOption { get; } = new("--non-interactive")
@@ -70,8 +71,9 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
     };
 
     private readonly ISetupRunner _runner;
+    private readonly WorkloadCatalogOptions _catalogOptions;
 
-    public SetupCommand(ISetupRunner runner)
+    public SetupCommand(ISetupRunner runner, IOptions<WorkloadCatalogOptions> catalogOptions)
         : base(
             "setup",
             "Prepare local Azure Functions CLI dependencies. "
@@ -79,6 +81,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
             + "For installing individual workload packages, see 'func workload'.")
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _catalogOptions = catalogOptions?.Value ?? throw new ArgumentNullException(nameof(catalogOptions));
 
         AddPathArgument();
         Options.Add(FeaturesOption);
@@ -108,7 +111,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
             SplitList(parseResult.GetValue(ProfileOption)).Concat(SplitList(parseResult.GetValue(ProfilesOption))).ToArray(),
             NullIfWhiteSpace(parseResult.GetValue(SourceOption)),
             ResolveInstallPolicy(parseResult.GetValue(InstallPolicyOption)),
-            parseResult.GetValue(PrereleaseOption),
+            parseResult.GetValue(PrereleaseOption) ?? _catalogOptions.IncludePrerelease,
             parseResult.GetValue(NonInteractiveOption),
             parseResult.GetValue(YesOption),
             parseResult.GetValue(CheckOption),

@@ -136,7 +136,7 @@ public class HostWorkloadResolverTests
         _workloadCatalog.ResolveLatestVersionInRangeAsync(
                 _hostPackageId,
                 Arg.Any<VersionRange>(),
-                true,
+                (bool?)null,
                 null,
                 Arg.Any<CancellationToken>())
             .Returns(resolved);
@@ -170,7 +170,7 @@ public class HostWorkloadResolverTests
         await _workloadCatalog.DidNotReceive().ResolveLatestVersionInRangeAsync(
             Arg.Any<string>(),
             Arg.Any<VersionRange>(),
-            Arg.Any<bool>(),
+            Arg.Any<bool?>(),
             Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
     }
@@ -229,7 +229,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
-                Arg.Any<bool>(),
+                Arg.Any<bool?>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
@@ -248,7 +248,7 @@ public class HostWorkloadResolverTests
             packageId: _hostPackageId,
             version: Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "4.1000.0"),
             source: null,
-            includePrerelease: true,
+            includePrerelease: null,
             exact: true,
             force: false,
             progress: null,
@@ -263,7 +263,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
-                Arg.Any<bool>(),
+                Arg.Any<bool?>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),

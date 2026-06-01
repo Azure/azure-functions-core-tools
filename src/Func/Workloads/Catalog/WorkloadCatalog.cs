@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Microsoft.Extensions.Options;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
 
@@ -12,10 +13,9 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// catalog operations workload commands need: search, version resolution,
 /// and package download.
 /// </summary>
-internal sealed class WorkloadCatalog(
-    IPackageSourceProvider sourceProvider,
-    Func<PackageSource, NuGetProtocolSourceClient> clientFactory) : IWorkloadCatalog
+internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, IPackageSourceProvider sourceProvider, Func<PackageSource, NuGetProtocolSourceClient> clientFactory) : IWorkloadCatalog
 {
+    private readonly WorkloadCatalogOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     private readonly IPackageSourceProvider _sourceProvider = sourceProvider ?? throw new ArgumentNullException(nameof(sourceProvider));
     private readonly Func<PackageSource, NuGetProtocolSourceClient> _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
 
@@ -23,19 +23,18 @@ internal sealed class WorkloadCatalog(
     public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        return ResolveClient(query.Source).SearchAsync(query, cancellationToken);
+
+        CatalogSearchQuery effectiveQuery = query with { IncludePrerelease = IncludePrerelease(query.IncludePrerelease) };
+
+        return ResolveClient(effectiveQuery.Source).SearchAsync(effectiveQuery, cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<ResolvedPackage?> ResolveLatestVersionAsync(
-        string packageId,
-        bool includePrerelease,
-        NuGetVersion? currentVersion = null,
-        bool allowMajor = true,
-        string? source = null,
-        CancellationToken cancellationToken = default)
+    public async Task<ResolvedPackage?> ResolveLatestVersionAsync(string packageId, bool? includePrerelease, NuGetVersion? currentVersion = null,
+        bool allowMajor = true, string? source = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        bool effectiveIncludePrerelease = IncludePrerelease(includePrerelease);
 
         return await ResolveMatchingVersionAsync(
             packageId,
@@ -43,31 +42,24 @@ internal sealed class WorkloadCatalog(
             cancellationToken,
             versions => SelectLatest(
                 versions,
-                candidate => (includePrerelease || !candidate.IsPrerelease)
+                candidate => (effectiveIncludePrerelease || !candidate.IsPrerelease)
                     && (allowMajor || currentVersion is null || candidate.Major == currentVersion.Major)));
     }
 
     /// <inheritdoc />
-    public async Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(
-        string packageId,
-        VersionRange versionRange,
-        bool includePrerelease,
-        string? source = null,
+    public async Task<ResolvedPackage?> ResolveLatestVersionInRangeAsync(string packageId, VersionRange versionRange, bool? includePrerelease, string? source = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentNullException.ThrowIfNull(versionRange);
+        bool effectiveIncludePrerelease = IncludePrerelease(includePrerelease);
 
         return await ResolveMatchingVersionAsync(packageId, source, cancellationToken,
-            versions => SelectLatest(versions, candidate => (includePrerelease || !candidate.IsPrerelease) && versionRange.Satisfies(candidate)));
+            versions => SelectLatest(versions, candidate => SatisfiesRange(versionRange, candidate, effectiveIncludePrerelease)));
     }
 
     /// <inheritdoc />
-    public async Task<ResolvedPackage?> ResolveVersionAsync(
-        string packageId,
-        NuGetVersion version,
-        string? source = null,
-        CancellationToken cancellationToken = default)
+    public async Task<ResolvedPackage?> ResolveVersionAsync(string packageId, NuGetVersion version, string? source = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentNullException.ThrowIfNull(version);
@@ -86,10 +78,9 @@ internal sealed class WorkloadCatalog(
     private NuGetProtocolSourceClient ResolveClient(string? source)
         => _clientFactory(_sourceProvider.GetSource(source));
 
-    private async Task<ResolvedPackage?> ResolveMatchingVersionAsync(
-        string packageId,
-        string? source,
-        CancellationToken cancellationToken,
+    private bool IncludePrerelease(bool? includePrerelease) => includePrerelease ?? _options.IncludePrerelease;
+
+    private async Task<ResolvedPackage?> ResolveMatchingVersionAsync(string packageId, string? source, CancellationToken cancellationToken,
         Func<IReadOnlyList<NuGetVersion>, NuGetVersion?> selectVersion)
     {
         NuGetProtocolSourceClient client = ResolveClient(source);
@@ -116,5 +107,27 @@ internal sealed class WorkloadCatalog(
         }
 
         return best;
+    }
+
+    // NuGet's VersionRange.Satisfies rejects prerelease candidates when the
+    // range itself has no prerelease in its bounds (e.g. a range pinned to
+    // "[3.13.0]" rejects "3.13.0-preview.1" even though both share the same
+    // numeric version). When prerelease is enabled, re-check the candidate's
+    // numeric portion against the range so prerelease versions whose numeric
+    // version is inside the bounds are accepted.
+    private static bool SatisfiesRange(VersionRange range, NuGetVersion candidate, bool includePrerelease)
+    {
+        if (range.Satisfies(candidate))
+        {
+            return true;
+        }
+
+        if (!includePrerelease || !candidate.IsPrerelease)
+        {
+            return false;
+        }
+
+        var numeric = new NuGetVersion(candidate.Major, candidate.Minor, candidate.Patch, candidate.Revision);
+        return range.Satisfies(numeric);
     }
 }

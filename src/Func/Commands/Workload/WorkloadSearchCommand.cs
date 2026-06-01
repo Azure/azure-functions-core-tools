@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Commands.Workload;
 
@@ -26,6 +27,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     private readonly IInteractionService _interaction;
     private readonly IWorkloadCatalog _catalog;
+    private readonly WorkloadCatalogOptions _catalogOptions;
 
     public Argument<string?> QueryArgument { get; } = new("query")
     {
@@ -38,10 +40,9 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         Description = "NuGet feed URI to search.",
     };
 
-    public Option<bool> IncludePrereleaseOption { get; } = new("--prerelease")
+    public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Include prerelease versions in the results. Default: enabled while workloads are in preview.",
-        DefaultValueFactory = _ => true,
+        Description = "Include prerelease versions in the results. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build.",
     };
 
     public Option<bool> JsonOption { get; } = new("--json")
@@ -54,11 +55,12 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         Description = "Show only stack workloads (packages tagged 'kind:workload', e.g. dotnet, node, python).",
     };
 
-    public WorkloadSearchCommand(IInteractionService interaction, IWorkloadCatalog catalog)
+    public WorkloadSearchCommand(IInteractionService interaction, IWorkloadCatalog catalog, IOptions<WorkloadCatalogOptions> catalogOptions)
         : base("search", "Search the workload catalog.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+        _catalogOptions = catalogOptions?.Value ?? throw new ArgumentNullException(nameof(catalogOptions));
 
         Arguments.Add(QueryArgument);
         Options.Add(SourceOption);
@@ -71,11 +73,13 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
     {
         string? query = parseResult.GetValue(QueryArgument);
         string? source = parseResult.GetValue(SourceOption);
-        bool includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
+        bool? includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool json = parseResult.GetValue(JsonOption);
         bool stackOnly = parseResult.GetValue(StackOption);
 
-        if (includePrerelease && !json)
+        bool effectivePrerelease = includePrerelease ?? _catalogOptions.IncludePrerelease;
+
+        if (effectivePrerelease && !json)
         {
             _interaction.WriteHint(WorkloadInstallCommand.PrereleasePreviewHint);
         }
@@ -85,7 +89,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         var searchQuery = new CatalogSearchQuery
         {
             Filter = query,
-            IncludePrerelease = includePrerelease,
+            IncludePrerelease = effectivePrerelease,
             Take = DefaultTake,
             Source = source,
         };

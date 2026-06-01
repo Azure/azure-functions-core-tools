@@ -43,7 +43,7 @@ public class DefaultFunctionsWorkerInstallerTests
         _workloadCatalog.ResolveLatestVersionInRangeAsync(
                 WorkerPackageId,
                 range,
-                includePrerelease: true,
+                includePrerelease: null,
                 source: null,
                 Arg.Any<CancellationToken>())
             .Returns(new ResolvedPackage(
@@ -54,7 +54,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
-                Arg.Any<bool>(),
+                Arg.Any<bool?>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
@@ -74,7 +74,7 @@ public class DefaultFunctionsWorkerInstallerTests
             WorkerPackageId,
             Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "3.13.0"),
             "https://example.test/v3/index.json",
-            includePrerelease: true,
+            includePrerelease: null,
             exact: true,
             force: false,
             progress: null,
@@ -89,7 +89,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
-                Arg.Any<bool>(),
+                Arg.Any<bool?>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
@@ -105,7 +105,7 @@ public class DefaultFunctionsWorkerInstallerTests
             WorkerPackageId,
             version: null,
             source: null,
-            includePrerelease: true,
+            includePrerelease: null,
             exact: true,
             force: false,
             progress: null,
@@ -124,7 +124,7 @@ public class DefaultFunctionsWorkerInstallerTests
         _workloadCatalog.ResolveLatestVersionInRangeAsync(
                 WorkerPackageId,
                 range,
-                includePrerelease: true,
+                includePrerelease: null,
                 source: null,
                 Arg.Any<CancellationToken>())
             .Returns((ResolvedPackage?)null);
@@ -146,7 +146,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<string>(),
                 Arg.Any<NuGetVersion?>(),
                 Arg.Any<string?>(),
-                Arg.Any<bool>(),
+                Arg.Any<bool?>(),
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
