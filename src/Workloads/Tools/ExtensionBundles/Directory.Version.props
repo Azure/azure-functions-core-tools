@@ -34,7 +34,8 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(BundleChannel)' != 'stable'">
-    <VersionPrefix>$(BundleVersion)-$(BundleChannel)</VersionPrefix>
+    <VersionPrefix>$(BundleVersion)</VersionPrefix>
+    <VersionSuffix>$(BundleChannel).1</VersionSuffix>
   </PropertyGroup>
 
 </Project>
