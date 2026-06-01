@@ -41,6 +41,14 @@ internal sealed class WorkloadInstaller(
     public const string KindTagPrefix = "kind:";
 
     /// <summary>
+    /// NuGet-tag prefix that pins a per-RID workload package to the runtime
+    /// identifier it targets (e.g. <c>rid:win-x64</c>). Lets alias resolution
+    /// pick the variant matching the current platform when an alias spans
+    /// multiple per-RID packs (host, python worker).
+    /// </summary>
+    public const string RidTagPrefix = "rid:";
+
+    /// <summary>
     /// Package-type name a workload package must declare in its .nuspec so
     /// the installer can refuse arbitrary .nupkgs. Mirrors dotnet's
     /// <c>DotnetTool</c> convention.
@@ -297,8 +305,10 @@ internal sealed class WorkloadInstaller(
         // Spec §6.1 step 2 (default flow): query the catalog for packages
         // declaring `alias:<aliasOrId>` and pick the unique match. Zero
         // matches falls back to treating the input as a literal package id.
-        // Multiple distinct package ids is an error; the user must re-run
-        // with --exact <packageId>.
+        // When an alias spans multiple per-RID packs (host, python worker),
+        // disambiguate by the `rid:` tag using the current runtime identifier.
+        // Multiple distinct package ids that don't disambiguate is an error;
+        // the user must re-run with --exact <packageId>.
         const int aliasSearchTake = 50;
 
         var query = new CatalogSearchQuery
@@ -310,34 +320,65 @@ internal sealed class WorkloadInstaller(
         };
 
         IReadOnlyList<CatalogSearchResult> hits = await _catalog.SearchAsync(query, cancellationToken);
-        IReadOnlyList<string> matchedIds = FilterByAlias(hits, aliasOrId);
+        IReadOnlyList<CatalogSearchResult> aliasMatches = FilterByAlias(hits, aliasOrId);
 
         // Some feeds (BaGet, older NuGet implementations) tokenize the `q=`
         // term in ways that drop hyphenated aliases like `node-worker`. When
         // the targeted query returns nothing, retry with an empty filter:
         // the `packageType=FuncCliWorkload` constraint keeps the result set
         // bounded to workload packages, which we then filter client-side.
-        if (matchedIds.Count == 0 && hits.Count == 0)
+        if (aliasMatches.Count == 0 && hits.Count == 0)
         {
             IReadOnlyList<CatalogSearchResult> all = await _catalog.SearchAsync(
                 query with { Filter = null },
                 cancellationToken);
-            matchedIds = FilterByAlias(all, aliasOrId);
+            aliasMatches = FilterByAlias(all, aliasOrId);
         }
+
+        IReadOnlyList<string> matchedIds = DistinctPackageIds(aliasMatches);
 
         if (matchedIds.Count > 1)
         {
+            // Per-RID disambiguation: if every match carries a `rid:` tag,
+            // pick the one matching the current runtime identifier. This is
+            // what makes `func workload install host` and
+            // `func workload install python-worker` resolve to the user's
+            // platform without forcing them to spell out the full RID.
+            if (aliasMatches.All(m => m.Rid is not null))
+            {
+                string currentRid = WorkloadRuntimeIdentifier.Current.ToLowerInvariant();
+                IReadOnlyList<string> ridMatches = DistinctPackageIds(
+                    aliasMatches.Where(m => string.Equals(m.Rid, currentRid, StringComparison.OrdinalIgnoreCase)));
+
+                if (ridMatches.Count == 1)
+                {
+                    return ridMatches[0];
+                }
+
+                if (ridMatches.Count == 0)
+                {
+                    IReadOnlyList<string> supported = aliasMatches
+                        .Select(m => m.Rid!)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    throw new WorkloadPackageNotFoundException(
+                        $"No '{aliasOrId}' workload is published for runtime identifier '{currentRid}'. "
+                        + $"Published runtimes: {string.Join(", ", supported)}.");
+                }
+            }
+
             throw new AmbiguousPackageMatchException(aliasOrId, matchedIds);
         }
 
         return matchedIds.Count == 1 ? matchedIds[0] : aliasOrId;
     }
 
-    private static IReadOnlyList<string> FilterByAlias(IReadOnlyList<CatalogSearchResult> hits, string alias) =>
-        [.. hits
-            .Where(r => r.Aliases.Any(a => string.Equals(a, alias, StringComparison.OrdinalIgnoreCase)))
-            .Select(r => r.PackageId)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
+    private static IReadOnlyList<CatalogSearchResult> FilterByAlias(IReadOnlyList<CatalogSearchResult> hits, string alias) =>
+        [.. hits.Where(r => r.Aliases.Any(a => string.Equals(a, alias, StringComparison.OrdinalIgnoreCase)))];
+
+    private static IReadOnlyList<string> DistinctPackageIds(IEnumerable<CatalogSearchResult> hits) =>
+        [.. hits.Select(r => r.PackageId).Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private async Task<ResolvedPackage> ResolveCatalogPackageAsync(
         string packageId,

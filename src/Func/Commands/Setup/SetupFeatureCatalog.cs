@@ -54,6 +54,12 @@ internal static class SetupFeatureCatalog
             return true;
         }
 
+        if (id.StartsWith(PythonWorkerWorkloadPackage.PackageIdPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            feature = "python";
+            return true;
+        }
+
         if (string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase))
         {
             feature = RuntimeFeature;

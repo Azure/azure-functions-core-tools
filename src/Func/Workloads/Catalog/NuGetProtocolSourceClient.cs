@@ -202,6 +202,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
                 Source: source)
             {
                 Kind = ParseKind(tagsString),
+                Rid = ParseRid(tagsString),
             });
         }
 
@@ -254,26 +255,35 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     // returning null when the tag is absent means callers can distinguish
     // "not declared" from a typo'd value.
     private static string? ParseKind(string? tags)
+        => ParseLastTagValue(tags, WorkloadInstaller.KindTagPrefix);
+
+    // Last rid:<value> tag wins, same as kind. Per-RID workload packs (host,
+    // python worker) carry exactly one `rid:` tag matching the runtime they
+    // target; single-RID packs omit it.
+    private static string? ParseRid(string? tags)
+        => ParseLastTagValue(tags, WorkloadInstaller.RidTagPrefix);
+
+    private static string? ParseLastTagValue(string? tags, string prefix)
     {
         if (string.IsNullOrWhiteSpace(tags))
         {
             return null;
         }
 
-        string? kind = null;
+        string? lastValue = null;
         foreach (string token in tags.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (token.StartsWith(WorkloadInstaller.KindTagPrefix, StringComparison.OrdinalIgnoreCase))
+            if (token.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
-                string value = token[WorkloadInstaller.KindTagPrefix.Length..].Trim();
+                string value = token[prefix.Length..].Trim();
                 if (value.Length > 0)
                 {
-                    kind = value.ToLowerInvariant();
+                    lastValue = value.ToLowerInvariant();
                 }
             }
         }
 
-        return kind;
+        return lastValue;
     }
 
     // Hits without a `packageTypes` array fall through (kept): V3 search

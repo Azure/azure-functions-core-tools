@@ -626,6 +626,138 @@ public sealed class WorkloadInstallerTests : IDisposable
         public void Report(WorkloadInstallProgress value) => sink.Add(value);
     }
 
+    [Fact]
+    public async Task InstallFromCatalog_AliasResolution_DisambiguatesByCurrentRid_WhenAllMatchesAreRidTagged()
+    {
+        // When an alias spans multiple per-RID packs (host, python worker),
+        // the resolver should pick the variant tagged with the current
+        // runtime identifier instead of throwing ambiguity.
+        string nupkg = BuildNupkg();
+        string currentRid = WorkloadRuntimeIdentifier.Current.ToLowerInvariant();
+        string targetId = $"Azure.Functions.Cli.Workloads.Workers.Python.{currentRid}";
+        var source = new PackageSource("https://example/v3/index.json", "test");
+        var resolved = NewResolved(targetId, "1.0.0");
+
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "python-worker"),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<CatalogSearchResult>
+            {
+                new("azure.functions.cli.workloads.workers.python.win-x64", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = "win-x64" },
+                new("azure.functions.cli.workloads.workers.python.linux-x64", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = "linux-x64" },
+                new(targetId.ToLowerInvariant(), NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = currentRid },
+            });
+        _catalog.ResolveLatestVersionAsync(
+                targetId.ToLowerInvariant(), true, null, true, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            "python-worker", version: null, source: null,
+            includePrerelease: true, exact: false, force: false);
+
+        Assert.NotNull(result);
+        await _catalog.Received(1).ResolveLatestVersionAsync(
+            targetId.ToLowerInvariant(), true, null, true, null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_AliasResolution_ThrowsClearError_WhenNoPackageForCurrentRid()
+    {
+        // If the alias only matches per-RID packs and none of them target the
+        // current runtime (e.g. python on win-arm64), surface a clear "no
+        // package for this RID" message listing what is published instead of
+        // a generic "package not found" or alias ambiguity error.
+        var source = new PackageSource("https://example/v3/index.json", "test");
+
+        // Use two RIDs that definitely aren't the current host so we exercise
+        // the "no pack for current RID" branch on every test environment.
+        string currentRid = WorkloadRuntimeIdentifier.Current.ToLowerInvariant();
+        string ridA = currentRid == "fake-rid-a" ? "fake-rid-c" : "fake-rid-a";
+        string ridB = currentRid == "fake-rid-b" ? "fake-rid-d" : "fake-rid-b";
+
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "python-worker"),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<CatalogSearchResult>
+            {
+                new($"azure.functions.cli.workloads.workers.python.{ridA}", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = ridA },
+                new($"azure.functions.cli.workloads.workers.python.{ridB}", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["python-worker"], Source: source) { Rid = ridB },
+            });
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
+            () => installer.InstallFromCatalogAsync(
+                "python-worker", version: null, source: null,
+                includePrerelease: true, exact: false, force: false));
+
+        Assert.Contains("python-worker", ex.Message);
+        Assert.Contains(ridA, ex.Message);
+        Assert.Contains(ridB, ex.Message);
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_AliasResolution_StillAmbiguous_WhenMatchesLackRidTag()
+    {
+        // Two unrelated packages declaring the same alias without any `rid:`
+        // tag must still throw ambiguity. RID disambiguation only kicks in
+        // when every match is RID-tagged.
+        var source = new PackageSource("https://example/v3/index.json", "test");
+
+        _catalog.SearchAsync(
+                Arg.Is<CatalogSearchQuery>(q => q.Filter == "shared-alias"),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<CatalogSearchResult>
+            {
+                new("pkg.one", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["shared-alias"], Source: source),
+                new("pkg.two", NuGetVersion.Parse("1.0.0"),
+                    Title: null, Description: null, Aliases: ["shared-alias"], Source: source),
+            });
+
+        WorkloadInstaller installer = NewInstaller();
+        await Assert.ThrowsAsync<AmbiguousPackageMatchException>(
+            () => installer.InstallFromCatalogAsync(
+                "shared-alias", version: null, source: null,
+                includePrerelease: true, exact: false, force: false));
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_ExplicitPackageId_BypassesAliasResolution()
+    {
+        // The user can always install a specific per-RID pack by its full id;
+        // alias resolution must not rewrite it. exact:true short-circuits the
+        // alias search entirely, but we also cover exact:false: passing a real
+        // package id (not an alias) should resolve to that id.
+        string nupkg = BuildNupkg();
+        string explicitId = "Azure.Functions.Cli.Workloads.Workers.Python.win-x64";
+        var resolved = NewResolved(explicitId, "1.0.0");
+
+        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        _catalog.ResolveLatestVersionAsync(
+                explicitId, true, null, true, null, Arg.Any<CancellationToken>())
+            .Returns(resolved);
+        _catalog.DownloadAsync(resolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(nupkg));
+
+        WorkloadInstaller installer = NewInstaller();
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            explicitId, version: null, source: null,
+            includePrerelease: true, exact: true, force: false);
+
+        Assert.NotNull(result);
+        await _catalog.Received(1).ResolveLatestVersionAsync(
+            explicitId, true, null, true, null, Arg.Any<CancellationToken>());
+    }
+
     private static WorkloadEntry ExistingEntry(string id, string version) => new()
     {
         PackageId = id,

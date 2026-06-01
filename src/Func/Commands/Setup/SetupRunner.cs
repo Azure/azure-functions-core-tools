@@ -427,6 +427,14 @@ internal sealed class SetupRunner(
 
             if (runtimeFeature.InstallWorker)
             {
+                if (TryDetectUnsupportedWorkerRid(runtimeFeature.Name, out string unsupportedMessage))
+                {
+                    failures.Add(SetupDependencyResult.Failed(
+                        SetupDependency.Worker(runtimeFeature.Name, versionRange: null),
+                        unsupportedMessage));
+                    continue;
+                }
+
                 VersionRange? workerRange = null;
                 profileScope.Profile?.WorkerVersionRanges.TryGetValue(runtimeFeature.ProfileRuntime, out workerRange);
                 dependencies.Add(SetupDependency.Worker(runtimeFeature.Name, workerRange));
@@ -741,6 +749,26 @@ internal sealed class SetupRunner(
         }
     }
 
+    // Reject runtimes whose worker workload isn't published for the current RID
+    // before we hit the catalog, so users get a clear "no python worker for
+    // win-arm64" message instead of an opaque "package not found".
+    private static bool TryDetectUnsupportedWorkerRid(string runtimeName, out string message)
+    {
+        if (string.Equals(runtimeName, "python", StringComparison.OrdinalIgnoreCase)
+            && !PythonWorkerWorkloadPackage.IsCurrentRuntimeSupported())
+        {
+            string currentRid = WorkloadRuntimeIdentifier.Current;
+            string supported = string.Join(", ", PythonWorkerWorkloadPackage.SupportedRuntimeIdentifiers
+                .OrderBy(r => r, StringComparer.OrdinalIgnoreCase));
+            message = $"No python worker is published for runtime identifier '{currentRid}'. "
+                + $"Supported runtimes: {supported}.";
+            return true;
+        }
+
+        message = string.Empty;
+        return false;
+    }
+
     private static string NormalizeFeature(string value)
     {
         string? normalized = NullIfWhiteSpace(value);
@@ -900,7 +928,10 @@ internal sealed record SetupDependency(
             _ => stack,
         };
 
-    private static string SetupRunnerWorkerPackageId(string runtime) => WorkerPackagePrefix + runtime;
+    private static string SetupRunnerWorkerPackageId(string runtime)
+        => string.Equals(runtime, "python", StringComparison.OrdinalIgnoreCase)
+            ? PythonWorkerWorkloadPackage.CurrentPackageId
+            : WorkerPackagePrefix + runtime;
 
     private static string? SetupRunnerRangeText(VersionRange? range)
         => range is null ? null : range.OriginalString ?? range.ToString();
