@@ -74,7 +74,7 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
             $"Auto-selecting '{hint.RequestedStack}' (the only installed workload).");
         _interaction.WriteLine(l => l
             .Muted("Install more with ")
-            .Command("func workload install")
+            .Command("func setup")
             .Muted(" or run ")
             .Command("func workload search")
             .Muted(" to discover available stacks."));

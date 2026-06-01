@@ -28,7 +28,8 @@
         "java",
         "powershell",
         "dotnet-isolated",
-        "custom"
+        "custom",
+        "go"
       ]
     },
     "linux-premium": {
