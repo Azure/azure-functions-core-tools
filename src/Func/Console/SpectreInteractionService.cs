@@ -319,7 +319,10 @@ internal class SpectreInteractionService : IInteractionService
             .ShowAsync(_stderr, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
+        => PromptForMultiSelectionAsync(title, choices.Select(static c => new MultiSelectionChoice(c)), cancellationToken);
+
+    public async Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default)
     {
         var choiceList = choices.ToList();
         if (!IsInteractive || choiceList.Count == 0)
@@ -327,13 +330,19 @@ internal class SpectreInteractionService : IInteractionService
             return [];
         }
 
-        List<string> selected = await new MultiSelectionPrompt<string>()
+        // NotRequired() lets the user press ENTER with nothing selected to exit
+        // the prompt cleanly. Callers treat an empty result as "no selection",
+        // which (for `func setup`) is the documented escape hatch from the
+        // stack picker.
+        List<MultiSelectionChoice> selected = await new MultiSelectionPrompt<MultiSelectionChoice>()
             .Title(title)
-            .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm)[/]")
+            .NotRequired()
+            .InstructionsText("[grey](press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm; [green]<enter>[/] with no selection exits)[/]")
+            .UseConverter(static choice => choice.Label)
             .AddChoices(choiceList)
             .ShowAsync(_stderr, cancellationToken);
 
-        return selected;
+        return [.. selected.Select(static choice => choice.Value)];
     }
 
     public async Task<string> PromptForInputAsync(string prompt, string? defaultValue = null, CancellationToken cancellationToken = default)

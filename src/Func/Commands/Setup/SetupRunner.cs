@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
@@ -26,7 +27,8 @@ internal sealed class SetupRunner(
     IOptionsMonitor<ProjectProfileOptions> projectProfileOptions,
     IOptionsMonitor<UserProfilePreferenceOptions> userProfilePreferenceOptions,
     ICliConfigurationProvider configurationProvider,
-    IHostJsonBundleSectionReader hostJsonBundleSectionReader) : ISetupRunner
+    IHostJsonBundleSectionReader hostJsonBundleSectionReader,
+    IFirstRunStateStore? firstRunStateStore = null) : ISetupRunner
 {
     private const string DotNetFeature = "dotnet";
     private const string DotNetProfileRuntime = "dotnet-isolated";
@@ -40,6 +42,7 @@ internal sealed class SetupRunner(
     private readonly IOptionsMonitor<UserProfilePreferenceOptions> _userProfilePreferenceOptions = userProfilePreferenceOptions ?? throw new ArgumentNullException(nameof(userProfilePreferenceOptions));
     private readonly ICliConfigurationProvider _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
     private readonly IHostJsonBundleSectionReader _hostJsonBundleSectionReader = hostJsonBundleSectionReader ?? throw new ArgumentNullException(nameof(hostJsonBundleSectionReader));
+    private readonly IFirstRunStateStore? _firstRunStateStore = firstRunStateStore;
 
     public async Task<SetupRunResult> RunAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
@@ -52,7 +55,17 @@ internal sealed class SetupRunner(
         }
         try
         {
-            SetupFeaturePlan featurePlan = await ResolveFeaturesAsync(options, cancellationToken);
+            SetupFeaturePlan? featurePlan = await ResolveFeaturesAsync(options, cancellationToken);
+            if (featurePlan is null)
+            {
+                // The interactive default-features prompt was confirmed with no
+                // selection. Treat that as a clean opt-out, not a failure: the
+                // user explicitly chose to leave without installing anything.
+                renderer.SetupSkippedNoSelection();
+                await TryMarkFirstRunCompleteAsync(cancellationToken);
+                return new SetupRunResult(0);
+            }
+
             IReadOnlyList<SetupProfileScope> profileScopes = await ResolveProfileScopesAsync(options, renderer, cancellationToken);
 
             renderer.SetupStarted(options, featurePlan, profileScopes);
@@ -81,6 +94,7 @@ internal sealed class SetupRunner(
             }
 
             renderer.SetupCompleted();
+            await TryMarkFirstRunCompleteAsync(cancellationToken);
             return new SetupRunResult(0);
         }
         catch (SetupConfigurationException ex)
@@ -97,6 +111,29 @@ internal sealed class SetupRunner(
         {
             renderer.SetupFailed(ex.Message);
             return new SetupRunResult(1);
+        }
+    }
+
+    private async Task TryMarkFirstRunCompleteAsync(CancellationToken cancellationToken)
+    {
+        if (_firstRunStateStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _firstRunStateStore.MarkCompleteAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Failing to mark the first-run marker after a successful setup
+            // is a minor nuisance (the user might see the first-run prompt
+            // one more time), not a setup failure. Stay silent.
         }
     }
 
@@ -134,11 +171,18 @@ internal sealed class SetupRunner(
         return new ProfileSetupOutcome(failures);
     }
 
-    private async Task<SetupFeaturePlan> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
+    private async Task<SetupFeaturePlan?> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
-        IReadOnlyList<string> requestedFeatures = options.Features.Count == 0
+        IReadOnlyList<string>? requestedFeatures = options.Features.Count == 0
             ? await GetDefaultFeaturesAsync(options, cancellationToken)
             : options.Features;
+
+        if (requestedFeatures is null)
+        {
+            // Interactive default-features prompt confirmed with no selection;
+            // the caller treats this as a graceful exit.
+            return null;
+        }
 
         if (requestedFeatures.Count == 0)
         {
@@ -209,7 +253,7 @@ internal sealed class SetupRunner(
             includeExtensionBundle);
     }
 
-    private async Task<IReadOnlyList<string>> GetDefaultFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<string>?> GetDefaultFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
         string? configuredStack = _configurationProvider
             .GetProjectConfiguration(options.WorkingDirectory)
@@ -222,21 +266,89 @@ internal sealed class SetupRunner(
 
         if (!options.NonInteractive && _interaction.IsInteractive)
         {
+            StackChoicesResult choices = await BuildStackChoicesAsync(cancellationToken);
+
+            // Render installed stacks as static "fake checkbox" lines above
+            // the prompt so they're visible in context but cannot be toggled
+            // (Spectre's MultiSelectionPrompt has no read-only items, and a
+             // toggle visually implies an uninstall that `func setup` doesn't do).
+            if (choices.InstalledStacks.Count > 0)
+            {
+                _interaction.WriteBlankLine();
+                _interaction.WriteLine(l => l.Muted("Already installed (use `func workload uninstall <name>` to remove):"));
+                foreach (string stack in choices.InstalledStacks)
+                {
+                    _interaction.WriteLine(l => l.Muted($"   [✓] {stack}"));
+                }
+
+                _interaction.WriteBlankLine();
+            }
+
+            if (choices.PromptChoices.Count == 0)
+            {
+                // Every supported stack is already installed; nothing to
+                // offer. Treat as a clean opt-out so the caller marks the
+                // first-run flag and exits without prompting.
+                return null;
+            }
+
             IReadOnlyList<string> picked = await _interaction.PromptForMultiSelectionAsync(
-                "Select stacks to install (SPACE to toggle, ENTER to confirm):",
-                SetupDependency.Stacks,
+                "Select stacks to install (SPACE to toggle, ENTER to confirm; ENTER with no selection exits):",
+                choices.PromptChoices,
                 cancellationToken);
 
-            // If the user confirmed without picking anything, fall through to
-            // the runtime-only default so we still install something useful.
-            if (picked.Count > 0)
-            {
-                return picked;
-            }
+            // No selection = user opted out. Signal that with null so the
+            // caller can exit cleanly instead of falling through to a default
+            // they did not ask for.
+            return picked.Count > 0 ? picked : null;
         }
 
         return ["runtime"];
     }
+
+    private async Task<StackChoicesResult> BuildStackChoicesAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> stacks = SetupDependency.Stacks;
+        HashSet<string> installedStackPackageIds;
+        try
+        {
+            IReadOnlyList<WorkloadEntry> installed = await _workloadStore.GetWorkloadsAsync(cancellationToken);
+            installedStackPackageIds = new HashSet<string>(
+                installed.Select(static entry => entry.PackageId),
+                StringComparer.OrdinalIgnoreCase);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Surfacing installed stacks is a UX hint, not a contract. If we
+            // can't read the store, fall back to showing every stack as
+            // available so the user can still make a selection.
+            installedStackPackageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        List<MultiSelectionChoice> promptChoices = [];
+        List<string> installedStacks = [];
+        foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
+        {
+            if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
+            {
+                installedStacks.Add(stack);
+            }
+            else
+            {
+                promptChoices.Add(new MultiSelectionChoice(stack, stack));
+            }
+        }
+
+        return new StackChoicesResult(promptChoices, installedStacks);
+    }
+
+    private readonly record struct StackChoicesResult(
+        IReadOnlyList<MultiSelectionChoice> PromptChoices,
+        IReadOnlyList<string> InstalledStacks);
 
     private async Task<IReadOnlyList<SetupProfileScope>> ResolveProfileScopesAsync(SetupCommandOptions options, SetupRenderer renderer, CancellationToken cancellationToken)
     {

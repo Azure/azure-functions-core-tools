@@ -148,6 +148,18 @@ internal class TestInteractionService : IInteractionService
         return Task.FromResult<IReadOnlyList<string>>([]);
     }
 
+    public virtual Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var choiceList = choices.ToList();
+        MultiSelectionChoices.Add(choiceList);
+        // Capture the label so tests can assert on the decorated text (e.g. "(installed)").
+        _lines.Add($"MULTISELECT: {title} [{string.Join(", ", choiceList.Select(c => c.Label))}]");
+        return Task.FromResult<IReadOnlyList<string>>([]);
+    }
+
+    public List<IReadOnlyList<MultiSelectionChoice>> MultiSelectionChoices { get; } = [];
+
     public Task<string> PromptForInputAsync(string prompt, string? defaultValue = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
