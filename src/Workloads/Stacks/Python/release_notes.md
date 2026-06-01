@@ -7,3 +7,4 @@
 - Honor an activated venv via `$VIRTUAL_ENV` and reuse pre-existing `venv`, `env`, or `.virtualenv` folders before falling back to creating `.venv`.
 - Point the host at the venv interpreter via `languageWorkers__python__defaultExecutablePath` and surface the detected Python major.minor as `FUNCTIONS_WORKER_RUNTIME_VERSION` so the worker sees the user's installed packages.
 - Fix Python worker startup on macOS/Linux by using `__` delimiter in `languageWorkers__python__defaultExecutablePath` (mirrors #5212 for `workerDirectory`).
+- Add `import logging` to the scaffolded `function_app.py` so sample HTTP handlers can call `logging.info(...)` without an extra import.
