@@ -58,9 +58,8 @@ internal sealed class SetupRunner(
             SetupFeaturePlan? featurePlan = await ResolveFeaturesAsync(options, cancellationToken);
             if (featurePlan is null)
             {
-                // The interactive default-features prompt was confirmed with no
-                // selection. Treat that as a clean opt-out, not a failure: the
-                // user explicitly chose to leave without installing anything.
+                // No stacks were offered to install (every supported stack is
+                // already installed). Treat that as a clean no-op, not a failure.
                 renderer.SetupSkippedNoSelection();
                 await TryMarkFirstRunCompleteAsync(cancellationToken);
                 return new SetupRunResult(0);
@@ -179,8 +178,8 @@ internal sealed class SetupRunner(
 
         if (requestedFeatures is null)
         {
-            // Interactive default-features prompt confirmed with no selection;
-            // the caller treats this as a graceful exit.
+            // Interactive prompt had nothing to offer (every supported stack
+            // is already installed); the caller treats this as a graceful exit.
             return null;
         }
 
@@ -293,14 +292,11 @@ internal sealed class SetupRunner(
             }
 
             IReadOnlyList<string> picked = await _interaction.PromptForMultiSelectionAsync(
-                "Select stacks to install (SPACE to toggle, ENTER to confirm; ENTER with no selection exits):",
+                "Select stacks to install (SPACE to toggle, ENTER to confirm; CTRL+C to cancel):",
                 choices.PromptChoices,
                 cancellationToken);
 
-            // No selection = user opted out. Signal that with null so the
-            // caller can exit cleanly instead of falling through to a default
-            // they did not ask for.
-            return picked.Count > 0 ? picked : null;
+            return picked;
         }
 
         return ["runtime"];

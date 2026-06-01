@@ -612,41 +612,6 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_InteractiveEmptySelection_ExitsCleanlyWithSkippedHint()
-    {
-        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0");
-        EmptyPickInteractionService interactive = new();
-        SetupRunner runner = new(
-            interactive,
-            _store,
-            catalog,
-            _installer,
-            _profileCatalog,
-            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
-            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
-            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
-            _bundleReader);
-
-        SetupRunResult result = await runner.RunAsync(
-            new SetupCommandOptions(
-                new DirectoryInfo(_tempDir),
-                Features: [],
-                ProfileNames: [],
-                Source: null,
-                SetupInstallPolicy.LatestCompatible,
-                IncludePrerelease: false,
-                NonInteractive: false,
-                AssumeYes: true,
-                Check: false,
-                SetupOutputMode.Plain),
-            CancellationToken.None);
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains(interactive.Lines, line => line.StartsWith("HINT:", StringComparison.Ordinal) && line.Contains("No stacks selected", StringComparison.Ordinal));
-        await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(default!, default, default, default, default, default, default, default);
-    }
-
-    [Fact]
     public async Task RunAsync_InteractiveEmptyFolder_RendersInstalledStacksAsStaticLines_AboveThePrompt()
     {
         const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
@@ -714,42 +679,6 @@ public sealed class SetupRunnerTests : IDisposable
             firstRunStore);
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
-
-        Assert.Equal(0, result.ExitCode);
-        await firstRunStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task RunAsync_MarksFirstRunComplete_WhenInteractiveSelectionEmpty()
-    {
-        IFirstRunStateStore firstRunStore = Substitute.For<IFirstRunStateStore>();
-        EmptyPickInteractionService interactive = new();
-        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0");
-        SetupRunner runner = new(
-            interactive,
-            _store,
-            catalog,
-            _installer,
-            _profileCatalog,
-            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
-            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
-            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
-            _bundleReader,
-            firstRunStore);
-
-        SetupRunResult result = await runner.RunAsync(
-            new SetupCommandOptions(
-                new DirectoryInfo(_tempDir),
-                Features: [],
-                ProfileNames: [],
-                Source: null,
-                SetupInstallPolicy.LatestCompatible,
-                IncludePrerelease: false,
-                NonInteractive: false,
-                AssumeYes: true,
-                Check: false,
-                SetupOutputMode.Plain),
-            CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
         await firstRunStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
@@ -945,18 +874,6 @@ public sealed class SetupRunnerTests : IDisposable
             MultiSelectionChoice? first = picks.FirstOrDefault(c => string.Equals(c.Value, "node", StringComparison.OrdinalIgnoreCase))
                 ?? picks.FirstOrDefault();
             return Task.FromResult<IReadOnlyList<string>>(first is null ? [] : [first.Value]);
-        }
-    }
-
-    private sealed class EmptyPickInteractionService : TestInteractionService
-    {
-        public override bool IsInteractive => true;
-
-        public override Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default)
-        {
-            var picks = choices.ToList();
-            base.PromptForMultiSelectionAsync(title, picks, cancellationToken).GetAwaiter().GetResult();
-            return Task.FromResult<IReadOnlyList<string>>([]);
         }
     }
 
