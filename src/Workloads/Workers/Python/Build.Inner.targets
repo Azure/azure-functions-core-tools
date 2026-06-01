@@ -1,0 +1,16 @@
+<Project>
+
+  <PropertyGroup>
+    <BeforePack>$(BeforePack);ValidatePackWithRuntimeIdentifier</BeforePack>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <PackageId>$(AssemblyName).$(RuntimeIdentifier)</PackageId>
+    <PackageTags>$(PackageTags) rid:$(RuntimeIdentifier)</PackageTags>
+  </PropertyGroup>
+
+  <Target Name="ValidatePackWithRuntimeIdentifier" Condition="'$(RuntimeIdentifier)' == ''">
+    <Error Text="RuntimeIdentifier is required when packing the python worker workload. Pass -r &lt;rid&gt; when packing the python worker workload." />
+  </Target>
+
+</Project>
