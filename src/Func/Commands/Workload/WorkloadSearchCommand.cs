@@ -42,7 +42,7 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
     public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Include prerelease versions in the results. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build. Set FUNC_CLI_WORKLOADS_PRERELEASE to override globally.",
+        Description = "Include prerelease versions in the results. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build.",
     };
 
     public Option<bool> JsonOption { get; } = new("--json")

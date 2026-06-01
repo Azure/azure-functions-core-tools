@@ -47,7 +47,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
     public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease versions when resolving from the catalog. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build. Set FUNC_CLI_WORKLOADS_PRERELEASE to override globally.",
+        Description = "Allow prerelease versions when resolving from the catalog. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build.",
     };
 
     public Option<bool> ForceOption { get; } = new("--force", "-f")

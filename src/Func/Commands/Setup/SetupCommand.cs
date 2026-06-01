@@ -47,7 +47,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool?> PrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Allow prerelease workload versions when resolving from the catalog. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build. Set FUNC_CLI_WORKLOADS_PRERELEASE to override globally.",
+        Description = "Allow prerelease workload versions when resolving from the catalog. Default: stable when running a stable CLI build, prerelease when running a prerelease CLI build.",
     };
 
     public Option<bool> NonInteractiveOption { get; } = new("--non-interactive")
