@@ -222,15 +222,9 @@ internal sealed class V2TemplateEngine
 
                         try
                         {
-                            // Ensure the snippet starts on a fresh line:
-                            // append-actions in real-world templates (python
-                            // function_body.py) carry neither a leading nor
-                            // trailing newline, so back-to-back appends to a
-                            // file whose tail isn't already a newline run the
-                            // previous function's closing token into the next
-                            // decorator (e.g. ")@app.route(...)") and yield
-                            // syntactically broken output. Probe a small tail
-                            // window rather than read the entire file.
+                            // Function-body snippets carry no leading or trailing
+                            // newline, so guard against the previous append's
+                            // closing token running into the next decorator.
                             EnsureTrailingNewline(fullPath);
                             File.AppendAllText(fullPath, snippet);
                             if (!writtenFiles.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
@@ -362,14 +356,10 @@ internal sealed class V2TemplateEngine
     private static TemplateApplicationResult.Failed Failed(string message)
         => new(new TemplateApplicationFailure.ProviderError(message, null));
 
-    // Multi-job v2 templates (e.g. python) expose CreateNewApp and
-    // AppendToFile as alternatives for the same outcome — make a new
-    // function_app.py, or append a decorator to the user's existing one.
-    // Pick AppendToFile when the create-job's target already exists on
-    // disk, so `func new` after `func init` appends rather than failing
-    // with AlreadyExists (#5209). Falls back to jobs[0] for single-job
-    // templates and for any template that doesn't declare both alternatives,
-    // preserving existing behaviour.
+    // Multi-job templates expose CreateNewApp and AppendToFile as alternatives
+    // for the same target. Pick the append job when the create-target already
+    // exists, so `func new` after `func init` appends instead of failing with
+    // AlreadyExists (#5209).
     private static V2Job? PickJob(NewTemplate template, DirectoryInfo workingDirectory)
     {
         if (template.Jobs is not { Count: > 0 })
@@ -400,12 +390,9 @@ internal sealed class V2TemplateEngine
         return CreateTargetExists(template, createJob, workingDirectory) ? appendJob : createJob;
     }
 
-    // Resolves the create-job's first WriteToFile target against the job's
-    // own input defaults, then checks whether the file already exists in
-    // the working directory. Uses defaults rather than user-supplied
-    // option values because the relevant filename inputs in real-world
-    // templates are gated to non-CLI clients (VS Code), so the CLI always
-    // sees the schema default at this point.
+    // Resolves against input defaults rather than user-supplied values: the
+    // relevant filename prompts (app-fileName, app-selectedFileName) are gated
+    // to VS Code clients, so the CLI always sees the schema default here.
     private static bool CreateTargetExists(NewTemplate template, V2Job createJob, DirectoryInfo workingDirectory)
     {
         IReadOnlyList<V2Action> sequence = ResolveActionSequence(template, createJob);

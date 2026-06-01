@@ -389,8 +389,6 @@ public class V2TemplateEngineTests : IDisposable
     [Fact]
     public void Apply_MultiJob_PicksCreateNewApp_When_Target_Missing()
     {
-        // Shape mirrors the real python v2 templates: a CreateNewApp job
-        // and an AppendToFile job that share the same target filename.
         NewTemplate template = MakeCreateOrAppendTemplate();
 
         var engine = new V2TemplateEngine();
@@ -437,9 +435,8 @@ public class V2TemplateEngineTests : IDisposable
     [Fact]
     public void Apply_MultiJob_AppendToFile_Inserts_Newline_When_Tail_Missing()
     {
-        // Pre-existing file deliberately ends without a trailing newline, as
-        // would happen after a previous AppendToFile whose snippet has no
-        // trailing newline (the real python function_body.py shape).
+        // Models the state left behind by a prior AppendToFile whose snippet
+        // had no trailing newline (the real python function_body.py shape).
         string target = Path.Combine(_workingDir, "function_app.py");
         File.WriteAllText(target, "prior_no_newline");
 
@@ -462,9 +459,6 @@ public class V2TemplateEngineTests : IDisposable
     [Fact]
     public void Apply_MultiJob_With_No_CreateNewApp_Falls_Back_To_First_Job()
     {
-        // Template with only Blueprint-style jobs (no CreateNewApp /
-        // AppendToFile pair). Picker should fall back to jobs[0], preserving
-        // legacy behaviour for templates the heuristic doesn't understand.
         NewTemplate template = new()
         {
             Id = "BlueprintOnly",
