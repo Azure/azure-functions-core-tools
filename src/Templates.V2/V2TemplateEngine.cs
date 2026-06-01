@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.Templates.V2;
 /// </remarks>
 internal sealed class V2TemplateEngine
 {
-    private const string FunctionNameVariable = "FUNCTION_NAME_INPUT";
+    internal const string FunctionNameVariable = "FUNCTION_NAME_INPUT";
 
     private static readonly Regex _substitutionPattern = new(@"\$\(([A-Za-z_][A-Za-z0-9_]*)\)", RegexOptions.Compiled);
 
@@ -338,7 +338,7 @@ internal sealed class V2TemplateEngine
         });
     }
 
-    private static string? ExtractVarName(string? assignTo)
+    internal static string? ExtractVarName(string? assignTo)
     {
         if (string.IsNullOrWhiteSpace(assignTo))
         {

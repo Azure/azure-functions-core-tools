@@ -26,6 +26,7 @@ internal static class V2TemplateProjection
         // hydrator surfaces each option once.
         List<TemplateUserPrompt> prompts = [];
         HashSet<string> seenPromptIds = new(StringComparer.OrdinalIgnoreCase);
+        string? defaultFunctionName = null;
 
         if (template.Jobs is { Count: > 0 })
         {
@@ -38,6 +39,22 @@ internal static class V2TemplateProjection
 
                 foreach (V2Input input in job.Inputs)
                 {
+                    // The function-name input is identified by its assignTo
+                    // target — every shipping v2 template writes the function
+                    // name into the engine's FUNCTION_NAME_INPUT variable.
+                    // This is the schema-driven equivalent of asking "which
+                    // prompt is the function-name prompt?" without needing a
+                    // hardcoded list of paramId variants.
+                    if (defaultFunctionName is null
+                        && !string.IsNullOrWhiteSpace(input.DefaultValue)
+                        && string.Equals(
+                            V2TemplateEngine.ExtractVarName(input.AssignTo),
+                            V2TemplateEngine.FunctionNameVariable,
+                            StringComparison.Ordinal))
+                    {
+                        defaultFunctionName = input.DefaultValue;
+                    }
+
                     TemplateUserPrompt? prompt = ProjectInput(input, payload);
                     if (prompt is null)
                     {
@@ -69,35 +86,10 @@ internal static class V2TemplateProjection
             EngineId: EngineIds.V2,
             DisplayName: displayName,
             Description: description,
-            DefaultFunctionName: ResolveDefaultFunctionName(prompts),
+            DefaultFunctionName: defaultFunctionName,
             Languages: languages,
             Metadata: metadata);
     }
-
-    // Picks up the per-template default for `func new` without `--name`. The
-    // recognised prompt ids mirror V2EngineProvider's function-name prompt set
-    // (Node v4 / Python v2 bundle templates both use trigger-functionName).
-    private static string? ResolveDefaultFunctionName(IReadOnlyList<TemplateUserPrompt> prompts)
-    {
-        foreach (TemplateUserPrompt prompt in prompts)
-        {
-            if (_functionNamePromptIds.Contains(prompt.Id) && !string.IsNullOrWhiteSpace(prompt.DefaultValue))
-            {
-                return prompt.DefaultValue;
-            }
-        }
-
-        return null;
-    }
-
-    private static readonly HashSet<string> _functionNamePromptIds = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "name",
-        "functionName",
-        "function-name",
-        "trigger-functionName",
-        "trigger-functionname",
-    };
 
     private static TemplateUserPrompt? ProjectInput(V2Input input, V2Payload payload)
     {

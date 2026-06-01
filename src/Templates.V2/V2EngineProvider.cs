@@ -116,15 +116,14 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
 
         // Seed defaults from each declared prompt, then override the
         // function-name prompt with the user-supplied context.FunctionName
-        // so it wins over the template's declared default. The engine reads
-        // values by paramId; the recognised function-name prompt ids match
-        // the conventions Node v4 / Python v2 bundle templates use. Finally,
-        // layer in any caller-supplied UserOptionValues so flags like
-        // --auth-level override the template default.
+        // so it wins over the template's declared default. Layer in any
+        // caller-supplied UserOptionValues so flags like --auth-level
+        // override the template default.
+        string? functionNamePromptId = ResolveFunctionNamePromptId(raw);
         var optionValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (TemplateUserPrompt prompt in context.Template.Metadata.UserPrompts)
         {
-            optionValues[prompt.Id] = _functionNamePromptIds.Contains(prompt.Id)
+            optionValues[prompt.Id] = string.Equals(prompt.Id, functionNamePromptId, StringComparison.OrdinalIgnoreCase)
                 ? context.FunctionName
                 : prompt.DefaultValue;
         }
@@ -133,9 +132,10 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
         {
             foreach (KeyValuePair<string, string?> pair in context.UserOptionValues)
             {
-                // Don't let the caller smuggle a value over the function
-                // name — that lives on context.FunctionName for a reason.
-                if (_functionNamePromptIds.Contains(pair.Key))
+                // The function name lives on context.FunctionName; don't
+                // let the caller smuggle it in via the prompt-id channel.
+                if (functionNamePromptId is not null
+                    && string.Equals(pair.Key, functionNamePromptId, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -152,14 +152,43 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
             context.Force);
     }
 
-    private static readonly HashSet<string> _functionNamePromptIds = new(StringComparer.OrdinalIgnoreCase)
+    // The function-name prompt is identified by its input's assignTo target
+    // pointing at the engine's FUNCTION_NAME_INPUT variable. Returns null
+    // when the template has no such input (the override + smuggle-guard
+    // then no-op and every prompt is seeded from its schema default).
+    private static string? ResolveFunctionNamePromptId(NewTemplate template)
     {
-        "name",
-        "functionName",
-        "function-name",
-        "trigger-functionName",
-        "trigger-functionname",
-    };
+        if (template.Jobs is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        foreach (V2Job job in template.Jobs)
+        {
+            if (job.Inputs is null)
+            {
+                continue;
+            }
+
+            foreach (V2Input input in job.Inputs)
+            {
+                if (string.IsNullOrWhiteSpace(input.ParamId))
+                {
+                    continue;
+                }
+
+                if (string.Equals(
+                        V2TemplateEngine.ExtractVarName(input.AssignTo),
+                        V2TemplateEngine.FunctionNameVariable,
+                        StringComparison.Ordinal))
+                {
+                    return input.ParamId;
+                }
+            }
+        }
+
+        return null;
+    }
 
     private static bool MatchesLanguage(FunctionTemplateInfo info, string? requestedLanguage)
     {

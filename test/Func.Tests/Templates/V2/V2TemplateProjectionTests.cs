@@ -41,8 +41,11 @@ public class V2TemplateProjectionTests
     }
 
     [Fact]
-    public void Project_DefaultFunctionName_Tolerates_Casing_On_ParamId()
+    public void Project_DefaultFunctionName_Picks_Input_By_AssignTo_Not_ParamId()
     {
+        // ParamId is deliberately exotic — the function-name input is
+        // identified by its assignTo target ($(FUNCTION_NAME_INPUT)),
+        // not by a hardcoded list of paramId variants.
         NewTemplate template = new()
         {
             Id = "HttpTrigger-Python",
@@ -55,7 +58,7 @@ public class V2TemplateProjectionTests
                     [
                         new V2Input
                         {
-                            ParamId = "trigger-functionname",
+                            ParamId = "exotic-prompt-id-the-cli-has-never-seen",
                             AssignTo = "$(FUNCTION_NAME_INPUT)",
                             DefaultValue = "http_trigger",
                         },
@@ -73,6 +76,8 @@ public class V2TemplateProjectionTests
     [Fact]
     public void Project_DefaultFunctionName_Is_Null_When_No_Function_Name_Prompt_Exists()
     {
+        // No input writes to $(FUNCTION_NAME_INPUT) — the template has no
+        // function-name prompt at all, just an auth-level prompt.
         NewTemplate template = new()
         {
             Id = "Bare",
