@@ -18,6 +18,16 @@ namespace Azure.Functions.Cli.Commands;
 /// Each registered initializer may also contribute additional options to this
 /// command (e.g. dotnet's <c>--target-framework</c>).
 /// </summary>
+/// <remarks>
+/// When the target directory already contains a <c>host.json</c> but no
+/// <c>.func/config.json</c>, the command "adopts" the project: it writes
+/// the CLI config and skips scaffolding. The stack is taken from
+/// <c>--stack</c> if provided, otherwise from <c>local.settings.json</c>'s
+/// <c>FUNCTIONS_WORKER_RUNTIME</c>. If the resolved stack isn't installed,
+/// adoption is refused with a pointer to <c>func setup</c>. When neither
+/// signal is available the user is prompted interactively, or the command
+/// refuses non-interactively. <c>--force</c> bypasses adopt mode entirely.
+/// </remarks>
 internal class InitCommand : FuncCliCommand, IBuiltInCommand
 {
     public Option<string?> StackOption { get; } = new("--stack", "-s");
@@ -39,17 +49,24 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
+    private readonly ILocalSettingsProvider _localSettingsProvider;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
-    public InitCommand(IInteractionService interaction, IWorkloadHintRenderer hintRenderer, IEnumerable<IProjectInitializer> initializers)
+    public InitCommand(
+        IInteractionService interaction,
+        IWorkloadHintRenderer hintRenderer,
+        ILocalSettingsProvider localSettingsProvider,
+        IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);
+        ArgumentNullException.ThrowIfNull(localSettingsProvider);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
         _hintRenderer = hintRenderer;
+        _localSettingsProvider = localSettingsProvider;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -105,32 +122,118 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
         string? requestedStack = parseResult.GetValue(StackOption);
 
-        // Refuse to overwrite an existing Functions project. Either host.json
-        // or .func/config.json being present is enough to count: both are
-        // Functions project skeleton files we'd otherwise rewrite. --force opts in
-        // to a re-init.
-        if (!force && IsAlreadyInitialized(workingDirectory.Info, out string existingFile))
+        InitializationState state = DetectInitializationState(workingDirectory.Info);
+
+        // .func/config.json already present means the project has been fully
+        // initialized by v5; re-running without --force would silently no-op
+        // the config write and re-scaffold on top of the user's code.
+        if (state == InitializationState.FullyInitialized && !force)
         {
             _interaction.WriteError(
-                $"This directory already contains a Functions project ('{existingFile}' is present). " +
+                $"This directory already contains a Functions project ('{CliConfigurationPathsOptions.ProjectConfigDisplayPath}' is present). " +
                 "Pass --force to re-initialize.");
             return 1;
         }
 
-        IProjectInitializer? initializer = await SelectInitializerAsync(requestedStack, cancellationToken);
+        // host.json without .func/config.json means a pre-existing Functions
+        // project that predates the v5 CLI config. Adopt it: write the config
+        // so subsequent commands know the stack/language, but skip scaffolding
+        // so we don't trample the user's source. --force still means "wipe and
+        // re-scaffold" and takes the normal path.
+        bool adoptExisting = state == InitializationState.AdoptableExistingProject && !force;
 
-        if (initializer is null)
+        // For adoption we honour what the project already declares.
+        // Source: local.settings.json's FUNCTIONS_WORKER_RUNTIME.
+        string? projectRuntime = adoptExisting ? ResolveProjectRuntime(workingDirectory.Info) : null;
+
+        IProjectInitializer? initializer;
+        if (adoptExisting)
         {
-            return 1;
+            // Resolve both signals to a concrete initializer (or null) using
+            // alias-aware matching, so e.g. "dotnet-isolated" in
+            // local.settings.json maps to the dotnet initializer and
+            // `--stack dotnet` is recognized as agreeing with it.
+            IProjectInitializer? requested = !string.IsNullOrWhiteSpace(requestedStack)
+                ? FindInitializerForCandidate(requestedStack)
+                : null;
+            IProjectInitializer? declared = projectRuntime is not null
+                ? FindInitializerForCandidate(projectRuntime)
+                : null;
+
+            // Explicit --stack that disagrees with the project's declared
+            // runtime is almost certainly a mistake (it would produce a
+            // .func/config.json that doesn't match what `func start` would
+            // run). --force is the existing escape hatch. We only block on a
+            // genuine conflict: when both signals resolve to known stacks
+            // and those stacks differ. An uninstalled-vs-installed mismatch
+            // is handled below by the "not installed" path.
+            if (requested is not null
+                && declared is not null
+                && !string.Equals(requested.Stack, declared.Stack, StringComparison.OrdinalIgnoreCase))
+            {
+                _interaction.WriteError(
+                    $"--stack '{requestedStack}' conflicts with the project's runtime '{projectRuntime}'. " +
+                    "Re-run with the matching stack, or pass --force to override.");
+                return 1;
+            }
+
+            // Pick a candidate: explicit --stack wins, else snap to the
+            // project's declared runtime.
+            string? candidate = !string.IsNullOrWhiteSpace(requestedStack) ? requestedStack : projectRuntime;
+            initializer = requested ?? declared;
+
+            if (candidate is not null && initializer is null)
+            {
+                // Candidate isn't an installed stack (and isn't an alias of
+                // one). Refuse rather than write a config we can't validate.
+                // The hint uses a `<stack>` placeholder on purpose: the
+                // candidate string may itself be unknown (e.g. a typo or a
+                // runtime value with no installed alias owner) and echoing
+                // it would promise a `func setup` command that won't
+                // necessarily work.
+                _interaction.WriteError(
+                    $"The '{candidate}' stack is not installed. " +
+                    "Run `func setup --features <stack>` to setup your dev environment, then re-run `func init`.");
+                return 1;
+            }
+
+            if (initializer is null)
+            {
+                // No project signal and no --stack. Don't auto-select: even
+                // when only one initializer is installed, writing the wrong
+                // stack to an existing project's .func/config.json is worse
+                // than asking. Prompt when we can, refuse when we can't.
+                initializer = await PromptForAdoptionStackAsync(cancellationToken);
+                if (initializer is null)
+                {
+                    return 1;
+                }
+            }
+
+            requestedStack = initializer.Stack;
+        }
+        else
+        {
+            initializer = await SelectInitializerAsync(requestedStack, cancellationToken);
+            if (initializer is null)
+            {
+                return 1;
+            }
         }
 
-        (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
-        if (errorCode is int code)
+        // For adoption with no explicit --language, skip language resolution
+        // entirely: the user already has code, and prompting / erroring for
+        // a language they're not changing is just noise.
+        if (!(adoptExisting && string.IsNullOrWhiteSpace(language)))
         {
-            return code;
-        }
+            (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
+            if (errorCode is int code)
+            {
+                return code;
+            }
 
-        language = resolved;
+            language = resolved;
+        }
 
         if (force)
         {
@@ -152,6 +255,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
         _interaction.WriteBlankLine();
 
+        if (adoptExisting)
+        {
+            _interaction.WriteLine(l => l
+                .Success("✓ ")
+                .Muted("Existing project adopted for ")
+                .Code(initializer.Stack)
+                .Muted("."));
+
+            return 0;
+        }
+
         var context = new InitContext(
             WorkingDirectory: workingDirectory,
             ProjectName: parseResult.GetValue(NameOption),
@@ -167,6 +281,20 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             .Muted("."));
 
         return 0;
+    }
+
+    private enum InitializationState
+    {
+        // No Functions project markers present; safe to scaffold from scratch.
+        Empty,
+
+        // host.json present but the v5 config (.func/config.json) is missing.
+        // Treat as a pre-v5 project we can adopt by writing the config.
+        AdoptableExistingProject,
+
+        // .func/config.json is present. Already a v5 project; refuse without
+        // --force.
+        FullyInitialized,
     }
 
     protected override string HelpFooterHint =>
@@ -241,24 +369,78 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         DirectoryGuard.ClearExceptGit(workingDirectory);
     }
 
-    private static bool IsAlreadyInitialized(DirectoryInfo workingDirectory, out string existingFile)
+    private static InitializationState DetectInitializationState(DirectoryInfo workingDirectory)
     {
-        string hostJson = Path.Combine(workingDirectory.FullName, "host.json");
-        if (File.Exists(hostJson))
-        {
-            existingFile = "host.json";
-            return true;
-        }
-
         string config = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
         if (File.Exists(config))
         {
-            existingFile = Path.GetRelativePath(workingDirectory.FullName, config);
-            return true;
+            return InitializationState.FullyInitialized;
         }
 
-        existingFile = string.Empty;
-        return false;
+        string hostJson = Path.Combine(workingDirectory.FullName, "host.json");
+        if (File.Exists(hostJson))
+        {
+            return InitializationState.AdoptableExistingProject;
+        }
+
+        return InitializationState.Empty;
+    }
+
+    // Looks up the project's worker runtime from local.settings.json. The CLI
+    // intentionally does not consult the FUNCTIONS_WORKER_RUNTIME process env
+    // var here: adoption is about the on-disk project shape, and an env var
+    // that happens to be set in the user's shell shouldn't change what we
+    // write into .func/config.json.
+    private string? ResolveProjectRuntime(DirectoryInfo workingDirectory)
+    {
+        string? raw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
+        return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+    }
+
+    // Resolves a candidate string (from --stack or local.settings.json) to
+    // an installed initializer. Matches against each initializer's canonical
+    // Stack id first, then its WorkerRuntimeAliases (e.g. "dotnet-isolated"
+    // → dotnet, "native" → go). Case-insensitive.
+    private IProjectInitializer? FindInitializerForCandidate(string candidate)
+    {
+        return _initializers.FirstOrDefault(i =>
+            string.Equals(i.Stack, candidate, StringComparison.OrdinalIgnoreCase)
+            || i.WorkerRuntimeAliases.Any(a => string.Equals(a, candidate, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    // Adoption-mode stack picker for the "no project signal" case. We never
+    // auto-select here: in adoption, picking the wrong stack would write a
+    // bad .func/config.json into a real project. Prompt when we're talking
+    // to a human, refuse with an actionable error otherwise.
+    private async Task<IProjectInitializer?> PromptForAdoptionStackAsync(CancellationToken cancellationToken)
+    {
+        string[] installed = [.. _initializers.Select(i => i.Stack)];
+
+        if (_initializers.Count == 0)
+        {
+            _hintRenderer.Render(new WorkloadHint(
+                WorkloadHintKind.NoWorkloadsInstalled, "initialize a project", null, installed));
+            return null;
+        }
+
+        if (!_interaction.IsInteractive)
+        {
+            _interaction.WriteError(
+                "Couldn't detect the project's stack from local.settings.json. " +
+                "Re-run with --stack <stack> to tell `func init` which stack to adopt.");
+            return null;
+        }
+
+        var displayToInitializer = _initializers.ToDictionary(
+            i => i.DisplayName,
+            i => i,
+            StringComparer.Ordinal);
+        string picked = await _interaction.PromptForSelectionAsync(
+            "Adopting an existing project. Which stack is it?",
+            displayToInitializer.Keys,
+            cancellationToken);
+
+        return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
 
     private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)

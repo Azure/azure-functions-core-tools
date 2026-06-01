@@ -4,8 +4,10 @@
 using System.CommandLine;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -14,17 +16,23 @@ public class InitCommandTests
 {
     private readonly TestInteractionService _interaction;
     private readonly RecordingWorkloadHintRenderer _hintRenderer;
+    private readonly ILocalSettingsProvider _localSettings;
 
     public InitCommandTests()
     {
         _interaction = new TestInteractionService();
         _hintRenderer = new RecordingWorkloadHintRenderer();
+        _localSettings = Substitute.For<ILocalSettingsProvider>();
+        _localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
     }
+
+    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
+        new(_interaction, _hintRenderer, _localSettings, initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
     {
-        var cmd = new InitCommand(_interaction, _hintRenderer, []);
+        var cmd = CreateCommand([]);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         Assert.Contains("--stack", optionNames);
@@ -36,7 +44,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_StackOptionDescription_NoInitializers_PointsAtSetup()
     {
-        var cmd = new InitCommand(_interaction, _hintRenderer, []);
+        var cmd = CreateCommand([]);
         string description = cmd.StackOption.Description ?? string.Empty;
 
         Assert.Contains("Set up a stack", description);
@@ -46,9 +54,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_StackOptionDescription_ListsInstalledStacks_SortedAndLowercased()
     {
-        var cmd = new InitCommand(
-            _interaction,
-            _hintRenderer,
+        var cmd = CreateCommand(
             [new FakeProjectInitializer("Python"), new FakeProjectInitializer("dotnet"), new FakeProjectInitializer("node")]);
         string description = cmd.StackOption.Description ?? string.Empty;
 
@@ -58,7 +64,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_HelpFooterHint_PointsAtWorkloadSearch()
     {
-        var cmd = new InitCommand(_interaction, _hintRenderer, []);
+        var cmd = CreateCommand([]);
 
         Assert.Contains("func workload search --stack", cmd.GetHelpFooterHint() ?? string.Empty);
     }
@@ -75,7 +81,7 @@ public class InitCommandTests
     [Fact]
     public void InitCommand_HasPathArgument()
     {
-        var cmd = new InitCommand(_interaction, _hintRenderer, []);
+        var cmd = CreateCommand([]);
         Assert.Single(cmd.Arguments);
         Assert.Equal("path", cmd.Arguments[0].Name);
     }
@@ -213,7 +219,7 @@ public class InitCommandTests
         bool force = false,
         IReadOnlyList<string>? extraArgs = null)
     {
-        var cmd = new InitCommand(_interaction, _hintRenderer, initializers);
+        var cmd = CreateCommand(initializers);
         var root = new RootCommand { cmd };
         var args = new List<string> { "init", path };
         if (stack is not null)
@@ -348,8 +354,11 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_PreservesExistingHostJson_WhenForceIsNotSet()
+    public async Task InitCommand_AdoptsExistingProject_WhenOnlyHostJsonPresent()
     {
+        // host.json without .func/config.json means a pre-v5 project. `func init`
+        // should adopt it: write .func/config.json, preserve host.json and any
+        // user source, and skip scaffolding.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -357,15 +366,19 @@ public class InitCommandTests
             string hostPath = Path.Combine(newDir, "host.json");
             const string existingContent = "{\"version\":\"2.0\",\"customMarker\":true}";
             File.WriteAllText(hostPath, existingContent);
+            string userFile = Path.Combine(newDir, "MyFunction.cs");
+            File.WriteAllText(userFile, "// user code");
 
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
-            // host.json present means the folder is already a Functions project;
-            // command refuses without --force, initializer never runs.
-            Assert.Equal(1, exitCode);
+            Assert.Equal(0, exitCode);
+            // Scaffolding is skipped: existing files survive untouched and the
+            // initializer is not invoked.
             Assert.False(initializer.WasInvoked);
             Assert.Equal(existingContent, File.ReadAllText(hostPath));
+            Assert.True(File.Exists(userFile));
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
         }
         finally
         {
@@ -374,22 +387,22 @@ public class InitCommandTests
     }
 
     [Fact]
-    public async Task InitCommand_RefusesEarly_WhenAlreadyInitialized()
+    public async Task InitCommand_RefusesEarly_WhenFullyInitialized()
     {
-        // A directory that already has a host.json is treated as initialized:
-        // no config write, exit 1.
+        // A directory that already has .func/config.json (a v5 project) is
+        // refused without --force: no overwrite, no scaffolding, exit 1.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
-            Directory.CreateDirectory(newDir);
-            File.WriteAllText(Path.Combine(newDir, "host.json"), "{\"version\":\"2.0\"}");
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(Path.Combine(newDir, ".func", "config.json"), "{}");
 
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
             Assert.Equal(1, exitCode);
             Assert.False(initializer.WasInvoked);
-            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Equal("{}", File.ReadAllText(Path.Combine(newDir, ".func", "config.json")));
         }
         finally
         {
@@ -470,6 +483,319 @@ public class InitCommandTests
         {
             CleanupDirectory(newDir);
         }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_SnapsViaRuntimeAlias()
+    {
+        // local.settings.json declares "dotnet-isolated" but the dotnet
+        // initializer owns that runtime as an alias. We should snap to the
+        // initializer's canonical stack id ("dotnet"), not error.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("dotnet-isolated");
+
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            int exitCode = await RunInitAsync(newDir, [dotnet], language: null, stack: null);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_StackOptionAgreesViaRuntimeAlias()
+    {
+        // --stack dotnet against a project whose local.settings.json says
+        // "dotnet-isolated" should resolve via the alias and adopt
+        // (not flag a phantom conflict).
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("dotnet-isolated");
+
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_StackOptionAlias_Recognized()
+    {
+        // The reverse direction: --stack dotnet-isolated (an alias) should
+        // resolve to the dotnet initializer when adopting an empty
+        // local.settings.json project.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var interactive = new InteractiveTestInteractionService();
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, [dotnet]);
+            var root = new RootCommand { command };
+
+            int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_SnapsStackFromLocalSettings()
+    {
+        // host.json + local.settings.json FUNCTIONS_WORKER_RUNTIME=python → snap
+        // to python, initializer is not invoked (existing project), config
+        // records python.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("python");
+
+            var python = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, [python], language: null, stack: null);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(python.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_UninstalledStack_RefusesAndSuggestsSetup()
+    {
+        // project_runtime points at a stack with no installed initializer:
+        // refuse rather than write a config we can't validate. The setup
+        // hint uses a `<stack>` placeholder (not the raw runtime value),
+        // because the runtime string may itself not be a valid feature id.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("ruby");
+
+            var python = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, [python], language: null, stack: null);
+
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Contains(_interaction.Lines, l =>
+                l.StartsWith("ERROR:")
+                && l.Contains("'ruby' stack is not installed")
+                && l.Contains("func setup --features <stack>"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_RefusesWhenStackOptionConflictsWithProjectRuntime()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("python");
+
+            var python = new FakeProjectInitializer("python");
+            var node = new FakeProjectInitializer("node");
+            int exitCode = await RunInitAsync(newDir, [python, node], language: null, stack: "node");
+
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.False(node.WasInvoked);
+            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Contains(_interaction.Lines, l => l.Contains("conflicts") && l.Contains("python") && l.Contains("node"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_AllowsStackOptionWhenItMatchesProjectRuntime()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("python");
+
+            var python = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, python, language: null, stack: "python");
+
+            Assert.Equal(0, exitCode);
+            Assert.False(python.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_NoProjectSignal_NonInteractive_Refuses()
+    {
+        // In adopt mode with no --stack and no FUNCTIONS_WORKER_RUNTIME, we
+        // don't auto-select even when only one initializer is installed:
+        // writing the wrong stack into an existing project's config is worse
+        // than failing fast. Non-interactive callers (CI, piped) get an
+        // actionable error.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var python = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, python, language: null);
+
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Contains(_interaction.Lines, l =>
+                l.StartsWith("ERROR:") && l.Contains("Couldn't detect the project's stack"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_NoProjectSignal_Interactive_PromptsForStack()
+    {
+        // Interactive callers get a prompt that names adoption explicitly so
+        // they know what they're answering for. The prompt's first choice is
+        // selected by the test interaction service.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var interactive = new InteractiveTestInteractionService();
+            var python = new FakeProjectInitializer("python");
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, [python]);
+            var root = new RootCommand { command };
+
+            int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
+
+            Assert.Equal(0, exitCode);
+            Assert.False(python.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
+            Assert.Contains(interactive.Lines, l =>
+                l.StartsWith("SELECT:") && l.Contains("Adopting an existing project"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_StackOption_UninstalledStack_Refuses()
+    {
+        // --stack X where X isn't installed should be refused just like the
+        // uninstalled local.settings.json case. Same hint, same exit code,
+        // no config written.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var python = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, [python], language: null, stack: "ruby");
+
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
+            Assert.Contains(_interaction.Lines, l =>
+                l.StartsWith("ERROR:")
+                && l.Contains("'ruby' stack is not installed")
+                && l.Contains("func setup --features <stack>"));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_ForceOverridesConflict()
+    {
+        // --force is the documented escape hatch: it wipes the directory and
+        // re-scaffolds with the requested stack, regardless of project signal.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            StubLocalSettingsRuntime("python");
+
+            var node = new FakeProjectInitializer("node");
+            int exitCode = await RunInitAsync(newDir, node, language: null, stack: "node", force: true);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(node.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "node", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    private void StubLocalSettingsRuntime(string runtime)
+    {
+        var snapshot = new LocalSettingsSnapshot
+        {
+            Values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["FUNCTIONS_WORKER_RUNTIME"] = runtime,
+            },
+        };
+        _localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(snapshot);
     }
 
     private static void AssertConfigJsonHasShape(string directory, string? expectedStack, string? expectedLanguage)
@@ -578,7 +904,7 @@ public class InitCommandTests
             "python",
             optionFactory: r => [r.GetOrAdd(new Option<bool>("--no-bundles"))]);
 
-        var cmd = new InitCommand(_interaction, _hintRenderer, [first, second]);
+        var cmd = CreateCommand([first, second]);
 
         int matches = cmd.Options.Count(o => o.Name == "--no-bundles");
         Assert.Equal(1, matches);
@@ -633,7 +959,7 @@ public class InitCommandTests
             optionFactory: r => [r.GetOrAdd(new Option<string>("--no-bundles"))]);
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            new InitCommand(_interaction, _hintRenderer, [first, second]));
+            CreateCommand([first, second]));
 
         Assert.Contains("python", ex.Message);
         Assert.Contains("node", ex.Message);
@@ -652,7 +978,7 @@ public class InitCommandTests
             optionFactory: r => [r.GetOrAdd(new Option<string>("--clean", "-c"))]);
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            new InitCommand(_interaction, _hintRenderer, [first, second]));
+            CreateCommand([first, second]));
 
         Assert.Contains("-c", ex.Message);
         Assert.Contains("--clean", ex.Message);
@@ -664,7 +990,8 @@ public class InitCommandTests
         IReadOnlyList<string>? supportedLanguages = null,
         IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null,
         Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
-        Action<FakeProjectInitializer, ParseResult>? onInitialize = null) : IProjectInitializer
+        Action<FakeProjectInitializer, ParseResult>? onInitialize = null,
+        IReadOnlyList<string>? workerRuntimeAliases = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
@@ -672,6 +999,8 @@ public class InitCommandTests
 
         public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
             aliases ?? new Dictionary<string, IReadOnlyList<string>>();
+
+        public IReadOnlyList<string> WorkerRuntimeAliases { get; } = workerRuntimeAliases ?? [];
 
         public bool WasInvoked { get; private set; }
 
@@ -689,5 +1018,10 @@ public class InitCommandTests
             onInitialize?.Invoke(this, parseResult);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class InteractiveTestInteractionService : TestInteractionService
+    {
+        public override bool IsInteractive => true;
     }
 }

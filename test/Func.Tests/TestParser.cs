@@ -84,6 +84,13 @@ internal static class TestParser
         services.AddSingleton(Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IExtensionBundleResolver>());
         services.AddSingleton(Substitute.For<IStartInitializationRunner>());
+
+        // InitCommand reads local.settings.json to drive adoption decisions.
+        // Default to "nothing set" so tests that don't care behave as if there's
+        // no project signal.
+        ILocalSettingsProvider emptyLocalSettings = Substitute.For<ILocalSettingsProvider>();
+        emptyLocalSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
+        services.AddSingleton(emptyLocalSettings);
         ISetupRunner setupRunner = Substitute.For<ISetupRunner>();
         setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
             .Returns(new SetupRunResult(0));

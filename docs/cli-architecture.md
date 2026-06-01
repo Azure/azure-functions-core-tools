@@ -360,9 +360,28 @@ If a newer version is found, a notice is printed after the command completes.
 2. Resolve the matching IProjectInitializer via CanHandle(stack)
    ├── No initializers installed  → "No language workloads installed." (exit 1)
    └── No matching initializer    → "No installed workload supports stack '<x>'." (exit 1)
-3. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
-4. Delegate to IProjectInitializer.InitializeAsync(context, parseResult)
+3. Detect existing project state:
+   ├── .func/config.json present  → fully initialized; refuse without --force
+   ├── host.json only             → adopt mode (see below); skip scaffolding
+   └── empty                      → scaffold via IProjectInitializer.InitializeAsync
+4. Build InitContext (WorkingDirectory, ProjectName, Language, Force)
+5. Delegate to IProjectInitializer.InitializeAsync(context, parseResult) (skipped in adopt mode)
 ```
+
+**Adopt mode** (host.json present, no `.func/config.json`):
+
+1. Resolve `project_runtime` from `local.settings.json`'s `FUNCTIONS_WORKER_RUNTIME`. The process env var is intentionally ignored: adoption is about the on-disk project shape.
+2. Apply:
+
+   | `project_runtime` → | `--stack` omitted | `--stack X` (installed) agrees | `--stack X` conflicts |
+   |---|---|---|---|
+   | null | interactive: prompt "Adopting an existing project. Which stack is it?". Non-interactive: refuse with "Couldn't detect the project's stack". | adopt with `X` | n/a |
+   | installed | adopt + snap | adopt with `X` | refuse (use `--force`) |
+   | uninstalled | refuse with `func setup --features <stack>` hint | refuse (same hint) | refuse |
+
+   Any candidate stack (from `--stack` or `local.settings.json`) that doesn't match an installed initializer (by canonical `Stack` id or by one of its `WorkerRuntimeAliases`) is refused. Aliases let runtime values like `dotnet-isolated` resolve to the `dotnet` stack and `native` to `go`. The hint uses a literal `<stack>` placeholder rather than the raw runtime value, because the value itself may not be a valid feature id (e.g. typos).
+
+3. Write `.func/config.json` with the resolved stack. Skip scaffolding so user source is untouched. `--force` always bypasses adopt mode and takes the full scaffold path.
 
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
