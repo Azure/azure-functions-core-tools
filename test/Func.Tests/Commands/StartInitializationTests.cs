@@ -743,6 +743,7 @@ public class StartInitializationTests : IDisposable
         Assert.Contains("entry 12", runningOutput);
 
         await renderer.OnEventAsync(new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, "prepare", "ready"), CancellationToken.None);
+        await WaitForOutputAsync(writer, output => output.Contains("ready", StringComparison.Ordinal));
         await renderer.OnEventAsync(new StartInitializationCompletedEvent(DateTimeOffset.UnixEpoch, CreateResult()), CancellationToken.None);
         await renderer.DisposeAsync();
 

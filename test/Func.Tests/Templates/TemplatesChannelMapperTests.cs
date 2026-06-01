@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Xunit;
 
@@ -8,36 +9,6 @@ namespace Azure.Functions.Cli.Tests.Templates;
 
 public class TemplatesChannelMapperTests
 {
-    [Theory]
-    [InlineData("Microsoft.Azure.Functions.ExtensionBundle", "")]
-    [InlineData("Microsoft.Azure.Functions.ExtensionBundle.Preview", "preview")]
-    [InlineData("Microsoft.Azure.Functions.ExtensionBundle.Experimental", "experimental")]
-    [InlineData("microsoft.azure.functions.extensionbundle", "")]
-    public void GetChannelLabel_Maps_Recognised_Ids(string bundleId, string expected)
-    {
-        Assert.Equal(expected, TemplatesChannelMapper.GetChannelLabel(bundleId));
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData(null)]
-    [InlineData("Some.Other.Bundle")]
-    public void GetChannelLabel_Unrecognised_Returns_Null(string? bundleId)
-    {
-        Assert.Null(TemplatesChannelMapper.GetChannelLabel(bundleId));
-    }
-
-    [Theory]
-    [InlineData("1.0.0", "")]
-    [InlineData("1.0.0-preview", "preview")]
-    [InlineData("1.0.0-experimental", "experimental")]
-    [InlineData("1.0.0-PREVIEW", "preview")]
-    [InlineData("1.0.0-preview+meta", "preview")]
-    public void GetPrereleaseLabel_Extracts_Label(string version, string expected)
-    {
-        Assert.Equal(expected, TemplatesChannelMapper.GetPrereleaseLabel(version));
-    }
-
     [Fact]
     public void PickChannelMatched_Returns_Highest_Of_Matching_Channel()
     {
@@ -49,11 +20,11 @@ public class TemplatesChannelMapperTests
             new("node", "1.1.0-preview", "/n/1.1.0-preview"),
         ];
 
-        InstalledTemplatesWorkload? stable = TemplatesChannelMapper.PickChannelMatched(rows, "");
+        InstalledTemplatesWorkload? stable = TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Stable);
         Assert.NotNull(stable);
         Assert.Equal("1.1.0", stable.PackageVersion);
 
-        InstalledTemplatesWorkload? preview = TemplatesChannelMapper.PickChannelMatched(rows, "preview");
+        InstalledTemplatesWorkload? preview = TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Preview);
         Assert.NotNull(preview);
         Assert.Equal("1.1.0-preview", preview.PackageVersion);
     }
@@ -66,6 +37,6 @@ public class TemplatesChannelMapperTests
             new("node", "1.0.0", "/n/1.0.0"),
         ];
 
-        Assert.Null(TemplatesChannelMapper.PickChannelMatched(rows, "experimental"));
+        Assert.Null(TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Experimental));
     }
 }

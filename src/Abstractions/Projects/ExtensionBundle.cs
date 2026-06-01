@@ -5,11 +5,12 @@ namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
 /// Release channel for the Functions extension bundle. Values map to the
-/// three published bundle ids (GA / Preview / Experimental).
+/// three published bundle ids (Stable / Preview / Experimental).
 /// </summary>
 public enum BundleChannel
 {
-    GA,
+    Unknown,
+    Stable,
     Preview,
     Experimental,
 }
@@ -32,6 +33,7 @@ public static class ExtensionBundle
     {
         BundleChannel.Preview => "Microsoft.Azure.Functions.ExtensionBundle.Preview",
         BundleChannel.Experimental => "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
-        _ => "Microsoft.Azure.Functions.ExtensionBundle",
+        BundleChannel.Stable => "Microsoft.Azure.Functions.ExtensionBundle",
+        _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null),
     };
 }

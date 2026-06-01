@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// </summary>
 public sealed class NodeWorkload : Workload
 {
-    public override string DisplayName => "Node";
+    public override string DisplayName => "Node.js Stack";
 
     public override string Description => "Azure Functions CLI tooling for Node.js projects.";
 

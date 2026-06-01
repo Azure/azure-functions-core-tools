@@ -183,7 +183,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 $"Updating workload '{packageId}'",
                 async (ctx, ct) => await _installer.UpdateAsync(
                     packageId, targetVersion, source, includePrerelease, allowMajor,
-                    new ProgressAdapter(ctx),
+                    new WorkloadInstallProgressAdapter(ctx),
                     ct),
                 cancellationToken);
 
@@ -234,7 +234,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                         source,
                         includePrerelease,
                         allowMajor,
-                        new ProgressAdapter(ctx),
+                        new WorkloadInstallProgressAdapter(ctx),
                         ct),
                     cancellationToken);
                 RenderSingle(result);
@@ -283,18 +283,4 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             $"Updated workload '{display}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
     }
 
-    /// <summary>
-    /// Bridges <see cref="IProgress{T}"/> reports from the installer onto
-    /// the live progress bar.
-    /// </summary>
-    private sealed class ProgressAdapter(IProgressContext context) : IProgress<WorkloadInstallProgress>
-    {
-        private readonly IProgressContext _context = context;
-
-        public void Report(WorkloadInstallProgress value)
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            _context.SetDescription(value.Description);
-        }
-    }
 }

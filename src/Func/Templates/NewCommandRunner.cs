@@ -268,8 +268,7 @@ internal sealed class NewCommandRunner
         // Step 4 (Node/Python): channel match against host.json.
         InstalledTemplatesWorkload? workload;
         string? bundleId = null;
-        string? channelLabel = null;
-
+        BundleChannel channel = BundleChannel.Unknown;
         if (string.Equals(stack, "dotnet", StringComparison.OrdinalIgnoreCase))
         {
             IReadOnlyList<InstalledTemplatesWorkload> allRows =
@@ -296,39 +295,38 @@ internal sealed class NewCommandRunner
             }
 
             bundleId = section.Id;
-            channelLabel = TemplatesChannelMapper.GetChannelLabel(bundleId);
-            if (channelLabel is null)
+            if (!BundleHelpers.TryGetBundleChannel(bundleId, out channel))
             {
-                _interaction.WriteError($"Unrecognised extension bundle id '{bundleId}'.");
+                _interaction.WriteError($"Unrecognized extension bundle id '{bundleId}'.");
                 _interaction.WriteLine(l => l
                     .Muted("Use one of: ")
-                    .Code(TemplatesChannelMapper.StableBundleId)
+                    .Code(BundleHelpers.StableBundleId)
                     .Muted(", ")
-                    .Code(TemplatesChannelMapper.PreviewBundleId)
+                    .Code(BundleHelpers.PreviewBundleId)
                     .Muted(", or ")
-                    .Code(TemplatesChannelMapper.ExperimentalBundleId)
+                    .Code(BundleHelpers.ExperimentalBundleId)
                     .Muted("."));
                 return null;
             }
 
             IReadOnlyList<InstalledTemplatesWorkload> allRows =
                 await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken);
-            workload = TemplatesChannelMapper.PickChannelMatched(allRows, channelLabel);
+            workload = TemplatesChannelMapper.PickChannelMatched(allRows, channel);
         }
 
         if (workload is null)
         {
-            if (channelLabel is null)
+            if (channel is BundleChannel.Unknown)
             {
                 _renderer.RenderNoTemplatesWorkloadInstalled(stack);
             }
             else
             {
-                string channelName = TemplatesChannelMapper.GetChannelDisplayName(channelLabel);
+                string channelName = channel.ToDisplayString();
                 string suggestedPkg = TemplatesWorkloadConstants.GetPackageId(stack);
-                string suggestedVer = string.IsNullOrEmpty(channelLabel)
+                string suggestedVer = channel == BundleChannel.Stable
                     ? "<version>"
-                    : $"<version>-{channelLabel}";
+                    : $"<version>-{channelName}.1";
                 _interaction.WriteError(
                     $"No installed templates workload matches this project's bundle channel " +
                     $"({bundleId} -> channel '{channelName}').");
@@ -356,7 +354,7 @@ internal sealed class NewCommandRunner
             language,
             workload,
             bundleId,
-            channelLabel);
+            channel);
     }
 
     private async Task<int> EnforceBundleGatesAsync(
@@ -651,7 +649,7 @@ internal sealed class NewCommandRunner
         string Language,
         InstalledTemplatesWorkload Workload,
         string? BundleId,
-        string? ChannelLabel);
+        BundleChannel Channel);
 }
 
 /// <summary>

@@ -15,7 +15,7 @@ public interface IInstalledTemplatesWorkloads
     /// NuGet package-id prefix for templates content workloads. Concrete ids
     /// are <c>{Prefix}.&lt;Stack&gt;</c> (e.g. <c>Azure.Functions.Cli.Workloads.Templates.Node</c>).
     /// Matched case-insensitively at lookup time; registry stores them lowercased
-    /// per NuGet normalisation.
+    /// per NuGet normalization.
     /// </summary>
     public const string TemplatesWorkloadPackageIdPrefix = "Azure.Functions.Cli.Workloads.Templates";
 

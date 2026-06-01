@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// </summary>
 public sealed class DotNetWorkload : Workload
 {
-    public override string DisplayName => ".NET";
+    public override string DisplayName => ".NET Stack";
 
     public override string Description => "Azure Functions CLI tooling for .NET (C#) projects.";
 
