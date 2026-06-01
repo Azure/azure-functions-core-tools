@@ -107,9 +107,10 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
             return;
         }
 
-        string[] columns = ["NAME", "DESCRIPTION"];
+        string[] columns = ["NAME", "TEMPLATE ID", "DESCRIPTION"];
         IEnumerable<string[]> rows = templates.Select(t => new[]
         {
+            string.IsNullOrWhiteSpace(t.DisplayName) ? t.Id : t.DisplayName,
             t.Id,
             t.Description ?? string.Empty,
         });
@@ -118,7 +119,7 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
         _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
             .Muted("Create one with: ")
-            .Code("func new --template <NAME> --name <function-name>")
+            .Code("func new --template <TEMPLATE_ID> --name <function-name>")
             .Muted("."));
     }
 
