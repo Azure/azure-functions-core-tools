@@ -23,13 +23,13 @@
         }
       },
       "supportedRuntimes": [
+        "go",
         "node",
         "python",
         "java",
         "powershell",
         "dotnet-isolated",
-        "custom",
-        "go"
+        "custom"
       ]
     },
     "linux-premium": {
