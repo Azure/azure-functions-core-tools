@@ -117,11 +117,8 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
             args.Add(prompt.DefaultValue);
         }
 
-        // Map --force through to `dotnet new`. Without this, --force at the
-        // func CLI surface looks like it was honoured but the dotnet engine
-        // refuses with exit code 73 the moment any non-primary output (e.g.
-        // the readme.md the timer / RabbitMQ upstream templates ship)
-        // collides with a file already on disk.
+        // Map --force through to `dotnet new`; without it the engine refuses
+        // with exit 73 on any collision (e.g. readme.md from the timer template).
         if (context.Force)
         {
             args.Add("--force");
