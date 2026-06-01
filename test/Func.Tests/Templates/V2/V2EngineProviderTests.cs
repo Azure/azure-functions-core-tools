@@ -59,6 +59,7 @@ public class V2EngineProviderTests : IDisposable
         Assert.Equal(EngineIds.V2, http.EngineId);
         Assert.Equal("node", http.Stack);
         Assert.Equal("HTTP trigger", http.DisplayName);
+        Assert.Equal("HttpTrigger", http.DefaultFunctionName);
     }
 
     [Fact]

@@ -69,10 +69,35 @@ internal static class V2TemplateProjection
             EngineId: EngineIds.V2,
             DisplayName: displayName,
             Description: description,
-            DefaultFunctionName: null,
+            DefaultFunctionName: ResolveDefaultFunctionName(prompts),
             Languages: languages,
             Metadata: metadata);
     }
+
+    // Picks up the per-template default for `func new` without `--name`. The
+    // recognised prompt ids mirror V2EngineProvider's function-name prompt set
+    // (Node v4 / Python v2 bundle templates both use trigger-functionName).
+    private static string? ResolveDefaultFunctionName(IReadOnlyList<TemplateUserPrompt> prompts)
+    {
+        foreach (TemplateUserPrompt prompt in prompts)
+        {
+            if (_functionNamePromptIds.Contains(prompt.Id) && !string.IsNullOrWhiteSpace(prompt.DefaultValue))
+            {
+                return prompt.DefaultValue;
+            }
+        }
+
+        return null;
+    }
+
+    private static readonly HashSet<string> _functionNamePromptIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name",
+        "functionName",
+        "function-name",
+        "trigger-functionName",
+        "trigger-functionname",
+    };
 
     private static TemplateUserPrompt? ProjectInput(V2Input input, V2Payload payload)
     {
