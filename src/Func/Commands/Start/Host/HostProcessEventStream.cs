@@ -19,6 +19,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
     private readonly Task _stdoutTask;
     private readonly Task _stderrTask;
     private int _shutdownRequested;
+    private int _disposed;
 
     public HostProcessEventStream(
         IHostProcess process,
@@ -80,6 +81,41 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
 
     public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
         => _exitTask.WaitAsync(cancellationToken);
+
+    /// <summary>
+    /// Ensures the host process is shut down (gracefully if it cooperates,
+    /// killed otherwise) before returning. Idempotent and best-effort, so
+    /// it's safe to call from <c>await using</c> on every code path,
+    /// including ones that already drove the pipeline to completion.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await RequestShutdownAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // RequestShutdownAsync is best-effort during disposal; the
+            // process is killed below regardless. Swallowing here keeps the
+            // outer failure (which is why we're disposing) primary.
+            try
+            {
+                _process.KillTree();
+            }
+            catch
+            {
+                // Process may already be gone; nothing more we can do.
+            }
+
+            await _process.DisposeAsync();
+        }
+    }
 
     private void WriteProcessStarted(HostProcessLaunchInfo launchInfo)
     {

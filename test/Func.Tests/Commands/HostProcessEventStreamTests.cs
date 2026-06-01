@@ -64,6 +64,39 @@ public class HostProcessEventStreamTests
         Assert.True(process.Disposed);
     }
 
+    [Fact]
+    public async Task DisposeAsync_KillsBlockingProcessTree()
+    {
+        var process = new BlockingHostProcess();
+        var stream = new HostProcessEventStream(
+            process,
+            new LineHostProcessOutputParser(),
+            CreateLaunchInfo(),
+            TimeSpan.Zero);
+
+        await stream.DisposeAsync();
+
+        Assert.True(process.StandardInputDisposed);
+        Assert.True(process.KillTreeCalled);
+        Assert.True(process.Disposed);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_IsIdempotent()
+    {
+        var process = new BlockingHostProcess();
+        var stream = new HostProcessEventStream(
+            process,
+            new LineHostProcessOutputParser(),
+            CreateLaunchInfo(),
+            TimeSpan.Zero);
+
+        await stream.DisposeAsync();
+        await stream.DisposeAsync();
+
+        Assert.Equal(1, process.KillTreeCallCount);
+    }
+
     private static async Task<HostLogEntry[]> ReadAllAsync(IHostEventStream stream)
     {
         List<HostLogEntry> entries = [];
@@ -137,6 +170,8 @@ public class HostProcessEventStreamTests
 
         public bool KillTreeCalled { get; private set; }
 
+        public int KillTreeCallCount { get; private set; }
+
         public bool Disposed { get; private set; }
 
         public void Start()
@@ -149,6 +184,7 @@ public class HostProcessEventStreamTests
         public void KillTree()
         {
             KillTreeCalled = true;
+            KillTreeCallCount++;
             _exit.TrySetResult();
         }
 

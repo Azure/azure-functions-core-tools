@@ -96,9 +96,31 @@ internal sealed class DemoStartInitializationRunner(
         };
         await EmitAsync(renderer, new StartInitializationStartedEvent(Now(), state.ProfileName), cancellationToken);
 
-        await RunStepsAsync(CreateSteps(), context, state, renderer, cancellationToken);
+        try
+        {
+            await RunStepsAsync(CreateSteps(), context, state, renderer, cancellationToken);
+            return state.ToResult(context);
+        }
+        catch
+        {
+            // If a step (or ToResult) fails after the host was started, the
+            // caller never gets a chance to take ownership of the event
+            // stream. Tear it down here so the spawned host process doesn't
+            // outlive `func run`.
+            if (state.EventStream is { } eventStream)
+            {
+                try
+                {
+                    await eventStream.DisposeAsync();
+                }
+                catch
+                {
+                    // Best effort: keep the original failure primary.
+                }
+            }
 
-        return state.ToResult(context);
+            throw;
+        }
     }
 
     private StartInitializationStepCollection CreateSteps()

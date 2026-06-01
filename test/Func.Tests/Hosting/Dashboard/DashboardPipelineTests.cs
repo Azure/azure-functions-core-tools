@@ -101,6 +101,46 @@ public class DashboardPipelineTests
         Assert.Contains("invocation_completed HttpTrigger1 invocation-1 failed duration_ms=42", output);
     }
 
+    [Fact]
+    public async Task RunAsync_WhenRendererThrows_StillShutsDownHostAndRethrows()
+    {
+        var state = new DashboardState();
+        var source = new NeverEndingLifecycleEventStream();
+        var renderer = new ThrowingRenderer();
+        var pipeline = new DashboardPipeline(state, source, renderer);
+
+        // Push an entry the renderer will choke on so ReadAsync throws a
+        // non-OperationCanceledException — the path that previously left
+        // the host PID running because shutdown only ran from the OCE catch.
+        source.PushEntry(new HostLogEntry(
+            DateTimeOffset.UnixEpoch,
+            "Function.HttpTrigger1",
+            LogLevel.Information,
+            default,
+            "trigger",
+            Exception: null,
+            HostLogEntry.EmptyAttributes));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => pipeline.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.True(source.ShutdownRequested);
+    }
+
+    private sealed class ThrowingRenderer : IDashboardRenderer
+    {
+        public Task OnStartAsync(DashboardState state, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task OnEventAsync(HostLogEntry entry, IReadOnlyList<DashboardEvent> events, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("renderer blew up");
+
+        public Task OnSummaryAsync(SummaryEvent summary, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class NeverEndingEventStream : IHostEventStream
     {
         public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
@@ -108,35 +148,19 @@ public class DashboardPipelineTests
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             yield break;
         }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class CompletedLifecycleEventStream(int exitCode) : IHostEventStream, IHostEventStreamLifecycle
     {
         public bool WaitForExitCalled { get; private set; }
 
-        public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await Task.CompletedTask;
-            yield break;
-        }
-
-        public Task RequestShutdownAsync(CancellationToken cancellationToken)
-            => Task.CompletedTask;
-
-        public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
-        {
-            WaitForExitCalled = true;
-            return Task.FromResult(exitCode);
-        }
-    }
-
-    private sealed class NeverEndingLifecycleEventStream : IHostEventStream, IHostEventStreamLifecycle
-    {
         public bool ShutdownRequested { get; private set; }
 
         public async IAsyncEnumerable<HostLogEntry> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            await Task.CompletedTask;
             yield break;
         }
 
@@ -147,7 +171,36 @@ public class DashboardPipelineTests
         }
 
         public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
+        {
+            WaitForExitCalled = true;
+            return Task.FromResult(exitCode);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class NeverEndingLifecycleEventStream : IHostEventStream, IHostEventStreamLifecycle
+    {
+        private readonly InMemoryHostEventStream _inner = new();
+
+        public bool ShutdownRequested { get; private set; }
+
+        public void PushEntry(HostLogEntry entry) => _inner.Write(entry);
+
+        public IAsyncEnumerable<HostLogEntry> ReadAsync(CancellationToken cancellationToken)
+            => _inner.ReadAsync(cancellationToken);
+
+        public Task RequestShutdownAsync(CancellationToken cancellationToken)
+        {
+            ShutdownRequested = true;
+            _inner.Complete();
+            return Task.CompletedTask;
+        }
+
+        public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
             => Task.FromResult(99);
+
+        public ValueTask DisposeAsync() => _inner.DisposeAsync();
     }
 
     private sealed class ShutdownRequestingRenderer : IDashboardRenderer, IDashboardShutdownRequester

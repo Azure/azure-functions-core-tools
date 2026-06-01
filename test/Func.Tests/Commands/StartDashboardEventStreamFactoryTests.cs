@@ -114,5 +114,7 @@ public class StartDashboardEventStreamFactoryTests
 
         public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
             => Task.FromResult(exitCode);
+
+        public ValueTask DisposeAsync() => _inner.DisposeAsync();
     }
 }

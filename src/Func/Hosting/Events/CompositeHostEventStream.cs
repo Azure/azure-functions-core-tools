@@ -36,6 +36,27 @@ internal sealed class CompositeHostEventStream : IHostEventStream, IHostEventStr
     public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
         => _lifecycle?.WaitForExitAsync(cancellationToken) ?? Task.FromResult(0);
 
+    public async ValueTask DisposeAsync()
+    {
+        List<Exception>? failures = null;
+        foreach (IHostEventStream source in _sources)
+        {
+            try
+            {
+                await source.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                (failures ??= []).Add(ex);
+            }
+        }
+
+        if (failures is { Count: > 0 })
+        {
+            throw new AggregateException(failures);
+        }
+    }
+
     private static IHostEventStream[] CopySources(IEnumerable<IHostEventStream> sources)
     {
         ArgumentNullException.ThrowIfNull(sources);
