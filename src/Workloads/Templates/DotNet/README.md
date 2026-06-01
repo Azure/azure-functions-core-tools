@@ -55,17 +55,18 @@ dotnet pack ... /p:SourceItemTemplatesVersion=4.0.5569
 dotnet pack ... /p:SourceItemTemplatesPackageId=Microsoft.Azure.Functions.Worker.ItemTemplates
 ```
 
-The `HydrateDotnetTemplates` target (in
-`eng/build/Workloads.Templates.DotNet.targets`) runs
-`dotnet new install <pkg>@<version>` against a build-scoped template
-hive, reads the resulting `templatecache.json`, filters to Functions
-item templates (`Classifications` contains `Azure Function` and
-`tags.type == "item"`), strips `bind` / `derived` / `computed` /
-`generated` / implicit / disabled symbols, and projects the result
-into `dotnet-templates.json` (Templates Workload Spec §5.3.1). When
-the upstream pkg is staged behind a private feed, pass
-`/p:DotnetTemplatesNuGetSource=<feed-url-or-path>` to forward it as
-`dotnet new install --add-source`.
+The csproj's `<PackageDownload>` item pulls the upstream pkg into the
+global packages folder during restore, so the pack-time `HydrateDotnetTemplates`
+target (in `eng/build/Workloads.Templates.DotNet.targets`) never reaches
+the network. It runs `dotnet new install <local-nupkg-path>` against a
+build-scoped template hive, reads the resulting `templatecache.json`,
+filters to Functions item templates (`Classifications` contains
+`Azure Function` and `tags.type == "item"`), strips
+`bind` / `derived` / `computed` / `generated` / implicit / disabled
+symbols, and projects the result into `dotnet-templates.json` (Templates
+Workload Spec §5.3.1). If `Microsoft.Azure.Functions.Worker.ItemTemplates`
+is staged in a private feed, configure the feed in `NuGet.Config` so
+restore picks it up.
 
 The dev-only flag `/p:SkipHydrateDotnetTemplates=true` produces a
 pack with no catalog payload for offline iteration; it is **not** for

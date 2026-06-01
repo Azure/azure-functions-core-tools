@@ -17,6 +17,11 @@
     <None Include="workload.json" Pack="true" PackagePath="/" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Pre-fetch the upstream nupkg during restore so the hydrate step is offline. -->
+    <PackageDownload Include="$(SourceItemTemplatesPackageId)" Version="[$(SourceItemTemplatesVersion)]" />
+  </ItemGroup>
+
   <Import Project="..\..\..\..\eng\build\Workloads.Templates.DotNet.targets" />
 
 </Project>

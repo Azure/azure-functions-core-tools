@@ -5,8 +5,10 @@
 
     Hydrates the workload payload (tools/any/content/dotnet-templates.json
     + tools/any/content/source.json) from the upstream
-    Microsoft.Azure.Functions.Worker.ItemTemplates NuGet package via
-    `dotnet new install` against a build-scoped template hive. See
+    Microsoft.Azure.Functions.Worker.ItemTemplates NuGet package. The
+    package is restored into the global packages folder by the
+    <PackageDownload> item in the csproj; this target consumes the
+    already-downloaded nupkg locally and does not reach the network. See
     proposed/templates-workload-spec.md §5.3 / §5.3.1 / §6.3 for the
     contract and the projection rules.
 
@@ -24,11 +26,6 @@
           carry no dotnet-templates.json and no source.json. Warning is
           emitted; do not use for release packs.
 
-      $(DotnetTemplatesNuGetSource) = <feed url or local path>
-          Forwarded as the `add-source` flag to `dotnet new install`. Useful
-          when the upstream pkg is staged in a private feed or local
-          fallback.
-
     All intermediate output stages under $(IntermediateOutputPath)
     dotnet-templates\:
         hive\        DOTNET_CLI_HOME for the dotnet new install.
@@ -38,19 +35,27 @@
 
     $(IntermediateOutputPath) is only populated when targets execute, so
     every dependent path is composed inline in target attributes rather
-    than in a top-level <PropertyGroup>.
+    than in a top-level <PropertyGroup>. $(NuGetPackageRoot) is set by
+    NuGet at evaluation time after restore, so the resolved nupkg path
+    is safe to define at the project level.
   -->
+
+  <PropertyGroup>
+    <_DotnetTemplatesNupkg Condition="'$(SourceItemTemplatesPackageId)' != '' and '$(SourceItemTemplatesVersion)' != '' and '$(NuGetPackageRoot)' != ''">$([MSBuild]::NormalizePath('$(NuGetPackageRoot)', '$(SourceItemTemplatesPackageId.ToLowerInvariant())', '$(SourceItemTemplatesVersion)', '$(SourceItemTemplatesPackageId.ToLowerInvariant()).$(SourceItemTemplatesVersion).nupkg'))</_DotnetTemplatesNupkg>
+  </PropertyGroup>
 
   <Target Name="HydrateDotnetTemplates"
           Condition="'$(SkipHydrateDotnetTemplates)' != 'true'"
           BeforeTargets="GenerateNuspec;_GetPackageFiles"
-          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)..\scripts\hydrate-dotnet-templates.ps1"
+          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)..\scripts\hydrate-dotnet-templates.ps1;$(_DotnetTemplatesNupkg)"
           Outputs="$(IntermediateOutputPath)dotnet-templates\.hydrated">
 
     <Error Condition="'$(SourceItemTemplatesPackageId)' == ''"
            Text="SourceItemTemplatesPackageId must be set (the upstream NuGet template package id, e.g. Microsoft.Azure.Functions.Worker.ItemTemplates)." />
     <Error Condition="'$(SourceItemTemplatesVersion)' == ''"
            Text="SourceItemTemplatesVersion must be set (the upstream NuGet template package version, e.g. 4.0.5569)." />
+    <Error Condition="!Exists('$(_DotnetTemplatesNupkg)')"
+           Text="Upstream template nupkg not found at '$(_DotnetTemplatesNupkg)'. Restore should have downloaded it via the &lt;PackageDownload&gt; item; run a full restore before pack." />
 
     <PropertyGroup>
       <_DotnetTemplatesHive>$(IntermediateOutputPath)dotnet-templates\hive</_DotnetTemplatesHive>
@@ -58,12 +63,11 @@
       <_DotnetTemplatesIndex>$(_DotnetTemplatesOutDir)\dotnet-templates.json</_DotnetTemplatesIndex>
       <_DotnetTemplatesSource>$(_DotnetTemplatesOutDir)\source.json</_DotnetTemplatesSource>
       <_DotnetTemplatesScript>$(MSBuildThisFileDirectory)..\scripts\hydrate-dotnet-templates.ps1</_DotnetTemplatesScript>
-      <_DotnetTemplatesSourceArg Condition="'$(DotnetTemplatesNuGetSource)' != ''"> -NuGetSource &quot;$(DotnetTemplatesNuGetSource)&quot;</_DotnetTemplatesSourceArg>
     </PropertyGroup>
 
     <MakeDir Directories="$(_DotnetTemplatesOutDir)" />
 
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(_DotnetTemplatesScript)&quot; -PackageId &quot;$(SourceItemTemplatesPackageId)&quot; -PackageVersion &quot;$(SourceItemTemplatesVersion)&quot; -HiveRoot &quot;$(_DotnetTemplatesHive)&quot; -OutputTemplates &quot;$(_DotnetTemplatesIndex)&quot; -OutputSource &quot;$(_DotnetTemplatesSource)&quot;$(_DotnetTemplatesSourceArg)"
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(_DotnetTemplatesScript)&quot; -PackageId &quot;$(SourceItemTemplatesPackageId)&quot; -PackageVersion &quot;$(SourceItemTemplatesVersion)&quot; -LocalNupkgPath &quot;$(_DotnetTemplatesNupkg)&quot; -HiveRoot &quot;$(_DotnetTemplatesHive)&quot; -OutputTemplates &quot;$(_DotnetTemplatesIndex)&quot; -OutputSource &quot;$(_DotnetTemplatesSource)&quot;"
           ConsoleToMSBuild="true" />
 
     <Error Condition="!Exists('$(_DotnetTemplatesIndex)')"

@@ -10,8 +10,11 @@
     Implements the build-time hydrate step from
     `proposed/templates-workload-spec.md` §6.3:
 
-      1. `dotnet new install <pkg>::<version>` against a build-scoped hive
-         (controlled by setting DOTNET_CLI_HOME to -HiveRoot).
+      1. `dotnet new install <LocalNupkgPath>` against a build-scoped hive
+         (controlled by setting DOTNET_CLI_HOME to -HiveRoot). The nupkg
+         is provided locally — restored into the global packages folder
+         by the <PackageDownload> item in the csproj — so no network
+         access is needed at hydrate time.
       2. Read `<hive>/.templateengine/dotnetcli/<sdkVer>/templatecache.json`
          (the templating engine's fully-hydrated cache of every installed
          template — Identity, GroupIdentity, Classifications, DefaultName,
@@ -38,10 +41,20 @@
 
 .PARAMETER PackageId
     Upstream NuGet template package id
-    (e.g. Microsoft.Azure.Functions.Worker.ItemTemplates).
+    (e.g. Microsoft.Azure.Functions.Worker.ItemTemplates). Used for the
+    sourcePackage.id field in the emitted dotnet-templates.json and
+    source.json, and for locating the installed nupkg in the hive
+    fallback path.
 
 .PARAMETER PackageVersion
-    Upstream NuGet template package version to pin (e.g. 4.0.5569).
+    Upstream NuGet template package version (e.g. 4.0.5569). Used for
+    the sourcePackage.version field.
+
+.PARAMETER LocalNupkgPath
+    Absolute path to the upstream NuGet template package on disk,
+    restored by the csproj's <PackageDownload> item. Passed directly to
+    `dotnet new install` so the install never touches the network and
+    re-read for per-template host descriptions.
 
 .PARAMETER HiveRoot
     Build-scoped directory used as DOTNET_CLI_HOME. The template engine
@@ -53,46 +66,40 @@
 
 .PARAMETER OutputSource
     Path to the generated source.json (§6.3 step 4).
-
-.PARAMETER NuGetSource
-    Optional --add-source argument forwarded to dotnet new install (e.g. a
-    pre-staged local feed in CI). When omitted, dotnet new uses its
-    configured feeds (NuGet.org by default).
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)] [string]$PackageId,
     [Parameter(Mandatory=$true)] [string]$PackageVersion,
+    [Parameter(Mandatory=$true)] [string]$LocalNupkgPath,
     [Parameter(Mandatory=$true)] [string]$HiveRoot,
     [Parameter(Mandatory=$true)] [string]$OutputTemplates,
-    [Parameter(Mandatory=$true)] [string]$OutputSource,
-    [string]$NuGetSource
+    [Parameter(Mandatory=$true)] [string]$OutputSource
 )
 
 $ErrorActionPreference = 'Stop'
-
-# Treat sentinel placeholders the build pipeline may emit as missing so we
-# don't pass them through to `dotnet new install --add-source`.
-if ($NuGetSource -and ($NuGetSource -match '^\s*$' -or $NuGetSource -eq '*Undefined*')) {
-    $NuGetSource = $null
-}
 
 function Resolve-FullPath([string]$path) {
     if ([System.IO.Path]::IsPathRooted($path)) { return [System.IO.Path]::GetFullPath($path) }
     return [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $path))
 }
 
+$LocalNupkgPath  = Resolve-FullPath $LocalNupkgPath
 $HiveRoot        = Resolve-FullPath $HiveRoot
 $OutputTemplates = Resolve-FullPath $OutputTemplates
 $OutputSource    = Resolve-FullPath $OutputSource
 
+if (-not (Test-Path -LiteralPath $LocalNupkgPath -PathType Leaf)) {
+    throw "Local nupkg not found at '$LocalNupkgPath'. The csproj's <PackageDownload> item should have restored it; ensure restore ran before pack."
+}
+
 Write-Host "hydrate-dotnet-templates:"
 Write-Host "  packageId       : $PackageId"
 Write-Host "  packageVersion  : $PackageVersion"
+Write-Host "  localNupkgPath  : $LocalNupkgPath"
 Write-Host "  hiveRoot        : $HiveRoot"
 Write-Host "  outputTemplates : $OutputTemplates"
 Write-Host "  outputSource    : $OutputSource"
-if ($NuGetSource) { Write-Host "  nugetSource     : $NuGetSource" }
 
 # ── 1. Set up a build-scoped hive ────────────────────────────────────────
 if (Test-Path -LiteralPath $HiveRoot) {
@@ -104,9 +111,10 @@ $env:DOTNET_CLI_HOME             = $HiveRoot
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO               = '1'
 
-# ── 2. Install the upstream template pkg into that hive ──────────────────
-$installArgs = @('new', 'install', "$PackageId@$PackageVersion")
-if ($NuGetSource) { $installArgs += @('--add-source', $NuGetSource) }
+# ── 2. Install the upstream template pkg into that hive from disk ────────
+# Passing the absolute nupkg path makes `dotnet new install` resolve from
+# the local file directly, so no NuGet feed is consulted.
+$installArgs = @('new', 'install', $LocalNupkgPath)
 
 Write-Host "+ dotnet $($installArgs -join ' ')"
 & dotnet @installArgs | ForEach-Object {
@@ -114,7 +122,7 @@ Write-Host "+ dotnet $($installArgs -join ' ')"
     Write-Host $_
 }
 if ($LASTEXITCODE -ne 0) {
-    throw "dotnet new install failed (exit $LASTEXITCODE) for $PackageId::$PackageVersion."
+    throw "dotnet new install failed (exit $LASTEXITCODE) for $LocalNupkgPath."
 }
 
 # ── 3. Locate templatecache.json (path is SDK-versioned) ─────────────────
@@ -163,7 +171,7 @@ function Get-HostDescriptionByIdentity([string]$nupkgPath) {
         return $map
     }
 
-    $expandDir = Join-Path ([System.IO.Path]::GetDirectoryName($nupkgPath)) '_host_metadata_expanded'
+    $expandDir = Join-Path $HiveRoot '_host_metadata_expanded'
     if (Test-Path -LiteralPath $expandDir) { Remove-Item -LiteralPath $expandDir -Recurse -Force }
     New-Item -ItemType Directory -Path $expandDir -Force | Out-Null
 
@@ -211,24 +219,7 @@ function Get-HostDescriptionByIdentity([string]$nupkgPath) {
     return $map
 }
 
-$packagesDir = Join-Path $HiveRoot '.templateengine/packages'
-$installedNupkg = Get-ChildItem -LiteralPath $packagesDir -Filter "$PackageId.$PackageVersion.nupkg" -File -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-if (-not $installedNupkg) {
-    # Some flows resolve a different concrete version (e.g. when caller
-    # passes "*" or omits version). Fall back to any nupkg matching the
-    # package id prefix.
-    $installedNupkg = Get-ChildItem -LiteralPath $packagesDir -Filter "$PackageId.*.nupkg" -File -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending |
-        Select-Object -First 1
-}
-
-$hostDescriptionsByIdentity = @{}
-if ($installedNupkg) {
-    $hostDescriptionsByIdentity = Get-HostDescriptionByIdentity $installedNupkg.FullName
-} else {
-    Write-Host "Host descriptions: no nupkg found under $packagesDir, projection will fall back to engine cache description (typically empty)."
-}
+$hostDescriptionsByIdentity = Get-HostDescriptionByIdentity $LocalNupkgPath
 
 # ── 4. Filter to Functions item templates ────────────────────────────────
 $entries = @($cache['TemplateInfo'] | Where-Object {
