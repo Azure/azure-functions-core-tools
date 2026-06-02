@@ -80,6 +80,26 @@ public class V2EngineProviderTests : IDisposable
         Assert.Empty(typescriptOnly);
     }
 
+    [Fact]
+    public async Task ListTemplatesAsync_Omits_Hidden_Templates()
+    {
+        WriteHiddenFixturePayload(_installDir);
+
+        IInstalledTemplatesWorkloads installed = Substitute.For<IInstalledTemplatesWorkloads>();
+        installed.ListInstalledAsync("node", Arg.Any<CancellationToken>())
+            .Returns([new InstalledTemplatesWorkload("node", "1.0.0", _installDir)]);
+
+        var provider = new V2EngineProvider(installed);
+        IReadOnlyList<FunctionTemplateInfo> templates = await provider.ListTemplatesAsync(
+            new TemplateListContext(new Cli.Common.WorkingDirectory(new DirectoryInfo(_workloadHome), false), "node", null),
+            CancellationToken.None);
+
+        // BlobTrigger-TypeScript and DurableFunctionsOrchestrator-JavaScript
+        // are on the hidden list; only the HTTP trigger should remain.
+        Assert.Single(templates);
+        Assert.Equal("HttpTrigger-JavaScript", templates[0].Id);
+    }
+
     private static void WriteFixturePayload(string installDir)
     {
         string v2 = Path.Combine(installDir, "tools", "any", "content", "v2");
@@ -119,5 +139,45 @@ public class V2EngineProviderTests : IDisposable
         File.WriteAllText(Path.Combine(v2, "resources", "Resources.json"), """
         { "HttpTrigger_description": "An HTTP-triggered function." }
         """);
+    }
+
+    private static void WriteHiddenFixturePayload(string installDir)
+    {
+        string v2 = Path.Combine(installDir, "tools", "any", "content", "v2");
+        Directory.CreateDirectory(Path.Combine(v2, "templates"));
+        Directory.CreateDirectory(Path.Combine(v2, "bindings"));
+        Directory.CreateDirectory(Path.Combine(v2, "resources"));
+
+        File.WriteAllText(Path.Combine(v2, "templates", "templates.json"), """
+        [
+          {
+            "id": "HttpTrigger-JavaScript",
+            "name": "HTTP trigger",
+            "language": "javascript",
+            "jobs": [ { "type": "CreateNewApp", "inputs": [ { "paramId": "trigger-functionName", "assignTo": "$(FUNCTION_NAME_INPUT)", "defaultValue": "HttpTrigger" } ] } ],
+            "actions": [ { "type": "WriteToFile", "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js", "fileContent": "// generated" } ]
+          },
+          {
+            "id": "BlobTrigger-TypeScript",
+            "name": "Blob trigger",
+            "language": "typescript",
+            "jobs": [ { "type": "CreateNewApp", "inputs": [ { "paramId": "trigger-functionName", "assignTo": "$(FUNCTION_NAME_INPUT)", "defaultValue": "BlobTrigger" } ] } ],
+            "actions": [ { "type": "WriteToFile", "filePath": "src/functions/$(FUNCTION_NAME_INPUT).ts", "fileContent": "// generated" } ]
+          },
+          {
+            "id": "DurableFunctionsOrchestrator-JavaScript",
+            "name": "Durable Functions orchestrator",
+            "language": "javascript",
+            "jobs": [ { "type": "CreateNewApp", "inputs": [ { "paramId": "trigger-functionName", "assignTo": "$(FUNCTION_NAME_INPUT)", "defaultValue": "DurableFunctionsOrchestrator" } ] } ],
+            "actions": [ { "type": "WriteToFile", "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js", "fileContent": "// generated" } ]
+          }
+        ]
+        """);
+
+        File.WriteAllText(Path.Combine(v2, "bindings", "userPrompts.json"), """
+        [ { "id": "trigger-functionName", "label": "Function name", "defaultValue": "HttpTrigger" } ]
+        """);
+
+        File.WriteAllText(Path.Combine(v2, "resources", "Resources.json"), "{}");
     }
 }
