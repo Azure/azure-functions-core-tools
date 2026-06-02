@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Commands.Update;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
@@ -42,6 +43,7 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, StartCommand>();
         services.AddSingleton<FuncCliCommand, PackCommand>();
         services.AddSingleton<FuncCliCommand, PublishCommand>();
+        services.AddSingleton<FuncCliCommand, UpdateCommand>();
         services.AddSingleton<ProfileListCommand>();
         services.AddSingleton<ProfileShowCommand>();
         services.AddSingleton<ProfileSetCommand>();
