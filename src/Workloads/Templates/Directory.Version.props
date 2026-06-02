@@ -34,7 +34,7 @@
   <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
 
   <PropertyGroup>
-    <TemplatesVersion>1.0.0</TemplatesVersion>
+    <TemplatesVersion>1.0.1</TemplatesVersion>
     <TemplatesChannel>stable</TemplatesChannel>
     <SourceBundleVersion Condition="'$(SourceBundleVersion)' == ''">$(LatestExtensionBundleVersion)</SourceBundleVersion>
     <MinBundleVersionRange Condition="'$(MinBundleVersionRange)' == ''">[4.0.0,)</MinBundleVersionRange>
