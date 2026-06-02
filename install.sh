@@ -144,6 +144,7 @@ if command -v func >/dev/null 2>&1; then
     esac
 fi
 
+UPDATED_PROFILE=""
 if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
     SHELL_NAME=$(basename "${SHELL:-bash}")
     case "$SHELL_NAME" in
@@ -160,6 +161,7 @@ if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
         export PATH="${INSTALL_DIR}:${PATH}"
     fi
     echo "Added ${INSTALL_DIR} to PATH in ${PROFILE}."
+    UPDATED_PROFILE="$PROFILE"
 fi
 
 echo "func CLI ${VERSION} installed to ${INSTALL_DIR}"
@@ -224,4 +226,13 @@ if [ "$BUGBASH" = "true" ]; then
     echo -e "\033[33mIf you open a new terminal session (or a shell that doesn't load\033[0m"
     echo -e "\033[33m${BUGBASH_PROFILE}), re-run the three exports above before using func.\033[0m"
     echo -e "\033[33m========================================================================\033[0m"
+fi
+
+# --- Reload shell reminder ---
+
+if [ -n "$UPDATED_PROFILE" ]; then
+    echo ""
+    echo -e "\033[33mReload your shell so 'func5' is on PATH in this session:\033[0m"
+    echo "  source ${UPDATED_PROFILE}"
+    echo "Or open a new terminal window."
 fi

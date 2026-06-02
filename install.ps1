@@ -176,6 +176,7 @@ if ($os -eq 'win') {
             Write-Host "Add to your shell profile: export PATH=`"$InstallDir`:`$PATH`""
             Write-Host "  echo 'export PATH=`"$InstallDir`:`$PATH`"' >> $shellProfile"
         }
+        Write-Host "Then reload your shell: source $shellProfile (or open a new terminal)."
     }
 }
 
