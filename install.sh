@@ -132,6 +132,18 @@ chmod +x "${INSTALL_DIR}/func5"
 
 # --- Update PATH ---
 
+# Detect a pre-existing 'func' that lives outside our install dir (e.g. Core Tools v4).
+# If one is present we APPEND our dir so the existing 'func' keeps winning and only
+# 'func5' resolves to v5. Otherwise we PREPEND so new users get 'func' = v5 by default.
+EXISTING_FUNC=""
+if command -v func >/dev/null 2>&1; then
+    RESOLVED=$(command -v func)
+    case "$RESOLVED" in
+        "${INSTALL_DIR}/"*) ;;
+        *) EXISTING_FUNC="$RESOLVED" ;;
+    esac
+fi
+
 if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
     SHELL_NAME=$(basename "${SHELL:-bash}")
     case "$SHELL_NAME" in
@@ -140,13 +152,18 @@ if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
         *)    PROFILE="$HOME/.profile" ;;
     esac
 
-    echo "export PATH=\"${INSTALL_DIR}:\$PATH\"" >> "$PROFILE"
+    if [ -n "$EXISTING_FUNC" ]; then
+        echo "export PATH=\"\$PATH:${INSTALL_DIR}\"" >> "$PROFILE"
+        export PATH="${PATH}:${INSTALL_DIR}"
+    else
+        echo "export PATH=\"${INSTALL_DIR}:\$PATH\"" >> "$PROFILE"
+        export PATH="${INSTALL_DIR}:${PATH}"
+    fi
     echo "Added ${INSTALL_DIR} to PATH in ${PROFILE}."
-    export PATH="${INSTALL_DIR}:${PATH}"
 fi
 
 echo "func CLI ${VERSION} installed to ${INSTALL_DIR}"
-func --version
+"${INSTALL_DIR}/func" --version
 
 # --- Telemetry notice ---
 
@@ -163,9 +180,13 @@ echo "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT envi
 echo ""
 echo "Side-by-side with Core Tools v4"
 echo "-------------------------------"
-echo "A 'func5' alias was installed alongside 'func' so you can run v5 without"
-echo "shadowing an existing v4 install. If you already have Core Tools v4 on your"
-echo "PATH, use 'func5' to invoke v5 and keep 'func' pointing at v4."
+if [ -n "$EXISTING_FUNC" ]; then
+    echo "Detected an existing 'func' at ${EXISTING_FUNC}, leaving it as the default."
+    echo "Use 'func5' to invoke v5; 'func' will continue to invoke the existing install."
+else
+    echo "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
+    echo "If you later install Core Tools v4, use 'func5' to keep invoking v5."
+fi
 
 # --- Bug bash env vars ---
 

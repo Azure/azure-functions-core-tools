@@ -143,18 +143,39 @@ try {
 
 # --- Update PATH ---
 
+# Detect a pre-existing 'func' that lives outside our install dir (e.g. Core Tools v4).
+# If one is present we APPEND our dir so the existing 'func' keeps winning and only
+# 'func5' resolves to v5. Otherwise we PREPEND so new users get 'func' = v5 by default.
+$installDirFull = (Resolve-Path $InstallDir).Path
+$existingFunc = $null
+$existingCmd = Get-Command func -ErrorAction SilentlyContinue | Where-Object { $_.CommandType -eq 'Application' } | Select-Object -First 1
+if ($existingCmd -and -not $existingCmd.Source.StartsWith($installDirFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $existingFunc = $existingCmd.Source
+}
+
 if ($os -eq 'win') {
     $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
     if ($userPath -notlike "*$InstallDir*") {
-        [Environment]::SetEnvironmentVariable('PATH', "$InstallDir;$userPath", 'User')
-        $env:PATH = "$InstallDir;$env:PATH"
+        if ($existingFunc) {
+            $newPath = "$userPath;$InstallDir"
+            $env:PATH = "$env:PATH;$InstallDir"
+        } else {
+            $newPath = "$InstallDir;$userPath"
+            $env:PATH = "$InstallDir;$env:PATH"
+        }
+        [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')
         Write-Host "Added $InstallDir to user PATH."
     }
 } else {
     if ($env:PATH -notlike "*$InstallDir*") {
         $shellProfile = if ($env:SHELL -like '*zsh*') { '~/.zshrc' } else { '~/.bashrc' }
-        Write-Host "Add to your shell profile: export PATH=`"$InstallDir`:`$PATH`""
-        Write-Host "  echo 'export PATH=`"$InstallDir`:`$PATH`"' >> $shellProfile"
+        if ($existingFunc) {
+            Write-Host "Add to your shell profile: export PATH=`"`$PATH`:$InstallDir`""
+            Write-Host "  echo 'export PATH=`"`$PATH`:$InstallDir`"' >> $shellProfile"
+        } else {
+            Write-Host "Add to your shell profile: export PATH=`"$InstallDir`:`$PATH`""
+            Write-Host "  echo 'export PATH=`"$InstallDir`:`$PATH`"' >> $shellProfile"
+        }
     }
 }
 
@@ -172,13 +193,16 @@ Write-Host "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOU
 
 # --- Side-by-side notice ---
 
-$aliasName = if ($os -eq 'win') { 'func5.cmd' } else { 'func5' }
 Write-Host ''
 Write-Host 'Side-by-side with Core Tools v4'
 Write-Host '-------------------------------'
-Write-Host "A '$aliasName' alias was installed alongside 'func' so you can run v5 without"
-Write-Host "shadowing an existing v4 install. If you already have Core Tools v4 on your"
-Write-Host "PATH, use 'func5' to invoke v5 and keep 'func' pointing at v4."
+if ($existingFunc) {
+    Write-Host "Detected an existing 'func' at $existingFunc, leaving it as the default."
+    Write-Host "Use 'func5' to invoke v5; 'func' will continue to invoke the existing install."
+} else {
+    Write-Host "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
+    Write-Host "If you later install Core Tools v4, use 'func5' to keep invoking v5."
+}
 
 # --- Bug bash env vars ---
 
