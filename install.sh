@@ -123,6 +123,13 @@ if [ "$OS" = "osx" ]; then
     xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
 fi
 
+# Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
+cat > "${INSTALL_DIR}/func5" <<'EOF'
+#!/usr/bin/env bash
+exec "$(dirname "$0")/func" "$@"
+EOF
+chmod +x "${INSTALL_DIR}/func5"
+
 # --- Update PATH ---
 
 if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
@@ -150,6 +157,15 @@ echo "The Azure Functions CLI collects usage data in order to help us improve yo
 echo "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
 echo ""
 echo "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+
+# --- Side-by-side notice ---
+
+echo ""
+echo "Side-by-side with Core Tools v4"
+echo "-------------------------------"
+echo "A 'func5' alias was installed alongside 'func' so you can run v5 without"
+echo "shadowing an existing v4 install. If you already have Core Tools v4 on your"
+echo "PATH, use 'func5' to invoke v5 and keep 'func' pointing at v4."
 
 # --- Bug bash env vars ---
 

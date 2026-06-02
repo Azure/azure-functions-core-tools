@@ -123,6 +123,20 @@ try {
             xattr -d com.apple.quarantine (Join-Path $InstallDir 'func') 2>$null
         }
     }
+
+    # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
+    if ($os -eq 'win') {
+        $wrapperPath = Join-Path $InstallDir 'func5.cmd'
+        @(
+            '@echo off',
+            '"%~dp0\func.exe" %*'
+        ) -join "`r`n" | Set-Content -Path $wrapperPath -Encoding Ascii -NoNewline
+    } else {
+        $wrapperPath = Join-Path $InstallDir 'func5'
+        $wrapperBody = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
+        [System.IO.File]::WriteAllText($wrapperPath, $wrapperBody)
+        chmod +x $wrapperPath
+    }
 } finally {
     Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -155,6 +169,16 @@ Write-Host 'The Azure Functions CLI collects usage data in order to help us impr
 Write-Host "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
 Write-Host ''
 Write-Host "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+
+# --- Side-by-side notice ---
+
+$aliasName = if ($os -eq 'win') { 'func5.cmd' } else { 'func5' }
+Write-Host ''
+Write-Host 'Side-by-side with Core Tools v4'
+Write-Host '-------------------------------'
+Write-Host "A '$aliasName' alias was installed alongside 'func' so you can run v5 without"
+Write-Host "shadowing an existing v4 install. If you already have Core Tools v4 on your"
+Write-Host "PATH, use 'func5' to invoke v5 and keep 'func' pointing at v4."
 
 # --- Bug bash env vars ---
 
