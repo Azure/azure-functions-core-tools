@@ -351,6 +351,9 @@ if ($existingCmd -and -not $existingCmd.Source.StartsWith($installDirFull, [Syst
     $existingFunc = $existingCmd.Source
 }
 
+$pathUpdated = $false
+$pathProfilePath = $null
+
 if ($SkipPath) {
     Write-Message 'Skipping PATH update (-SkipPath).'
 } elseif ($DryRun) {
@@ -366,19 +369,18 @@ if ($SkipPath) {
             $env:PATH = "$InstallPath;$env:PATH"
         }
         [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')
-        Write-Message "Added $InstallPath to user PATH."
+        $pathUpdated = $true
     }
 } else {
     if ($env:PATH -notlike "*$InstallPath*") {
-        $shellProfile = if ($env:SHELL -like '*zsh*') { '~/.zshrc' } else { '~/.bashrc' }
-        if ($existingFunc) {
-            Write-Message "Add to your shell profile: export PATH=`"`$PATH`:$InstallPath`""
-            Write-Message "  echo 'export PATH=`"`$PATH`:$InstallPath`"' >> $shellProfile"
+        $pathProfilePath = if ($env:SHELL -like '*zsh*') { "$HOME/.zshrc" } else { "$HOME/.bashrc" }
+        $exportLine = if ($existingFunc) {
+            "export PATH=`"`$PATH`:$InstallPath`""
         } else {
-            Write-Message "Add to your shell profile: export PATH=`"$InstallPath`:`$PATH`""
-            Write-Message "  echo 'export PATH=`"$InstallPath`:`$PATH`"' >> $shellProfile"
+            "export PATH=`"$InstallPath`:`$PATH`""
         }
-        Write-Message "Then reload your shell: source $shellProfile (or open a new terminal)."
+        Add-Content -Path $pathProfilePath -Value "`n# Added by Azure Functions CLI installer`n$exportLine"
+        $pathUpdated = $true
     }
 }
 
@@ -397,43 +399,39 @@ if ($DryRun) {
     Exit-Script 0; return
 }
 
-Write-Message "func CLI $Version installed to $InstallPath" -Level Success
+Write-Message "func CLI $Version successfully installed to: $funcPath" -Level Success
 
-# --- Telemetry notice ---
-
-Write-Message ''
-Write-Message 'Telemetry'
-Write-Message '---------'
-Write-Message 'The Azure Functions CLI collects usage data in order to help us improve your experience.'
-Write-Message "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
-Write-Message ''
-Write-Message "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+if ($pathUpdated) {
+    if ($os -eq 'win') {
+        Write-Message "Added $InstallPath to PATH for current session"
+        Write-Message "Added $InstallPath to user PATH environment variable"
+    } else {
+        Write-Message "Successfully added func to `$PATH in $pathProfilePath" -Level Success
+    }
+}
 
 # --- Side-by-side notice ---
 
-Write-Message ''
-Write-Message 'Side-by-side with Core Tools v4'
-Write-Message '-------------------------------'
 if ($existingFunc) {
+    Write-Message ''
     Write-Message "Detected an existing 'func' at $existingFunc, leaving it as the default."
-    Write-Message "Use 'func5' to invoke v5; 'func' will continue to invoke the existing install."
-} else {
-    Write-Message "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
-    Write-Message "If you later install Core Tools v4, use 'func5' to keep invoking v5."
+    Write-Message "Use 'func5' to invoke v5."
 }
 
 # --- Reload shell reminder ---
 
-if (-not $SkipPath) {
-    Write-Message ''
-    Write-Message 'Reload your shell'
-    Write-Message '-----------------'
+if (-not $SkipPath -and -not $DryRun) {
     if ($os -eq 'win') {
-        Write-Message "Open a new terminal so 'func' and 'func5' are on PATH, or refresh the current session with:"
-        Write-Message "  `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','User') + ';' + [Environment]::GetEnvironmentVariable('PATH','Machine')"
-    } else {
-        $shellProfile = if ($env:SHELL -like '*zsh*') { '~/.zshrc' } else { '~/.bashrc' }
-        Write-Message "If 'func5' isn't found in your current shell, open a new terminal or run:"
-        Write-Message "  source $shellProfile"
+        Write-Message ''
+        Write-Message 'The func CLI is now available for use in this and new sessions.'
+    } elseif ($pathProfilePath) {
+        Write-Message ''
+        Write-Message 'To use the func CLI in new terminal sessions, restart your terminal or run:'
+        Write-Message "  source $pathProfilePath"
     }
 }
+
+# --- Telemetry notice ---
+
+Write-Message ''
+Write-Message 'Telemetry: this CLI collects anonymous usage data. Opt out with FUNC_CLI_TELEMETRY_OPTOUT=1.'

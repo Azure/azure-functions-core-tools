@@ -462,7 +462,6 @@ elif [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
             say_verbose "Export already present in $PROFILE"
         else
             printf "\n# Added by Azure Functions CLI installer\n%s\n" "$EXPORT_LINE" >> "$PROFILE"
-            say_info "Added ${INSTALL_DIR} to PATH in ${PROFILE}."
         fi
         if [[ "$PREPEND" == true ]]; then
             export PATH="${INSTALL_DIR}:${PATH}"
@@ -488,46 +487,29 @@ if [[ "$DRY_RUN" == true ]]; then
     exit 0
 fi
 
-say_success "func CLI ${VERSION} installed to ${INSTALL_DIR}"
-"${INSTALL_DIR}/func" --version
+say_success "func CLI ${VERSION} successfully installed to: ${INSTALL_DIR}/func"
 
-# --- Telemetry notice ---
-
-say_info ""
-say_info "Telemetry"
-say_info "---------"
-say_info "The Azure Functions CLI collects usage data in order to help us improve your experience."
-say_info "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
-say_info ""
-say_info "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+if [[ -n "$UPDATED_PROFILE" ]]; then
+    say_success "Successfully added func to \$PATH in ${UPDATED_PROFILE}"
+fi
 
 # --- Side-by-side notice ---
 
-say_info ""
-say_info "Side-by-side with Core Tools v4"
-say_info "-------------------------------"
 if [[ -n "$EXISTING_FUNC" ]]; then
+    say_info ""
     say_info "Detected an existing 'func' at ${EXISTING_FUNC}, leaving it as the default."
-    say_info "Use 'func5' to invoke v5; 'func' will continue to invoke the existing install."
-else
-    say_info "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
-    say_info "If you later install Core Tools v4, use 'func5' to keep invoking v5."
+    say_info "Use 'func5' to invoke v5."
 fi
 
 # --- Reload shell reminder ---
 
-if [[ "$SKIP_PATH" != true ]]; then
+if [[ "$SKIP_PATH" != true && -n "$UPDATED_PROFILE" ]]; then
     say_info ""
-    say_info "Reload your shell"
-    say_info "-----------------"
-    if [[ -n "$UPDATED_PROFILE" ]]; then
-        echo -e "${YELLOW}Reload your shell so 'func5' is on PATH in this session:${RESET}" >&2
-        say_info "  source ${UPDATED_PROFILE}"
-        say_info "Or open a new terminal window."
-    else
-        SHELL_NAME=$(basename "${SHELL:-bash}")
-        PROFILE_HINT=$(detect_shell_config "$SHELL_NAME")
-        say_info "If 'func5' isn't found in your current shell, open a new terminal or run:"
-        say_info "  source ${PROFILE_HINT}"
-    fi
+    say_info "To use the func CLI in new terminal sessions, restart your terminal or run:"
+    say_info "  source ${UPDATED_PROFILE}"
 fi
+
+# --- Telemetry notice ---
+
+say_info ""
+say_info "Telemetry: this CLI collects anonymous usage data. Opt out with FUNC_CLI_TELEMETRY_OPTOUT=1."
