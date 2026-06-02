@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Workers;
@@ -9,12 +11,17 @@ namespace Azure.Functions.Cli.Workers;
 /// <summary>
 /// Default worker resolver for content workload payloads.
 /// </summary>
-internal sealed class DefaultFunctionsWorkerContentResolver(IWorkerConfigFileSystem workerConfigFileSystem) : IFunctionsWorkerContentResolver
+internal sealed class DefaultFunctionsWorkerContentResolver(
+    IWorkerConfigFileSystem workerConfigFileSystem,
+    IOptions<WorkloadCatalogOptions> catalogOptions) : IFunctionsWorkerContentResolver
 {
     private const string WorkerConfigFileName = "worker.config.json";
 
     private readonly IWorkerConfigFileSystem _workerConfigFileSystem = workerConfigFileSystem
         ?? throw new ArgumentNullException(nameof(workerConfigFileSystem));
+
+    private readonly WorkloadCatalogOptions _catalogOptions = catalogOptions?.Value
+        ?? throw new ArgumentNullException(nameof(catalogOptions));
 
     public FunctionsWorkerResolutionResult ResolveWorker(
         FunctionsWorkerId workerId,
@@ -69,8 +76,9 @@ internal sealed class DefaultFunctionsWorkerContentResolver(IWorkerConfigFileSys
         return FunctionsWorkerResolutionResults.Resolved(resolvedWorker);
     }
 
-    private static bool SatisfiesConstraint(NuGetVersion version, VersionRange? constraint)
-        => constraint is null || constraint.Satisfies(version);
+    private bool SatisfiesConstraint(NuGetVersion version, VersionRange? constraint)
+        => constraint is null
+            || WorkloadVersionRanges.SatisfiesRange(constraint, version, _catalogOptions.IncludePrerelease);
 
     private static FunctionsWorkerResolutionResult NotInstalled(FunctionsWorkerId workerId)
         => NotInstalledResult(

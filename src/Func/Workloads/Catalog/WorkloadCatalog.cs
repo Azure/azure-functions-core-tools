@@ -109,25 +109,6 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
         return best;
     }
 
-    // NuGet's VersionRange.Satisfies rejects prerelease candidates when the
-    // range itself has no prerelease in its bounds (e.g. a range pinned to
-    // "[3.13.0]" rejects "3.13.0-preview.1" even though both share the same
-    // numeric version). When prerelease is enabled, re-check the candidate's
-    // numeric portion against the range so prerelease versions whose numeric
-    // version is inside the bounds are accepted.
     private static bool SatisfiesRange(VersionRange range, NuGetVersion candidate, bool includePrerelease)
-    {
-        if (range.Satisfies(candidate))
-        {
-            return true;
-        }
-
-        if (!includePrerelease || !candidate.IsPrerelease)
-        {
-            return false;
-        }
-
-        var numeric = new NuGetVersion(candidate.Major, candidate.Minor, candidate.Patch, candidate.Revision);
-        return range.Satisfies(numeric);
-    }
+        => WorkloadVersionRanges.SatisfiesRange(range, candidate, includePrerelease);
 }

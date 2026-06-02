@@ -2,3 +2,5 @@
 
 #### Changes
 
+- Fix `func start` failing to resolve installed prerelease worker workloads against built-in profile ranges (e.g. `node [3.13.0]` now accepts `3.13.0-preview.1`). (#5286)
+
