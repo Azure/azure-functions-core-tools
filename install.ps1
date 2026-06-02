@@ -146,9 +146,11 @@ try {
 # Detect a pre-existing 'func' that lives outside our install dir (e.g. Core Tools v4).
 # If one is present we APPEND our dir so the existing 'func' keeps winning and only
 # 'func5' resolves to v5. Otherwise we PREPEND so new users get 'func' = v5 by default.
+# Include both Application (.exe/.cmd/.bat) and ExternalScript (.ps1) so we catch
+# npm-installed shims, which use a .ps1 wrapper that wins over .cmd in pwsh.
 $installDirFull = (Resolve-Path $InstallDir).Path
 $existingFunc = $null
-$existingCmd = Get-Command func -ErrorAction SilentlyContinue | Where-Object { $_.CommandType -eq 'Application' } | Select-Object -First 1
+$existingCmd = Get-Command func -CommandType Application, ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($existingCmd -and -not $existingCmd.Source.StartsWith($installDirFull, [System.StringComparison]::OrdinalIgnoreCase)) {
     $existingFunc = $existingCmd.Source
 }
