@@ -27,16 +27,22 @@ curl -sSL https://aka.ms/func-cli/install.sh | bash
 
 Both scripts auto-detect your OS and architecture, download the latest 5.x release from GitHub, and install to `~/.azure-functions`.
 
+> v5 is currently pre-release only. Add `--prerelease` / `-Prerelease` (see below) until the first stable 5.x ships.
+
+If a v4 `func` is already on PATH (e.g., from npm), the installer leaves it as the default and installs a `func5` wrapper alongside so you can run v5 side-by-side without breaking v4.
+
 ### Options
+
+Pass flags to the installer using the patterns below. Run with `-Help` / `--help` for the full list (includes `-DryRun`, `-Verbose`, `-SkipPath`, `-KeepArchive`).
 
 | Option | PowerShell | Bash |
 |--------|-----------|------|
-| Include pre-releases | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Prerelease` | `curl -sSL https://aka.ms/func-cli/install.sh \| PRERELEASE=true bash` |
-| Specific version | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -Version 5.0.0` | `curl -sSL https://aka.ms/func-cli/install.sh \| VERSION=5.0.0 bash` |
-| Custom install dir | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -InstallDir ~/my-tools` | `curl -sSL https://aka.ms/func-cli/install.sh \| INSTALL_DIR=~/my-tools bash` |
-| Bug bash env vars | `& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1))) -BugBash` | `curl -sSL https://aka.ms/func-cli/install.sh \| BUGBASH=true bash` |
+| Include pre-releases | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --prerelease` |
+| Specific version | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Version 5.0.0"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --version 5.0.0` |
+| Custom install dir | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -InstallPath ~/my-tools"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --install-path ~/my-tools` |
+| Show help | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Help"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --help` |
 
-The `-BugBash` / `BUGBASH=true` option installs the CLI and then sets the pre-release workloads feed and quickstart manifest env vars (`FUNC_CLI_WORKLOADS_SOURCE`, `FUNC_CLI_QUICKSTART_MANIFEST_URL`) required for bug bash testing. The values are exported in the current session and persisted (to your shell profile on Linux/macOS, or user environment variables on Windows). The installer prints the exact assignments so you can re-set them if you switch terminals. Prerelease workload packages resolve automatically when the installed CLI is itself a prerelease build; the optional `FUNC_CLI_WORKLOADS_PRERELEASE=true|false` env var (or `--prerelease`/`--prerelease false` on `setup` / `workload install|update|search`) overrides that auto-detection in either direction.
+The Bash script also still honours the legacy environment variables (`VERSION`, `PRERELEASE=true`, `INSTALL_DIR`, `FORCE=true`, `SOURCE`) for back-compat. Flags take precedence.
 
 ### Unattended install
 
@@ -45,7 +51,7 @@ To chain commands after the installer (e.g., in CI pipelines or Dockerfiles), so
 **PowerShell:**
 
 ```powershell
-& ([scriptblock]::Create((irm https://aka.ms/func-cli/install.ps1)))
+iex "& { $(irm https://aka.ms/func-cli/install.ps1) }"
 func workload install dotnet
 ```
 
@@ -58,6 +64,8 @@ func workload install node
 ```
 
 The install script adds `~/.azure-functions` to your PATH automatically. In PowerShell, the current session is updated immediately. In Bash, you need to `source` your shell profile to pick up the change before running `func`.
+
+In GitHub Actions, the installer also appends the install dir to `$GITHUB_PATH`, so `func` is on PATH in subsequent steps without needing to source anything.
 
 ## Usage
 
