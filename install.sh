@@ -41,6 +41,22 @@ esac
 
 ASSET_NAME="func-${OS}-${ARCH}.tar.gz"
 
+# --- GitHub CLI detection ---
+
+# Prefer 'gh' when available and authenticated so the GitHub API calls below run
+# against the user's authenticated quota (5000/hr) instead of the anonymous
+# 60/hr limit that customers have been hitting from shared NAT egress.
+USE_GH="false"
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    USE_GH="true"
+fi
+
+if [ "$USE_GH" = "true" ]; then
+    echo "Using GitHub CLI ('gh') for release metadata and asset download (authenticated, higher rate limit)."
+else
+    echo "Using anonymous GitHub API requests. If you hit a rate limit, install and 'gh auth login' the GitHub CLI: https://cli.github.com"
+fi
+
 # --- Resolve version ---
 
 if [ -z "$VERSION" ]; then
@@ -51,7 +67,11 @@ if [ -z "$VERSION" ]; then
     fi
 
     # GitHub API returns releases newest-first. Extract tag_name + prerelease pairs, then filter.
-    RELEASES_JSON=$(curl -sSL "${API_BASE}/releases?per_page=50")
+    if [ "$USE_GH" = "true" ]; then
+        RELEASES_JSON=$(gh api "/repos/${REPO}/releases?per_page=50")
+    else
+        RELEASES_JSON=$(curl -sSL "${API_BASE}/releases?per_page=50")
+    fi
     VERSION=$(echo "$RELEASES_JSON" \
         | tr ',' '\n' \
         | grep -E '"tag_name"|"prerelease"' \
@@ -115,7 +135,11 @@ DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${ASSET_NA
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-curl -sSL -o "${TEMP_DIR}/${ASSET_NAME}" "$DOWNLOAD_URL"
+if [ "$USE_GH" = "true" ]; then
+    gh release download "$VERSION" --repo "$REPO" --pattern "$ASSET_NAME" --output "${TEMP_DIR}/${ASSET_NAME}" --clobber
+else
+    curl -sSL -o "${TEMP_DIR}/${ASSET_NAME}" "$DOWNLOAD_URL"
+fi
 mkdir -p "$INSTALL_DIR"
 tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
 
