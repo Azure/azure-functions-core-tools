@@ -116,6 +116,9 @@ https.get(options, response => {
                             fs.chmodSync(`${installPath}/in-proc6/func`, 0o755);
                         }
                     }
+                }).catch(err => {
+                    console.error(chalk.red('Error extracting zip file: ' + err.message));
+                    process.exit(1);
                 });
             });
         });
