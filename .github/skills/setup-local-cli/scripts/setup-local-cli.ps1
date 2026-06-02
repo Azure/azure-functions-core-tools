@@ -2,12 +2,16 @@
 <#
 .SYNOPSIS
     Build and publish func for the current OS/arch, stand up the local
-    workloads feed, and print a paste-ready shell snippet that aliases f5 to
-    the built binary and exports the workload + quickstart manifest env vars.
+    workloads feed, and print paste-ready shell snippets that alias f5 to
+    the built binary and export the workloads feed env var.
 
 .DESCRIPTION
     End-to-end local-loop setup so a contributor can iterate on the v5 CLI
     in their own terminal. See SKILL.md next to this script.
+
+    Both the CLI publish and the delegated build-workloads invocation run
+    with CI=true so contributors get the same FileVersion, workload
+    version suffix, and warnings-as-errors behaviour that customers see.
 
 .PARAMETER Configuration
     Build configuration for both the CLI publish and the workloads pack.
@@ -19,10 +23,6 @@
 
 .PARAMETER Port
     Host port for the local workloads feed. Default: 5555.
-
-.PARAMETER QuickstartManifestUrl
-    URL the CLI should load templates from. Default: the dev branch of
-    azure-functions-templates.
 
 .PARAMETER SkipWorkloads
     Skip the workloads-feed build/publish (assumes the feed is already up).
@@ -36,7 +36,6 @@ param(
     [string] $Configuration = 'Release',
     [string] $Rid,
     [int] $Port = 5555,
-    [string] $QuickstartManifestUrl = 'https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json',
     [switch] $SkipWorkloads,
     [switch] $SkipCli
 )
@@ -64,11 +63,17 @@ function Get-HostRid {
 
 if (-not $Rid) { $Rid = Get-HostRid }
 
+# Run both the CLI publish and the workloads build with CI=true so contributors
+# get the same FileVersion, workload version suffix, and warnings-as-errors
+# behaviour as the official CI/release builds (see eng/build/Version.props,
+# eng/build/Version.targets, eng/build/Release.props, eng/build/Engineering.props).
+$env:CI = 'true'
+
 if (-not $SkipCli) {
     if (Test-Path $cliOutDir) { Remove-Item -Recurse -Force $cliOutDir }
     New-Item -ItemType Directory -Path $cliOutDir | Out-Null
 
-    Write-Host "Publishing func ($Rid, $Configuration) to $cliOutDir ..." -ForegroundColor Cyan
+    Write-Host "Publishing func ($Rid, $Configuration, CI=true) to $cliOutDir ..." -ForegroundColor Cyan
     & dotnet publish $cliProject -c $Configuration -r $Rid -o $cliOutDir --nologo
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
 }
@@ -99,14 +104,18 @@ if (-not $SkipWorkloads) {
 }
 
 $feedUrl = "http://localhost:$Port/v3/index.json"
-$snippet = "alias f5=`"$funcPath`" && export FUNC_CLI_WORKLOADS_SOURCE=`"$feedUrl`" && export FUNC_CLI_QUICKSTART_MANIFEST_URL=`"$QuickstartManifestUrl`""
+$bashSnippet = "alias f5=`"$funcPath`" && export FUNC_CLI_WORKLOADS_SOURCE=`"$feedUrl`""
+$pwshSnippet = "function f5 { & `"$funcPath`" @args }; `$env:FUNC_CLI_WORKLOADS_SOURCE = `"$feedUrl`""
 
 Write-Host ""
-Write-Host "func binary:        $funcPath" -ForegroundColor Green
-Write-Host "Workloads feed:     $feedUrl" -ForegroundColor Green
-Write-Host "Quickstart manifest: $QuickstartManifestUrl" -ForegroundColor Green
+Write-Host "func binary:    $funcPath" -ForegroundColor Green
+Write-Host "Workloads feed: $feedUrl" -ForegroundColor Green
 Write-Host ""
-Write-Host "Paste this in your shell to use the CLI as 'f5':" -ForegroundColor Yellow
+Write-Host "Paste the snippet for your shell to use the CLI as 'f5':" -ForegroundColor Yellow
 Write-Host ""
-Write-Host $snippet
+Write-Host "Bash / zsh:" -ForegroundColor Yellow
+Write-Host $bashSnippet
+Write-Host ""
+Write-Host "PowerShell:" -ForegroundColor Yellow
+Write-Host $pwshSnippet
 Write-Host ""
