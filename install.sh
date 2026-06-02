@@ -311,10 +311,10 @@ resolve_version() {
                     }')
 
             if [[ -n "$pre_versions" ]]; then
-                say_error "No stable 5.x release found. Available pre-releases:"
-                echo "$pre_versions" | sed 's/^/  /' >&2
+                say_warning "No stable 5.x release found. Available pre-releases:"
+                echo "$pre_versions" | sed 's/^/  /'
                 say_info ""
-                say_error "To install a pre-release, re-run with --prerelease."
+                say_info "To install a pre-release, re-run with --prerelease."
                 exit 1
             fi
         fi

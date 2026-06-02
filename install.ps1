@@ -267,10 +267,10 @@ if (-not $Version) {
         if (-not $Prerelease) {
             $prereleases = $releases | Where-Object { $_.tag_name -match '^v?5\.' -and $_.prerelease }
             if ($prereleases) {
-                Write-Message 'No stable 5.x release found. Available pre-releases:' -Level Error
-                $prereleases | Select-Object -First 5 | ForEach-Object { Write-Message "  $($_.tag_name)" -Level Error }
+                Write-Message 'No stable 5.x release found. Available pre-releases:' -Level Warning
+                $prereleases | Select-Object -First 5 | ForEach-Object { Write-Message "  $($_.tag_name)" }
                 Write-Message ''
-                Write-Message 'To install a pre-release, re-run with -Prerelease.' -Level Error
+                Write-Message 'To install a pre-release, re-run with -Prerelease.'
                 Exit-Script 1; return
             }
         }
