@@ -8,10 +8,10 @@ using Azure.Functions.Cli.Hosting;
 namespace Azure.Functions.Cli.Commands.Update;
 
 /// <summary>
-/// Updates the installed func CLI in place. Modeled on
-/// <c>aspire update --self</c>: resolves the requested channel, downloads the
-/// matching GitHub release asset for the current RID, swaps the on-disk
-/// binary with backup/rollback, and verifies via <c>func --version</c>.
+/// Updates the installed func CLI in place: resolves the requested release
+/// channel, downloads the matching GitHub release asset for the current RID,
+/// swaps the on-disk binary with backup/rollback, and verifies via
+/// <c>func --version</c>.
 /// </summary>
 /// <remarks>
 /// Option surface is wired up now so help text, parser composition, and DI
