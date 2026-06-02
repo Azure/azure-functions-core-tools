@@ -27,6 +27,10 @@ curl -sSL https://aka.ms/func-cli/install.sh | bash
 
 Both scripts auto-detect your OS and architecture, download the latest 5.x release from GitHub, and install to `~/.azure-functions`.
 
+> v5 is currently pre-release only. Add `--prerelease` / `-Prerelease` (see below) until the first stable 5.x ships.
+
+If a v4 `func` is already on PATH (e.g., from npm), the installer leaves it as the default and installs a `func5` wrapper alongside so you can run v5 side-by-side without breaking v4.
+
 ### Options
 
 Pass flags to the installer using the patterns below. Run with `-Help` / `--help` for the full list (includes `-DryRun`, `-Verbose`, `-SkipPath`, `-KeepArchive`).
