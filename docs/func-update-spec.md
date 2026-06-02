@@ -48,6 +48,44 @@ Precedence:
 
 No per-project channel config.
 
+### Version classification (SemVer)
+
+Release classification uses [SemVer 2.0](https://semver.org/) on the GitHub
+release tag, NOT the GitHub `prerelease` flag on the release object. The repo
+already publishes tags in SemVer form:
+
+| Tag           | SemVer parse                               | Channel    |
+| ------------- | ------------------------------------------ | ---------- |
+| `v5.0.0`      | `5.0.0` (no prerelease label)              | stable     |
+| `v5.1.2`      | `5.1.2` (no prerelease label)              | stable     |
+| `v5.0.0-preview.1` | `5.0.0-preview.1` (prerelease label)  | prerelease |
+| `v5.0.0-rc.1` | `5.0.0-rc.1` (prerelease label)            | prerelease |
+
+Rules:
+
+- A release is **stable** iff `SemVersion.Prerelease` is empty.
+- A release is **prerelease** iff `SemVersion.Prerelease` is non-empty
+  (any label: `preview.N`, `rc.N`, `beta.N`, etc.).
+- Tag → version: strip a leading `v`, then `SemVersion.Parse(value, SemVersionStyles.Strict)`.
+  Tags that don't parse strictly are skipped with a debug log.
+- "Latest" within a channel = the max `SemVersion` by SemVer precedence (NOT
+  GitHub's `published_at` ordering), filtered to the channel set defined above.
+- The GitHub release object's `prerelease` boolean is used only as a tiebreaker
+  when SemVer alone is ambiguous (which it shouldn't be for our tags). The
+  authoritative signal is the SemVer prerelease label.
+- The running CLI's own version (from `AssemblyCliVersionProvider`) is parsed
+  the same way, so "newer than current" comparisons use SemVer precedence.
+
+This keeps `func update` and the install scripts in lockstep: both already
+decide "is this a prerelease?" from the SemVer label, so a tag like
+`v5.0.0-preview.1` is treated as prerelease everywhere without any extra
+metadata.
+
+We pick up [Semver](https://www.nuget.org/packages/Semver) (the library Aspire
+uses) rather than `NuGet.Versioning`. It's a single small dependency that
+implements SemVer 2.0 cleanly and matches the upstream reference we're
+mirroring.
+
 ### Release channels vs deployment channels (future)
 
 The `--prerelease` flag selects a **release channel** (which GitHub release to
