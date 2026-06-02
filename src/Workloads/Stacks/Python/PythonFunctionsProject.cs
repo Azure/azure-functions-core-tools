@@ -39,10 +39,11 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         _workerReference = FunctionsWorkerReference.FromWorkload("python");
     }
 
-    // Internal seams so tests can stub interpreter / pip invocations.
-    internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunCreateVenv { get; set; } = DefaultRunCreateVenv;
+    // Internal seams so tests can stub interpreter / pip invocations. stdout and stderr lines are streamed
+    // to the callbacks as the process produces them, and the task yields the process exit code.
+    internal Func<string, string, Action<string>, Action<string>, CancellationToken, Task<int>> RunCreateVenv { get; set; } = DefaultRunCreateVenv;
 
-    internal Func<string, string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunPipInstall { get; set; } = DefaultRunPipInstall;
+    internal Func<string, string, string, Action<string>, Action<string>, CancellationToken, Task<int>> RunPipInstall { get; set; } = DefaultRunPipInstall;
 
     internal Func<string, CancellationToken, Task<string?>> ReadPythonVersion { get; set; } = DefaultReadPythonVersion;
 
@@ -72,14 +73,17 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         {
             context.Reporter.ReportStatus($"Creating Python virtual environment in {Path.GetFileName(venvPath)}");
 
-            (int exitCode, string stderr) = await RunCreateVenv(root, venvPath, cancellationToken).ConfigureAwait(false);
-
-            WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+            int exitCode = await RunCreateVenv(
+                root,
+                venvPath,
+                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                cancellationToken).ConfigureAwait(false);
 
             if (exitCode != 0)
             {
                 throw new GracefulException(
-                    $"'python -m venv {Path.GetFileName(venvPath)}' failed (exit {exitCode}). {stderr?.Trim()}",
+                    $"'python -m venv {Path.GetFileName(venvPath)}' failed (exit {exitCode}).",
                     isUserError: true);
             }
         }
@@ -90,14 +94,18 @@ internal sealed class PythonFunctionsProject : FunctionsProject
             context.Reporter.ReportStatus($"Installing Python dependencies from {RequirementsFileName}");
 
             string pipPath = GetVenvExecutablePath(venvPath, "pip");
-            (int exitCode, string stderr) = await RunPipInstall(root, pipPath, requirementsPath, cancellationToken).ConfigureAwait(false);
-
-            WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+            int exitCode = await RunPipInstall(
+                root,
+                pipPath,
+                requirementsPath,
+                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+                line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                cancellationToken).ConfigureAwait(false);
 
             if (exitCode != 0)
             {
                 throw new GracefulException(
-                    $"'pip install -r {RequirementsFileName}' failed (exit {exitCode}). {stderr?.Trim()}",
+                    $"'pip install -r {RequirementsFileName}' failed (exit {exitCode}).",
                     isUserError: true);
             }
         }
@@ -118,14 +126,6 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         if (!string.IsNullOrEmpty(majorMinor))
         {
             context.EnvironmentVariables[WorkerRuntimeVersionEnvVar] = majorMinor;
-        }
-    }
-
-    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
-    {
-        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            reporter.WriteLog(line, severity);
         }
     }
 
@@ -164,7 +164,12 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         return (Path.Combine(projectRoot, DefaultVenvFolderName), false);
     }
 
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunCreateVenv(string workingDirectory, string venvPath, CancellationToken cancellationToken)
+    private static async Task<int> DefaultRunCreateVenv(
+        string workingDirectory,
+        string venvPath,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
+        CancellationToken cancellationToken)
     {
         // Prefer `python3` on POSIX so we don't pick up a Python 2 shim. If the
         // interpreter isn't on PATH (Win32Exception from Process.Start), retry
@@ -174,29 +179,43 @@ internal sealed class PythonFunctionsProject : FunctionsProject
             ? ["python", "python3"]
             : ["python3", "python"];
 
-        (int ExitCode, string Stderr) last = (-1, "No Python interpreter was found.");
         foreach (string interpreter in interpreters)
         {
-            (int exitCode, string stderr, bool launched) = await TryRunProcessAsync(
+            (int exitCode, bool launched) = await TryRunProcessStreamingAsync(
                 interpreter,
                 ["-m", "venv", venvPath],
                 workingDirectory,
+                onOutputLine,
+                onErrorLine,
                 cancellationToken).ConfigureAwait(false);
 
             if (launched)
             {
-                return (exitCode, stderr);
+                return exitCode;
             }
-
-            last = (exitCode, stderr);
         }
 
-        return last;
+        onErrorLine("No Python interpreter was found.");
+        return -1;
     }
 
-    private static Task<(int ExitCode, string Stderr)> DefaultRunPipInstall(string workingDirectory, string pipPath, string requirementsPath, CancellationToken cancellationToken)
+    private static async Task<int> DefaultRunPipInstall(
+        string workingDirectory,
+        string pipPath,
+        string requirementsPath,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
+        CancellationToken cancellationToken)
     {
-        return RunProcessAsync(pipPath, ["install", "-r", requirementsPath], workingDirectory, cancellationToken);
+        (int exitCode, _) = await TryRunProcessStreamingAsync(
+            pipPath,
+            ["install", "-r", requirementsPath],
+            workingDirectory,
+            onOutputLine,
+            onErrorLine,
+            cancellationToken).ConfigureAwait(false);
+
+        return exitCode;
     }
 
     private static async Task<string?> DefaultReadPythonVersion(string pythonPath, CancellationToken cancellationToken)
@@ -241,61 +260,111 @@ internal sealed class PythonFunctionsProject : FunctionsProject
         }
     }
 
-    private static async Task<(int ExitCode, string Stderr)> RunProcessAsync(
+    // Streams each line of stdout and stderr to the callbacks as the process produces them, waits for exit,
+    // and returns the exit code plus whether the process actually launched. A failure to launch (interpreter
+    // not on PATH) is reported via Launched=false so the caller can fall back to another interpreter.
+    private static async Task<(int ExitCode, bool Launched)> TryRunProcessStreamingAsync(
         string fileName,
         IReadOnlyList<string> args,
         string workingDirectory,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
         CancellationToken cancellationToken)
     {
-        (int exitCode, string stderr, _) = await TryRunProcessAsync(fileName, args, workingDirectory, cancellationToken).ConfigureAwait(false);
-        return (exitCode, stderr);
-    }
+        var psi = new ProcessStartInfo
+        {
+            FileName = fileName,
+            WorkingDirectory = workingDirectory,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
 
-    private static async Task<(int ExitCode, string Stderr, bool Launched)> TryRunProcessAsync(
-        string fileName,
-        IReadOnlyList<string> args,
-        string workingDirectory,
-        CancellationToken cancellationToken)
-    {
+        foreach (string arg in args)
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        using var process = new Process { StartInfo = psi };
+
+        // stdout and stderr are delivered on separate thread-pool threads, so each stream gets its own
+        // completion signal; each line callback is invoked only from its own stream's thread.
+        TaskCompletionSource stdoutComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource stderrComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stdoutComplete.TrySetResult();
+            }
+            else
+            {
+                onOutputLine(e.Data);
+            }
+        };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stderrComplete.TrySetResult();
+            }
+            else
+            {
+                onErrorLine(e.Data);
+            }
+        };
+
         try
         {
-            var psi = new ProcessStartInfo
+            if (!process.Start())
             {
-                FileName = fileName,
-                WorkingDirectory = workingDirectory,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            foreach (string arg in args)
-            {
-                psi.ArgumentList.Add(arg);
+                onErrorLine($"Failed to start '{fileName}' process.");
+                return (-1, true);
             }
 
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return (-1, $"Failed to start '{fileName}' process.", false);
-            }
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
 
-            // Drain stdout and stderr in parallel: if either pipe buffer (~64KB) fills
-            // while we're only reading the other, the child blocks on write and we deadlock.
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, await stderrTask.ConfigureAwait(false), true);
+
+            // WaitForExitAsync does not guarantee the async stream readers have drained, so wait for the
+            // trailing (null Data) sentinel on both streams to ensure every line has been delivered.
+            await stdoutComplete.Task.ConfigureAwait(false);
+            await stderrComplete.Task.ConfigureAwait(false);
+
+            return (process.ExitCode, true);
         }
-        catch (Win32Exception ex)
+        catch (Win32Exception)
         {
             // Interpreter wasn't on PATH; let the caller try a fallback.
-            return (-1, ex.Message, false);
+            return (-1, false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return (-1, ex.Message, true);
+            onErrorLine(ex.Message);
+            return (-1, true);
+        }
+        finally
+        {
+            KillProcess(process);
+        }
+    }
+
+    private static void KillProcess(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception)
+        {
+            // Best effort: don't mask the original outcome if the process has already exited.
         }
     }
 }

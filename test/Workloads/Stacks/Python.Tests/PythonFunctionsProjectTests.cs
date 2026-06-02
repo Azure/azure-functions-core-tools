@@ -40,17 +40,17 @@ public class PythonFunctionsProjectTests : IDisposable
 
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, path, _) =>
+            RunCreateVenv = (_, path, _, _, _) =>
             {
                 venvCreatedAt = path;
                 Directory.CreateDirectory(path);
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, pip, req, _) =>
+            RunPipInstall = (_, pip, req, _, _, _) =>
             {
                 pipUsed = pip;
                 requirementsUsed = req;
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
             ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
             ReadEnvironmentVariable = _ => null,
@@ -73,12 +73,12 @@ public class PythonFunctionsProjectTests : IDisposable
         bool venvCreated = false;
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, _, _) =>
+            RunCreateVenv = (_, _, _, _, _) =>
             {
                 venvCreated = true;
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            RunPipInstall = (_, _, _, _, _, _) => Task.FromResult(0),
             ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
             ReadEnvironmentVariable = _ => null,
         };
@@ -94,15 +94,15 @@ public class PythonFunctionsProjectTests : IDisposable
         bool pipRan = false;
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, path, _) =>
+            RunCreateVenv = (_, path, _, _, _) =>
             {
                 Directory.CreateDirectory(path);
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, _, _, _) =>
+            RunPipInstall = (_, _, _, _, _, _) =>
             {
                 pipRan = true;
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
             ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
             ReadEnvironmentVariable = _ => null,
@@ -114,21 +114,55 @@ public class PythonFunctionsProjectTests : IDisposable
     }
 
     [Fact]
+    public async Task PrepareForHostRun_streams_venv_output_to_reporter()
+    {
+        var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        {
+            RunCreateVenv = (_, path, onOut, onErr, _) =>
+            {
+                Directory.CreateDirectory(path);
+                onOut("created virtual environment");
+                onErr("venv warning");
+                return Task.FromResult(0);
+            },
+            RunPipInstall = (_, _, _, _, _, _) => Task.FromResult(0),
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
+            ReadEnvironmentVariable = _ => null,
+        };
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
+
+        await project.PrepareForHostRunAsync(context, default);
+
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "created virtual environment");
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "venv warning");
+    }
+
+    [Fact]
     public async Task PrepareForHostRun_throws_graceful_on_venv_failure()
     {
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, _, _) => Task.FromResult((1, "python not found")),
-            RunPipInstall = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            RunCreateVenv = (_, _, _, onErr, _) =>
+            {
+                onErr("python not found");
+                return Task.FromResult(1);
+            },
+            RunPipInstall = (_, _, _, _, _, _) => Task.FromResult(0),
             ReadEnvironmentVariable = _ => null,
         };
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+            () => project.PrepareForHostRunAsync(context, default));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("venv", ex.Message);
-        Assert.Contains("python not found", ex.Message);
+        Assert.Contains("exit 1", ex.Message);
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "python not found");
     }
 
     [Fact]
@@ -137,21 +171,29 @@ public class PythonFunctionsProjectTests : IDisposable
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "broken==");
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, path, _) =>
+            RunCreateVenv = (_, path, _, _, _) =>
             {
                 Directory.CreateDirectory(path);
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, _, _, _) => Task.FromResult((2, "invalid spec")),
+            RunPipInstall = (_, _, _, _, onErr, _) =>
+            {
+                onErr("invalid spec");
+                return Task.FromResult(2);
+            },
             ReadEnvironmentVariable = _ => null,
         };
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+            () => project.PrepareForHostRunAsync(context, default));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("pip install", ex.Message);
-        Assert.Contains("invalid spec", ex.Message);
+        Assert.Contains("exit 2", ex.Message);
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "invalid spec");
     }
 
     [Fact]
@@ -160,12 +202,12 @@ public class PythonFunctionsProjectTests : IDisposable
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, path, _) =>
+            RunCreateVenv = (_, path, _, _, _) =>
             {
                 Directory.CreateDirectory(path);
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            RunPipInstall = (_, _, _, _, _, _) => Task.FromResult(0),
             ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.12"),
             ReadEnvironmentVariable = _ => null,
         };
@@ -186,12 +228,12 @@ public class PythonFunctionsProjectTests : IDisposable
     {
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, path, _) =>
+            RunCreateVenv = (_, path, _, _, _) =>
             {
                 Directory.CreateDirectory(path);
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, _, _, _) => Task.FromResult((0, string.Empty)),
+            RunPipInstall = (_, _, _, _, _, _) => Task.FromResult(0),
             ReadPythonVersion = (_, _) => Task.FromResult<string?>(null),
             ReadEnvironmentVariable = _ => null,
         };
@@ -213,15 +255,15 @@ public class PythonFunctionsProjectTests : IDisposable
 
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, _, _) =>
+            RunCreateVenv = (_, _, _, _, _) =>
             {
                 venvCreated = true;
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, pip, _, _) =>
+            RunPipInstall = (_, pip, _, _, _, _) =>
             {
                 pipUsed = pip;
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
             ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
             ReadEnvironmentVariable = name => name == PythonFunctionsProject.VirtualEnvEnvVar ? activatedVenv : null,
@@ -249,15 +291,15 @@ public class PythonFunctionsProjectTests : IDisposable
 
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
-            RunCreateVenv = (_, _, _) =>
+            RunCreateVenv = (_, _, _, _, _) =>
             {
                 venvCreated = true;
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
-            RunPipInstall = (_, pip, _, _) =>
+            RunPipInstall = (_, pip, _, _, _, _) =>
             {
                 pipUsed = pip;
-                return Task.FromResult((0, string.Empty));
+                return Task.FromResult(0);
             },
             ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.11"),
             ReadEnvironmentVariable = _ => null,
@@ -276,4 +318,33 @@ public class PythonFunctionsProjectTests : IDisposable
         {
             ["FUNCTIONS_WORKER_RUNTIME"] = "python",
         });
+
+    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    {
+        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly object _gate = new();
+
+        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _logs.ToArray();
+                }
+            }
+        }
+
+        public void ReportStatus(string message)
+        {
+        }
+
+        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        {
+            lock (_gate)
+            {
+                _logs.Add((line, severity));
+            }
+        }
+    }
 }
