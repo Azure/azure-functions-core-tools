@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Configuration;
 using NuGet.Versioning;
@@ -181,7 +182,7 @@ public class DefaultFunctionsWorkerInstallerTests
     [Fact]
     public void Ctor_NullDependencies_Throw()
     {
-        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem);
+        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()));
 
         Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerInstaller(null!, _workloadInstaller, _workloadPaths, contentResolver));
         Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, null!, _workloadPaths, contentResolver));
@@ -191,7 +192,7 @@ public class DefaultFunctionsWorkerInstallerTests
 
     private DefaultFunctionsWorkerInstaller CreateInstaller()
     {
-        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem);
+        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()));
         return new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, _workloadPaths, contentResolver);
     }
 

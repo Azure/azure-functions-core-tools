@@ -3,6 +3,8 @@
 
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Versioning;
 using Xunit;
@@ -264,7 +266,52 @@ public class DefaultFunctionsWorkerResolverTests
     [Fact]
     public void ContentResolverCtor_NullWorkerConfigFileSystem_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerContentResolver(null!));
+        Assert.Throws<ArgumentNullException>(
+            () => new DefaultFunctionsWorkerContentResolver(null!, Options.Create(new WorkloadCatalogOptions())));
+    }
+
+    [Fact]
+    public void ContentResolverCtor_NullCatalogOptions_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerContentResolver(_fileSystem, null!));
+    }
+
+    [Fact]
+    public async Task ResolveWorkerAsync_ExactStableRange_ResolvesPrereleaseInstalled_WhenIncludePrereleaseTrue()
+    {
+        // Repro for issue #5286: built-in profile pins worker to exact stable [3.13.0]
+        // but the catalog/installer only has 3.13.0-preview.1 installed. The resolver
+        // must accept the prerelease when prerelease is enabled.
+        ContentWorkloadInfo preview = CreateContentWorkload(NodeWorkerPackageId, "3.13.0-preview.1");
+        UseContentWorkloads(preview);
+
+        DefaultFunctionsWorkerResolver resolver = CreateResolver(
+            new Dictionary<string, VersionRange> { ["node"] = VersionRange.Parse("[3.13.0]") },
+            includePrerelease: true);
+
+        FunctionsWorkerResolutionResult result = await resolver.ResolveWorkerAsync(
+            new FunctionsWorkerId("node"),
+            CancellationToken.None);
+
+        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        Assert.Equal("3.13.0-preview.1", resolved.Worker.Version);
+    }
+
+    [Fact]
+    public async Task ResolveWorkerAsync_ExactStableRange_RejectsPrereleaseInstalled_WhenIncludePrereleaseFalse()
+    {
+        ContentWorkloadInfo preview = CreateContentWorkload(NodeWorkerPackageId, "3.13.0-preview.1");
+        UseContentWorkloads(preview);
+
+        DefaultFunctionsWorkerResolver resolver = CreateResolver(
+            new Dictionary<string, VersionRange> { ["node"] = VersionRange.Parse("[3.13.0]") },
+            includePrerelease: false);
+
+        FunctionsWorkerResolutionResult result = await resolver.ResolveWorkerAsync(
+            new FunctionsWorkerId("node"),
+            CancellationToken.None);
+
+        Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
     }
 
     private void UseContentWorkloads(params ContentWorkloadInfo[] workloads)
@@ -280,10 +327,13 @@ public class DefaultFunctionsWorkerResolverTests
             });
     }
 
-    private DefaultFunctionsWorkerResolver CreateResolver(IReadOnlyDictionary<string, VersionRange>? workerVersionRanges = null)
-        => new(_workloads, CreateContentResolver(), workerVersionRanges);
+    private DefaultFunctionsWorkerResolver CreateResolver(
+        IReadOnlyDictionary<string, VersionRange>? workerVersionRanges = null,
+        bool includePrerelease = false)
+        => new(_workloads, CreateContentResolver(includePrerelease), workerVersionRanges);
 
-    private DefaultFunctionsWorkerContentResolver CreateContentResolver() => new(_fileSystem);
+    private DefaultFunctionsWorkerContentResolver CreateContentResolver(bool includePrerelease = false)
+        => new(_fileSystem, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
 
     private static ContentWorkloadInfo CreateContentWorkload(string packageId, string packageVersion, IReadOnlyList<string>? aliases = null)
     {
