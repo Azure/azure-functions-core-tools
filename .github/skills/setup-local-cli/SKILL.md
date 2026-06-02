@@ -1,13 +1,17 @@
 ---
 name: setup-local-cli
-description: 'Use when a contributor wants a ready-to-use local v5 CLI build: publishes func for the host RID to artifacts/func-cli, refreshes the local workloads feed, and prints a paste-ready shell snippet that aliases f5 to the binary and exports the workload + quickstart manifest env vars.'
+description: 'Use when a contributor wants a ready-to-use local v5 CLI build: publishes func for the host RID to artifacts/func-cli, refreshes the local workloads feed, and prints paste-ready bash and PowerShell snippets that alias f5 to the binary and export the workloads feed env var.'
 ---
 
 # Set Up the Local v5 CLI for Hand Testing
 
 Contributors iterating on v5 want to drive the CLI from a real shell, not
 `dotnet run`. This skill builds everything needed for that loop in one go and
-hands back a single line to paste.
+hands back a snippet per shell to paste.
+
+Both the CLI publish and the delegated `build-workloads` invocation run with
+`CI=true` so contributors get the same `FileVersion`, workload version suffix,
+and warnings-as-errors behaviour that customers see in official builds.
 
 What it produces:
 
@@ -16,9 +20,17 @@ What it produces:
 2. A clean local NuGet feed at `http://localhost:5555/v3/index.json` populated
    with every workload package in the repo (delegates to the `build-workloads`
    skill).
-3. A one-line snippet the user pastes in their own shell, of the form:
+3. Two paste-ready snippets, one per shell. Pick the one for the shell you
+   want to run `f5` from:
+
+   Bash / zsh:
    ```
-   alias f5="<repo>/artifacts/func-cli/func" && export FUNC_CLI_WORKLOADS_SOURCE="http://localhost:5555/v3/index.json" && export FUNC_CLI_QUICKSTART_MANIFEST_URL="https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
+   alias f5="<repo>/artifacts/func-cli/func" && export FUNC_CLI_WORKLOADS_SOURCE="http://localhost:5555/v3/index.json"
+   ```
+
+   PowerShell:
+   ```
+   function f5 { & "<repo>/artifacts/func-cli/func" @args }; $env:FUNC_CLI_WORKLOADS_SOURCE = "http://localhost:5555/v3/index.json"
    ```
 
 Use this skill when the user says things like:
@@ -37,14 +49,13 @@ pwsh ./.github/skills/setup-local-cli/scripts/setup-local-cli.ps1
 
 Flags worth knowing (see script header for the full list):
 
-- `-Configuration <Debug|Release>` — default `Release`.
-- `-Rid <rid>` — override the auto-detected host RID
+- `-Configuration <Debug|Release>`, default `Release`.
+- `-Rid <rid>`, override the auto-detected host RID
   (`osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`).
-- `-Port <int>` — host port for the workloads feed (default `5555`).
-- `-QuickstartManifestUrl <url>` — override the templates manifest URL.
-- `-SkipWorkloads` — skip the feed teardown + rebuild (the feed is already up
+- `-Port <int>`, host port for the workloads feed (default `5555`).
+- `-SkipWorkloads`, skip the feed teardown and rebuild (the feed is already up
   and current).
-- `-SkipCli` — skip the CLI publish (an existing
+- `-SkipCli`, skip the CLI publish (an existing
   `artifacts/func-cli/func` is fine).
 
 The script is the source of truth. If a flag is in the script but missing
