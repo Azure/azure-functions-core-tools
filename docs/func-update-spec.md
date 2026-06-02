@@ -10,18 +10,18 @@ the func CLI has no separate project-pinning concern: `func update` always means
 ## User experience
 
 ```text
-func update                       # update to latest on the current channel (default: stable)
-func update --channel preview     # update to latest on the preview channel
+func update                       # update to latest stable release
+func update --prerelease          # update to latest release including prereleases
 func update --version 5.1.0       # pin to a specific version
 func update -y / --yes            # skip confirmation prompts (required when non-interactive)
 ```
 
-Channel values: `stable` (default), `preview`. Case-insensitive. Unknown values
-fail with a `GracefulException` listing the valid set.
+`--prerelease` matches the existing install scripts (`install.sh PRERELEASE=true`
+/ `install.ps1 -Prerelease`) so the same mental model carries over.
 
 Output is concise, themed via `IInteractionService` / `ITheme`:
 
-1. Resolve channel (stable/preview).
+1. Resolve channel (stable, or prerelease when `--prerelease`).
 2. Show "Checking for updates…" spinner; print current + latest version.
 3. If up to date, exit 0 with a one-liner.
 4. If newer, prompt `Update func from X to Y? (Y/n)` (suppressed by `-y` / `--yes`).
@@ -33,21 +33,42 @@ Exit codes: `0` success / already current, non-zero on failure
 
 ## Channel resolution
 
-Two channels, matching the existing install-script behaviour:
+Two release channels, matching the existing install-script behaviour:
 
 | Channel | Source | Selector |
 | --- | --- | --- |
 | stable | latest non-prerelease GitHub release | default |
-| preview | latest GitHub release including prereleases | `--channel preview` |
+| prerelease | latest GitHub release including prereleases | `--prerelease` |
 
 Precedence:
 
-1. `--version X.Y.Z` (explicit, wins; `--channel` still resolves the feed).
-2. `--channel <name>`.
-3. Default → `stable`.
+1. `--version X.Y.Z` (explicit, wins; `--prerelease` is still allowed for clarity).
+2. `--prerelease` flag → prerelease channel.
+3. Default → stable.
 
-Channel values are case-insensitive. Unknown values fail with a
-`GracefulException` listing the valid set. No per-project channel config.
+No per-project channel config.
+
+### Release channels vs deployment channels (future)
+
+The `--prerelease` flag selects a **release channel** (which GitHub release to
+fetch). It is intentionally distinct from the **deployment channel**, i.e. the
+install method the user originally used (GitHub install script, npm, Homebrew,
+Chocolatey, winget, MSI).
+
+When we later support installing via npm / Homebrew / etc., `func update` MUST
+keep the user on their original deployment channel:
+
+- A user who installed via `npm i -g` should be told to run `npm i -g …` and
+  never have their npm-owned files overwritten by an in-process binary swap.
+- A Homebrew user should be told to run `brew upgrade`, and so on.
+- Only the install-script deployment channel (`~/.azure-functions/func`) ever
+  performs an in-process update.
+
+The install-method detector (see below) is the mechanism that enforces this.
+The `--prerelease` selector on `func update` still applies inside whichever
+deployment channel the user is on (e.g. `npm i -g @azure/functions-core-tools@next`
+for prerelease on npm), so the user-facing flag stays consistent across all
+install methods.
 
 ## Install-method detection (must do, copy from Aspire)
 
@@ -148,8 +169,8 @@ update as the user's explicit `func update` invocation.
 Behaviour:
 
 - On every `func` invocation, a background task asks `IReleaseFeed` for the
-  latest version on the current channel (`stable` by default; `preview` when
-  the running build is a preview, mirroring the install-script auto-detect).
+  latest version on the current channel (stable by default; prerelease when
+  the running build is a prerelease, mirroring the install-script auto-detect).
 - The check is cached on disk under `~/.azure-functions/.update-check.json`
   (`{ checkedAt, latestVersion, channel }`). TTL: 24 hours. Cache hit → no
   network call.
