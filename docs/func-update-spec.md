@@ -139,10 +139,68 @@ utilities. Wire registrations in `Program.cs` / DI module. Add to
 - `CliInstallerTests` — fake filesystem + fake archive: happy path, version-probe failure → rollback, write-permission failure → rollback, partial extract failure → rollback, backup cleanup.
 - `GitHubReleaseFeedTests` — `HttpMessageHandler` stub returning fixture payloads; stable vs prerelease filtering, asset matching by RID, hash field plumbing.
 
+## Update notifier (in scope)
+
+Modeled on Aspire's `ICliUpdateNotifier`: a low-cost, non-blocking check that
+prints a single hint when a newer release is available, leaving the actual
+update as the user's explicit `func update` invocation.
+
+Behaviour:
+
+- On every `func` invocation, a background task asks `IReleaseFeed` for the
+  latest version on the current channel (`stable` by default; `preview` when
+  the running build is a preview, mirroring the install-script auto-detect).
+- The check is cached on disk under `~/.azure-functions/.update-check.json`
+  (`{ checkedAt, latestVersion, channel }`). TTL: 24 hours. Cache hit → no
+  network call.
+- The check never blocks the command: it runs in parallel with the invoked
+  command and is awaited briefly at shutdown. If it hasn't completed (or
+  errored, or is rate-limited) the CLI exits without printing anything.
+- When a newer version is detected, a single themed line is printed to stderr
+  after the command's normal output:
+
+  ```text
+  A new func release is available: 5.1.0 → 5.2.0
+  Run 'func update' to upgrade.
+  ```
+
+- Suppressed when:
+  - `--quiet` / non-TTY stderr.
+  - `FUNC_CLI_UPDATE_NOTIFIER=0` is set.
+  - The current invocation IS `func update` (avoid double-printing).
+  - The detected install method is a package manager (npm/brew/choco/winget):
+    the hint instead points at the appropriate `upgrade` command, same as
+    `func update` itself.
+- Failures (network, JSON parse, FS) are logged at `Debug` and swallowed.
+  The notifier MUST NOT change exit codes or surface stack traces.
+
+Out of the notifier's scope (separate follow-up):
+- Telemetry on hint-shown / hint-acted-on rates.
+- Per-channel opt-out (the env var is global on/off for v1).
+
+### Notifier code layout
+
+```text
+src/Func/Update/
+  ICliUpdateNotifier.cs
+  CliUpdateNotifier.cs        # background check + cache + render
+  UpdateCheckCache.cs         # JSON read/write on ~/.azure-functions/.update-check.json
+```
+
+Wired in `Program.cs` so the notifier is started before command execution and
+awaited (with a short timeout) during shutdown.
+
+### Notifier tests
+
+- `CliUpdateNotifierTests` — fresh check / cache hit / cache stale, env-var
+  off, package-manager install path (no hint), `func update` invocation
+  (suppressed), network failure (silent).
+- `UpdateCheckCacheTests` — JSON round-trip, corrupted-file recovery, TTL
+  boundary, concurrent-write race (best-effort, single writer wins).
+
 ## Out of scope (for this spec)
 
-- Background "update available" notifier on every command (Aspire's `ICliUpdateNotifier`). Track separately.
-- Auto-update on launch. Always explicit.
+- Silent in-process auto-update on launch (download + swap without user action). Notifier only; the actual update remains an explicit `func update`.
 - Updating across major versions with breaking workload changes — same UX, but the install method detector must refuse `--version <older-major>` downgrades unless `--force` is passed.
 - Telemetry events (add once the telemetry surface stabilises).
 
