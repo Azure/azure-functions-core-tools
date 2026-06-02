@@ -16,7 +16,7 @@
   <PropertyGroup>
     <WorkerVersion>4.43.0</WorkerVersion>
     <VersionPrefix>$(WorkerVersion)</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <VersionSuffix>preview.2</VersionSuffix>
   </PropertyGroup>
 
 </Project>
