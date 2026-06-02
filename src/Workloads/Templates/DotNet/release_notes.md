@@ -1,5 +1,4 @@
 # Azure.Functions.Cli.Workloads.Templates.DotNet
 
-## 1.0.0
+## 1.0.1
 
-- Initial scaffold of the .NET templates workload (index + NuGet pin).

@@ -23,7 +23,7 @@
   -->
 
   <PropertyGroup>
-    <TemplatesVersion>1.0.0</TemplatesVersion>
+    <TemplatesVersion>1.0.1</TemplatesVersion>
     <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
 
     <SourceItemTemplatesPackageId>Microsoft.Azure.Functions.Worker.ItemTemplates</SourceItemTemplatesPackageId>
