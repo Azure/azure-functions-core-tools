@@ -247,3 +247,18 @@ if ($BugBash) {
     Write-Host 're-run the three assignments above before using func.' -ForegroundColor Yellow
     Write-Host '========================================================================' -ForegroundColor Yellow
 }
+
+# --- Reload shell reminder ---
+
+Write-Host ''
+Write-Host 'Reload your shell'
+Write-Host '-----------------'
+if ($os -eq 'win') {
+    Write-Host "Open a new terminal so 'func' and 'func5' are on PATH, or refresh the current"
+    Write-Host 'session with:'
+    Write-Host "  `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','User') + ';' + [Environment]::GetEnvironmentVariable('PATH','Machine')"
+} else {
+    $shellProfile = if ($env:SHELL -like '*zsh*') { '~/.zshrc' } else { '~/.bashrc' }
+    Write-Host "If 'func5' isn't found in your current shell, open a new terminal or run:"
+    Write-Host "  source $shellProfile"
+}
