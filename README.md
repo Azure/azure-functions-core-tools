@@ -36,12 +36,9 @@ Pass flags to the installer using the patterns below. Run with `-Help` / `--help
 | Include pre-releases | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --prerelease` |
 | Specific version | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Version 5.0.0"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --version 5.0.0` |
 | Custom install dir | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -InstallPath ~/my-tools"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --install-path ~/my-tools` |
-| Bug bash env vars | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -BugBash"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --bugbash` |
 | Show help | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Help"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --help` |
 
-The Bash script also still honours the legacy environment variables (`VERSION`, `PRERELEASE=true`, `INSTALL_DIR`, `FORCE=true`, `BUGBASH=true`, `SOURCE`) for back-compat. Flags take precedence.
-
-The `-BugBash` / `--bugbash` option installs the CLI and then sets the pre-release workloads feed and quickstart manifest env vars (`FUNC_CLI_WORKLOADS_SOURCE`, `FUNC_CLI_QUICKSTART_MANIFEST_URL`) required for bug bash testing. The values are exported in the current session and persisted (to your shell profile on Linux/macOS, or user environment variables on Windows). The installer prints the exact assignments so you can re-set them if you switch terminals. Prerelease workload packages resolve automatically when the installed CLI is itself a prerelease build; the optional `FUNC_CLI_WORKLOADS_PRERELEASE=true|false` env var (or `--prerelease`/`--prerelease false` on `setup` / `workload install|update|search`) overrides that auto-detection in either direction.
+The Bash script also still honours the legacy environment variables (`VERSION`, `PRERELEASE=true`, `INSTALL_DIR`, `FORCE=true`, `SOURCE`) for back-compat. Flags take precedence.
 
 ### Unattended install
 

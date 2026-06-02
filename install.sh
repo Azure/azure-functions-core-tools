@@ -14,9 +14,6 @@ readonly ARCHIVE_DOWNLOAD_TIMEOUT_SEC=600
 readonly HEAD_REQUEST_TIMEOUT_SEC=60
 readonly DEFAULT_REPO="Azure/azure-functions-core-tools"
 readonly DEFAULT_INSTALL_DIR="$HOME/.azure-functions"
-readonly BUGBASH_WORKLOADS_SOURCE="https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
-readonly BUGBASH_QUICKSTART_MANIFEST_URL="https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
-
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
@@ -29,7 +26,6 @@ VERSION="${VERSION:-}"
 REPO="${SOURCE:-}"
 PRERELEASE="${PRERELEASE:-false}"
 FORCE="${FORCE:-false}"
-BUGBASH="${BUGBASH:-false}"
 SKIP_PATH=false
 KEEP_ARCHIVE=false
 DRY_RUN=false
@@ -79,7 +75,6 @@ OPTIONS:
         --source REPO           GitHub repo to fetch releases from (default: Azure/azure-functions-core-tools)
         --prerelease            Include pre-release versions when resolving latest
     -f, --force                 Overwrite an existing installation
-        --bugbash               Set bug bash workload feed and quickstart manifest env vars
         --skip-path             Do not update PATH or shell profile
     -k, --keep-archive          Keep the downloaded archive and temp directory after install
         --dry-run               Show what would happen without making changes
@@ -87,7 +82,7 @@ OPTIONS:
     -h, --help                  Show this help message
 
 ENVIRONMENT VARIABLES (back-compat, flags take precedence):
-    INSTALL_DIR, VERSION, SOURCE, PRERELEASE=true, FORCE=true, BUGBASH=true
+    INSTALL_DIR, VERSION, SOURCE, PRERELEASE=true, FORCE=true
 
 GITHUB ACTIONS:
     When GITHUB_ACTIONS=true, the install dir is also appended to $GITHUB_PATH so
@@ -98,7 +93,6 @@ EXAMPLES:
     ./install.sh --install-path ~/bin/func
     ./install.sh --version 5.0.0 --force
     ./install.sh --prerelease
-    ./install.sh --bugbash
 
     # Piped execution:
     curl -sSL https://aka.ms/func-cli/install.sh | bash
@@ -123,7 +117,6 @@ parse_args() {
                 REPO="$2"; shift 2 ;;
             --prerelease) PRERELEASE=true; shift ;;
             -f|--force)   FORCE=true; shift ;;
-            --bugbash)    BUGBASH=true; shift ;;
             --skip-path)  SKIP_PATH=true; shift ;;
             -k|--keep-archive) KEEP_ARCHIVE=true; shift ;;
             --dry-run)    DRY_RUN=true; shift ;;
@@ -519,53 +512,6 @@ if [[ -n "$EXISTING_FUNC" ]]; then
 else
     say_info "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
     say_info "If you later install Core Tools v4, use 'func5' to keep invoking v5."
-fi
-
-# --- Bug bash env vars ---
-
-if [[ "$BUGBASH" == true ]]; then
-    SHELL_NAME=$(basename "${SHELL:-bash}")
-    BUGBASH_PROFILE=$(detect_shell_config "$SHELL_NAME")
-
-    case "$SHELL_NAME" in
-        fish)
-            {
-                echo ""
-                echo "# Azure Functions CLI bug bash env vars"
-                echo "set -gx FUNC_CLI_WORKLOADS_SOURCE \"${BUGBASH_WORKLOADS_SOURCE}\""
-                echo "set -gx FUNC_CLI_QUICKSTART_MANIFEST_URL \"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
-                echo "set -gx FUNC_CLI_WORKLOADS_PRERELEASE true"
-            } >> "$BUGBASH_PROFILE"
-            ;;
-        *)
-            {
-                echo ""
-                echo "# Azure Functions CLI bug bash env vars"
-                echo "export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
-                echo "export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
-                echo "export FUNC_CLI_WORKLOADS_PRERELEASE=true"
-            } >> "$BUGBASH_PROFILE"
-            ;;
-    esac
-
-    export FUNC_CLI_WORKLOADS_SOURCE="${BUGBASH_WORKLOADS_SOURCE}"
-    export FUNC_CLI_QUICKSTART_MANIFEST_URL="${BUGBASH_QUICKSTART_MANIFEST_URL}"
-    export FUNC_CLI_WORKLOADS_PRERELEASE=true
-
-    say_info ""
-    echo -e "${YELLOW}========================================================================${RESET}" >&2
-    echo -e "${YELLOW}  BUG BASH MODE: required environment variables have been set${RESET}" >&2
-    echo -e "${YELLOW}========================================================================${RESET}" >&2
-    echo -e "${YELLOW}Added to current session and appended to ${BUGBASH_PROFILE}:${RESET}" >&2
-    say_info ""
-    say_info "  FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
-    say_info "  FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
-    say_info "  FUNC_CLI_WORKLOADS_PRERELEASE=true"
-    say_info ""
-    echo -e "${YELLOW}WARNING: these env vars MUST be set in your shell for the bug bash.${RESET}" >&2
-    echo -e "${YELLOW}If you open a new terminal that doesn't load ${BUGBASH_PROFILE},${RESET}" >&2
-    echo -e "${YELLOW}re-run the three exports above before using func.${RESET}" >&2
-    echo -e "${YELLOW}========================================================================${RESET}" >&2
 fi
 
 # --- Reload shell reminder ---

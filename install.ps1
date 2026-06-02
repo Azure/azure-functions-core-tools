@@ -28,10 +28,6 @@
 .PARAMETER Force
     Overwrite an existing installation.
 
-.PARAMETER BugBash
-    Set the FUNC_CLI_WORKLOADS_SOURCE, FUNC_CLI_QUICKSTART_MANIFEST_URL and
-    FUNC_CLI_WORKLOADS_PRERELEASE env vars required for bug bash testing.
-
 .PARAMETER SkipPath
     Do not update PATH or the shell profile.
 
@@ -53,7 +49,6 @@ param(
     [string] $Source = "Azure/azure-functions-core-tools",
     [switch] $Prerelease,
     [switch] $Force,
-    [switch] $BugBash,
     [switch] $SkipPath,
     [switch] $KeepArchive,
     [switch] $DryRun,
@@ -68,8 +63,6 @@ $Script:UserAgent = 'func-cli-install.ps1/1.0'
 $Script:ArchiveDownloadTimeoutSec = 600
 $Script:HeadRequestTimeoutSec = 60
 $Script:DefaultInstallDir = Join-Path $HOME '.azure-functions'
-$Script:BugBashWorkloadsSource = 'https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json'
-$Script:BugBashQuickstartManifestUrl = 'https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json'
 
 # True when invoked as a file (pwsh -File ... or .\install.ps1), false when piped
 # into iex. We use this so a piped 'exit' doesn't kill the user's pwsh session.
@@ -115,7 +108,6 @@ PARAMETERS:
     -Source <string>            GitHub repo to fetch releases from (default: Azure/azure-functions-core-tools)
     -Prerelease                 Include pre-release versions when resolving latest
     -Force                      Overwrite an existing installation
-    -BugBash                    Set bug bash workload feed and quickstart manifest env vars
     -SkipPath                   Do not update PATH or shell profile
     -KeepArchive                Keep the downloaded archive after install
     -DryRun                     Show what would happen without making changes
@@ -428,45 +420,6 @@ if ($existingFunc) {
 } else {
     Write-Message "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
     Write-Message "If you later install Core Tools v4, use 'func5' to keep invoking v5."
-}
-
-# --- Bug bash env vars ---
-
-if ($BugBash) {
-    $env:FUNC_CLI_WORKLOADS_SOURCE = $Script:BugBashWorkloadsSource
-    $env:FUNC_CLI_QUICKSTART_MANIFEST_URL = $Script:BugBashQuickstartManifestUrl
-    $env:FUNC_CLI_WORKLOADS_PRERELEASE = 'true'
-
-    if ($os -eq 'win') {
-        [Environment]::SetEnvironmentVariable('FUNC_CLI_WORKLOADS_SOURCE', $Script:BugBashWorkloadsSource, 'User')
-        [Environment]::SetEnvironmentVariable('FUNC_CLI_QUICKSTART_MANIFEST_URL', $Script:BugBashQuickstartManifestUrl, 'User')
-        [Environment]::SetEnvironmentVariable('FUNC_CLI_WORKLOADS_PRERELEASE', 'true', 'User')
-        $persistedLocation = 'user environment variables'
-    } else {
-        $bugBashProfile = if ($env:SHELL -like '*zsh*') { "$HOME/.zshrc" } else { "$HOME/.bashrc" }
-        @(
-            '',
-            '# Azure Functions CLI bug bash env vars',
-            "export FUNC_CLI_WORKLOADS_SOURCE=`"$($Script:BugBashWorkloadsSource)`"",
-            "export FUNC_CLI_QUICKSTART_MANIFEST_URL=`"$($Script:BugBashQuickstartManifestUrl)`"",
-            'export FUNC_CLI_WORKLOADS_PRERELEASE=true'
-        ) | Add-Content -Path $bugBashProfile
-        $persistedLocation = $bugBashProfile
-    }
-
-    Write-Message ''
-    Write-Message '========================================================================' -Level Warning
-    Write-Message '  BUG BASH MODE: required environment variables have been set' -Level Warning
-    Write-Message '========================================================================' -Level Warning
-    Write-Message "Added to current session and persisted to: $persistedLocation"
-    Write-Message ''
-    Write-Message "  `$env:FUNC_CLI_WORKLOADS_SOURCE = `"$($Script:BugBashWorkloadsSource)`""
-    Write-Message "  `$env:FUNC_CLI_QUICKSTART_MANIFEST_URL = `"$($Script:BugBashQuickstartManifestUrl)`""
-    Write-Message "  `$env:FUNC_CLI_WORKLOADS_PRERELEASE = `"true`""
-    Write-Message ''
-    Write-Message 'WARNING: these env vars MUST be set in your shell for the bug bash.' -Level Warning
-    Write-Message 'If you open a new terminal that does not inherit these values,' -Level Warning
-    Write-Message 're-run the three assignments above before using func.' -Level Warning
 }
 
 # --- Reload shell reminder ---
