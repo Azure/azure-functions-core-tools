@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
-using Azure.Functions.Cli.Console;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
@@ -24,7 +23,6 @@ public class ManagedAzuriteOrchestratorTests
     private readonly IDockerAvailabilityProbe _dockerProbe = Substitute.For<IDockerAvailabilityProbe>();
     private readonly IAzuriteLauncher _launcher = Substitute.For<IAzuriteLauncher>();
     private readonly IAzuriteManagedPathsProvider _paths = Substitute.For<IAzuriteManagedPathsProvider>();
-    private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
 
     public ManagedAzuriteOrchestratorTests()
     {
@@ -37,7 +35,7 @@ public class ManagedAzuriteOrchestratorTests
 
     private ManagedAzuriteOrchestrator CreateSut() => new(
         _classifier, _probe, _locator, _dockerProbe, _launcher, _paths,
-        _interaction, NullLogger<ManagedAzuriteOrchestrator>.Instance);
+        NullLogger<ManagedAzuriteOrchestrator>.Instance);
 
     private static ManagedAzuriteRequest Request(bool disabled = false, TimeSpan? timeout = null) =>
         new(Conn, ProjectRoot, disabled, timeout ?? TimeSpan.FromSeconds(5));
@@ -286,6 +284,7 @@ public class ManagedAzuriteOrchestratorTests
         Assert.Contains(messages, m => m.Contains("checking for an existing Azurite endpoint", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(messages, m => m.Contains("looking for a local Azurite installation", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(messages, m => m.Contains("starting Azurite (native)", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, m => m.Contains("Azurite ready", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

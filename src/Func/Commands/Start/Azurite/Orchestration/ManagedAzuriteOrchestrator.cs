@@ -3,7 +3,6 @@
 
 using System.Text;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
-using Azure.Functions.Cli.Console;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
@@ -20,7 +19,6 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
     private readonly IDockerAvailabilityProbe _dockerProbe;
     private readonly IAzuriteLauncher _launcher;
     private readonly IAzuriteManagedPathsProvider _pathsProvider;
-    private readonly IInteractionService _interaction;
     private readonly ILogger<ManagedAzuriteOrchestrator> _logger;
 
     public ManagedAzuriteOrchestrator(
@@ -30,7 +28,6 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         IDockerAvailabilityProbe dockerProbe,
         IAzuriteLauncher launcher,
         IAzuriteManagedPathsProvider pathsProvider,
-        IInteractionService interaction,
         ILogger<ManagedAzuriteOrchestrator> logger)
     {
         _classifier = classifier ?? throw new ArgumentNullException(nameof(classifier));
@@ -39,7 +36,6 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         _dockerProbe = dockerProbe ?? throw new ArgumentNullException(nameof(dockerProbe));
         _launcher = launcher ?? throw new ArgumentNullException(nameof(launcher));
         _pathsProvider = pathsProvider ?? throw new ArgumentNullException(nameof(pathsProvider));
-        _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -147,7 +143,6 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
                 endpoints,
                 AzuriteLaunchMode.Native,
                 executable.FilePath,
-                executable.Version,
                 progress,
                 cancellationToken);
         }
@@ -167,7 +162,6 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
             endpoints,
             AzuriteLaunchMode.Docker,
             executablePath: null,
-            executableVersion: docker.Version,
             progress,
             cancellationToken);
     }
@@ -177,14 +171,11 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         AzuriteEndpointTuple endpoints,
         AzuriteLaunchMode mode,
         string? executablePath,
-        string? executableVersion,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
         AzuriteManagedPaths paths = _pathsProvider.GetPaths();
         await _pathsProvider.EnsureCreatedAsync(paths, cancellationToken);
-
-        WriteStartBanner(mode, executablePath, executableVersion, endpoints, paths);
 
         AzuriteLaunchRequest launchRequest = new(
             mode: mode,
@@ -213,7 +204,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         switch (poll.Kind)
         {
             case PollOutcomeKind.Ready:
-                _interaction.WriteSuccess($"Azurite ready ({poll.Elapsed.TotalSeconds:0.0}s).");
+                progress?.Report($"Azurite ready ({poll.Elapsed.TotalSeconds:0.0}s)");
                 return new ManagedAzuriteResult.Started(process, mode, endpoints);
 
             case PollOutcomeKind.ProcessExited:
@@ -369,46 +360,6 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
 
         await SafeDisposeAsync(process);
     }
-
-    private void WriteStartBanner(
-        AzuriteLaunchMode mode,
-        string? executablePath,
-        string? executableVersion,
-        AzuriteEndpointTuple endpoints,
-        AzuriteManagedPaths paths)
-    {
-        string modeLabel = mode == AzuriteLaunchMode.Native ? "native" : "Docker";
-        _interaction.WriteLine(l =>
-        {
-            l.Plain("Starting Azurite (").Emphasis(modeLabel).Plain(") for AzureWebJobsStorage...");
-        });
-
-        if (mode == AzuriteLaunchMode.Native && !string.IsNullOrEmpty(executablePath))
-        {
-            _interaction.WriteLine(l => l.Muted("  Executable: ").Path(executablePath));
-        }
-        else if (mode == AzuriteLaunchMode.Docker)
-        {
-            _interaction.WriteLine(l => l.Muted("  Image: ").Path(AzuriteDockerImage.Default));
-        }
-
-        if (!string.IsNullOrEmpty(executableVersion))
-        {
-            _interaction.WriteLine(l => l.Muted("  Version: ").Plain(executableVersion));
-        }
-
-        _interaction.WriteLine(l => l.Muted("  Data: ").Path(paths.DataDirectory));
-        _interaction.WriteLine(l => l.Muted("  Logs: ").Path(paths.LogFilePath));
-        _interaction.WriteLine(l => l
-            .Muted("  Endpoints: blob ")
-            .Plain(FormatEndpoint(endpoints.BlobEndpoint))
-            .Muted(", queue ")
-            .Plain(FormatEndpoint(endpoints.QueueEndpoint))
-            .Muted(", table ")
-            .Plain(FormatEndpoint(endpoints.TableEndpoint)));
-    }
-
-    private static string FormatEndpoint(Uri uri) => $"{uri.Host}:{uri.Port}";
 
     private static AzuriteEndpointTuple DefaultEndpoints()
     {
