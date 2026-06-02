@@ -30,8 +30,9 @@ internal sealed class NodeFunctionsProject : FunctionsProject
 
     // Internal seam so tests can stub npm invocations without spawning real
     // processes. Args is forwarded as a single argv list to keep tests
-    // simple to assert against (e.g. ["install"], ["run", "build"]).
-    internal Func<string, IReadOnlyList<string>, CancellationToken, Task<(int ExitCode, string Stderr)>> RunNpm { get; set; } = DefaultRunNpm;
+    // simple to assert against (e.g. ["install"], ["run", "build"]). stdout and
+    // stderr lines are streamed to the callbacks as the process produces them.
+    internal Func<string, IReadOnlyList<string>, Action<string>, Action<string>, CancellationToken, Task<int>> RunNpm { get; set; } = DefaultRunNpm;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -99,29 +100,30 @@ internal sealed class NodeFunctionsProject : FunctionsProject
     {
         reporter.ReportStatus($"Running {display}");
 
-        (int exitCode, string stderr) = await RunNpm(root, args, cancellationToken).ConfigureAwait(false);
-
-        WriteLogLines(reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+        // Stream stdout as informational and stderr as error output as the process produces it, so the
+        // build/restore progress shows up live under the spinner instead of appearing all at once on exit.
+        int exitCode = await RunNpm(
+            root,
+            args,
+            line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+            line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+            cancellationToken).ConfigureAwait(false);
 
         if (exitCode != 0)
         {
+            // Output has already been streamed live through the callbacks above, so the message points the
+            // user there instead of repeating it.
             throw new GracefulException(
-                $"'{display}' failed (exit {exitCode}). {stderr?.Trim()}",
+                $"'{display}' failed (exit {exitCode}).",
                 isUserError: true);
         }
     }
 
-    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
-    {
-        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            reporter.WriteLog(line, severity);
-        }
-    }
-
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunNpm(
+    private static async Task<int> DefaultRunNpm(
         string workingDirectory,
         IReadOnlyList<string> args,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
         CancellationToken cancellationToken)
     {
         try
@@ -151,23 +153,92 @@ internal sealed class NodeFunctionsProject : FunctionsProject
                 psi.ArgumentList.Add(arg);
             }
 
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return (-1, "Failed to start 'npm' process.");
-            }
-
-            // Drain stdout and stderr in parallel: if either pipe buffer (~64KB) fills
-            // while we're only reading the other, npm blocks on write and we deadlock.
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
+            return await RunProcessStreamingAsync(psi, onOutputLine, onErrorLine, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return (-1, ex.Message);
+            onErrorLine(ex.Message);
+            return -1;
+        }
+    }
+
+    // Streams each line of stdout and stderr to the supplied callbacks as the process produces them, waits
+    // for exit, and returns the exit code. Mirrors the live-streaming process core used by the .NET stack.
+    private static async Task<int> RunProcessStreamingAsync(
+        ProcessStartInfo startInfo,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
+        CancellationToken cancellationToken)
+    {
+        using var process = new Process { StartInfo = startInfo };
+
+        // stdout and stderr are delivered on separate thread-pool threads, so each stream gets its own
+        // completion signal; each line callback is invoked only from its own stream's thread.
+        TaskCompletionSource stdoutComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource stderrComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stdoutComplete.TrySetResult();
+            }
+            else
+            {
+                onOutputLine(e.Data);
+            }
+        };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stderrComplete.TrySetResult();
+            }
+            else
+            {
+                onErrorLine(e.Data);
+            }
+        };
+
+        if (!process.Start())
+        {
+            onErrorLine("Failed to start 'npm' process.");
+            return -1;
+        }
+
+        try
+        {
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+            // WaitForExitAsync does not guarantee the async stream readers have drained, so wait for the
+            // trailing (null Data) sentinel on both streams to ensure every line has been delivered.
+            await stdoutComplete.Task.ConfigureAwait(false);
+            await stderrComplete.Task.ConfigureAwait(false);
+
+            return process.ExitCode;
+        }
+        finally
+        {
+            KillProcess(process);
+        }
+    }
+
+    private static void KillProcess(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception)
+        {
+            // Best effort: don't mask the original outcome if the process has already exited.
         }
     }
 }
