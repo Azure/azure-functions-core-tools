@@ -171,6 +171,94 @@ public class DotNetEngineProviderTests : IDisposable
         Assert.IsType<TemplateApplicationFailure.ProviderError>(failed.Failure);
     }
 
+    [Fact]
+    public async Task ApplyAsync_Passes_Force_Flag_Through_To_DotnetNew()
+    {
+        WriteFixture(_installDir);
+
+        IInstalledTemplatesWorkloads installed = Substitute.For<IInstalledTemplatesWorkloads>();
+        installed.ListInstalledAsync("dotnet", Arg.Any<CancellationToken>())
+            .Returns([new InstalledTemplatesWorkload("dotnet", "1.0.0", _installDir)]);
+
+        IReadOnlyList<string>? capturedArgs = null;
+        IDotnetTemplateRunner runner = Substitute.For<IDotnetTemplateRunner>();
+        runner.RunAsync(
+                Arg.Any<string>(),
+                Arg.Any<DirectoryInfo>(),
+                Arg.Do<IReadOnlyList<string>>(a => capturedArgs = a),
+                Arg.Any<CancellationToken>())
+            .Returns(new DotnetTemplateRunResult(0, string.Empty, string.Empty));
+
+        var provider = new DotNetEngineProvider(installed, runner);
+
+        FunctionTemplateInfo info = new(
+            Id: "timer",
+            Stack: "dotnet",
+            EngineId: EngineIds.DotNet,
+            DisplayName: "TimerTrigger",
+            Description: null,
+            DefaultFunctionName: null,
+            Languages: ["c#"],
+            Metadata: new TemplateMetadata([], RequiresExtensionBundle: false, MinBundleVersion: null));
+
+        await provider.ApplyAsync(
+            new NewContext(
+                new Cli.Common.WorkingDirectory(new DirectoryInfo(_installDir), false),
+                info,
+                FunctionName: "MyTimer",
+                Language: "csharp",
+                Force: true),
+            new System.CommandLine.RootCommand().Parse(string.Empty),
+            CancellationToken.None);
+
+        Assert.NotNull(capturedArgs);
+        Assert.Contains("--force", capturedArgs!);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Does_Not_Pass_Force_Flag_When_Force_False()
+    {
+        WriteFixture(_installDir);
+
+        IInstalledTemplatesWorkloads installed = Substitute.For<IInstalledTemplatesWorkloads>();
+        installed.ListInstalledAsync("dotnet", Arg.Any<CancellationToken>())
+            .Returns([new InstalledTemplatesWorkload("dotnet", "1.0.0", _installDir)]);
+
+        IReadOnlyList<string>? capturedArgs = null;
+        IDotnetTemplateRunner runner = Substitute.For<IDotnetTemplateRunner>();
+        runner.RunAsync(
+                Arg.Any<string>(),
+                Arg.Any<DirectoryInfo>(),
+                Arg.Do<IReadOnlyList<string>>(a => capturedArgs = a),
+                Arg.Any<CancellationToken>())
+            .Returns(new DotnetTemplateRunResult(0, string.Empty, string.Empty));
+
+        var provider = new DotNetEngineProvider(installed, runner);
+
+        FunctionTemplateInfo info = new(
+            Id: "timer",
+            Stack: "dotnet",
+            EngineId: EngineIds.DotNet,
+            DisplayName: "TimerTrigger",
+            Description: null,
+            DefaultFunctionName: null,
+            Languages: ["c#"],
+            Metadata: new TemplateMetadata([], RequiresExtensionBundle: false, MinBundleVersion: null));
+
+        await provider.ApplyAsync(
+            new NewContext(
+                new Cli.Common.WorkingDirectory(new DirectoryInfo(_installDir), false),
+                info,
+                FunctionName: "MyTimer",
+                Language: "csharp",
+                Force: false),
+            new System.CommandLine.RootCommand().Parse(string.Empty),
+            CancellationToken.None);
+
+        Assert.NotNull(capturedArgs);
+        Assert.DoesNotContain("--force", capturedArgs!);
+    }
+
     private static void WriteFixture(string installDir)
     {
         string contentDir = Path.Combine(installDir, "tools", "any", "content");

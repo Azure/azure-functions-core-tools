@@ -117,6 +117,13 @@ internal sealed class DotNetEngineProvider : ITemplateEngineProvider
             args.Add(prompt.DefaultValue);
         }
 
+        // Map --force through to `dotnet new`; without it the engine refuses
+        // with exit 73 on any collision (e.g. readme.md from the timer template).
+        if (context.Force)
+        {
+            args.Add("--force");
+        }
+
         try
         {
             // Provision the custom item-template hive on demand from the
