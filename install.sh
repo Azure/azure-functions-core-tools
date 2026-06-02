@@ -235,4 +235,14 @@ if [ -n "$UPDATED_PROFILE" ]; then
     echo -e "\033[33mReload your shell so 'func5' is on PATH in this session:\033[0m"
     echo "  source ${UPDATED_PROFILE}"
     echo "Or open a new terminal window."
+else
+    SHELL_NAME=$(basename "${SHELL:-bash}")
+    case "$SHELL_NAME" in
+        zsh)  PROFILE_HINT="$HOME/.zshrc" ;;
+        bash) PROFILE_HINT="$HOME/.bashrc" ;;
+        *)    PROFILE_HINT="$HOME/.profile" ;;
+    esac
+    echo ""
+    echo "If 'func5' isn't found in your current shell, open a new terminal or run:"
+    echo "  source ${PROFILE_HINT}"
 fi
