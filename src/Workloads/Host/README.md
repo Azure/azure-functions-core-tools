@@ -16,13 +16,7 @@ func workload install host
 
 Preview. The shell expects the Azure Functions CLI to prepare the process
 environment and command-line arguments before launch. It does not translate
-private CLI configuration into host settings. Local builds are
-framework-dependent by default.
-
-Release packaging should be performed with a RID-specific self-contained payload under `tools/any/` by passing
-`-p:PackRidSpecificHostWorkload=true -r <rid> -p:SelfContained=true`, which also suffixes the package id with the RID.
-The self-contained executable must be placed at `tools/any/Azure.Functions.Cli.Workloads.Host` on Unix-like platforms and
-`tools/any/Azure.Functions.Cli.Workloads.Host.exe` on Windows.
+private CLI configuration into host settings.
 
 ## Launch contract
 
@@ -34,11 +28,6 @@ The Azure Functions CLI is responsible for resolving the RID-specific workload p
 directory, overlaying prepared environment variables, and building host arguments before launching the workload process.
 The working directory and `AzureWebJobsScriptRoot` environment variable both point to the prepared function app startup
 directory.
-
-For local CLI/host iteration, set `FUNC_HOST_CONTENT_ROOT` to a built host
-content root that contains `Azure.Functions.Cli.Workloads.Host(.exe)` and
-`workers/workers.txt`. The CLI then skips workload resolution/installation and
-launches that local content root through the normal start pipeline.
 
 | Argument | Owner | Description |
 | --- | --- | --- |
