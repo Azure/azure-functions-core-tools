@@ -123,24 +123,62 @@ try {
             xattr -d com.apple.quarantine (Join-Path $InstallDir 'func') 2>$null
         }
     }
+
+    # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
+    if ($os -eq 'win') {
+        $wrapperPath = Join-Path $InstallDir 'func5.cmd'
+        @(
+            '@echo off',
+            '"%~dp0\func.exe" %*'
+        ) -join "`r`n" | Set-Content -Path $wrapperPath -Encoding Ascii -NoNewline
+    } else {
+        $wrapperPath = Join-Path $InstallDir 'func5'
+        $wrapperBody = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
+        [System.IO.File]::WriteAllText($wrapperPath, $wrapperBody)
+        chmod +x $wrapperPath
+    }
 } finally {
     Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # --- Update PATH ---
 
+# Detect a pre-existing 'func' that lives outside our install dir (e.g. Core Tools v4).
+# If one is present we APPEND our dir so the existing 'func' keeps winning and only
+# 'func5' resolves to v5. Otherwise we PREPEND so new users get 'func' = v5 by default.
+# Include both Application (.exe/.cmd/.bat) and ExternalScript (.ps1) so we catch
+# npm-installed shims, which use a .ps1 wrapper that wins over .cmd in pwsh.
+$installDirFull = (Resolve-Path $InstallDir).Path
+$existingFunc = $null
+$existingCmd = Get-Command func -CommandType Application, ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($existingCmd -and -not $existingCmd.Source.StartsWith($installDirFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $existingFunc = $existingCmd.Source
+}
+
 if ($os -eq 'win') {
     $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
     if ($userPath -notlike "*$InstallDir*") {
-        [Environment]::SetEnvironmentVariable('PATH', "$InstallDir;$userPath", 'User')
-        $env:PATH = "$InstallDir;$env:PATH"
+        if ($existingFunc) {
+            $newPath = "$userPath;$InstallDir"
+            $env:PATH = "$env:PATH;$InstallDir"
+        } else {
+            $newPath = "$InstallDir;$userPath"
+            $env:PATH = "$InstallDir;$env:PATH"
+        }
+        [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')
         Write-Host "Added $InstallDir to user PATH."
     }
 } else {
     if ($env:PATH -notlike "*$InstallDir*") {
         $shellProfile = if ($env:SHELL -like '*zsh*') { '~/.zshrc' } else { '~/.bashrc' }
-        Write-Host "Add to your shell profile: export PATH=`"$InstallDir`:`$PATH`""
-        Write-Host "  echo 'export PATH=`"$InstallDir`:`$PATH`"' >> $shellProfile"
+        if ($existingFunc) {
+            Write-Host "Add to your shell profile: export PATH=`"`$PATH`:$InstallDir`""
+            Write-Host "  echo 'export PATH=`"`$PATH`:$InstallDir`"' >> $shellProfile"
+        } else {
+            Write-Host "Add to your shell profile: export PATH=`"$InstallDir`:`$PATH`""
+            Write-Host "  echo 'export PATH=`"$InstallDir`:`$PATH`"' >> $shellProfile"
+        }
+        Write-Host "Then reload your shell: source $shellProfile (or open a new terminal)."
     }
 }
 
@@ -155,6 +193,19 @@ Write-Host 'The Azure Functions CLI collects usage data in order to help us impr
 Write-Host "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
 Write-Host ''
 Write-Host "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+
+# --- Side-by-side notice ---
+
+Write-Host ''
+Write-Host 'Side-by-side with Core Tools v4'
+Write-Host '-------------------------------'
+if ($existingFunc) {
+    Write-Host "Detected an existing 'func' at $existingFunc, leaving it as the default."
+    Write-Host "Use 'func5' to invoke v5; 'func' will continue to invoke the existing install."
+} else {
+    Write-Host "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
+    Write-Host "If you later install Core Tools v4, use 'func5' to keep invoking v5."
+}
 
 # --- Bug bash env vars ---
 
@@ -197,4 +248,19 @@ if ($BugBash) {
     Write-Host 'If you open a new terminal session that does not inherit these values,' -ForegroundColor Yellow
     Write-Host 're-run the three assignments above before using func.' -ForegroundColor Yellow
     Write-Host '========================================================================' -ForegroundColor Yellow
+}
+
+# --- Reload shell reminder ---
+
+Write-Host ''
+Write-Host 'Reload your shell'
+Write-Host '-----------------'
+if ($os -eq 'win') {
+    Write-Host "Open a new terminal so 'func' and 'func5' are on PATH, or refresh the current"
+    Write-Host 'session with:'
+    Write-Host "  `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','User') + ';' + [Environment]::GetEnvironmentVariable('PATH','Machine')"
+} else {
+    $shellProfile = if ($env:SHELL -like '*zsh*') { '~/.zshrc' } else { '~/.bashrc' }
+    Write-Host "If 'func5' isn't found in your current shell, open a new terminal or run:"
+    Write-Host "  source $shellProfile"
 }
