@@ -21,6 +21,10 @@ internal static class V2HiddenTemplates
         // JavaScript
         "DurableFunctionsEntity-JavaScript",
         "DurableFunctionsOrchestrator-JavaScript",
+
+        // Python
+        "DurableFunctionsEntityTrigger-Python",
+        "DurableFunctionsOrchestration-Python",
     };
 
     public static bool IsHidden(string templateId) =>
