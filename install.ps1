@@ -40,6 +40,47 @@ $ErrorActionPreference = 'Stop'
 $repo = $Source
 $apiBase = "https://api.github.com/repos/$repo"
 
+# --- GitHub CLI detection ---
+
+# Prefer 'gh' when available and authenticated so the GitHub API calls below run
+# against the user's authenticated quota (5000/hr) instead of the anonymous
+# 60/hr limit that customers have been hitting from shared NAT egress.
+$useGh = $false
+if (Get-Command gh -ErrorAction SilentlyContinue) {
+    & gh auth status *> $null
+    if ($LASTEXITCODE -eq 0) { $useGh = $true }
+}
+
+if ($useGh) {
+    Write-Host "Using GitHub CLI ('gh') for release metadata and asset download (authenticated, higher rate limit)."
+} else {
+    Write-Host "Using anonymous GitHub API requests. If you hit a rate limit, install and 'gh auth login' the GitHub CLI: https://cli.github.com"
+}
+
+function Get-GitHubReleases {
+    if ($useGh) {
+        return & gh api "/repos/$repo/releases?per_page=50" | ConvertFrom-Json
+    }
+    return Invoke-RestMethod -Uri "$apiBase/releases?per_page=50"
+}
+
+function Get-GitHubReleaseByTag([string] $Tag) {
+    if ($useGh) {
+        return & gh api "/repos/$repo/releases/tags/$Tag" | ConvertFrom-Json
+    }
+    return Invoke-RestMethod -Uri "$apiBase/releases/tags/$Tag"
+}
+
+function Get-GitHubReleaseAsset([string] $Tag, [string] $AssetName, [string] $OutFile) {
+    if ($useGh) {
+        & gh release download $Tag --repo $repo --pattern $AssetName --output $OutFile --clobber
+        if ($LASTEXITCODE -ne 0) { throw "gh release download failed with exit code $LASTEXITCODE" }
+        return
+    }
+    $downloadUrl = "https://github.com/$repo/releases/download/$Tag/$AssetName"
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $OutFile
+}
+
 # --- Detect platform ---
 
 if ($IsWindows -or $env:OS -eq 'Windows_NT') {
@@ -67,7 +108,7 @@ $assetName = "func-$os-$archStr.$ext"
 if (-not $Version) {
     $label = if ($Prerelease) { 'latest 5.x pre-release' } else { 'latest 5.x stable release' }
     Write-Host "Resolving $label..."
-    $releases = Invoke-RestMethod -Uri "$apiBase/releases?per_page=50"
+    $releases = Get-GitHubReleases
     $release = $releases |
         Where-Object { $_.tag_name -match '^v?5\.' -and ($Prerelease -or -not $_.prerelease) } |
         Select-Object -First 1
@@ -90,7 +131,7 @@ if (-not $Version) {
     $Version = $release.tag_name
 } else {
     if ($Version -notlike 'v*') { $Version = "v$Version" }
-    $release = Invoke-RestMethod -Uri "$apiBase/releases/tags/$Version"
+    $release = Get-GitHubReleaseByTag -Tag $Version
 }
 
 Write-Host "Installing func CLI $Version ($os-$archStr)..."
@@ -106,13 +147,12 @@ if ((Test-Path $funcPath) -and -not $Force) {
 
 # --- Download and extract ---
 
-$downloadUrl = "https://github.com/$repo/releases/download/$Version/$assetName"
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "func-cli-install-$(Get-Random)"
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
 try {
     $downloadPath = Join-Path $tempDir $assetName
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath
+    Get-GitHubReleaseAsset -Tag $Version -AssetName $assetName -OutFile $downloadPath
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
     if ($ext -eq 'zip') {
