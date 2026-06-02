@@ -1,78 +1,294 @@
 #!/usr/bin/env bash
+
+# install.sh - Download and install the Azure Functions CLI for the current platform
+# Usage: ./install.sh [OPTIONS]
+#        curl -sSL https://aka.ms/func-cli/install.sh | bash
+#        curl -sSL https://aka.ms/func-cli/install.sh | bash -s -- [OPTIONS]
+
 set -euo pipefail
 
-# Azure Functions Core Tools CLI installer
-# Usage: curl -sSL https://aka.ms/func-cli/install.sh | bash
+# --- Constants ---
 
-REPO="${SOURCE:-Azure/azure-functions-core-tools}"
-API_BASE="https://api.github.com/repos/${REPO}"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.azure-functions}"
+readonly USER_AGENT="func-cli-install.sh/1.0"
+readonly ARCHIVE_DOWNLOAD_TIMEOUT_SEC=600
+readonly HEAD_REQUEST_TIMEOUT_SEC=60
+readonly DEFAULT_REPO="Azure/azure-functions-core-tools"
+readonly DEFAULT_INSTALL_DIR="$HOME/.azure-functions"
+readonly BUGBASH_WORKLOADS_SOURCE="https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
+readonly BUGBASH_QUICKSTART_MANIFEST_URL="https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
+
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly RESET='\033[0m'
+
+# --- Variables (defaults applied after arg parsing) ---
+
+INSTALL_DIR="${INSTALL_DIR:-}"
 VERSION="${VERSION:-}"
+REPO="${SOURCE:-}"
 PRERELEASE="${PRERELEASE:-false}"
 FORCE="${FORCE:-false}"
 BUGBASH="${BUGBASH:-false}"
+SKIP_PATH=false
+KEEP_ARCHIVE=false
+DRY_RUN=false
+VERBOSE=false
+SHOW_HELP=false
 
-# --- Parse flags ---
+# --- Logging ---
 
-for arg in "$@"; do
-    case "$arg" in
-        --bugbash) BUGBASH="true" ;;
-        --prerelease) PRERELEASE="true" ;;
-        --force) FORCE="true" ;;
+say_info() {
+    echo -e "$1" >&2
+}
+
+say_success() {
+    echo -e "${GREEN}$1${RESET}" >&2
+}
+
+say_warn() {
+    echo -e "${YELLOW}Warning: $1${RESET}" >&2
+}
+
+say_error() {
+    echo -e "${RED}Error: $1${RESET}" >&2
+}
+
+say_verbose() {
+    if [[ "$VERBOSE" == true ]]; then
+        echo -e "${YELLOW}$1${RESET}" >&2
+    fi
+}
+
+# --- Help ---
+
+show_help() {
+    cat << 'EOF'
+Azure Functions CLI installer
+
+DESCRIPTION:
+    Downloads and installs the func CLI for the current platform from GitHub Releases.
+    Automatically updates your shell profile so func is on PATH in new terminals.
+
+USAGE:
+    ./install.sh [OPTIONS]
+
+OPTIONS:
+    -i, --install-path PATH     Directory to install the CLI (default: $HOME/.azure-functions)
+        --version VERSION       Specific version to install (default: latest 5.x stable)
+        --source REPO           GitHub repo to fetch releases from (default: Azure/azure-functions-core-tools)
+        --prerelease            Include pre-release versions when resolving latest
+    -f, --force                 Overwrite an existing installation
+        --bugbash               Set bug bash workload feed and quickstart manifest env vars
+        --skip-path             Do not update PATH or shell profile
+    -k, --keep-archive          Keep the downloaded archive and temp directory after install
+        --dry-run               Show what would happen without making changes
+    -v, --verbose               Enable verbose output
+    -h, --help                  Show this help message
+
+ENVIRONMENT VARIABLES (back-compat, flags take precedence):
+    INSTALL_DIR, VERSION, SOURCE, PRERELEASE=true, FORCE=true, BUGBASH=true
+
+GITHUB ACTIONS:
+    When GITHUB_ACTIONS=true, the install dir is also appended to $GITHUB_PATH so
+    func is available in subsequent workflow steps.
+
+EXAMPLES:
+    ./install.sh
+    ./install.sh --install-path ~/bin/func
+    ./install.sh --version 5.0.0 --force
+    ./install.sh --prerelease
+    ./install.sh --bugbash
+
+    # Piped execution:
+    curl -sSL https://aka.ms/func-cli/install.sh | bash
+    curl -sSL https://aka.ms/func-cli/install.sh | bash -s -- --prerelease
+    curl -sSL https://aka.ms/func-cli/install.sh | bash -s -- --install-path ~/bin/func
+EOF
+}
+
+# --- Argument parsing ---
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -i|--install-path)
+                [[ $# -lt 2 || -z "$2" ]] && { say_error "Option '$1' requires a value"; exit 1; }
+                INSTALL_DIR="$2"; shift 2 ;;
+            --version)
+                [[ $# -lt 2 || -z "$2" ]] && { say_error "Option '$1' requires a value"; exit 1; }
+                VERSION="$2"; shift 2 ;;
+            --source)
+                [[ $# -lt 2 || -z "$2" ]] && { say_error "Option '$1' requires a value"; exit 1; }
+                REPO="$2"; shift 2 ;;
+            --prerelease) PRERELEASE=true; shift ;;
+            -f|--force)   FORCE=true; shift ;;
+            --bugbash)    BUGBASH=true; shift ;;
+            --skip-path)  SKIP_PATH=true; shift ;;
+            -k|--keep-archive) KEEP_ARCHIVE=true; shift ;;
+            --dry-run)    DRY_RUN=true; shift ;;
+            -v|--verbose) VERBOSE=true; shift ;;
+            -h|--help)    SHOW_HELP=true; shift ;;
+            *)
+                say_error "Unknown option: $1"
+                say_info "Use --help for usage information."
+                exit 1
+                ;;
+        esac
+    done
+}
+
+parse_args "$@"
+
+if [[ "$SHOW_HELP" == true ]]; then
+    show_help
+    exit 0
+fi
+
+INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+REPO="${REPO:-$DEFAULT_REPO}"
+API_BASE="https://api.github.com/repos/${REPO}"
+
+# --- Platform detection ---
+
+detect_os() {
+    case "$(uname -s)" in
+        Linux*)
+            if command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -q musl; then
+                printf "linux-musl"
+            else
+                printf "linux"
+            fi
+            ;;
+        Darwin*) printf "osx" ;;
+        CYGWIN*|MINGW*|MSYS*) printf "win" ;;
+        *) return 1 ;;
     esac
-done
+}
 
-BUGBASH_WORKLOADS_SOURCE="https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
-BUGBASH_QUICKSTART_MANIFEST_URL="https://raw.githubusercontent.com/Azure/azure-functions-templates/dev/Functions.Templates/Template-Manifest/manifest.json"
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64)  printf "x64" ;;
+        arm64|aarch64) printf "arm64" ;;
+        *) return 1 ;;
+    esac
+}
 
-# --- Detect platform ---
+OS=$(detect_os) || { say_error "Unsupported OS: $(uname -s)"; exit 1; }
+ARCH=$(detect_arch) || { say_error "Unsupported architecture: $(uname -m)"; exit 1; }
 
-case "$(uname -s)" in
-    Linux*)  OS="linux" ;;
-    Darwin*) OS="osx" ;;
-    *)       echo "Error: Unsupported OS: $(uname -s)" >&2; exit 1 ;;
-esac
-
-case "$(uname -m)" in
-    x86_64|amd64)  ARCH="x64" ;;
-    arm64|aarch64) ARCH="arm64" ;;
-    *)             echo "Error: Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
-esac
+if [[ "$OS" == "linux-musl" ]]; then
+    say_warn "Detected musl libc (Alpine and similar). The published Linux assets target glibc; install may fail."
+    OS="linux"
+fi
 
 ASSET_NAME="func-${OS}-${ARCH}.tar.gz"
+say_verbose "Resolved platform: ${OS}-${ARCH}, asset: ${ASSET_NAME}"
 
 # --- GitHub CLI detection ---
 
-# Prefer 'gh' when available and authenticated so the GitHub API calls below run
-# against the user's authenticated quota (5000/hr) instead of the anonymous
-# 60/hr limit that customers have been hitting from shared NAT egress.
-USE_GH="false"
+# Prefer 'gh' when available and authenticated so API calls run against the user's
+# authenticated quota (5000/hr) instead of the anonymous 60/hr limit that customers
+# have been hitting from shared NAT egress.
+USE_GH=false
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-    USE_GH="true"
+    USE_GH=true
 fi
 
-if [ "$USE_GH" = "true" ]; then
-    echo "Using GitHub CLI ('gh') for release metadata and asset download (authenticated, higher rate limit)."
+if [[ "$USE_GH" == true ]]; then
+    say_info "Using GitHub CLI ('gh') for release metadata and asset download (authenticated, higher rate limit)."
 else
-    echo "Using anonymous GitHub API requests. If you hit a rate limit, install and 'gh auth login' the GitHub CLI: https://cli.github.com"
+    say_info "Using anonymous GitHub API requests. If you hit a rate limit, install and 'gh auth login' the GitHub CLI: https://cli.github.com"
 fi
+
+# --- HTTP helpers ---
+
+# Hardened curl: TLS-pinned, retries, timeouts, capped redirects.
+secure_curl() {
+    local url="$1"
+    local output_file="$2"
+    local timeout="${3:-$ARCHIVE_DOWNLOAD_TIMEOUT_SEC}"
+    local method="${4:-GET}"
+
+    local args=(
+        --fail
+        --show-error
+        --location
+        --tlsv1.2
+        --max-time "$timeout"
+        --user-agent "$USER_AGENT"
+        --max-redirs 10
+        --retry 5
+        --retry-delay 1
+        --retry-max-time 60
+        --request "$method"
+    )
+
+    if [[ "$method" == "HEAD" ]]; then
+        args+=(--silent --head)
+    elif [[ "$VERBOSE" == true ]]; then
+        args+=(--progress-bar)
+    else
+        args+=(--silent)
+    fi
+
+    if [[ "$method" == "GET" ]]; then
+        args+=(--output "$output_file")
+    fi
+
+    say_verbose "curl ${args[*]} $url"
+    curl "${args[@]}" "$url"
+}
+
+# HEAD-probe to make sure we're about to download a binary, not an HTML error page.
+validate_content_type() {
+    local url="$1"
+    local headers
+
+    say_verbose "Validating content type for $url"
+
+    if ! headers=$(secure_curl "$url" /dev/null "$HEAD_REQUEST_TIMEOUT_SEC" "HEAD" 2>&1); then
+        say_verbose "HEAD request failed; proceeding with download anyway."
+        return 0
+    fi
+
+    # GitHub asset URLs return one or more 3xx redirects followed by a final 2xx.
+    # Look only at the final response block.
+    local final_headers
+    final_headers=$(printf "%s\n" "$headers" | awk '
+        /^HTTP(\/| )[0-9]/ { block = $0 "\n"; next }
+        { block = block $0 "\n" }
+        END { printf "%s", block }')
+
+    if echo "$final_headers" | grep -qi "content-type:.*text/html"; then
+        say_error "Server returned HTML instead of an archive. URL: $url"
+        return 1
+    fi
+    return 0
+}
 
 # --- Resolve version ---
 
-if [ -z "$VERSION" ]; then
-    if [ "$PRERELEASE" = "true" ]; then
-        echo "Resolving latest 5.x pre-release..."
-    else
-        echo "Resolving latest stable 5.x release..."
+resolve_version() {
+    if [[ -n "$VERSION" ]]; then
+        case "$VERSION" in v*) ;; *) VERSION="v${VERSION}" ;; esac
+        return 0
     fi
 
-    # GitHub API returns releases newest-first. Extract tag_name + prerelease pairs, then filter.
-    if [ "$USE_GH" = "true" ]; then
-        RELEASES_JSON=$(gh api "/repos/${REPO}/releases?per_page=50")
+    if [[ "$PRERELEASE" == true ]]; then
+        say_info "Resolving latest 5.x pre-release..."
     else
-        RELEASES_JSON=$(curl -sSL "${API_BASE}/releases?per_page=50")
+        say_info "Resolving latest stable 5.x release..."
     fi
-    VERSION=$(echo "$RELEASES_JSON" \
+
+    local releases_json
+    if [[ "$USE_GH" == true ]]; then
+        releases_json=$(gh api "/repos/${REPO}/releases?per_page=50")
+    else
+        releases_json=$(curl -sSL --user-agent "$USER_AGENT" --max-time 60 "${API_BASE}/releases?per_page=50")
+    fi
+
+    VERSION=$(echo "$releases_json" \
         | tr ',' '\n' \
         | grep -E '"tag_name"|"prerelease"' \
         | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/tag:\1/; s/.*"prerelease"[[:space:]]*:[[:space:]]*([^[:space:]]+).*/pre:\1/' \
@@ -86,9 +302,10 @@ if [ -z "$VERSION" ]; then
                 }
             }')
 
-    if [ -z "$VERSION" ]; then
-        if [ "$PRERELEASE" != "true" ]; then
-            PRE_VERSIONS=$(echo "$RELEASES_JSON" \
+    if [[ -z "$VERSION" ]]; then
+        if [[ "$PRERELEASE" != true ]]; then
+            local pre_versions
+            pre_versions=$(echo "$releases_json" \
                 | tr ',' '\n' \
                 | grep -E '"tag_name"|"prerelease"' \
                 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/tag:\1/; s/.*"prerelease"[[:space:]]*:[[:space:]]*([^[:space:]]+).*/pre:\1/' \
@@ -100,32 +317,30 @@ if [ -z "$VERSION" ]; then
                         if (tag ~ /^v?5\./ && pre == "true") { print tag; count++; if (count >= 5) exit }
                     }')
 
-            if [ -n "$PRE_VERSIONS" ]; then
-                echo -e "\033[31mNo stable 5.x release found. Available pre-releases:\033[0m" >&2
-                echo "$PRE_VERSIONS" | sed 's/^/  /' | while IFS= read -r line; do echo -e "\033[31m${line}\033[0m"; done >&2
-                echo "" >&2
-                echo -e "\033[31mTo install a pre-release, re-run with PRERELEASE=true\033[0m" >&2
+            if [[ -n "$pre_versions" ]]; then
+                say_error "No stable 5.x release found. Available pre-releases:"
+                echo "$pre_versions" | sed 's/^/  /' >&2
+                say_info ""
+                say_error "To install a pre-release, re-run with --prerelease."
                 exit 1
             fi
         fi
-        echo "Error: Could not find a 5.x release."
+        say_error "Could not find a 5.x release."
         exit 1
     fi
-fi
 
-# Ensure version has 'v' prefix
-case "$VERSION" in
-    v*) ;;
-    *)  VERSION="v${VERSION}" ;;
-esac
+    case "$VERSION" in v*) ;; *) VERSION="v${VERSION}" ;; esac
+}
 
-echo "Installing func CLI ${VERSION} (${OS}-${ARCH})..."
+resolve_version
+
+say_info "Installing func CLI ${VERSION} (${OS}-${ARCH})..."
 
 # --- Check existing install ---
 
-if [ -f "${INSTALL_DIR}/func" ] && [ "$FORCE" != "true" ]; then
-    echo -e "\033[31mfunc CLI is already installed at ${INSTALL_DIR}.\033[0m"
-    echo -e "\033[31mTo overwrite, re-run with FORCE=true.\033[0m"
+if [[ -f "${INSTALL_DIR}/func" && "$FORCE" != true ]]; then
+    say_error "func CLI is already installed at ${INSTALL_DIR}."
+    say_error "To overwrite, re-run with --force."
     exit 0
 fi
 
@@ -133,32 +348,100 @@ fi
 
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${ASSET_NAME}"
 TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
-
-if [ "$USE_GH" = "true" ]; then
-    gh release download "$VERSION" --repo "$REPO" --pattern "$ASSET_NAME" --output "${TEMP_DIR}/${ASSET_NAME}" --clobber
+if [[ "$KEEP_ARCHIVE" != true ]]; then
+    trap 'rm -rf "$TEMP_DIR"' EXIT
 else
-    curl -sSL -o "${TEMP_DIR}/${ASSET_NAME}" "$DOWNLOAD_URL"
-fi
-mkdir -p "$INSTALL_DIR"
-tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
-
-if [ "$OS" = "osx" ]; then
-    xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
+    say_info "Keeping temp dir: $TEMP_DIR"
 fi
 
-# Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
-cat > "${INSTALL_DIR}/func5" <<'EOF'
+if [[ "$DRY_RUN" == true ]]; then
+    say_info "[DRY RUN] Would download ${DOWNLOAD_URL} to ${TEMP_DIR}/${ASSET_NAME}"
+    say_info "[DRY RUN] Would extract to ${INSTALL_DIR}"
+else
+    if [[ "$USE_GH" == true ]]; then
+        gh release download "$VERSION" --repo "$REPO" --pattern "$ASSET_NAME" --output "${TEMP_DIR}/${ASSET_NAME}" --clobber
+    else
+        validate_content_type "$DOWNLOAD_URL" || exit 1
+        say_info "Downloading ${ASSET_NAME}..."
+        secure_curl "$DOWNLOAD_URL" "${TEMP_DIR}/${ASSET_NAME}"
+    fi
+    mkdir -p "$INSTALL_DIR"
+    tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
+
+    if [[ "$OS" == "osx" ]]; then
+        xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
+    fi
+
+    # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
+    cat > "${INSTALL_DIR}/func5" <<'EOF'
 #!/usr/bin/env bash
 exec "$(dirname "$0")/func" "$@"
 EOF
-chmod +x "${INSTALL_DIR}/func5"
+    chmod +x "${INSTALL_DIR}/func5"
+fi
 
-# --- Update PATH ---
+# --- PATH / shell profile ---
 
-# Detect a pre-existing 'func' that lives outside our install dir (e.g. Core Tools v4).
-# If one is present we APPEND our dir so the existing 'func' keeps winning and only
-# 'func5' resolves to v5. Otherwise we PREPEND so new users get 'func' = v5 by default.
+# Resolve a shell config file. Walk a list per shell and pick the first that exists;
+# if none exist, fall back to the canonical default for that shell.
+detect_shell_config() {
+    local shell_name="${1:-bash}"
+    local xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    local candidates default_file
+
+    case "$shell_name" in
+        zsh)
+            candidates=("$HOME/.zshrc" "$HOME/.zshenv" "$xdg_config_home/zsh/.zshrc")
+            default_file="$HOME/.zshrc"
+            ;;
+        fish)
+            candidates=("$xdg_config_home/fish/config.fish")
+            default_file="$xdg_config_home/fish/config.fish"
+            ;;
+        sh|dash|ash)
+            candidates=("$HOME/.profile")
+            default_file="$HOME/.profile"
+            ;;
+        bash|*)
+            candidates=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile")
+            default_file="$HOME/.bashrc"
+            ;;
+    esac
+
+    for f in "${candidates[@]}"; do
+        if [[ -f "$f" ]]; then
+            printf "%s" "$f"
+            return 0
+        fi
+    done
+    printf "%s" "$default_file"
+}
+
+build_path_export() {
+    local shell_name="$1"
+    local dir="$2"
+    local prepend="$3"
+    case "$shell_name" in
+        fish)
+            if [[ "$prepend" == true ]]; then
+                printf "set -gx PATH %s \$PATH" "$dir"
+            else
+                printf "set -gx PATH \$PATH %s" "$dir"
+            fi
+            ;;
+        *)
+            if [[ "$prepend" == true ]]; then
+                printf "export PATH=\"%s:\$PATH\"" "$dir"
+            else
+                printf "export PATH=\"\$PATH:%s\"" "$dir"
+            fi
+            ;;
+    esac
+}
+
+# Detect a pre-existing 'func' outside our install dir (e.g. Core Tools v4).
+# If present: APPEND so v4 keeps winning and only 'func5' resolves to v5.
+# Otherwise: PREPEND so new users get 'func' = v5 by default.
 EXISTING_FUNC=""
 if command -v func >/dev/null 2>&1; then
     RESOLVED=$(command -v func)
@@ -169,105 +452,136 @@ if command -v func >/dev/null 2>&1; then
 fi
 
 UPDATED_PROFILE=""
-if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
+if [[ "$SKIP_PATH" == true ]]; then
+    say_info "Skipping PATH update (--skip-path)."
+elif [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
     SHELL_NAME=$(basename "${SHELL:-bash}")
-    case "$SHELL_NAME" in
-        zsh)  PROFILE="$HOME/.zshrc" ;;
-        bash) PROFILE="$HOME/.bashrc" ;;
-        *)    PROFILE="$HOME/.profile" ;;
-    esac
+    PROFILE=$(detect_shell_config "$SHELL_NAME")
+    PREPEND=true
+    [[ -n "$EXISTING_FUNC" ]] && PREPEND=false
+    EXPORT_LINE=$(build_path_export "$SHELL_NAME" "$INSTALL_DIR" "$PREPEND")
 
-    if [ -n "$EXISTING_FUNC" ]; then
-        echo "export PATH=\"\$PATH:${INSTALL_DIR}\"" >> "$PROFILE"
-        export PATH="${PATH}:${INSTALL_DIR}"
+    if [[ "$DRY_RUN" == true ]]; then
+        say_info "[DRY RUN] Would append to ${PROFILE}: ${EXPORT_LINE}"
     else
-        echo "export PATH=\"${INSTALL_DIR}:\$PATH\"" >> "$PROFILE"
-        export PATH="${INSTALL_DIR}:${PATH}"
+        mkdir -p "$(dirname "$PROFILE")"
+        if [[ -f "$PROFILE" ]] && grep -Fxq "$EXPORT_LINE" "$PROFILE"; then
+            say_verbose "Export already present in $PROFILE"
+        else
+            printf "\n# Added by Azure Functions CLI installer\n%s\n" "$EXPORT_LINE" >> "$PROFILE"
+            say_info "Added ${INSTALL_DIR} to PATH in ${PROFILE}."
+        fi
+        if [[ "$PREPEND" == true ]]; then
+            export PATH="${INSTALL_DIR}:${PATH}"
+        else
+            export PATH="${PATH}:${INSTALL_DIR}"
+        fi
+        UPDATED_PROFILE="$PROFILE"
     fi
-    echo "Added ${INSTALL_DIR} to PATH in ${PROFILE}."
-    UPDATED_PROFILE="$PROFILE"
 fi
 
-echo "func CLI ${VERSION} installed to ${INSTALL_DIR}"
+# GitHub Actions: make func available in subsequent workflow steps.
+if [[ "${GITHUB_ACTIONS:-}" == "true" && -n "${GITHUB_PATH:-}" ]]; then
+    if [[ "$DRY_RUN" == true ]]; then
+        say_info "[DRY RUN] Would append ${INSTALL_DIR} to \$GITHUB_PATH"
+    else
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        say_info "Appended ${INSTALL_DIR} to \$GITHUB_PATH for subsequent workflow steps."
+    fi
+fi
+
+if [[ "$DRY_RUN" == true ]]; then
+    say_success "[DRY RUN] func CLI ${VERSION} would be installed to ${INSTALL_DIR}"
+    exit 0
+fi
+
+say_success "func CLI ${VERSION} installed to ${INSTALL_DIR}"
 "${INSTALL_DIR}/func" --version
 
 # --- Telemetry notice ---
 
-echo ""
-echo "Telemetry"
-echo "---------"
-echo "The Azure Functions CLI collects usage data in order to help us improve your experience."
-echo "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
-echo ""
-echo "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
+say_info ""
+say_info "Telemetry"
+say_info "---------"
+say_info "The Azure Functions CLI collects usage data in order to help us improve your experience."
+say_info "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
+say_info ""
+say_info "You can opt-out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to any value other than 'no', 'n', '0', 'false', or 'off' using your favorite shell."
 
 # --- Side-by-side notice ---
 
-echo ""
-echo "Side-by-side with Core Tools v4"
-echo "-------------------------------"
-if [ -n "$EXISTING_FUNC" ]; then
-    echo "Detected an existing 'func' at ${EXISTING_FUNC}, leaving it as the default."
-    echo "Use 'func5' to invoke v5; 'func' will continue to invoke the existing install."
+say_info ""
+say_info "Side-by-side with Core Tools v4"
+say_info "-------------------------------"
+if [[ -n "$EXISTING_FUNC" ]]; then
+    say_info "Detected an existing 'func' at ${EXISTING_FUNC}, leaving it as the default."
+    say_info "Use 'func5' to invoke v5; 'func' will continue to invoke the existing install."
 else
-    echo "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
-    echo "If you later install Core Tools v4, use 'func5' to keep invoking v5."
+    say_info "No existing 'func' was found on PATH, so 'func' and 'func5' both invoke v5."
+    say_info "If you later install Core Tools v4, use 'func5' to keep invoking v5."
 fi
 
 # --- Bug bash env vars ---
 
-if [ "$BUGBASH" = "true" ]; then
+if [[ "$BUGBASH" == true ]]; then
     SHELL_NAME=$(basename "${SHELL:-bash}")
-    case "$SHELL_NAME" in
-        zsh)  BUGBASH_PROFILE="$HOME/.zshrc" ;;
-        bash) BUGBASH_PROFILE="$HOME/.bashrc" ;;
-        *)    BUGBASH_PROFILE="$HOME/.profile" ;;
-    esac
+    BUGBASH_PROFILE=$(detect_shell_config "$SHELL_NAME")
 
-    {
-        echo ""
-        echo "# Azure Functions CLI bug bash env vars"
-        echo "export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
-        echo "export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
-        echo "export FUNC_CLI_WORKLOADS_PRERELEASE=true"
-    } >> "$BUGBASH_PROFILE"
+    case "$SHELL_NAME" in
+        fish)
+            {
+                echo ""
+                echo "# Azure Functions CLI bug bash env vars"
+                echo "set -gx FUNC_CLI_WORKLOADS_SOURCE \"${BUGBASH_WORKLOADS_SOURCE}\""
+                echo "set -gx FUNC_CLI_QUICKSTART_MANIFEST_URL \"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
+                echo "set -gx FUNC_CLI_WORKLOADS_PRERELEASE true"
+            } >> "$BUGBASH_PROFILE"
+            ;;
+        *)
+            {
+                echo ""
+                echo "# Azure Functions CLI bug bash env vars"
+                echo "export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
+                echo "export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
+                echo "export FUNC_CLI_WORKLOADS_PRERELEASE=true"
+            } >> "$BUGBASH_PROFILE"
+            ;;
+    esac
 
     export FUNC_CLI_WORKLOADS_SOURCE="${BUGBASH_WORKLOADS_SOURCE}"
     export FUNC_CLI_QUICKSTART_MANIFEST_URL="${BUGBASH_QUICKSTART_MANIFEST_URL}"
     export FUNC_CLI_WORKLOADS_PRERELEASE=true
 
-    echo ""
-    echo -e "\033[33m========================================================================\033[0m"
-    echo -e "\033[33m  BUG BASH MODE: required environment variables have been set\033[0m"
-    echo -e "\033[33m========================================================================\033[0m"
-    echo -e "\033[33mAdded to current session and appended to ${BUGBASH_PROFILE}:\033[0m"
-    echo ""
-    echo "  export FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
-    echo "  export FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
-    echo "  export FUNC_CLI_WORKLOADS_PRERELEASE=true"
-    echo ""
-    echo -e "\033[33mWARNING: these env vars MUST be set in your shell for the bug bash.\033[0m"
-    echo -e "\033[33mIf you open a new terminal session (or a shell that doesn't load\033[0m"
-    echo -e "\033[33m${BUGBASH_PROFILE}), re-run the three exports above before using func.\033[0m"
-    echo -e "\033[33m========================================================================\033[0m"
+    say_info ""
+    echo -e "${YELLOW}========================================================================${RESET}" >&2
+    echo -e "${YELLOW}  BUG BASH MODE: required environment variables have been set${RESET}" >&2
+    echo -e "${YELLOW}========================================================================${RESET}" >&2
+    echo -e "${YELLOW}Added to current session and appended to ${BUGBASH_PROFILE}:${RESET}" >&2
+    say_info ""
+    say_info "  FUNC_CLI_WORKLOADS_SOURCE=\"${BUGBASH_WORKLOADS_SOURCE}\""
+    say_info "  FUNC_CLI_QUICKSTART_MANIFEST_URL=\"${BUGBASH_QUICKSTART_MANIFEST_URL}\""
+    say_info "  FUNC_CLI_WORKLOADS_PRERELEASE=true"
+    say_info ""
+    echo -e "${YELLOW}WARNING: these env vars MUST be set in your shell for the bug bash.${RESET}" >&2
+    echo -e "${YELLOW}If you open a new terminal that doesn't load ${BUGBASH_PROFILE},${RESET}" >&2
+    echo -e "${YELLOW}re-run the three exports above before using func.${RESET}" >&2
+    echo -e "${YELLOW}========================================================================${RESET}" >&2
 fi
 
 # --- Reload shell reminder ---
 
-echo ""
-echo "Reload your shell"
-echo "-----------------"
-if [ -n "$UPDATED_PROFILE" ]; then
-    echo -e "\033[33mReload your shell so 'func5' is on PATH in this session:\033[0m"
-    echo "  source ${UPDATED_PROFILE}"
-    echo "Or open a new terminal window."
-else
-    SHELL_NAME=$(basename "${SHELL:-bash}")
-    case "$SHELL_NAME" in
-        zsh)  PROFILE_HINT="$HOME/.zshrc" ;;
-        bash) PROFILE_HINT="$HOME/.bashrc" ;;
-        *)    PROFILE_HINT="$HOME/.profile" ;;
-    esac
-    echo "If 'func5' isn't found in your current shell, open a new terminal or run:"
-    echo "  source ${PROFILE_HINT}"
+if [[ "$SKIP_PATH" != true ]]; then
+    say_info ""
+    say_info "Reload your shell"
+    say_info "-----------------"
+    if [[ -n "$UPDATED_PROFILE" ]]; then
+        echo -e "${YELLOW}Reload your shell so 'func5' is on PATH in this session:${RESET}" >&2
+        say_info "  source ${UPDATED_PROFILE}"
+        say_info "Or open a new terminal window."
+    else
+        SHELL_NAME=$(basename "${SHELL:-bash}")
+        PROFILE_HINT=$(detect_shell_config "$SHELL_NAME")
+        say_info "If 'func5' isn't found in your current shell, open a new terminal or run:"
+        say_info "  source ${PROFILE_HINT}"
+    fi
 fi
