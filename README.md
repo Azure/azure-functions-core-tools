@@ -147,6 +147,8 @@ apt-get update && apt-get install libicu-dev  -y
 
 npm can be used on all platforms. On unix platforms, you may need to specify `--unsafe-perm` if you are running npm with sudo. That's due to npm behavior of post install script.
 
+> **Note:** [npm RFC #868](https://github.com/npm/rfcs/pull/868) will block install scripts (like `postinstall`) by default in a future npm version. If the install script is skipped, the Azure Functions Core Tools binary will be downloaded automatically the first time you run `func`. No extra configuration is needed. If you want the binary installed at `npm install` time with a newer npm, add `azure-functions-core-tools` to the `allowScripts` field in your `package.json`.
+
 Alternatively, you can install the CLI manually by downloading the latest release from the GitHub repo:
 
 1. Download the latest release for your platform from [here](https://github.com/Azure/azure-functions-core-tools/releases).
