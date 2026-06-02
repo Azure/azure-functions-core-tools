@@ -27,7 +27,7 @@
     <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
 
     <SourceItemTemplatesPackageId>Microsoft.Azure.Functions.Worker.ItemTemplates</SourceItemTemplatesPackageId>
-    <SourceItemTemplatesVersion>4.0.5584</SourceItemTemplatesVersion>
+    <SourceItemTemplatesVersion>4.0.5590</SourceItemTemplatesVersion>
   </PropertyGroup>
 
 </Project>
