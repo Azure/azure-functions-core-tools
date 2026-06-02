@@ -37,15 +37,16 @@ internal sealed class GoFunctionsProject : FunctionsProject
     }
 
     // Internal seam so tests can stub out the `go build` invocation
-    // without spawning real processes.
-    internal Func<string, string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoBuild { get; set; } = DefaultRunGoBuildAsync;
+    // without spawning real processes. stdout and stderr lines are streamed to
+    // the callbacks as the process produces them, and the task yields the exit code.
+    internal Func<string, string, Action<string>, Action<string>, CancellationToken, Task<int>> RunGoBuild { get; set; } = DefaultRunGoBuildAsync;
 
     internal Func<CancellationToken, Task<(int Major, int Minor)?>> ReadGoVersion { get; set; } = DefaultReadGoVersionAsync;
 
     // Run `go mod tidy` before building so missing/stale module entries are resolved
     // (especially for apps scaffolded from the version-less go.mod template). Internal
     // seam for tests.
-    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoModTidy { get; set; } = DefaultRunGoModTidyAsync;
+    internal Func<string, Action<string>, Action<string>, CancellationToken, Task<int>> RunGoModTidy { get; set; } = DefaultRunGoModTidyAsync;
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
@@ -98,24 +99,30 @@ internal sealed class GoFunctionsProject : FunctionsProject
         // require line on purpose, so `go mod tidy` resolves the latest tag from the
         // imports in main.go. Also rescues apps whose go.sum has drifted.
         context.Reporter.ReportStatus("Running go mod tidy");
-        (int tidyExit, string tidyStderr) = await RunGoModTidy(root, cancellationToken).ConfigureAwait(false);
+        int tidyExit = await RunGoModTidy(
+            root,
+            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+            cancellationToken).ConfigureAwait(false);
         if (tidyExit != 0)
         {
-            string detail = string.IsNullOrWhiteSpace(tidyStderr) ? "see output above." : tidyStderr.Trim();
             throw new GracefulException(
-                $"'go mod tidy' failed (exit {tidyExit}). {detail}",
+                $"'go mod tidy' failed (exit {tidyExit}).",
                 isUserError: true);
         }
 
         context.Reporter.ReportStatus("Running go build");
-        (int exitCode, string stderr) = await RunGoBuild(root, outputPath, cancellationToken).ConfigureAwait(false);
-
-        WriteLogLines(context.Reporter, stderr, exitCode == 0 ? FunctionsProjectReportSeverity.Info : FunctionsProjectReportSeverity.Error);
+        int exitCode = await RunGoBuild(
+            root,
+            outputPath,
+            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+            line => context.Reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+            cancellationToken).ConfigureAwait(false);
 
         if (exitCode != 0)
         {
             throw new GracefulException(
-                $"'go build' failed (exit {exitCode}). {stderr?.Trim()}",
+                $"'go build' failed (exit {exitCode}).",
                 isUserError: true);
         }
 
@@ -123,14 +130,6 @@ internal sealed class GoFunctionsProject : FunctionsProject
         // worker's `defaultExecutablePath = bin/app` is resolved relative to the script
         // root, so AzureWebJobsScriptRoot pointing at the project root yields the
         // correct <project>/bin/app launch path.
-    }
-
-    private static void WriteLogLines(IFunctionsProjectHostRunReporter reporter, string output, FunctionsProjectReportSeverity severity)
-    {
-        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            reporter.WriteLog(line, severity);
-        }
     }
 
     private static async Task<(int Major, int Minor)?> DefaultReadGoVersionAsync(CancellationToken cancellationToken)
@@ -177,91 +176,125 @@ internal sealed class GoFunctionsProject : FunctionsProject
         }
     }
 
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunGoBuildAsync(
+    private static async Task<int> DefaultRunGoBuildAsync(
         string workingDirectory,
         string outputPath,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
         CancellationToken cancellationToken)
     {
+        string? outputDir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(outputDir))
+        {
+            Directory.CreateDirectory(outputDir);
+        }
+
+        return await RunGoAsync(workingDirectory, ["build", "-o", outputPath, "."], onOutputLine, onErrorLine, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static Task<int> DefaultRunGoModTidyAsync(
+        string workingDirectory,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
+        CancellationToken cancellationToken)
+        => RunGoAsync(workingDirectory, ["mod", "tidy"], onOutputLine, onErrorLine, cancellationToken);
+
+    // Streams each line of stdout and stderr to the callbacks as `go` produces them, waits for exit, and
+    // returns the exit code. Mirrors the live-streaming process core used by the .NET stack.
+    private static async Task<int> RunGoAsync(
+        string workingDirectory,
+        string[] arguments,
+        Action<string> onOutputLine,
+        Action<string> onErrorLine,
+        CancellationToken cancellationToken)
+    {
+        var psi = new ProcessStartInfo("go")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (string arg in arguments)
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        using var process = new Process { StartInfo = psi };
+
+        // stdout and stderr are delivered on separate thread-pool threads, so each stream gets its own
+        // completion signal; each line callback is invoked only from its own stream's thread.
+        TaskCompletionSource stdoutComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource stderrComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stdoutComplete.TrySetResult();
+            }
+            else
+            {
+                onOutputLine(e.Data);
+            }
+        };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stderrComplete.TrySetResult();
+            }
+            else
+            {
+                onErrorLine(e.Data);
+            }
+        };
+
         try
         {
-            string? outputDir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(outputDir))
+            if (!process.Start())
             {
-                Directory.CreateDirectory(outputDir);
+                onErrorLine("Failed to start 'go' process.");
+                return -1;
             }
 
-            var psi = new ProcessStartInfo("go")
-            {
-                WorkingDirectory = workingDirectory,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            psi.ArgumentList.Add("build");
-            psi.ArgumentList.Add("-o");
-            psi.ArgumentList.Add(outputPath);
-            psi.ArgumentList.Add(".");
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
 
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return (-1, "Failed to start 'go' process.");
-            }
-
-            // Drain stdout and stderr in parallel: if either pipe buffer (~64KB) fills
-            // while we're only reading the other, go blocks on write and we deadlock.
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
+
+            // WaitForExitAsync does not guarantee the async stream readers have drained, so wait for the
+            // trailing (null Data) sentinel on both streams to ensure every line has been delivered.
+            await stdoutComplete.Task.ConfigureAwait(false);
+            await stderrComplete.Task.ConfigureAwait(false);
+
+            return process.ExitCode;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return (-1, ex.Message);
+            onErrorLine(ex.Message);
+            return -1;
+        }
+        finally
+        {
+            KillProcess(process);
         }
     }
 
-    private static Task<(int ExitCode, string Stderr)> DefaultRunGoModTidyAsync(string workingDirectory, CancellationToken cancellationToken)
-        => RunGoAsync(workingDirectory, ["mod", "tidy"], cancellationToken);
-
-    private static async Task<(int ExitCode, string Stderr)> RunGoAsync(
-        string workingDirectory,
-        string[] arguments,
-        CancellationToken cancellationToken)
+    private static void KillProcess(Process process)
     {
         try
         {
-            var psi = new ProcessStartInfo("go")
+            if (!process.HasExited)
             {
-                WorkingDirectory = workingDirectory,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            foreach (string arg in arguments)
-            {
-                psi.ArgumentList.Add(arg);
+                process.Kill(entireProcessTree: true);
             }
-
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return (-1, "Failed to start 'go' process.");
-            }
-
-            // Drain both pipes in parallel to avoid deadlocking on a full pipe buffer.
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception)
         {
-            return (-1, ex.Message);
+            // Best effort: don't mask the original outcome if the process has already exited.
         }
     }
 }

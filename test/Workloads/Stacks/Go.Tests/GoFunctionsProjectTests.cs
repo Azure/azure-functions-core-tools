@@ -37,11 +37,11 @@ public class GoFunctionsProjectTests : IDisposable
 
         string? observedRoot = null;
         string? observedOutput = null;
-        GoFunctionsProject project = CreateProject((root, output, _) =>
+        GoFunctionsProject project = CreateProject((root, output, _, _, _) =>
         {
             observedRoot = root;
             observedOutput = output;
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         FunctionsProjectHostRunContext context = CreateContext();
@@ -56,26 +56,55 @@ public class GoFunctionsProjectTests : IDisposable
     }
 
     [Fact]
+    public async Task PrepareForHostRun_streams_build_output_to_reporter()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n\ngo 1.24\n");
+
+        GoFunctionsProject project = CreateProject((_, _, onOut, onErr, _) =>
+        {
+            onOut("compiling example.com/myapp");
+            onErr("go: warning");
+            return Task.FromResult(0);
+        });
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
+
+        await project.PrepareForHostRunAsync(context, default);
+
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "compiling example.com/myapp");
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "go: warning");
+    }
+
+    [Fact]
     public async Task PrepareForHostRun_throws_graceful_on_nonzero_exit()
     {
-        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((1, "compile error")));
+        GoFunctionsProject project = CreateProject((_, _, _, onErr, _) =>
+        {
+            onErr("compile error");
+            return Task.FromResult(1);
+        });
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+            () => project.PrepareForHostRunAsync(context, default));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("go build", ex.Message);
-        Assert.Contains("compile error", ex.Message);
+        Assert.Contains("exit 1", ex.Message);
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "compile error");
     }
 
     [Fact]
     public async Task PrepareForHostRun_skips_build_when_SkipBuild()
     {
         bool invoked = false;
-        GoFunctionsProject project = CreateProject((_, _, _) =>
+        GoFunctionsProject project = CreateProject((_, _, _, _, _) =>
         {
             invoked = true;
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         FunctionsProjectHostRunContext context = CreateContext(skipBuild: true);
@@ -88,7 +117,7 @@ public class GoFunctionsProjectTests : IDisposable
     [Fact]
     public async Task PrepareForHostRun_throws_graceful_when_go_not_installed()
     {
-        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        GoFunctionsProject project = CreateProject((_, _, _, _, _) => Task.FromResult(0));
         project.ReadGoVersion = _ => Task.FromResult<(int, int)?>(null);
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -101,7 +130,7 @@ public class GoFunctionsProjectTests : IDisposable
     [Fact]
     public async Task PrepareForHostRun_throws_graceful_when_go_too_old()
     {
-        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
+        GoFunctionsProject project = CreateProject((_, _, _, _, _) => Task.FromResult(0));
         project.ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 21));
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -117,15 +146,15 @@ public class GoFunctionsProjectTests : IDisposable
         File.WriteAllText(Path.Combine(_projectDir.FullName, "go.mod"), "module example.com/myapp\n\ngo 1.24\n");
 
         var calls = new List<string>();
-        GoFunctionsProject project = CreateProject((_, _, _) =>
+        GoFunctionsProject project = CreateProject((_, _, _, _, _) =>
         {
             calls.Add("build");
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
-        project.RunGoModTidy = (root, _) =>
+        project.RunGoModTidy = (root, _, _, _) =>
         {
             calls.Add($"tidy:{root}");
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         };
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
@@ -138,26 +167,34 @@ public class GoFunctionsProjectTests : IDisposable
     [Fact]
     public async Task PrepareForHostRun_throws_graceful_when_tidy_fails()
     {
-        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
-        project.RunGoModTidy = (_, _) => Task.FromResult((1, "module not found"));
+        GoFunctionsProject project = CreateProject((_, _, _, _, _) => Task.FromResult(0));
+        project.RunGoModTidy = (_, _, onErr, _) =>
+        {
+            onErr("module not found");
+            return Task.FromResult(1);
+        };
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+            () => project.PrepareForHostRunAsync(context, default));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("go mod tidy", ex.Message);
-        Assert.Contains("module not found", ex.Message);
+        Assert.Contains("exit 1", ex.Message);
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "module not found");
     }
 
     [Fact]
     public async Task PrepareForHostRun_skips_tidy_when_SkipBuild()
     {
         bool tidyInvoked = false;
-        GoFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((0, string.Empty)));
-        project.RunGoModTidy = (_, _) =>
+        GoFunctionsProject project = CreateProject((_, _, _, _, _) => Task.FromResult(0));
+        project.RunGoModTidy = (_, _, _, _) =>
         {
             tidyInvoked = true;
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         };
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
@@ -165,14 +202,43 @@ public class GoFunctionsProjectTests : IDisposable
         Assert.False(tidyInvoked);
     }
 
-    private GoFunctionsProject CreateProject(Func<string, string, CancellationToken, Task<(int, string)>> runner)
+    private GoFunctionsProject CreateProject(Func<string, string, Action<string>, Action<string>, CancellationToken, Task<int>> runner)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
             RunGoBuild = runner,
             ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 24)),
-            RunGoModTidy = (_, _) => Task.FromResult((0, string.Empty)),
+            RunGoModTidy = (_, _, _, _) => Task.FromResult(0),
         };
 
     private FunctionsProjectHostRunContext CreateContext(bool skipBuild = false)
         => new(_projectDir, "go", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);
+
+    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    {
+        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly object _gate = new();
+
+        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _logs.ToArray();
+                }
+            }
+        }
+
+        public void ReportStatus(string message)
+        {
+        }
+
+        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        {
+            lock (_gate)
+            {
+                _logs.Add((line, severity));
+            }
+        }
+    }
 }
