@@ -65,6 +65,11 @@ internal sealed class V2EngineProvider : ITemplateEngineProvider
         List<FunctionTemplateInfo> projected = [];
         foreach (NewTemplate template in payload.Templates)
         {
+            if (V2HiddenTemplates.IsHidden(template.Id ?? string.Empty))
+            {
+                continue;
+            }
+
             FunctionTemplateInfo? info = V2TemplateProjection.Project(template, payload, context.Stack);
             if (info is not null && MatchesLanguage(info, context.Language))
             {
