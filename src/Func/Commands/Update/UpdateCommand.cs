@@ -20,14 +20,14 @@ namespace Azure.Functions.Cli.Commands.Update;
 /// </remarks>
 internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
 {
-    public Option<string?> ChannelOption { get; } = new("--channel")
+    public Option<bool> PrereleaseOption { get; } = new("--prerelease")
     {
-        Description = "Release channel to update from. One of: stable, preview. Default: stable.",
+        Description = "Update to the latest release including prereleases. Default: stable releases only.",
     };
 
     public Option<string?> VersionOption { get; } = new("--version")
     {
-        Description = "Pin to a specific CLI version (e.g. 5.1.0). When set, overrides --channel selection of 'latest'.",
+        Description = "Pin to a specific CLI version (e.g. 5.1.0). When set, '--prerelease' is still allowed for clarity.",
     };
 
     public Option<bool> YesOption { get; } = new("--yes", "-y")
@@ -39,9 +39,9 @@ internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
         : base(
             "update",
             "Update the installed func CLI in place. Defaults to the latest stable release; "
-            + "use '--channel preview' for the latest preview, or '--version' to pin a specific build.")
+            + "use '--prerelease' for the latest prerelease, or '--version' to pin a specific build.")
     {
-        Options.Add(ChannelOption);
+        Options.Add(PrereleaseOption);
         Options.Add(VersionOption);
         Options.Add(YesOption);
     }
