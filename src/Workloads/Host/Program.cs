@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Workloads.Host.Interop;
+using Azure.Functions.Cli.Workloads.Host.Startup;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using DotnetHost = Microsoft.Extensions.Hosting.Host;
@@ -12,6 +14,11 @@ internal static class Program
     public static async Task<int> Main(string[] args)
     {
         SetHostEnvironmentVariables();
+
+        if (OperatingSystem.IsWindows())
+        {
+            new ChildProcessHandleSanitizer(new Win32NativeHandleApi()).DisableInheritanceOnOpenHandles();
+        }
 
         HostApplicationBuilder builder = DotnetHost.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton<HostShell>();
