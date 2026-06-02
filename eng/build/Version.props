@@ -22,6 +22,9 @@
 
     <!-- Major.Minor.Patch -> Major.Minor.0.0 -->
     <AssemblyVersion>$(VersionPrefix.Substring(0, $(VersionPrefix.LastIndexOf('.')))).0.0</AssemblyVersion>
+
+    <!-- Define a constant for preview builds. -->
+    <DefineConstants Condition="'$(VersionSuffix)' != ''">$(DefineConstants);PREVIEW</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(CI)' != 'true'">

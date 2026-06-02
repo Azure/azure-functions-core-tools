@@ -426,6 +426,7 @@ public sealed class WorkloadCatalogTests
         ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
         provider.InformationalVersion.Returns(informational);
         provider.Version.Returns(informational.Split('-', '+')[0]);
+        provider.IsPrerelease.Returns(informational.Contains('-'));
         return provider;
     }
 }
