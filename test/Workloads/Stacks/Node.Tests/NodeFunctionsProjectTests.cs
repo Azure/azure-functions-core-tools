@@ -34,10 +34,10 @@ public class NodeFunctionsProjectTests : IDisposable
     public async Task PrepareForHostRun_without_package_json_is_noop()
     {
         bool invoked = false;
-        NodeFunctionsProject project = CreateProject((_, _, _) =>
+        NodeFunctionsProject project = CreateProject((_, _, _, _, _) =>
         {
             invoked = true;
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
@@ -50,10 +50,10 @@ public class NodeFunctionsProjectTests : IDisposable
     {
         WritePackageJson("""{ "name": "x", "version": "1.0.0" }""");
         var commands = new List<IReadOnlyList<string>>();
-        NodeFunctionsProject project = CreateProject((_, args, _) =>
+        NodeFunctionsProject project = CreateProject((_, args, _, _, _) =>
         {
             commands.Add(args);
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
@@ -68,10 +68,10 @@ public class NodeFunctionsProjectTests : IDisposable
         WritePackageJson("""{ "name": "x", "version": "1.0.0" }""");
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "node_modules"));
         var commands = new List<IReadOnlyList<string>>();
-        NodeFunctionsProject project = CreateProject((_, args, _) =>
+        NodeFunctionsProject project = CreateProject((_, args, _, _, _) =>
         {
             commands.Add(args);
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
@@ -85,10 +85,10 @@ public class NodeFunctionsProjectTests : IDisposable
         WritePackageJson("""{ "name": "x", "scripts": { "build": "tsc" } }""");
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "node_modules"));
         var commands = new List<IReadOnlyList<string>>();
-        NodeFunctionsProject project = CreateProject((_, args, _) =>
+        NodeFunctionsProject project = CreateProject((_, args, _, _, _) =>
         {
             commands.Add(args);
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
@@ -98,17 +98,45 @@ public class NodeFunctionsProjectTests : IDisposable
     }
 
     [Fact]
+    public async Task PrepareForHostRun_streams_output_to_reporter()
+    {
+        WritePackageJson("""{ "name": "x", "version": "1.0.0" }""");
+        NodeFunctionsProject project = CreateProject((_, _, onOut, onErr, _) =>
+        {
+            onOut("added 42 packages");
+            onErr("npm warn deprecated");
+            return Task.FromResult(0);
+        });
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
+
+        await project.PrepareForHostRunAsync(context, default);
+
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "added 42 packages");
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "npm warn deprecated");
+    }
+
+    [Fact]
     public async Task PrepareForHostRun_throws_graceful_on_install_failure()
     {
         WritePackageJson("""{ "name": "x" }""");
-        NodeFunctionsProject project = CreateProject((_, _, _) => Task.FromResult((1, "ENOENT")));
+        NodeFunctionsProject project = CreateProject((_, _, _, onErr, _) =>
+        {
+            onErr("ENOENT");
+            return Task.FromResult(1);
+        });
+        var reporter = new CapturingReporter();
+        FunctionsProjectHostRunContext context = CreateContext();
+        context.Reporter = reporter;
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+            () => project.PrepareForHostRunAsync(context, default));
 
         Assert.True(ex.IsUserError);
-        Assert.Contains("npm install", ex.Message);
-        Assert.Contains("ENOENT", ex.Message);
+        Assert.Contains("install", ex.Message);
+        Assert.Contains("exit 1", ex.Message);
+        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "ENOENT");
     }
 
     [Fact]
@@ -117,10 +145,10 @@ public class NodeFunctionsProjectTests : IDisposable
         WritePackageJson("""{ "name": "x", "scripts": { "build": "tsc" } }""");
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "node_modules"));
         var commands = new List<IReadOnlyList<string>>();
-        NodeFunctionsProject project = CreateProject((_, args, _) =>
+        NodeFunctionsProject project = CreateProject((_, args, _, _, _) =>
         {
             commands.Add(args);
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
@@ -133,10 +161,10 @@ public class NodeFunctionsProjectTests : IDisposable
     {
         WritePackageJson("""{ "name": "x", "scripts": { "build": "tsc" } }""");
         var commands = new List<IReadOnlyList<string>>();
-        NodeFunctionsProject project = CreateProject((_, args, _) =>
+        NodeFunctionsProject project = CreateProject((_, args, _, _, _) =>
         {
             commands.Add(args);
-            return Task.FromResult((0, string.Empty));
+            return Task.FromResult(0);
         });
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
@@ -145,7 +173,7 @@ public class NodeFunctionsProjectTests : IDisposable
         Assert.Equal(new[] { "install" }, commands[0]);
     }
 
-    private NodeFunctionsProject CreateProject(Func<string, IReadOnlyList<string>, CancellationToken, Task<(int, string)>> runner)
+    private NodeFunctionsProject CreateProject(Func<string, IReadOnlyList<string>, Action<string>, Action<string>, CancellationToken, Task<int>> runner)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
             RunNpm = runner,
@@ -158,4 +186,33 @@ public class NodeFunctionsProjectTests : IDisposable
         => new(_projectDir, "node", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
         }, skipBuild);
+
+    private sealed class CapturingReporter : IFunctionsProjectHostRunReporter
+    {
+        private readonly List<(string Line, FunctionsProjectReportSeverity Severity)> _logs = [];
+        private readonly object _gate = new();
+
+        public IReadOnlyList<(string Line, FunctionsProjectReportSeverity Severity)> Logs
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _logs.ToArray();
+                }
+            }
+        }
+
+        public void ReportStatus(string message)
+        {
+        }
+
+        public void WriteLog(string line, FunctionsProjectReportSeverity severity = FunctionsProjectReportSeverity.Info)
+        {
+            lock (_gate)
+            {
+                _logs.Add((line, severity));
+            }
+        }
+    }
 }
