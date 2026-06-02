@@ -493,9 +493,20 @@ if [[ -n "$UPDATED_PROFILE" ]]; then
     say_success "Successfully added func to \$PATH in ${UPDATED_PROFILE}"
 fi
 
+# --- Telemetry notice ---
+
+say_info ""
+say_info "Telemetry"
+say_info "---------"
+say_info ""
+say_info "The Azure Functions CLI collects usage data. It is collected by Microsoft and is used to help us improve your experience. You can opt out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your preferred shell."
+
 # --- Side-by-side notice ---
 
 if [[ -n "$EXISTING_FUNC" ]]; then
+    say_info ""
+    say_info "Side-by-side notice"
+    say_info "-------------------"
     say_info ""
     say_info "Detected an existing 'func' at ${EXISTING_FUNC}, leaving it as the default."
     say_info "Use 'func5' to invoke v5."
@@ -505,14 +516,10 @@ fi
 
 if [[ "$SKIP_PATH" != true && -n "$UPDATED_PROFILE" ]]; then
     say_info ""
+    say_info "Reload shell"
+    say_info "------------"
+    say_info ""
     say_info "To use the func CLI in new terminal sessions, restart your terminal or run:"
     say_info "  source ${UPDATED_PROFILE}"
 fi
 
-# --- Telemetry notice ---
-
-say_info ""
-say_info "Telemetry"
-say_info "---------"
-say_info ""
-say_info "The Azure Functions CLI collects usage data. It is collected by Microsoft and is used to help us improve your experience. You can opt out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your preferred shell."

@@ -410,9 +410,20 @@ if ($pathUpdated) {
     }
 }
 
+# --- Telemetry notice ---
+
+Write-Message ''
+Write-Message 'Telemetry'
+Write-Message '---------'
+Write-Message ''
+Write-Message "The Azure Functions CLI collects usage data. It is collected by Microsoft and is used to help us improve your experience. You can opt out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your preferred shell."
+
 # --- Side-by-side notice ---
 
 if ($existingFunc) {
+    Write-Message ''
+    Write-Message 'Side-by-side notice'
+    Write-Message '-------------------'
     Write-Message ''
     Write-Message "Detected an existing 'func' at $existingFunc, leaving it as the default."
     Write-Message "Use 'func5' to invoke v5."
@@ -423,18 +434,16 @@ if ($existingFunc) {
 if (-not $SkipPath -and -not $DryRun) {
     if ($os -eq 'win') {
         Write-Message ''
+        Write-Message 'Reload shell'
+        Write-Message '------------'
+        Write-Message ''
         Write-Message 'The func CLI is now available for use in this and new sessions.'
     } elseif ($pathProfilePath) {
+        Write-Message ''
+        Write-Message 'Reload shell'
+        Write-Message '------------'
         Write-Message ''
         Write-Message 'To use the func CLI in new terminal sessions, restart your terminal or run:'
         Write-Message "  source $pathProfilePath"
     }
 }
-
-# --- Telemetry notice ---
-
-Write-Message ''
-Write-Message 'Telemetry'
-Write-Message '---------'
-Write-Message ''
-Write-Message "The Azure Functions CLI collects usage data. It is collected by Microsoft and is used to help us improve your experience. You can opt out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your preferred shell."
