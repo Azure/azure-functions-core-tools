@@ -35,7 +35,7 @@
     <None Include="workload.json" Pack="true" PackagePath="/" />
   </ItemGroup>
 
-  <Target Name="IncludePythonWorkerContentInPack" AfterTargets="AssignTargetPaths" BeforeTargets="_GetPackageFiles">
+  <Target Name="IncludePythonWorkerContentInPack" DependsOnTargets="AssignTargetPaths" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
       <None Update="@(None)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)" Pack="true" PackagePath="tools/any/"
          Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers/python/'))" />
