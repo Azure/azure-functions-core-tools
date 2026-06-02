@@ -434,4 +434,9 @@ if (-not $SkipPath -and -not $DryRun) {
 # --- Telemetry notice ---
 
 Write-Message ''
-Write-Message 'Telemetry: this CLI collects anonymous usage data. Opt out with FUNC_CLI_TELEMETRY_OPTOUT=1.'
+Write-Message 'Telemetry'
+Write-Message '---------'
+Write-Message ''
+Write-Message "The Azure Functions CLI collects usage data. It is collected by Microsoft and is used to help us improve your experience. You can opt out of telemetry by setting the FUNC_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your preferred shell."
+Write-Message ''
+Write-Message 'Read more about Azure Functions CLI telemetry: https://aka.ms/func-cli/telemetry'
