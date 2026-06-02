@@ -230,8 +230,10 @@ fi
 
 # --- Reload shell reminder ---
 
+echo ""
+echo "Reload your shell"
+echo "-----------------"
 if [ -n "$UPDATED_PROFILE" ]; then
-    echo ""
     echo -e "\033[33mReload your shell so 'func5' is on PATH in this session:\033[0m"
     echo "  source ${UPDATED_PROFILE}"
     echo "Or open a new terminal window."
@@ -242,7 +244,6 @@ else
         bash) PROFILE_HINT="$HOME/.bashrc" ;;
         *)    PROFILE_HINT="$HOME/.profile" ;;
     esac
-    echo ""
     echo "If 'func5' isn't found in your current shell, open a new terminal or run:"
     echo "  source ${PROFILE_HINT}"
 fi
