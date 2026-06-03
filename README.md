@@ -151,6 +151,51 @@ export PATH="$PATH:$(pwd)/out/bin/Func/debug"
 func <command>
 ```
 
+### Run Locally with Workloads
+
+One-time bootstrap (per workload you want to test, into ./.debug-workloads/):
+
+```bash
+dotnet build src/Func/Func.csproj
+dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj \
+ -t:DeployForDebug -p:FuncCliEnsureWorkloadInstalled=true
+```
+
+That packs the workload, runs func workload install against `./.debug-workloads/`, and drops the freshly built DLL+PDB into the install dir.
+
+Inner loop (after editing workload source, no re-install, no pack):
+
+```bash
+dotnet build src/Workloads/Stacks/Node/Workloads.Node.csproj -t:DeployForDebug
+```
+
+> Just copies the new DLL+PDB over the installed one.
+
+Run the CLI against that home:
+
+```bash
+export FUNC_CLI_WORKLOADS_HOME="$PWD/.debug-workloads"
+./out/bin/Func/debug/func <args>
+```
+
+#### One-shot script
+
+`eng/scripts/debug-workloads.ps1` wraps the above for every workload in the repo, so you can bootstrap a full home in one command:
+
+```bash
+pwsh ./eng/scripts/debug-workloads.ps1                  # all workloads
+pwsh ./eng/scripts/debug-workloads.ps1 -Project Node    # just one
+pwsh ./eng/scripts/debug-workloads.ps1 -Clean           # wipe + reinstall
+```
+
+Inner loop with the script (sub-second, copy-only):
+
+```bash
+pwsh ./eng/scripts/debug-workloads.ps1 -Project Node -SkipFuncBuild
+```
+
+Reach for the `build-workloads` skill instead when what you're testing is `func workload install` itself (feed resolution, manifest behaviour, etc.). Otherwise the script above is faster because it skips the NuGet feed.
+
 ### Publish a Self-Contained Build
 
 ```bash

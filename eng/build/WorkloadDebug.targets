@@ -37,10 +37,11 @@
       <!-- func workload install normalises the package id to lowercase on disk. -->
       <_DeployForDebugPackageIdLower>$(PackageId.ToLowerInvariant())</_DeployForDebugPackageIdLower>
       <_DeployForDebugTargetDir>$(_DeployForDebugHome)/workloads/$(_DeployForDebugPackageIdLower)/$(PackageVersion)/tools/any</_DeployForDebugTargetDir>
+      <_DeployForDebugInstallVersionDir>$(_DeployForDebugHome)/workloads/$(_DeployForDebugPackageIdLower)/$(PackageVersion)</_DeployForDebugInstallVersionDir>
       <_DeployForDebugFuncDll>$(RepoRoot)out/bin/Func/debug/func.dll</_DeployForDebugFuncDll>
       <_DeployForDebugPackOutput>$(_DeployForDebugHome)/.pack-cache</_DeployForDebugPackOutput>
       <_DeployForDebugNupkg>$(_DeployForDebugPackOutput)/$(PackageId).$(PackageVersion).nupkg</_DeployForDebugNupkg>
-      <_DeployForDebugNeedsInstall Condition="!Exists('$(_DeployForDebugTargetDir)')">true</_DeployForDebugNeedsInstall>
+      <_DeployForDebugNeedsInstall Condition="!Exists('$(_DeployForDebugInstallVersionDir)')">true</_DeployForDebugNeedsInstall>
     </PropertyGroup>
 
     <!--
@@ -49,7 +50,7 @@
       install via `func workload install`).
     -->
     <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' != 'true'"
-           Text="DeployForDebug: '$(PackageId)' $(PackageVersion) is not installed at '$(_DeployForDebugTargetDir)'. Either rerun with -p:FuncCliEnsureWorkloadInstalled=true to auto-install (the &quot;auto-install&quot; VS Code launch config does this), or run `func workload install &lt;nupkg-or-id&gt;` against the same home first." />
+           Text="DeployForDebug: '$(PackageId)' $(PackageVersion) is not installed at '$(_DeployForDebugInstallVersionDir)'. Either rerun with -p:FuncCliEnsureWorkloadInstalled=true to auto-install (the &quot;auto-install&quot; VS Code launch config does this), or run `func workload install &lt;nupkg-or-id&gt;` against the same home first." />
 
     <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugFuncDll)')"
            Text="DeployForDebug: '$(PackageId)' isn't installed yet and func.dll wasn't found at '$(_DeployForDebugFuncDll)'. Build Func.csproj first." />
@@ -63,14 +64,14 @@
           Command='dotnet "$(_DeployForDebugFuncDll)" workload install "$(_DeployForDebugNupkg)" --force'
           EnvironmentVariables="FUNC_CLI_WORKLOADS_HOME=$(_DeployForDebugHome)" />
 
-    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugTargetDir)')"
-           Text="DeployForDebug: install of '$(_DeployForDebugNupkg)' didn't produce '$(_DeployForDebugTargetDir)'. Check the func workload install output above." />
+    <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugInstallVersionDir)')"
+           Text="DeployForDebug: install of '$(_DeployForDebugNupkg)' didn't produce '$(_DeployForDebugInstallVersionDir)'. Check the func workload install output above." />
 
     <Message Condition="'$(PackageType)' == 'FuncCliWorkload' AND '$(_DeployForDebugNeedsInstall)' != 'true'"
              Importance="High"
-             Text="DeployForDebug: '$(PackageId)' $(PackageVersion) already installed at $(_DeployForDebugTargetDir)." />
+             Text="DeployForDebug: '$(PackageId)' $(PackageVersion) already installed at $(_DeployForDebugInstallVersionDir)." />
 
-    <ItemGroup Condition="'$(PackageType)' == 'FuncCliWorkload'">
+    <ItemGroup Condition="'$(PackageType)' == 'FuncCliWorkload' AND '$(IncludeBuildOutput)' != 'false'">
       <_DeployForDebugPayload Include="$(TargetPath)" />
       <_DeployForDebugPayload Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
     </ItemGroup>
