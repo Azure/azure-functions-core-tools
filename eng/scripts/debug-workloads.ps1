@@ -119,6 +119,18 @@ function Resolve-WorkloadProject {
     return @($hits)[0]
 }
 
+function Get-WorkloadRid {
+    param([Parameter(Mandatory)] [string] $Csproj)
+    # Host and Workers.Python override PackageId with `.<rid>` (matching what
+    # `func workload install` resolves from the feed for real users), so they
+    # have to be packed with -r <rid>. Detect that by looking for a
+    # <RuntimeIdentifiers> element in the csproj.
+    [xml] $proj = Get-Content -Raw $Csproj
+    $rids = $proj.SelectNodes('//RuntimeIdentifiers') | Select-Object -First 1
+    if (-not $rids -or [string]::IsNullOrWhiteSpace($rids.InnerText)) { return $null }
+    return [System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
+}
+
 if ($Clean -and (Test-Path -LiteralPath $WorkloadsHome)) {
     Write-Host "Cleaning workloads home: $WorkloadsHome" -ForegroundColor Cyan
     Remove-Item -Recurse -Force -LiteralPath $WorkloadsHome
@@ -152,7 +164,7 @@ foreach ($proj in $targets) {
     Write-Host ""
     Write-Host "==> $name" -ForegroundColor Cyan
     try {
-        Invoke-Native -File 'dotnet' -Arguments @(
+        $buildArgs = @(
             'build', $proj,
             '-c', $Configuration,
             '-t:DeployForDebug',
@@ -161,6 +173,12 @@ foreach ($proj in $targets) {
             '/clp:NoSummary',
             '/v:m'
         )
+        $rid = Get-WorkloadRid -Csproj $proj
+        if ($rid) {
+            Write-Host "    (RID-aware workload, packing as -r $rid -p:PackAllRids=true)" -ForegroundColor DarkGray
+            $buildArgs += @('-r', $rid, '-p:PackAllRids=true')
+        }
+        Invoke-Native -File 'dotnet' -Arguments $buildArgs
     } catch {
         Write-Warning "Failed to deploy $name : $_"
         $failed += $name
