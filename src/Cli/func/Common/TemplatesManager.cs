@@ -142,7 +142,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task Deploy(string name, string fileName, Template template)
         {
-            if (template.Id.EndsWith("JavaScript-4.x", StringComparison.OrdinalIgnoreCase) || template.Id.EndsWith("TypeScript-4.x", StringComparison.OrdinalIgnoreCase))
+            if (TemplateHelpers.IsNodeV4Template(template))
             {
                 await DeployNewNodeProgrammingModel(name, fileName, template);
             }

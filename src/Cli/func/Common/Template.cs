@@ -21,6 +21,15 @@ namespace Azure.Functions.Cli.Common
         public Dictionary<string, string> Files { get; set; }
     }
 
+    internal static class TemplateHelpers
+    {
+        public static bool IsNodeV4Template(Template template)
+        {
+            return template.Id.EndsWith("JavaScript-4.x", StringComparison.OrdinalIgnoreCase) ||
+                template.Id.EndsWith("TypeScript-4.x", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     internal class TemplateMetadata
     {
         [JsonProperty("name")]
