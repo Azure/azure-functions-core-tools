@@ -59,16 +59,6 @@ public interface IProjectInitializer
     public Regex? DefaultFunctionNameValidator => null;
 
     /// <summary>
-    /// Detects the language used by an existing on-disk project being adopted
-    /// by <c>func init</c>. Called only in the adopt path when
-    /// <c>--language</c> is not supplied. Should return one of
-    /// <see cref="SupportedLanguages"/> (case-insensitive) when the language
-    /// can be inferred from the project layout (e.g. a <c>.csproj</c> vs
-    /// <c>.fsproj</c> file), or <c>null</c> when it can't.
-    /// </summary>
-    public string? DetectAdoptedLanguage(DirectoryInfo workingDirectory) => null;
-
-    /// <summary>
     /// Registers the options this initializer contributes to <c>func init</c> via
     /// <paramref name="registry"/>, and returns the canonical instances to use when reading
     /// values back inside <see cref="InitializeAsync"/>. Options shared across workloads

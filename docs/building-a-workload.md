@@ -219,16 +219,6 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
         stack.Equals("javascript", StringComparison.OrdinalIgnoreCase) ||
         stack.Equals("typescript", StringComparison.OrdinalIgnoreCase);
 
-    // Optional. Override on multi-language stacks so `func init` can adopt
-    // an existing project (host.json present, no .func/config.json) without
-    // forcing the user to repeat --language. Return one of SupportedLanguages
-    // when the on-disk shape makes it clear (here: tsconfig.json → TypeScript),
-    // or null to fall back to no language in .func/config.json.
-    public string? DetectAdoptedLanguage(DirectoryInfo workingDirectory) =>
-        File.Exists(Path.Combine(workingDirectory.FullName, "tsconfig.json"))
-            ? "TypeScript"
-            : "JavaScript";
-
     // Workload-specific options. Registered through the supplied IInitOptionRegistry,
     // which is what lets options like `--no-bundles` that multiple stacks contribute
     // appear once in --help and resolve to the same instance for every workload that

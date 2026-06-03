@@ -50,23 +50,27 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
+    private readonly IFunctionsProjectResolver _projectResolver;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
     public InitCommand(
         IInteractionService interaction,
         IWorkloadHintRenderer hintRenderer,
         ILocalSettingsProvider localSettingsProvider,
+        IFunctionsProjectResolver projectResolver,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);
         ArgumentNullException.ThrowIfNull(localSettingsProvider);
+        ArgumentNullException.ThrowIfNull(projectResolver);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
         _hintRenderer = hintRenderer;
         _localSettingsProvider = localSettingsProvider;
+        _projectResolver = projectResolver;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -221,15 +225,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             }
         }
 
-        // For adoption with no explicit --language, try to infer the language
-        // from the project's on-disk shape (e.g. .csproj vs .fsproj, presence
-        // of tsconfig.json). When the stack offers a language choice, this
-        // keeps `.func/config.json` complete enough for downstream commands
-        // (`func new --list` and friends) without forcing the user to repeat
-        // information that's already visible in the project.
+        // For adoption with no explicit --language, ask the project resolver
+        // to fingerprint the on-disk project and use whatever language it
+        // surfaces. This reuses the same factory the host/start commands use,
+        // so we don't carry a parallel set of init-specific detection rules.
         if (adoptExisting && string.IsNullOrWhiteSpace(language))
         {
-            language = initializer.DetectAdoptedLanguage(workingDirectory.Info);
+            language = await DetectAdoptedLanguageAsync(workingDirectory, cancellationToken);
         }
 
         // For adoption with no resolvable language, skip language resolution
@@ -406,6 +408,21 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     {
         string? raw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
         return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+    }
+
+    // Adopt-mode language fingerprinter. Defers to the shared project resolver
+    // (the same one `func start` / `func new` use) so we don't carry a parallel
+    // set of init-only detection rules. Returns null when the resolver can't
+    // classify the directory or the resolved project doesn't surface a Language
+    // (single-language stacks, .NET output dirs, etc.) — adoption then falls
+    // back to writing the stack runtime without a language entry.
+    private async Task<string?> DetectAdoptedLanguageAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+    {
+        ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
+            new ProjectResolutionContext(workingDirectory),
+            cancellationToken);
+
+        return resolution is ProjectResolutionResult.Resolved resolved ? resolved.Project.Language : null;
     }
 
     // Resolves a candidate string (from --stack or local.settings.json) to

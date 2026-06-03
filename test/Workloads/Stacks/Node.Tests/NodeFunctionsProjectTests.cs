@@ -173,6 +173,49 @@ public class NodeFunctionsProjectTests : IDisposable
         Assert.Equal(new[] { "install" }, commands[0]);
     }
 
+    [Fact]
+    public void Language_ReturnsTypeScript_WhenTsconfigPresent()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "tsconfig.json"), "{}");
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "package.json"), "{}");
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "index.js"), string.Empty);
+
+        var project = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName));
+
+        Assert.Equal("TypeScript", project.Language);
+    }
+
+    [Fact]
+    public void Language_ReturnsTypeScript_WhenTopLevelTsFilePresent()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "index.ts"), string.Empty);
+
+        var project = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName));
+
+        Assert.Equal("TypeScript", project.Language);
+    }
+
+    [Fact]
+    public void Language_ReturnsJavaScript_WhenOnlyPackageJsonPresent()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "package.json"), "{}");
+
+        var project = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName));
+
+        Assert.Equal("JavaScript", project.Language);
+    }
+
+    [Fact]
+    public void Language_DefaultsToJavaScript_WhenNoFingerprint()
+    {
+        // The factory will only construct a NodeFunctionsProject after it has
+        // already classified the directory as Node, so falling back to JS when
+        // there's no further signal is safe.
+        var project = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName));
+
+        Assert.Equal("JavaScript", project.Language);
+    }
+
     private NodeFunctionsProject CreateProject(Func<string, IReadOnlyList<string>, Action<string>, Action<string>, CancellationToken, Task<int>> runner)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
         {
