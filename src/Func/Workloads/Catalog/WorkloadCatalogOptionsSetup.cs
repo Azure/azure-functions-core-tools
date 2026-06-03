@@ -27,8 +27,11 @@ internal sealed class WorkloadCatalogOptionsSetup(
     private static readonly HashSet<string> _falseEnvironmentValues =
         new(StringComparer.OrdinalIgnoreCase) { "0", "false", "f", "n", "no", "off" };
 
-    private readonly IProcessEnvironment _processEnvironment = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
-    private readonly ICliVersionProvider _cliVersionProvider = cliVersionProvider ?? throw new ArgumentNullException(nameof(cliVersionProvider));
+    private readonly IProcessEnvironment _processEnvironment = processEnvironment
+        ?? throw new ArgumentNullException(nameof(processEnvironment));
+
+    private readonly ICliVersionProvider _cliVersionProvider = cliVersionProvider
+        ?? throw new ArgumentNullException(nameof(cliVersionProvider));
 
     public void Configure(WorkloadCatalogOptions options)
     {
@@ -62,11 +65,6 @@ internal sealed class WorkloadCatalogOptionsSetup(
             }
         }
 
-        // Auto-detect: a prerelease CLI build resolves prerelease workload
-        // packages by default. SemVer prerelease suffixes are delimited with
-        // '-' (e.g. "5.0.0-preview.1"), so the presence of a dash in the
-        // informational version is a reliable, build-agnostic signal.
-        string informational = _cliVersionProvider.InformationalVersion;
-        return !string.IsNullOrEmpty(informational) && informational.Contains('-');
+        return _cliVersionProvider.IsPrerelease;
     }
 }

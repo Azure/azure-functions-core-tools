@@ -21,4 +21,9 @@ internal interface ICliVersionProvider
     /// (e.g. <c>"5.0.0+abc1234"</c>).
     /// </summary>
     public string InformationalVersion { get; }
+
+    /// <summary>
+    /// Indicates if the version is a prerelease.
+    /// </summary>
+    public bool IsPrerelease { get; }
 }

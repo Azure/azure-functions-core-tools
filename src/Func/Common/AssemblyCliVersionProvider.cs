@@ -28,4 +28,10 @@ internal sealed class AssemblyCliVersionProvider : ICliVersionProvider
     public string Version { get; }
 
     public string InformationalVersion { get; }
+
+#if PREVIEW
+    public bool IsPrerelease => true;
+#else
+    public bool IsPrerelease => false;
+#endif
 }
