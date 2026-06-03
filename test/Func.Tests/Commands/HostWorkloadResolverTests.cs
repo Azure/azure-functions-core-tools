@@ -188,7 +188,8 @@ public class HostWorkloadResolverTests
         var step = new ValidateHostWorkloadInitializationStep(
             resolver,
             Substitute.For<IWorkloadInstaller>(),
-            CreateWorkloadPaths());
+            CreateWorkloadPaths(),
+            Substitute.For<IProcessEnvironment>());
         StartInitializationStepContext context = NewStepContext(step, offline: true);
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -211,7 +212,8 @@ public class HostWorkloadResolverTests
         var step = new ValidateHostWorkloadInitializationStep(
             resolver,
             Substitute.For<IWorkloadInstaller>(),
-            CreateWorkloadPaths());
+            CreateWorkloadPaths(),
+            Substitute.For<IProcessEnvironment>());
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);

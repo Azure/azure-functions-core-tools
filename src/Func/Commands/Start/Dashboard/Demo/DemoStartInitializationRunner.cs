@@ -107,7 +107,7 @@ internal sealed class DemoStartInitializationRunner(
         [
             new ResolveProfileInitializationStep(_profileResolver),
             new ResolveConstraintsInitializationStep(),
-            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller, _workloadPaths),
+            new ValidateHostWorkloadInitializationStep(_hostWorkloadResolver, _workloadInstaller, _workloadPaths, _processEnvironment),
             new ResolveFunctionsProjectInitializationStep(_projectResolver),
             new ResolveFunctionsWorkerInitializationStep(_workerResolverFactory, _workerInstaller),
             new ValidateExtensionBundleInitializationStep(
