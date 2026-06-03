@@ -1085,6 +1085,101 @@ public class InitCommandTests
         }
     }
 
+    [Fact]
+    public async Task InitCommand_Heal_FillsMissingLanguageWithoutForce()
+    {
+        // Config with runtime but no language on a multi-language stack heals
+        // in place: detector fills language, all other keys are preserved.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(
+                Path.Combine(newDir, ".func", "config.json"),
+                "{\"stack\":{\"runtime\":\"dotnet\"},\"profiles\":{\"keep\":true}}");
+
+            _projectResolver
+                .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: "C#"), "stub"));
+
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                aliases: new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["C#"] = ["csharp"],
+                    ["F#"] = ["fsharp"],
+                });
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(newDir, ".func", "config.json")));
+            Assert.True(doc.RootElement.TryGetProperty("profiles", out JsonElement profiles));
+            Assert.True(profiles.GetProperty("keep").GetBoolean());
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Heal_SingleLanguageStack_StillRefuses()
+    {
+        // Single-language stacks (e.g. python) don't persist 'language' even on
+        // a fresh init, so a config with only 'runtime' is the correct shape.
+        // Heal must not trigger; behaviour falls back to the existing refuse.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(
+                Path.Combine(newDir, ".func", "config.json"),
+                "{\"stack\":{\"runtime\":\"python\"}}");
+
+            var python = new FakeProjectInitializer("python", supportedLanguages: ["python"]);
+
+            int exitCode = await RunInitAsync(newDir, python, language: null, stack: null);
+
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.Contains(_interaction.Lines, l => l.Contains("already contains a Functions project", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Heal_ConfigAlreadyHasLanguage_StillRefuses()
+    {
+        // Nothing to heal: config already has both keys. The refuse path runs.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(
+                Path.Combine(newDir, ".func", "config.json"),
+                "{\"stack\":{\"runtime\":\"dotnet\",\"language\":\"C#\"}}");
+
+            var dotnet = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#", "F#"]);
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
+
+            Assert.Equal(1, exitCode);
+            Assert.False(dotnet.WasInvoked);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
     private sealed class StubFunctionsProject(string stackName, string? language) : FunctionsProject
     {
         private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
