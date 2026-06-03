@@ -186,8 +186,11 @@ export FUNC_CLI_WORKLOADS_HOME="$PWD/.debug-workloads"
 ```bash
 pwsh ./eng/scripts/debug-workloads.ps1                  # all workloads
 pwsh ./eng/scripts/debug-workloads.ps1 -Project Node    # just one
+pwsh ./eng/scripts/debug-workloads.ps1 -Feature node    # everything `func setup --features node` installs
 pwsh ./eng/scripts/debug-workloads.ps1 -Clean           # wipe + reinstall
 ```
+
+`-Feature` accepts `host`, `runtime`, `dotnet`, `node`, `python`, `go` (or any combination, deduped).
 
 Inner loop with the script (sub-second, copy-only):
 
