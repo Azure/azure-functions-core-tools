@@ -61,7 +61,7 @@ $Script:InvokedFromFile = -not [string]::IsNullOrEmpty($PSCommandPath)
 
 function Exit-Script {
     param([int] $Code = 0)
-    if ($Script:InvokedFromFile) { exit $Code } else { return }
+    if ($Script:InvokedFromFile) { exit $Code } else { return $Code }
 }
 
 # --- Logging ---
