@@ -35,9 +35,7 @@
     Keep the downloaded archive and temp directory after install.
 
 .PARAMETER Help
-    Show help text. Provided because PowerShell's built-in -? and Get-Help
-    require the script to exist as a file on disk, which the documented
-    `irm | iex` install flow doesn't satisfy.
+    Show help text.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
