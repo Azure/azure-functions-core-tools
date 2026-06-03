@@ -33,12 +33,9 @@
 
 .PARAMETER KeepArchive
     Keep the downloaded archive and temp directory after install.
-
-.PARAMETER DryRun
-    Show what would happen without making changes.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [Alias('InstallDir')]
     [string] $InstallPath = "",
@@ -47,8 +44,7 @@ param(
     [switch] $Prerelease,
     [switch] $Force,
     [switch] $SkipPath,
-    [switch] $KeepArchive,
-    [switch] $DryRun
+    [switch] $KeepArchive
 )
 
 $ErrorActionPreference = 'Stop'
@@ -260,10 +256,7 @@ New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 try {
     $downloadPath = Join-Path $tempDir $assetName
 
-    if ($DryRun) {
-        Write-Message "[DRY RUN] Would download $assetName from release $Version to $downloadPath"
-        Write-Message "[DRY RUN] Would extract to $InstallPath"
-    } else {
+    if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName from release $Version and install func CLI")) {
         Write-Message "Downloading $assetName..."
         Get-GitHubReleaseAsset -Tag $Version -AssetName $assetName -OutFile $downloadPath
         New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
@@ -313,20 +306,20 @@ $pathProfilePath = $null
 
 if ($SkipPath) {
     Write-Message 'Skipping PATH update (-SkipPath).'
-} elseif ($DryRun) {
-    Write-Message "[DRY RUN] Would add $InstallPath to PATH"
 } elseif ($os -eq 'win') {
     $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
     if ($userPath -notlike "*$InstallPath*") {
-        if ($existingFunc) {
-            $newPath = "$userPath;$InstallPath"
-            $env:PATH = "$env:PATH;$InstallPath"
-        } else {
-            $newPath = "$InstallPath;$userPath"
-            $env:PATH = "$InstallPath;$env:PATH"
+        if ($PSCmdlet.ShouldProcess('User PATH environment variable', "Add $InstallPath")) {
+            if ($existingFunc) {
+                $newPath = "$userPath;$InstallPath"
+                $env:PATH = "$env:PATH;$InstallPath"
+            } else {
+                $newPath = "$InstallPath;$userPath"
+                $env:PATH = "$InstallPath;$env:PATH"
+            }
+            [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')
+            $pathUpdated = $true
         }
-        [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')
-        $pathUpdated = $true
     }
 } else {
     if ($env:PATH -notlike "*$InstallPath*") {
@@ -336,23 +329,22 @@ if ($SkipPath) {
         } else {
             "export PATH=`"$InstallPath`:`$PATH`""
         }
-        Add-Content -Path $pathProfilePath -Value "`n# Added by Azure Functions CLI installer`n$exportLine"
-        $pathUpdated = $true
+        if ($PSCmdlet.ShouldProcess($pathProfilePath, "Append PATH export for $InstallPath")) {
+            Add-Content -Path $pathProfilePath -Value "`n# Added by Azure Functions CLI installer`n$exportLine"
+            $pathUpdated = $true
+        }
     }
 }
 
 # GitHub Actions: make func available in subsequent workflow steps.
 if ($env:GITHUB_ACTIONS -eq 'true' -and $env:GITHUB_PATH) {
-    if ($DryRun) {
-        Write-Message "[DRY RUN] Would append $InstallPath to `$env:GITHUB_PATH"
-    } else {
+    if ($PSCmdlet.ShouldProcess('$env:GITHUB_PATH', "Append $InstallPath")) {
         Add-Content -Path $env:GITHUB_PATH -Value $InstallPath
         Write-Message "Appended $InstallPath to `$env:GITHUB_PATH for subsequent workflow steps."
     }
 }
 
-if ($DryRun) {
-    Write-Message "[DRY RUN] func CLI $Version would be installed to $InstallPath" -Level Success
+if ($WhatIfPreference) {
     Exit-Script 0; return
 }
 
@@ -388,7 +380,7 @@ if ($existingFunc) {
 
 # --- Reload shell reminder ---
 
-if (-not $SkipPath -and -not $DryRun) {
+if (-not $SkipPath -and -not $WhatIfPreference) {
     if ($os -eq 'win') {
         Write-Message ''
         Write-Message 'Reload shell'
