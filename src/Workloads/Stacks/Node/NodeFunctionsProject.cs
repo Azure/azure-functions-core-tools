@@ -21,10 +21,12 @@ internal sealed class NodeFunctionsProject : FunctionsProject
 
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
+    private readonly string _language;
 
-    public NodeFunctionsProject(WorkingDirectory workingDirectory)
+    public NodeFunctionsProject(WorkingDirectory workingDirectory, string language)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
+        _language = language ?? throw new ArgumentNullException(nameof(language));
         _workerReference = FunctionsWorkerReference.FromWorkload("node");
     }
 
@@ -44,26 +46,7 @@ internal sealed class NodeFunctionsProject : FunctionsProject
 
     public override FunctionsWorkerReference WorkerReference => _workerReference;
 
-    public override string? Language
-    {
-        get
-        {
-            string root = _workingDirectory.Info.FullName;
-
-            // tsconfig.json (or a top-level .ts file) is the strongest signal
-            // that this is a TS project. Otherwise fall back to JavaScript;
-            // package.json / .js / .mjs / .cjs all map there, and so does a
-            // detected Node project with no further fingerprint (the factory
-            // already vouched that this is a Node project at all).
-            if (File.Exists(Path.Combine(root, "tsconfig.json"))
-                || Directory.EnumerateFiles(root, "*.ts", SearchOption.TopDirectoryOnly).Any())
-            {
-                return "TypeScript";
-            }
-
-            return "JavaScript";
-        }
-    }
+    public override string Language => _language;
 
     public override async Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {
