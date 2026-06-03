@@ -438,8 +438,18 @@ loads.
 
 The auto-install mode only installs the workload you picked. For end-to-end
 runs (`func start`) you also need a host and the matching language worker
-installed, since workload installs are not transitive today. Two recipes:
+installed, since workload installs are not transitive today. Three recipes:
 
+- **Everything in one go (recommended)**: `eng/scripts/debug-workloads.ps1`
+  drives `DeployForDebug` for every workload in the repo, installing into
+  `.debug-workloads/` so VS Code F5 finds them.
+  ```bash
+  pwsh ./eng/scripts/debug-workloads.ps1            # all 12 workloads
+  pwsh ./eng/scripts/debug-workloads.ps1 -Project Node   # iterate on one
+  pwsh ./eng/scripts/debug-workloads.ps1 -Clean     # wipe + reinstall
+  ```
+  After the first run, subsequent runs are copy-only (sub-second per
+  workload).
 - **Single language, file-based**: pack and install just what you need.
   ```bash
   dotnet pack src/Workloads/Host/Workloads.Host.csproj                -c Debug -o /tmp/funcpkgs
@@ -449,8 +459,9 @@ installed, since workload installs are not transitive today. Two recipes:
   ./out/bin/Func/debug/func workload install /tmp/funcpkgs/Azure.Functions.Cli.Workloads.Workers.Node.*.nupkg
   ```
 - **All workloads via a local feed**: see the `build-workloads` skill in
-  `.github/skills/build-workloads/`. Pack-and-pushes every workload to a
-  Dockerized NuGet feed; install with `func workload install <alias> --source <feed>`.
+  `.github/skills/build-workloads/`. Use this when what you're testing is
+  `func workload install` itself (feed resolution, manifest behaviour, etc.).
+  Otherwise the script above is faster.
 
 Once bootstrapped, every F5 redeploys only the workload you're iterating on
 and leaves the rest of the home untouched.
