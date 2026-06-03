@@ -18,11 +18,8 @@ public abstract class FunctionsProject
     public abstract string StackDisplayName { get; }
 
     /// <summary>
-    /// The canonical display name of the language used by this project (e.g.
-    /// "C#", "F#", "JavaScript", "TypeScript"), or <c>null</c> when the
-    /// project layout doesn't carry enough information to tell. Single-language
-    /// stacks (Python, Go) leave this <c>null</c> because the stack already
-    /// implies the language.
+    /// Display name of the project's language (e.g. "C#", "TypeScript"), or
+    /// <c>null</c> for single-language stacks where the stack implies it.
     /// </summary>
     public virtual string? Language => null;
 

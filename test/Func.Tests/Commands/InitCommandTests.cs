@@ -995,10 +995,6 @@ public class InitCommandTests
     [Fact]
     public async Task InitCommand_Adopt_DetectsLanguageViaResolver_PersistsToConfig()
     {
-        // Adoption on a multi-language stack should pull the language from
-        // the same project resolver `func start` uses, so downstream commands
-        // like `func new --list` see the language in .func/config.json without
-        // the user repeating it.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -1033,9 +1029,6 @@ public class InitCommandTests
     [Fact]
     public async Task InitCommand_Adopt_ResolverReturnsNullLanguage_LeavesLanguageUnset()
     {
-        // When the resolver can classify the project but doesn't expose a
-        // language (e.g. a .NET output directory or a single-language stack),
-        // adoption still succeeds and falls back to omitting `stack.language`.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {
@@ -1062,8 +1055,6 @@ public class InitCommandTests
     [Fact]
     public async Task InitCommand_Adopt_ExplicitLanguage_WinsOverResolver()
     {
-        // --language should take precedence over the resolver: the user has
-        // explicitly told us what they want.
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
         try
         {

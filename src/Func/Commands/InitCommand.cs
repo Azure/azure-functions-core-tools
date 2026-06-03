@@ -225,18 +225,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             }
         }
 
-        // For adoption with no explicit --language, ask the project resolver
-        // to fingerprint the on-disk project and use whatever language it
-        // surfaces. This reuses the same factory the host/start commands use,
-        // so we don't carry a parallel set of init-specific detection rules.
+        // Reuse the runtime project resolver so adoption doesn't need its own
+        // detection rules.
         if (adoptExisting && string.IsNullOrWhiteSpace(language))
         {
             language = await DetectAdoptedLanguageAsync(workingDirectory, cancellationToken);
         }
 
-        // For adoption with no resolvable language, skip language resolution
-        // entirely: the user already has code, and prompting / erroring for
-        // a language they're not changing is just noise.
+        // Adopt without a resolvable language: skip prompting, the user isn't
+        // changing existing code.
         if (!(adoptExisting && string.IsNullOrWhiteSpace(language)))
         {
             (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
@@ -410,12 +407,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
     }
 
-    // Adopt-mode language fingerprinter. Defers to the shared project resolver
-    // (the same one `func start` / `func new` use) so we don't carry a parallel
-    // set of init-only detection rules. Returns null when the resolver can't
-    // classify the directory or the resolved project doesn't surface a Language
-    // (single-language stacks, .NET output dirs, etc.) — adoption then falls
-    // back to writing the stack runtime without a language entry.
+    // Returns null when the resolver can't classify the directory or the
+    // resolved project doesn't surface a Language; adoption then writes the
+    // stack runtime without a language entry.
     private async Task<string?> DetectAdoptedLanguageAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
     {
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(

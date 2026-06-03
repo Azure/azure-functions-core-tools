@@ -40,11 +40,8 @@ internal sealed class NodeProjectFactory : IFunctionsProjectFactory
         return Task.FromResult(Created(project, reason));
     }
 
-    // Returns the human-readable detection reason (null when nothing matched)
-    // alongside the language ("TypeScript" if a tsconfig.json or top-level
-    // *.ts file is present, otherwise "JavaScript"). The language is
-    // unconditional once we've decided it's a Node project: even a bare
-    // package.json with no .ts files is treated as JavaScript.
+    // Language defaults to JavaScript so a Node directory with only package.json
+    // (no .ts files) still classifies cleanly.
     private static (string? Reason, string Language) Fingerprint(DirectoryInfo workingDirectory)
     {
         string root = workingDirectory.FullName;
