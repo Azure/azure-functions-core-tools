@@ -33,14 +33,14 @@ If a v4 `func` is already on PATH (e.g., from npm), the installer leaves it as t
 
 ### Options
 
-Pass flags to the installer using the patterns below. Run with `-Help` / `--help` for the full list (includes `-DryRun`, `-Verbose`, `-SkipPath`, `-KeepArchive`).
+Pass flags to the installer using the patterns below. Run `Get-Help install.ps1` (PowerShell) or `install.sh --help` (Bash) for the full list (includes `-WhatIf` / `--dry-run`, `-Verbose`, `-SkipPath`, `-KeepArchive`).
 
 | Option | PowerShell | Bash |
 |--------|-----------|------|
 | Include pre-releases | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --prerelease` |
 | Specific version | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Version 5.0.0"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --version 5.0.0` |
 | Custom install dir | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -InstallPath ~/my-tools"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --install-path ~/my-tools` |
-| Show help | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Help"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --help` |
+| Show help | `Get-Help install.ps1` (after saving locally) or `install.ps1 -?` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --help` |
 
 The Bash script also still honours the legacy environment variables (`VERSION`, `PRERELEASE=true`, `INSTALL_DIR`, `FORCE=true`, `SOURCE`) for back-compat. Flags take precedence.
 

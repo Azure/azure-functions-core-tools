@@ -36,9 +36,6 @@
 
 .PARAMETER DryRun
     Show what would happen without making changes.
-
-.PARAMETER Help
-    Show help text.
 #>
 
 [CmdletBinding()]
@@ -51,8 +48,7 @@ param(
     [switch] $Force,
     [switch] $SkipPath,
     [switch] $KeepArchive,
-    [switch] $DryRun,
-    [switch] $Help
+    [switch] $DryRun
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,45 +87,6 @@ function Write-Message {
         'Warning' { Write-Warning $Message }
         'Error'   { Write-Error $Message }
     }
-}
-
-# --- Help ---
-
-if ($Help) {
-    Write-Message @"
-Azure Functions CLI installer
-
-DESCRIPTION:
-    Downloads and installs the func CLI for the current platform from GitHub Releases.
-
-PARAMETERS:
-    -InstallPath <string>       Directory to install the CLI (default: `$HOME\.azure-functions)
-    -Version <string>           Specific version to install (default: latest 5.x stable)
-    -Source <string>            GitHub repo to fetch releases from (default: Azure/azure-functions-core-tools)
-    -Prerelease                 Include pre-release versions when resolving latest
-    -Force                      Overwrite an existing installation
-    -SkipPath                   Do not update PATH or shell profile
-    -KeepArchive                Keep the downloaded archive after install
-    -DryRun                     Show what would happen without making changes
-    -Help                       Show this help message
-
-GITHUB ACTIONS:
-    When GITHUB_ACTIONS=true, the install dir is also appended to `$env:GITHUB_PATH so
-    func is available in subsequent workflow steps.
-
-EXAMPLES:
-    .\install.ps1
-    .\install.ps1 -InstallPath C:\tools\func
-    .\install.ps1 -Version 5.0.0 -Force
-    .\install.ps1 -Prerelease
-
-    # Piped execution:
-    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) }"
-    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"
-    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -InstallPath C:\tools\func"
-"@
-    Exit-Script 0
-    return
 }
 
 if (-not $InstallPath) { $InstallPath = $Script:DefaultInstallDir }
