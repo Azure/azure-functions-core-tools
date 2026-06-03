@@ -10,7 +10,7 @@
     PATH so 'func' / 'func5' are available in new terminals.
 
     Piped usage:
-        iex "& { $(irm https://aka.ms/func-cli/install.ps1) }"
+        irm https://aka.ms/func-cli/install.ps1 | iex
         iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"
 
 .PARAMETER InstallPath
@@ -34,14 +34,11 @@
 .PARAMETER KeepArchive
     Keep the downloaded archive and temp directory after install.
 
-.PARAMETER DryRun
-    Show what would happen without making changes.
-
 .PARAMETER Help
     Show help text.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [Alias('InstallDir')]
     [string] $InstallPath = "",
@@ -51,7 +48,6 @@ param(
     [switch] $Force,
     [switch] $SkipPath,
     [switch] $KeepArchive,
-    [switch] $DryRun,
     [switch] $Help
 )
 
@@ -70,7 +66,7 @@ $Script:InvokedFromFile = -not [string]::IsNullOrEmpty($PSCommandPath)
 
 function Exit-Script {
     param([int] $Code = 0)
-    if ($Script:InvokedFromFile) { exit $Code } else { return }
+    if ($Script:InvokedFromFile) { exit $Code } else { return $Code }
 }
 
 # --- Logging ---
@@ -95,6 +91,11 @@ function Write-Message {
 
 # --- Help ---
 
+# We expose a custom -Help switch because PowerShell's built-in -? and
+# Get-Help both need the script to exist as a file PowerShell can resolve
+# by path. The documented install flow is `irm <url> | iex`, where the
+# script body is piped through Invoke-Expression and never lands on disk,
+# so neither built-in works there.
 if ($Help) {
     Write-Message @"
 Azure Functions CLI installer
@@ -110,7 +111,7 @@ PARAMETERS:
     -Force                      Overwrite an existing installation
     -SkipPath                   Do not update PATH or shell profile
     -KeepArchive                Keep the downloaded archive after install
-    -DryRun                     Show what would happen without making changes
+    -WhatIf                     Show what would happen without making changes (built-in)
     -Help                       Show this help message
 
 GITHUB ACTIONS:
@@ -118,15 +119,10 @@ GITHUB ACTIONS:
     func is available in subsequent workflow steps.
 
 EXAMPLES:
-    .\install.ps1
-    .\install.ps1 -InstallPath C:\tools\func
-    .\install.ps1 -Version 5.0.0 -Force
-    .\install.ps1 -Prerelease
-
-    # Piped execution:
-    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) }"
+    irm https://aka.ms/func-cli/install.ps1 | iex
     iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"
     iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -InstallPath C:\tools\func"
+    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -Help"
 "@
     Exit-Script 0
     return
@@ -303,10 +299,7 @@ New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 try {
     $downloadPath = Join-Path $tempDir $assetName
 
-    if ($DryRun) {
-        Write-Message "[DRY RUN] Would download $assetName from release $Version to $downloadPath"
-        Write-Message "[DRY RUN] Would extract to $InstallPath"
-    } else {
+    if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName from release $Version and install func CLI")) {
         Write-Message "Downloading $assetName..."
         Get-GitHubReleaseAsset -Tag $Version -AssetName $assetName -OutFile $downloadPath
         New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
@@ -356,20 +349,20 @@ $pathProfilePath = $null
 
 if ($SkipPath) {
     Write-Message 'Skipping PATH update (-SkipPath).'
-} elseif ($DryRun) {
-    Write-Message "[DRY RUN] Would add $InstallPath to PATH"
 } elseif ($os -eq 'win') {
     $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
     if ($userPath -notlike "*$InstallPath*") {
-        if ($existingFunc) {
-            $newPath = "$userPath;$InstallPath"
-            $env:PATH = "$env:PATH;$InstallPath"
-        } else {
-            $newPath = "$InstallPath;$userPath"
-            $env:PATH = "$InstallPath;$env:PATH"
+        if ($PSCmdlet.ShouldProcess('User PATH environment variable', "Add $InstallPath")) {
+            if ($existingFunc) {
+                $newPath = "$userPath;$InstallPath"
+                $env:PATH = "$env:PATH;$InstallPath"
+            } else {
+                $newPath = "$InstallPath;$userPath"
+                $env:PATH = "$InstallPath;$env:PATH"
+            }
+            [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')
+            $pathUpdated = $true
         }
-        [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')
-        $pathUpdated = $true
     }
 } else {
     if ($env:PATH -notlike "*$InstallPath*") {
@@ -379,23 +372,22 @@ if ($SkipPath) {
         } else {
             "export PATH=`"$InstallPath`:`$PATH`""
         }
-        Add-Content -Path $pathProfilePath -Value "`n# Added by Azure Functions CLI installer`n$exportLine"
-        $pathUpdated = $true
+        if ($PSCmdlet.ShouldProcess($pathProfilePath, "Append PATH export for $InstallPath")) {
+            Add-Content -Path $pathProfilePath -Value "`n# Added by Azure Functions CLI installer`n$exportLine"
+            $pathUpdated = $true
+        }
     }
 }
 
 # GitHub Actions: make func available in subsequent workflow steps.
 if ($env:GITHUB_ACTIONS -eq 'true' -and $env:GITHUB_PATH) {
-    if ($DryRun) {
-        Write-Message "[DRY RUN] Would append $InstallPath to `$env:GITHUB_PATH"
-    } else {
+    if ($PSCmdlet.ShouldProcess('$env:GITHUB_PATH', "Append $InstallPath")) {
         Add-Content -Path $env:GITHUB_PATH -Value $InstallPath
         Write-Message "Appended $InstallPath to `$env:GITHUB_PATH for subsequent workflow steps."
     }
 }
 
-if ($DryRun) {
-    Write-Message "[DRY RUN] func CLI $Version would be installed to $InstallPath" -Level Success
+if ($WhatIfPreference) {
     Exit-Script 0; return
 }
 
@@ -431,7 +423,7 @@ if ($existingFunc) {
 
 # --- Reload shell reminder ---
 
-if (-not $SkipPath -and -not $DryRun) {
+if (-not $SkipPath -and -not $WhatIfPreference) {
     if ($os -eq 'win') {
         Write-Message ''
         Write-Message 'Reload shell'
