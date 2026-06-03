@@ -32,6 +32,11 @@
 
 .PARAMETER KeepArchive
     Keep the downloaded archive and temp directory after install.
+
+.PARAMETER Help
+    Show help text. Provided because PowerShell's built-in -? and Get-Help
+    require the script to exist as a file on disk, which the documented
+    `irm | iex` install flow doesn't satisfy.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
@@ -43,7 +48,8 @@ param(
     [switch] $Prerelease,
     [switch] $Force,
     [switch] $SkipPath,
-    [switch] $KeepArchive
+    [switch] $KeepArchive,
+    [switch] $Help
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,6 +88,45 @@ function Write-Message {
         'Warning' { Write-Warning $Message }
         'Error'   { Write-Error $Message }
     }
+}
+
+# --- Help ---
+
+# We expose a custom -Help switch because PowerShell's built-in -? and
+# Get-Help both need the script to exist as a file PowerShell can resolve
+# by path. The documented install flow is `irm <url> | iex`, where the
+# script body is piped through Invoke-Expression and never lands on disk,
+# so neither built-in works there.
+if ($Help) {
+    Write-Message @"
+Azure Functions CLI installer
+
+DESCRIPTION:
+    Downloads and installs the func CLI for the current platform from GitHub Releases.
+
+PARAMETERS:
+    -InstallPath <string>       Directory to install the CLI (default: `$HOME\.azure-functions)
+    -Version <string>           Specific version to install (default: latest 5.x stable)
+    -Source <string>            GitHub repo to fetch releases from (default: Azure/azure-functions-core-tools)
+    -Prerelease                 Include pre-release versions when resolving latest
+    -Force                      Overwrite an existing installation
+    -SkipPath                   Do not update PATH or shell profile
+    -KeepArchive                Keep the downloaded archive after install
+    -WhatIf                     Show what would happen without making changes (built-in)
+    -Help                       Show this help message
+
+GITHUB ACTIONS:
+    When GITHUB_ACTIONS=true, the install dir is also appended to `$env:GITHUB_PATH so
+    func is available in subsequent workflow steps.
+
+EXAMPLES:
+    irm https://aka.ms/func-cli/install.ps1 | iex
+    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"
+    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -InstallPath C:\tools\func"
+    iex "& { `$(irm https://aka.ms/func-cli/install.ps1) } -Help"
+"@
+    Exit-Script 0
+    return
 }
 
 if (-not $InstallPath) { $InstallPath = $Script:DefaultInstallDir }

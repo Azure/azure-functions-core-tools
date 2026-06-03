@@ -41,6 +41,7 @@ Pass flags to the installer using the patterns below. The PowerShell script also
 | Specific version | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Version 5.0.0"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --version 5.0.0` |
 | Custom install dir | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -InstallPath ~/my-tools"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --install-path ~/my-tools` |
 | Preview without writing | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -WhatIf"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --dry-run` |
+| Show help | `iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Help"` | `curl -sSL https://aka.ms/func-cli/install.sh \| bash -s -- --help` |
 
 The Bash script also still honours the legacy environment variables (`VERSION`, `PRERELEASE=true`, `INSTALL_DIR`, `FORCE=true`, `SOURCE`) for back-compat. Flags take precedence.
 
