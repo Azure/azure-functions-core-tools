@@ -11,6 +11,7 @@
 
     Piped usage:
         irm https://aka.ms/func-cli/install.ps1 | iex
+        iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"
 
 .PARAMETER InstallPath
     Directory to install the CLI. Defaults to $HOME\.azure-functions.
