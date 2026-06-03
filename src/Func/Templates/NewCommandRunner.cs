@@ -78,11 +78,14 @@ internal sealed class NewCommandRunner
     {
         ArgumentNullException.ThrowIfNull(invocation);
 
-        ResolvedContext? resolved = await ResolveContextAsync(invocation, cancellationToken);
-        if (resolved is null)
+        ResolutionOutcome outcome = await ResolveContextAsync(invocation, cancellationToken);
+        if (outcome.Failure is { } executeFailure)
         {
+            RenderResolutionFailure(executeFailure);
             return 1;
         }
+
+        ResolvedContext resolved = outcome.Context!;
 
         // Steps 11a / 11b: extension-bundle presence + min-bundle gate.
         // DotNet doesn't ship a templates-workload.json, so the gate is a
@@ -161,11 +164,14 @@ internal sealed class NewCommandRunner
     {
         ArgumentNullException.ThrowIfNull(invocation);
 
-        ResolvedContext? resolved = await ResolveContextAsync(invocation, cancellationToken);
-        if (resolved is null)
+        ResolutionOutcome outcome = await ResolveContextAsync(invocation, cancellationToken);
+        if (outcome.Failure is { } listFailure)
         {
+            RenderResolutionFailure(listFailure);
             return 1;
         }
+
+        ResolvedContext resolved = outcome.Context!;
 
         IReadOnlyList<FunctionTemplateInfo> templates = await ListTemplatesAsync(resolved, cancellationToken);
         if (templates.Count == 0)
@@ -212,6 +218,13 @@ internal sealed class NewCommandRunner
     /// overload on the execute path to map user-supplied values back to
     /// the v2 paramId the engine resolves against.
     /// </summary>
+    /// <remarks>
+    /// Pre-parse / hydration callers are best-effort: when resolution fails
+    /// they return <c>null</c> silently. Rendering the failure is the job of
+    /// the execute / list entry-points, which call <see cref="ResolveContextAsync"/>
+    /// themselves; rendering here too would surface the same error twice
+    /// (or three times, once #5304's third call site lands) for one invocation.
+    /// </remarks>
     public async Task<IReadOnlyList<HydratedTemplateOption>?> HydrateOptionsForTemplateWithIdsAsync(
         NewInvocation invocation,
         string templateId,
@@ -220,8 +233,8 @@ internal sealed class NewCommandRunner
         ArgumentNullException.ThrowIfNull(invocation);
         ArgumentException.ThrowIfNullOrWhiteSpace(templateId);
 
-        ResolvedContext? resolved = await ResolveContextAsync(invocation, cancellationToken);
-        if (resolved is null)
+        ResolutionOutcome outcome = await ResolveContextAsync(invocation, cancellationToken);
+        if (outcome.Context is not { } resolved)
         {
             return null;
         }
@@ -238,7 +251,7 @@ internal sealed class NewCommandRunner
         return _optionHydrator.HydrateWithIds(template);
     }
 
-    private async Task<ResolvedContext?> ResolveContextAsync(
+    private async Task<ResolutionOutcome> ResolveContextAsync(
         NewInvocation invocation,
         CancellationToken cancellationToken)
     {
@@ -259,8 +272,7 @@ internal sealed class NewCommandRunner
 
         if (projectResult is not ProjectResolutionResult.Resolved resolved)
         {
-            _renderer.RenderProjectRequired();
-            return null;
+            return ResolutionOutcome.Fail(new ResolutionFailure(ResolutionFailureKind.ProjectRequired));
         }
 
         string stack = resolved.Project.StackName;
@@ -283,30 +295,15 @@ internal sealed class NewCommandRunner
                 invocation.WorkingDirectory.Info, cancellationToken);
             if (section is null || string.IsNullOrWhiteSpace(section.Id))
             {
-                _interaction.WriteError(
-                    "Cannot resolve templates: host.json declares no extension bundle.");
-                _interaction.WriteLine(l => l
-                    .Muted("Configure ")
-                    .Code("extensionBundle.id")
-                    .Muted(" in host.json or run ")
-                    .Code("func init")
-                    .Muted(" with a stack that declares one."));
-                return null;
+                return ResolutionOutcome.Fail(new ResolutionFailure(ResolutionFailureKind.HostJsonBundleMissing));
             }
 
             bundleId = section.Id;
             if (!BundleHelpers.TryGetBundleChannel(bundleId, out channel))
             {
-                _interaction.WriteError($"Unrecognized extension bundle id '{bundleId}'.");
-                _interaction.WriteLine(l => l
-                    .Muted("Use one of: ")
-                    .Code(BundleHelpers.StableBundleId)
-                    .Muted(", ")
-                    .Code(BundleHelpers.PreviewBundleId)
-                    .Muted(", or ")
-                    .Code(BundleHelpers.ExperimentalBundleId)
-                    .Muted("."));
-                return null;
+                return ResolutionOutcome.Fail(new ResolutionFailure(
+                    ResolutionFailureKind.UnrecognisedBundleId,
+                    BundleId: bundleId));
             }
 
             IReadOnlyList<InstalledTemplatesWorkload> allRows =
@@ -318,24 +315,16 @@ internal sealed class NewCommandRunner
         {
             if (channel is BundleChannel.Unknown)
             {
-                _renderer.RenderNoTemplatesWorkloadInstalled(stack);
+                return ResolutionOutcome.Fail(new ResolutionFailure(
+                    ResolutionFailureKind.NoTemplatesWorkloadInstalled,
+                    Stack: stack));
             }
-            else
-            {
-                string channelName = channel.ToDisplayString();
-                string suggestedPkg = TemplatesWorkloadConstants.GetPackageId(stack);
-                string suggestedVer = channel == BundleChannel.Stable
-                    ? "<version>"
-                    : $"<version>-{channelName}.1";
-                _interaction.WriteError(
-                    $"No installed templates workload matches this project's bundle channel " +
-                    $"({bundleId} -> channel '{channelName}').");
-                _interaction.WriteLine(l => l
-                    .Muted("Install one with: ")
-                    .Code($"func workload install {suggestedPkg} --version {suggestedVer}")
-                    .Muted("."));
-            }
-            return null;
+
+            return ResolutionOutcome.Fail(new ResolutionFailure(
+                ResolutionFailureKind.NoTemplatesWorkloadForChannel,
+                Stack: stack,
+                BundleId: bundleId,
+                Channel: channel));
         }
 
         // Step 5: language resolution via IOptionsMonitor<StackOptions>.
@@ -344,17 +333,85 @@ internal sealed class NewCommandRunner
         string? language = ResolveLanguage(stack, stackOptionsBound);
         if (language is null)
         {
-            _renderer.RenderMissingLanguage(stack, projectDirectory);
-            return null;
+            return ResolutionOutcome.Fail(new ResolutionFailure(
+                ResolutionFailureKind.MissingLanguage,
+                Stack: stack,
+                ProjectPath: projectDirectory));
         }
 
-        return new ResolvedContext(
+        return ResolutionOutcome.Succeed(new ResolvedContext(
             invocation.WorkingDirectory,
             stack,
             language,
             workload,
             bundleId,
-            channel);
+            channel));
+    }
+
+    /// <summary>
+    /// Renders a single <see cref="ResolutionFailure"/>. Centralizing the
+    /// render here keeps <see cref="ResolveContextAsync"/> side-effect free:
+    /// each <see cref="ExecuteAsync"/> / <see cref="ListAsync"/> entry-point
+    /// renders the failure at most once, regardless of how many internal
+    /// resolution passes a caller adds (pre-parse / hydration paths run the
+    /// same resolver but consume the outcome silently).
+    /// </summary>
+    private void RenderResolutionFailure(ResolutionFailure failure)
+    {
+        switch (failure.Kind)
+        {
+            case ResolutionFailureKind.ProjectRequired:
+                _renderer.RenderProjectRequired();
+                break;
+
+            case ResolutionFailureKind.HostJsonBundleMissing:
+                _interaction.WriteError(
+                    "Cannot resolve templates: host.json declares no extension bundle.");
+                _interaction.WriteLine(l => l
+                    .Muted("Configure ")
+                    .Code("extensionBundle.id")
+                    .Muted(" in host.json or run ")
+                    .Code("func init")
+                    .Muted(" with a stack that declares one."));
+                break;
+
+            case ResolutionFailureKind.UnrecognisedBundleId:
+                _interaction.WriteError($"Unrecognized extension bundle id '{failure.BundleId}'.");
+                _interaction.WriteLine(l => l
+                    .Muted("Use one of: ")
+                    .Code(BundleHelpers.StableBundleId)
+                    .Muted(", ")
+                    .Code(BundleHelpers.PreviewBundleId)
+                    .Muted(", or ")
+                    .Code(BundleHelpers.ExperimentalBundleId)
+                    .Muted("."));
+                break;
+
+            case ResolutionFailureKind.NoTemplatesWorkloadInstalled:
+                _renderer.RenderNoTemplatesWorkloadInstalled(failure.Stack!);
+                break;
+
+            case ResolutionFailureKind.NoTemplatesWorkloadForChannel:
+                {
+                    string channelName = failure.Channel.ToDisplayString();
+                    string suggestedPkg = TemplatesWorkloadConstants.GetPackageId(failure.Stack!);
+                    string suggestedVer = failure.Channel == BundleChannel.Stable
+                        ? "<version>"
+                        : $"<version>-{channelName}.1";
+                    _interaction.WriteError(
+                        $"No installed templates workload matches this project's bundle channel " +
+                        $"({failure.BundleId} -> channel '{channelName}').");
+                    _interaction.WriteLine(l => l
+                        .Muted("Install one with: ")
+                        .Code($"func workload install {suggestedPkg} --version {suggestedVer}")
+                        .Muted("."));
+                    break;
+                }
+
+            case ResolutionFailureKind.MissingLanguage:
+                _renderer.RenderMissingLanguage(failure.Stack!, failure.ProjectPath!);
+                break;
+        }
     }
 
     private async Task<int> EnforceBundleGatesAsync(
@@ -650,6 +707,40 @@ internal sealed class NewCommandRunner
         InstalledTemplatesWorkload Workload,
         string? BundleId,
         BundleChannel Channel);
+
+    private enum ResolutionFailureKind
+    {
+        ProjectRequired,
+        HostJsonBundleMissing,
+        UnrecognisedBundleId,
+        NoTemplatesWorkloadInstalled,
+        NoTemplatesWorkloadForChannel,
+        MissingLanguage,
+    }
+
+    private sealed record ResolutionFailure(
+        ResolutionFailureKind Kind,
+        string? Stack = null,
+        string? ProjectPath = null,
+        string? BundleId = null,
+        BundleChannel Channel = BundleChannel.Unknown);
+
+    private readonly struct ResolutionOutcome
+    {
+        private ResolutionOutcome(ResolvedContext? context, ResolutionFailure? failure)
+        {
+            Context = context;
+            Failure = failure;
+        }
+
+        public ResolvedContext? Context { get; }
+
+        public ResolutionFailure? Failure { get; }
+
+        public static ResolutionOutcome Succeed(ResolvedContext context) => new(context, null);
+
+        public static ResolutionOutcome Fail(ResolutionFailure failure) => new(null, failure);
+    }
 }
 
 /// <summary>
