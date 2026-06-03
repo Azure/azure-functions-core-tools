@@ -221,7 +221,18 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             }
         }
 
-        // For adoption with no explicit --language, skip language resolution
+        // For adoption with no explicit --language, try to infer the language
+        // from the project's on-disk shape (e.g. .csproj vs .fsproj, presence
+        // of tsconfig.json). When the stack offers a language choice, this
+        // keeps `.func/config.json` complete enough for downstream commands
+        // (`func new --list` and friends) without forcing the user to repeat
+        // information that's already visible in the project.
+        if (adoptExisting && string.IsNullOrWhiteSpace(language))
+        {
+            language = initializer.DetectAdoptedLanguage(workingDirectory.Info);
+        }
+
+        // For adoption with no resolvable language, skip language resolution
         // entirely: the user already has code, and prompting / erroring for
         // a language they're not changing is just noise.
         if (!(adoptExisting && string.IsNullOrWhiteSpace(language)))

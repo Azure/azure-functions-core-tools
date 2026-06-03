@@ -41,6 +41,31 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
     public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
 
+    public string? DetectAdoptedLanguage(DirectoryInfo workingDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(workingDirectory);
+        if (!workingDirectory.Exists)
+        {
+            return null;
+        }
+
+        // Project file extension is the canonical signal: .csproj → C#,
+        // .fsproj → F#. Search the top level only so a stray project file
+        // nested under bin/obj or a sample folder doesn't override the
+        // user's actual app.
+        if (Directory.EnumerateFiles(workingDirectory.FullName, "*.fsproj", SearchOption.TopDirectoryOnly).Any())
+        {
+            return "F#";
+        }
+
+        if (Directory.EnumerateFiles(workingDirectory.FullName, "*.csproj", SearchOption.TopDirectoryOnly).Any())
+        {
+            return "C#";
+        }
+
+        return null;
+    }
+
     public Option<string> FrameworkOption { get; private set; } = default!;
 
     public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)

@@ -36,6 +36,36 @@ internal sealed class NodeProjectInitializer : IProjectInitializer
 
     public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
 
+    public string? DetectAdoptedLanguage(DirectoryInfo workingDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(workingDirectory);
+        if (!workingDirectory.Exists)
+        {
+            return null;
+        }
+
+        // tsconfig.json is the strongest signal that this is a TS project;
+        // a .ts file at the top level is the fallback for projects that
+        // skip the config file. Anything else (package.json with .js,
+        // bare .js files) means JavaScript.
+        string root = workingDirectory.FullName;
+        if (File.Exists(Path.Combine(root, "tsconfig.json"))
+            || Directory.EnumerateFiles(root, "*.ts", SearchOption.TopDirectoryOnly).Any())
+        {
+            return "TypeScript";
+        }
+
+        if (File.Exists(Path.Combine(root, "package.json"))
+            || Directory.EnumerateFiles(root, "*.js", SearchOption.TopDirectoryOnly).Any()
+            || Directory.EnumerateFiles(root, "*.mjs", SearchOption.TopDirectoryOnly).Any()
+            || Directory.EnumerateFiles(root, "*.cjs", SearchOption.TopDirectoryOnly).Any())
+        {
+            return "JavaScript";
+        }
+
+        return null;
+    }
+
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
     public Option<BundleChannel> BundlesChannelOption { get; private set; } = default!;

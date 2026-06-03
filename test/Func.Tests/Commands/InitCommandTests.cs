@@ -985,13 +985,107 @@ public class InitCommandTests
         Assert.Contains("--bundles-channel", ex.Message);
     }
 
+    [Fact]
+    public async Task InitCommand_Adopt_DetectsLanguage_PersistsToConfig()
+    {
+        // Adoption on a multi-language stack should infer the language from
+        // the on-disk project (here via the FakeProjectInitializer's detector
+        // hook), so downstream commands like `func new --list` see the
+        // language in .func/config.json without the user repeating it.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            File.WriteAllText(Path.Combine(newDir, "App.csproj"), "<Project/>");
+
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                languageDetector: dir =>
+                    Directory.EnumerateFiles(dir.FullName, "*.csproj").Any() ? "C#" : null);
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_DetectorReturnsNull_LeavesLanguageUnset()
+    {
+        // When the initializer can't infer the language (e.g. no .csproj or
+        // .fsproj at the project root), adoption still succeeds and falls
+        // back to the prior behaviour of omitting `stack.language`.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                languageDetector: _ => null);
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_ExplicitLanguage_WinsOverDetector()
+    {
+        // --language should take precedence over the on-disk detector: the
+        // user has explicitly told us what they want.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+            File.WriteAllText(Path.Combine(newDir, "App.csproj"), "<Project/>");
+
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                aliases: new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["C#"] = ["csharp"],
+                    ["F#"] = ["fsharp"],
+                },
+                languageDetector: _ => "C#");
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: "F#", stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "f#");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
     private sealed class FakeProjectInitializer(
         string stack,
         IReadOnlyList<string>? supportedLanguages = null,
         IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null,
         Func<IInitOptionRegistry, IReadOnlyList<Option>>? optionFactory = null,
         Action<FakeProjectInitializer, ParseResult>? onInitialize = null,
-        IReadOnlyList<string>? workerRuntimeAliases = null) : IProjectInitializer
+        IReadOnlyList<string>? workerRuntimeAliases = null,
+        Func<DirectoryInfo, string?>? languageDetector = null) : IProjectInitializer
     {
         public string Stack { get; } = stack;
 
@@ -1011,6 +1105,9 @@ public class InitCommandTests
             ContributedOptions = optionFactory?.Invoke(registry) ?? [];
             return ContributedOptions;
         }
+
+        public string? DetectAdoptedLanguage(DirectoryInfo workingDirectory) =>
+            languageDetector?.Invoke(workingDirectory);
 
         public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
         {

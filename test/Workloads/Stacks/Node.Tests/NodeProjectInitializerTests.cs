@@ -41,6 +41,52 @@ public class NodeProjectInitializerTests : IDisposable
         Assert.Equal("node", new NodeProjectInitializer().Stack);
     }
 
+    [Fact]
+    public void DetectAdoptedLanguage_TsconfigPresent_ReturnsTypeScript()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "tsconfig.json"), "{}");
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "package.json"), "{}");
+
+        Assert.Equal("TypeScript", new NodeProjectInitializer().DetectAdoptedLanguage(_projectDir));
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_TsFilesPresent_ReturnsTypeScript()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "index.ts"), string.Empty);
+
+        Assert.Equal("TypeScript", new NodeProjectInitializer().DetectAdoptedLanguage(_projectDir));
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_PackageJsonOnly_ReturnsJavaScript()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "package.json"), "{}");
+
+        Assert.Equal("JavaScript", new NodeProjectInitializer().DetectAdoptedLanguage(_projectDir));
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_JsFilesOnly_ReturnsJavaScript()
+    {
+        File.WriteAllText(Path.Combine(_projectDir.FullName, "index.js"), string.Empty);
+
+        Assert.Equal("JavaScript", new NodeProjectInitializer().DetectAdoptedLanguage(_projectDir));
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_NoSignals_ReturnsNull()
+    {
+        Assert.Null(new NodeProjectInitializer().DetectAdoptedLanguage(_projectDir));
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_MissingDirectory_ReturnsNull()
+    {
+        var missing = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "func-node-detect-missing-" + Guid.NewGuid().ToString("N")));
+        Assert.Null(new NodeProjectInitializer().DetectAdoptedLanguage(missing));
+    }
+
     [Theory]
     [InlineData(null, "JavaScript")]
     [InlineData("", "JavaScript")]

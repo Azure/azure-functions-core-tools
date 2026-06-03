@@ -55,6 +55,68 @@ public class DotNetProjectInitializerTests : IDisposable
     }
 
     [Fact]
+    public void DetectAdoptedLanguage_CsprojAtRoot_ReturnsCSharp()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "func-test-detect-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "MyApp.csproj"), "<Project/>");
+
+            Assert.Equal("C#", CreateInitializer().DetectAdoptedLanguage(new DirectoryInfo(dir)));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_FsprojAtRoot_ReturnsFSharp()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "func-test-detect-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "MyApp.fsproj"), "<Project/>");
+            // .csproj at root would normally win; the .fsproj check fires first
+            // so an F# project with a sibling .csproj sample folder still maps to F#.
+            Directory.CreateDirectory(Path.Combine(dir, "samples"));
+            File.WriteAllText(Path.Combine(dir, "samples", "Sample.csproj"), "<Project/>");
+
+            Assert.Equal("F#", CreateInitializer().DetectAdoptedLanguage(new DirectoryInfo(dir)));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_NoProjectFile_ReturnsNull()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "func-test-detect-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "host.json"), "{}");
+
+            Assert.Null(CreateInitializer().DetectAdoptedLanguage(new DirectoryInfo(dir)));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DetectAdoptedLanguage_MissingDirectory_ReturnsNull()
+    {
+        var dir = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "func-test-detect-missing-" + Guid.NewGuid().ToString("N")));
+        Assert.Null(CreateInitializer().DetectAdoptedLanguage(dir));
+    }
+
+    [Fact]
     public void TemplatesPackageName_IsCorrect()
     {
         Assert.Equal("Microsoft.Azure.Functions.Worker.ProjectTemplates", DotNetProjectInitializer.TemplatesPackageName);
