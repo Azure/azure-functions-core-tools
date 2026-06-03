@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Diagnostics;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -411,6 +412,14 @@ internal sealed class NewCommandRunner
             case ResolutionFailureKind.MissingLanguage:
                 _renderer.RenderMissingLanguage(failure.Stack!, failure.ProjectPath!);
                 break;
+
+            default:
+                // Guard against silently swallowing a future ResolutionFailureKind.
+                // Without this, a new enum value would return null from the caller
+                // with no user-visible error, reintroducing the class of bug this
+                // refactor exists to prevent.
+                throw new UnreachableException(
+                    $"Unhandled {nameof(ResolutionFailureKind)}: {failure.Kind}.");
         }
     }
 
