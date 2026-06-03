@@ -10,8 +10,7 @@
     PATH so 'func' / 'func5' are available in new terminals.
 
     Piped usage:
-        iex "& { $(irm https://aka.ms/func-cli/install.ps1) }"
-        iex "& { $(irm https://aka.ms/func-cli/install.ps1) } -Prerelease"
+        irm https://aka.ms/func-cli/install.ps1 | iex
 
 .PARAMETER InstallPath
     Directory to install the CLI. Defaults to $HOME\.azure-functions.
