@@ -12,7 +12,11 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// <summary>
 /// Validates that the requested host workload is available.
 /// </summary>
-internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolver resolver, IWorkloadInstaller installer, IWorkloadPaths workloadPaths)
+internal sealed class ValidateHostWorkloadInitializationStep(
+    IHostWorkloadResolver resolver,
+    IWorkloadInstaller installer,
+    IWorkloadPaths workloadPaths,
+    IProcessEnvironment processEnvironment)
     : FuncStartInitializationStep
 {
     public const string StepId = "resolve_host_workload";
@@ -25,6 +29,7 @@ internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolv
     private readonly IHostWorkloadResolver _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
     private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
+    private readonly IProcessEnvironment _processEnvironment = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
 
     public override string Id => StepId;
 
@@ -36,7 +41,7 @@ internal sealed class ValidateHostWorkloadInitializationStep(IHostWorkloadResolv
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        string? localContentRoot = Environment.GetEnvironmentVariable(HostContentRootEnvironmentVariable);
+        string? localContentRoot = _processEnvironment.Get(HostContentRootEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(localContentRoot))
         {
             ContentWorkloadInfo workload = CreateLocalContentWorkload(localContentRoot);
