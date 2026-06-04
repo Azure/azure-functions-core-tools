@@ -68,15 +68,6 @@ updates), push all tags from the same `vnext` commit. Call out the grouping
 in the PR description, and in `release_notes.md`, so consumers know which
 versions are compatible.
 
-## Host + worker coordination
-
-If a host tag changes the worker contract, also bump the affected workers
-and call it out in the PR description with the command users should run:
-
-```bash
-pwsh ./eng/scripts/validate-worker-versions.ps1 -Update -HostVersion <NewHostVersion>
-```
-
 ## Notes
 
 - Do not retag. If a release is broken, bump the patch (or `-preview.N+1`)
