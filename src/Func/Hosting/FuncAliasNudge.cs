@@ -51,11 +51,9 @@ internal sealed class FuncAliasNudge(
             _interaction.WriteBlankLine();
             _interaction.WriteLine(line => line
                 .Warning("Preview: ")
-                .Muted("if you also have Core Tools v4 installed, invoke v5 as '")
+                .Muted("if you also have Core Tools (v4) installed, you may need to invoke the new CLI via '")
                 .Command("func5")
-                .Muted("' instead of '")
-                .Command("func")
-                .Muted("'."));
+                .Muted("' instead."));
         }
         catch
         {
