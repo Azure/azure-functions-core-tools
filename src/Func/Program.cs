@@ -142,7 +142,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
 if (exitCode != 130)
 {
     await PrintVersionNotice(interaction, versionCheckTask, cts.Token);
-    aliasNudge?.TryPrint();
+    aliasNudge?.TryPrint(commandName);
 }
 
 // Container disposal (triggered by `using var host` going out of scope)

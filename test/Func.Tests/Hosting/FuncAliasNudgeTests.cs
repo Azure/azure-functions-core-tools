@@ -10,27 +10,47 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 
 public class FuncAliasNudgeTests
 {
-    [Fact]
-    public void Prints_WhenPreviewInteractiveAndConflictDetected()
+    [Theory]
+    [InlineData("init")]
+    [InlineData("new")]
+    [InlineData("setup")]
+    [InlineData("start")]
+    [InlineData("help")]
+    [InlineData("profile set")]
+    [InlineData("workload install")]
+    [InlineData("unknown")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void Prints_WhenPreviewInteractiveAndAllowedCommand(string? commandName)
     {
         var interaction = new InteractiveTestInteractionService();
-        IFuncInvocation invocation = Conflict("/foreign/func");
         ICliVersionProvider version = Version(isPrerelease: true);
 
-        new FuncAliasNudge(interaction, invocation, version).TryPrint();
+        new FuncAliasNudge(interaction, version).TryPrint(commandName);
 
-        Assert.Contains(interaction.Lines, l => l.Contains("/foreign/func", StringComparison.Ordinal));
         Assert.Contains(interaction.Lines, l => l.Contains("func5", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("version")]
+    [InlineData("--version")]
+    public void Silent_OnCommandsWithoutFuncHints(string commandName)
+    {
+        var interaction = new InteractiveTestInteractionService();
+        ICliVersionProvider version = Version(isPrerelease: true);
+
+        new FuncAliasNudge(interaction, version).TryPrint(commandName);
+
+        Assert.Empty(interaction.Lines);
     }
 
     [Fact]
     public void Silent_WhenNotPreview()
     {
         var interaction = new InteractiveTestInteractionService();
-        IFuncInvocation invocation = Conflict("/foreign/func");
         ICliVersionProvider version = Version(isPrerelease: false);
 
-        new FuncAliasNudge(interaction, invocation, version).TryPrint();
+        new FuncAliasNudge(interaction, version).TryPrint("init");
 
         Assert.Empty(interaction.Lines);
     }
@@ -39,23 +59,9 @@ public class FuncAliasNudgeTests
     public void Silent_WhenNotInteractive()
     {
         var interaction = new TestInteractionService(); // IsInteractive == false
-        IFuncInvocation invocation = Conflict("/foreign/func");
         ICliVersionProvider version = Version(isPrerelease: true);
 
-        new FuncAliasNudge(interaction, invocation, version).TryPrint();
-
-        Assert.Empty(interaction.Lines);
-    }
-
-    [Fact]
-    public void Silent_WhenNoConflict()
-    {
-        var interaction = new InteractiveTestInteractionService();
-        IFuncInvocation invocation = Substitute.For<IFuncInvocation>();
-        invocation.ConflictDetected.Returns(false);
-        ICliVersionProvider version = Version(isPrerelease: true);
-
-        new FuncAliasNudge(interaction, invocation, version).TryPrint();
+        new FuncAliasNudge(interaction, version).TryPrint("init");
 
         Assert.Empty(interaction.Lines);
     }
@@ -64,21 +70,10 @@ public class FuncAliasNudgeTests
     public void NullArgs_Throw()
     {
         var interaction = new InteractiveTestInteractionService();
-        IFuncInvocation invocation = Substitute.For<IFuncInvocation>();
         ICliVersionProvider version = Substitute.For<ICliVersionProvider>();
 
-        Assert.Throws<ArgumentNullException>(() => new FuncAliasNudge(null!, invocation, version));
-        Assert.Throws<ArgumentNullException>(() => new FuncAliasNudge(interaction, null!, version));
-        Assert.Throws<ArgumentNullException>(() => new FuncAliasNudge(interaction, invocation, null!));
-    }
-
-    private static IFuncInvocation Conflict(string path)
-    {
-        IFuncInvocation invocation = Substitute.For<IFuncInvocation>();
-        invocation.ConflictDetected.Returns(true);
-        invocation.ConflictingPath.Returns(path);
-        invocation.RecommendedName.Returns("func5");
-        return invocation;
+        Assert.Throws<ArgumentNullException>(() => new FuncAliasNudge(null!, version));
+        Assert.Throws<ArgumentNullException>(() => new FuncAliasNudge(interaction, null!));
     }
 
     private static ICliVersionProvider Version(bool isPrerelease)

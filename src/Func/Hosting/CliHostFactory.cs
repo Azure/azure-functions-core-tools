@@ -93,8 +93,6 @@ internal static class CliHostFactory
         }
 
         builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
-        builder.Services.AddSingleton<IFuncOnPathResolver, PathFuncOnPathResolver>();
-        builder.Services.AddSingleton<IFuncInvocation, FuncInvocation>();
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();
