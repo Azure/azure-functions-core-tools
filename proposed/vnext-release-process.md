@@ -49,7 +49,6 @@ Rules:
    - Bumps the component's version in its props file (e.g.
      `src/Workloads/<area>/<Name>/Directory.Version.props`).
    - Updates `release_notes.md` with the new version and a short changelog.
-   - Add the `vnext` label.
 3. **Merge the PR** into `vnext` once CI is green and reviews are in.
 4. **Tag the merge commit** on `vnext`:
    ```bash
