@@ -25,6 +25,12 @@
     folder segment (e.g. `Node`, `Workers.Node`). Omit to deploy every workload
     discovered in Azure.Functions.Cli.slnx under src/Workloads/.
 
+.PARAMETER Feature
+    One or more feature names matching `func setup --features`. Expands to
+    the set of workloads that feature installs end-to-end. Supported:
+    `host`, `runtime`, `dotnet`, `node`, `python`, `go`. Combine with -Project
+    to add extra workloads.
+
 .PARAMETER WorkloadsHome
     Workloads home directory to deploy into. Default: `<repo>/.debug-workloads`.
     The VS Code launch profiles read from the same path.
@@ -51,12 +57,19 @@
     Iterates on just the Node stack workload.
 
 .EXAMPLE
+    ./eng/scripts/debug-workloads.ps1 -Feature node
+    Deploys everything `func setup --features node` would install: host,
+    Node stack, Node worker, Node templates, extension bundles.
+
+.EXAMPLE
     ./eng/scripts/debug-workloads.ps1 -Clean
     Fresh start: wipes the home and reinstalls every workload.
 #>
 [CmdletBinding()]
 param(
     [string[]] $Project,
+    [ValidateSet('host', 'runtime', 'dotnet', 'node', 'python', 'go')]
+    [string[]] $Feature,
     [string] $WorkloadsHome,
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Debug',
@@ -147,10 +160,34 @@ if (-not $SkipFuncBuild) {
 }
 
 $allProjects = Get-AllWorkloadProjects
-if ($Project) {
+
+# Mirrors `func setup --features`: feature -> set of workload short names that
+# the feature installs end-to-end. Keep aligned with SetupRunner.BuildPlan.
+$featureMap = @{
+    'host'    = @('Workloads.Host')
+    'runtime' = @('Workloads.Host', 'Workloads.ExtensionBundles')
+    'dotnet'  = @('Workloads.Host', 'Workloads.DotNet', 'Workloads.Templates.DotNet')
+    'node'    = @('Workloads.Host', 'Workloads.Node', 'Workloads.Workers.Node', 'Workloads.Templates.Node', 'Workloads.ExtensionBundles')
+    'python'  = @('Workloads.Host', 'Workloads.Python', 'Workloads.Workers.Python', 'Workloads.Templates.Python', 'Workloads.ExtensionBundles')
+    'go'      = @('Workloads.Host', 'Workloads.Go', 'Workloads.Workers.Go', 'Workloads.ExtensionBundles')
+}
+
+if ($Feature -or $Project) {
+    $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $targets = @()
-    foreach ($spec in $Project) {
-        $targets += Resolve-WorkloadProject -Spec $spec -AllProjects $allProjects
+    if ($Feature) {
+        foreach ($f in $Feature) {
+            foreach ($spec in $featureMap[$f.ToLowerInvariant()]) {
+                $resolved = Resolve-WorkloadProject -Spec $spec -AllProjects $allProjects
+                if ($seen.Add($resolved)) { $targets += $resolved }
+            }
+        }
+    }
+    if ($Project) {
+        foreach ($spec in $Project) {
+            $resolved = Resolve-WorkloadProject -Spec $spec -AllProjects $allProjects
+            if ($seen.Add($resolved)) { $targets += $resolved }
+        }
     }
 } else {
     $targets = @($allProjects)
