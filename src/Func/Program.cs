@@ -63,7 +63,6 @@ int exitCode = 0;
 string commandName = "unknown";
 
 FuncAliasNudge? aliasNudge = null;
-bool isBareInvocation = args.Length == 0;
 using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
 {
     FuncRootCommand? rootCommand = null;
@@ -143,7 +142,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
 if (exitCode != 130)
 {
     await PrintVersionNotice(interaction, versionCheckTask, cts.Token);
-    aliasNudge?.TryPrint(exitCode, isBareInvocation);
+    aliasNudge?.TryPrint(exitCode, commandName);
 }
 
 // Container disposal (triggered by `using var host` going out of scope)

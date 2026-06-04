@@ -21,9 +21,10 @@ namespace Azure.Functions.Cli.Hosting;
 /// </para>
 /// <para>
 /// Printed only when the user is likely to benefit: failed invocations
-/// (where v4 running instead of v5 is a plausible cause) and bare
-/// <c>func</c> (where help text references <c>func ...</c>). Successful
-/// commands stay quiet so the banner doesn't become noise.
+/// (where v4 running instead of v5 is a plausible cause) and the help
+/// surface (bare <c>func</c> or explicit <c>func help</c>, where the
+/// rendered help text references <c>func ...</c>). Successful commands
+/// stay quiet so the banner doesn't become noise.
 /// </para>
 /// </remarks>
 internal sealed class FuncAliasNudge(
@@ -37,12 +38,12 @@ internal sealed class FuncAliasNudge(
     /// Prints the nudge if the gates are satisfied. Never throws.
     /// </summary>
     /// <param name="exitCode">Exit code of the just-completed command.</param>
-    /// <param name="isBareInvocation"><c>true</c> when the user typed <c>func</c> with no arguments.</param>
-    public void TryPrint(int exitCode, bool isBareInvocation)
+    /// <param name="commandName">Resolved command name (see <see cref="Telemetry.CommandNameResolver"/>).</param>
+    public void TryPrint(int exitCode, string? commandName)
     {
         try
         {
-            if (!ShouldPrint(exitCode, isBareInvocation))
+            if (!ShouldPrint(exitCode, commandName))
             {
                 return;
             }
@@ -63,7 +64,7 @@ internal sealed class FuncAliasNudge(
         }
     }
 
-    private bool ShouldPrint(int exitCode, bool isBareInvocation)
+    private bool ShouldPrint(int exitCode, string? commandName)
     {
         if (!_versionProvider.IsPrerelease)
         {
@@ -75,6 +76,10 @@ internal sealed class FuncAliasNudge(
             return false;
         }
 
-        return exitCode != 0 || isBareInvocation;
+        // Failed commands: v4 running instead of v5 is a plausible cause.
+        // "help" (bare `func` or explicit `func help`): the help text the
+        // user is reading references `func ...` examples.
+        return exitCode != 0
+            || string.Equals(commandName, "help", StringComparison.OrdinalIgnoreCase);
     }
 }
