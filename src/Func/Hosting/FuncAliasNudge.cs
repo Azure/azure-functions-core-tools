@@ -10,23 +10,6 @@ namespace Azure.Functions.Cli.Hosting;
 /// Preview-only nudge that reminds users with a side-by-side Core Tools v4
 /// install that v5 is invocable as <c>func5</c>. Removed at GA.
 /// </summary>
-/// <remarks>
-/// <para>
-/// The CLI ships hint text like "Run 'func init' to ..." which assumes the
-/// running binary is reachable as <c>func</c>. In preview the installer
-/// drops a <c>func5</c> shim alongside <c>func</c>; if v4 is also on PATH
-/// it wins the bare name and those hints silently invoke v4. We don't
-/// detect that situation; the message is phrased conditionally so it's
-/// true for everyone in the preview audience.
-/// </para>
-/// <para>
-/// Printed only when the user is likely to benefit: failed invocations
-/// (where v4 running instead of v5 is a plausible cause) and the help
-/// surface (bare <c>func</c> or explicit <c>func help</c>, where the
-/// rendered help text references <c>func ...</c>). Successful commands
-/// stay quiet so the banner doesn't become noise.
-/// </para>
-/// </remarks>
 internal sealed class FuncAliasNudge(
     IInteractionService interaction,
     ICliVersionProvider versionProvider)
