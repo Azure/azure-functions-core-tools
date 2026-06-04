@@ -83,86 +83,49 @@ updates), push all tags from the same `vnext` commit. Call out the grouping
 in the PR description, and in `release_notes.md`, so consumers know which
 versions are compatible.
 
-## Releasing preview and experimental bundles
+## Releasing bundles (stable, preview, experimental)
 
 The extension bundles workload ships three channels: `stable`, `preview`,
-and `experimental`. The channel is selected by the `BundleChannel` property
-in `src/Workloads/Tools/ExtensionBundles/Directory.Version.props`, which
-drives both the CDN bundle id pulled at pack time and the prerelease label
-on the workload package:
+and `experimental`. Unlike other workloads, bundles is **content-only**:
+the channel is just a label and a CDN bundle id, not compiled output. So
+for bundles, **the tag is the version**, including the channel.
 
-| Channel        | Example package version | Example tag                       |
-| -------------- | ----------------------- | --------------------------------- |
-| `stable`       | `4.35.0`                | `bundles/v4.35.0`                 |
-| `preview`      | `4.35.0-preview.1`      | `bundles/v4.35.0-preview.1`       |
-| `experimental` | `4.35.0-experimental.1` | `bundles/v4.35.0-experimental.1`  |
+`vnext` keeps `BundleChannel` at its default in
+`src/Workloads/Tools/ExtensionBundles/Directory.Version.props`. The release
+pipeline inspects the tag it was queued against and overrides the channel
+at pack time:
 
-The `BundleVersion` (payload version) is shared across all three channels
-and defaults to `$(LatestExtensionBundleVersion)` so the bundle payload
+| Channel        | Example tag                       | Resulting package version |
+| -------------- | --------------------------------- | ------------------------- |
+| `stable`       | `bundles/v4.35.0`                 | `4.35.0`                  |
+| `preview`      | `bundles/v4.35.0-preview.1`       | `4.35.0-preview.1`        |
+| `experimental` | `bundles/v4.35.0-experimental.1`  | `4.35.0-experimental.1`   |
+
+The `BundleVersion` (payload version) is shared across channels and
+defaults to `$(LatestExtensionBundleVersion)` so the bundle payload always
 matches the snapshot the templates workloads were built against.
 
-### Release steps (preview / experimental)
+### Release steps (bundles)
 
-Two options below; the team will pick one in review.
-
-#### Option A: channel checked into `vnext` at tag time
-
-Treat `BundleChannel` like every other workload's version: whatever is in
-`Directory.Version.props` on the tagged commit is what ships.
-
-1. **Set the channel** in
-   `src/Workloads/Tools/ExtensionBundles/Directory.Version.props`:
-   ```xml
-   <BundleChannel>preview</BundleChannel>   <!-- or experimental -->
-   ```
-   Override `BundleVersion` only if the payload version needs to diverge
-   from the default.
-2. **Open a release-prep PR against `vnext`** with the channel change and a
-   `release_notes.md` entry calling out the channel.
-3. **Merge and tag** the merge commit using the matching prerelease tag,
-   e.g. `bundles/v4.35.0-preview.1` or `bundles/v4.35.0-experimental.1`.
-4. **Trigger the bundles release pipeline** from the
+1. **Tag a commit on `vnext`** with the channel-suffixed tag, e.g.
+   `bundles/v4.35.0`, `bundles/v4.35.0-preview.1`, or
+   `bundles/v4.35.0-experimental.1`. No PR is required for a channel
+   change.
+2. **Trigger the bundles release pipeline** from the
    [internal release pipelines folder][release-pipelines] against the tag.
-   Check **Publish to NuGet** only when pushing to customers; leave it
-   unchecked for internal-feed testing. The pipeline packs the workload
-   with the prerelease label and publishes it; consumers opt in by
-   installing the prerelease version
-   (`func workload install bundles --version 4.35.0-preview.1`).
-5. **Promoting to stable**: open a follow-up PR that flips `BundleChannel`
-   back to `stable`, then tag `bundles/v<version>` (no suffix) and trigger
-   the pipeline. The workload is repackaged from the same payload without
-   the prerelease label.
+   - Check **Publish to NuGet** only when pushing to customers.
+   - Leave it unchecked for internal-feed testing.
+3. The pipeline parses the tag's prerelease suffix, sets
+   `-p:BundleChannel=preview` (or `experimental`) for the pack, and
+   publishes the workload with the matching version.
+4. **Smoke test** with `func workload install bundles --version <tag-version>`.
 
-Pros: consistent with all other workloads, reproducible from the tag
-alone. Cons: every preview release needs a flip-to-preview PR and a
-flip-back PR, which churns `vnext` history and leaves a window where HEAD
-disagrees with intent.
+> Increment prerelease tags per release (`-preview.1`, `-preview.2`, ...).
+> Do not reuse a prerelease tag.
 
-#### Option B: `vnext` stays on `stable`, tag drives the channel
-
-Bundles is a content-only workload; the channel is just a label and a CDN
-id, not compiled output. Keep `BundleChannel` set to `stable` in `vnext`
-permanently and let the tag select the channel at pack time.
-
-1. **No props change required.** `vnext` HEAD always reads `stable`.
-2. **Tag the commit** to release from, using the channel-suffixed tag:
-   - `bundles/v4.35.0` (stable)
-   - `bundles/v4.35.0-preview.1` (preview)
-   - `bundles/v4.35.0-experimental.1` (experimental)
-3. **CI** parses the tag's prerelease suffix and packs with
-   `-p:BundleChannel=preview` (or `experimental`), overriding the default.
-   The published package version still matches the tag.
-4. **Promoting to stable**: tag `bundles/v<version>` (no suffix) on the
-   same or a later commit. No PR needed.
-
-Pros: no flip-flop PRs, tag is the single signal, prerelease workflow
-behaves like any other prereleased package. Cons: reproducing a build
-requires both the tag and the pipeline's tag-parsing logic, not just the
-tagged commit. Bundles becomes the one workload that derives a build
-input from the tag instead of from props.
-
-> Preview and experimental tags should be incremented per release
-> (`-preview.1`, `-preview.2`, ...). Do not reuse a prerelease tag.
+> Tracking work to support this: props-based channel conditions in
+> `Directory.Version.props` and the tag-parsing logic in the bundles
+> release pipeline.
 
 ## Notes
 
