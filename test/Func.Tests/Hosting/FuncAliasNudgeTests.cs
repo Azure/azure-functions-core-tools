@@ -10,36 +10,35 @@ namespace Azure.Functions.Cli.Tests.Hosting;
 
 public class FuncAliasNudgeTests
 {
-    [Theory]
-    [InlineData("init")]
-    [InlineData("new")]
-    [InlineData("setup")]
-    [InlineData("start")]
-    [InlineData("help")]
-    [InlineData("profile set")]
-    [InlineData("workload install")]
-    [InlineData("unknown")]
-    [InlineData("")]
-    [InlineData(null)]
-    public void Prints_WhenPreviewInteractiveAndAllowedCommand(string? commandName)
+    [Fact]
+    public void Prints_OnFailedInvocation()
     {
         var interaction = new InteractiveTestInteractionService();
         ICliVersionProvider version = Version(isPrerelease: true);
 
-        new FuncAliasNudge(interaction, version).TryPrint(commandName);
+        new FuncAliasNudge(interaction, version).TryPrint(exitCode: 1, isBareInvocation: false);
 
         Assert.Contains(interaction.Lines, l => l.Contains("func5", StringComparison.Ordinal));
     }
 
-    [Theory]
-    [InlineData("version")]
-    [InlineData("--version")]
-    public void Silent_OnCommandsWithoutFuncHints(string commandName)
+    [Fact]
+    public void Prints_OnBareInvocation_EvenWhenExitCodeZero()
     {
         var interaction = new InteractiveTestInteractionService();
         ICliVersionProvider version = Version(isPrerelease: true);
 
-        new FuncAliasNudge(interaction, version).TryPrint(commandName);
+        new FuncAliasNudge(interaction, version).TryPrint(exitCode: 0, isBareInvocation: true);
+
+        Assert.Contains(interaction.Lines, l => l.Contains("func5", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Silent_OnSuccessfulNonBareInvocation()
+    {
+        var interaction = new InteractiveTestInteractionService();
+        ICliVersionProvider version = Version(isPrerelease: true);
+
+        new FuncAliasNudge(interaction, version).TryPrint(exitCode: 0, isBareInvocation: false);
 
         Assert.Empty(interaction.Lines);
     }
@@ -50,7 +49,7 @@ public class FuncAliasNudgeTests
         var interaction = new InteractiveTestInteractionService();
         ICliVersionProvider version = Version(isPrerelease: false);
 
-        new FuncAliasNudge(interaction, version).TryPrint("init");
+        new FuncAliasNudge(interaction, version).TryPrint(exitCode: 1, isBareInvocation: true);
 
         Assert.Empty(interaction.Lines);
     }
@@ -61,7 +60,7 @@ public class FuncAliasNudgeTests
         var interaction = new TestInteractionService(); // IsInteractive == false
         ICliVersionProvider version = Version(isPrerelease: true);
 
-        new FuncAliasNudge(interaction, version).TryPrint("init");
+        new FuncAliasNudge(interaction, version).TryPrint(exitCode: 1, isBareInvocation: true);
 
         Assert.Empty(interaction.Lines);
     }

@@ -16,48 +16,33 @@ namespace Azure.Functions.Cli.Hosting;
 /// running binary is reachable as <c>func</c>. In preview the installer
 /// drops a <c>func5</c> shim alongside <c>func</c>; if v4 is also on PATH
 /// it wins the bare name and those hints silently invoke v4. We don't
-/// detect that situation (filesystem probe in the hot path isn't worth
-/// it), instead the message is phrased conditionally so it's true for
-/// everyone in the preview audience.
+/// detect that situation; the message is phrased conditionally so it's
+/// true for everyone in the preview audience.
 /// </para>
 /// <para>
-/// Printed only after commands that themselves emit <c>func ...</c> hints
-/// (see <see cref="ShouldShowFor"/>), so it sits next to the text it
-/// clarifies. Best-effort: render failures never affect the exit code.
+/// Printed only when the user is likely to benefit: failed invocations
+/// (where v4 running instead of v5 is a plausible cause) and bare
+/// <c>func</c> (where help text references <c>func ...</c>). Successful
+/// commands stay quiet so the banner doesn't become noise.
 /// </para>
 /// </remarks>
 internal sealed class FuncAliasNudge(
     IInteractionService interaction,
     ICliVersionProvider versionProvider)
 {
-    // Top-level commands whose output references `func ...` somewhere
-    // (init/new/setup/start hints, workload subcommand suggestions, help
-    // text, profile errors). `version` is excluded because it only prints
-    // the version string and nothing else.
-    private static readonly HashSet<string> _allowedRootCommands =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            "help",
-            "init",
-            "new",
-            "profile",
-            "setup",
-            "start",
-            "workload",
-            "unknown", // CommandNameResolver fallback for parse errors
-        };
-
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly ICliVersionProvider _versionProvider = versionProvider ?? throw new ArgumentNullException(nameof(versionProvider));
 
     /// <summary>
     /// Prints the nudge if the gates are satisfied. Never throws.
     /// </summary>
-    public void TryPrint(string? commandName)
+    /// <param name="exitCode">Exit code of the just-completed command.</param>
+    /// <param name="isBareInvocation"><c>true</c> when the user typed <c>func</c> with no arguments.</param>
+    public void TryPrint(int exitCode, bool isBareInvocation)
     {
         try
         {
-            if (!ShouldPrint(commandName))
+            if (!ShouldPrint(exitCode, isBareInvocation))
             {
                 return;
             }
@@ -78,7 +63,7 @@ internal sealed class FuncAliasNudge(
         }
     }
 
-    private bool ShouldPrint(string? commandName)
+    private bool ShouldPrint(int exitCode, bool isBareInvocation)
     {
         if (!_versionProvider.IsPrerelease)
         {
@@ -90,18 +75,6 @@ internal sealed class FuncAliasNudge(
             return false;
         }
 
-        return ShouldShowFor(commandName);
-    }
-
-    private static bool ShouldShowFor(string? commandName)
-    {
-        if (string.IsNullOrEmpty(commandName))
-        {
-            return true;
-        }
-
-        int spaceIndex = commandName.IndexOf(' ');
-        string root = spaceIndex < 0 ? commandName : commandName[..spaceIndex];
-        return _allowedRootCommands.Contains(root);
+        return exitCode != 0 || isBareInvocation;
     }
 }
