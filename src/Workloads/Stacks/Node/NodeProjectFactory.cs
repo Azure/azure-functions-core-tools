@@ -46,8 +46,9 @@ internal sealed class NodeProjectFactory : IFunctionsProjectFactory
     {
         string root = workingDirectory.FullName;
         bool hasTsConfig = File.Exists(Path.Combine(root, "tsconfig.json"));
-        bool hasTopLevelTs = Directory.EnumerateFiles(root, "*.ts", SearchOption.TopDirectoryOnly).Any();
-        string language = hasTsConfig || hasTopLevelTs ? "TypeScript" : "JavaScript";
+        bool hasTopLevelTs = hasTsConfig
+            || Directory.EnumerateFiles(root, "*.ts", SearchOption.TopDirectoryOnly).Any();
+        string language = hasTopLevelTs ? "TypeScript" : "JavaScript";
 
         string packageJsonPath = Path.Combine(root, "package.json");
         if (File.Exists(packageJsonPath))
