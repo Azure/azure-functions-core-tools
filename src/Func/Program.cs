@@ -62,6 +62,7 @@ int exitCode = 0;
 // non-null value.
 string commandName = "unknown";
 
+FuncAliasNudge? aliasNudge = null;
 using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
 {
     FuncRootCommand? rootCommand = null;
@@ -70,6 +71,11 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
     {
         using IHost host = await CliHostFactory.CreateHostAsync(interaction, cts.Token);
         await host.StartAsync(cts.Token);
+
+        // Capture nudge before host disposal so it can run after the
+        // version notice. Its dependencies (interaction, version
+        // provider) are stateless singletons that outlive the host.
+        aliasNudge = host.Services.GetRequiredService<FuncAliasNudge>();
 
         rootCommand = Parser.CreateCommand(host.Services);
 
@@ -136,6 +142,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
 if (exitCode != 130)
 {
     await PrintVersionNotice(interaction, versionCheckTask, cts.Token);
+    aliasNudge?.TryPrint(exitCode, commandName);
 }
 
 // Container disposal (triggered by `using var host` going out of scope)
