@@ -266,6 +266,18 @@ public class DotNetSourceProjectTests : IDisposable
         Assert.True(ex.IsUserError);
     }
 
+    [Theory]
+    [InlineData("MyApp.csproj", "C#")]
+    [InlineData("MyApp.fsproj", "F#")]
+    [InlineData("MyApp.FsProj", "F#")]
+    public void Language_FromProjectFileExtension(string projectFileName, string expectedLanguage)
+    {
+        string projectFile = Path.Combine(_projectDir.FullName, projectFileName);
+        DotNetSourceProject project = CreateProject(projectFile);
+
+        Assert.Equal(expectedLanguage, project.Language);
+    }
+
     private DotNetSourceProject CreateProject(string projectFile)
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName), projectFile, _dotnetCli);
 

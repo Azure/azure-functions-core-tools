@@ -21,10 +21,12 @@ internal sealed class NodeFunctionsProject : FunctionsProject
 
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
+    private readonly string _language;
 
-    public NodeFunctionsProject(WorkingDirectory workingDirectory)
+    public NodeFunctionsProject(WorkingDirectory workingDirectory, string language)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
+        _language = language ?? throw new ArgumentNullException(nameof(language));
         _workerReference = FunctionsWorkerReference.FromWorkload("node");
     }
 
@@ -43,6 +45,8 @@ internal sealed class NodeFunctionsProject : FunctionsProject
     public override bool SupportsExtensionBundles => true;
 
     public override FunctionsWorkerReference WorkerReference => _workerReference;
+
+    public override string Language => _language;
 
     public override async Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {

@@ -68,11 +68,9 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
     {
         _interaction.WriteError($"Cannot determine language for stack '{stack}' in '{projectPath}'.");
         _interaction.WriteLine(l => l
-            .Muted("`stack.language` is missing from ")
-            .Code(".func/config.json")
-            .Muted(" — run ")
+            .Muted("Run ")
             .Code("func init")
-            .Muted(" to scaffold the project (which writes the language) before adding functions."));
+            .Muted(" to set up the project. It scaffolds a new one or adopts an existing one."));
     }
 
     /// <summary>

@@ -30,40 +30,49 @@ internal sealed class NodeProjectFactory : IFunctionsProjectFactory
             return Task.FromResult(NotCreated("directory does not exist"));
         }
 
-        string? reason = TryGetReason(workingDirectory);
+        (string? reason, string language) = Fingerprint(workingDirectory);
         if (reason is null)
         {
             return Task.FromResult(NotCreated("no Node project fingerprint found"));
         }
 
-        FunctionsProject project = new NodeFunctionsProject(context.WorkingDirectory);
+        FunctionsProject project = new NodeFunctionsProject(context.WorkingDirectory, language);
         return Task.FromResult(Created(project, reason));
     }
 
-    private static string? TryGetReason(DirectoryInfo workingDirectory)
+    // Language defaults to JavaScript so a Node directory with only package.json
+    // (no .ts files) still classifies cleanly.
+    private static (string? Reason, string Language) Fingerprint(DirectoryInfo workingDirectory)
     {
-        string packageJsonPath = Path.Combine(workingDirectory.FullName, "package.json");
+        string root = workingDirectory.FullName;
+        bool hasTsConfig = File.Exists(Path.Combine(root, "tsconfig.json"));
+        bool hasTopLevelTs = hasTsConfig
+            || Directory.EnumerateFiles(root, "*.ts", SearchOption.TopDirectoryOnly).Any();
+        string language = hasTopLevelTs ? "TypeScript" : "JavaScript";
+
+        string packageJsonPath = Path.Combine(root, "package.json");
         if (File.Exists(packageJsonPath))
         {
-            return DeclaresFunctionsPackage(packageJsonPath)
+            string reason = DeclaresFunctionsPackage(packageJsonPath)
                 ? "package.json declares @azure/functions"
                 : "found package.json";
+            return (reason, language);
         }
 
-        if (File.Exists(Path.Combine(workingDirectory.FullName, "tsconfig.json")))
+        if (hasTsConfig)
         {
-            return "found tsconfig.json";
+            return ("found tsconfig.json", language);
         }
 
         foreach (string pattern in _sourceFilePatterns)
         {
-            if (Directory.EnumerateFiles(workingDirectory.FullName, pattern, SearchOption.TopDirectoryOnly).Any())
+            if (Directory.EnumerateFiles(root, pattern, SearchOption.TopDirectoryOnly).Any())
             {
-                return $"found {pattern} file";
+                return ($"found {pattern} file", language);
             }
         }
 
-        return null;
+        return (null, language);
     }
 
     private static bool DeclaresFunctionsPackage(string packageJsonPath)

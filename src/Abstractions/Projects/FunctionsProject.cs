@@ -17,6 +17,12 @@ public abstract class FunctionsProject
 
     public abstract string StackDisplayName { get; }
 
+    /// <summary>
+    /// Display name of the project's language (e.g. "C#", "TypeScript"), or
+    /// <c>null</c> for single-language stacks where the stack implies it.
+    /// </summary>
+    public virtual string? Language => null;
+
     public abstract bool SupportsExtensionBundles { get; }
 
     public abstract FunctionsWorkerReference WorkerReference { get; }

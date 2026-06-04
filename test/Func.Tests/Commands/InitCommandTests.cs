@@ -4,8 +4,10 @@
 using System.CommandLine;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 using Xunit;
@@ -17,6 +19,7 @@ public class InitCommandTests
     private readonly TestInteractionService _interaction;
     private readonly RecordingWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettings;
+    private readonly IFunctionsProjectResolver _projectResolver;
 
     public InitCommandTests()
     {
@@ -24,10 +27,14 @@ public class InitCommandTests
         _hintRenderer = new RecordingWorkloadHintRenderer();
         _localSettings = Substitute.For<ILocalSettingsProvider>();
         _localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
+        _projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        _projectResolver
+            .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.NotResolved("no project"));
     }
 
     private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, initializers);
+        new(_interaction, _hintRenderer, _localSettings, _projectResolver, initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -551,7 +558,7 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, [dotnet]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, [dotnet]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
@@ -715,7 +722,7 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, [python]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, [python]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
@@ -983,6 +990,212 @@ public class InitCommandTests
         Assert.Contains("-c", ex.Message);
         Assert.Contains("--clean", ex.Message);
         Assert.Contains("--bundles-channel", ex.Message);
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_DetectsLanguageViaResolver_PersistsToConfig()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            _projectResolver
+                .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: "C#"), "stub"));
+
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                aliases: new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["C#"] = ["csharp"],
+                    ["F#"] = ["fsharp"],
+                });
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_ResolverReturnsNullLanguage_LeavesLanguageUnset()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            _projectResolver
+                .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: null), "stub"));
+
+            var dotnet = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#", "F#"]);
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_ExplicitLanguage_WinsOverResolver()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(newDir, "host.json"), "{}");
+
+            _projectResolver
+                .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: "C#"), "stub"));
+
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                aliases: new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["C#"] = ["csharp"],
+                    ["F#"] = ["fsharp"],
+                });
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: "F#", stack: "dotnet");
+
+            Assert.Equal(0, exitCode);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "f#");
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Heal_FillsMissingLanguageWithoutForce()
+    {
+        // Config with runtime but no language on a multi-language stack heals
+        // in place: detector fills language, all other keys are preserved.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(
+                Path.Combine(newDir, ".func", "config.json"),
+                "{\"stack\":{\"runtime\":\"dotnet\"},\"profiles\":{\"keep\":true}}");
+
+            _projectResolver
+                .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", language: "C#"), "stub"));
+
+            var dotnet = new FakeProjectInitializer(
+                "dotnet",
+                supportedLanguages: ["C#", "F#"],
+                aliases: new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["C#"] = ["csharp"],
+                    ["F#"] = ["fsharp"],
+                });
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
+
+            Assert.Equal(0, exitCode);
+            Assert.False(dotnet.WasInvoked);
+            AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(newDir, ".func", "config.json")));
+            Assert.True(doc.RootElement.TryGetProperty("profiles", out JsonElement profiles));
+            Assert.True(profiles.GetProperty("keep").GetBoolean());
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Heal_SingleLanguageStack_StillRefuses()
+    {
+        // Single-language stacks (e.g. python) don't persist 'language' even on
+        // a fresh init, so a config with only 'runtime' is the correct shape.
+        // Heal must not trigger; behaviour falls back to the existing refuse.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(
+                Path.Combine(newDir, ".func", "config.json"),
+                "{\"stack\":{\"runtime\":\"python\"}}");
+
+            var python = new FakeProjectInitializer("python", supportedLanguages: ["python"]);
+
+            int exitCode = await RunInitAsync(newDir, python, language: null, stack: null);
+
+            Assert.Equal(1, exitCode);
+            Assert.False(python.WasInvoked);
+            Assert.Contains(_interaction.Lines, l => l.Contains("already contains a Functions project", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Heal_ConfigAlreadyHasLanguage_StillRefuses()
+    {
+        // Nothing to heal: config already has both keys. The refuse path runs.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(newDir, ".func"));
+            File.WriteAllText(
+                Path.Combine(newDir, ".func", "config.json"),
+                "{\"stack\":{\"runtime\":\"dotnet\",\"language\":\"C#\"}}");
+
+            var dotnet = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#", "F#"]);
+
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
+
+            Assert.Equal(1, exitCode);
+            Assert.False(dotnet.WasInvoked);
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    private sealed class StubFunctionsProject(string stackName, string? language) : FunctionsProject
+    {
+        private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
+        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(stackName);
+
+        public override WorkingDirectory WorkingDirectory => _workingDirectory;
+
+        public override string StackName { get; } = stackName;
+
+        public override string StackDisplayName => StackName;
+
+        public override string? Language { get; } = language;
+
+        public override bool SupportsExtensionBundles => false;
+
+        public override FunctionsWorkerReference WorkerReference => _workerReference;
     }
 
     private sealed class FakeProjectInitializer(

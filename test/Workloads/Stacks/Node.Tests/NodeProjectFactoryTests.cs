@@ -102,6 +102,37 @@ public class NodeProjectFactoryTests : IDisposable
         Assert.NotNull(created.Reason);
     }
 
+    [Theory]
+    [InlineData("tsconfig.json", "TypeScript")]
+    [InlineData("index.ts", "TypeScript")]
+    [InlineData("package.json", "JavaScript")]
+    [InlineData("index.js", "JavaScript")]
+    [InlineData("index.mjs", "JavaScript")]
+    [InlineData("index.cjs", "JavaScript")]
+    public async Task Classifies_language_from_fingerprint(string fileName, string expectedLanguage)
+    {
+        WriteFile("host.json", "{}");
+        WriteFile(fileName, "{}");
+
+        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+
+        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
+        Assert.Equal(expectedLanguage, created.Project.Language);
+    }
+
+    [Fact]
+    public async Task Classifies_typescript_when_tsconfig_and_package_json_both_present()
+    {
+        WriteFile("host.json", "{}");
+        WriteFile("package.json", "{}");
+        WriteFile("tsconfig.json", "{}");
+
+        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+
+        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
+        Assert.Equal("TypeScript", created.Project.Language);
+    }
+
     [Fact]
     public async Task PackageJson_with_azure_functions_dep_uses_specific_reason()
     {

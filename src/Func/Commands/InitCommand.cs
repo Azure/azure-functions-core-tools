@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
@@ -27,6 +28,10 @@ namespace Azure.Functions.Cli.Commands;
 /// adoption is refused with a pointer to <c>func setup</c>. When neither
 /// signal is available the user is prompted interactively, or the command
 /// refuses non-interactively. <c>--force</c> bypasses adopt mode entirely.
+/// When <c>.func/config.json</c> exists but is missing <c>stack.language</c>
+/// on a multi-language stack, the command "heals" it: it detects the
+/// language via the project resolver and merges the missing key in,
+/// preserving every other key in the file. <c>--force</c> still wipes.
 /// </remarks>
 internal class InitCommand : FuncCliCommand, IBuiltInCommand
 {
@@ -50,23 +55,27 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
+    private readonly IFunctionsProjectResolver _projectResolver;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
     public InitCommand(
         IInteractionService interaction,
         IWorkloadHintRenderer hintRenderer,
         ILocalSettingsProvider localSettingsProvider,
+        IFunctionsProjectResolver projectResolver,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);
         ArgumentNullException.ThrowIfNull(localSettingsProvider);
+        ArgumentNullException.ThrowIfNull(projectResolver);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
         _hintRenderer = hintRenderer;
         _localSettingsProvider = localSettingsProvider;
+        _projectResolver = projectResolver;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -123,6 +132,23 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         string? requestedStack = parseResult.GetValue(StackOption);
 
         InitializationState state = DetectInitializationState(workingDirectory.Info);
+        string? existingRuntime = null;
+
+        // Heal one specific partial state: config exists with a runtime but no
+        // language on a multi-language stack. Detection here happens before the
+        // FullyInitialized refuse so the user doesn't have to reach for --force
+        // (which would wipe profiles, custom keys, etc.) just to fill in a
+        // missing language field. Other partial shapes still require --force.
+        if (state == InitializationState.FullyInitialized
+            && !force
+            && TryReadExistingStack(workingDirectory.Info) is { } snapshot
+            && !string.IsNullOrWhiteSpace(snapshot.Runtime)
+            && string.IsNullOrWhiteSpace(snapshot.Language)
+            && FindInitializerForCandidate(snapshot.Runtime) is { SupportedLanguages.Count: > 1 })
+        {
+            state = InitializationState.PartiallyInitialized;
+            existingRuntime = snapshot.Runtime;
+        }
 
         // .func/config.json already present means the project has been fully
         // initialized by v5; re-running without --force would silently no-op
@@ -141,13 +167,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // so we don't trample the user's source. --force still means "wipe and
         // re-scaffold" and takes the normal path.
         bool adoptExisting = state == InitializationState.AdoptableExistingProject && !force;
+        bool healExisting = state == InitializationState.PartiallyInitialized && !force;
 
-        // For adoption we honour what the project already declares.
-        // Source: local.settings.json's FUNCTIONS_WORKER_RUNTIME.
-        string? projectRuntime = adoptExisting ? ResolveProjectRuntime(workingDirectory.Info) : null;
+        // Where the project's stack runtime comes from: heal trusts what's
+        // already in .func/config.json; adopt reads local.settings.json
+        // (FUNCTIONS_WORKER_RUNTIME); the default path doesn't snap to either.
+        string? projectRuntime = healExisting
+            ? existingRuntime
+            : adoptExisting ? ResolveProjectRuntime(workingDirectory.Info) : null;
 
         IProjectInitializer? initializer;
-        if (adoptExisting)
+        if (adoptExisting || healExisting)
         {
             // Resolve both signals to a concrete initializer (or null) using
             // alias-aware matching, so e.g. "dotnet-isolated" in
@@ -221,10 +251,19 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             }
         }
 
-        // For adoption with no explicit --language, skip language resolution
-        // entirely: the user already has code, and prompting / erroring for
-        // a language they're not changing is just noise.
-        if (!(adoptExisting && string.IsNullOrWhiteSpace(language)))
+        // Reuse the runtime project resolver so adoption/heal doesn't need its
+        // own detection rules.
+        if ((adoptExisting || healExisting) && string.IsNullOrWhiteSpace(language))
+        {
+            language = await DetectAdoptedLanguageAsync(workingDirectory, cancellationToken);
+        }
+
+        // Adopt without a resolvable language: skip prompting, the user isn't
+        // changing existing code. Heal is multi-language by construction, so
+        // language must be resolved (either from --language or the detector
+        // above); fall through to ResolveLanguageAsync to surface the right
+        // error if it wasn't.
+        if (healExisting || !(adoptExisting && string.IsNullOrWhiteSpace(language)))
         {
             (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
             if (errorCode is int code)
@@ -252,6 +291,19 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // For stacks with no declared language list, persist whatever the
         // caller supplied so we don't silently drop their input.
         string? persistedLanguage = initializer.SupportedLanguages.Count == 1 ? null : language;
+
+        if (healExisting)
+        {
+            MergeLanguageIntoConfig(workingDirectory.Info, persistedLanguage);
+            _interaction.WriteBlankLine();
+            _interaction.WriteLine(l => l
+                .Success("✓ ")
+                .Muted("Existing project completed for ")
+                .Code(initializer.Stack)
+                .Muted("."));
+            return 0;
+        }
+
         WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
         _interaction.WriteBlankLine();
 
@@ -292,8 +344,14 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // Treat as a pre-v5 project we can adopt by writing the config.
         AdoptableExistingProject,
 
-        // .func/config.json is present. Already a v5 project; refuse without
-        // --force.
+        // .func/config.json exists with a runtime but no language on a
+        // multi-language stack. Run the adopt-mode language detector and
+        // merge the result back into the existing config without touching
+        // other keys. Single-language stacks never enter this state because
+        // language is intentionally omitted for them.
+        PartiallyInitialized,
+
+        // .func/config.json is present and complete. Refuse without --force.
         FullyInitialized,
     }
 
@@ -386,6 +444,37 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return InitializationState.Empty;
     }
 
+    // Reads the existing .func/config.json and returns its stack runtime /
+    // language fields. Returns null when the file can't be parsed; callers
+    // then treat the project as fully initialized and require --force.
+    private static (string? Runtime, string? Language)? TryReadExistingStack(DirectoryInfo workingDirectory)
+    {
+        string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
+        try
+        {
+            using FileStream stream = File.OpenRead(path);
+            using var doc = JsonDocument.Parse(stream);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty(CliConfigurationNames.StackSectionName, out JsonElement stack)
+                || stack.ValueKind != JsonValueKind.Object)
+            {
+                return (null, null);
+            }
+
+            string? runtime = stack.TryGetProperty(CliConfigurationNames.StackRuntimeKey, out JsonElement r) && r.ValueKind == JsonValueKind.String
+                ? r.GetString()
+                : null;
+            string? lang = stack.TryGetProperty(CliConfigurationNames.StackLanguageKey, out JsonElement l) && l.ValueKind == JsonValueKind.String
+                ? l.GetString()
+                : null;
+            return (runtime, lang);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
+
     // Looks up the project's worker runtime from local.settings.json. The CLI
     // intentionally does not consult the FUNCTIONS_WORKER_RUNTIME process env
     // var here: adoption is about the on-disk project shape, and an env var
@@ -395,6 +484,18 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     {
         string? raw = _localSettingsProvider.Get(workingDirectory).WorkerRuntime;
         return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+    }
+
+    // Returns null when the resolver can't classify the directory or the
+    // resolved project doesn't surface a Language; adoption then writes the
+    // stack runtime without a language entry.
+    private async Task<string?> DetectAdoptedLanguageAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
+    {
+        ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
+            new ProjectResolutionContext(workingDirectory),
+            cancellationToken);
+
+        return resolution is ProjectResolutionResult.Resolved resolved ? resolved.Project.Language : null;
     }
 
     // Resolves a candidate string (from --stack or local.settings.json) to
@@ -493,6 +594,43 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             _interaction.WriteLine(l => l
                 .Warning("! ")
                 .Muted($"Could not write {CliConfigurationPathsOptions.ProjectConfigDisplayPath} (")
+                .Code(ex.Message)
+                .Muted(")."));
+        }
+    }
+
+    // Patches stack.language into an existing .func/config.json without
+    // touching any other key. Used for the PartiallyInitialized heal path so
+    // users keep their profiles / custom keys instead of reaching for --force.
+    private void MergeLanguageIntoConfig(DirectoryInfo workingDirectory, string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+        {
+            return;
+        }
+
+        string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
+        try
+        {
+            string existing = File.ReadAllText(path);
+            JsonObject root = JsonNode.Parse(existing) as JsonObject ?? [];
+            JsonObject stack = root[CliConfigurationNames.StackSectionName] as JsonObject ?? [];
+            stack[CliConfigurationNames.StackLanguageKey] = language;
+            root[CliConfigurationNames.StackSectionName] = stack;
+
+            string json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(path, json + Environment.NewLine);
+
+            _interaction.WriteLine(l => l
+                .Muted("· Updated ")
+                .Code(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
+                .Muted($" with language: {language}."));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            _interaction.WriteLine(l => l
+                .Warning("! ")
+                .Muted($"Could not update {CliConfigurationPathsOptions.ProjectConfigDisplayPath} (")
                 .Code(ex.Message)
                 .Muted(")."));
         }

@@ -173,8 +173,18 @@ public class NodeFunctionsProjectTests : IDisposable
         Assert.Equal(new[] { "install" }, commands[0]);
     }
 
+    [Fact]
+    public void Language_ReflectsValuePassedToConstructor()
+    {
+        var ts = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "TypeScript");
+        var js = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "JavaScript");
+
+        Assert.Equal("TypeScript", ts.Language);
+        Assert.Equal("JavaScript", js.Language);
+    }
+
     private NodeFunctionsProject CreateProject(Func<string, IReadOnlyList<string>, Action<string>, Action<string>, CancellationToken, Task<int>> runner)
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName))
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), "JavaScript")
         {
             RunNpm = runner,
         };
