@@ -1,5 +1,14 @@
 # Azure.Functions.Cli.Workloads.Workers.Python
 
-## 4.43.0-preview.2
+All notable changes to this package are documented here.
 
-- fix: address per-RID content files missing in nupkg (#5285)
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [4.43.0-preview.2]
+
+### Fixed
+
+- Per-RID content files missing in nupkg. (#5285)
