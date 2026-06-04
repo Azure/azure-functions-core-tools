@@ -96,6 +96,13 @@ matches the snapshot the templates workloads were built against.
 
 ### Release steps (preview / experimental)
 
+Two options below; the team will pick one in review.
+
+#### Option A: channel checked into `vnext` at tag time
+
+Treat `BundleChannel` like every other workload's version: whatever is in
+`Directory.Version.props` on the tagged commit is what ships.
+
 1. **Set the channel** in
    `src/Workloads/Tools/ExtensionBundles/Directory.Version.props`:
    ```xml
@@ -114,6 +121,34 @@ matches the snapshot the templates workloads were built against.
    back to `stable`, then tag `bundles/v<version>` (no suffix). The
    workload is repackaged from the same payload without the prerelease
    label.
+
+Pros: consistent with all other workloads, reproducible from the tag
+alone. Cons: every preview release needs a flip-to-preview PR and a
+flip-back PR, which churns `vnext` history and leaves a window where HEAD
+disagrees with intent.
+
+#### Option B: `vnext` stays on `stable`, tag drives the channel
+
+Bundles is a content-only workload; the channel is just a label and a CDN
+id, not compiled output. Keep `BundleChannel` set to `stable` in `vnext`
+permanently and let the tag select the channel at pack time.
+
+1. **No props change required.** `vnext` HEAD always reads `stable`.
+2. **Tag the commit** to release from, using the channel-suffixed tag:
+   - `bundles/v4.35.0` (stable)
+   - `bundles/v4.35.0-preview.1` (preview)
+   - `bundles/v4.35.0-experimental.1` (experimental)
+3. **CI** parses the tag's prerelease suffix and packs with
+   `-p:BundleChannel=preview` (or `experimental`), overriding the default.
+   The published package version still matches the tag.
+4. **Promoting to stable**: tag `bundles/v<version>` (no suffix) on the
+   same or a later commit. No PR needed.
+
+Pros: no flip-flop PRs, tag is the single signal, prerelease workflow
+behaves like any other prereleased package. Cons: reproducing a build
+requires both the tag and the pipeline's tag-parsing logic, not just the
+tagged commit. Bundles becomes the one workload that derives a build
+input from the tag instead of from props.
 
 > Preview and experimental tags should be incremented per release
 > (`-preview.1`, `-preview.2`, ...). Do not reuse a prerelease tag.
