@@ -69,11 +69,7 @@ internal sealed class FuncAliasNudge(
                 .Command("func5")
                 .Muted("' instead of '")
                 .Command("func")
-                .Muted("'. v4 wins the 'func' name on PATH; both '")
-                .Command("func5")
-                .Muted("' and '")
-                .Command("func")
-                .Muted("' run the same commands."));
+                .Muted("'."));
         }
         catch
         {
