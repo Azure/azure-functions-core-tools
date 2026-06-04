@@ -4,9 +4,9 @@
 
 The `vnext` branch ships the v5 CLI as a set of independently versioned
 components: the host, bundles, templates, workers, and language stacks. Each
-component is released by pushing a **prefixed git tag** from `vnext`. CI
-picks up the tag, packs the matching workload(s), and publishes them to the
-appropriate feed.
+component is released by pushing a git tag from `vnext` and then queuing
+its release pipeline against that tag. The pipeline packs the matching
+workload(s) and publishes them to the appropriate feed.
 
 Versions follow SemVer. Preview releases use `-preview.N` suffixes.
 
@@ -64,10 +64,17 @@ Rules:
    git tag <component>/v<semver>
    git push origin <component>/v<semver>
    ```
-5. **Verify CI**: the tag-triggered pipeline packs the workload and publishes
-   the `.nupkg` to the configured feed.
-6. **Smoke test** the published package via `func workload install` against
+5. **Trigger the release pipeline** for the component from the
+   [internal release pipelines folder][release-pipelines] (one pipeline per
+   component). Queue the run against the tag you just pushed.
+   - Check **Publish to NuGet** if the release is going out to customers.
+   - Leave it unchecked to publish only to the internal feed for testing.
+6. **Verify CI**: the pipeline packs the workload and publishes the
+   `.nupkg` to the selected feed.
+7. **Smoke test** the published package via `func workload install` against
    the feed.
+
+[release-pipelines]: https://azfunc.visualstudio.com/internal/_build?definitionScope=%5Cazure%5Cazure-functions-core-tools%5Cvnext%5Crelease
 
 ## Multi-component releases
 
@@ -114,13 +121,17 @@ Treat `BundleChannel` like every other workload's version: whatever is in
    `release_notes.md` entry calling out the channel.
 3. **Merge and tag** the merge commit using the matching prerelease tag,
    e.g. `bundles/v4.35.0-preview.1` or `bundles/v4.35.0-experimental.1`.
-4. **CI** packs the workload with the prerelease label and publishes it to
-   the same feed; consumers opt in by installing the prerelease version
+4. **Trigger the bundles release pipeline** from the
+   [internal release pipelines folder][release-pipelines] against the tag.
+   Check **Publish to NuGet** only when pushing to customers; leave it
+   unchecked for internal-feed testing. The pipeline packs the workload
+   with the prerelease label and publishes it; consumers opt in by
+   installing the prerelease version
    (`func workload install bundles --version 4.35.0-preview.1`).
 5. **Promoting to stable**: open a follow-up PR that flips `BundleChannel`
-   back to `stable`, then tag `bundles/v<version>` (no suffix). The
-   workload is repackaged from the same payload without the prerelease
-   label.
+   back to `stable`, then tag `bundles/v<version>` (no suffix) and trigger
+   the pipeline. The workload is repackaged from the same payload without
+   the prerelease label.
 
 Pros: consistent with all other workloads, reproducible from the tag
 alone. Cons: every preview release needs a flip-to-preview PR and a
