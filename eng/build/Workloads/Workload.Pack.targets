@@ -1,0 +1,107 @@
+<Project>
+  <UsingTask TaskName="AddPackageType" AssemblyFile="$(MicrosoftNETBuildTasksAssembly)" />
+  <Import Project="$(MSBuildThisFileDirectory)Workload.Pack.Tasks.targets" />
+
+  <ItemGroup>
+    <_AllowedWorkloadKind Include="workload;content;meta" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- constants -->
+    <_FuncWorkloadSchema>https://aka.ms/func-workloads/package/v1/schema.json</_FuncWorkloadSchema>
+
+    <!-- Set up package type and tags for this workload -->
+    <PackageTags>$(PackageTags);func-workload</PackageTags>
+    <PackageTags Condition="'$(WorkloadKind)' != ''">$(PackageTags);kind:$(WorkloadKind)</PackageTags>
+
+    <PackageTags Condition="'$(WorkloadAlias)' != ''">$(PackageTags);alias:$(WorkloadAlias)</PackageTags>
+    <!-- General pack settings -->
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnablePackageValidation>false</EnablePackageValidation>
+
+    <!-- Per-RID pack settings -->
+    <CreateRidSpecificWorkloadPackages Condition="'$(CreateRidSpecificWorkloadPackages)' == ''">false</CreateRidSpecificWorkloadPackages>
+    <CreateRidSpecificWorkloadPackages Condition="'$(CreateRidSpecificWorkloadPackages)' == '' AND '$(RuntimeIdentifiers)' != ''">true</CreateRidSpecificWorkloadPackages>
+
+    <!-- Hook in workload pack targets -->
+    <!-- Ensure the workload packages are created for each runtime identifier (if there are any to create). -->
+    <GenerateNuspecDependsOn>$(GenerateNuspecDependsOn);_CreateRIDSpecificWorkloadPackages</GenerateNuspecDependsOn>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackWorkload</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' AND $(CreateRidSpecificWorkloadPackages)">
+    <PackageId Condition="'$(PackageId)' == ''">$(AssemblyName).$(RuntimeIdentifier)</PackageId>
+    <PackageId Condition="'$(PackageId)' != ''">$(PackageId).$(RuntimeIdentifier)</PackageId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="workload.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <Target Name="_PackWorkloadValidation" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(WorkloadKind)' == ''" Text="WorkloadKind is not specified. Valid values are: @(_AllowedWorkloadKind)." />
+    <Error Condition="!@(_AllowedWorkloadKind->AnyHaveMetadataValue('Identity', '$(WorkloadKind)'))" Text="Invalid WorkloadKind '$(WorkloadKind)'. Valid values are: @(_AllowedWorkloadKind)." />
+  </Target>
+
+  <Target Name="SetWorkloadPackageType" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <_WorkloadPackageType Condition="'$(RuntimeIdentifier)' != '' AND $(CreateRidSpecificWorkloadPackages)">FuncCliWorkloadRidPackage</_WorkloadPackageType>
+      <_WorkloadPackageType Condition="'$(_WorkloadPackageType)' == ''">FuncCliWorkload</_WorkloadPackageType>
+    </PropertyGroup>
+
+    <AddPackageType Condition="'$(_WorkloadPackageType)' == 'FuncCliWorkload'" CurrentPackageType="$(PackageType)" PackageTypeToAdd="$(_WorkloadPackageType)">
+      <Output TaskParameter="UpdatedPackageType" PropertyName="PackageType" />
+    </AddPackageType>
+  </Target>
+
+    <PropertyGroup>
+      <!-- per-RID workload packages get a specific package type, so they are hidden from regular searches. -->
+      <PackageType Condition="'$(_WorkloadPackageType)' == 'FuncCliWorkloadRidPackage'">FuncCliWorkloadRidPackage</PackageType>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="_ResolveWorkloadEntryPoint" Condition="'$(WorkloadType)' == 'workload'">
+    <PropertyGroup>
+      <WorkloadEntryPointAssembly Condition="'$(WorkloadEntryPointAssembly)' == ''">$(TargetFileName)</WorkloadEntryPointAssembly>
+    </PropertyGroup>
+
+    <ReadCliWorkload AssemblyPath="$(TargetPath)" Condition="'$(WorkloadEntryPointType)' == ''">
+      <Output TaskParameter="WorkloadType" PropertyName="WorkloadEntryPointType" />
+    </ReadCliWorkload>
+  </Target>
+
+  <Target Name="_GenerateWorkloadJsonCache">
+    <ItemGroup>
+      <_WorkloadJsonInputCacheToHash Include="$(WorkloadKind)" />
+      <_WorkloadJsonInputCacheToHash Include="$(_FuncWorkloadSchema)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="GenerateWorkloadJson">
+
+  </Target>
+
+  <Target Name="PackWorkload" DependsOnTargets="SetWorkloadPackageType;_PackWorkloadValidation">
+    <PropertyGroup>
+      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' == ''">any</_WorkloadRidPath>
+      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_WorkloadRidPath>
+    </PropertyGroup>
+
+
+  </Target>
+
+  <Target Name="_CreateRIDSpecificWorkloadPackages" Condition="'$(RuntimeIdentifiers)' == '' AND $(CreateRidSpecificWorkloadPackages) == 'true'">
+    <ItemGroup>
+      <_WorkloadRuntimeIdentifiers Include="$(RuntimeIdentifiers)" />
+      <_RidSpecificWorkloadPackageProject Include="$(MSBuildProjectFullPath)">
+        <AdditionalProperties>RuntimeIdentifier=%(_WorkloadRuntimeIdentifiers.Identity);</AdditionalProperties>
+      </_RidSpecificWorkloadPackageProject>
+    </ItemGroup>
+
+    <MSBuild Projects="@(_RidSpecificWorkloadPackageProject)" Targets="Pack" BuildInParallel="true">
+        <Output TaskParameter="TargetOutputs" ItemName="_WorkloadPackageOutputs" />
+    </MSBuild>
+  </Target>
+
+</Project>
