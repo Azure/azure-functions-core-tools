@@ -1,0 +1,50 @@
+parameters:
+- name: tagPrefix
+  type: string
+- name: allowChannels
+  type: boolean
+  default: true
+
+# Parses the git tag the release pipeline was queued against and sets
+# pipeline variables consumed by the workload's MSBuild props via
+# -p:... in build_args:
+#   $(ReleaseTagVersion)  three-part SemVer parsed from the tag
+#   $(ReleaseTagChannel)  stable | preview | experimental (always
+#                         stable when allowChannels=false)
+#   $(ReleaseTagSuffix)   prerelease suffix (e.g. preview.1); empty
+#                         when channel is stable
+#
+# Tag format:
+#   <prefix>/v<major>.<minor>.<patch>                       (stable)
+#   <prefix>/v<major>.<minor>.<patch>-(preview|experimental).<n>
+steps:
+- pwsh: |
+    $source = "$(Build.SourceBranch)"
+    $prefix = '${{ parameters.tagPrefix }}'
+    $allowChannels = [System.Boolean]::Parse('${{ parameters.allowChannels }}')
+
+    if ($allowChannels) {
+      $pattern = "^refs/tags/$([regex]::Escape($prefix))/v(\d+\.\d+\.\d+)(?:-(preview|experimental)\.(\d+))?$"
+    } else {
+      $pattern = "^refs/tags/$([regex]::Escape($prefix))/v(\d+\.\d+\.\d+)$"
+    }
+
+    $match = [regex]::Match($source, $pattern)
+    if (-not $match.Success) {
+      Write-Host "##vso[task.logissue type=error]Invalid release tag '$source' for workload '$prefix'."
+      exit 1
+    }
+
+    $version = $match.Groups[1].Value
+    $channel = 'stable'
+    $suffix = ''
+    if ($allowChannels -and $match.Groups[2].Success) {
+      $channel = $match.Groups[2].Value
+      $suffix = "$channel.$($match.Groups[3].Value)"
+    }
+
+    Write-Host "Parsed tag: version=$version channel=$channel suffix=$suffix"
+    Write-Host "##vso[task.setvariable variable=ReleaseTagVersion]$version"
+    Write-Host "##vso[task.setvariable variable=ReleaseTagChannel]$channel"
+    Write-Host "##vso[task.setvariable variable=ReleaseTagSuffix]$suffix"
+  displayName: Parse workload tag (${{ parameters.tagPrefix }})

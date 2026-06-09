@@ -6,6 +6,17 @@ parameters:
 - name: public
   type: boolean
   default: false
+- name: tagSpec
+  # Optional. When set with a tagPrefix, the pipeline validates the queued
+  # tag and parses it into ReleaseTagVersion / ReleaseTagChannel /
+  # ReleaseTagSuffix pipeline variables. The wrapping release yml is
+  # expected to map those to the workload's MSBuild props via build_args.
+  # Shape: { tagPrefix: string, allowChannels: boolean (default true) }
+  type: object
+  default: {}
+- name: build_args
+  type: string
+  default: ''
 
 resources:
   repositories:
@@ -40,6 +51,14 @@ extends:
       - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
         parameters:
           failOnInvalidRef: ${{ parameters.public }}
+      - ${{ if parameters.tagSpec.tagPrefix }}:
+        - template: /eng/ci/templates/jobs/validate-workload-tag.yml@self
+          parameters:
+            tagPrefix: ${{ parameters.tagSpec.tagPrefix }}
+            ${{ if ne(parameters.tagSpec.allowChannels, false) }}:
+              allowChannels: true
+            ${{ else }}:
+              allowChannels: false
 
     - stage: Build
       dependsOn: Validate
@@ -52,7 +71,8 @@ extends:
           sign: true
           artifacts: ['pack']
           projects: ${{ parameters.projects }}
-          build_args: -p:IsReleaseCI=true
+          tagSpec: ${{ parameters.tagSpec }}
+          build_args: -p:IsReleaseCI=true ${{ parameters.build_args }}
 
     - stage: Release
       dependsOn: Build

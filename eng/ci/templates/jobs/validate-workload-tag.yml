@@ -1,0 +1,36 @@
+parameters:
+- name: tagPrefix
+  type: string
+- name: allowChannels
+  type: boolean
+  default: true
+
+jobs:
+- job: ValidateTag
+  displayName: Validate ${{ parameters.tagPrefix }} tag
+  templateContext:
+    type: validationJob
+
+  steps:
+  - checkout: none
+
+  - pwsh: |
+      $source = "$(Build.SourceBranch)"
+      $prefix = '${{ parameters.tagPrefix }}'
+      $allowChannels = [System.Boolean]::Parse('${{ parameters.allowChannels }}')
+
+      if ($allowChannels) {
+        $pattern = "^refs/tags/$([regex]::Escape($prefix))/v(\d+\.\d+\.\d+)(?:-(preview|experimental)\.(\d+))?$"
+        $expected = "refs/tags/$prefix/v<major>.<minor>.<patch>[-(preview|experimental).<n>]"
+      } else {
+        $pattern = "^refs/tags/$([regex]::Escape($prefix))/v(\d+\.\d+\.\d+)$"
+        $expected = "refs/tags/$prefix/v<major>.<minor>.<patch>"
+      }
+
+      if ($source -notmatch $pattern) {
+        Write-Host "##vso[task.logissue type=error]Invalid release tag '$source' for workload '$prefix'. Expected: $expected"
+        exit 1
+      }
+
+      Write-Host "Tag '$source' matches the '$prefix' release format."
+    displayName: Validate workload tag format

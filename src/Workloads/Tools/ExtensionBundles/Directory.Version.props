@@ -1,32 +1,45 @@
 <Project>
 
   <!--
-    Workload pkg versioning. This is a content-only workload (no workload
-    code or assemblies), so the pkg version maps 1:1 to the bundle payload
-    version it carries:
-      $(BundleVersion)  - the bundle payload version. Drives the CDN URL
-                          and the user-facing version in func logs. Bare
-                          three-part SemVer. Defaults to
-                          $(LatestExtensionBundleVersion) from
-                          eng/build/Workloads.Templates.SourceBundleVersion.props
-                          so the bundle this workload ships always matches
-                          the snapshot the templates workloads were built
-                          against (one-line bump for both).
-      $(BundleChannel)  - stable | preview | experimental. Selects the CDN
-                          bundle id (see DownloadDefaultBundle.targets) and
-                          the workload pkg's prerelease label.
+    Workload pkg versioning. Bundles is a content-only workload (no
+    workload code or assemblies), so the pkg version maps 1:1 to the
+    bundle payload version it carries.
+
+    Properties (overridable via -p:... from the release pipeline):
+      $(BundleVersion)  Bundle payload version. Drives the CDN URL and
+                        the user-facing version in func logs. Bare
+                        three-part SemVer. Defaults to
+                        $(LatestExtensionBundleVersion) from
+                        eng/build/Workloads.Templates.SourceBundleVersion.props
+                        so the bundle this workload ships always matches
+                        the snapshot the templates workloads were built
+                        against (one-line bump for both).
+      $(BundleChannel)  stable | preview | experimental. Selects the CDN
+                        bundle id (see DownloadDefaultBundle.targets) and
+                        the workload pkg's prerelease label. Default
+                        stable.
+      $(VersionSuffix)  Optional prerelease label (e.g. preview.1,
+                        experimental.2). When unset and channel != stable,
+                        falls back to $(BundleChannel).1 for local builds.
+
+    Release model: vnext carries only the stable line. The release
+    pipeline parses the git tag (e.g. bundles/v4.35.0-preview.1) and
+    passes -p:BundleVersion / -p:BundleChannel / -p:VersionSuffix.
+    Stable releases must match $(LatestExtensionBundleVersion) (enforced
+    by the lockstep target below); preview / experimental may drift so
+    the bundles workload can ship a new bundle line ahead of templates.
 
     Derived $(VersionPrefix):
       stable        -> 4.35.0
-      preview       -> 4.35.0-preview
-      experimental  -> 4.35.0-experimental
+      preview       -> 4.35.0  (+ VersionSuffix preview.N)
+      experimental  -> 4.35.0  (+ VersionSuffix experimental.N)
   -->
 
   <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
 
   <PropertyGroup>
+    <BundleChannel Condition="'$(BundleChannel)' == ''">stable</BundleChannel>
     <BundleVersion Condition="'$(BundleVersion)' == ''">$(LatestExtensionBundleVersion)</BundleVersion>
-    <BundleChannel>stable</BundleChannel>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(BundleChannel)' == 'stable'">
@@ -35,7 +48,29 @@
 
   <PropertyGroup Condition="'$(BundleChannel)' != 'stable'">
     <VersionPrefix>$(BundleVersion)</VersionPrefix>
-    <VersionSuffix>$(BundleChannel).1</VersionSuffix>
+    <VersionSuffix Condition="'$(VersionSuffix)' == ''">$(BundleChannel).1</VersionSuffix>
   </PropertyGroup>
+
+  <Target Name="_ValidateBundleChannel" BeforeTargets="GenerateNuspec;_GetPackageFiles;Build">
+    <Error Condition="'$(BundleChannel)' != 'stable' AND '$(BundleChannel)' != 'preview' AND '$(BundleChannel)' != 'experimental'"
+           Text="BundleChannel '$(BundleChannel)' is not one of stable|preview|experimental." />
+  </Target>
+
+  <!--
+    Stable bundles release must match the bundle version checked in to
+    vnext (via $(LatestExtensionBundleVersion)). This keeps the bundles
+    workload and the templates workloads on the same bundle snapshot for
+    any commit shipped through a stable tag. To ship a new stable bundle
+    line: PR the bump to eng/build/Workloads.Templates.SourceBundleVersion.props
+    on vnext first, then tag bundles/vX.Y.Z.
+
+    Preview / experimental tags are intentionally exempt: those channels
+    exist so the bundles workload can ship a new bundle line ahead of
+    the templates baseline.
+  -->
+  <Target Name="_ValidateBundleStableLockstep" BeforeTargets="GenerateNuspec;_GetPackageFiles;Build">
+    <Error Condition="'$(BundleChannel)' == 'stable' AND '$(BundleVersion)' != '$(LatestExtensionBundleVersion)'"
+           Text="Stable bundles release: BundleVersion ('$(BundleVersion)') must match LatestExtensionBundleVersion ('$(LatestExtensionBundleVersion)'). Bump eng/build/Workloads.Templates.SourceBundleVersion.props on vnext first, then re-tag." />
+  </Target>
 
 </Project>

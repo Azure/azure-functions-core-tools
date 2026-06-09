@@ -7,27 +7,55 @@
     Microsoft.Azure.Functions.Worker.ItemTemplates NuGet pin (which
     is exposed below and written into content/source.json at pack time).
 
-      $(TemplatesVersion)               Workload pkg version (3-part SemVer).
-                                        Drives $(VersionPrefix).
+    Properties (overridable via -p:... from the release pipeline):
+      $(StableTemplatesVersion)         Source of truth on vnext for the
+                                        DotNet templates workload version.
+                                        Bumping this property is the
+                                        lockstep gate for a release: PR
+                                        the bump to vnext, then tag
+                                        templates-dotnet/vX.Y.Z.
+      $(TemplatesVersion)               Effective workload pkg version
+                                        (3-part SemVer). Defaults to
+                                        $(StableTemplatesVersion). The
+                                        release pipeline overrides via
+                                        -p:TemplatesVersion (parsed from
+                                        the tag); the lockstep target
+                                        below enforces they match.
       $(SourceItemTemplatesPackageId)   Upstream NuGet template package id
                                         that the workload hydrates from at
                                         build time (Templates Workload Spec
                                         §6.3 step 1).
       $(SourceItemTemplatesVersion)     Upstream NuGet template package
                                         version. Drives the dotnet new
-                                        install during the hydrate step and
-                                        is written into content/source.json
-                                        so the CLI core knows which pkg to
-                                        provision into the dotnet template
-                                        hive at func workload install time.
+                                        install during the hydrate step
+                                        and is written into
+                                        content/source.json so the CLI
+                                        core knows which pkg to provision
+                                        into the dotnet template hive at
+                                        func workload install time.
+
+    DotNet has no preview / experimental channel today. The tag namespace
+    is stable-only (templates-dotnet/vX.Y.Z).
   -->
 
   <PropertyGroup>
-    <TemplatesVersion>1.0.1</TemplatesVersion>
+    <StableTemplatesVersion>1.0.1</StableTemplatesVersion>
+    <TemplatesVersion Condition="'$(TemplatesVersion)' == ''">$(StableTemplatesVersion)</TemplatesVersion>
     <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
 
     <SourceItemTemplatesPackageId>Microsoft.Azure.Functions.Worker.ItemTemplates</SourceItemTemplatesPackageId>
     <SourceItemTemplatesVersion>4.0.5590</SourceItemTemplatesVersion>
   </PropertyGroup>
+
+  <!--
+    Stable releases (the only kind for templates-dotnet today) must match
+    the version checked in to vnext ($(StableTemplatesVersion)). To ship
+    a new version: PR the bump here on vnext first, then tag
+    templates-dotnet/vX.Y.Z.
+  -->
+  <Target Name="_ValidateTemplatesDotNetStableLockstep" BeforeTargets="GenerateNuspec;_GetPackageFiles;Build">
+    <Error Condition="'$(TemplatesVersion)' != '$(StableTemplatesVersion)'"
+           Text="templates-dotnet release: TemplatesVersion ('$(TemplatesVersion)') must match StableTemplatesVersion ('$(StableTemplatesVersion)'). Bump src/Workloads/Templates/DotNet/Directory.Version.props on vnext first, then re-tag." />
+  </Target>
 
 </Project>

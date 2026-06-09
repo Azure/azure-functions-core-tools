@@ -15,3 +15,7 @@ extends:
     folder: workloads/templates/python
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Templates/Python/Workloads.Templates.Python.csproj
+    tagSpec:
+      tagPrefix: templates-python
+      allowChannels: true
+    build_args: -p:TemplatesVersion=$(ReleaseTagVersion) -p:TemplatesChannel=$(ReleaseTagChannel) -p:VersionSuffix=$(ReleaseTagSuffix)

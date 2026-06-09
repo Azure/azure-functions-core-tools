@@ -46,7 +46,16 @@
     <!-- Only set public release if this is a release tag or a release branch -->
     <!-- tag must be 'v{Version}', '{name}-v{Version}', or '{name}/v{Version}' for a match -->
     <!-- release branch must be refs/heads/release/* -->
-    <PublicReleaseTag Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(BUILD_SOURCEBRANCH), `refs/tags/(?:.*[-/])?v.*`))">$(BUILD_SOURCEBRANCHNAME)</PublicReleaseTag>
+    <!--
+      PublicReleaseTag is the full tag name (e.g. 'v4.0.0', 'host-v4.20.0',
+      'bundles/v4.35.0-preview.1'). We strip the 'refs/tags/' prefix from
+      BUILD_SOURCEBRANCH rather than using BUILD_SOURCEBRANCHNAME, which
+      only returns the last path segment and would drop the workload
+      prefix from slash-namespaced tags ('v4.35.0-preview.1' instead of
+      'bundles/v4.35.0-preview.1'). The full tag is needed so the GitHub
+      release link in release notes resolves correctly.
+    -->
+    <PublicReleaseTag Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(BUILD_SOURCEBRANCH), `refs/tags/(?:.*[-/])?v.*`))">$(BUILD_SOURCEBRANCH.Substring(10))</PublicReleaseTag>
     <PublicRelease>false</PublicRelease>
     <PublicRelease Condition="'$(PublicReleaseTag)' != ''">true</PublicRelease>
     <PublicRelease Condition="'$(BUILD_SOURCEBRANCH)' != '' AND $(BUILD_SOURCEBRANCH.StartsWith('refs/heads/release/'))">true</PublicRelease>

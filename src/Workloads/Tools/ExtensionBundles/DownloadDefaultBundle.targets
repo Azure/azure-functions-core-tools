@@ -13,13 +13,20 @@
     pack of a developer build, or a PR build whose $(BundleVersion) is
     not yet published to the CDN).
 
-    The CDN bundle id is selected from $(BundleChannel):
+    The CDN bundle id is selected from $(BundleChannel) (validated by
+    Directory.Version.props):
       stable        -> Microsoft.Azure.Functions.ExtensionBundle
       preview       -> Microsoft.Azure.Functions.ExtensionBundle.Preview
       experimental  -> Microsoft.Azure.Functions.ExtensionBundle.Experimental
 
     The CDN URL always carries the bare $(BundleVersion); the workload pkg's
     own prerelease label (preview/experimental.N) is not part of the URL.
+
+    Release model: the bundles release pipeline parses the git tag (e.g.
+    bundles/v4.35.0-preview.1) and supplies BundleChannel + BundleVersion
+    via -p:. See src/Workloads/Tools/ExtensionBundles/Directory.Version.props
+    for the full release model and the stable-only lockstep with
+    $(LatestExtensionBundleVersion).
 
     TODO: switch the pack-time payload source from the public CDN to the
     bundle CI build artifacts so the workload always ships the exact
@@ -37,8 +44,6 @@
           BeforeTargets="GenerateNuspec;_GetPackageFiles"
           Inputs="$(MSBuildProjectFullPath)"
           Outputs="$(IntermediateOutputPath)bundle\.extracted">
-    <Error Condition="'$(_BundleCdnId)' == ''"
-           Text="BundleChannel '$(BundleChannel)' is not one of stable|preview|experimental." />
     <PropertyGroup>
       <_BundleCdnZipUrl>https://cdn.functions.azure.com/public/ExtensionBundles/$(_BundleCdnId)/$(BundleVersion)/$(_BundleCdnId).$(BundleVersion).zip</_BundleCdnZipUrl>
       <_BundleStaging>$(IntermediateOutputPath)bundle\</_BundleStaging>

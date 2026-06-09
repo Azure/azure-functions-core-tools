@@ -6,36 +6,58 @@
     Directory.Version.props because it does not snapshot from an
     extension bundle (see proposed/templates-workload-spec.md §4.4.3).
 
-      $(TemplatesVersion)         workload pkg version. Bare three-part SemVer.
-      $(TemplatesChannel)         stable | preview | experimental. Selects the
-                                  source bundle id at build time and the
-                                  workload pkg's prerelease label.
-      $(SourceBundleVersion)      bundle version snapshotted at build time.
-                                  Defaults to $(LatestExtensionBundleVersion)
-                                  so a bundle bump propagates from one file
-                                  (eng/build/Workloads.Templates.SourceBundleVersion.props).
-                                  Recorded as build provenance only; not
-                                  used to derive the templates pkg version
-                                  (Templates Workload Spec §4.4.1).
-      $(MinBundleVersionRange)    NuGet version range the workload pkg
-                                  declares it is compatible with. Feeds the
-                                  nuspec `minBundle:` tag, the workload.json
-                                  description sentence, and the generated
-                                  templates-workload.json sibling manifest,
-                                  so the three storage locations cannot
-                                  drift (Templates Workload Spec §4.4.4).
+    Properties (overridable via -p:... from the release pipeline):
+      $(StableTemplatesVersion)  Source of truth on vnext for the stable
+                                 templates line. Bumping this property is
+                                 the lockstep gate for a stable release:
+                                 PR the bump to vnext, then tag
+                                 templates-node/vX.Y.Z (or python).
+      $(TemplatesVersion)        Effective workload pkg version. Defaults
+                                 to $(StableTemplatesVersion). The release
+                                 pipeline overrides via -p:TemplatesVersion
+                                 (parsed from the tag) so preview /
+                                 experimental tags can ship a different
+                                 version line.
+      $(TemplatesChannel)        stable | preview | experimental. Selects
+                                 the source bundle id at build time and
+                                 the workload pkg's prerelease label.
+                                 Default stable.
+      $(VersionSuffix)           Optional prerelease label (e.g.
+                                 preview.1, experimental.2). Default
+                                 unset.
+      $(SourceBundleVersion)     Bundle version snapshotted at build time.
+                                 Defaults to $(LatestExtensionBundleVersion)
+                                 so a bundle bump propagates from one file
+                                 (eng/build/Workloads.Templates.SourceBundleVersion.props).
+                                 Recorded as build provenance only; not
+                                 used to derive the templates pkg version
+                                 (Templates Workload Spec §4.4.1).
+      $(MinBundleVersionRange)   NuGet version range the workload pkg
+                                 declares it is compatible with. Feeds
+                                 the nuspec `minBundle:` tag, the
+                                 workload.json description sentence, and
+                                 the generated templates-workload.json
+                                 sibling manifest, so the three storage
+                                 locations cannot drift (Templates
+                                 Workload Spec §4.4.4).
+
+    Release model: vnext carries only the stable line. The release
+    pipeline parses the git tag and passes -p:TemplatesVersion /
+    -p:TemplatesChannel / -p:VersionSuffix. Stable releases must match
+    $(StableTemplatesVersion); preview / experimental may drift.
 
     Derived $(VersionPrefix):
-      stable        -> 1.0.0
-      preview       -> 1.0.0-preview
-      experimental  -> 1.0.0-experimental
+      stable        -> 1.0.1
+      preview       -> 1.0.1  (+ VersionSuffix preview.N)
+      experimental  -> 1.0.1  (+ VersionSuffix experimental.N)
   -->
 
   <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
 
   <PropertyGroup>
-    <TemplatesVersion>1.0.1</TemplatesVersion>
-    <TemplatesChannel>stable</TemplatesChannel>
+    <StableTemplatesVersion>1.0.1</StableTemplatesVersion>
+    <TemplatesChannel Condition="'$(TemplatesChannel)' == ''">stable</TemplatesChannel>
+    <TemplatesVersion Condition="'$(TemplatesVersion)' == ''">$(StableTemplatesVersion)</TemplatesVersion>
     <SourceBundleVersion Condition="'$(SourceBundleVersion)' == ''">$(LatestExtensionBundleVersion)</SourceBundleVersion>
     <MinBundleVersionRange Condition="'$(MinBundleVersionRange)' == ''">[4.0.0,)</MinBundleVersionRange>
   </PropertyGroup>
@@ -45,7 +67,26 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TemplatesChannel)' != 'stable'">
-    <VersionPrefix>$(TemplatesVersion)-$(TemplatesChannel)</VersionPrefix>
+    <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
+    <VersionSuffix Condition="'$(VersionSuffix)' == ''">$(TemplatesChannel).1</VersionSuffix>
   </PropertyGroup>
+
+  <Target Name="_ValidateTemplatesChannel" BeforeTargets="GenerateNuspec;_GetPackageFiles;Build">
+    <Error Condition="'$(TemplatesChannel)' != 'stable' AND '$(TemplatesChannel)' != 'preview' AND '$(TemplatesChannel)' != 'experimental'"
+           Text="TemplatesChannel '$(TemplatesChannel)' is not one of stable|preview|experimental." />
+  </Target>
+
+  <!--
+    Stable templates release must match the version checked in to vnext
+    ($(StableTemplatesVersion)). To ship a new stable line: PR the bump
+    here on vnext first, then tag templates-node/vX.Y.Z (or python).
+
+    Preview / experimental tags are exempt so they can ship ahead of the
+    stable line without a flip-flop PR.
+  -->
+  <Target Name="_ValidateTemplatesStableLockstep" BeforeTargets="GenerateNuspec;_GetPackageFiles;Build">
+    <Error Condition="'$(TemplatesChannel)' == 'stable' AND '$(TemplatesVersion)' != '$(StableTemplatesVersion)'"
+           Text="Stable templates release: TemplatesVersion ('$(TemplatesVersion)') must match StableTemplatesVersion ('$(StableTemplatesVersion)'). Bump src/Workloads/Templates/Directory.Version.props on vnext first, then re-tag." />
+  </Target>
 
 </Project>

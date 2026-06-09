@@ -15,3 +15,7 @@ extends:
     folder: workloads/bundles
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj
+    tagSpec:
+      tagPrefix: bundles
+      allowChannels: true
+    build_args: -p:BundleVersion=$(ReleaseTagVersion) -p:BundleChannel=$(ReleaseTagChannel) -p:VersionSuffix=$(ReleaseTagSuffix)

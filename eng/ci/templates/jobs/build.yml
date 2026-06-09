@@ -13,6 +13,13 @@ parameters:
 - name: build_args
   type: string
   default: ''
+- name: tagSpec
+  # Optional. When set with a tagPrefix, a parse-workload-tag step runs
+  # before Restore and exposes ReleaseTagVersion / ReleaseTagChannel /
+  # ReleaseTagSuffix to subsequent steps. Shape:
+  # { tagPrefix: string, allowChannels: boolean (default true) }
+  type: object
+  default: {}
 
 jobs:
 - job: build
@@ -44,6 +51,15 @@ jobs:
     - template: /eng/ci/templates/steps/setup-dependencies.yml@self
       parameters:
         sign: ${{ parameters.sign }}
+
+    - ${{ if parameters.tagSpec.tagPrefix }}:
+      - template: /eng/ci/templates/steps/parse-workload-tag.yml@self
+        parameters:
+          tagPrefix: ${{ parameters.tagSpec.tagPrefix }}
+          ${{ if ne(parameters.tagSpec.allowChannels, false) }}:
+            allowChannels: true
+          ${{ else }}:
+            allowChannels: false
 
     - task: DotNetCoreCLI@2
       displayName: Restore
