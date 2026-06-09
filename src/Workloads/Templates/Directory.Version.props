@@ -32,6 +32,12 @@
                                  Recorded as build provenance only; not
                                  used to derive the templates pkg version
                                  (Templates Workload Spec §4.4.1).
+                                 NOTE: preview / experimental templates
+                                 releases that need to snapshot from a
+                                 non-stable bundle version must pass
+                                 -p:SourceBundleVersion=... at pipeline-
+                                 queue time; the tag does not carry it
+                                 today.
       $(MinBundleVersionRange)   NuGet version range the workload pkg
                                  declares it is compatible with. Feeds
                                  the nuspec `minBundle:` tag, the
@@ -87,6 +93,17 @@
   <Target Name="_ValidateTemplatesStableLockstep" BeforeTargets="GenerateNuspec;_GetPackageFiles;Build">
     <Error Condition="'$(TemplatesChannel)' == 'stable' AND '$(TemplatesVersion)' != '$(StableTemplatesVersion)'"
            Text="Stable templates release: TemplatesVersion ('$(TemplatesVersion)') must match StableTemplatesVersion ('$(StableTemplatesVersion)'). Bump src/Workloads/Templates/Directory.Version.props on vnext first, then re-tag." />
+  </Target>
+  <!--
+    Stable templates release must snapshot from the stable bundle baseline
+    on vnext ($(LatestExtensionBundleVersion)). Preview / experimental
+    tags are exempt so they can snapshot from a different bundle version
+    when needed (operator overrides with -p:SourceBundleVersion=... at
+    pipeline-queue time).
+  -->
+  <Target Name="_ValidateTemplatesStableSourceBundleLockstep" BeforeTargets="GenerateNuspec;_GetPackageFiles;Build">
+    <Error Condition="'$(TemplatesChannel)' == 'stable' AND '$(SourceBundleVersion)' != '$(LatestExtensionBundleVersion)'"
+           Text="Stable templates release: SourceBundleVersion ('$(SourceBundleVersion)') must match LatestExtensionBundleVersion ('$(LatestExtensionBundleVersion)'). Bump eng/build/Workloads.Templates.SourceBundleVersion.props on vnext first, then re-tag." />
   </Target>
 
 </Project>
