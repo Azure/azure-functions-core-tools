@@ -131,6 +131,12 @@ Implement func doctor command.
   - Azurite availability check
   - port conflict check
   - workload package cache check
+- Integrate with [`azure-functions-skills`](https://github.com/Azure/azure-functions-skills):
+  the skills repo already ships a doctor command that runs LLM-driven
+  skills to validate config + code (~53% of incoming ICMs could be
+  prevented by keeping these skills current). Decide whether
+  `func doctor` shells out to the skills runtime, or whether the skills'
+  doctor calls into `func doctor` for the deterministic checks.
 
 ### Schema store
 
