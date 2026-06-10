@@ -6,6 +6,9 @@ parameters:
 - name: public
   type: boolean
   default: false
+- name: build_args
+  type: string
+  default: ""
 
 resources:
   repositories:
@@ -52,7 +55,7 @@ extends:
           sign: true
           artifacts: ['pack']
           projects: ${{ parameters.projects }}
-          build_args: -p:IsReleaseCI=true
+          build_args: -p:IsReleaseCI=true ${{ parameters.build_args }}
 
     - stage: Release
       dependsOn: Build
