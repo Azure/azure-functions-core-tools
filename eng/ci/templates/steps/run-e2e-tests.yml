@@ -42,7 +42,7 @@ steps:
     $worker = '${{ parameters.worker }}'
     $proj = '$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/Azure.Functions.Cli.E2ETests.csproj'
     $baseArgs = @(
-      '--framework', 'net8.0'
+      '--framework', 'net10.0'
       '--blame-hang-timeout', '10m'
       '--logger', 'console;verbosity=detailed'
       '--logger', 'trx'
