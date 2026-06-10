@@ -41,7 +41,7 @@
   </ItemGroup>
   <!-- host -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.NETCore.DotNetAppHost" Version="8.0.8" />
+    <PackageVersion Include="Microsoft.NETCore.DotNetAppHost" Version="10.0.9" />
   </ItemGroup>
   <!-- test projects -->
   <ItemGroup>
