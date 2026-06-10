@@ -19,7 +19,7 @@
 
       FilterTemplatesByBundleChannel=true makes pack also fetch
       bin/extensions.json from the latest listed bundle of
-      $(TemplatesChannel) (CDN index.json + HTTP-Range zip extraction)
+      $(BundleChannel) (CDN index.json + HTTP-Range zip extraction)
       and subset templates.json against content/v2/templates/_bindings.json
       so the published nupkg only carries templates whose extension
       dependencies are present in the active channel's bundle. See
