@@ -5,7 +5,6 @@ using AwesomeAssertions;
 using Azure.Functions.Cli.E2ETests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Xunit;
 using Xunit.Abstractions;
 
