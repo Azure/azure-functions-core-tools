@@ -1,11 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
-using Microsoft.DotNet.PlatformAbstractions;
 
 namespace Azure.Functions.Cli.Telemetry
 {
@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Telemetry
                 };
                 _client = new TelemetryClient(telemetryConfiguration);
                 _client.Context.Session.Id = _currentSessionId;
-                _client.Context.Device.OperatingSystem = RuntimeEnvironment.OperatingSystem;
+                _client.Context.Device.OperatingSystem = RuntimeInformation.OSDescription;
 
                 // We don't want to log this.
                 // Setting it to null doesn't work. So might as well log the session id.
