@@ -22,20 +22,15 @@
       experimental  -> 4.35.0-experimental
   -->
 
+  <PropertyGroup Condition="'$(BundleChannel)' == '' AND '$(PublicReleaseTag)' != ''">
+    <BundleChannel>$([System.Text.RegularExpressions.Regex]::Match($(BUILD_SOURCEBRANCHNAME), '^v[^-]+(?:-([^.]+))').Groups[1].Value)</BundleChannel>
+  </PropertyGroup>
+
   <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
 
   <PropertyGroup>
-    <BundleVersion Condition="'$(BundleVersion)' == ''">$(LatestExtensionBundleVersion)</BundleVersion>
-    <BundleChannel>stable</BundleChannel>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(BundleChannel)' == 'stable'">
     <VersionPrefix>$(BundleVersion)</VersionPrefix>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(BundleChannel)' != 'stable'">
-    <VersionPrefix>$(BundleVersion)</VersionPrefix>
-    <VersionSuffix>$(BundleChannel).1</VersionSuffix>
+    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel).1</VersionSuffix>
   </PropertyGroup>
 
 </Project>

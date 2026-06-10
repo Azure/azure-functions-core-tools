@@ -26,26 +26,26 @@
     bundle drop we own, instead of whatever happens to be on the CDN.
   -->
 
-  <PropertyGroup>
-    <_BundleCdnId Condition="'$(BundleChannel)' == 'stable'">Microsoft.Azure.Functions.ExtensionBundle</_BundleCdnId>
-    <_BundleCdnId Condition="'$(BundleChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_BundleCdnId>
-    <_BundleCdnId Condition="'$(BundleChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_BundleCdnId>
-  </PropertyGroup>
-
-  <Target Name="DownloadDefaultBundle"
-          Condition="'$(SkipDefaultBundleDownload)' != 'true'"
-          BeforeTargets="GenerateNuspec;_GetPackageFiles"
-          Inputs="$(MSBuildProjectFullPath)"
-          Outputs="$(IntermediateOutputPath)bundle\.extracted">
-    <Error Condition="'$(_BundleCdnId)' == ''"
-           Text="BundleChannel '$(BundleChannel)' is not one of stable|preview|experimental." />
+  <Target Name="_DownloadBundleProperties">
+    <Error Condition="'$(_BundleCdnId)' == ''" Text="BundleChannel '$(BundleChannel)' is not one of stable|preview|experimental." />
     <PropertyGroup>
       <_BundleCdnZipUrl>https://cdn.functions.azure.com/public/ExtensionBundles/$(_BundleCdnId)/$(BundleVersion)/$(_BundleCdnId).$(BundleVersion).zip</_BundleCdnZipUrl>
-      <_BundleStaging>$(IntermediateOutputPath)bundle\</_BundleStaging>
+      <_BundleStaging>$(IntermediateOutputPath)bundle/$(BundleChannel)</_BundleStaging>
       <_BundleZipName>$(_BundleCdnId).$(BundleVersion).zip</_BundleZipName>
       <_BundleZipPath>$(IntermediateOutputPath)$(_BundleZipName)</_BundleZipPath>
       <_BundleMarker>$(_BundleStaging).extracted</_BundleMarker>
+      <_BundleHash>$(_BundleStaging).hash</_BundleHash>
     </PropertyGroup>
+
+    <WriteLinesToFile File="$(_BundleHash)" Lines="$(_BundleCdnZipUrl)" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <Target Name="DownloadDefaultBundle"
+          DependsOnTargets="_DownloadBundleProperties"
+          Condition="'$(SkipDefaultBundleDownload)' != 'true'"
+          BeforeTargets="GenerateNuspec;_GetPackageFiles"
+          Inputs="@(MSBuildAllProjects);$(_BundleHash)"
+          Outputs="$(_BundleMarker)">
     <MakeDir Directories="$(_BundleStaging)" />
     <DownloadFile SourceUrl="$(_BundleCdnZipUrl)"
                   DestinationFolder="$(IntermediateOutputPath)"

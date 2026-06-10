@@ -23,4 +23,17 @@
     <LatestExtensionBundleVersion>4.35.0</LatestExtensionBundleVersion>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <BundleChannel Condition="'$(BundleChannel)' == ''">stable</BundleChannel>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'stable'">Microsoft.Azure.Functions.ExtensionBundle</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_BundleCdnId>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BundleVersion)' == ''">
+    <BundleVersion Condition="'$(BundleChannel)' == 'stable'">4.35.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'preview'">4.42.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'experimental'">4.60.0</BundleVersion>
+  </PropertyGroup>
+
 </Project>
