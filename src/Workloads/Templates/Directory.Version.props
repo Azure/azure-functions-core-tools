@@ -6,7 +6,7 @@
     Directory.Version.props because it does not snapshot from an
     extension bundle (see proposed/templates-workload-spec.md §4.4.3).
 
-      $(TemplatesVersion)         workload pkg version. Bare three-part SemVer.
+      $(VersionPrefix)            workload pkg version. Bare three-part SemVer.
       $(BundleChannel)            stable | preview | experimental. Single
                                   channel concept shared with the bundles
                                   workload. Selects the source bundle id at
@@ -29,10 +29,10 @@
                                   so the three storage locations cannot
                                   drift (Templates Workload Spec §4.4.4).
 
-    Derived $(VersionPrefix):
-      stable        -> 1.0.0
-      preview       -> 1.0.0-preview
-      experimental  -> 1.0.0-experimental
+    Derived workload pkg version:
+      stable        -> 1.0.1
+      preview       -> 1.0.1-preview
+      experimental  -> 1.0.1-experimental
   -->
 
   <PropertyGroup Condition="'$(BundleChannel)' == '' AND '$(PublicReleaseTag)' != ''">
@@ -42,14 +42,11 @@
   <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
 
   <PropertyGroup>
-    <TemplatesVersion>1.0.1</TemplatesVersion>
+    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel)</VersionSuffix>
+
     <SourceBundleVersion Condition="'$(SourceBundleVersion)' == ''">$(BundleVersion)</SourceBundleVersion>
     <MinBundleVersionRange Condition="'$(MinBundleVersionRange)' == ''">[4.0.0,)</MinBundleVersionRange>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <VersionPrefix Condition="'$(BundleChannel)' == 'stable'">$(TemplatesVersion)</VersionPrefix>
-    <VersionPrefix Condition="'$(BundleChannel)' != 'stable'">$(TemplatesVersion)-$(BundleChannel)</VersionPrefix>
   </PropertyGroup>
 
 </Project>
