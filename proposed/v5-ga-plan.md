@@ -37,63 +37,30 @@ Themes: parity (durable + pack + custom handlers), CLI settings / config, toolin
 
 ### Parity: Durable
 
-- Implement durable workload
-- Setup durable workload CI/CD
+- Implement durable workload (#5340)
+- Setup durable workload CI/CD (#5341)
 
 ### Parity: `func pack`
 
-- Design: new `func pack` experience & AZ CLI integration
+- Design: new `func pack` experience & AZ CLI integration (#5342)
 
 ### CLI settings / config
 
-- Design: figure out the settings story (local settings json / .env / app.settings etc.)
+- Design: figure out the settings story (local settings json / .env / app.settings etc.) (#5343)
 
-### Tooling integrations
+### Tooling: notify partner teams (#5344)
 
-External tools that embed or invoke `func`. For each: confirm v5 compat,
-ship updates, document the integration contract so it doesn't silently
-break on a CLI change.
+Reach out to teams that ship tools embedding `func` so they have a head
+start migrating from v4 and can raise concerns before GA. We're not
+asking them to release anything; this is awareness + intake. Reference
+doc: https://aka.ms/func-cli.
 
-#### VS Code (Azure Functions extension)
-
-- Audit current `func` invocation sites in the extension
-- Update extension to detect + prefer v5 install
-- Coordinate release of extension version that supports v5
-- Document the CLI-to-extension contract (commands, JSON output shapes,
-  exit codes the extension depends on)
-
-#### Visual Studio (Azure Functions tooling)
-
-- Audit current `func` invocation sites
-- Update VS tooling to support v5
-- Coordinate release with the VS tooling team
-- Document the CLI-to-VS contract
-
-#### Azure CLI (`az functionapp` integrations)
-
-- Audit `az` codepaths that shell out to `func`
-- Update `az` to support v5
-- Coordinate release with the `az` team
-
-#### Rider (JetBrains Azure Toolkit)
-
-- Audit Rider plugin `func` invocation sites
-- Update plugin to support v5
-- Coordinate release with the JetBrains plugin owners
-
-#### IntelliJ (JetBrains Azure Toolkit)
-
-- Audit IntelliJ plugin `func` invocation sites
-- Update plugin to support v5
-- Coordinate release with the JetBrains plugin owners
-
-#### Tooling: shared
-
-- Stable, documented CLI contract for tooling consumers (output shapes,
-  exit codes, version-detection command)
-- Breaking-change communication channel for tooling owners
-- Pre-release / preview CLI builds available to tooling teams for
-  validation before GA
+- Notify VS Code Azure Functions extension team + capture feedback
+- Notify Visual Studio Azure Functions tooling team + capture feedback
+- Notify Azure CLI (`az functionapp`) team + capture feedback
+- Notify Rider Azure Toolkit team + capture feedback
+- Notify IntelliJ Azure Toolkit team + capture feedback
+- Triage any concerns raised into follow-up issues before GA
 
 ---
 
@@ -102,14 +69,14 @@ break on a CLI change.
 Themes: Kubernetes/KEDA decision, workload ownership migration, `func
 doctor`, schema store publishing.
 
-### Investigate Kubernetes / KEDA usage in v4
+### Investigate Kubernetes / KEDA usage in v4 (#5345)
 
 - Pull telemetry on `func kubernetes` + `func keda` usage in v4
 - Decision: ship a v5 Kubernetes/KEDA workload, or drop?
 - If shipping: open implementation issues (kubernetes deploy/delete,
   keda install/remove, scaler helpers, workload packaging + CI)
 
-### Workload ownership + migration to owner repos
+### Workload ownership + migration to owner repos (#5346)
 
 - Document workload publisher onboarding (per-repo CI + feed publishing)
 - Move .NET templates workload to templates repo
@@ -121,7 +88,7 @@ doctor`, schema store publishing.
 - Move PowerShell worker workload to pwsh-worker repo
 - Move Host workload to host repo
 
-### `func doctor`
+### `func doctor` (#5347)
 
 Implement func doctor command.
 
@@ -138,7 +105,7 @@ Implement func doctor command.
   `func doctor` shells out to the skills runtime, or whether the skills'
   doctor calls into `func doctor` for the deterministic checks.
 
-### Schema store
+### Schema store (#5348)
 
 Publish all defined schemas in the new CLI.
 
@@ -149,7 +116,7 @@ Publish all defined schemas in the new CLI.
 - Audit vnext for other authored configs and publish them
 - Add `$schema` references in samples and docs
 
-### Telemetry & diagnostics
+### Telemetry & diagnostics (#5349)
 
 - Telemetry vendor / pipeline decision
 - Telemetry opt-in/opt-out wiring
@@ -167,7 +134,7 @@ Publish all defined schemas in the new CLI.
 
 Not yet assigned to a milestone. Grouped by area for easy sorting.
 
-### Docs
+### Docs (epic: #5350)
 
 #### External
 
@@ -185,9 +152,9 @@ Not yet assigned to a milestone. Grouped by area for easy sorting.
 
 #### UX
 
-- `--help` audit: every command has a one-line description
-- `--help` audit: every option has a one-line description
-- Error messages include next-step hints
+- `--help` audit: every command has a one-line description (#5351)
+- `--help` audit: every option has a one-line description (#5351)
+- Error messages include next-step hints (#5352)
 - `func completion bash`
 - `func completion zsh`
 - `func completion pwsh`
@@ -197,11 +164,11 @@ Not yet assigned to a milestone. Grouped by area for easy sorting.
 
 E2E testing and performance.
 
-- E2E testing
-- Performance budget: define cold-start target
-- Performance budget: enforce in CI
+- E2E testing (#5353)
+- Performance budget: define cold-start target (#5354)
+- Performance budget: enforce in CI (#5354)
 
-### Parity Audit
+### Parity Audit (epic: #5355)
 
 #### Languages (audit matrix)
 
@@ -224,19 +191,19 @@ E2E testing and performance.
 
 ### Migration & v4 deprecation
 
-- v4 -> v5 migration guide content
-- v4 -> v5 command map (companion to in-repo docs)
-- v4 -> v5 behavior diffs catalog
-- v4 -> v5 known gaps page
-- `func --version` v4-detected migration pointer
-- `local.settings.json` schema compatibility audit
-- `host.json` schema compatibility audit
-- Document any breaking schema changes
-- v4 deprecation timeline (public announcement)
-- v4 security-only support window decision
-- v4 archive / sunset date decision
+- v4 -> v5 migration guide content (#5356)
+- v4 -> v5 command map (companion to in-repo docs) (#5356)
+- v4 -> v5 behavior diffs catalog (#5356)
+- v4 -> v5 known gaps page (#5356)
+- `func --version` v4-detected migration pointer (#5357)
+- `local.settings.json` schema compatibility audit (#5358)
+- `host.json` schema compatibility audit (#5358)
+- Document any breaking schema changes (#5358)
+- v4 deprecation timeline (public announcement) (#5359)
+- v4 security-only support window decision (#5359)
+- v4 archive / sunset date decision (#5359)
 
-### Security
+### Security (#5360)
 
 - Token handling review
 - Workload package signature verification
@@ -244,18 +211,18 @@ E2E testing and performance.
 - Supply-chain audit
 - Threat modeling
 
-### Localization
+### Localization (#5361)
 
 - Decision (in-scope for GA or defer)
 - Implementation (if in-scope)
 
-### Accessibility
+### Accessibility (#5362)
 
 - NO_COLOR audit
 - Non-TTY audit
 - Screen-reader friendliness via `IInteractionService`
 
-### Release process (GA cutover)
+### Release process (GA cutover) (#5363)
 
 - Switch default branch (vnext -> main, or rename)
 - Cut `v5.0.0` tag
