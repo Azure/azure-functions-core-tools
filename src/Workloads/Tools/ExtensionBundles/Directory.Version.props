@@ -30,7 +30,7 @@
 
   <PropertyGroup>
     <VersionPrefix>$(BundleVersion)</VersionPrefix>
-    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel).1</VersionSuffix>
+    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel).2</VersionSuffix>
   </PropertyGroup>
 
 </Project>

@@ -3,6 +3,15 @@ parameters:
   displayName: Publish to nuget.org?
   type: boolean
   default: false
+- name: channel
+  displayName: Bundle channel
+  type: string
+  default: inferred
+  values:
+    - inferred
+    - stable
+    - preview
+    - experimental
 
 # Release has no triggers outside of pipeline
 trigger: none
@@ -15,3 +24,5 @@ extends:
     folder: workloads/bundles
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Tools/ExtensionBundles/Workloads.ExtensionBundles.csproj
+    ${{ if ne(parameters.channel, 'inferred') }}:
+      build_args: -p:BundleChannel=${{ parameters.channel }}
