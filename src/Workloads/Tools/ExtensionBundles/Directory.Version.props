@@ -6,8 +6,8 @@
     version it carries:
       $(BundleVersion)  - the bundle payload version. Drives the CDN URL
                           and the user-facing version in func logs. Bare
-                          three-part SemVer. Defaults to
-                          $(LatestExtensionBundleVersion) from
+                          three-part SemVer. Defaults to the channel's
+                          pinned value in
                           eng/build/Workloads.Templates.SourceBundleVersion.props
                           so the bundle this workload ships always matches
                           the snapshot the templates workloads were built

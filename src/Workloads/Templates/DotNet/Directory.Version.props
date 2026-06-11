@@ -7,8 +7,7 @@
     Microsoft.Azure.Functions.Worker.ItemTemplates NuGet pin (which
     is exposed below and written into content/source.json at pack time).
 
-      $(TemplatesVersion)               Workload pkg version (3-part SemVer).
-                                        Drives $(VersionPrefix).
+      $(VersionPrefix)                  Workload pkg version (3-part SemVer).
       $(SourceItemTemplatesPackageId)   Upstream NuGet template package id
                                         that the workload hydrates from at
                                         build time (Templates Workload Spec
@@ -23,8 +22,7 @@
   -->
 
   <PropertyGroup>
-    <TemplatesVersion>1.0.1</TemplatesVersion>
-    <VersionPrefix>$(TemplatesVersion)</VersionPrefix>
+    <VersionPrefix>1.0.1</VersionPrefix>
 
     <SourceItemTemplatesPackageId>Microsoft.Azure.Functions.Worker.ItemTemplates</SourceItemTemplatesPackageId>
     <SourceItemTemplatesVersion>4.0.5590</SourceItemTemplatesVersion>

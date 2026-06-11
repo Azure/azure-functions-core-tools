@@ -24,7 +24,7 @@ channel maps 1:1 to an extension-bundle id (Templates Workload Spec
 
 Per-channel template subsetting is **on** by default for the Node
 workload. At pack time the build fetches `bin/extensions.json` from
-the latest **listed** bundle of `$(TemplatesChannel)` (resolved from
+the latest **listed** bundle of `$(BundleChannel)` (resolved from
 the channel's CDN `index.json`) using HTTP Range requests (~10 KB
 rather than the full 150 MB bundle) and drops any template whose
 required bindings aren't present in that channel's bundle. The mapping
@@ -49,11 +49,14 @@ MSBuild property, so they cannot drift:
 ## Build-time channel selection
 
 The workload pkg version's prerelease label is driven by
-`$(TemplatesChannel)` in `Directory.Version.props`:
+`$(BundleChannel)` in `Directory.Version.props`, the same property
+the bundles workload uses. In CI it is inferred from the git tag
+(e.g. `templates-node/v1.0.1-preview.1` → `preview`); locally you
+can pass it directly:
 
 ```bash
-dotnet pack ... /p:TemplatesChannel=preview
-dotnet pack ... /p:TemplatesChannel=experimental
+dotnet pack ... /p:BundleChannel=preview
+dotnet pack ... /p:BundleChannel=experimental
 ```
 
 For Node, channel does **not** select a CDN source, `$(TemplatesContentSource)`

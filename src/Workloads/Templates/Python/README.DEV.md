@@ -33,17 +33,22 @@ MSBuild property, so they cannot drift:
 ## Build-time channel selection
 
 The source bundle id used at pack time is driven by
-`$(TemplatesChannel)` in `Directory.Version.props`:
+`$(BundleChannel)` in `Directory.Version.props`, the same property
+the bundles workload uses. In CI it is inferred from the git tag
+(e.g. `templates-python/v1.0.1-preview.1` → `preview`); locally you
+can pass it directly:
 
 ```bash
-dotnet pack ... /p:TemplatesChannel=preview
-dotnet pack ... /p:TemplatesChannel=experimental
+dotnet pack ... /p:BundleChannel=preview
+dotnet pack ... /p:BundleChannel=experimental
 ```
 
 `$(SourceBundleVersion)` selects the bundle version whose
-`StaticContent/v2` subtree is snapshotted at build time. It is
-recorded as build provenance only; it does not derive the templates
-pkg version (Templates Workload Spec §4.4.1).
+`StaticContent/v2` subtree is snapshotted at build time. It defaults
+to the channel-resolved `$(BundleVersion)` from the shared
+`Workloads.Templates.SourceBundleVersion.props` and is recorded as
+build provenance only; it does not derive the templates pkg version
+(Templates Workload Spec §4.4.1).
 
 ## Layout
 
