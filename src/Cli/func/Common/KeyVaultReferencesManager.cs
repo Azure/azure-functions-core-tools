@@ -22,9 +22,16 @@ namespace Azure.Functions.Cli.Common
         {
             foreach (var key in settings.Keys.ToList())
             {
+                ParseSecretResult parseResult = null;
                 try
                 {
-                    var keyVaultValue = GetSecretValue(key, settings[key]);
+                    parseResult = ParseSecret(key, settings[key]);
+                    if (parseResult == null)
+                    {
+                        continue;
+                    }
+
+                    var keyVaultValue = GetSecretValue(parseResult);
                     if (keyVaultValue != null)
                     {
                         settings[key] = keyVaultValue;
@@ -34,23 +41,21 @@ namespace Azure.Functions.Cli.Common
                 {
                     // Do not block StartHostAction if secret cannot be resolved: instead, skip it
                     // and attempt to resolve other secrets
+                    if (parseResult != null)
+                    {
+                        ColoredConsole.WriteLine(WarningColor($"Unable to resolve the Key Vault reference for setting: {key}"));
+                    }
+
                     continue;
                 }
             }
         }
 
-        private string GetSecretValue(string key, string value)
+        protected virtual string GetSecretValue(ParseSecretResult parseResult)
         {
-            var result = ParseSecret(key, value);
-
-            if (result != null)
-            {
-                var client = GetSecretClient(result.Uri);
-                var secret = client.GetSecret(result.Name, result.Version);
-                return secret.Value.Value;
-            }
-
-            return null;
+            var client = GetSecretClient(parseResult.Uri);
+            var secret = client.GetSecret(parseResult.Name, parseResult.Version);
+            return secret.Value.Value;
         }
 
         internal ParseSecretResult ParseSecret(string key, string value)

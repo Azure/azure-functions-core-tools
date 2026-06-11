@@ -42,6 +42,62 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             exception.Should().BeNull();
         }
 
+        [Fact]
+        public void ResolveKeyVaultReferencesEmitsWarningWhenParsedReferenceFailsToResolve()
+        {
+            // Arrange
+            const string failedKey = "FailedSecret";
+            const string failedReference = "@Microsoft.KeyVault(VaultName=testvault;SecretName=throwsecret)";
+            const string resolvedKey = "ResolvedSecret";
+            const string resolvedValue = "resolved-value";
+            var manager = new TestKeyVaultReferencesManager(secretName =>
+            {
+                if (secretName == "throwsecret")
+                {
+                    throw new InvalidOperationException("Could not resolve secret");
+                }
+
+                return resolvedValue;
+            });
+            _settings = new Dictionary<string, string>
+            {
+                { failedKey, failedReference },
+                { resolvedKey, "@Microsoft.KeyVault(VaultName=testvault;SecretName=resolvedsecret)" },
+            };
+
+            // Act
+            var outputString = CaptureConsoleOutput(() => manager.ResolveKeyVaultReferences(_settings));
+
+            // Assert
+            outputString.Should().Contain($"Unable to resolve the Key Vault reference for setting: {failedKey}");
+            outputString.Should().NotContain(failedReference);
+            outputString.Should().NotContain("throwsecret");
+            outputString.Should().NotContain(resolvedValue);
+            _settings[failedKey].Should().Be(failedReference);
+            _settings[resolvedKey].Should().Be(resolvedValue);
+        }
+
+        [Fact]
+        public void ResolveKeyVaultReferencesDoesNotEmitResolutionWarningForUnparseableReferences()
+        {
+            // Arrange
+            const string key = "UnparseableSecret";
+            const string reference = "@Microsoft.KeyVault(VaultName=testvault;)";
+            var manager = new TestKeyVaultReferencesManager(_ => throw new InvalidOperationException("Should not resolve"));
+            _settings = new Dictionary<string, string>
+            {
+                { key, reference },
+            };
+
+            // Act
+            var outputString = CaptureConsoleOutput(() => manager.ResolveKeyVaultReferences(_settings));
+
+            // Assert
+            outputString.Should().Contain($"Unable to parse the Key Vault reference for setting: {key}");
+            outputString.Should().NotContain($"Unable to resolve the Key Vault reference for setting: {key}");
+            outputString.Should().NotContain(reference);
+        }
+
         [Theory]
         [InlineData("test", null, false)]
         [InlineData("test", "@Microsoft.KeyVault()", true)]
@@ -52,19 +108,10 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
         [InlineData("test", "@Microsoft-KeyVault()", false)] // hyphen instead of dot
         public void ParseSecretEmitsWarningWithUnsuccessfullyMatchedKeyVaultReferences(string key, string value, bool attemptedKeyVaultReference)
         {
-            // Arrange
-            var output = new StringBuilder();
-            var console = Substitute.For<IConsoleWriter>();
-            console.WriteLine(Arg.Do<object>(o => output.AppendLine(o?.ToString()))).Returns(console);
-            console.Write(Arg.Do<object>(o => output.Append(o.ToString()))).Returns(console);
-            ColoredConsole.Out = console;
-            ColoredConsole.Error = console;
-
             // Act
-            _keyVaultReferencesManager.ParseSecret(key, value);
+            var outputString = CaptureConsoleOutput(() => _keyVaultReferencesManager.ParseSecret(key, value));
 
             // Assert
-            var outputString = output.ToString();
             if (attemptedKeyVaultReference)
             {
                 outputString.Should().Contain($"Unable to parse the Key Vault reference for setting: {key}");
@@ -120,6 +167,44 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
 
             // Assert
             Assert.Equal(expectedValue, result);
+        }
+
+        private static string CaptureConsoleOutput(Action action)
+        {
+            var output = new StringBuilder();
+            var console = Substitute.For<IConsoleWriter>();
+            console.WriteLine(Arg.Do<object>(o => output.AppendLine(o?.ToString()))).Returns(console);
+            console.Write(Arg.Do<object>(o => output.Append(o?.ToString()))).Returns(console);
+
+            var oldOut = ColoredConsole.Out;
+            var oldErr = ColoredConsole.Error;
+            try
+            {
+                ColoredConsole.Out = console;
+                ColoredConsole.Error = console;
+                action();
+                return output.ToString();
+            }
+            finally
+            {
+                ColoredConsole.Out = oldOut;
+                ColoredConsole.Error = oldErr;
+            }
+        }
+
+        private class TestKeyVaultReferencesManager : KeyVaultReferencesManager
+        {
+            private readonly Func<string, string> _getSecretValue;
+
+            public TestKeyVaultReferencesManager(Func<string, string> getSecretValue)
+            {
+                _getSecretValue = getSecretValue;
+            }
+
+            protected override string GetSecretValue(ParseSecretResult parseResult)
+            {
+                return _getSecretValue(parseResult.Name);
+            }
         }
     }
 }
