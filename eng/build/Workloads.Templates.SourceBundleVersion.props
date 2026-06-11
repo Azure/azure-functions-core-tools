@@ -33,7 +33,7 @@
   <PropertyGroup Condition="'$(BundleVersion)' == ''">
     <BundleVersion Condition="'$(BundleChannel)' == 'stable'">4.35.0</BundleVersion>
     <BundleVersion Condition="'$(BundleChannel)' == 'preview'">4.42.0</BundleVersion>
-    <BundleVersion Condition="'$(BundleChannel)' == 'experimental'">4.60.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'experimental'">4.6.0</BundleVersion>
   </PropertyGroup>
 
 </Project>
