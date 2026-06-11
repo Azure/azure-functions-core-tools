@@ -60,8 +60,7 @@
           DependsOnTargets="DownloadDefaultBundle"
           BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <None Include="$(IntermediateOutputPath)bundle\**\*"
-            Exclude="$(IntermediateOutputPath)bundle\.extracted"
+      <None Include="$(IntermediateOutputPath)bundle\$(BundleChannel)\**\*"
             Pack="true"
             PackagePath="tools/any/$(BundleVersion)/"
             Visible="false" />
