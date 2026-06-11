@@ -31,8 +31,8 @@
 
     Derived workload pkg version:
       stable        -> 1.0.1
-      preview       -> 1.0.1-preview
-      experimental  -> 1.0.1-experimental
+      preview       -> 1.0.1-preview.1
+      experimental  -> 1.0.1-experimental.1
   -->
 
   <PropertyGroup Condition="'$(BundleChannel)' == '' AND '$(PublicReleaseTag)' != ''">
@@ -43,7 +43,7 @@
 
   <PropertyGroup>
     <VersionPrefix>1.0.1</VersionPrefix>
-    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel)</VersionSuffix>
+    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel).1</VersionSuffix>
 
     <SourceBundleVersion Condition="'$(SourceBundleVersion)' == ''">$(BundleVersion)</SourceBundleVersion>
     <MinBundleVersionRange Condition="'$(MinBundleVersionRange)' == ''">[4.0.0,)</MinBundleVersionRange>
