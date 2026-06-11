@@ -88,6 +88,11 @@ internal sealed class NewCommandRunner
 
         ResolvedContext resolved = outcome.Context!;
 
+        if (resolved.UsedStableFallback)
+        {
+            _renderer.RenderTemplatesChannelFallback(resolved.Stack, resolved.BundleId!, resolved.Channel);
+        }
+
         // Steps 11a / 11b: extension-bundle presence + min-bundle gate.
         // DotNet doesn't ship a templates-workload.json, so the gate is a
         // no-op for it; Node and Python carry one.
@@ -173,6 +178,11 @@ internal sealed class NewCommandRunner
         }
 
         ResolvedContext resolved = outcome.Context!;
+
+        if (resolved.UsedStableFallback)
+        {
+            _renderer.RenderTemplatesChannelFallback(resolved.Stack, resolved.BundleId!, resolved.Channel);
+        }
 
         IReadOnlyList<FunctionTemplateInfo> templates = await ListTemplatesAsync(resolved, cancellationToken);
         if (templates.Count == 0)
@@ -282,6 +292,7 @@ internal sealed class NewCommandRunner
         InstalledTemplatesWorkload? workload;
         string? bundleId = null;
         BundleChannel channel = BundleChannel.Unknown;
+        bool usedStableFallback = false;
         if (string.Equals(stack, "dotnet", StringComparison.OrdinalIgnoreCase))
         {
             IReadOnlyList<InstalledTemplatesWorkload> allRows =
@@ -310,6 +321,20 @@ internal sealed class NewCommandRunner
             IReadOnlyList<InstalledTemplatesWorkload> allRows =
                 await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken);
             workload = TemplatesChannelMapper.PickChannelMatched(allRows, channel);
+
+            // Issue #5369: when the project asks for a non-stable channel
+            // (preview / experimental) and no matching workload is installed,
+            // fall back to the stable templates workload if one exists rather
+            // than hard-failing. The warning is emitted by Execute / List so
+            // pre-parse hydration paths stay silent.
+            if (workload is null && channel != BundleChannel.Stable)
+            {
+                workload = TemplatesChannelMapper.PickChannelMatched(allRows, BundleChannel.Stable);
+                if (workload is not null)
+                {
+                    usedStableFallback = true;
+                }
+            }
         }
 
         if (workload is null)
@@ -346,7 +371,8 @@ internal sealed class NewCommandRunner
             language,
             workload,
             bundleId,
-            channel));
+            channel,
+            usedStableFallback));
     }
 
     /// <summary>
@@ -715,7 +741,8 @@ internal sealed class NewCommandRunner
         string Language,
         InstalledTemplatesWorkload Workload,
         string? BundleId,
-        BundleChannel Channel);
+        BundleChannel Channel,
+        bool UsedStableFallback);
 
     private enum ResolutionFailureKind
     {
