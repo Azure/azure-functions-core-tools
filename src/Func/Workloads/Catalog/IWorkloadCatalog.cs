@@ -90,6 +90,21 @@ internal interface IWorkloadCatalog
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Lists every version of <paramref name="packageId"/> visible on the
+    /// configured source, including prerelease versions. Used by
+    /// <c>func workload search</c> to surface the latest version of each
+    /// release channel (stable, preview, experimental, ...) instead of just
+    /// the single highest version.
+    /// </summary>
+    /// <param name="packageId">NuGet package id; case-insensitive.</param>
+    /// <param name="source">Optional <c>--source</c> override.</param>
+    /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
+    public Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(
+        string packageId,
+        string? source = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Downloads the <c>.nupkg</c> for <paramref name="package"/> to a temp
     /// file and returns an open read stream over it. The caller owns the
     /// returned stream; closing it removes the temp file.

@@ -38,6 +38,15 @@ internal sealed record CatalogSearchResult(
     /// matches the current platform when an alias spans multiple per-RID packs.
     /// </summary>
     public string? Rid { get; init; }
+
+    /// <summary>
+    /// Release channel this row represents (e.g. <c>stable</c>, <c>preview</c>,
+    /// <c>experimental</c>). Set when <c>func workload search</c> expands a
+    /// single package into one row per channel so users can install a
+    /// non-latest channel. <see langword="null"/> when channel grouping was
+    /// not requested.
+    /// </summary>
+    public string? Channel { get; init; }
 }
 
 /// <summary>

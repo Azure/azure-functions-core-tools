@@ -824,6 +824,13 @@ public sealed class SetupRunnerTests : IDisposable
         public Task<Stream> DownloadAsync(ResolvedPackage package, CancellationToken cancellationToken = default)
             => Task.FromResult<Stream>(new MemoryStream());
 
+        public Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(string packageId, string? source = null, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<NuGetVersion>>(
+                _latest.TryGetValue(packageId, out NuGetVersion? version) ? [version] : []);
+        }
+
         private ResolvedPackage? CreateResolved(string packageId, NuGetVersion? version)
             => version is null ? null : new ResolvedPackage(packageId.ToLowerInvariant(), version, _source);
     }
