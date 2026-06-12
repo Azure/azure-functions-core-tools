@@ -104,7 +104,7 @@ public class WorkloadSearchCommandTests
         Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith("Python workload"));
         Assert.Contains("HINT: Showing 1 result.", _interaction.Lines);
         Assert.Contains("HINT: Run 'func workload install <alias | package id>' to install one (stable by default).", _interaction.Lines);
-        Assert.Contains("HINT: When several versions or channels exist, pass --version (-v) to pick a specific one.", _interaction.Lines);
+        Assert.Contains("HINT: When several versions or channels exist, pass --version (-v) to install a specific version.", _interaction.Lines);
     }
 
     [Fact]
