@@ -41,14 +41,16 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
     {
         string channelName = projectChannel.ToDisplayString();
         string suggestedPkg = TemplatesWorkloadConstants.GetPackageId(stack);
-        string suggestedVer = $"<version>-{channelName}.1";
 
         _interaction.WriteWarning(
             $"No '{channelName}' templates workload installed for bundle '{bundleId}'; using stable templates instead.");
+        _interaction.WriteLine("Templates may differ from what your bundle ships. Install the matching workload:");
         _interaction.WriteLine(l => l
-            .Muted("Templates may differ from what your bundle ships. Install the matching workload with: ")
-            .Code($"func workload install {suggestedPkg} --version {suggestedVer}")
-            .Muted("."));
+            .Muted("  ")
+            .Code($"func workload install {suggestedPkg} --version <version>-{channelName}.1"));
+        _interaction.WriteLine(l => l
+            .Muted("Find available versions with: ")
+            .Code($"func workload search {suggestedPkg} --prerelease"));
     }
 
     /// <summary>
