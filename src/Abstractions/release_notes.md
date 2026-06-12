@@ -1,6 +1,14 @@
-# Azure Functions CLI Abstractions 1.0.0
+# Azure Functions CLI Abstractions
 
-#### Changes
+All notable changes to this package are documented here.
 
-- Added `FunctionsProject.Language` virtual property so workloads can report the detected project language to the CLI (used by `func init` adopt mode). (#5300)
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.0.0]
+
+### Added
+
+- `FunctionsProject.Language` virtual property so workloads can report the detected project language to the CLI (used by `func init` adopt mode). (#5300)
