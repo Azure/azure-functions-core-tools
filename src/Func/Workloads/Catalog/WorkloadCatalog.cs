@@ -69,6 +69,13 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(string packageId, string? source = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        return ResolveClient(source).ListVersionsAsync(packageId, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<Stream> DownloadAsync(ResolvedPackage package, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(package);

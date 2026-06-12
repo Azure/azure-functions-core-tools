@@ -277,10 +277,134 @@ public class WorkloadSearchCommandTests
         Assert.Contains("\"aliases\":[\"python\"]", jsonLine);
     }
 
+    [Fact]
+    public async Task Search_Prerelease_ExpandsResultsByChannel()
+    {
+        // Search returns the highest prerelease per package, we expand into
+        // one row per channel by listing every version of the package.
+        StubSearch(
+            new CatalogSearchResult(
+                "func.workload.bundles",
+                NuGetVersion.Parse("4.42.0-preview.1"),
+                Title: "Extension Bundles",
+                Description: "Bundles",
+                Aliases: ["bundles"],
+                Source: _stubSource));
+        StubVersions(
+            "func.workload.bundles",
+            NuGetVersion.Parse("4.35.0"),
+            NuGetVersion.Parse("4.40.0-experimental.2"),
+            NuGetVersion.Parse("4.42.0-preview.1"));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
+        int exit = await InvokeAsync(cmd, "--prerelease");
+
+        Assert.Equal(0, exit);
+        // One card per channel. Channel-label line is emitted on expansion
+        // so users can tell which row matches `--version` for which channel.
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("4.42.0-preview.1"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("4.40.0-experimental.2"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("4.35.0"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("preview"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("experimental"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("stable"));
+        Assert.Contains("HINT: Showing 3 results.", _interaction.Lines);
+    }
+
+    [Fact]
+    public async Task Search_Prerelease_PicksLatestPerChannel()
+    {
+        StubSearch(
+            new CatalogSearchResult(
+                "pkg",
+                NuGetVersion.Parse("2.0.0-preview.5"),
+                Title: "Pkg",
+                Description: null,
+                Aliases: [],
+                Source: _stubSource));
+        StubVersions(
+            "pkg",
+            NuGetVersion.Parse("1.5.0"),
+            NuGetVersion.Parse("2.0.0"),
+            NuGetVersion.Parse("2.0.0-preview.1"),
+            NuGetVersion.Parse("2.0.0-preview.5"),
+            NuGetVersion.Parse("2.1.0-preview.2"));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
+        await InvokeAsync(cmd, "--prerelease");
+
+        // Latest stable wins out over earlier stable, latest preview wins
+        // out over earlier prereleases on the same channel.
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("2.1.0-preview.2"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("2.0.0"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("2.0.0-preview.5"));
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.5.0"));
+    }
+
+    [Fact]
+    public async Task Search_NoPrerelease_DoesNotExpand()
+    {
+        StubSearch(
+            new CatalogSearchResult(
+                "pkg",
+                NuGetVersion.Parse("1.0.0"),
+                Title: "Pkg",
+                Description: null,
+                Aliases: [],
+                Source: _stubSource));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
+        await InvokeAsync(cmd);
+
+        // ListVersionsAsync is not called when prerelease is off, the
+        // server-side search filter already gives us the stable row.
+        await _catalog.DidNotReceiveWithAnyArgs().ListVersionsAsync(default!, default, default);
+        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Channel:"));
+    }
+
+    [Fact]
+    public async Task Search_Prerelease_ListVersionsFailure_FallsBackToOriginalRow()
+    {
+        StubSearch(
+            new CatalogSearchResult(
+                "pkg",
+                NuGetVersion.Parse("1.0.0-preview"),
+                Title: "Pkg",
+                Description: null,
+                Aliases: [],
+                Source: _stubSource));
+        _catalog.ListVersionsAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<NuGetVersion>>>(_ => throw new InvalidOperationException("feed down"));
+
+        var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
+        int exit = await InvokeAsync(cmd, "--prerelease");
+
+        Assert.Equal(0, exit);
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.0.0-preview"));
+        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("preview"));
+    }
+
+    [Theory]
+    [InlineData("1.0.0", "stable")]
+    [InlineData("1.0.0-preview.1", "preview")]
+    [InlineData("4.42.0-experimental.2", "experimental")]
+    [InlineData("1.0.0-alpha", "alpha")]
+    [InlineData("1.0.0-rc.1+build.5", "rc")]
+    public void GetChannel_ParsesPrereleaseLabel(string version, string expectedChannel)
+    {
+        Assert.Equal(expectedChannel, WorkloadSearchCommand.GetChannel(NuGetVersion.Parse(version)));
+    }
+
     private void StubSearch(params CatalogSearchResult[] results)
     {
         _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
             .Returns(results);
+    }
+
+    private void StubVersions(string packageId, params NuGetVersion[] versions)
+    {
+        _catalog.ListVersionsAsync(packageId, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<NuGetVersion>)versions);
     }
 
     private static Task<int> InvokeAsync(WorkloadSearchCommand cmd, params string[] args)
