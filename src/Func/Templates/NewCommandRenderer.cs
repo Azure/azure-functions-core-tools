@@ -47,7 +47,7 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
         _interaction.WriteLine("Templates may differ from what your bundle ships. Install the matching workload:");
         _interaction.WriteLine(l => l
             .Muted("  ")
-            .Code($"func workload install {alias}@<version>-{channelName}.1"));
+            .Code($"func workload install {alias} --version <version>-{channelName}.1"));
         _interaction.WriteLine(l => l
             .Muted("Find available versions with: ")
             .Code($"func workload search {alias} --prerelease"));
