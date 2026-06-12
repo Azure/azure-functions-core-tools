@@ -44,12 +44,9 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
 
         _interaction.WriteWarning(
             $"No '{channelName}' templates workload installed for bundle '{bundleId}'; using stable templates instead.");
-        _interaction.WriteLine("Templates may differ from what your bundle ships. Install the matching workload:");
+        _interaction.WriteLine("Templates may differ from what your bundle ships.");
         _interaction.WriteLine(l => l
-            .Muted("  ")
-            .Code($"func workload install {alias} --version <version>-{channelName}.1"));
-        _interaction.WriteLine(l => l
-            .Muted("Find available versions with: ")
+            .Muted("Find a matching workload with: ")
             .Code($"func workload search {alias} --prerelease"));
     }
 
