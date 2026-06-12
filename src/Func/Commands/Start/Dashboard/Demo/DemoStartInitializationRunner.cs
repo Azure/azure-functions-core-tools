@@ -96,9 +96,28 @@ internal sealed class DemoStartInitializationRunner(
         };
         await EmitAsync(renderer, new StartInitializationStartedEvent(Now(), state.ProfileName), cancellationToken);
 
-        await RunStepsAsync(CreateSteps(), context, state, renderer, cancellationToken);
+        try
+        {
+            await RunStepsAsync(CreateSteps(), context, state, renderer, cancellationToken);
+            return state.ToResult(context);
+        }
+        catch
+        {
+            // Ensure the host process doesn't outlive a failed startup before the caller takes ownership.
+            if (state.EventStream is { } eventStream)
+            {
+                try
+                {
+                    await eventStream.DisposeAsync();
+                }
+                catch
+                {
+                    // Best effort.
+                }
+            }
 
-        return state.ToResult(context);
+            throw;
+        }
     }
 
     private StartInitializationStepCollection CreateSteps()

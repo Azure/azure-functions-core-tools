@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Hosting.Events;
 /// the future, a transport-backed source bridging the real host (gRPC, OTLP,
 /// or similar). The abstraction is intentionally transport-neutral.
 /// </summary>
-internal interface IHostEventStream
+internal interface IHostEventStream : IAsyncDisposable
 {
     /// <summary>
     /// Reads records as they arrive. Completes when the source signals end

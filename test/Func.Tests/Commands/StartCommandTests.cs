@@ -449,5 +449,7 @@ public class StartCommandTests : IDisposable
 
         public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
             => Task.FromResult(exitCode);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

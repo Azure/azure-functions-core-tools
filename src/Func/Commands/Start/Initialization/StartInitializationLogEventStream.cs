@@ -28,6 +28,8 @@ internal sealed class StartInitializationLogEventStream(IEnumerable<StartInitial
         }
     }
 
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
     private static IReadOnlyList<HostLogEntry> BuildEntries(IEnumerable<StartInitializationEvent> initializationEvents)
     {
         ArgumentNullException.ThrowIfNull(initializationEvents);
