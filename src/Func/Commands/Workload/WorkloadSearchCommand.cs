@@ -164,7 +164,8 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         }
 
         _interaction.WriteHint(countLine);
-        _interaction.WriteHint("Run 'func workload install <alias>' to install one.");
+        _interaction.WriteHint("Run 'func workload install <alias | package id>' to install one (stable by default).");
+        _interaction.WriteHint("When several versions or channels exist, pass --version (-v) to pick a specific one.");
     }
 
     private static string DisplayNameOrPackageId(CatalogSearchResult result)
