@@ -40,17 +40,17 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
     public void RenderTemplatesChannelFallback(string stack, string bundleId, BundleChannel projectChannel)
     {
         string channelName = projectChannel.ToDisplayString();
-        string suggestedPkg = TemplatesWorkloadConstants.GetPackageId(stack);
+        string alias = $"{stack.ToLowerInvariant()}-templates";
 
         _interaction.WriteWarning(
             $"No '{channelName}' templates workload installed for bundle '{bundleId}'; using stable templates instead.");
         _interaction.WriteLine("Templates may differ from what your bundle ships. Install the matching workload:");
         _interaction.WriteLine(l => l
             .Muted("  ")
-            .Code($"func workload install {suggestedPkg} --version <version>-{channelName}.1"));
+            .Code($"func workload install {alias}@<version>-{channelName}.1"));
         _interaction.WriteLine(l => l
             .Muted("Find available versions with: ")
-            .Code($"func workload search {suggestedPkg} --prerelease"));
+            .Code($"func workload search {alias} --prerelease"));
     }
 
     /// <summary>
