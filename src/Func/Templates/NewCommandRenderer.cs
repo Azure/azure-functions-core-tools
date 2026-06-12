@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -28,6 +30,24 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
             .Muted("Install a templates workload: ")
             .Code("func workload install Azure.Functions.Cli.Workloads.Templates.<stack>")
             .Muted("."));
+    }
+
+    /// <summary>
+    /// Renders the warning surfaced when the project's bundle channel
+    /// (preview / experimental) has no matching installed templates workload
+    /// and the runner has fallen back to the stable workload (issue #5369).
+    /// </summary>
+    public void RenderTemplatesChannelFallback(string stack, string bundleId, BundleChannel projectChannel)
+    {
+        string channelName = projectChannel.ToDisplayString();
+        string alias = $"{stack.ToLowerInvariant()}-templates";
+
+        _interaction.WriteWarning(
+            $"No '{channelName}' templates workload installed for bundle '{bundleId}'; using stable templates instead.");
+        _interaction.WriteLine("Templates may differ from what your bundle ships.");
+        _interaction.WriteLine(l => l
+            .Muted("Find a matching workload with: ")
+            .Code($"func workload search {alias} --prerelease"));
     }
 
     /// <summary>
