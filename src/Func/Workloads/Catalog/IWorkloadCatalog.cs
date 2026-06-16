@@ -75,6 +75,31 @@ internal interface IWorkloadCatalog
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns the highest version of <paramref name="packageId"/> on a single
+    /// release channel, or <c>null</c> when no version matches. The stable
+    /// channel (<paramref name="prereleaseLabel"/> is <c>null</c>) selects only
+    /// released versions; any other value selects prerelease versions whose
+    /// first label equals it (e.g. <c>preview</c>, <c>experimental</c>).
+    /// </summary>
+    /// <remarks>
+    /// Unlike the other resolve methods, the channel fully determines prerelease
+    /// handling, so this ignores the catalog's configured prerelease default.
+    /// </remarks>
+    /// <param name="packageId">NuGet package id; case-insensitive.</param>
+    /// <param name="prereleaseLabel">
+    /// Prerelease label identifying the channel, or <c>null</c> for the stable channel.
+    /// </param>
+    /// <param name="versionRange">Optional range the selected version must satisfy.</param>
+    /// <param name="source">Optional <c>--source</c> override.</param>
+    /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
+    public Task<ResolvedPackage?> ResolveLatestVersionOnChannelAsync(
+        string packageId,
+        string? prereleaseLabel,
+        VersionRange? versionRange = null,
+        string? source = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Resolves an exact <paramref name="version"/> of <paramref name="packageId"/>
     /// against the configured source. Returns <c>null</c> when the source does
     /// not advertise that version. Used by <c>install --version</c>.

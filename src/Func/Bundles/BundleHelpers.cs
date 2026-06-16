@@ -51,6 +51,37 @@ internal static class BundleHelpers
         };
 
     /// <summary>
+    /// Returns the NuGet prerelease label that identifies <paramref name="channel"/>,
+    /// or <c>null</c> for the stable channel (whose versions carry no prerelease label).
+    /// </summary>
+    /// <param name="channel">The channel to convert.</param>
+    /// <returns>The prerelease label, or <c>null</c> for stable.</returns>
+    public static string? ToPrereleaseLabel(this BundleChannel channel) =>
+        channel switch
+        {
+            BundleChannel.Stable => null,
+            BundleChannel.Preview => PreviewLabel,
+            BundleChannel.Experimental => ExperimentalLabel,
+            _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
+        };
+
+    /// <summary>
+    /// Determines whether <paramref name="version"/> belongs to <paramref name="channel"/>.
+    /// Stable matches only released versions; preview and experimental match prerelease
+    /// versions whose label identifies that channel.
+    /// </summary>
+    /// <param name="version">The nuget package version.</param>
+    /// <param name="channel">The channel to test against.</param>
+    /// <returns>True when the version belongs to the channel.</returns>
+    public static bool MatchesChannel(NuGetVersion version, BundleChannel channel)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        return channel == BundleChannel.Stable
+            ? !version.IsPrerelease
+            : version.IsPrerelease && GetBundleChannel(version) == channel;
+    }
+
+    /// <summary>
     /// Gets the channel label for a given bundle ID.
     /// </summary>
     /// <param name="bundleId">The bundle ID.</param>

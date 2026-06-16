@@ -59,6 +59,18 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
     }
 
     /// <inheritdoc />
+    public async Task<ResolvedPackage?> ResolveLatestVersionOnChannelAsync(string packageId, string? prereleaseLabel, VersionRange? versionRange = null,
+        string? source = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        bool includePrerelease = prereleaseLabel is not null;
+
+        return await ResolveMatchingVersionAsync(packageId, source, cancellationToken,
+            versions => SelectLatest(versions, candidate => MatchesChannel(candidate, prereleaseLabel)
+                && (versionRange is null || SatisfiesRange(versionRange, candidate, includePrerelease))));
+    }
+
+    /// <inheritdoc />
     public async Task<ResolvedPackage?> ResolveVersionAsync(string packageId, NuGetVersion version, string? source = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
@@ -118,4 +130,9 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
 
     private static bool SatisfiesRange(VersionRange range, NuGetVersion candidate, bool includePrerelease)
         => WorkloadVersionRanges.SatisfiesRange(range, candidate, includePrerelease);
+
+    private static bool MatchesChannel(NuGetVersion candidate, string? prereleaseLabel)
+        => prereleaseLabel is null
+            ? !candidate.IsPrerelease
+            : candidate.IsPrerelease && string.Equals(candidate.ReleaseLabels.FirstOrDefault(), prereleaseLabel, StringComparison.OrdinalIgnoreCase);
 }

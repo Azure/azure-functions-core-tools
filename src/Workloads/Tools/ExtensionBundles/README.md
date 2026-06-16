@@ -19,6 +19,20 @@ separate workload code to version).
 The prerelease label, when present, names the channel. `func` always
 reports the 3-part bundle version (`4.35.0`) in user-facing logs.
 
+## Channel selection in `func setup` and `func init`
+
+`func setup` installs the **stable** bundle by default. When a project's
+`host.json` opts into a channel via `extensionBundle.id` (the `.Preview` or
+`.Experimental` id above), setup installs the matching channel for both the
+bundle and the script-stack templates (Node, Python). If that channel has
+nothing published, setup falls back to the stable channel and prints a
+warning rather than failing; the warning points at
+`func workload search bundles --prerelease` so you can see what is available.
+
+`func init -s <stack> -c preview|experimental` scaffolds a `host.json` pinned
+to the chosen channel. If no bundle workload for that channel is installed, it
+prints a hint to run `func workload search bundles --prerelease`.
+
 ## Install
 
 ```bash
