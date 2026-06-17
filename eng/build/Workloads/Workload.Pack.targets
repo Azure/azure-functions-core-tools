@@ -1,9 +1,19 @@
 <Project>
+
+  <PropertyGroup>
+    <_WorkloadSdkAssembly>$(BaseOutputPath)../Workloads.Sdk/$(Configuration.ToLowerInvariant())/Azure.Functions.Cli.Workloads.Sdk.dll</_WorkloadSdkAssembly>
+  </PropertyGroup>
+
   <UsingTask TaskName="AddPackageType" AssemblyFile="$(MicrosoftNETBuildTasksAssembly)" />
-  <Import Project="$(MSBuildThisFileDirectory)Workload.Pack.Tasks.targets" />
+  <UsingTask TaskName="ResolveWorkloadEntry" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
+  <UsingTask TaskName="WriteWorkloadJson" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
 
   <ItemGroup>
     <_AllowedWorkloadKind Include="workload;content;meta" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Workloads/Sdk/Workloads.Sdk.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -26,8 +36,14 @@
 
     <!-- Hook in workload pack targets -->
     <!-- Ensure the workload packages are created for each runtime identifier (if there are any to create). -->
-    <GenerateNuspecDependsOn>$(GenerateNuspecDependsOn);_CreateRIDSpecificWorkloadPackages</GenerateNuspecDependsOn>
+    <GenerateNuspecDependsOn>$(GenerateNuspecDependsOn);SetWorkloadPackageType;_CreateRIDSpecificWorkloadPackages</GenerateNuspecDependsOn>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackWorkload</TargetsForTfmSpecificContentInPackage>
+
+    <_WorkloadJsonCacheFile Condition="'$(_WorkloadJsonCacheFile)' == ''">$(IntermediateOutputPath)workload.json.cache</_WorkloadJsonCacheFile>
+    <_WorkloadJsonFile Condition="'$(_WorkloadJsonFile)' == ''">$(IntermediateOutputPath)workload.json</_WorkloadJsonFile>
+
+    <!-- When NoBuild is true, assume assemblies will already exist as needed. -->
+    <_ResolveWorkloadEntryPointDependsOn Condition="'$(NoBuild)' != 'true'">Build</_ResolveWorkloadEntryPointDependsOn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' AND $(CreateRidSpecificWorkloadPackages)">
@@ -35,16 +51,12 @@
     <PackageId Condition="'$(PackageId)' != ''">$(PackageId).$(RuntimeIdentifier)</PackageId>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Include="workload.json" Pack="true" PackagePath="/" />
-  </ItemGroup>
-
   <Target Name="_PackWorkloadValidation" BeforeTargets="BeforeBuild">
     <Error Condition="'$(WorkloadKind)' == ''" Text="WorkloadKind is not specified. Valid values are: @(_AllowedWorkloadKind)." />
     <Error Condition="!@(_AllowedWorkloadKind->AnyHaveMetadataValue('Identity', '$(WorkloadKind)'))" Text="Invalid WorkloadKind '$(WorkloadKind)'. Valid values are: @(_AllowedWorkloadKind)." />
   </Target>
 
-  <Target Name="SetWorkloadPackageType" BeforeTargets="BeforeBuild">
+  <Target Name="SetWorkloadPackageType" Outputs="$(_WorkloadPackageType)">
     <PropertyGroup>
       <_WorkloadPackageType Condition="'$(RuntimeIdentifier)' != '' AND $(CreateRidSpecificWorkloadPackages)">FuncCliWorkloadRidPackage</_WorkloadPackageType>
       <_WorkloadPackageType Condition="'$(_WorkloadPackageType)' == ''">FuncCliWorkload</_WorkloadPackageType>
@@ -53,7 +65,6 @@
     <AddPackageType Condition="'$(_WorkloadPackageType)' == 'FuncCliWorkload'" CurrentPackageType="$(PackageType)" PackageTypeToAdd="$(_WorkloadPackageType)">
       <Output TaskParameter="UpdatedPackageType" PropertyName="PackageType" />
     </AddPackageType>
-  </Target>
 
     <PropertyGroup>
       <!-- per-RID workload packages get a specific package type, so they are hidden from regular searches. -->
@@ -61,34 +72,70 @@
     </PropertyGroup>
   </Target>
 
-  <Target Name="_ResolveWorkloadEntryPoint" Condition="'$(WorkloadType)' == 'workload'">
+  <Target Name="_ResolveWorkloadEntryPoint" Condition="'$(WorkloadKind)' == 'workload'" 
+    DependsOnTargets="$(_ResolveWorkloadEntryPointDependsOn)">
     <PropertyGroup>
       <WorkloadEntryPointAssembly Condition="'$(WorkloadEntryPointAssembly)' == ''">$(TargetFileName)</WorkloadEntryPointAssembly>
     </PropertyGroup>
 
-    <ReadCliWorkload AssemblyPath="$(TargetPath)" Condition="'$(WorkloadEntryPointType)' == ''">
+    <ResolveWorkloadEntry AssemblyPath="$(TargetPath)" Condition="'$(WorkloadEntryPointType)' == ''">
       <Output TaskParameter="WorkloadType" PropertyName="WorkloadEntryPointType" />
-    </ReadCliWorkload>
+    </ResolveWorkloadEntry>
+
+    <Error Condition="'$(WorkloadEntryPointType)' == ''" Text="Failed to resolve workload entry point type. 'WorkloadEntryPointType' is empty." />
   </Target>
 
-  <Target Name="_GenerateWorkloadJsonCache">
+  <Target Name="_GenerateWorkloadJsonCache" DependsOnTargets="_ResolveWorkloadEntryPoint">
     <ItemGroup>
       <_WorkloadJsonInputCacheToHash Include="$(WorkloadKind)" />
       <_WorkloadJsonInputCacheToHash Include="$(_FuncWorkloadSchema)" />
     </ItemGroup>
+
+    <ItemGroup Condition="'$(WorkloadKind)' == 'workload'">
+      <_WorkloadJsonInputCacheToHash Include="$(WorkloadEntryPointAssembly)" />
+      <_WorkloadJsonInputCacheToHash Include="$(WorkloadEntryPointType)" />
+    </ItemGroup>
+
+    <Hash ItemsToHash="@(_WorkloadJsonInputCacheToHash)">
+      <Output TaskParameter="HashResult" PropertyName="_WorkloadJsonCacheHash" />
+    </Hash>
+
+    <WriteLinesToFile File="$(_WorkloadJsonCacheFile)" Lines="$(_WorkloadJsonCacheHash)" Overwrite="true" WriteOnlyWhenDifferent="true"  />
   </Target>
 
-  <Target Name="GenerateWorkloadJson">
+  <Target Name="GenerateWorkloadJson"
+    DependsOnTargets="_GenerateWorkloadJsonCache"
+    Inputs="$(_WorkloadJsonCacheFile);$(MSBuildAllProjects)"
+    Outputs="$(_WorkloadJsonFile)">
 
+    <WriteWorkloadJson
+      OutputPath="$(_WorkloadJsonFile)"
+      Schema="$(_FuncWorkloadSchema)"
+      Kind="$(WorkloadKind)"
+      EntryPointAssemblyPath="$(WorkloadEntryPointAssembly)"
+      EntryPointType="$(WorkloadEntryPointType)" />
+
+    <ItemGroup>
+      <FileWrites Include="$(_WorkloadJsonFile)" />
+    </ItemGroup>
   </Target>
 
-  <Target Name="PackWorkload" DependsOnTargets="SetWorkloadPackageType;_PackWorkloadValidation">
+  <Target Name="_IncludeWorkloadMetadata" DependsOnTargets="GenerateWorkloadJson" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <Content Include="$(_WorkloadJsonFile)" Pack="true" PackagePath="/" />
+      <EmbedInBinLog Include="$(_WorkloadJsonFile)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PackWorkload" DependsOnTargets="_PackWorkloadValidation" Returns="@(TfmSpecificPackageFile)">
     <PropertyGroup>
       <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' == ''">any</_WorkloadRidPath>
       <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_WorkloadRidPath>
     </PropertyGroup>
 
-
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="tools/$(_WorkloadRidPath)/" />
+    </ItemGroup>
   </Target>
 
   <Target Name="_CreateRIDSpecificWorkloadPackages" Condition="'$(RuntimeIdentifiers)' == '' AND $(CreateRidSpecificWorkloadPackages) == 'true'">

@@ -3,7 +3,10 @@
 
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
+
+[assembly: CliWorkload<Azure.Functions.Cli.Workloads.DotNet.DotNetWorkload>()]
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 

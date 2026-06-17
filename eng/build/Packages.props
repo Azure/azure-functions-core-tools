@@ -1,4 +1,5 @@
 <Project>
+
   <!-- abstractions -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
@@ -11,9 +12,12 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
     <PackageVersion Include="NuGet.Packaging" Version="6.13.2" />
     <PackageVersion Include="NuGet.Protocol" Version="6.13.2" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.6" />
     <PackageVersion Include="Spectre.Console" Version="0.49.1" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.6" />
+    <PackageVersion Include="System.Reflection.MetadataLoadContext" Version="10.0.9" />
+    <PackageVersion Include="System.Text.Json" Version="10.0.9" />
   </ItemGroup>
+
   <!-- telemetry -->
   <ItemGroup>
     <PackageVersion Include="OpenTelemetry" Version="1.15.3" />
@@ -22,10 +26,14 @@
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.7.0" />
     <PackageVersion Include="NuGet.Versioning" Version="6.13.2" />
   </ItemGroup>
-  <!-- analyzers -->
+
+  <!-- tooling -->
   <ItemGroup>
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
+    <PackageVersion Include="Microsoft.Build.Utilities.Core" Version="17.11.48" />
+    <PackageVersion Include="Microsoft.Build.Framework" Version="17.11.48" />
   </ItemGroup>
+
   <!-- language workers
        Authoritative source for each worker pkg version is the corresponding
        workload's Directory.Version.props ($(WorkerVersion)), which both pins
@@ -36,11 +44,13 @@
     <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.13.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.43.0" />
   </ItemGroup>
+
   <!-- host -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1048.200" />
     <PackageVersion Include="System.Diagnostics.EventLog" Version="10.0.0" />
   </ItemGroup>
+
   <!-- test projects -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
@@ -48,4 +58,5 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
+
 </Project>

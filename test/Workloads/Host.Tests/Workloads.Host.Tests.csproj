@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <AssemblyName>Azure.Functions.Cli.Workloads.Host.Tests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

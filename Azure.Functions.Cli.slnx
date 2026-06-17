@@ -13,12 +13,16 @@
   <Folder Name="/src/Workloads/">
     <Project Path="src/Workloads/Host/Workloads.Host.csproj" />
   </Folder>
+  <Folder Name="/src/Workloads/Sdk/">
+    <Project Path="src/Workloads/Sdk/Workloads.Sdk.csproj" />
+  </Folder>
   <Folder Name="/src/Workloads/Stacks/">
     <Project Path="src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
     <Project Path="src/Workloads/Stacks/Go/Workloads.Go.csproj" />
     <Project Path="src/Workloads/Stacks/Node/Workloads.Node.csproj" />
     <Project Path="src/Workloads/Stacks/Python/Workloads.Python.csproj" />
   </Folder>
+  <Folder Name="/src/Workloads/Stacks/DotNet/" />
   <Folder Name="/src/Workloads/Templates/">
     <Project Path="src/Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj" />
     <Project Path="src/Workloads/Templates/Node/Workloads.Templates.Node.csproj" />
@@ -40,6 +44,9 @@
   </Folder>
   <Folder Name="/test/Workloads/">
     <Project Path="test/Workloads/Host.Tests/Workloads.Host.Tests.csproj" />
+  </Folder>
+  <Folder Name="/test/Workloads/Sdk.Tests/">
+    <Project Path="test/Workloads/Sdk.Tests/Workloads.Sdk.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Workloads/Stacks/">
     <Project Path="test/Workloads/Stacks/DotNet.Tests/Workloads.DotNet.Tests.csproj" />
