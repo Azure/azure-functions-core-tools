@@ -652,7 +652,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_RendersChecklistLines()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
         var startedEvent = new StartInitializationStartedEvent(DateTimeOffset.UnixEpoch, "none");
@@ -720,7 +720,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_RendersBoundedLogTailAndFullyCollapsesOnSuccess()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
         var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
@@ -759,7 +759,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_ShowsRunningLineCountWhileStreaming()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
         var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
@@ -783,7 +783,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_TruncatesLongLogLinesToWidth()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         string longLine = new('x', console.Profile.Width * 2);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
@@ -808,7 +808,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_RetainsLogTailOnFailure()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
         var step = new StartInitializationStep("prepare", "Prepare project", DisplayKind: StartInitializationDisplayKind.Progress);
@@ -831,7 +831,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_DoesNotClearWhenInitializationStarts()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
 
@@ -853,7 +853,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_AnimatesStatusStepBetweenEvents()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         var renderer = new CompactStartInitializationRenderer(new TestInteractionService(), "5.0.0-test", console);
 
@@ -888,7 +888,7 @@ public class StartInitializationTests : IDisposable
     [Fact]
     public async Task CompactRenderer_ConfirmAsync_PreservesStatusBeforePromptAndPausesLiveDisplay()
     {
-        using var writer = new StringWriter();
+        using var writer = new ThreadSafeStringWriter();
         IAnsiConsole console = CreateInteractiveConsole(writer);
         IInteractionService interaction = Substitute.For<IInteractionService>();
         interaction.Theme.Returns(new DefaultTheme());
@@ -1400,6 +1400,53 @@ public class StartInitializationTests : IDisposable
 
         public void SetEncoding(Encoding encoding)
         {
+        }
+    }
+
+    // Serializes the renderer's live-display background-thread writes with ToString() reads on the test thread.
+    // StringWriter/StringBuilder are not thread-safe, so a concurrent write during ToString() can throw ArgumentOutOfRangeException.
+    private sealed class ThreadSafeStringWriter : StringWriter
+    {
+        private readonly Lock _gate = new();
+
+        public override void Write(char value)
+        {
+            lock (_gate)
+            {
+                base.Write(value);
+            }
+        }
+
+        public override void Write(string? value)
+        {
+            lock (_gate)
+            {
+                base.Write(value);
+            }
+        }
+
+        public override void Write(char[] buffer, int index, int count)
+        {
+            lock (_gate)
+            {
+                base.Write(buffer, index, count);
+            }
+        }
+
+        public override void Write(ReadOnlySpan<char> buffer)
+        {
+            lock (_gate)
+            {
+                base.Write(buffer);
+            }
+        }
+
+        public override string ToString()
+        {
+            lock (_gate)
+            {
+                return base.ToString();
+            }
         }
     }
 }
