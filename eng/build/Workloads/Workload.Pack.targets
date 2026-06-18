@@ -25,8 +25,9 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' AND $(CreateRidSpecificWorkloadPackages)">
-    <PackageId Condition="'$(PackageId)' == ''">$(AssemblyName).$(RuntimeIdentifier)</PackageId>
     <PackageId Condition="'$(PackageId)' != ''">$(PackageId).$(RuntimeIdentifier)</PackageId>
+    <PackageId Condition="'$(PackageId)' == ''">$(AssemblyName).$(RuntimeIdentifier)</PackageId>
+    <PackageTags>$(PackageTags);rid:$(RuntimeIdentifier)</PackageTags>
   </PropertyGroup>
 
   <Target Name="SetWorkloadPackageType" Outputs="$(_WorkloadPackageType)">
@@ -76,17 +77,25 @@
 
   <Target Name="PackWorkload" Returns="@(TfmSpecificPackageFile)" DependsOnTargets="$(PackWorkloadDependsOn)" />
 
-  <Target Name="_CreateRIDSpecificWorkloadPackages" Condition="'$(RuntimeIdentifier)' == '' AND $(CreateRidSpecificWorkloadPackages)">
+  <Target Name="_ResolveRidSpecificWorkload">
     <ItemGroup>
       <_WorkloadRuntimeIdentifiers Include="$(RuntimeIdentifiers)" />
       <_RidSpecificWorkloadPackageProject Include="$(MSBuildProjectFullPath)">
         <AdditionalProperties>RuntimeIdentifier=%(_WorkloadRuntimeIdentifiers.Identity);</AdditionalProperties>
       </_RidSpecificWorkloadPackageProject>
     </ItemGroup>
+  </Target>
 
+  <Target Name="_CreateRIDSpecificWorkloadPackages" Condition="'$(RuntimeIdentifier)' == '' AND $(CreateRidSpecificWorkloadPackages)"
+    DependsOnTargets="_ResolveRidSpecificWorkload">
     <MSBuild Projects="@(_RidSpecificWorkloadPackageProject)" Targets="Pack" BuildInParallel="true">
         <Output TaskParameter="TargetOutputs" ItemName="_WorkloadPackageOutputs" />
     </MSBuild>
+  </Target>
+
+  <Target Name="_BuildRIDSpecificWorkload" Condition="'$(RuntimeIdentifier)' == '' AND $(CreateRidSpecificWorkloadPackages)"
+    BeforeTargets="BeforeBuild" DependsOnTargets="_ResolveRidSpecificWorkload">
+    <MSBuild Projects="@(_RidSpecificWorkloadPackageProject)" Targets="Build" BuildInParallel="true" />
   </Target>
 
 </Project>

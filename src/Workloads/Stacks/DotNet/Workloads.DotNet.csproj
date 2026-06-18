@@ -7,7 +7,6 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>dotnet</WorkloadAlias>
-    <IsPublishable>true</IsPublishable>
   </PropertyGroup>
 
   <ItemGroup>
