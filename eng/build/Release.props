@@ -53,7 +53,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="$(ApplicationIcon)" Pack="true" PackagePath="/" />
     <Content Include="$(IconFile)" Pack="true" PackagePath="/" />
     <Content Include="$(ReadmeFile)" Pack="true" PackagePath="/" Condition="Exists('$(ReadmeFile)')" />
   </ItemGroup>

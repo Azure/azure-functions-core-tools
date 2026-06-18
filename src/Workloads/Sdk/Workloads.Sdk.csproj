@@ -12,4 +12,13 @@
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- We need this built and copied for metadata scanning. -->
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj"
+      ReferenceOutputAssembly="false"
+      SkipGetTargetFrameworkProperties="true"
+      OutputItemType="Content"
+      CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

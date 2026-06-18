@@ -11,6 +11,6 @@
   <Import Project="$(MSBuildThisFileDirectory)Publish.AllRuntimes.targets" />
   <Import Project="$(MSBuildThisFileDirectory)WorkloadDebug.targets" />
 
-  <Import Project="$(MSBuildThisFileDirectory)Workloads/Workload.Pack.targets" Condition="'$(PackAsWorkload)' == 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)Workloads/Workload.targets" Condition="'$(PackAsWorkload)' == 'true'" />
 
 </Project>

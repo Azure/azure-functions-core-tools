@@ -7,6 +7,7 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>dotnet</WorkloadAlias>
+    <IsPublishable>true</IsPublishable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,10 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj">
-      <PrivateAssets>all</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
-    </ProjectReference>
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

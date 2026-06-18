@@ -9,6 +9,10 @@ namespace Azure.Functions.Cli.Workloads.Sdk.Tasks;
 
 public sealed class ResolveWorkloadEntry : Microsoft.Build.Utilities.Task
 {
+    private static readonly string _abstractionsAssembly = Path.Combine(
+        Path.GetDirectoryName(typeof(ResolveWorkloadEntry).Assembly.Location),
+        "Azure.Functions.Cli.Abstractions.dll");
+
     [Required]
     public string AssemblyPath { get; set; } = string.Empty;
 
@@ -25,15 +29,9 @@ public sealed class ResolveWorkloadEntry : Microsoft.Build.Utilities.Task
                     == "Azure.Functions.Cli.Workloads.CliWorkloadAttribute`1";
         }
 
-        static string GetAbstractionsAssembly(string inputAssembly)
-        {
-            // We assume all workloads are built with this dependency (otherwise they wouldn't have the required attributes).
-            return Path.Combine(Path.GetDirectoryName(inputAssembly), "Azure.Functions.Cli.Abstractions.dll");
-        }
-
         string runtimeDir = RuntimeEnvironment.GetRuntimeDirectory();
         string[] runtimeAssemblies = Directory.GetFiles(runtimeDir, "*.dll");
-        IEnumerable<string> paths = runtimeAssemblies.Concat([ AssemblyPath, GetAbstractionsAssembly(AssemblyPath) ]);
+        IEnumerable<string> paths = runtimeAssemblies.Concat([ AssemblyPath, _abstractionsAssembly ]);
         var resolver = new PathAssemblyResolver(paths);
 
         using MetadataLoadContext mlc = new(resolver);

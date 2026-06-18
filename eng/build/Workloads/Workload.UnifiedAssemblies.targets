@@ -1,0 +1,10 @@
+<Project>
+
+  <ItemGroup>
+    <_WorkloadUnifiedItems Include="$(SrcRoot)Abstractions/Abstractions.csproj" Kind="Project" />
+    <_WorkloadUnifiedItems Include="Azure.Functions.Cli.Abstractions" Kind="Package" />
+    <_WorkloadUnifiedItems Include="Microsoft.Extensions.DependencyInjection.Abstractions" Kind="Package" />
+    <_WorkloadUnifiedItems Include="System.CommandLine" Kind="Package" />
+  </ItemGroup>
+
+</Project>
