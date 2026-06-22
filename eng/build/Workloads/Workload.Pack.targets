@@ -1,10 +1,11 @@
 <Project>
 
+  <UsingTask TaskName="AddPackageType" AssemblyFile="$(MicrosoftNETBuildTasksAssembly)" />
+
   <PropertyGroup>
     <!-- Set up package type and tags for this workload -->
     <PackageTags>$(PackageTags);func-workload</PackageTags>
     <PackageTags Condition="'$(WorkloadKind)' != ''">$(PackageTags);kind:$(WorkloadKind)</PackageTags>
-
     <PackageTags Condition="'$(WorkloadAlias)' != ''">$(PackageTags);alias:$(WorkloadAlias)</PackageTags>
 
     <!-- General pack settings -->
@@ -28,10 +29,11 @@
     <PackageId Condition="'$(PackageId)' != ''">$(PackageId).$(RuntimeIdentifier)</PackageId>
     <PackageId Condition="'$(PackageId)' == ''">$(AssemblyName).$(RuntimeIdentifier)</PackageId>
     <PackageTags>$(PackageTags);rid:$(RuntimeIdentifier)</PackageTags>
+    <NuspecOutputPath>$(IntermediateOutputPath)</NuspecOutputPath>
   </PropertyGroup>
 
   <!--
-    Set the package type for the workload based on its kind and runtime identifier.
+  Set the package type for the workload based on its kind and runtime identifier.
   -->
   <Target Name="SetWorkloadPackageType" Outputs="$(_WorkloadPackageType)">
     <PropertyGroup>
@@ -70,7 +72,7 @@
   </Target>
 
   <!--
-    Generate and include the workload.json metadata in the package.
+  Generate and include the workload.json metadata in the package.
   -->
   <Target Name="_IncludeWorkloadMetadata" DependsOnTargets="GenerateWorkloadJson" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
@@ -80,9 +82,9 @@
   </Target>
 
   <!--
-    Include the workload's copy-local dependencies in the package.
-    Will resolve both runtime (packages) and reference copy-local paths.
-    Will trim out all unified (CLI-controlled) assemblies.
+  Include the workload's copy-local dependencies in the package.
+  Will resolve both runtime (packages) and reference copy-local paths.
+  Will trim out all unified (CLI-controlled) assemblies.
   -->
   <Target Name="_IncludeWorkloadCopyLocal" DependsOnTargets="ResolveReferences" Condition="'$(WorkloadKind)' == 'workload'">
     <PropertyGroup>
@@ -101,12 +103,12 @@
   </Target>
 
   <!--
-    Entry-point for collecting TFM-specific package files.
+  Entry-point for collecting TFM-specific package files.
   -->
   <Target Name="PackWorkload" Returns="@(TfmSpecificPackageFile)" DependsOnTargets="$(PackWorkloadDependsOn)" />
 
   <!--
-    Resolve the RID-specific workload projects to build & pack.
+  Resolve the RID-specific workload projects to build & pack.
   -->
   <Target Name="_ResolveRidSpecificWorkload">
     <ItemGroup>
@@ -118,18 +120,16 @@
   </Target>
 
   <!--
-    Pack the RID-specific workload packages. When multi-RID, this will fan out an independent pack target for each RID.
+  Pack the RID-specific workload packages. When multi-RID, this will fan out an independent pack target for each RID.
   -->
   <Target Name="_CreateRIDSpecificWorkloadPackages" Condition="'$(RuntimeIdentifier)' == '' AND $(CreateRidSpecificWorkloadPackages)"
     DependsOnTargets="_ResolveRidSpecificWorkload">
-    <MSBuild Projects="@(_RidSpecificWorkloadPackageProject)" Targets="Pack" BuildInParallel="true">
-        <Output TaskParameter="TargetOutputs" ItemName="_WorkloadPackageOutputs" />
-    </MSBuild>
+    <MSBuild Projects="@(_RidSpecificWorkloadPackageProject)" Targets="Pack" BuildInParallel="true" />
   </Target>
 
   <!--
-    Build the RID-specific workload projects. When multi-RID, this will fan out an independent build target for each RID.
-    This ensures the artifacts are ready for packaging.
+  Build the RID-specific workload projects. When multi-RID, this will fan out an independent build target for each RID.
+  This ensures the artifacts are ready for packaging.
   -->
   <Target Name="_BuildRIDSpecificWorkload" Condition="'$(RuntimeIdentifier)' == '' AND $(CreateRidSpecificWorkloadPackages)"
     BeforeTargets="BeforeBuild" DependsOnTargets="_ResolveRidSpecificWorkload">

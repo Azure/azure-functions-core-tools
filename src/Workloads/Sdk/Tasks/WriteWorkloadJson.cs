@@ -22,6 +22,9 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
 
     public string EntryPointType { get; set; } = string.Empty;
 
+    [Required]
+    public ITaskItem[] InnerPackages { get; set; } = [];
+
     public override bool Execute()
     {
         EntryPointModel? entryPoint = null;
@@ -34,11 +37,22 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
             };
         }
 
+        Dictionary<string, string>? packages = null;
+        if (InnerPackages is { Length: > 0 })
+        {
+            packages = new(StringComparer.OrdinalIgnoreCase);
+            foreach (ITaskItem package in InnerPackages)
+            {
+                packages[package.GetMetadata("RuntimeIdentifier")] = package.ItemSpec;
+            }
+        }
+
         WorkloadJsonModel model = new()
         {
             Schema = Schema,
             Kind = Kind,
             EntryPoint = entryPoint,
+            Packages = packages,
         };
 
         byte[] content = JsonSerializer.SerializeToUtf8Bytes(
@@ -96,6 +110,9 @@ internal sealed class WorkloadJsonModel
 
     [JsonPropertyName("entryPoint")]
     public EntryPointModel? EntryPoint { get; set; }
+
+    [JsonPropertyName("packages")]
+    public IDictionary<string, string>? Packages { get; set; }
 }
 
 internal sealed class EntryPointModel

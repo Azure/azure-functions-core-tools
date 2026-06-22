@@ -11,7 +11,7 @@
     <NoWarn>$(NoWarn);ASPDEPR008</NoWarn>
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>content</WorkloadKind>
-    <WorkloadAlias>dotnet</WorkloadAlias>
+    <WorkloadAlias>host</WorkloadAlias>
   </PropertyGroup>
 
   <ItemGroup>
