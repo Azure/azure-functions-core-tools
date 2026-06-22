@@ -30,13 +30,36 @@
     <PackageTags>$(PackageTags);rid:$(RuntimeIdentifier)</PackageTags>
   </PropertyGroup>
 
+  <!--
+    Set the package type for the workload based on its kind and runtime identifier.
+  -->
   <Target Name="SetWorkloadPackageType" Outputs="$(_WorkloadPackageType)">
     <PropertyGroup>
       <_WorkloadPackageType Condition="'$(RuntimeIdentifier)' != '' AND $(CreateRidSpecificWorkloadPackages)">FuncCliWorkloadRidPackage</_WorkloadPackageType>
       <_WorkloadPackageType Condition="'$(_WorkloadPackageType)' == ''">FuncCliWorkload</_WorkloadPackageType>
     </PropertyGroup>
 
-    <AddPackageType Condition="'$(_WorkloadPackageType)' == 'FuncCliWorkload'" CurrentPackageType="$(PackageType)" PackageTypeToAdd="$(_WorkloadPackageType)">
+    <!--
+    PackageType is semicolon-delimited, case-insensitive, with an optional version.
+
+    FuncCliWorkload should be added to the set of package types if the PackAsWorkload property is set to true.
+
+    Examples:
+       PackageType = ''                     -> 'FuncCliWorkload'
+       PackageType = 'MyCustomType'         -> 'FuncCliWorkload;MyCustomType'
+       PackageType = 'MyCustomType, 1.0'    -> 'FuncCliWorkload;MyCustomType, 1.0'
+       PackageType = 'funccliworkload'      -> 'funccliworkload'
+       PackageType = 'FuncCliWorkload, 1.0.0.0'  -> 'FuncCliWorkload, 1.0.0.0'
+       PackageType = 'FuncCliWorkload , 1.0.0.0' -> 'FuncCliWorkload , 1.0.0.0'
+       PackageType = 'MyFuncCliWorkload'         -> 'FuncCliWorkload;MyFuncCliWorkload'
+
+    AddPackageType is used to ensure that the PackageType is semicolon delimited and can be easily checked for an existing FuncCliWorkload package type.
+
+    All of this should only apply for the 'outer' workload package - the 'inner' RID-specific workload packages are always of type FuncCliWorkloadRidPackage.
+    This is so that the inner packages do not appear on any workload search results.
+    -->
+    <AddPackageType Condition="'$(_WorkloadPackageType)' == 'FuncCliWorkload'"
+      CurrentPackageType="$(PackageType)" PackageTypeToAdd="$(_WorkloadPackageType)">
       <Output TaskParameter="UpdatedPackageType" PropertyName="PackageType" />
     </AddPackageType>
 
@@ -46,6 +69,9 @@
     </PropertyGroup>
   </Target>
 
+  <!--
+    Generate and include the workload.json metadata in the package.
+  -->
   <Target Name="_IncludeWorkloadMetadata" DependsOnTargets="GenerateWorkloadJson" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
       <Content Include="$(_WorkloadJsonFile)" Pack="true" PackagePath="/" />
@@ -53,12 +79,11 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="_NoBuildResolveReferences" Condition="'$(NoBuild)' == 'true'">
-    <PropertyGroup>
-      <BuildProjectReferences>false</BuildProjectReferences>
-    </PropertyGroup>
-  </Target>
-
+  <!--
+    Include the workload's copy-local dependencies in the package.
+    Will resolve both runtime (packages) and reference copy-local paths.
+    Will trim out all unified (CLI-controlled) assemblies.
+  -->
   <Target Name="_IncludeWorkloadCopyLocal" DependsOnTargets="ResolveReferences" Condition="'$(WorkloadKind)' == 'workload'">
     <PropertyGroup>
       <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' == ''">any</_WorkloadRidPath>
@@ -75,8 +100,14 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    Entry-point for collecting TFM-specific package files.
+  -->
   <Target Name="PackWorkload" Returns="@(TfmSpecificPackageFile)" DependsOnTargets="$(PackWorkloadDependsOn)" />
 
+  <!--
+    Resolve the RID-specific workload projects to build & pack.
+  -->
   <Target Name="_ResolveRidSpecificWorkload">
     <ItemGroup>
       <_WorkloadRuntimeIdentifiers Include="$(RuntimeIdentifiers)" />
@@ -86,6 +117,9 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    Pack the RID-specific workload packages. When multi-RID, this will fan out an independent pack target for each RID.
+  -->
   <Target Name="_CreateRIDSpecificWorkloadPackages" Condition="'$(RuntimeIdentifier)' == '' AND $(CreateRidSpecificWorkloadPackages)"
     DependsOnTargets="_ResolveRidSpecificWorkload">
     <MSBuild Projects="@(_RidSpecificWorkloadPackageProject)" Targets="Pack" BuildInParallel="true">
@@ -93,6 +127,10 @@
     </MSBuild>
   </Target>
 
+  <!--
+    Build the RID-specific workload projects. When multi-RID, this will fan out an independent build target for each RID.
+    This ensures the artifacts are ready for packaging.
+  -->
   <Target Name="_BuildRIDSpecificWorkload" Condition="'$(RuntimeIdentifier)' == '' AND $(CreateRidSpecificWorkloadPackages)"
     BeforeTargets="BeforeBuild" DependsOnTargets="_ResolveRidSpecificWorkload">
     <MSBuild Projects="@(_RidSpecificWorkloadPackageProject)" Targets="Build" BuildInParallel="true" />

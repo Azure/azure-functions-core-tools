@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <_AllowedWorkloadKind Include="workload;content;meta" />
+
+    <!-- This project contains tasks we need. Hook here to ensure it is built. -->
     <ProjectReference Include="$(SrcRoot)Workloads/Sdk/Workloads.Sdk.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
@@ -10,6 +12,8 @@
   </PropertyGroup>
 
   <UsingTask TaskName="AddPackageType" AssemblyFile="$(MicrosoftNETBuildTasksAssembly)" />
+
+  <!-- TODO: Remove 'TaskHostFactory' when shipping as a nupkg. It is used here to avoid file locking issues between builds. -->
   <UsingTask TaskName="ResolveWorkloadEntry" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
   <UsingTask TaskName="WriteWorkloadJson" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
   <UsingTask TaskName="ResolveWorkloadCopyLocal" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
@@ -24,11 +28,13 @@
     <_WorkloadJsonFile Condition="'$(_WorkloadJsonFile)' == ''">$(IntermediateOutputPath)workload.json</_WorkloadJsonFile>
   </PropertyGroup>
 
+  <!-- Perform early validation of the workload. -->
   <Target Name="_ValidateWorkload" BeforeTargets="BeforeBuild">
     <Error Condition="'$(WorkloadKind)' == ''" Text="WorkloadKind is not specified. Valid values are: @(_AllowedWorkloadKind)." />
     <Error Condition="!@(_AllowedWorkloadKind->AnyHaveMetadataValue('Identity', '$(WorkloadKind)'))" Text="Invalid WorkloadKind '$(WorkloadKind)'. Valid values are: @(_AllowedWorkloadKind)." />
   </Target>
 
+  <!-- Resolve the entry point for the workload when it is a 'workload' kind. -->
   <Target Name="_ResolveWorkloadEntryPoint" Condition="'$(WorkloadKind)' == 'workload'" 
     DependsOnTargets="$(_ResolveWorkloadEntryPointDependsOn)">
     <PropertyGroup>
@@ -42,7 +48,12 @@
     <Error Condition="'$(WorkloadEntryPointType)' == ''" Text="Failed to resolve workload entry point type. 'WorkloadEntryPointType' is empty." />
   </Target>
 
-  <Target Name="_GenerateWorkloadJsonCache" DependsOnTargets="_ResolveWorkloadEntryPoint">
+  <!--
+    Generate the workload JSON cache. This is for incremental builds.
+    We hash the inputs into workload.json to determine if it needs to be regenerated.
+    Does not use FileWrites as this is a pack-time operation. FileWrites are for build-time operations.
+  -->
+  <Target Name="_GenerateWorkloadJsonCache" DependsOnTargets="_ResolveWorkloadEntryPoint" Outputs="$(_WorkloadJsonCacheFile)">
     <ItemGroup>
       <_WorkloadJsonInputCacheToHash Include="$(WorkloadKind)" />
       <_WorkloadJsonInputCacheToHash Include="$(_FuncWorkloadSchema)" />
@@ -57,13 +68,16 @@
       <Output TaskParameter="HashResult" PropertyName="_WorkloadJsonCacheHash" />
     </Hash>
 
+    <!-- Don't use FileWrites as this is a pack-time operation. FileWrites are for build-time operations. -->
     <WriteLinesToFile File="$(_WorkloadJsonCacheFile)" Lines="$(_WorkloadJsonCacheHash)" Overwrite="true" WriteOnlyWhenDifferent="true"  />
   </Target>
 
-  <Target Name="GenerateWorkloadJson"
-    DependsOnTargets="_GenerateWorkloadJsonCache"
-    Inputs="$(_WorkloadJsonCacheFile);$(MSBuildAllProjects)"
-    Outputs="$(_WorkloadJsonFile)">
+  <!--
+    Generate the workload JSON file. Will skip if up to date.
+    Does not use FileWrites as this is a pack-time operation. FileWrites are for build-time operations.
+  -->
+  <Target Name="GenerateWorkloadJson" DependsOnTargets="_GenerateWorkloadJsonCache"
+    Inputs="$(_WorkloadJsonCacheFile);$(MSBuildAllProjects)" Outputs="$(_WorkloadJsonFile)">
     <WriteWorkloadJson
       OutputPath="$(_WorkloadJsonFile)"
       Schema="$(_FuncWorkloadSchema)"
@@ -72,7 +86,7 @@
       EntryPointType="$(WorkloadEntryPointType)" />
 
     <ItemGroup>
-      <FileWrites Include="$(_WorkloadJsonFile)" />
+      <EmbedInBinlog Include="$(_WorkloadJsonFile)" />
     </ItemGroup>
   </Target>
 
