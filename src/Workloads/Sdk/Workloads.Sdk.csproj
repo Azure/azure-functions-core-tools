@@ -21,4 +21,8 @@
       CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.Sdk.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -3,7 +3,7 @@
 
 namespace Azure.Functions.Cli.Workloads.Sdk.Tests;
 
-public static class Helpers
+public static class TestHelpers
 {
 #if DEBUG
     public const string Configuration = "debug";

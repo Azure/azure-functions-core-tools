@@ -18,16 +18,15 @@ public sealed class ResolveWorkloadCopyLocal : Microsoft.Build.Utilities.Task
 
     public override bool Execute()
     {
-        GetUnifiedItems(out HashSet<string> runtimeProjects, out HashSet<string> runtimePackages);
+        GetUnifiedItems(out HashSet<string> unifiedProjects, out HashSet<string> unifiedPackages);
 
         List<ITaskItem> filteredCopyLocalFiles = [];
         foreach (ITaskItem item in Items)
         {
-            if (ShouldIncludeItem(item, runtimeProjects, runtimePackages))
+            if (ShouldIncludeItem(item, unifiedProjects, unifiedPackages))
             {
-                string path = item.GetMetadata("DestinationSubPath") is string p
-                    ? p
-                    : Path.GetFileName(item.ItemSpec);
+                string path = item.GetMetadata("DestinationSubPath") is string p && !string.IsNullOrEmpty(p)
+                    ? p : Path.GetFileName(item.ItemSpec);
                 item.SetMetadata("TargetPath", path);
                 filteredCopyLocalFiles.Add(item);
             }
@@ -38,10 +37,10 @@ public sealed class ResolveWorkloadCopyLocal : Microsoft.Build.Utilities.Task
     }
 
     private bool ShouldIncludeItem(
-        ITaskItem item, HashSet<string> runtimeProjects, HashSet<string> runtimePackages)
+        ITaskItem item, HashSet<string> unifiedProjects, HashSet<string> unifiedPackages)
     {
         string packageId = item.GetMetadata("NuGetPackageId");
-        if (!string.IsNullOrEmpty(packageId) && runtimePackages.Contains(packageId))
+        if (!string.IsNullOrEmpty(packageId) && unifiedPackages.Contains(packageId))
         {
             // Comes from a runtime package, exclude.
             Log.LogMessage(MessageImportance.Low, $"Excluding item: {item.ItemSpec} (from package: {packageId})");
@@ -49,7 +48,7 @@ public sealed class ResolveWorkloadCopyLocal : Microsoft.Build.Utilities.Task
         }
 
         string project = item.GetMetadata("MSBuildSourceProjectFile");
-        if (!string.IsNullOrEmpty(project) && runtimeProjects.Contains(project))
+        if (!string.IsNullOrEmpty(project) && unifiedProjects.Contains(project))
         {
             // Comes from a runtime project, exclude.
             Log.LogMessage(MessageImportance.Low, $"Excluding item: {item.ItemSpec} (from project: {project})");

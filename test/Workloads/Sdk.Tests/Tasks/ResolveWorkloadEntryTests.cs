@@ -13,7 +13,7 @@ public class ResolveWorkloadEntryTests
     [Fact]
     public void ScanWorkloadEntry_Success()
     {
-        string assemblyPath = Helpers.GetProjectAssemblyPath("Workloads.DotNet");
+        string assemblyPath = TestHelpers.GetProjectAssemblyPath("Workloads.DotNet");
         ResolveWorkloadEntry resolveWorkloadEntry = new()
         {
             BuildEngine = Substitute.For<IBuildEngine>(),
@@ -23,5 +23,21 @@ public class ResolveWorkloadEntryTests
         resolveWorkloadEntry.Execute();
 
         Assert.Equal("Azure.Functions.Cli.Workloads.DotNet.DotNetWorkload", resolveWorkloadEntry.WorkloadType);
+    }
+
+
+    [Fact]
+    public void ScanWorkloadEntry_NotFound()
+    {
+        string assemblyPath = typeof(ResolveWorkloadEntry).Assembly.Location;
+        ResolveWorkloadEntry resolveWorkloadEntry = new()
+        {
+            BuildEngine = Substitute.For<IBuildEngine>(),
+            AssemblyPath = assemblyPath
+        };
+
+        resolveWorkloadEntry.Execute();
+
+        Assert.Empty(resolveWorkloadEntry.WorkloadType);
     }
 }
