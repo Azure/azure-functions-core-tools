@@ -272,6 +272,68 @@ public sealed class WorkloadCatalogTests
     }
 
     [Fact]
+    public async Task ResolveLatestVersionOnChannelAsync_StableChannel_ExcludesPrerelease()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0-preview.1"), V("1.5.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: null);
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("1.5.0"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionOnChannelAsync_PreviewChannel_PicksHighestPreview()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_defaultSource, BuildClient(_defaultSource, versions:
+                [V("1.0.0"), V("2.0.0-preview.1"), V("2.0.0-preview.3"), V("2.0.0-experimental.1")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "preview");
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("2.0.0-preview.3"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionOnChannelAsync_ExperimentalChannel_PicksExperimental()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_defaultSource, BuildClient(_defaultSource, versions:
+                [V("1.0.0"), V("2.0.0-preview.1"), V("2.5.0-experimental.2")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "experimental");
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("2.5.0-experimental.2"), resolved!.Version);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionOnChannelAsync_PreviewChannel_NoPreviewPublished_ReturnsNull()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("1.0.0"), V("2.0.0")])));
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "preview");
+
+        Assert.Null(resolved);
+    }
+
+    [Fact]
+    public async Task ResolveLatestVersionOnChannelAsync_PreviewChannel_RespectsRange()
+    {
+        WorkloadCatalog catalog = NewCatalog(
+            (_defaultSource, BuildClient(_defaultSource, versions: [V("4.10.0-preview.1"), V("4.20.0-preview.1")])));
+        var range = VersionRange.Parse("[4.0.0, 4.15.0)");
+
+        ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "preview", versionRange: range);
+
+        Assert.NotNull(resolved);
+        Assert.Equal(V("4.10.0-preview.1"), resolved!.Version);
+    }
+
+    [Fact]
     public async Task ResolveVersionAsync_ReturnsResolvedPackage_WhenSourceHasVersion()
     {
         WorkloadCatalog catalog = NewCatalog(

@@ -158,6 +158,50 @@ public class BundleHelpersTests
         Assert.Throws<ArgumentOutOfRangeException>(() => ((BundleChannel)99).ToDisplayString());
     }
 
+    // --- ToPrereleaseLabel ---
+
+    [Fact]
+    public void ToPrereleaseLabel_Stable_ReturnsNull()
+    {
+        Assert.Null(BundleChannel.Stable.ToPrereleaseLabel());
+    }
+
+    [Theory]
+    [InlineData(BundleChannel.Preview, "preview")]
+    [InlineData(BundleChannel.Experimental, "experimental")]
+    public void ToPrereleaseLabel_PrereleaseChannel_ReturnsLabel(BundleChannel channel, string expected)
+    {
+        Assert.Equal(expected, channel.ToPrereleaseLabel());
+    }
+
+    [Theory]
+    [InlineData(BundleChannel.Unknown)]
+    [InlineData((BundleChannel)99)]
+    public void ToPrereleaseLabel_InvalidChannel_Throws(BundleChannel channel)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => channel.ToPrereleaseLabel());
+    }
+
+    // --- MatchesChannel ---
+
+    [Theory]
+    [InlineData("1.5.0", BundleChannel.Stable, true)]
+    [InlineData("2.0.0-preview.1", BundleChannel.Stable, false)]
+    [InlineData("2.0.0-preview.1", BundleChannel.Preview, true)]
+    [InlineData("2.0.0-experimental.1", BundleChannel.Preview, false)]
+    [InlineData("2.0.0-experimental.2", BundleChannel.Experimental, true)]
+    [InlineData("1.5.0", BundleChannel.Preview, false)]
+    public void MatchesChannel_ReturnsExpected(string version, BundleChannel channel, bool expected)
+    {
+        Assert.Equal(expected, BundleHelpers.MatchesChannel(NuGetVersion.Parse(version), channel));
+    }
+
+    [Fact]
+    public void MatchesChannel_NullVersion_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => BundleHelpers.MatchesChannel(null!, BundleChannel.Stable));
+    }
+
     // --- GetBundleChannel(NuGetVersion) null guard ---
 
     [Fact]

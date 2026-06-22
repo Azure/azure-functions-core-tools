@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
@@ -56,6 +57,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
     private readonly IFunctionsProjectResolver _projectResolver;
+    private readonly IHostJsonBundleSectionReader _bundleSectionReader;
+    private readonly InstalledBundleScanner _bundleScanner;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
     public InitCommand(
@@ -63,6 +66,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IWorkloadHintRenderer hintRenderer,
         ILocalSettingsProvider localSettingsProvider,
         IFunctionsProjectResolver projectResolver,
+        IHostJsonBundleSectionReader bundleSectionReader,
+        InstalledBundleScanner bundleScanner,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
@@ -70,12 +75,16 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(hintRenderer);
         ArgumentNullException.ThrowIfNull(localSettingsProvider);
         ArgumentNullException.ThrowIfNull(projectResolver);
+        ArgumentNullException.ThrowIfNull(bundleSectionReader);
+        ArgumentNullException.ThrowIfNull(bundleScanner);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
         _hintRenderer = hintRenderer;
         _localSettingsProvider = localSettingsProvider;
         _projectResolver = projectResolver;
+        _bundleSectionReader = bundleSectionReader;
+        _bundleScanner = bundleScanner;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -332,7 +341,33 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             .Code(initializer.Stack)
             .Muted("."));
 
+        await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
+
         return 0;
+    }
+
+    // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).
+    // Warn when no bundle workload for that channel is installed, pointing at
+    // workload search so `func start` doesn't later fail to resolve the bundle.
+    private async Task WarnIfBundleChannelNotInstalledAsync(DirectoryInfo projectDirectory, CancellationToken cancellationToken)
+    {
+        HostJsonBundleSection? bundle = await _bundleSectionReader.ReadAsync(projectDirectory, cancellationToken);
+        if (bundle is null
+            || !BundleHelpers.TryGetBundleChannel(bundle.Id, out BundleChannel channel)
+            || channel == BundleChannel.Stable)
+        {
+            return;
+        }
+
+        ScanResult scan = await _bundleScanner.ScanAsync(channel, cancellationToken);
+        if (scan.FilteredVersions.Count > 0)
+        {
+            return;
+        }
+
+        _interaction.WriteWarning(
+            $"This project targets the '{channel.ToDisplayString()}' extension bundle channel, but no matching bundle workload is installed. "
+            + "Find one with: func workload search bundles --prerelease");
     }
 
     private enum InitializationState

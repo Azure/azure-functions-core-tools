@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.Text.Json;
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -20,6 +21,8 @@ public class InitCommandTests
     private readonly RecordingWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettings;
     private readonly IFunctionsProjectResolver _projectResolver;
+    private readonly IHostJsonBundleSectionReader _bundleReader;
+    private readonly IInstalledBundleWorkloads _installedBundles;
 
     public InitCommandTests()
     {
@@ -31,10 +34,18 @@ public class InitCommandTests
         _projectResolver
             .ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.NotResolved("no project"));
+        _bundleReader = Substitute.For<IHostJsonBundleSectionReader>();
+        _bundleReader
+            .ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns((HostJsonBundleSection?)null);
+        _installedBundles = Substitute.For<IInstalledBundleWorkloads>();
+        _installedBundles
+            .ListInstalledAsync(Arg.Any<CancellationToken>())
+            .Returns([]);
     }
 
     private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, initializers);
+        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -148,6 +159,80 @@ public class InitCommandTests
             {
                 Directory.Delete(newDir, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_PreviewChannelBundle_NoInstalledBundle_WarnsWithSearchHint()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+
+        try
+        {
+            _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+                .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
+
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains(
+                _interaction.Lines,
+                line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_PreviewChannelBundle_InstalledBundle_DoesNotWarn()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+
+        try
+        {
+            _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+                .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
+            _installedBundles.ListInstalledAsync(Arg.Any<CancellationToken>())
+                .Returns(new InstalledBundleWorkload[] { new("4.11.0-preview.1", newDir) });
+
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
+
+            Assert.Equal(0, exitCode);
+            Assert.DoesNotContain(
+                _interaction.Lines,
+                line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_StableChannelBundle_DoesNotWarn()
+    {
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+
+        try
+        {
+            _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+                .Returns(new HostJsonBundleSection(BundleHelpers.StableBundleId, "[4.0.0, 5.0.0)"));
+
+            var initializer = new FakeProjectInitializer("python");
+            int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
+
+            Assert.Equal(0, exitCode);
+            Assert.DoesNotContain(
+                _interaction.Lines,
+                line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
         }
     }
 
@@ -558,7 +643,7 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, [dotnet]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
@@ -722,7 +807,7 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, [python]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();

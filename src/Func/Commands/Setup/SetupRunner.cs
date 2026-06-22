@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -405,6 +406,9 @@ internal sealed class SetupRunner(
         List<SetupDependency> dependencies = [];
         List<SetupDependencyResult> failures = [];
 
+        HostJsonBundleSection? hostJsonBundle = await _hostJsonBundleSectionReader.ReadAsync(workingDirectory, cancellationToken);
+        BundleChannel bundleChannel = ResolveBundleChannel(hostJsonBundle);
+
         dependencies.Add(SetupDependency.Host(profileScope.Profile?.HostVersionRange));
 
         foreach (SetupRuntimeFeature runtimeFeature in featurePlan.RuntimeFeatures)
@@ -443,53 +447,54 @@ internal sealed class SetupRunner(
 
             if (SetupDependency.SupportsTemplates(runtimeFeature.Name))
             {
-                dependencies.Add(SetupDependency.Templates(runtimeFeature.Name));
+                // Script stacks ship per-channel templates that track the bundle
+                // channel; dotnet templates don't use bundles, so they stay channel-less.
+                BundleChannel? templatesChannel = IsDotNetRuntime(runtimeFeature.Name) ? null : bundleChannel;
+                dependencies.Add(SetupDependency.Templates(runtimeFeature.Name, templatesChannel));
             }
         }
 
         if (featurePlan.IncludeExtensionBundle)
         {
-            SetupDependencyResult? failure = null;
-            SetupDependency? bundleDependency = await TryCreateBundleDependencyAsync(workingDirectory, profileScope, cancellationToken);
+            SetupDependency? bundleDependency = CreateBundleDependency(hostJsonBundle, bundleChannel, profileScope);
             if (bundleDependency is null)
             {
-                var dependency = SetupDependency.Bundle(BundleHelpers.StableBundleId, versionRange: null, rangeText: null);
-                failure = SetupDependencyResult.Failed(
+                var dependency = SetupDependency.Bundle(BundleHelpers.StableBundleId, versionRange: null, rangeText: null, BundleChannel.Stable);
+                failures.Add(SetupDependencyResult.Failed(
                     dependency,
-                    "The host.json extensionBundle range and profile extensionBundle range do not overlap.");
+                    "The host.json extensionBundle range and profile extensionBundle range do not overlap."));
             }
             else
             {
                 dependencies.Add(bundleDependency);
-            }
-
-            if (failure is not null)
-            {
-                failures.Add(failure);
             }
         }
 
         return new SetupDependencyPlan(dependencies, failures);
     }
 
-    private async Task<SetupDependency?> TryCreateBundleDependencyAsync(
-        DirectoryInfo workingDirectory,
-        SetupProfileScope profileScope,
-        CancellationToken cancellationToken)
+    private static BundleChannel ResolveBundleChannel(HostJsonBundleSection? hostJsonBundle)
+        => hostJsonBundle is not null && BundleHelpers.TryGetBundleChannel(hostJsonBundle.Id, out BundleChannel channel)
+            ? channel
+            : BundleChannel.Stable;
+
+    private static SetupDependency? CreateBundleDependency(
+        HostJsonBundleSection? hostJsonBundle,
+        BundleChannel channel,
+        SetupProfileScope profileScope)
     {
-        HostJsonBundleSection? hostJsonBundle = await _hostJsonBundleSectionReader.ReadAsync(workingDirectory, cancellationToken);
         VersionRange? profileRange = profileScope.Profile?.ExtensionBundleVersionRange;
         string? profileRangeText = RangeText(profileRange);
 
         if (hostJsonBundle is null)
         {
-            return SetupDependency.Bundle(BundleHelpers.StableBundleId, profileRange, profileRangeText);
+            return SetupDependency.Bundle(BundleHelpers.StableBundleId, profileRange, profileRangeText, channel);
         }
 
         VersionRange? effectiveRange = VersionRangeIntersection.Intersect(hostJsonBundle.Version, profileRangeText);
         return effectiveRange is null
             ? null
-            : SetupDependency.Bundle(hostJsonBundle.Id, effectiveRange, RangeText(effectiveRange));
+            : SetupDependency.Bundle(hostJsonBundle.Id, effectiveRange, RangeText(effectiveRange), channel);
     }
 
     private async Task<SetupDependencyResult> EnsureDependencyAsync(
@@ -537,25 +542,30 @@ internal sealed class SetupRunner(
         }
 
         ResolvedPackage package = resolution.Package!;
+        string? channelWarning = resolution.Warning;
         dependency = dependency with { ResolvedPackageId = package.PackageId };
-        InstalledCandidate? exactInstalled = GetInstalledCandidates(installed, dependency, options.IncludePrerelease)
-            .FirstOrDefault(candidate => candidate.Version.Equals(package.Version));
+
+        // Match the exact resolved version directly: the version string already
+        // encodes the channel, so this stays correct when a channeled dependency
+        // fell back to the stable channel (where the installed version's channel
+        // no longer equals dependency.Channel).
+        bool exactInstalled = IsExactVersionInstalled(installed, dependency, package.Version);
 
         string targetVersion = package.Version.ToNormalizedString();
-        if (exactInstalled is not null)
+        if (exactInstalled)
         {
             return SetupDependencyResult.Satisfied(
                 dependency,
                 package.PackageId,
                 targetVersion,
-                $"{dependency.DisplayName} {targetVersion} is already installed.");
+                $"{dependency.DisplayName} {targetVersion} is already installed.") with { Warning = channelWarning };
         }
 
         if (options.Check)
         {
             return SetupDependencyResult.Failed(
                 dependency,
-                $"{dependency.DisplayName} {targetVersion} is not installed.");
+                $"{dependency.DisplayName} {targetVersion} is not installed.") with { Warning = channelWarning };
         }
 
         try
@@ -589,12 +599,12 @@ internal sealed class SetupRunner(
                     dependency,
                     installResult.Entry.PackageId,
                     installedVersion,
-                    $"{dependency.DisplayName} {installedVersion} is already installed.")
+                    $"{dependency.DisplayName} {installedVersion} is already installed.") with { Warning = channelWarning }
                 : SetupDependencyResult.Installed(
                     dependency,
                     installResult.Entry.PackageId,
                     installedVersion,
-                    $"Installed {dependency.DisplayName} {installedVersion}.");
+                    $"Installed {dependency.DisplayName} {installedVersion}.") with { Warning = channelWarning };
         }
         catch (WorkloadPackageNotFoundException ex)
         {
@@ -626,6 +636,11 @@ internal sealed class SetupRunner(
     {
         try
         {
+            if (dependency.Channel is { } channel)
+            {
+                return await ResolveChannelFromCatalogAsync(dependency, channel, source, cancellationToken);
+            }
+
             ResolvedPackage? package = dependency.VersionRange is null
                 ? await _workloadCatalog.ResolveLatestVersionAsync(
                     dependency.PackageId,
@@ -643,8 +658,7 @@ internal sealed class SetupRunner(
 
             if (package is null)
             {
-                string range = dependency.RangeText is null ? string.Empty : $" in range '{dependency.RangeText}'";
-                return CatalogResolution.Missing($"No {dependency.DisplayName} workload version{range} is available from the configured workload catalog.");
+                return CatalogResolution.Missing(NoVersionMessage(dependency));
             }
 
             return CatalogResolution.Resolved(package);
@@ -665,6 +679,59 @@ internal sealed class SetupRunner(
         }
     }
 
+    // Resolves a bundle or templates dependency on its declared channel. When the
+    // requested channel has nothing published we fall back to the stable channel
+    // (with a warning) so setup still provisions a working workload rather than failing.
+    private async Task<CatalogResolution> ResolveChannelFromCatalogAsync(
+        SetupDependency dependency,
+        BundleChannel channel,
+        string? source,
+        CancellationToken cancellationToken)
+    {
+        ResolvedPackage? package = await _workloadCatalog.ResolveLatestVersionOnChannelAsync(
+            dependency.PackageId,
+            channel.ToPrereleaseLabel(),
+            dependency.VersionRange,
+            source,
+            cancellationToken);
+
+        if (package is not null)
+        {
+            return CatalogResolution.Resolved(package);
+        }
+
+        if (channel != BundleChannel.Stable)
+        {
+            ResolvedPackage? stable = await _workloadCatalog.ResolveLatestVersionOnChannelAsync(
+                dependency.PackageId,
+                BundleChannel.Stable.ToPrereleaseLabel(),
+                dependency.VersionRange,
+                source,
+                cancellationToken);
+
+            if (stable is not null)
+            {
+                return CatalogResolution.Resolved(stable, ChannelFallbackWarning(dependency, channel));
+            }
+        }
+
+        return CatalogResolution.Missing(NoVersionMessage(dependency));
+    }
+
+    private static string ChannelFallbackWarning(SetupDependency dependency, BundleChannel channel)
+    {
+        string suggestion = dependency.SearchAlias is { } alias
+            ? $" Find a matching workload with: func workload search {alias} --prerelease"
+            : string.Empty;
+        return $"No '{channel.ToDisplayString()}' {dependency.DisplayName} is available; using stable instead.{suggestion}";
+    }
+
+    private static string NoVersionMessage(SetupDependency dependency)
+    {
+        string range = dependency.RangeText is null ? string.Empty : $" in range '{dependency.RangeText}'";
+        return $"No {dependency.DisplayName} workload version{range} is available from the configured workload catalog.";
+    }
+
     private static IReadOnlyList<InstalledCandidate> GetInstalledCandidates(
         IReadOnlyList<WorkloadEntry> installed,
         SetupDependency dependency,
@@ -674,8 +741,21 @@ internal sealed class SetupRunner(
         foreach (WorkloadEntry entry in installed)
         {
             if (!MatchesDependency(entry, dependency)
-                || !NuGetVersion.TryParse(entry.PackageVersion, out NuGetVersion? version)
-                || (!includePrerelease && version.IsPrerelease))
+                || !NuGetVersion.TryParse(entry.PackageVersion, out NuGetVersion? version))
+            {
+                continue;
+            }
+
+            // A channeled dependency only counts an installed version that belongs
+            // to the same channel; otherwise fall back to the prerelease toggle.
+            if (dependency.Channel is { } channel)
+            {
+                if (!BundleHelpers.MatchesChannel(version, channel))
+                {
+                    continue;
+                }
+            }
+            else if (!includePrerelease && version.IsPrerelease)
             {
                 continue;
             }
@@ -684,6 +764,21 @@ internal sealed class SetupRunner(
         }
 
         return candidates;
+    }
+
+    private static bool IsExactVersionInstalled(IReadOnlyList<WorkloadEntry> installed, SetupDependency dependency, NuGetVersion version)
+    {
+        foreach (WorkloadEntry entry in installed)
+        {
+            if (MatchesDependency(entry, dependency)
+                && NuGetVersion.TryParse(entry.PackageVersion, out NuGetVersion? installedVersion)
+                && installedVersion.Equals(version))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool MatchesDependency(WorkloadEntry entry, SetupDependency dependency)
@@ -791,9 +886,9 @@ internal sealed class SetupRunner(
         => string.Equals(runtime, DotNetFeature, StringComparison.OrdinalIgnoreCase)
             || string.Equals(runtime, DotNetProfileRuntime, StringComparison.OrdinalIgnoreCase);
 
-    private sealed record CatalogResolution(ResolvedPackage? Package, string? FailureMessage, bool PackageMissing)
+    private sealed record CatalogResolution(ResolvedPackage? Package, string? FailureMessage, bool PackageMissing, string? Warning = null)
     {
-        public static CatalogResolution Resolved(ResolvedPackage package) => new(package, FailureMessage: null, PackageMissing: false);
+        public static CatalogResolution Resolved(ResolvedPackage package, string? warning = null) => new(package, FailureMessage: null, PackageMissing: false, warning);
 
         public static CatalogResolution Failed(string failureMessage) => new(Package: null, failureMessage, PackageMissing: false);
 
@@ -828,7 +923,8 @@ internal sealed record SetupDependency(
     VersionRange? VersionRange,
     string? RangeText,
     string? ResolvedPackageId,
-    bool Optional = false)
+    bool Optional = false,
+    BundleChannel? Channel = null)
 {
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
@@ -875,7 +971,7 @@ internal sealed record SetupDependency(
             ResolvedPackageId: null,
             Optional: true);
 
-    public static SetupDependency Bundle(string bundleId, VersionRange? versionRange, string? rangeText)
+    public static SetupDependency Bundle(string bundleId, VersionRange? versionRange, string? rangeText, BundleChannel channel)
         => new(
             SetupDependencyKind.ExtensionBundle,
             bundleId,
@@ -883,7 +979,8 @@ internal sealed record SetupDependency(
             IInstalledBundleWorkloads.BundleWorkloadPackageId,
             versionRange,
             rangeText,
-            ResolvedPackageId: null);
+            ResolvedPackageId: null,
+            Channel: channel);
 
     public static SetupDependency Stack(string stack)
         => new(
@@ -900,7 +997,7 @@ internal sealed record SetupDependency(
 
     public static IReadOnlyList<string> Stacks => [.. _stacks];
 
-    public static SetupDependency Templates(string stack)
+    public static SetupDependency Templates(string stack, BundleChannel? channel)
         => new(
             SetupDependencyKind.Templates,
             stack,
@@ -909,10 +1006,20 @@ internal sealed record SetupDependency(
             VersionRange: null,
             RangeText: null,
             ResolvedPackageId: null,
-            Optional: true);
+            Optional: true,
+            Channel: channel);
 
     public static bool SupportsTemplates(string stack)
         => !string.IsNullOrWhiteSpace(stack) && _templates.Contains(stack.Trim());
+
+    // Workload search alias for the channel-fallback hint. Only the channeled
+    // dependency kinds (bundle, templates) need one.
+    public string? SearchAlias => Kind switch
+    {
+        SetupDependencyKind.ExtensionBundle => "bundles",
+        SetupDependencyKind.Templates => $"{Name}-templates",
+        _ => null,
+    };
 
     private static string StackPackageSuffix(string stack)
         => stack.Trim().ToLowerInvariant() switch
@@ -958,7 +1065,8 @@ internal sealed record SetupDependencyResult(
     SetupDependencyStatus Status,
     string? PackageId,
     string? Version,
-    string Message)
+    string Message,
+    string? Warning = null)
 {
     public static SetupDependencyResult Satisfied(SetupDependency dependency, string packageId, string version, string message)
         => new(dependency, SetupDependencyStatus.Satisfied, packageId, version, message);

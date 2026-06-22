@@ -82,6 +82,8 @@ internal static class TestParser
         services.AddSingleton(Substitute.For<Cli.Projects.IFunctionsProjectResolver>());
         services.AddSingleton(Substitute.For<Cli.Workloads.Storage.IWorkloadPaths>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>());
+        services.AddSingleton(Substitute.For<Cli.Bundles.IInstalledBundleWorkloads>());
+        services.AddSingleton<Cli.Bundles.InstalledBundleScanner>();
         services.AddSingleton(Substitute.For<Cli.Bundles.IExtensionBundleResolver>());
         services.AddSingleton(Substitute.For<IStartInitializationRunner>());
 

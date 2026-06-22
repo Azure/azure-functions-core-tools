@@ -79,6 +79,11 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
 
             payload["version"] = result.Version;
             payload["message"] = result.Message;
+            if (result.Warning is not null)
+            {
+                payload["warning"] = result.Warning;
+            }
+
             WriteEvent("dependency.result", payload);
             return;
         }
@@ -104,6 +109,11 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
             case SetupDependencyStatus.Failed:
                 _interaction.WriteError(result.Message);
                 break;
+        }
+
+        if (result.Warning is not null)
+        {
+            _interaction.WriteWarning(result.Warning);
         }
     }
 

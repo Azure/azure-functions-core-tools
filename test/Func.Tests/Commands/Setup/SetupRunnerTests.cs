@@ -512,6 +512,151 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_StableProject_IgnoresPrereleaseBundle_EvenWithIncludePrerelease()
+    {
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithVersions(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0", "4.20.0-preview.1");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(includePrerelease: true), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.10.0"),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.20.0-preview.1"),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_HostJsonPreviewBundle_InstallsPreviewBundleAndTemplates()
+    {
+        const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
+        const string nodeTemplates = "Azure.Functions.Cli.Workloads.Templates.Node";
+        _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithVersions(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0", "4.11.0-preview.1")
+            .WithLatest(WorkerPackage("node"), "1.0.0")
+            .WithLatest(nodeStack, "1.0.0")
+            .WithVersions(nodeTemplates, "1.0.0", "1.1.0-preview.1");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.11.0-preview.1"),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, nodeTemplates, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.1.0-preview.1"),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_HostJsonPreviewBundle_NoPreviewPublished_FallsBackToStableWithWarning()
+    {
+        _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithVersions(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.10.0"),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        Assert.Contains(
+            _interaction.Lines,
+            line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_HostJsonExperimentalBundle_InstallsExperimentalBundle()
+    {
+        _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(new HostJsonBundleSection(BundleHelpers.ExperimentalBundleId, "[4.0.0, 5.0.0)"));
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithVersions(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0", "4.12.0-experimental.3");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.12.0-experimental.3"),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_PreviewBundleFallbackAlreadyInstalled_CheckPasses()
+    {
+        _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                Entry(_hostPackageId, "4.1.0", aliases: ["host"], kind: WorkloadKind.Content),
+                Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0", kind: WorkloadKind.Content),
+            ]);
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithVersions(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(check: true), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("extension bundle", StringComparison.Ordinal)
+            && line.Contains("not installed", StringComparison.Ordinal));
+        Assert.Contains(
+            _interaction.Lines,
+            line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RunAsync_FeatureWithoutStackMapping_DoesNotInstallStack()
     {
         string workerPackageId = WorkerPackage("java");
@@ -741,6 +886,7 @@ public sealed class SetupRunnerTests : IDisposable
         private readonly PackageSource _source = new("https://example.test/v3/index.json");
         private readonly Dictionary<string, CatalogSearchResult> _aliases = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, NuGetVersion> _latest = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<NuGetVersion>> _versions = new(StringComparer.OrdinalIgnoreCase);
 
         public int ResolveLatestCallCount { get; private set; }
 
@@ -760,12 +906,25 @@ public sealed class SetupRunnerTests : IDisposable
                 _source);
             _aliases[alias] = result;
             _latest[packageId] = parsed;
+            AddVersion(packageId, parsed);
             return this;
         }
 
         public FakeCatalog WithLatest(string packageId, string version)
         {
-            _latest[packageId] = NuGetVersion.Parse(version);
+            var parsed = NuGetVersion.Parse(version);
+            _latest[packageId] = parsed;
+            AddVersion(packageId, parsed);
+            return this;
+        }
+
+        public FakeCatalog WithVersions(string packageId, params string[] versions)
+        {
+            foreach (string version in versions)
+            {
+                AddVersion(packageId, NuGetVersion.Parse(version));
+            }
+
             return this;
         }
 
@@ -811,6 +970,30 @@ public sealed class SetupRunnerTests : IDisposable
             return Task.FromResult(CreateResolved(packageId, version));
         }
 
+        public Task<ResolvedPackage?> ResolveLatestVersionOnChannelAsync(
+            string packageId,
+            string? prereleaseLabel,
+            VersionRange? versionRange = null,
+            string? source = null,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ResolveLatestCallCount++;
+            ResolveSources.Add(source);
+
+            NuGetVersion? selected = null;
+            if (_versions.TryGetValue(packageId, out List<NuGetVersion>? candidates))
+            {
+                selected = candidates
+                    .Where(v => MatchesLabel(v, prereleaseLabel))
+                    .Where(v => versionRange is null || WorkloadVersionRanges.SatisfiesRange(versionRange, v, prereleaseLabel is not null))
+                    .OrderByDescending(v => v)
+                    .FirstOrDefault();
+            }
+
+            return Task.FromResult(CreateResolved(packageId, selected));
+        }
+
         public Task<ResolvedPackage?> ResolveVersionAsync(
             string packageId,
             NuGetVersion version,
@@ -829,6 +1012,25 @@ public sealed class SetupRunnerTests : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult<IReadOnlyList<NuGetVersion>>(
                 _latest.TryGetValue(packageId, out NuGetVersion? version) ? [version] : []);
+        }
+
+        private static bool MatchesLabel(NuGetVersion version, string? prereleaseLabel)
+            => prereleaseLabel is null
+                ? !version.IsPrerelease
+                : version.IsPrerelease && string.Equals(version.ReleaseLabels.FirstOrDefault(), prereleaseLabel, StringComparison.OrdinalIgnoreCase);
+
+        private void AddVersion(string packageId, NuGetVersion version)
+        {
+            if (!_versions.TryGetValue(packageId, out List<NuGetVersion>? list))
+            {
+                list = [];
+                _versions[packageId] = list;
+            }
+
+            if (!list.Contains(version))
+            {
+                list.Add(version);
+            }
         }
 
         private ResolvedPackage? CreateResolved(string packageId, NuGetVersion? version)
