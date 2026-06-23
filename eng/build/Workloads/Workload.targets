@@ -4,7 +4,7 @@
     <_AllowedWorkloadKind Include="workload;content;meta;rid-pointer" />
 
     <!-- This project contains tasks we need. Hook here to ensure it is built. -->
-    <ProjectReference Include="$(SrcRoot)Workloads/Sdk/Workloads.Sdk.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Sdk/Workloads.Sdk.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -28,6 +28,12 @@
     <_WorkloadJsonCacheFile Condition="'$(_WorkloadJsonCacheFile)' == ''">$(IntermediateOutputPath)workload.json.cache</_WorkloadJsonCacheFile>
     <_WorkloadJsonFile Condition="'$(_WorkloadJsonFile)' == ''">$(IntermediateOutputPath)workload.json</_WorkloadJsonFile>
   </PropertyGroup>
+
+  <Target Name="_EnsureAbstractionsPrivate" BeforeTargets="AssignProjectConfiguration">
+    <ItemGroup>
+      <ProjectReference Update="@(ProjectReference)" Private="false" Condition="'%(Filename)%(Extension)' == 'Abstractions.csproj'" />
+    </ItemGroup>
+  </Target>
 
   <!-- Perform early validation of the workload. -->
   <Target Name="_ValidateWorkload" BeforeTargets="BeforeBuild">
@@ -100,5 +106,6 @@
 
   <Import Project="$(MSBuildThisFileDirectory)Workload.UnifiedAssemblies.targets" />
   <Import Project="$(MSBuildThisFileDirectory)Workload.Pack.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)Workload.Publish.targets" />
 
 </Project>
