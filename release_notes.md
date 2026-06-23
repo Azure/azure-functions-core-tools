@@ -1,11 +1,11 @@
-# Azure Functions CLI 4.12.0
+# Azure Functions CLI 4.12.1
 
 #### Host Version
 
 - Host Runtime Version: 4.1048.200
 - In-Proc CLI:
-  - CLI Version: 4.5.0
-  - Host Runtime Version: 4.48.100 (includes 4.848.100, 4.648.100)
+  - CLI Version: 4.6.0
+  - Host Runtime Version: 4.49.100 (includes 4.849.100, 4.649.100)
 
 #### Changes
 
