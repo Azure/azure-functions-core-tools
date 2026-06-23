@@ -22,7 +22,6 @@
 
       <!-- Transform _RuntimeIdentifiersToDispatch items to project items to pass to MSBuild task -->
       <_ProjectsForDispatch Include="@(_RuntimeIdentifiersToDispatch->'$(MSBuildProjectFullPath)')">
-        <!-- Delay setting SelfContained until now to avoid RuntimeIdentifier being set prematurely. -->
         <AdditionalProperties>RuntimeIdentifier=%(_RuntimeIdentifiersToDispatch.Identity)</AdditionalProperties>
       </_ProjectsForDispatch>
     </ItemGroup>

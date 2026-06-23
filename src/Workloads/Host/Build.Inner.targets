@@ -1,15 +1,8 @@
 <Project>
 
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
-    <PackageId>$(AssemblyName).$(RuntimeIdentifier)</PackageId>
-    <PackageTags>$(PackageTags) rid:$(RuntimeIdentifier)</PackageTags>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);StageHostWorkloadPayload</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
-
-  <Target Name="ValidatePackWithRuntimeIdentifier" BeforeTargets="ResolvePackageAssets;GenerateNuspec" Condition="'$(RuntimeIdentifier)' == ''">
-    <Error
-      Text="RuntimeIdentifier is required when packing the host workload. Pass -r &lt;rid&gt; when packing the host workload." />
-  </Target>
 
   <Target Name="StageHostWorkloadPayload">
     <PropertyGroup>

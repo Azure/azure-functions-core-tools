@@ -1,5 +1,4 @@
-<Project>
-  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,13 +7,11 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <Title>Functions Host</Title>
     <Description>Azure Functions CLI content workload that ships the Azure Functions host.</Description>
-    <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:content alias:host func-workload</PackageTags>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <!-- The pinned WebHost package still exposes IWebHost; remove this when the package exposes the IHost-based entry point from dev. -->
-    <NoWarn>$(NoWarn);NU5128;NU5100;ASPDEPR008</NoWarn>
-    <PackAllRids>$(CI)</PackAllRids>
+    <NoWarn>$(NoWarn);ASPDEPR008</NoWarn>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>host</WorkloadAlias>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,17 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="workload.json" Pack="true" PackagePath="/" />
     <None Include="workers\workers.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!--
-    In CI, we want to build and pack the host workload for each runtime identifier.
-    We use 'PackAllRids' as an intermediate property so local dev can still pack with -p:PackAllRids=true
-    (and not needing to set the full CI=true).
-  -->
-  <Import Project="Build.Inner.targets" Condition="$(PackAllRids) AND '$(RuntimeIdentifier)' != ''" />
-  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
-  <Import Project="Build.Outer.targets" Condition="$(PackAllRids) AND '$(RuntimeIdentifier)' == ''" />
+  <Import Project="$(MSBuildThisFileDirectory)Build.Inner.targets" />
 
 </Project>

@@ -1,0 +1,104 @@
+<Project>
+
+  <ItemGroup>
+    <_AllowedWorkloadKind Include="workload;content;meta;rid-pointer" />
+
+    <!-- This project contains tasks we need. Hook here to ensure it is built. -->
+    <ProjectReference Include="$(SrcRoot)Workloads/Sdk/Workloads.Sdk.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <_WorkloadSdkAssembly>$(BaseOutputPath)../Workloads.Sdk/$(Configuration.ToLowerInvariant())/Azure.Functions.Cli.Workloads.Sdk.dll</_WorkloadSdkAssembly>
+  </PropertyGroup>
+
+  <!-- TODO: Remove 'TaskHostFactory' when shipping as a nupkg. It is used here to avoid file locking issues between builds. -->
+  <UsingTask TaskName="ResolveWorkloadEntry" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
+  <UsingTask TaskName="WriteWorkloadJson" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
+  <UsingTask TaskName="ResolveWorkloadCopyLocal" AssemblyFile="$(_WorkloadSdkAssembly)" TaskFactory="TaskHostFactory" />
+
+  <PropertyGroup>
+    <!-- constants -->
+    <_FuncWorkloadSchema>https://aka.ms/func-workloads/package/v1/schema.json</_FuncWorkloadSchema>
+
+    <!-- This is a multi-RID package. The outer package will become 'rid-pointer' and each inner package will keep the original kind. -->
+    <WorkloadKind Condition="'$(RuntimeIdentifiers)' != '' AND '$(RuntimeIdentifier)' == ''">rid-pointer</WorkloadKind>
+
+    <!-- When NoBuild is true, assume assemblies will already exist as needed. -->
+    <_ResolveWorkloadEntryPointDependsOn Condition="'$(NoBuild)' != 'true'">Build</_ResolveWorkloadEntryPointDependsOn>
+    <_WorkloadJsonCacheFile Condition="'$(_WorkloadJsonCacheFile)' == ''">$(IntermediateOutputPath)workload.json.cache</_WorkloadJsonCacheFile>
+    <_WorkloadJsonFile Condition="'$(_WorkloadJsonFile)' == ''">$(IntermediateOutputPath)workload.json</_WorkloadJsonFile>
+  </PropertyGroup>
+
+  <!-- Perform early validation of the workload. -->
+  <Target Name="_ValidateWorkload" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(WorkloadKind)' == ''" Text="WorkloadKind is not specified. Valid values are: @(_AllowedWorkloadKind)." />
+    <Error Condition="!@(_AllowedWorkloadKind->AnyHaveMetadataValue('Identity', '$(WorkloadKind)'))" Text="Invalid WorkloadKind '$(WorkloadKind)'. Valid values are: @(_AllowedWorkloadKind)." />
+  </Target>
+
+  <!-- Resolve the entry point for the workload when it is a 'workload' kind. -->
+  <Target Name="_ResolveWorkloadEntryPoint" Condition="'$(WorkloadKind)' == 'workload'" 
+    DependsOnTargets="$(_ResolveWorkloadEntryPointDependsOn)">
+    <PropertyGroup>
+      <WorkloadEntryPointAssembly Condition="'$(WorkloadEntryPointAssembly)' == ''">$(TargetFileName)</WorkloadEntryPointAssembly>
+    </PropertyGroup>
+
+    <ResolveWorkloadEntry AssemblyPath="$(TargetPath)" Condition="'$(WorkloadEntryPointType)' == ''">
+      <Output TaskParameter="WorkloadType" PropertyName="WorkloadEntryPointType" />
+    </ResolveWorkloadEntry>
+
+    <Error Condition="'$(WorkloadEntryPointType)' == ''" Text="Failed to resolve workload entry point type. 'WorkloadEntryPointType' is empty." />
+  </Target>
+
+  <!--
+  Generate the workload JSON cache. This is for incremental builds.
+  We hash the inputs into workload.json to determine if it needs to be regenerated.
+  Does not use FileWrites as this is a pack-time operation. FileWrites are for build-time operations.
+  -->
+  <Target Name="_GenerateWorkloadJsonCache" DependsOnTargets="_ResolveWorkloadEntryPoint;_ResolveRidSpecificWorkload" Outputs="$(_WorkloadJsonCacheFile)">
+    <ItemGroup>
+      <_WorkloadJsonInputCacheToHash Include="$(WorkloadKind)" />
+      <_WorkloadJsonInputCacheToHash Include="$(_FuncWorkloadSchema)" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(WorkloadKind)' == 'workload'">
+      <_WorkloadJsonInputCacheToHash Include="$(WorkloadEntryPointAssembly)" />
+      <_WorkloadJsonInputCacheToHash Include="$(WorkloadEntryPointType)" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(WorkloadKind)' == 'rid-pointer'">
+      <_WorkloadRid Include="$(RuntimeIdentifiers)" />
+      <_WorkloadRidSpecificPackage Include="@(_WorkloadRid->'$(PackageId).%(Identity)')" RuntimeIdentifier="%(Identity)" />
+      <_WorkloadJsonInputCacheToHash Include="@(_WorkloadRidSpecificPackage)" />
+    </ItemGroup>
+
+    <Hash ItemsToHash="@(_WorkloadJsonInputCacheToHash)">
+      <Output TaskParameter="HashResult" PropertyName="_WorkloadJsonCacheHash" />
+    </Hash>
+
+    <WriteLinesToFile File="$(_WorkloadJsonCacheFile)" Lines="$(_WorkloadJsonCacheHash)" Overwrite="true" WriteOnlyWhenDifferent="true"  />
+  </Target>
+
+  <!--
+  Generate the workload JSON file. Will skip if up to date.
+  Does not use FileWrites as this is a pack-time operation. FileWrites are for build-time operations.
+  -->
+  <Target Name="GenerateWorkloadJson" DependsOnTargets="_GenerateWorkloadJsonCache;_ResolveRidSpecificWorkload"
+    Inputs="$(_WorkloadJsonCacheFile);$(MSBuildAllProjects)" Outputs="$(_WorkloadJsonFile)">
+
+    <WriteWorkloadJson
+      OutputPath="$(_WorkloadJsonFile)"
+      Schema="$(_FuncWorkloadSchema)"
+      Kind="$(WorkloadKind)"
+      EntryPointAssemblyPath="$(WorkloadEntryPointAssembly)"
+      EntryPointType="$(WorkloadEntryPointType)"
+      InnerPackages="@(_WorkloadRidSpecificPackage)"/>
+
+    <ItemGroup>
+      <EmbedInBinlog Include="$(_WorkloadJsonFile)" />
+    </ItemGroup>
+  </Target>
+
+  <Import Project="$(MSBuildThisFileDirectory)Workload.UnifiedAssemblies.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)Workload.Pack.targets" />
+
+</Project>

@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+  This file defines the unified assemblies for the workload. Anything here is EXCLUDED from the final workload package.
+  -->
+  <ItemGroup>
+    <!-- In the final SDK, the 'Project' one will be removed. It is only here because we use p2p references. -->
+    <_WorkloadUnifiedItems Include="$(SrcRoot)Abstractions/Abstractions.csproj" Kind="Project" />
+    <_WorkloadUnifiedItems Include="Azure.Functions.Cli.Abstractions" Kind="Package" />
+    <_WorkloadUnifiedItems Include="Microsoft.Extensions.DependencyInjection.Abstractions" Kind="Package" />
+    <_WorkloadUnifiedItems Include="System.CommandLine" Kind="Package" />
+  </ItemGroup>
+
+</Project>
