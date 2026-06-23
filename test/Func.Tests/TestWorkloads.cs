@@ -23,7 +23,8 @@ internal static class TestWorkloads
             InstallDirectory: AppContext.BaseDirectory,
             ContentRoot: AppContext.BaseDirectory,
             DisplayName: instance.DisplayName,
-            Description: instance.Description);
+            Description: instance.Description,
+            LoadContext: null!);
     }
 
     public static ContentWorkloadInfo CreateContentInfo(string packageId = "Test.Content.A", string version = "1.0.0")

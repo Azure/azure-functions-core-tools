@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Workloads.Loading;
+
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
@@ -35,6 +37,10 @@ internal abstract record WorkloadInfo(
 /// <param name="ContentRoot">Directory containing package payload files.</param>
 /// <param name="DisplayName">Human-readable name for <c>func workload list</c>.</param>
 /// <param name="Description">One-line workload description.</param>
+/// <param name="LoadContext">The assembly load context used to load the workload.</param>
+/// <remarks>
+/// The <see cref="LoadContext"/> must be kept in memory as long as the workload is in use.
+/// </remarks>
 internal sealed record RuntimeWorkloadInfo(
     Workload Instance,
     string PackageId,
@@ -43,7 +49,8 @@ internal sealed record RuntimeWorkloadInfo(
     string InstallDirectory,
     string ContentRoot,
     string DisplayName,
-    string Description)
+    string Description,
+    WorkloadLoadContext LoadContext)
     : WorkloadInfo(WorkloadKind.Workload, PackageId, PackageVersion, Aliases, InstallDirectory, ContentRoot, DisplayName, Description);
 
 /// <summary>

@@ -335,7 +335,8 @@ public class WorkloadListCommandTests
             AppContext.BaseDirectory,
             AppContext.BaseDirectory,
             instance.DisplayName,
-            instance.Description);
+            instance.Description,
+            LoadContext: null!);
 
     private static Task<int> InvokeAsync(WorkloadListCommand cmd, params string[] args)
         => InvokeAsync(cmd, includeRootVerbose: false, args);

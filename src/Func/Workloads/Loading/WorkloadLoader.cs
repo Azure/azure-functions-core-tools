@@ -68,8 +68,8 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
                 $"[{entry.PackageId}] Could not load workload: assembly '{entryPoint.AssemblyPath}' was not found at '{contentRoot}'.");
         }
 
-        Assembly assembly = new WorkloadLoadContext(entry.PackageId, assemblyPath)
-            .LoadFromAssemblyPath(assemblyPath);
+        WorkloadLoadContext loadContext = new(entry.PackageId, assemblyPath);
+        Assembly assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
 
         Type? type = assembly.GetType(entryPoint.Type, throwOnError: false) ?? throw new InvalidWorkloadException(
                 $"[{entry.PackageId}] Could not load workload: type '{entryPoint.Type}' was not found in '{entryPoint.AssemblyPath}' (install path: '{installPath}').");
@@ -81,7 +81,6 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
         }
 
         var instance = (Workload)Activator.CreateInstance(type)!;
-
         return new RuntimeWorkloadInfo(
             Instance: instance,
             PackageId: entry.PackageId,
@@ -90,6 +89,7 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
             InstallDirectory: installPath,
             ContentRoot: contentRoot,
             DisplayName: instance.DisplayName,
-            Description: instance.Description);
+            Description: instance.Description,
+            LoadContext: loadContext);
     }
 }
