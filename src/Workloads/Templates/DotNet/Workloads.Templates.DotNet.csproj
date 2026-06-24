@@ -22,6 +22,6 @@
     <PackageDownload Include="$(SourceItemTemplatesPackageId)" Version="[$(SourceItemTemplatesVersion)]" />
   </ItemGroup>
 
-  <Import Project="..\..\..\..\eng\build\Workloads.Templates.DotNet.targets" />
+  <Import Project="$(EngBuildRoot)Workloads/Workloads.Templates.DotNet.targets" />
 
 </Project>

@@ -202,7 +202,7 @@
     <Error Condition="'$(TemplatesStackLanguageFilter)' == ''"
            Text="TemplatesStackLanguageFilter must be set (e.g. 'JavaScript;TypeScript' for Node, 'Python' for Python)." />
 
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../scripts/filter-templates.ps1&quot; -Path &quot;$(_TplStaging)v1/templates/templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v1" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../scripts/filter-templates.ps1&quot; -Path &quot;$(_TplStaging)v1/templates/templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v1" />
 
     <Touch Files="$(_TplStaging).filtered.v1" AlwaysCreate="true" />
   </Target>
@@ -216,7 +216,7 @@
     <Error Condition="'$(TemplatesStackLanguageFilter)' == ''"
            Text="TemplatesStackLanguageFilter must be set (e.g. 'JavaScript;TypeScript' for Node, 'Python' for Python)." />
 
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../scripts/filter-templates.ps1&quot; -Path &quot;$(_TplStaging)v2/templates/templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v2" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../scripts/filter-templates.ps1&quot; -Path &quot;$(_TplStaging)v2/templates/templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v2" />
 
     <Touch Files="$(_TplStaging).filtered.v2" AlwaysCreate="true" />
   </Target>
@@ -300,7 +300,7 @@
       backslashes are literal filename characters, not path separators,
       and the staged file ends up at the wrong path.
     -->
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../scripts/fetch-bundle-extensions-json.ps1&quot; -Channel &quot;$(BundleChannel)&quot; -OutputPath &quot;$(_TplStaging)bundle/extensions.json&quot; -VersionOut &quot;$(_TplStaging)bundle/version.txt&quot;" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../scripts/fetch-bundle-extensions-json.ps1&quot; -Channel &quot;$(BundleChannel)&quot; -OutputPath &quot;$(_TplStaging)bundle/extensions.json&quot; -VersionOut &quot;$(_TplStaging)bundle/version.txt&quot;" />
   </Target>
 
   <Target Name="FilterStaticTemplatesByBundleChannel"
@@ -311,7 +311,7 @@
           Outputs="$(_TplStaging)v2/templates/templates.json">
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json')"
            Text="FilterTemplatesByBundleChannel=true requires content/v2/templates/_bindings.json (per-template binding-requirements map)." />
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../scripts/filter-node-templates-by-bundle.ps1&quot; -TemplatesPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/templates.json&quot; -BindingsMapPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json&quot; -ExtensionsJsonPath &quot;$(_TplStaging)bundle/extensions.json&quot; -OutputPath &quot;$(_TplStaging)v2/templates/templates.json&quot; -ChannelLabel &quot;$(BundleChannel)&quot;" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../scripts/filter-node-templates-by-bundle.ps1&quot; -TemplatesPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/templates.json&quot; -BindingsMapPath &quot;$(MSBuildProjectDirectory)/content/v2/templates/_bindings.json&quot; -ExtensionsJsonPath &quot;$(_TplStaging)bundle/extensions.json&quot; -OutputPath &quot;$(_TplStaging)v2/templates/templates.json&quot; -ChannelLabel &quot;$(BundleChannel)&quot;" />
   </Target>
 
   <Target Name="_AddStaticTemplatesToPack"

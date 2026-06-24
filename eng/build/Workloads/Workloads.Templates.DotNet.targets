@@ -47,8 +47,8 @@
   <Target Name="HydrateDotnetTemplates"
           Condition="'$(SkipHydrateDotnetTemplates)' != 'true'"
           BeforeTargets="GenerateNuspec;_GetPackageFiles"
-          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)..\scripts\hydrate-dotnet-templates.ps1;$(_DotnetTemplatesNupkg)"
-          Outputs="$(IntermediateOutputPath)dotnet-templates\.hydrated">
+          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)../../scripts/hydrate-dotnet-templates.ps1;$(_DotnetTemplatesNupkg)"
+          Outputs="$(IntermediateOutputPath)dotnet-templates/.hydrated">
 
     <Error Condition="'$(SourceItemTemplatesPackageId)' == ''"
            Text="SourceItemTemplatesPackageId must be set (the upstream NuGet template package id, e.g. Microsoft.Azure.Functions.Worker.ItemTemplates)." />
@@ -58,11 +58,11 @@
            Text="Upstream template nupkg not found at '$(_DotnetTemplatesNupkg)'. Restore should have downloaded it via the &lt;PackageDownload&gt; item; run a full restore before pack." />
 
     <PropertyGroup>
-      <_DotnetTemplatesHive>$(IntermediateOutputPath)dotnet-templates\hive</_DotnetTemplatesHive>
-      <_DotnetTemplatesOutDir>$(IntermediateOutputPath)dotnet-templates\out</_DotnetTemplatesOutDir>
-      <_DotnetTemplatesIndex>$(_DotnetTemplatesOutDir)\dotnet-templates.json</_DotnetTemplatesIndex>
-      <_DotnetTemplatesSource>$(_DotnetTemplatesOutDir)\source.json</_DotnetTemplatesSource>
-      <_DotnetTemplatesScript>$(MSBuildThisFileDirectory)..\scripts\hydrate-dotnet-templates.ps1</_DotnetTemplatesScript>
+      <_DotnetTemplatesHive>$(IntermediateOutputPath)dotnet-templates/hive</_DotnetTemplatesHive>
+      <_DotnetTemplatesOutDir>$(IntermediateOutputPath)dotnet-templates/out</_DotnetTemplatesOutDir>
+      <_DotnetTemplatesIndex>$(_DotnetTemplatesOutDir)/dotnet-templates.json</_DotnetTemplatesIndex>
+      <_DotnetTemplatesSource>$(_DotnetTemplatesOutDir)/source.json</_DotnetTemplatesSource>
+      <_DotnetTemplatesScript>$(MSBuildThisFileDirectory)../../scripts/hydrate-dotnet-templates.ps1</_DotnetTemplatesScript>
     </PropertyGroup>
 
     <MakeDir Directories="$(_DotnetTemplatesOutDir)" />
@@ -75,7 +75,7 @@
     <Error Condition="!Exists('$(_DotnetTemplatesSource)')"
            Text="Hydrate script reported success but $(_DotnetTemplatesSource) was not produced. Check the script output above." />
 
-    <Touch Files="$(IntermediateOutputPath)dotnet-templates\.hydrated" AlwaysCreate="true" />
+    <Touch Files="$(IntermediateOutputPath)dotnet-templates/.hydrated" AlwaysCreate="true" />
   </Target>
 
   <Target Name="_AddDotnetTemplatesToPack"
@@ -83,9 +83,9 @@
           Condition="'$(SkipHydrateDotnetTemplates)' != 'true'"
           BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <None Include="$(IntermediateOutputPath)dotnet-templates\out\dotnet-templates.json"
+      <None Include="$(IntermediateOutputPath)dotnet-templates/out/dotnet-templates.json"
             Pack="true" PackagePath="tools/any/content/" Visible="false" />
-      <None Include="$(IntermediateOutputPath)dotnet-templates\out\source.json"
+      <None Include="$(IntermediateOutputPath)dotnet-templates/out/source.json"
             Pack="true" PackagePath="tools/any/content/" Visible="false" />
     </ItemGroup>
   </Target>

@@ -16,7 +16,7 @@
       $(SourceBundleVersion)      bundle version snapshotted at build time.
                                   Defaults to $(BundleVersion) (the
                                   channel-resolved bundle version from
-                                  eng/build/Workloads.Templates.SourceBundleVersion.props)
+                                  eng/build/Workloads/Workloads.Templates.SourceBundleVersion.props)
                                   so a bundle bump propagates from one file.
                                   Recorded as build provenance only; not
                                   used to derive the templates pkg version
@@ -39,7 +39,7 @@
     <BundleChannel>$([System.Text.RegularExpressions.Regex]::Match($(BUILD_SOURCEBRANCHNAME), '^v[^-]+(?:-([^.]+))').Groups[1].Value)</BundleChannel>
   </PropertyGroup>
 
-  <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
+  <Import Project="$(EngBuildRoot)Workloads/Workloads.Templates.SourceBundleVersion.props" />
 
   <PropertyGroup>
     <VersionPrefix>1.0.1</VersionPrefix>
