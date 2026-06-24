@@ -313,11 +313,15 @@ try {
             }
         }
 
-        # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 'func' on PATH.
+        # Drop func5 wrappers so v5 can be invoked side-by-side with a v4 'func' on PATH.
         if ($os -eq 'win') {
-            $wrapperPath = Join-Path $InstallPath 'func5.cmd'
+            $cmdWrapperPath = Join-Path $InstallPath 'func5.cmd'
             @('@echo off', '"%~dp0\func.exe" %*') -join "`r`n" |
-                Set-Content -Path $wrapperPath -Encoding Ascii -NoNewline
+                Set-Content -Path $cmdWrapperPath -Encoding Ascii -NoNewline
+
+            $bashWrapperPath = Join-Path $InstallPath 'func5'
+            $bashWrapperBody = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func.exe`" `"`$@`"`n"
+            [System.IO.File]::WriteAllText($bashWrapperPath, $bashWrapperBody)
         } else {
             $wrapperPath = Join-Path $InstallPath 'func5'
             $body = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
