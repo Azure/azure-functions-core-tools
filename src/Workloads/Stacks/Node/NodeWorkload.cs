@@ -6,6 +6,8 @@ using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
+[assembly: CliWorkload<Azure.Functions.Cli.Workloads.Node.NodeWorkload>()]
+
 namespace Azure.Functions.Cli.Workloads.Node;
 
 /// <summary>

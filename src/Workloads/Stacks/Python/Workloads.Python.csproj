@@ -4,11 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Title>Python Stack</Title>
     <Description>Azure Functions CLI tooling for Python projects.</Description>
-    <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:workload alias:python func-workload</PackageTags>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>workload</WorkloadKind>
+    <WorkloadAlias>python</WorkloadAlias>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,15 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj">
-      <PrivateAssets>all</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
-    </ProjectReference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="workload.json" Pack="true" PackagePath="/" />
-    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="tools/any/" Visible="false" />
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
