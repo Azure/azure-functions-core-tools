@@ -4,12 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <Title>Node.js Worker</Title>
     <Description>Azure Functions CLI content workload that ships the Node.js language worker.</Description>
-    <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:content alias:node-worker func-worker func-workload</PackageTags>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>node-worker</WorkloadAlias>
+    <PackageTags>func-worker</PackageTags>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeNodeWorkerContentInPack</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,19 +31,13 @@
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="workload.json" Pack="true" PackagePath="/" />
-  </ItemGroup>
-
-  <Target Name="IncludeNodeWorkerContentInPack" BeforeTargets="_GetPackageFiles">
+  <Target Name="IncludeNodeWorkerContentInPack">
     <Error Condition="'$(PkgMicrosoft_Azure_Functions_NodeJsWorker)' == ''"
            Text="Microsoft.Azure.Functions.NodeJsWorker package path not resolved. Run 'dotnet restore' first." />
     <ItemGroup>
       <_NodeWorkerFile Include="$(PkgMicrosoft_Azure_Functions_NodeJsWorker)/contentFiles/any/any/workers/node/**/*" />
-      <None Include="@(_NodeWorkerFile)"
-            TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
-            Pack="true"
-            PackagePath="tools/any/" />
+      <TfmSpecificPackageFile Include="@(_NodeWorkerFile)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+        Pack="true" PackagePath="tools/any/" />
     </ItemGroup>
   </Target>
 
