@@ -18,6 +18,10 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
     [Required]
     public string Kind { get; set; } = string.Empty;
 
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string Description { get; set; } = string.Empty;
+
     public string EntryPointAssemblyPath { get; set; } = string.Empty;
 
     public string EntryPointType { get; set; } = string.Empty;
@@ -51,6 +55,8 @@ public sealed class WriteWorkloadJson : Microsoft.Build.Utilities.Task
         {
             Schema = Schema,
             Kind = Kind,
+            DisplayName = string.IsNullOrEmpty(DisplayName) ? null : DisplayName,
+            Description = string.IsNullOrEmpty(Description) ? null : Description,
             EntryPoint = entryPoint,
             Packages = packages,
         };
@@ -107,6 +113,12 @@ internal sealed class WorkloadJsonModel
 
     [JsonPropertyName("kind")]
     public string Kind { get; set; } = string.Empty;
+
+    [JsonPropertyName("displayName")]
+    public string? DisplayName { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
 
     [JsonPropertyName("entryPoint")]
     public EntryPointModel? EntryPoint { get; set; }

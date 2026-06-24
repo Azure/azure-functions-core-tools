@@ -89,6 +89,8 @@
       OutputPath="$(_WorkloadJsonFile)"
       Schema="$(_FuncWorkloadSchema)"
       Kind="$(WorkloadKind)"
+      DisplayName="$(Title)"
+      Description="$(Description)"
       EntryPointAssemblyPath="$(WorkloadEntryPointAssembly)"
       EntryPointType="$(WorkloadEntryPointType)"
       InnerPackages="@(_WorkloadRidSpecificPackage)"/>
