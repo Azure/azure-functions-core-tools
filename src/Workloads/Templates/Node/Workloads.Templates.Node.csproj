@@ -4,13 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <Title>Node.js Function Templates</Title>
     <Description>Node.js function templates for the func CLI. Compatible with Microsoft.Azure.Functions.ExtensionBundle (minBundle:$(MinBundleVersionRange)).</Description>
-    <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:content alias:node-templates func-workload minBundle:$(MinBundleVersionRange)</PackageTags>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackageTags>minBundle:$(MinBundleVersionRange)</PackageTags>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>node-templates</WorkloadAlias>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
 
     <!--
       Static content source: the v2 Node templates ship as in-repo content
@@ -30,10 +28,6 @@
     <IncludeV2Templates>true</IncludeV2Templates>
     <FilterTemplatesByBundleChannel>true</FilterTemplatesByBundleChannel>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Include="workload.json" Pack="true" PackagePath="/" />
-  </ItemGroup>
 
   <Import Project="$(EngBuildRoot)Workloads/Workloads.Templates.targets" />
 

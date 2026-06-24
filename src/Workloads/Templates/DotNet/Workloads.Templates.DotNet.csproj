@@ -4,18 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <Title>.NET Function Templates</Title>
     <Description>.NET function templates for the func CLI. Resolves templates from Microsoft.Azure.Functions.Worker.ItemTemplates at func new time.</Description>
-    <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:content alias:dotnet-templates func-workload</PackageTags>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>dotnet-templates</WorkloadAlias>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Include="workload.json" Pack="true" PackagePath="/" />
-  </ItemGroup>
 
   <ItemGroup>
     <!-- Pre-fetch the upstream nupkg during restore so the hydrate step is offline. -->
