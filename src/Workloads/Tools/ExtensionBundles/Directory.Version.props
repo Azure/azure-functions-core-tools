@@ -8,7 +8,7 @@
                           and the user-facing version in func logs. Bare
                           three-part SemVer. Defaults to the channel's
                           pinned value in
-                          eng/build/Workloads.Templates.SourceBundleVersion.props
+                          eng/build/Workloads/Workloads.Templates.SourceBundleVersion.props
                           so the bundle this workload ships always matches
                           the snapshot the templates workloads were built
                           against (one-line bump for both).
@@ -26,7 +26,7 @@
     <BundleChannel>$([System.Text.RegularExpressions.Regex]::Match($(BUILD_SOURCEBRANCHNAME), '^v[^-]+(?:-([^.]+))').Groups[1].Value)</BundleChannel>
   </PropertyGroup>
 
-  <Import Project="$(EngBuildRoot)Workloads.Templates.SourceBundleVersion.props" />
+  <Import Project="$(EngBuildRoot)Workloads/Workloads.Templates.SourceBundleVersion.props" />
 
   <PropertyGroup>
     <VersionPrefix>$(BundleVersion)</VersionPrefix>

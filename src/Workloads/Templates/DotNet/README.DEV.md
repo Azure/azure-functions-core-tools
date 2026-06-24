@@ -28,7 +28,7 @@ dotnet pack ... /p:SourceItemTemplatesPackageId=Microsoft.Azure.Functions.Worker
 
 The csproj's `<PackageDownload>` item pulls the upstream pkg into the
 global packages folder during restore, so the pack-time `HydrateDotnetTemplates`
-target (in `eng/build/Workloads.Templates.DotNet.targets`) never reaches
+target (in `eng/build/Workloads/Workloads.Templates.DotNet.targets`) never reaches
 the network. It runs `dotnet new install <local-nupkg-path>` against a
 build-scoped template hive, reads the resulting `templatecache.json`,
 filters to Functions item templates (`Classifications` contains

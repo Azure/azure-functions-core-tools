@@ -20,6 +20,6 @@
     <None Include="workload.json" Pack="true" PackagePath="/" />
   </ItemGroup>
 
-  <Import Project="..\..\..\..\eng\build\Workloads.Templates.targets" />
+  <Import Project="$(EngBuildRoot)Workloads/Workloads.Templates.targets" />
 
 </Project>
