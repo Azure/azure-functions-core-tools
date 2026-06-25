@@ -216,6 +216,8 @@ Implementation items this design surfaces.
    requirement.
 7. Homebrew formula/tap for v5 with auto-bump on release.
 8. Installer coverage validation matrix (all supported os/arch) as a GA gate.
+9. Update ADO pipeline task and GitHub Actions workflow (azure/functions-action)
+   to support v5 CLI installation.
 
 **Channels (post-GA)**
 
