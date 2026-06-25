@@ -1,7 +1,6 @@
 #! /usr/bin/env node
 
 const extract = require('extract-zip');
-const url = require('url');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const https = require('https');
 const version = require('../package.json').version;
@@ -49,7 +48,13 @@ const fileName = 'Azure.Functions.Cli.' + platform + '.' + version + '.zip';
 const endpoint = 'https://cdn.functions.azure.com/public/' + consolidatedBuildId + '/' + fileName;
 
 console.log('attempting to GET %j', endpoint);
-const options = url.parse(endpoint);
+const endpointUrl = new URL(endpoint);
+const options = {
+    protocol: endpointUrl.protocol,
+    hostname: endpointUrl.hostname,
+    port: endpointUrl.port,
+    path: endpointUrl.pathname + endpointUrl.search
+};
 
 // npm config preceed system environment
 // https://github.com/npm/npm/blob/19397ad523434656af3d3765e80e22d7e6305f48/lib/config/reg-client.js#L7-L8
