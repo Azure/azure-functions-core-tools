@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>PowerShell Worker</Title>
+    <Description>Azure Functions CLI content workload that ships the PowerShell language worker.</Description>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>powershell-worker</WorkloadAlias>
+    <PackageTags>func-worker</PackageTags>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludePowerShellWorkerContentInPack</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The PowerShell worker ships one NuGet per supported PS version. Each
+      package carries:
+        - A shared worker.config.json at contentFiles/any/any/workers/powershell/
+        - Version-specific DLLs under contentFiles/any/any/workers/powershell/<ver>/
+
+      We reference all supported versions and merge their content into a single
+      tools/any/ layout so the host can resolve the correct version at runtime
+      via %FUNCTIONS_WORKER_RUNTIME_VERSION%.
+
+      GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_PowerShellWorker_PS7_4)
+      etc. IncludeAssets=none prevents upstream build targets from affecting this project.
+    -->
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" GeneratePathProperty="true" VersionOverride="$(WorkerVersionPS74)">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>none</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.6" GeneratePathProperty="true" VersionOverride="$(WorkerVersionPS76)">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>none</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Target Name="IncludePowerShellWorkerContentInPack">
+    <Error Condition="'$(PkgMicrosoft_Azure_Functions_PowerShellWorker_PS7_4)' == ''"
+           Text="Microsoft.Azure.Functions.PowerShellWorker.PS7.4 package path not resolved. Run 'dotnet restore' first." />
+    <Error Condition="'$(PkgMicrosoft_Azure_Functions_PowerShellWorker_PS7_6)' == ''"
+           Text="Microsoft.Azure.Functions.PowerShellWorker.PS7.6 package path not resolved. Run 'dotnet restore' first." />
+    <ItemGroup>
+      <!-- PS 7.4 content (worker.config.json + 7.4/ subdirectory) -->
+      <_PS74WorkerFile Include="$(PkgMicrosoft_Azure_Functions_PowerShellWorker_PS7_4)/contentFiles/any/any/workers/powershell/**/*" />
+      <TfmSpecificPackageFile Include="@(_PS74WorkerFile)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+        Pack="true" PackagePath="tools/any/" />
+
+      <!-- PS 7.6 content (7.6/ subdirectory; worker.config.json is identical, deduped by NuGet) -->
+      <_PS76WorkerFile Include="$(PkgMicrosoft_Azure_Functions_PowerShellWorker_PS7_6)/contentFiles/any/any/workers/powershell/**/*" />
+      <TfmSpecificPackageFile Include="@(_PS76WorkerFile)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+        Pack="true" PackagePath="tools/any/" />
+    </ItemGroup>
+  </Target>
+
+</Project>
