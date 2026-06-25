@@ -6,10 +6,10 @@ using System.Text.Json.Serialization;
 namespace Azure.Functions.Cli.Update;
 
 /// <summary>
-/// Source-generated <see cref="JsonSerializerContext"/> for GitHub releases
-/// deserialization. Keeps JSON reflection-free (AOT/trim-friendly), matching
+/// Source-generated <see cref="JsonSerializerContext"/> for the CDN version
+/// manifest. Keeps JSON reflection-free (AOT/trim-friendly), matching
 /// the pattern used by other JSON-consuming subsystems in this CLI.
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
-[JsonSerializable(typeof(GitHubRelease[]))]
+[JsonSerializable(typeof(VersionManifest))]
 internal sealed partial class UpdateJsonContext : JsonSerializerContext;
