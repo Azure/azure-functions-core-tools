@@ -1,10 +1,5 @@
 # Core Tools & Functions CLI Release Design
 
-> **Status:** Draft. This document proposes how Azure Functions Core Tools
-> ships v4 and v5 in parallel: release cadence, workload alignment with the
-> core CLI, the per-channel distribution matrix, and the rollback story.
-> It resolves [#5328](https://github.com/Azure/azure-functions-core-tools/issues/5328).
-
 ## Summary of Decisions
 
 | # | Decision | Outcome |
