@@ -65,13 +65,13 @@ Both fields contain bare SemVer version strings (no `v` prefix).
 Artifacts are hosted on the same CDN at a predictable path:
 
 ```
-https://cdn.functions.azure.com/public/{version}/Azure.Functions.Cli.{rid}.{version}.zip
+https://cdn.functions.azure.com/public/v5/{version}/Azure.Functions.Cli.{rid}.{version}.zip
 ```
 
 Examples:
 
-- `https://cdn.functions.azure.com/public/5.1.2/Azure.Functions.Cli.win-x64.5.1.2.zip`
-- `https://cdn.functions.azure.com/public/5.2.0-preview.1/Azure.Functions.Cli.osx-arm64.5.2.0-preview.1.zip`
+- `https://cdn.functions.azure.com/public/v5/5.1.2/Azure.Functions.Cli.win-x64.5.1.2.zip`
+- `https://cdn.functions.azure.com/public/v5/5.2.0-preview.1/Azure.Functions.Cli.osx-arm64.5.2.0-preview.1.zip`
 
 ### Advantages over GitHub Releases
 
@@ -152,7 +152,7 @@ install methods.
 GET https://cdn.functions.azure.com/public/cli/v5/version.json
   → parse manifest, select version from stable/preview field
   → compare with current version (SemVer precedence)
-  → if newer: download zip from CDN at public/{version}/Azure.Functions.Cli.{rid}.{version}.zip
+  → if newer: download zip from CDN at public/v5/{version}/Azure.Functions.Cli.{rid}.{version}.zip
   → extract, swap, verify
 ```
 
@@ -184,7 +184,7 @@ fail with a `GracefulException` pointing the user to re-run the install script.
 
 1. Resolve `currentExePath = Environment.ProcessPath`; derive `installDir`.
 2. Resolve target version from CDN manifest (or `--version` directly).
-3. Build download URL: `https://cdn.functions.azure.com/public/{version}/Azure.Functions.Cli.{rid}.{version}.zip`
+3. Build download URL: `https://cdn.functions.azure.com/public/v5/{version}/Azure.Functions.Cli.{rid}.{version}.zip`
 4. Download the archive to a temp dir.
 5. Extract to a temp dir.
 6. Locate the new `func` / `func.exe` in the extracted payload.
@@ -215,7 +215,7 @@ manifest. The process uses a two-phase approach for atomicity:
 Upload the platform-specific zip archives to the CDN:
 
 ```
-public/{version}/Azure.Functions.Cli.{rid}.{version}.zip
+public/v5/{version}/Azure.Functions.Cli.{rid}.{version}.zip
 ```
 
 For all supported RIDs:
