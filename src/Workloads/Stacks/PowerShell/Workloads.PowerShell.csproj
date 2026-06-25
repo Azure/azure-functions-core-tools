@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>PowerShell Stack</Title>
+    <Description>Azure Functions CLI tooling for PowerShell projects.</Description>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>workload</WorkloadKind>
+    <WorkloadAlias>powershell</WorkloadAlias>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.PowerShell.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
