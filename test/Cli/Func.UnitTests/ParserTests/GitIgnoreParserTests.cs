@@ -150,7 +150,7 @@ othernonexistent/**/what
         }
 
         [Fact]
-        public async void PowerShellModuleBinFoldersShouldBeHandledCorrectly()
+        public async Task PowerShellModuleBinFoldersShouldBeHandledCorrectly()
         {
             // Test the current gitignore content from the actual static resource
             var currentGitIgnore = await StaticResources.GitIgnore;

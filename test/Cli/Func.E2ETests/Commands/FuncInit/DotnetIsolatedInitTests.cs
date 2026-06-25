@@ -126,7 +126,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         [InlineData("net8.0")]
         [InlineData("net9.0")]
         [InlineData("net10.0")]
-        public async void Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile(string targetFramework)
+        public async Task Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile(string targetFramework)
         {
             var workingDir = Path.Combine(WorkingDirectory, targetFramework);
 

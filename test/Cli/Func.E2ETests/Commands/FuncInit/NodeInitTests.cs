@@ -140,7 +140,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         }
 
         [Fact]
-        public async void Init_DockerOnlyOnExistingProject_GeneratesDockerfile()
+        public async Task Init_DockerOnlyOnExistingProject_GeneratesDockerfile()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_DockerOnlyOnExistingProject_GeneratesDockerfile);

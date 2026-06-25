@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
 {
     public class BaseUserSecretsTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public async Task RunUserSecretsTest(string language, string testName)
+        internal async Task RunUserSecretsTest(string language, string testName)
         {
             var port = ProcessHelper.GetAvailablePort();
 
@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
             result.Should().HaveStdOutContaining("Using for user secrets file configuration.");
         }
 
-        public async Task RunMissingStorageConnString(string languageWorker, bool shouldFail, string testName)
+        internal async Task RunMissingStorageConnString(string languageWorker, bool shouldFail, string testName)
         {
             var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
@@ -142,7 +142,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
             }
         }
 
-        public async Task RunWithUserSecrets_MissingBindingSettings(string languageWorker, string testName)
+        internal async Task RunWithUserSecrets_MissingBindingSettings(string languageWorker, string testName)
         {
             var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
