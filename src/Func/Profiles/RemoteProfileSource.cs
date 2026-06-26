@@ -12,8 +12,8 @@ namespace Azure.Functions.Cli.Profiles;
 /// </summary>
 internal sealed class RemoteProfileSource : IProfileSource
 {
-    internal const string RegistryUrl = "https://cdn.functions.azure.com/public/cli/v5/profiles/v1/registry.json";
-    internal const string ChecksumUrl = "https://cdn.functions.azure.com/public/cli/v5/profiles/v1/registry.json.sha256";
+    internal const string RegistryUrl = "https://cdn-staging.functions.azure.com/public/cli/v5/profiles/v1/registry.json";
+    internal const string ChecksumUrl = "https://cdn-staging.functions.azure.com/public/cli/v5/profiles/v1/registry.json.sha256";
     internal const string HttpClientName = "ProfileRegistry";
 
     private const string CacheFileName = "registry.json";
