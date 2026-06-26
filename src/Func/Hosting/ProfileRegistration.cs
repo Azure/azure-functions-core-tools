@@ -23,7 +23,9 @@ internal static class ProfileRegistration
         services.AddSingleton<IProfileFileSystem, ProfileFileSystem>();
         services.AddSingleton<IProfileSource, ProjectProfileSource>();
         services.AddSingleton<IProfileSource, UserProfileSource>();
+        services.AddSingleton<IProfileSource, RemoteProfileSource>();
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
+        services.AddHttpClient(RemoteProfileSource.HttpClientName);
         services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
         services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
         services.AddSingleton<IProjectProfileConfigStore, ProjectProfileConfigStore>();
