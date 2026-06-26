@@ -1,0 +1,24 @@
+bin
+obj
+.vs
+
+*.user
+*.suo
+*.Cache
+project.lock.json
+
+/packages
+/TestResults
+
+/App_Data
+/secrets
+/data
+.secrets
+appsettings.json
+local.settings.json
+
+# Azurite artifacts
+__blobstorage__
+__queuestorage__
+__tablestorage__/
+__azurite_db*__.json
