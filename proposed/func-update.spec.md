@@ -21,7 +21,7 @@ func update -y / --yes            # skip confirmation prompts (required when non
 
 Output is concise, themed via `IInteractionService` / `ITheme`:
 
-1. Resolve channel (stable, or prerelease when `--prerelease`).
+1. Determine release quality (stable only, or include prereleases).
 2. Show "Checking for updates…" spinner; print current + latest version.
 3. If up to date, exit 0 with a one-liner.
 4. If newer, prompt `Update func from X to Y? (Y/n)` (suppressed by `-y` / `--yes`).
@@ -46,10 +46,7 @@ https://cdn.functions.azure.com/public/cli/v5/version.json
 
 ### Manifest format
 
-`--prerelease` = latest stable or prerelease (include preview in the comparison,
-pick whichever is higher by SemVer precedence).
-
-Default (no flag) = latest stable only.
+The manifest publishes the latest version at each release quality level:
 
 ```json
 {
@@ -88,34 +85,36 @@ Examples:
   no need to enumerate release assets.
 - **Faster discovery**: a single small JSON fetch vs paginated GitHub API calls.
 
-## Channel resolution
+## Version selection
 
-Release quality over channel — the channel determines which versions are
-eligible, not a separate concept from the version itself.
+The `--prerelease` flag controls which release quality levels are eligible when
+determining whether a newer version exists. This is about **release quality**,
+not channels — there is no channel subscription or pinning.
 
-Two release channels, matching the existing install-script behaviour:
-
-| Channel | Manifest field | Selector |
+| Quality | Manifest field | Selector |
 | --- | --- | --- |
-| stable | `stable` | default |
+| stable | `stable` | default (no flag) |
 | prerelease | `preview` | `--prerelease` |
 
-Precedence:
+Behaviour:
 
-1. `--version X.Y.Z` (explicit, wins; `--prerelease` is still allowed for clarity).
-   Downloads directly from the CDN at the specified version without consulting
-   the manifest.
-2. `--prerelease` flag → reads `preview` from manifest.
-3. Default → reads `stable` from manifest.
+- **Default** (no flag): reads `stable` from manifest. Only stable releases are
+  considered.
+- **`--prerelease`**: reads both `stable` and `preview` from manifest, picks
+  whichever is higher by SemVer precedence. This means a prerelease is only
+  offered if it's actually newer than the current stable.
+- **`--version X.Y.Z`** (explicit pin): downloads directly from the CDN at the
+  specified version without consulting the manifest. `--prerelease` is still
+  allowed alongside for clarity but has no effect.
 
-No per-project channel config.
+No per-project version pinning or quality config.
 
 ### Version classification (SemVer)
 
 Release classification uses [SemVer 2.0](https://semver.org/) on the version
-string from the manifest:
+string:
 
-| Version | SemVer parse | Channel |
+| Version | SemVer parse | Quality |
 | --- | --- | --- |
 | `5.0.0` | no prerelease label | stable |
 | `5.1.2` | no prerelease label | stable |
@@ -133,33 +132,32 @@ We pick up [Semver](https://www.nuget.org/packages/Semver) (the library Aspire
 uses) rather than `NuGet.Versioning`. It's a single small dependency that
 implements SemVer 2.0 cleanly.
 
-### Release channels vs deployment channels (future)
+### Release quality vs deployment method (future)
 
-The `--prerelease` flag selects a **release channel** (which version to fetch
-from the manifest). It is intentionally distinct from the **deployment channel**,
-i.e. the install method the user originally used (GitHub install script, npm,
-Homebrew, Chocolatey, winget, MSI).
+The `--prerelease` flag controls which **release quality** is eligible (stable
+only, or include prereleases). It is intentionally distinct from the
+**deployment method** — i.e. how the user originally installed `func` (install
+script, npm, Homebrew, Chocolatey, winget, MSI).
 
 When we later support installing via npm / Homebrew / etc., `func update` MUST
-keep the user on their original deployment channel:
+keep the user on their original deployment method:
 
 - A user who installed via `npm i -g` should be told to run `npm i -g …` and
   never have their npm-owned files overwritten by an in-process binary swap.
 - A Homebrew user should be told to run `brew upgrade`, and so on.
-- Only the install-script deployment channel (`~/.azure-functions/func`) ever
+- Only the install-script deployment method (`~/.azure-functions/func`) ever
   performs an in-process update.
 
 The install-method detector (see below) is the mechanism that enforces this.
-The `--prerelease` selector on `func update` still applies inside whichever
-deployment channel the user is on (e.g. `npm i -g @azure/functions-core-tools@next`
-for prerelease on npm), so the user-facing flag stays consistent across all
-install methods.
+The `--prerelease` flag still applies regardless of deployment method (e.g.
+`npm i -g @azure/functions-core-tools@next` for prerelease on npm), so the
+user-facing flag stays consistent across all install methods.
 
 ## Update flow
 
 ```
 GET https://cdn.functions.azure.com/public/cli/v5/version.json
-  → parse manifest, select version from stable/preview field
+  → parse manifest, select version based on release quality (stable or include prerelease)
   → compare with current version (SemVer precedence)
   → if newer: download zip from CDN at public/cli/v5/{version}/Azure.Functions.Cli.{rid}.{version}.zip
   → extract, swap, verify
@@ -229,7 +227,7 @@ Important deltas from Aspire:
 ## Pipeline requirements (CDN publishing)
 
 The release pipeline must publish artifacts to the CDN and update the version
-manifest. The process uses a two-phase approach for atomicity:
+manifest. The process uses a multi-phase approach for atomicity:
 
 ### Phase 1: Upload versioned artifacts
 
@@ -330,7 +328,6 @@ src/Func/Update/
   InstallMethodDetector.cs
   ICliInstaller.cs          # extract + swap + verify + rollback
   CliInstaller.cs
-  RidResolver.cs            # OS + arch → asset suffix (shared with install scripts spec)
 ```
 
 All types `internal`, primary-constructor DI, no static helpers except pure
@@ -339,49 +336,46 @@ utilities. Wire registrations in `Program.cs` / DI module. Add to
 
 ## Tests (xUnit + NSubstitute + AwesomeAssertions)
 
-- `UpdateCommandTests` — option parsing, channel selection precedence, confirm prompt, `--yes` enforcement under non-interactive.
+- `UpdateCommandTests` — option parsing, version selection precedence, confirm prompt, `--yes` enforcement under non-interactive.
 - `InstallMethodDetectorTests` — npm/brew/choco/winget/script paths, env-var overrides, unknown location.
 - `CliInstallerTests` — fake filesystem + fake archive: happy path, version-probe failure → rollback, write-permission failure → rollback, partial extract failure → rollback, backup cleanup.
-- `CdnReleaseFeedTests` — `HttpMessageHandler` stub returning fixture payloads; manifest parsing, stable vs prerelease field selection, direct version URL construction, 404 handling for unknown versions.
+- `CdnReleaseFeedTests` — `HttpMessageHandler` stub returning fixture payloads; manifest parsing, stable vs prerelease selection, direct version URL construction, 404 handling for unknown versions.
 
 ## Work items
 
-Status of implementation relative to this spec.
+Parent issue: https://github.com/Azure/azure-functions-core-tools/issues/5333
 
 ### Done
 
-| # | Item | Status |
-| - | ---- | ------ |
-| 1 | `UpdateCommand` scaffold (options, help text, Parser registration) | ✅ Done (PR #5297) |
-| 2 | `IReleaseFeed` abstraction + `CdnReleaseFeed` implementation | ✅ Done (PR #5298) |
-| 3 | `CdnReleaseFeedTests` (manifest parsing, channel selection, URL construction) | ✅ Done (PR #5298) |
-| 4 | `VersionManifest` model + JSON serialization context | ✅ Done (PR #5298) |
-| 5 | `ICliUpdater` download/swap/rollback pipeline | ✅ Done (PR #5428) |
+| Item | Status |
+| ---- | ------ |
+| `UpdateCommand` scaffold (options, help text, Parser registration) | ✅ Done |
+| `IReleaseFeed` + `CdnReleaseFeed` (manifest parsing, version selection, URL construction) | ✅ Done |
+| `VersionManifest` model + `UpdateJsonContext` source-gen serialization | ✅ Done |
+| `ICliUpdater` download/swap/rollback pipeline | ✅ Done |
 
 ### Remaining (CLI implementation)
 
-| # | Item | Description |
-| - | ---- | ----------- |
-| 6 | `UpdateRunner` / command handler wiring | Orchestrates the full flow: resolve version → compare → download → swap → verify. Replaces the placeholder `GracefulException` in `ExecuteAsync`. |
-| 7 | `IInstallMethodDetector` + `InstallMethodDetector` | Detect npm/brew/choco/winget/install-script; print appropriate upgrade command and exit for managed installs. |
-| 8 | Confirmation prompt + `--yes` enforcement | Interactive prompt via `IInteractionService`; require `--yes` when non-interactive. |
-| 9 | Progress reporting | Download progress bar / spinner via `IInteractionService`. |
-| 10 | `UpdateCommand` integration tests | End-to-end with a fake HTTP server serving manifest + zip; verify binary swap and rollback. |
+Proposed issue titles for remaining work:
+
+- `func update: wire UpdateCommand handler (version compare → download → swap → verify)`
+- `func update: add IInstallMethodDetector to detect npm/brew/choco/winget installs`
+- `func update: add confirmation prompt + --yes enforcement for non-interactive`
+- `func update: add download progress reporting via IInteractionService`
+- `func update: integration tests with fake HTTP server + binary swap verification`
 
 ### Remaining (pipeline / infrastructure)
 
-| # | Item | Description |
-| - | ---- | ----------- |
-| 11 | CDN artifact upload in release pipeline | Publish platform zips to `public/cli/v5/{version}/Azure.Functions.Cli.{rid}.{version}.zip` for all supported RIDs. |
-| 12 | Install script signing + CDN upload | Sign `install.ps1` / `install.sh` and publish to `public/cli/v5/install.ps1` / `install.sh`. |
-| 13 | Version manifest publish step | After all artifacts are uploaded and verified, write/update `public/cli/v5/version.json` with new stable or preview version. |
-| 14 | CDN cache invalidation | Implement programmatic cache purge for `public/cli/v5/` non-versioned files (manifest, install scripts) in release CI. |
-| 15 | Rollback runbook | Document how to revert a bad release by re-publishing the previous manifest. |
+- `Release pipeline: upload versioned CLI artifacts to CDN`
+- `Release pipeline: sign and upload v5 install scripts (install.ps1 / install.sh) to CDN`
+- `Release pipeline: publish version.json manifest after artifact upload`
+- `Release pipeline: implement CDN cache invalidation for non-versioned files`
+- `CDN: provision storage account and configure caching rules for public/cli/v5/`
+- `Write v5 install scripts (install.ps1 / install.sh) that fetch from CDN`
+- `Release pipeline: rollback runbook for reverting bad releases via manifest`
 
 ### Future (not blocking v1 of `func update`)
 
-| # | Item | Description |
-| - | ---- | ----------- |
-| 16 | Update notifier (background check) | Periodic "a new version is available" notice on CLI startup. |
-| 17 | Deployment-channel-aware update hints | npm/brew/choco/winget users see their native upgrade command. |
-| 18 | SHA-256 verification | Publish a checksum file alongside zips; verify after download. |
+- `func update: background update notifier on CLI startup`
+- `func update: deployment-method-aware upgrade hints for npm/brew/choco/winget`
+- `func update: SHA-256 verification of downloaded artifacts`
