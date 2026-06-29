@@ -16,9 +16,6 @@ func update --version 5.1.0       # pin to a specific version
 func update -y / --yes            # skip confirmation prompts (required when non-interactive)
 ```
 
-`--prerelease` matches the existing install scripts (`install.sh PRERELEASE=true`
-/ `install.ps1 -Prerelease`) so the same mental model carries over.
-
 Output is concise, themed via `IInteractionService` / `ITheme`:
 
 1. Determine release quality (stable only, or include prereleases).
@@ -366,13 +363,19 @@ Proposed issue titles for remaining work:
 
 ### Remaining (pipeline / infrastructure)
 
-- `Release pipeline: upload versioned CLI artifacts to CDN`
-- `Release pipeline: sign and upload v5 install scripts (install.ps1 / install.sh) to CDN`
+Existing issues:
+
+- #5422 — Release pipeline: push v5 CLI artifacts to CDN
+- #5416 — Release pipeline: CLI archive signing + macOS notarization
+- #5423 — Per-channel rollback playbook and tooling
+
+New work items (proposed):
+
 - `Release pipeline: publish version.json manifest after artifact upload`
 - `Release pipeline: implement CDN cache invalidation for non-versioned files`
 - `CDN: provision storage account and configure caching rules for public/cli/v5/`
 - `Write v5 install scripts (install.ps1 / install.sh) that fetch from CDN`
-- `Release pipeline: rollback runbook for reverting bad releases via manifest`
+- `Release pipeline: sign and upload v5 install scripts to CDN`
 
 ### Future (not blocking v1 of `func update`)
 
