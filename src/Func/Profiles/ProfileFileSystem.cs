@@ -28,4 +28,12 @@ internal sealed class ProfileFileSystem : IProfileFileSystem
         return File.WriteAllTextAsync(path, contents, cancellationToken);
     }
 
+    public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        Directory.CreateDirectory(path);
+        return Task.CompletedTask;
+    }
+
 }

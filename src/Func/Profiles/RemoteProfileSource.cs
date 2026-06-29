@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Reflection;
 using System.Security.Cryptography;
 using Azure.Functions.Cli.Configuration;
 using Microsoft.Extensions.Logging;
@@ -12,9 +13,12 @@ namespace Azure.Functions.Cli.Profiles;
 /// </summary>
 internal sealed class RemoteProfileSource : IProfileSource
 {
-    internal const string RegistryUrl = "https://cdn-staging.functions.azure.com/public/cli/v5/profiles/v1/registry.json";
-    internal const string ChecksumUrl = "https://cdn-staging.functions.azure.com/public/cli/v5/profiles/v1/registry.json.sha256";
     internal const string HttpClientName = "ProfileRegistry";
+
+    private const string ProdBaseUrl = "https://cdn.functions.azure.com";
+    private const string StagingBaseUrl = "https://cdn-staging.functions.azure.com";
+    private const string RegistryPath = "/public/cli/v5/profiles/v1/registry.json";
+    private const string ChecksumPath = "/public/cli/v5/profiles/v1/registry.json.sha256";
 
     private const string CacheFileName = "registry.json";
     private const string CacheChecksumFileName = "registry.json.sha256";
@@ -45,6 +49,10 @@ internal sealed class RemoteProfileSource : IProfileSource
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    internal static string RegistryUrl => GetBaseUrl() + RegistryPath;
+
+    internal static string ChecksumUrl => GetBaseUrl() + ChecksumPath;
+
     public async Task<ProfileSourceSnapshot> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -54,8 +62,8 @@ internal sealed class RemoteProfileSource : IProfileSource
         string cacheChecksumPath = Path.Combine(cacheDir, CacheChecksumFileName);
         string cacheMetaPath = Path.Combine(cacheDir, CacheMetaFileName);
 
-        // Try cached registry first (within TTL)
-        string? cachedJson = await TryLoadCacheAsync(cachePath, cacheMetaPath, cancellationToken);
+        // Try cached registry first (within TTL, checksum-validated)
+        string? cachedJson = await TryLoadValidatedCacheAsync(cachePath, cacheChecksumPath, cacheMetaPath, cancellationToken);
         if (cachedJson is not null)
         {
             _logger.LogDebug("Using cached profile registry (within TTL).");
@@ -71,8 +79,8 @@ internal sealed class RemoteProfileSource : IProfileSource
             return _parser.ParseBuiltInRegistry(remoteJson, remoteSource);
         }
 
-        // Fall back to stale cache (beyond TTL but still usable)
-        string? staleCachedJson = await _fileSystem.ReadAllTextIfExistsAsync(cachePath, cancellationToken);
+        // Fall back to stale cache (beyond TTL but still checksum-valid)
+        string? staleCachedJson = await TryLoadValidatedCacheContentAsync(cachePath, cacheChecksumPath, cancellationToken);
         if (staleCachedJson is not null)
         {
             DateTimeOffset? fetchTime = await ReadFetchTimestampAsync(cacheMetaPath, cancellationToken);
@@ -96,7 +104,7 @@ internal sealed class RemoteProfileSource : IProfileSource
         return ProfileSourceSnapshot.Empty(emptySource);
     }
 
-    private async Task<string?> TryLoadCacheAsync(string cachePath, string metaPath, CancellationToken cancellationToken)
+    private async Task<string?> TryLoadValidatedCacheAsync(string cachePath, string checksumPath, string metaPath, CancellationToken cancellationToken)
     {
         DateTimeOffset? fetchTime = await ReadFetchTimestampAsync(metaPath, cancellationToken);
         if (fetchTime is null)
@@ -109,7 +117,33 @@ internal sealed class RemoteProfileSource : IProfileSource
             return null;
         }
 
-        return await _fileSystem.ReadAllTextIfExistsAsync(cachePath, cancellationToken);
+        return await TryLoadValidatedCacheContentAsync(cachePath, checksumPath, cancellationToken);
+    }
+
+    private async Task<string?> TryLoadValidatedCacheContentAsync(string cachePath, string checksumPath, CancellationToken cancellationToken)
+    {
+        string? json = await _fileSystem.ReadAllTextIfExistsAsync(cachePath, cancellationToken);
+        if (json is null)
+        {
+            return null;
+        }
+
+        string? expectedChecksum = await _fileSystem.ReadAllTextIfExistsAsync(checksumPath, cancellationToken);
+        if (expectedChecksum is null)
+        {
+            // No checksum file — treat cache as unverifiable
+            _logger.LogDebug("Cached profile registry has no checksum file; discarding.");
+            return null;
+        }
+
+        string actualChecksum = ComputeSha256(json);
+        if (!string.Equals(actualChecksum, expectedChecksum.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Cached profile registry checksum mismatch; discarding corrupt cache.");
+            return null;
+        }
+
+        return json;
     }
 
     private async Task<string?> TryFetchRemoteAsync(
@@ -124,7 +158,7 @@ internal sealed class RemoteProfileSource : IProfileSource
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(_fetchTimeout);
 
-            HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
+            using HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
 
             // Fetch registry and checksum in parallel
             Task<string> registryTask = client.GetStringAsync(RegistryUrl, cts.Token);
@@ -144,7 +178,7 @@ internal sealed class RemoteProfileSource : IProfileSource
             }
 
             // Persist to cache
-            Directory.CreateDirectory(cacheDir);
+            await _fileSystem.EnsureDirectoryExistsAsync(cacheDir, cancellationToken);
             await _fileSystem.WriteAllTextAsync(cachePath, registryJson, cancellationToken);
             await _fileSystem.WriteAllTextAsync(cacheChecksumPath, expectedChecksum, cancellationToken);
             await _fileSystem.WriteAllTextAsync(cacheMetaPath, DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
@@ -152,8 +186,14 @@ internal sealed class RemoteProfileSource : IProfileSource
             _logger.LogDebug("Profile registry fetched and cached from CDN.");
             return registryJson;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // User-initiated cancellation (Ctrl+C) — propagate immediately
+            throw;
+        }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
+            // Timeout or network failure — fall back gracefully
             _logger.LogDebug(ex, "Failed to fetch profile registry from CDN.");
             return null;
         }
@@ -168,6 +208,16 @@ internal sealed class RemoteProfileSource : IProfileSource
         }
 
         return DateTimeOffset.TryParse(meta.Trim(), out DateTimeOffset ts) ? ts : null;
+    }
+
+    private static string GetBaseUrl()
+    {
+        string? version = typeof(RemoteProfileSource).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+
+        bool isPrerelease = version?.Contains('-') == true;
+        return isPrerelease ? StagingBaseUrl : ProdBaseUrl;
     }
 
     private static string ComputeSha256(string content)

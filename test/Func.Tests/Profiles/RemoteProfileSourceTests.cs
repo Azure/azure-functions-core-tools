@@ -137,6 +137,45 @@ public class RemoteProfileSourceTests
         Assert.Empty(snapshot.Profiles);
     }
 
+    [Fact]
+    public async Task LoadAsync_DiscardsCorruptCacheWithinTtl()
+    {
+        var fileSystem = new InMemoryProfileFileSystem();
+        var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+
+        // Pre-populate cache with mismatched checksum
+        string cacheDir = Path.Combine(configPaths.Home, "profiles");
+        fileSystem.Files[Path.Combine(cacheDir, "registry.json")] = _validRegistry;
+        fileSystem.Files[Path.Combine(cacheDir, "registry.json.sha256")] = "corrupted_checksum_value";
+        fileSystem.Files[Path.Combine(cacheDir, "registry.json.meta")] = DateTimeOffset.UtcNow.ToString("O");
+
+        // Remote also fails — should end up empty (no valid cache, no remote)
+        var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
+        var httpClientFactory = CreateFactory(handler);
+        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+
+        var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
+        ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
+
+        Assert.Empty(snapshot.Profiles);
+    }
+
+    [Fact]
+    public async Task LoadAsync_PropagatesUserCancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var handler = new FakeHttpMessageHandler(_validRegistry, ComputeSha256(_validRegistry));
+        var httpClientFactory = CreateFactory(handler);
+        var fileSystem = new InMemoryProfileFileSystem();
+        var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+
+        var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => source.LoadAsync(context, cts.Token));
+    }
+
     private static IHttpClientFactory CreateFactory(HttpMessageHandler handler)
     {
         var factory = Substitute.For<IHttpClientFactory>();
@@ -178,6 +217,11 @@ public class RemoteProfileSourceTests
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
         {
             Files[path] = contents;
+            return Task.CompletedTask;
+        }
+
+        public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken)
+        {
             return Task.CompletedTask;
         }
     }
