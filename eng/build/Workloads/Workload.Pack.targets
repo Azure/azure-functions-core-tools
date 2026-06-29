@@ -86,19 +86,14 @@
   Will resolve both runtime (packages) and reference copy-local paths.
   Will trim out all unified (CLI-controlled) assemblies.
   -->
-  <Target Name="_IncludeWorkloadCopyLocal" DependsOnTargets="ResolveReferences" Condition="'$(WorkloadKind)' == 'workload'">
-    <PropertyGroup>
-      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' == ''">any</_WorkloadRidPath>
-      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_WorkloadRidPath>
-    </PropertyGroup>
-
+  <Target Name="_IncludeWorkloadCopyLocal" DependsOnTargets="ResolveReferences;_SetWorkloadProperties" Condition="'$(WorkloadKind)' == 'workload'">
     <ResolveWorkloadCopyLocal Items="@(RuntimeCopyLocalItems);@(ReferenceCopyLocalPaths)" UnifiedItems="@(_WorkloadUnifiedItems)">
       <Output TaskParameter="WorkloadCopyLocal" ItemName="_WorkloadCopyLocal" />
     </ResolveWorkloadCopyLocal>
 
     <ItemGroup>
-      <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="tools/$(_WorkloadRidPath)/" />
-      <TfmSpecificPackageFile Include="@(_WorkloadCopyLocal)" PackagePath="tools/$(_WorkloadRidPath)/%(_WorkloadCopyLocal.TargetPath)" />
+      <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="$(_WorkloadPackageContentRoot)" />
+      <TfmSpecificPackageFile Include="@(_WorkloadCopyLocal)" PackagePath="$(_WorkloadPackageContentRoot)%(_WorkloadCopyLocal.TargetPath)" />
     </ItemGroup>
   </Target>
 

@@ -24,7 +24,8 @@
     <WorkloadKind Condition="'$(RuntimeIdentifiers)' != '' AND '$(RuntimeIdentifier)' == ''">rid-pointer</WorkloadKind>
 
     <!-- When NoBuild is true, assume assemblies will already exist as needed. -->
-    <_ResolveWorkloadEntryPointDependsOn Condition="'$(NoBuild)' != 'true'">Build</_ResolveWorkloadEntryPointDependsOn>
+    <_ResolveWorkloadEntryPointDependsOn>_SetWorkloadProperties</_ResolveWorkloadEntryPointDependsOn>
+    <_ResolveWorkloadEntryPointDependsOn Condition="'$(NoBuild)' != 'true'">Build;$(_ResolveWorkloadEntryPointDependsOn)</_ResolveWorkloadEntryPointDependsOn>
     <_WorkloadJsonCacheFile Condition="'$(_WorkloadJsonCacheFile)' == ''">$(IntermediateOutputPath)workload.json.cache</_WorkloadJsonCacheFile>
     <_WorkloadJsonFile Condition="'$(_WorkloadJsonFile)' == ''">$(IntermediateOutputPath)workload.json</_WorkloadJsonFile>
   </PropertyGroup>
@@ -41,11 +42,19 @@
     <Error Condition="!@(_AllowedWorkloadKind->AnyHaveMetadataValue('Identity', '$(WorkloadKind)'))" Text="Invalid WorkloadKind '$(WorkloadKind)'. Valid values are: @(_AllowedWorkloadKind)." />
   </Target>
 
+  <Target Name="_SetWorkloadProperties">
+    <PropertyGroup>
+      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' == ''">any</_WorkloadRidPath>
+      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_WorkloadRidPath>
+      <_WorkloadPackageContentRoot>tools/$(_WorkloadRidPath)/</_WorkloadPackageContentRoot>
+    </PropertyGroup>
+  </Target>
+
   <!-- Resolve the entry point for the workload when it is a 'workload' kind. -->
   <Target Name="_ResolveWorkloadEntryPoint" Condition="'$(WorkloadKind)' == 'workload'" 
     DependsOnTargets="$(_ResolveWorkloadEntryPointDependsOn)">
     <PropertyGroup>
-      <WorkloadEntryPointAssembly Condition="'$(WorkloadEntryPointAssembly)' == ''">$(TargetFileName)</WorkloadEntryPointAssembly>
+      <WorkloadEntryPointAssembly Condition="'$(WorkloadEntryPointAssembly)' == ''">$(_WorkloadPackageContentRoot)$(TargetFileName)</WorkloadEntryPointAssembly>
     </PropertyGroup>
 
     <ResolveWorkloadEntry AssemblyPath="$(TargetPath)" Condition="'$(WorkloadEntryPointType)' == ''">
