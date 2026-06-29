@@ -92,7 +92,7 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
         {
             ProjectFiles.MergeHostJson(
                 Path.Combine(root, "host.json"),
-                host => EnsureManagedDependency(host));
+                EnsureManagedDependency);
         }
 
         // local.settings.json
@@ -174,13 +174,13 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
             client.DefaultRequestHeaders.Add("User-Agent", "azure-functions-core-tools");
             client.Timeout = TimeSpan.FromSeconds(GalleryTimeoutSeconds);
 
-            var response = await client.GetAsync(address, cancellationToken).ConfigureAwait(false);
+            HttpResponseMessage response = await client.GetAsync(address, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 
             XmlDocument doc = new();
-            using (XmlReader reader = XmlReader.Create(stream))
+            using (var reader = XmlReader.Create(stream))
             {
                 doc.Load(reader);
             }
@@ -191,14 +191,14 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
             nsmgr.AddNamespace("m", "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata");
 
             XmlNode? root = doc.DocumentElement;
-            var props = root?.SelectNodes("//m:properties[d:IsPrerelease = \"false\"]/d:Version", nsmgr);
+            XmlNodeList? props = root?.SelectNodes("//m:properties[d:IsPrerelease = \"false\"]/d:Version", nsmgr);
             var latestVersion = new Version("0.0");
 
             if (props is { Count: > 0 })
             {
                 foreach (XmlNode prop in props)
                 {
-                    if (Version.TryParse(prop.FirstChild?.Value, out var currentVersion) && currentVersion > latestVersion)
+                    if (Version.TryParse(prop.FirstChild?.Value, out Version? currentVersion) && currentVersion > latestVersion)
                     {
                         latestVersion = currentVersion;
                     }
