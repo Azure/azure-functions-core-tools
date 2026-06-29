@@ -229,7 +229,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
                     e.PackageVersion,
                     e.Aliases ?? [],
                     info?.DisplayName ?? GetDisplayName(e),
-                    info?.Description ?? (e.Description ?? string.Empty),
+                    info?.Description ?? e.Description ?? string.Empty,
                     Loaded: loaded);
             })];
     }

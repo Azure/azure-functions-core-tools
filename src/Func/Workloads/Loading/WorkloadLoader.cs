@@ -46,26 +46,26 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
                 "Only kind=workload entries should reach the loader. This is a CLI bug.");
 
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-        string contentRoot = Path.GetFullPath(Path.Combine(installPath, "tools", "any"));
-        string assemblyPath = Path.GetFullPath(Path.Combine(contentRoot, entryPoint.AssemblyPath));
+        string assemblyPath = ResolveAssemblyPath(installPath, entryPoint.AssemblyPath, entry.PackageId);
+        string contentRoot = Path.GetDirectoryName(assemblyPath)!;
 
         // Defense-in-depth: the metadata reader already rejects rooted paths
         // and `..` segments, but the on-disk registry stores the same value
         // and could be tampered with. Refuse anything resolving outside
-        // the content root.
-        string contentRootWithSeparator = contentRoot.EndsWith(Path.DirectorySeparatorChar)
-            ? contentRoot
-            : contentRoot + Path.DirectorySeparatorChar;
-        if (!assemblyPath.StartsWith(contentRootWithSeparator, StringComparison.Ordinal))
+        // the install directory (where workload.json lives).
+        string installPathWithSeparator = installPath.EndsWith(Path.DirectorySeparatorChar)
+            ? installPath
+            : installPath + Path.DirectorySeparatorChar;
+        if (!assemblyPath.StartsWith(installPathWithSeparator, StringComparison.Ordinal))
         {
             throw new InvalidWorkloadException(
-                $"[{entry.PackageId}] Could not load workload: assembly path '{entryPoint.AssemblyPath}' resolves outside the package content root '{contentRoot}'.");
+                $"[{entry.PackageId}] Could not load workload: assembly path '{entryPoint.AssemblyPath}' resolves outside the install directory '{installPath}'.");
         }
 
         if (!File.Exists(assemblyPath))
         {
             throw new InvalidWorkloadException(
-                $"[{entry.PackageId}] Could not load workload: assembly '{entryPoint.AssemblyPath}' was not found at '{contentRoot}'.");
+                $"[{entry.PackageId}] Could not load workload: assembly '{entryPoint.AssemblyPath}' was not found at '{installPath}'.");
         }
 
         WorkloadLoadContext loadContext = new(entry.PackageId, assemblyPath);
@@ -91,5 +91,29 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
             DisplayName: instance.DisplayName,
             Description: instance.Description,
             LoadContext: loadContext);
+    }
+
+    /// <summary>
+    /// Resolves the entry-point assembly path, first relative to the install directory
+    /// (where workload.json lives), then falling back to the legacy tools/any/ subdirectory.
+    /// </summary>
+    private static string ResolveAssemblyPath(string installPath, string relativeAssemblyPath, string packageId)
+    {
+        // Try resolving directly relative to the install root (workload.json location).
+        string candidate = Path.GetFullPath(Path.Combine(installPath, relativeAssemblyPath));
+        if (File.Exists(candidate))
+        {
+            return candidate;
+        }
+
+        // Fall back to legacy tools/any/ layout.
+        string legacyCandidate = Path.GetFullPath(Path.Combine(installPath, "tools", "any", relativeAssemblyPath));
+        if (File.Exists(legacyCandidate))
+        {
+            return legacyCandidate;
+        }
+
+        // Return the primary candidate so the caller produces a clear error message.
+        return candidate;
     }
 }
