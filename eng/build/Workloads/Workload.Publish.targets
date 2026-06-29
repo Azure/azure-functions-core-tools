@@ -20,13 +20,8 @@
   Mirrors _IncludeWorkloadCopyLocal from Workload.Pack.targets, targeting publish output instead of NuGet package paths.
   -->
   <Target Name="_TrimUnifiedAssembliesForPublish" Condition="'$(WorkloadKind)' == 'workload'"
-    AfterTargets="ComputeResolvedFilesToPublishList" BeforeTargets="ComputeFilesToPublish">
-
-    <PropertyGroup>
-      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' == ''">any</_WorkloadRidPath>
-      <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_WorkloadRidPath>
-    </PropertyGroup>
-
+    AfterTargets="ComputeResolvedFilesToPublishList" BeforeTargets="ComputeFilesToPublish"
+    DependsOnTargets="_SetWorkloadProperties">
     <ItemGroup>
       <_PackageResolveFileToPublish Include="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.NuGetPackageId)' != ''" />
     </ItemGroup>
@@ -39,8 +34,8 @@
       <ResolvedFileToPublish Remove="@(_PackageResolveFileToPublish)" />
       <ResolvedFileToPublish Remove="$(ProjectDepsFilePath)" />
       <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)' == '$(TargetName)'"
-        RelativePath="tools/$(_WorkloadRidPath)/%(Filename)%(Extension)" />
-      <ResolvedFileToPublish Include="@(_WorkloadPublishCopyLocal)" RelativePath="tools/$(_WorkloadRidPath)/%(_WorkloadPublishCopyLocal.TargetPath)" />
+        RelativePath="$(_WorkloadPackageContentRoot)%(Filename)%(Extension)" />
+      <ResolvedFileToPublish Include="@(_WorkloadPublishCopyLocal)" RelativePath="$(_WorkloadPackageContentRoot)%(_WorkloadPublishCopyLocal.TargetPath)" />
     </ItemGroup>
   </Target>
 
