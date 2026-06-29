@@ -92,7 +92,7 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
         {
             throw new ArgumentException(
                 $"PowerShell runtime version '{runtimeVersion}' is not supported. Supported versions: {string.Join(", ", _supportedRuntimeVersions)}.",
-                nameof(parseResult));
+                nameof(runtimeVersion));
         }
 
         // host.json
@@ -229,8 +229,10 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
             string major = latestVersion.Major.ToString();
             return major == "0" ? null : major;
         }
-        catch
+        catch (Exception)
         {
+            // Best-effort lookup; failures (network issues, invalid JSON, etc.) are non-fatal
+            // because the Az module version is only used to pre-populate requirements.psd1.
             return null;
         }
     }

@@ -25,7 +25,7 @@ public class PowerShellProjectInitializerTests
     }
 
     [Fact]
-    public void GetInitOptions_ReturnsThreeOptions()
+    public void GetInitOptions_ReturnsFourOptions()
     {
         RootCommand root = [];
         IReadOnlyList<Option> options = new PowerShellProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
