@@ -186,24 +186,138 @@ public class WorkloadLoaderTests
     }
 
     [Fact]
-    public void Load_Throws_WhenAssemblyPathEscapesContentRoot()
-    {
-        // The metadata reader rejects rooted paths and `..` segments at parse
-        // time, but the registry persists the same value and could be tampered
-        // with on disk. Pin the loader's defense-in-depth check.
-        var loader = new WorkloadLoader(StubPaths());
-        var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "../../../escape.dll");
-
-        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
-
-        Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
-        Assert.Contains("outside the package content root", ex.Message);
-    }
-
-    [Fact]
     public void Ctor_NullPaths_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => new WorkloadLoader(null!));
+    }
+
+    [Fact]
+    public void Load_ResolvesAssembly_FromInstallRootDirectly()
+    {
+        // Simulates the new publish layout where the DLL lives directly relative
+        // to the install root (where workload.json is), without tools/any/.
+        string tempDir = Path.Combine(Path.GetTempPath(), $"wl-loader-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            CopyFixtureToDirectory(FixtureAssemblyFile, tempDir);
+
+            var paths = Substitute.For<IWorkloadPaths>();
+            paths.WorkloadsRoot.Returns(tempDir);
+            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(tempDir);
+
+            var loader = new WorkloadLoader(paths);
+            var entry = FixtureEntry(FixturePackageId);
+
+            var loaded = loader.Load([entry]);
+
+            var item = Assert.Single(loaded);
+            Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
+            Assert.Equal(tempDir, item.ContentRoot);
+            UnloadAndRelease(item.LoadContext);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempDir);
+        }
+    }
+
+    [Fact]
+    public void Load_ResolvesAssembly_FromSubdirectoryRelativeToInstallRoot()
+    {
+        // Assembly path includes a subdirectory (e.g. "lib/MyWorkload.dll")
+        // resolved relative to the install root.
+        string tempDir = Path.Combine(Path.GetTempPath(), $"wl-loader-test-{Guid.NewGuid():N}");
+        try
+        {
+            string subDir = Path.Combine(tempDir, "lib");
+            Directory.CreateDirectory(subDir);
+            CopyFixtureToDirectory(FixtureAssemblyFile, subDir);
+
+            var paths = Substitute.For<IWorkloadPaths>();
+            paths.WorkloadsRoot.Returns(tempDir);
+            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(tempDir);
+
+            var loader = new WorkloadLoader(paths);
+            var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: $"lib/{FixtureAssemblyFile}");
+
+            var loaded = loader.Load([entry]);
+
+            var item = Assert.Single(loaded);
+            Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
+            Assert.Equal(subDir, item.ContentRoot);
+            UnloadAndRelease(item.LoadContext);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempDir);
+        }
+    }
+
+    [Fact]
+    public void Load_PrefersInstallRoot_OverToolsAny()
+    {
+        // When the assembly exists both at the install root and under tools/any/,
+        // the install root takes precedence.
+        string tempDir = Path.Combine(Path.GetTempPath(), $"wl-loader-test-{Guid.NewGuid():N}");
+        try
+        {
+            string toolsAny = Path.Combine(tempDir, "tools", "any");
+            Directory.CreateDirectory(toolsAny);
+            CopyFixtureToDirectory(FixtureAssemblyFile, tempDir);
+            CopyFixtureToDirectory(FixtureAssemblyFile, toolsAny);
+
+            var paths = Substitute.For<IWorkloadPaths>();
+            paths.WorkloadsRoot.Returns(tempDir);
+            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(tempDir);
+
+            var loader = new WorkloadLoader(paths);
+            var entry = FixtureEntry(FixturePackageId);
+
+            var loaded = loader.Load([entry]);
+
+            var item = Assert.Single(loaded);
+            Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
+            // ContentRoot is the directory of the resolved assembly — should be the install root.
+            Assert.Equal(tempDir, item.ContentRoot);
+            UnloadAndRelease(item.LoadContext);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempDir);
+        }
+    }
+
+    [Fact]
+    public void Load_Throws_WhenSubdirectoryPathEscapesInstallRoot()
+    {
+        // Relative paths that escape the install directory must be rejected,
+        // even when they point to valid files on disk.
+        string tempDir = Path.Combine(Path.GetTempPath(), $"wl-loader-test-{Guid.NewGuid():N}");
+        try
+        {
+            string nested = Path.Combine(tempDir, "inner");
+            Directory.CreateDirectory(nested);
+
+            // Place the DLL one level above the "install directory" to simulate escape.
+            CopyFixtureToDirectory(FixtureAssemblyFile, tempDir);
+
+            var paths = Substitute.For<IWorkloadPaths>();
+            paths.WorkloadsRoot.Returns(nested);
+            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(nested);
+
+            var loader = new WorkloadLoader(paths);
+            var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: $"../{FixtureAssemblyFile}");
+
+            var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
+
+            Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
+            Assert.Contains("outside the install directory", ex.Message);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempDir);
+        }
     }
 
     private static IWorkloadPaths StubPaths()
@@ -212,7 +326,7 @@ public class WorkloadLoaderTests
         // Fixture dlls land at <BaseDirectory>/tools/any/<file> via test
         // project copies, so returning BaseDirectory as the install directory
         // lines up with a registry entry of AssemblyPath = "<file>" without
-        // having to materialise a <pkgid>/<version>/tools/any tree.
+        // having to materialize a <package_id>/<version>/tools/any tree.
         var paths = Substitute.For<IWorkloadPaths>();
         paths.WorkloadsRoot.Returns(AppContext.BaseDirectory);
         paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
@@ -244,4 +358,56 @@ public class WorkloadLoaderTests
             Type = SdkFixtureTypeName,
         },
     };
+
+    /// <summary>
+    /// Copies the fixture assembly (and its deps.json / runtimeconfig.json) from the
+    /// test output's tools/any/ directory into the specified target directory.
+    /// </summary>
+    private static void CopyFixtureToDirectory(string assemblyFileName, string targetDir)
+    {
+        string sourceDir = Path.Combine(AppContext.BaseDirectory, "tools", "any");
+        string baseName = Path.GetFileNameWithoutExtension(assemblyFileName);
+
+        foreach (string ext in new[] { ".dll", ".deps.json", ".runtimeconfig.json", ".pdb" })
+        {
+            string source = Path.Combine(sourceDir, baseName + ext);
+            if (File.Exists(source))
+            {
+                File.Copy(source, Path.Combine(targetDir, baseName + ext), overwrite: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Unloads a collectible <see cref="WorkloadLoadContext"/> and waits for the GC
+    /// to release file handles so temp directories can be deleted on Windows.
+    /// </summary>
+    private static void UnloadAndRelease(WorkloadLoadContext context)
+    {
+        context.Unload();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
+
+    /// <summary>
+    /// Best-effort cleanup of temp directories. On Windows, collectible ALC file
+    /// handles may linger briefly after unload; swallow access errors so test
+    /// assertions are not masked by cleanup failures.
+    /// </summary>
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            Directory.Delete(path, recursive: true);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // File still locked by the OS after ALC unload; acceptable in tests.
+        }
+        catch (IOException)
+        {
+            // Same — lingering handle.
+        }
+    }
 }
