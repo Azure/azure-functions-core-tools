@@ -7,11 +7,11 @@ namespace Azure.Functions.Cli.Update;
 
 /// <summary>
 /// A published func CLI release as seen by the update pipeline. The version
-/// drives both channel classification (stable vs preview) and "newer than
+/// drives both quality classification (stable vs preview) and "newer than
 /// current" comparisons. The download URL is constructed from the CDN base
 /// and the version/RID.
 /// </summary>
-internal sealed record Release(
-    SemVersion Version,
-    bool IsPrerelease,
-    string DownloadUrl);
+internal sealed record Release(SemVersion Version, Uri DownloadUrl)
+{
+    public bool IsPrerelease => Version.IsPrerelease;
+}

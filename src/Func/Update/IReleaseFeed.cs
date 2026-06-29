@@ -13,20 +13,25 @@ namespace Azure.Functions.Cli.Update;
 internal interface IReleaseFeed
 {
     /// <summary>
-    /// Returns the latest release on the requested channel, or <c>null</c>
-    /// when no version is published for that channel.
+    /// Returns the latest release based on the requested quality level.
     /// </summary>
     /// <param name="includePrerelease">
     /// <c>false</c> to return the latest stable release;
-    /// <c>true</c> to return the latest preview release.
+    /// <c>true</c> to return whichever is higher by SemVer precedence
+    /// between the latest stable and preview releases.
     /// </param>
-    public Task<Release?> GetLatestAsync(bool includePrerelease, CancellationToken cancellationToken);
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the manifest cannot be fetched or contains no version for
+    /// the requested quality level.
+    /// </exception>
+    public Task<Release> GetLatestAsync(bool includePrerelease, CancellationToken cancellationToken);
 
     /// <summary>
     /// Returns a <see cref="Release"/> for the given <paramref name="version"/>
-    /// if it exists on the CDN (i.e. the zip artifact is downloadable), or
-    /// <c>null</c> when the version is not available.
-    /// Used by <c>func update --version X.Y.Z</c>.
+    /// after verifying the artifact exists on the CDN.
     /// </summary>
-    public Task<Release?> GetVersionAsync(SemVersion version, CancellationToken cancellationToken);
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the version is not available on the CDN or the request fails.
+    /// </exception>
+    public Task<Release> GetVersionAsync(SemVersion version, CancellationToken cancellationToken);
 }

@@ -4,7 +4,6 @@
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Logging;
 using Semver;
 
@@ -17,75 +16,91 @@ namespace Azure.Functions.Cli.Update;
 /// rate limits and authentication requirements.
 /// </summary>
 internal sealed class CdnReleaseFeed(
-    IHttpClientFactory httpClientFactory,
+    HttpClient httpClient,
     ILogger<CdnReleaseFeed> logger) : IReleaseFeed
 {
-    /// <summary>Named <see cref="HttpClient"/> identifier; registered alongside this service.</summary>
-    internal const string HttpClientName = "func-cdn";
-
     internal const string ManifestPath = "public/cli/v5/version.json";
 
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly ILogger<CdnReleaseFeed> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public async Task<Release?> GetLatestAsync(bool includePrerelease, CancellationToken cancellationToken)
+    public async Task<Release> GetLatestAsync(bool includePrerelease, CancellationToken cancellationToken)
     {
         VersionManifest manifest = await FetchManifestAsync(cancellationToken);
 
-        string? versionString = includePrerelease ? manifest.Preview : manifest.Stable;
-        if (string.IsNullOrEmpty(versionString))
+        if (includePrerelease)
         {
-            return null;
-        }
+            // Pick whichever is higher: stable or preview.
+            SemVersion? stable = TryParseVersion(manifest.Stable, "stable");
+            SemVersion? preview = TryParseVersion(manifest.Preview, "preview");
 
-        if (!SemVersion.TryParse(versionString, SemVersionStyles.Strict, out SemVersion? version))
+            SemVersion? best = (stable, preview) switch
+            {
+                (not null, not null) => SemVersion.PrecedenceComparer.Compare(preview, stable) > 0 ? preview : stable,
+                (not null, null) => stable,
+                (null, not null) => preview,
+                _ => null,
+            };
+
+            if (best is null)
+            {
+                throw new InvalidOperationException(
+                    $"Error reading version manifest from '{ManifestPath}': no valid version found");
+            }
+
+            return new Release(best, BuildDownloadUri(best));
+        }
+        else
         {
-            _logger.LogWarning("CDN manifest contains unparseable version '{Version}' for channel {Channel}.", versionString, includePrerelease ? "preview" : "stable");
-            return null;
-        }
+            if (string.IsNullOrEmpty(manifest.Stable))
+            {
+                throw new InvalidOperationException(
+                    $"Error reading version manifest from '{ManifestPath}': stable version is missing");
+            }
 
-        return new Release(
-            Version: version,
-            IsPrerelease: version.IsPrerelease,
-            DownloadUrl: BuildDownloadUrl(version));
+            if (!SemVersion.TryParse(manifest.Stable, SemVersionStyles.Strict, out SemVersion? version))
+            {
+                throw new InvalidOperationException(
+                    $"Error reading version manifest from '{ManifestPath}': invalid stable version '{manifest.Stable}'");
+            }
+
+            return new Release(version, BuildDownloadUri(version));
+        }
     }
 
-    public async Task<Release?> GetVersionAsync(SemVersion version, CancellationToken cancellationToken)
+    public async Task<Release> GetVersionAsync(SemVersion version, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(version);
 
-        // Verify the artifact exists on CDN with a HEAD request.
-        string downloadUrl = BuildDownloadUrl(version);
+        Uri downloadUri = BuildDownloadUri(version);
 
-        using HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
-        using var request = new HttpRequestMessage(HttpMethod.Head, downloadUrl);
-
-        using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Head, downloadUri);
+        using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            return null;
+            throw new InvalidOperationException(
+                $"Version {version} not found on CDN at '{downloadUri}'");
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new GracefulException(
-                $"CDN returned {(int)response.StatusCode} when checking for version {version}. Try again later.",
-                isUserError: true);
+            throw new InvalidOperationException(
+                $"Error checking version {version} at '{downloadUri}': {response.StatusCode}");
         }
 
-        return new Release(
-            Version: version,
-            IsPrerelease: version.IsPrerelease,
-            DownloadUrl: downloadUrl);
+        return new Release(version, downloadUri);
     }
 
     private async Task<VersionManifest> FetchManifestAsync(CancellationToken cancellationToken)
     {
-        using HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
-        using HttpResponseMessage response = await client.GetAsync(ManifestPath, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using HttpResponseMessage response = await _httpClient.GetAsync(ManifestPath, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
-        EnsureSuccessOrThrowGraceful(response);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Error reading version manifest from '{ManifestPath}': {response.StatusCode}");
+        }
 
         await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
 
@@ -99,50 +114,41 @@ internal sealed class CdnReleaseFeed(
         }
         catch (JsonException ex)
         {
-            throw new GracefulException(
-                "Could not parse the CDN version manifest. The format may have changed.",
-                ex);
+            throw new InvalidOperationException(
+                $"Error reading version manifest from '{ManifestPath}': invalid format", ex);
         }
 
         if (manifest is null)
         {
-            throw new GracefulException(
-                "The CDN version manifest was empty or null.",
-                isUserError: true);
+            throw new InvalidOperationException(
+                $"Error reading version manifest from '{ManifestPath}': invalid format");
         }
 
         return manifest;
     }
 
-    private static string BuildDownloadUrl(SemVersion version)
+    private SemVersion? TryParseVersion(string? versionString, string fieldName)
     {
-        string rid = RuntimeInformation.RuntimeIdentifier;
-        return $"public/{version}/Azure.Functions.Cli.{rid}.{version}.zip";
+        if (string.IsNullOrEmpty(versionString))
+        {
+            return null;
+        }
+
+        if (!SemVersion.TryParse(versionString, SemVersionStyles.Strict, out SemVersion? version))
+        {
+            _logger.LogWarning(
+                "CDN manifest contains unparseable version '{Version}' for {Field}.",
+                versionString,
+                fieldName);
+            return null;
+        }
+
+        return version;
     }
 
-    private static void EnsureSuccessOrThrowGraceful(HttpResponseMessage response)
+    private static Uri BuildDownloadUri(SemVersion version)
     {
-        if (response.IsSuccessStatusCode)
-        {
-            return;
-        }
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            throw new GracefulException(
-                "CDN version manifest not found. The update feed may not be configured yet.",
-                isUserError: true);
-        }
-
-        if ((int)response.StatusCode >= 500)
-        {
-            throw new GracefulException(
-                $"CDN returned {(int)response.StatusCode} while fetching the version manifest. Try again later.",
-                isUserError: true);
-        }
-
-        throw new GracefulException(
-            $"Unexpected response ({(int)response.StatusCode} {response.ReasonPhrase}) from CDN version manifest.",
-            isUserError: true);
+        string rid = RuntimeInformation.RuntimeIdentifier;
+        return new Uri($"public/cli/v5/{version}/Azure.Functions.Cli.{rid}.{version}.zip", UriKind.Relative);
     }
 }
