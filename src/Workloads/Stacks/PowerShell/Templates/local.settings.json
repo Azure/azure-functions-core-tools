@@ -2,7 +2,7 @@
   "IsEncrypted": false,
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "powershell",
-    "FUNCTIONS_WORKER_RUNTIME_VERSION": "7.4",
+    "FUNCTIONS_WORKER_RUNTIME_VERSION": "{RuntimeVersion}",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true"
   }
 }

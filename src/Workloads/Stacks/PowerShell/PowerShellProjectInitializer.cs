@@ -4,7 +4,7 @@
 using System.CommandLine;
 using System.Reflection;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
+
 using System.Xml;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
@@ -22,6 +22,10 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
     private const string PowerShellGalleryFindPackagesByIdUri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id=";
     private const int GalleryTimeoutSeconds = 10;
     private const string MajorVersionPlaceholder = "MAJOR_VERSION";
+    private const string RuntimeVersionPlaceholder = "{RuntimeVersion}";
+    private const string DefaultRuntimeVersion = "7.4";
+
+    private static readonly string[] _supportedRuntimeVersions = ["7.4", "7.6"];
 
     private static readonly Assembly _assembly = typeof(PowerShellProjectInitializer).Assembly;
 
@@ -42,6 +46,8 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
 
     public Option<bool> ManagedDependenciesOption { get; private set; } = default!;
 
+    public Option<string> RuntimeVersionOption { get; private set; } = default!;
+
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
     public Option<BundleChannel> BundlesChannelOption { get; private set; } = default!;
@@ -56,11 +62,17 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
             DefaultValueFactory = _ => false,
         });
 
+        RuntimeVersionOption = registry.GetOrAdd(new Option<string>("--runtime-version")
+        {
+            Description = $"PowerShell runtime version. Supported: {string.Join(", ", _supportedRuntimeVersions)}.",
+            DefaultValueFactory = _ => DefaultRuntimeVersion,
+        });
+
         NoBundleOption = registry.GetOrAdd(CommonInitOptions.NoBundle());
 
         BundlesChannelOption = registry.GetOrAdd(CommonInitOptions.BundlesChannel());
 
-        return [ManagedDependenciesOption, NoBundleOption, BundlesChannelOption];
+        return [ManagedDependenciesOption, RuntimeVersionOption, NoBundleOption, BundlesChannelOption];
     }
 
     public async Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default)
@@ -72,8 +84,16 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
         string root = context.WorkingDirectory.Info.FullName;
         bool force = context.Force;
         bool managedDependencies = parseResult.GetValue(ManagedDependenciesOption);
+        string runtimeVersion = parseResult.GetValue(RuntimeVersionOption) ?? DefaultRuntimeVersion;
         bool noBundle = parseResult.GetValue(NoBundleOption);
         BundleChannel channel = parseResult.GetValue(BundlesChannelOption);
+
+        if (!_supportedRuntimeVersions.Contains(runtimeVersion))
+        {
+            throw new ArgumentException(
+                $"PowerShell runtime version '{runtimeVersion}' is not supported. Supported versions: {string.Join(", ", _supportedRuntimeVersions)}.",
+                nameof(parseResult));
+        }
 
         // host.json
         ProjectFiles.WriteIfMissing(
@@ -98,7 +118,8 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
         // local.settings.json
         ProjectFiles.WriteIfMissing(
             Path.Combine(root, "local.settings.json"),
-            ProjectFiles.ReadTemplate(_assembly, "local.settings.json"),
+            ProjectFiles.ReadTemplate(_assembly, "local.settings.json")
+                .Replace(RuntimeVersionPlaceholder, runtimeVersion),
             force);
 
         // profile.ps1
@@ -171,10 +192,10 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
             Uri address = new($"{PowerShellGalleryFindPackagesByIdUri}'{AzModuleName}'");
 
             using HttpClient client = new();
-            client.DefaultRequestHeaders.Add("User-Agent", "azure-functions-core-tools");
+            client.DefaultRequestHeaders.Add("User-Agent", "AzureFunctionsCli");
             client.Timeout = TimeSpan.FromSeconds(GalleryTimeoutSeconds);
 
-            HttpResponseMessage response = await client.GetAsync(address, cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.GetAsync(address, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);

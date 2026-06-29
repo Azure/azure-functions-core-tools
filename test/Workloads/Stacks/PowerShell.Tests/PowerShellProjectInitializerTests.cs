@@ -30,7 +30,7 @@ public class PowerShellProjectInitializerTests
         RootCommand root = [];
         IReadOnlyList<Option> options = new PowerShellProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
 
-        Assert.Equal(3, options.Count);
+        Assert.Equal(4, options.Count);
     }
 
     [Fact]
@@ -157,6 +157,67 @@ public class PowerShellProjectInitializerTests
 
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => initializer.InitializeAsync(null!, root.Parse([])));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WithRuntimeVersion_WritesCorrectVersion()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            PowerShellProjectInitializer initializer = new();
+            initializer.GetLatestAzModuleMajorVersion = _ => Task.FromResult<string?>(null);
+
+            RootCommand root = [];
+            initializer.GetInitOptions(new InitOptionRegistry(root));
+
+            InitContext context = new(
+                WorkingDirectory.FromExplicit(tempDir),
+                ProjectName: "my-ps-app",
+                Language: null,
+                Force: false);
+
+            await initializer.InitializeAsync(context, root.Parse(["--runtime-version", "7.6"]));
+
+            string localSettings = File.ReadAllText(Path.Combine(tempDir, "local.settings.json"));
+            Assert.Contains("\"7.6\"", localSettings);
+            Assert.DoesNotContain("7.4", localSettings);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WithUnsupportedRuntimeVersion_Throws()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            PowerShellProjectInitializer initializer = new();
+            initializer.GetLatestAzModuleMajorVersion = _ => Task.FromResult<string?>(null);
+
+            RootCommand root = [];
+            initializer.GetInitOptions(new InitOptionRegistry(root));
+
+            InitContext context = new(
+                WorkingDirectory.FromExplicit(tempDir),
+                ProjectName: "my-ps-app",
+                Language: null,
+                Force: false);
+
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => initializer.InitializeAsync(context, root.Parse(["--runtime-version", "6.0"])));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
     }
 
     [Fact]
