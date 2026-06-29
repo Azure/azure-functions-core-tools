@@ -99,6 +99,14 @@ jobs:
           projects: ${{ parameters.projects }}
           arguments: -c ${{ parameters.configuration }} -v m --no-restore -t:PublishAllRids -p:AllRuntimesPublishRoot=$(publish_dir) ${{ parameters.build_args }}
 
+      - task: CopyFiles@2
+        displayName: Copy files
+        inputs:
+          Contents: |
+            install.ps1
+            install.sh
+          TargetFolder: $(drop_cli)
+
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       - template: ci/sign-files.yml@eng
         parameters:
