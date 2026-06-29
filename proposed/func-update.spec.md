@@ -177,14 +177,6 @@ are out of scope for v1.
 | MSI / winget | Print `winget upgrade …` and exit 0 |
 | Install script (`~/.azure-functions/func`) | Perform in-place update (this spec) |
 
-> **Open Q:** Do we want to print the upgrade command or try to run it ourselves?
->
-> We discussed having a single install location of the CLI instead of different
-> locations (like mentioned above per dist channel) to avoid having multiple
-> versions of the CLI installed at the same time. If we do that, we probably
-> should always update via script and not print out the dist channel upgrade
-> command.
-
 Detection signals:
 
 - npm: env vars set by the npm launcher (Aspire pattern) and/or process path under `node_modules`.
@@ -310,56 +302,17 @@ Update rules:
 - Unrecognised exceptions surface as runtime bugs (stack trace), per repo
   conventions.
 
-## Code layout (proposed)
-
-```text
-src/Func/Commands/Update/
-  UpdateCommand.cs          # FuncCliCommand + IBuiltInCommand, thin handler
-  UpdateCommandOptions.cs   # parsed options DTO
-  UpdateRunner.cs           # orchestrates check → download → swap → verify
-
-src/Func/Update/
-  IReleaseFeed.cs           # CDN version manifest abstraction
-  CdnReleaseFeed.cs         # IHttpClientFactory-backed impl (fetches version.json)
-  IInstallMethodDetector.cs # detects npm/brew/choco/winget/install-script
-  InstallMethodDetector.cs
-  ICliInstaller.cs          # extract + swap + verify + rollback
-  CliInstaller.cs
-```
-
-All types `internal`, primary-constructor DI, no static helpers except pure
-utilities. Wire registrations in `Program.cs` / DI module. Add to
-`BuiltInCommands.cs` and `Parser.cs` per the `add-command` skill.
-
-## Tests (xUnit + NSubstitute + AwesomeAssertions)
-
-- `UpdateCommandTests` — option parsing, version selection precedence, confirm prompt, `--yes` enforcement under non-interactive.
-- `InstallMethodDetectorTests` — npm/brew/choco/winget/script paths, env-var overrides, unknown location.
-- `CliInstallerTests` — fake filesystem + fake archive: happy path, version-probe failure → rollback, write-permission failure → rollback, partial extract failure → rollback, backup cleanup.
-- `CdnReleaseFeedTests` — `HttpMessageHandler` stub returning fixture payloads; manifest parsing, stable vs prerelease selection, direct version URL construction, 404 handling for unknown versions.
-
 ## Work items
-
-Parent issue: https://github.com/Azure/azure-functions-core-tools/issues/5333
-
-### Done
-
-| Item | Status |
-| ---- | ------ |
-| `UpdateCommand` scaffold (options, help text, Parser registration) | ✅ Done |
-| `IReleaseFeed` + `CdnReleaseFeed` (manifest parsing, version selection, URL construction) | ✅ Done |
-| `VersionManifest` model + `UpdateJsonContext` source-gen serialization | ✅ Done |
-| `ICliUpdater` download/swap/rollback pipeline | ✅ Done |
 
 ### Remaining (CLI implementation)
 
-Proposed issue titles for remaining work:
+Proposed issue titles for remaining work under parent issue: https://github.com/Azure/azure-functions-core-tools/issues/5333
 
-- `func update: wire UpdateCommand handler (version compare → download → swap → verify)`
-- `func update: add IInstallMethodDetector to detect npm/brew/choco/winget installs`
-- `func update: add confirmation prompt + --yes enforcement for non-interactive`
-- `func update: add download progress reporting via IInteractionService`
-- `func update: integration tests with fake HTTP server + binary swap verification`
+- `wire UpdateCommand handler (version compare → download → swap → verify)`
+- `add IInstallMethodDetector to detect npm/brew/choco/winget installs`
+- `add confirmation prompt + --yes enforcement for non-interactive`
+- `add download progress reporting via IInteractionService`
+- `integration tests with fake HTTP server + binary swap verification`
 
 ### Remaining (pipeline / infrastructure)
 
@@ -371,10 +324,9 @@ Existing issues:
 
 New work items (proposed):
 
+- `Update v5 install scripts (install.ps1 / install.sh) to fetch from CDN`
 - `Release pipeline: publish version.json manifest after artifact upload`
 - `Release pipeline: implement CDN cache invalidation for non-versioned files`
-- `CDN: provision storage account and configure caching rules for public/cli/v5/`
-- `Write v5 install scripts (install.ps1 / install.sh) that fetch from CDN`
 - `Release pipeline: sign and upload v5 install scripts to CDN`
 
 ### Future (not blocking v1 of `func update`)
