@@ -42,6 +42,8 @@
        documentation aid. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.13.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4759" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.6" Version="4.0.4778" />
     <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.43.0" />
   </ItemGroup>
 

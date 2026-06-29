@@ -1,0 +1,25 @@
+<Project>
+
+  <!--
+    Workload pkg versioning. This is a content-only workload (no workload
+    code or assemblies), so the pkg version maps 1:1 to the worker payload
+    version it carries:
+      $(WorkerVersion) - the PowerShell worker package version. Mirrors the
+                         Microsoft.Azure.Functions.PowerShellWorker.PS7.x
+                         versions pulled in at pack time. All per-version
+                         packages share the same version number.
+
+    Unlike the bundles workload, there is no channel axis: the upstream
+    PowerShellWorker NuGets don't ship preview/experimental SKUs, so the
+    workload pkg version is just $(WorkerVersion).
+  -->
+
+  <PropertyGroup>
+    <WorkerVersion>4.0.4778</WorkerVersion>
+    <WorkerVersionPS74>4.0.4759</WorkerVersionPS74>
+    <WorkerVersionPS76>4.0.4778</WorkerVersionPS76>
+    <VersionPrefix>$(WorkerVersion)</VersionPrefix>
+    <VersionSuffix>preview.1</VersionSuffix>
+  </PropertyGroup>
+
+</Project>
