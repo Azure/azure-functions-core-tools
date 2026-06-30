@@ -43,11 +43,11 @@
   </ItemGroup>
   <!-- test projects -->
   <ItemGroup>
-    <PackageVersion Include="Azure.Data.Tables" Version="12.8.3" />
+    <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.22.1" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.27.0" />
     <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="15.6.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
     <PackageVersion Include="Moq" Version="4.8.2" />
     <PackageVersion Include="NSubstitute" Version="3.1.0" />
     <PackageVersion Include="Octokit" Version="0.29.0" />
