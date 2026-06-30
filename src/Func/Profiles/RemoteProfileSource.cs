@@ -177,11 +177,13 @@ internal sealed class RemoteProfileSource : IProfileSource
                 return null;
             }
 
-            // Persist to cache
+            // Persist to cache atomically: write to temp files then rename so
+            // concurrent CLI processes never see a half-written cache.
             await _fileSystem.EnsureDirectoryExistsAsync(cacheDir, cancellationToken);
-            await _fileSystem.WriteAllTextAsync(cachePath, registryJson, cancellationToken);
-            await _fileSystem.WriteAllTextAsync(cacheChecksumPath, expectedChecksum, cancellationToken);
-            await _fileSystem.WriteAllTextAsync(cacheMetaPath, DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
+            await _fileSystem.WriteAllTextAtomicAsync(cachePath, registryJson, cancellationToken);
+            await _fileSystem.WriteAllTextAtomicAsync(cacheChecksumPath, expectedChecksum, cancellationToken);
+            // Meta written last: a partial write looks like an expired cache (safe).
+            await _fileSystem.WriteAllTextAtomicAsync(cacheMetaPath, DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
 
             _logger.LogDebug("Profile registry fetched and cached from CDN.");
             return registryJson;

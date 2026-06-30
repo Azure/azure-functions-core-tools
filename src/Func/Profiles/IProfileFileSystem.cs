@@ -19,6 +19,11 @@ internal interface IProfileFileSystem
     public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Writes a text file atomically via temp-file-and-rename.
+    /// </summary>
+    public Task WriteAllTextAtomicAsync(string path, string contents, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Ensures a directory exists, creating it if necessary.
     /// </summary>
     public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken);

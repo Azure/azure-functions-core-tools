@@ -220,6 +220,12 @@ public class RemoteProfileSourceTests
             return Task.CompletedTask;
         }
 
+        public Task WriteAllTextAtomicAsync(string path, string contents, CancellationToken cancellationToken)
+        {
+            Files[path] = contents;
+            return Task.CompletedTask;
+        }
+
         public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;

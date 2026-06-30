@@ -28,6 +28,16 @@ internal sealed class ProfileFileSystem : IProfileFileSystem
         return File.WriteAllTextAsync(path, contents, cancellationToken);
     }
 
+    public async Task WriteAllTextAtomicAsync(string path, string contents, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(contents);
+
+        string tempPath = path + ".tmp." + Guid.NewGuid().ToString("N")[..8];
+        await File.WriteAllTextAsync(tempPath, contents, cancellationToken);
+        File.Move(tempPath, path, overwrite: true);
+    }
+
     public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
