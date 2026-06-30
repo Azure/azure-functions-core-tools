@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Azure.Functions.Cli.Profiles;
 
 /// <summary>
-/// Fetches the built-in profile registry from the CDN, falling back to a local cache.
+/// Fetches the profile registry from the CDN, falling back to a local cache.
 /// </summary>
 internal sealed class RemoteProfileSource : IProfileSource
 {
