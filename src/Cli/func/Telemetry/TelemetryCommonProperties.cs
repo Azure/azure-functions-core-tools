@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
-using RuntimeEnvironment = Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment;
 using RuntimeInformation = System.Runtime.InteropServices.RuntimeInformation;
 
 namespace Azure.Functions.Cli.Telemetry
@@ -49,10 +48,10 @@ namespace Azure.Functions.Cli.Telemetry
         {
             return new Dictionary<string, string>
             {
-                { OSVersion, RuntimeEnvironment.OperatingSystemVersion },
-                { OSPlatform, RuntimeEnvironment.OperatingSystemPlatform.ToString() },
+                { OSVersion, Environment.OSVersion.VersionString },
+                { OSPlatform, RuntimeInformation.OSDescription },
                 { OutputRedirected, Console.IsOutputRedirected.ToString() },
-                { RuntimeId, RuntimeEnvironment.GetRuntimeIdentifier() },
+                { RuntimeId, RuntimeInformation.RuntimeIdentifier },
                 { ProductVersion, Constants.CliVersion },
                 { TelemetryProfile, Environment.GetEnvironmentVariable(TelemetryProfileEnvironmentVariable) },
                 { DockerContainer, IsDockerContainerCache() },

@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         }
 
         [Fact]
-        public async void Init_WithExistingProject_SkipsExistingFilesCreation()
+        public async Task Init_WithExistingProject_SkipsExistingFilesCreation()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithExistingProject_SkipsExistingFilesCreation);

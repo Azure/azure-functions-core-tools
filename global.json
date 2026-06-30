@@ -5,7 +5,7 @@
     "rollForward": "latestMajor"
   },
   "msbuild-sdks": {
-    "Microsoft.Build.NoTargets": "3.7.56",
-    "Microsoft.Build.Traversal": "4.1.0"
+    "Microsoft.Build.NoTargets": "3.7.134",
+    "Microsoft.Build.Traversal": "4.1.82"
   }
 }
