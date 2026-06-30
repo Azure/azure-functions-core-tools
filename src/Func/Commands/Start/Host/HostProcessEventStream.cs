@@ -98,7 +98,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         }
         catch
         {
-            // Graceful shutdown failed; force-kill below.
+            // Graceful shutdown failed; force-kill and let _exitTask complete so it doesn't go unobserved.
             try
             {
                 _process.KillTree();
@@ -108,7 +108,15 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
                 // Process already gone.
             }
 
-            await _process.DisposeAsync();
+            // _exitTask drains stdout/stderr and disposes _process in its finally block.
+            try
+            {
+                await _exitTask;
+            }
+            catch
+            {
+                // _exitTask may fault after KillTree; we only need it to finish, not succeed.
+            }
         }
     }
 
