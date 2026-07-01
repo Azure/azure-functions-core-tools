@@ -40,7 +40,7 @@ public sealed class CliUpdaterTests
         fileSystem.DirectoryExists(Arg.Any<string>()).Returns(true);
 
         // Act
-        await updater.UpdateAsync(_stableRelease, CancellationToken.None);
+        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
 
         // Assert: backup, then swap into place
         fileSystem.Received(1).MoveDirectory(FakeInstallDir, FakeBackupDir);
@@ -62,7 +62,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("503", ex.Message, StringComparison.Ordinal);
         Assert.Contains("again", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -84,7 +84,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("Verification failed", ex.Message, StringComparison.OrdinalIgnoreCase);
 
@@ -110,7 +110,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         // Rollback: backup restored since installDir doesn't exist
         fileSystem.DidNotReceive().DeleteDirectory(FakeInstallDir);

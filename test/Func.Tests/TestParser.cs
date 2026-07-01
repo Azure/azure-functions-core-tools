@@ -129,6 +129,12 @@ internal static class TestParser
         services.AddSingleton(Substitute.For<IQuickstartScaffolder>());
         services.AddSingleton(Substitute.For<IQuickstartProviderResolver>());
 
+        // Update pipeline: UpdateCommand depends on these; substitute them so
+        // the parser resolves without wiring the real CDN HttpClient.
+        services.AddSingleton(Substitute.For<Cli.Update.IReleaseFeed>());
+        services.AddSingleton(Substitute.For<Cli.Update.ICliUpdater>());
+        services.AddSingleton(Substitute.For<Cli.Update.IInstallMethodDetector>());
+
         return services;
     }
 }
