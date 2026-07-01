@@ -14,16 +14,16 @@
   </ItemGroup>
   <!-- func -->
   <ItemGroup>
-    <PackageVersion Include="Autofac" Version="9.1.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.17.1" />
-    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.6.0" />
+    <PackageVersion Include="Autofac" Version="9.3.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.11.0" />
     <PackageVersion Include="AccentedCommandLineParser" Version="2.0.1" />
     <PackageVersion Include="Microsoft.ApplicationInsights" Version="2.23.0" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
     <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1051.300" />
-    <PackageVersion Include="Microsoft.Build" Version="17.11.48" />
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.2" />
+    <PackageVersion Include="Microsoft.Build" Version="17.14.28" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.85.2" />
     <PackageVersion Include="NuGet.Packaging" Version="5.11.7" />
     <PackageVersion Include="YamlDotNet" Version="6.1.2" />
   </ItemGroup>
@@ -45,10 +45,10 @@
   <ItemGroup>
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.22.1" />
-    <PackageVersion Include="Azure.Storage.Queues" Version="12.27.0" />
+    <PackageVersion Include="Azure.Storage.Queues" Version="12.27.1" />
     <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
-    <PackageVersion Include="Moq" Version="4.8.2" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="NSubstitute" Version="3.1.0" />
     <PackageVersion Include="Octokit" Version="0.29.0" />
     <PackageVersion Include="RichardSzalay.MockHttp" Version="5.0.0" />
