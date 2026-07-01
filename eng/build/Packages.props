@@ -25,7 +25,7 @@
     <PackageVersion Include="Microsoft.Build" Version="17.11.48" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.2" />
     <PackageVersion Include="NuGet.Packaging" Version="5.11.7" />
-    <PackageVersion Include="YamlDotNet" Version="6.1.2" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <!-- workers -->
   <ItemGroup>
