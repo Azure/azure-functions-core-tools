@@ -43,7 +43,7 @@ public sealed class CliUpdaterTests
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
-        await updater.UpdateAsync(_stableRelease, CancellationToken.None);
+        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
 
         // Assert: binary renamed to .old, new binary copied in
         fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
@@ -62,7 +62,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("503", ex.Message, StringComparison.Ordinal);
         Assert.Contains("again", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -84,7 +84,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("Verification failed", ex.Message, StringComparison.OrdinalIgnoreCase);
 
@@ -109,7 +109,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         // Swap never completed, so rollback should NOT attempt to restore backup
         fileSystem.DidNotReceive().MoveFile(_fakeBackupPath, _fakeProcessPath);
@@ -129,7 +129,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(releaseWithChecksum, CancellationToken.None));
+            () => updater.UpdateAsync(releaseWithChecksum, progress: null, CancellationToken.None));
 
         Assert.Contains("Checksum mismatch", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("expected0000", ex.Message, StringComparison.Ordinal);
@@ -153,7 +153,7 @@ public sealed class CliUpdaterTests
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
-        await updater.UpdateAsync(_stableRelease, CancellationToken.None);
+        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
 
         // Assert — ComputeSha256Async was never called
         await fileSystem.DidNotReceive().ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -181,7 +181,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         // Both files were swapped
         fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
@@ -214,7 +214,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         // The original was renamed to .old successfully
         fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
@@ -235,7 +235,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -253,7 +253,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("escapes the install directory", ex.Message, StringComparison.OrdinalIgnoreCase);
 

@@ -24,7 +24,7 @@ internal sealed partial class CliUpdater(
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
     private readonly ILogger<CliUpdater> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public async Task UpdateAsync(Release release, CancellationToken cancellationToken)
+    public async Task UpdateAsync(Release release, IProgress<UpdateProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(release);
 
@@ -43,11 +43,13 @@ internal sealed partial class CliUpdater(
         try
         {
             Log.DownloadingVersion(_logger, release.Version);
-            await DownloadAsync(release, archivePath, cancellationToken);
+            progress?.Report(new UpdateProgress(UpdatePhase.Downloading));
+            await DownloadAsync(release, archivePath, progress, cancellationToken);
 
             await VerifyChecksumAsync(release, archivePath, cancellationToken);
 
             Log.ExtractingUpdatePackage(_logger);
+            progress?.Report(new UpdateProgress(UpdatePhase.Extracting));
             try
             {
                 ExtractArchive(archivePath, extractDir.Path);
@@ -69,6 +71,7 @@ internal sealed partial class CliUpdater(
             }
 
             Log.UpdatingFiles(_logger, extractedFiles.Count);
+            progress?.Report(new UpdateProgress(UpdatePhase.Installing));
 
             // Rename each existing file to .old, then copy the new one in.
             // On Windows, renaming running executables and loaded DLLs is allowed
@@ -109,6 +112,7 @@ internal sealed partial class CliUpdater(
                 _fileSystem.CopyFile(extractedPath, targetPath);
             }
 
+            progress?.Report(new UpdateProgress(UpdatePhase.Verifying));
             await VerifyAsync(release, installDir, cancellationToken);
 
             // Best-effort removal of backups; on Windows the running exe may
@@ -168,7 +172,7 @@ internal sealed partial class CliUpdater(
         }
     }
 
-    private async Task DownloadAsync(Release release, string zipPath, CancellationToken cancellationToken)
+    private async Task DownloadAsync(Release release, string zipPath, IProgress<UpdateProgress>? progress, CancellationToken cancellationToken)
     {
         HttpResponseMessage response;
         try
@@ -192,8 +196,17 @@ internal sealed partial class CliUpdater(
                     isUserError: true);
             }
 
+            long? totalBytes = response.Content.Headers.ContentLength;
             await using Stream content = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await _fileSystem.SaveStreamToFileAsync(zipPath, content, cancellationToken);
+
+            // Wrap the CDN stream so the underlying file writer sees a
+            // transparent Stream while we count bytes as they flow through.
+            // Reporting on Read (not after copy) is what enables live progress.
+            Stream source = progress is null
+                ? content
+                : new ProgressReadStream(content, totalBytes, progress);
+
+            await _fileSystem.SaveStreamToFileAsync(zipPath, source, cancellationToken);
         }
     }
 

@@ -125,10 +125,10 @@ internal class TestInteractionService : IInteractionService
         public void Increment(double amount) => _lines.Add(FormattableString.Invariant($"PROGRESS INCREMENT: {amount:0.##}"));
     }
 
-    public Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
+    public virtual Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
         => ConfirmAsync(prompt, defaultValue, whenInputUnavailable: defaultValue, cancellationToken);
 
-    public Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default)
+    public virtual Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _lines.Add($"CONFIRM: {prompt} (default: {defaultValue})");
