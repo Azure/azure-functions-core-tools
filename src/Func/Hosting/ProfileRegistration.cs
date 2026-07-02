@@ -14,8 +14,12 @@ namespace Azure.Functions.Cli.Hosting;
 /// </summary>
 internal static class ProfileRegistration
 {
-    internal static readonly Uri ProdCdnBaseUri = new("https://cdn.functions.azure.com/public/");
-    internal static readonly Uri StagingCdnBaseUri = new("https://cdn-staging.functions.azure.com/public/");
+    /// <summary>
+    /// Environment variable that overrides the CDN base URL for the profile registry.
+    /// </summary>
+    internal const string CdnBaseUrlEnvVar = "FUNC_CLI_PROFILES_CDN_BASE_URL";
+
+    private static readonly Uri _defaultCdnBaseUri = new("https://cdn.functions.azure.com/public/");
 
     public static IServiceCollection AddProfiles(this IServiceCollection services)
     {
@@ -30,7 +34,10 @@ internal static class ProfileRegistration
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
         services.AddHttpClient(RemoteProfileSource.HttpClientName, client =>
         {
-            client.BaseAddress = ProdCdnBaseUri;
+            string? overrideUrl = Environment.GetEnvironmentVariable(CdnBaseUrlEnvVar);
+            client.BaseAddress = string.IsNullOrWhiteSpace(overrideUrl)
+                ? _defaultCdnBaseUri
+                : new Uri(overrideUrl);
         });
         services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
         services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
