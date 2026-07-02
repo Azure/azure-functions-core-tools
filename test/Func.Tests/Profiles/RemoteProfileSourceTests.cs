@@ -7,6 +7,7 @@ using System.Text;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -45,7 +46,7 @@ public class RemoteProfileSourceTests
         var httpClientFactory = CreateFactory(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -66,7 +67,7 @@ public class RemoteProfileSourceTests
         var httpClientFactory = CreateFactory(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -90,7 +91,7 @@ public class RemoteProfileSourceTests
         // Handler that would fail if called
         var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
         var httpClientFactory = CreateFactory(handler);
-        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -113,7 +114,7 @@ public class RemoteProfileSourceTests
 
         var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
         var httpClientFactory = CreateFactory(handler);
-        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -129,7 +130,7 @@ public class RemoteProfileSourceTests
         var httpClientFactory = CreateFactory(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -152,7 +153,7 @@ public class RemoteProfileSourceTests
         // Remote also fails — should end up empty (no valid cache, no remote)
         var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
         var httpClientFactory = CreateFactory(handler);
-        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -170,7 +171,7 @@ public class RemoteProfileSourceTests
         var httpClientFactory = CreateFactory(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => source.LoadAsync(context, cts.Token));

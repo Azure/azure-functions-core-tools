@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Profiles;
 
@@ -11,6 +12,7 @@ namespace Azure.Functions.Cli.Profiles;
 /// </summary>
 internal sealed class RemoteProfileSource(
     IHttpClientFactory httpClientFactory,
+    IOptions<RemoteProfileOptions> options,
     ProfileDocumentParser parser,
     IProfileFileSystem fileSystem,
     CliConfigurationPathsOptions configurationPaths,
@@ -26,11 +28,10 @@ internal sealed class RemoteProfileSource(
     private const string CacheMetaFileName = "registry.json.meta";
     private const string CacheDirectoryName = "profiles";
 
-    private static readonly TimeSpan _cacheTtl = TimeSpan.FromHours(1);
     private static readonly TimeSpan _stalenessWarningThreshold = TimeSpan.FromDays(7);
-    private static readonly TimeSpan _fetchTimeout = TimeSpan.FromSeconds(10);
 
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly RemoteProfileOptions _options = (options ?? throw new ArgumentNullException(nameof(options))).Value;
     private readonly ProfileDocumentParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
     private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
@@ -95,7 +96,7 @@ internal sealed class RemoteProfileSource(
             return null;
         }
 
-        if (DateTimeOffset.UtcNow - fetchTime.Value > _cacheTtl)
+        if (DateTimeOffset.UtcNow - fetchTime.Value > _options.CacheTtl)
         {
             return null;
         }
@@ -138,7 +139,7 @@ internal sealed class RemoteProfileSource(
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(_fetchTimeout);
+            cts.CancelAfter(_options.HttpTimeout);
 
             using HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
 

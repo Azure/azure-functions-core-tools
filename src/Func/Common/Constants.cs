@@ -49,10 +49,17 @@ internal static class Constants
     public const string WorkloadsSourceEnvironmentVariable = "FUNC_CLI_WORKLOADS_SOURCE";
 
     /// <summary>
+    /// <summary>
     /// Environment variable that, when set, allows prerelease workload
     /// versions across catalog resolution and installation flows.
     /// </summary>
     public const string WorkloadsPrereleaseEnvironmentVariable = "FUNC_CLI_WORKLOADS_PRERELEASE";
+
+    /// <summary>
+    /// Environment variable that overrides the CDN base URL used to fetch
+    /// the remote profile registry.
+    /// </summary>
+    public const string ProfilesCdnBaseUrlEnvironmentVariable = "FUNC_CLI_PROFILES_CDN_BASE_URL";
 
     /// <summary>
     /// The telemetry instrumentation key, injected at build time via Telemetry.props.

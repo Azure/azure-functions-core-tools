@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,13 +15,6 @@ namespace Azure.Functions.Cli.Hosting;
 /// </summary>
 internal static class ProfileRegistration
 {
-    /// <summary>
-    /// Environment variable that overrides the CDN base URL for the profile registry.
-    /// </summary>
-    internal const string CdnBaseUrlEnvVar = "FUNC_CLI_PROFILES_CDN_BASE_URL";
-
-    private static readonly Uri _defaultCdnBaseUri = new("https://cdn.functions.azure.com/public/");
-
     public static IServiceCollection AddProfiles(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -32,13 +26,25 @@ internal static class ProfileRegistration
         services.AddSingleton<IProfileSource, UserProfileSource>();
         services.AddSingleton<IProfileSource, RemoteProfileSource>();
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
-        services.AddHttpClient(RemoteProfileSource.HttpClientName, client =>
-        {
-            string? overrideUrl = Environment.GetEnvironmentVariable(CdnBaseUrlEnvVar);
-            client.BaseAddress = string.IsNullOrWhiteSpace(overrideUrl)
-                ? _defaultCdnBaseUri
-                : new Uri(overrideUrl);
-        });
+
+        services.AddOptions<RemoteProfileOptions>()
+            .Configure(opts =>
+            {
+                string? overrideUrl = Environment.GetEnvironmentVariable(Constants.ProfilesCdnBaseUrlEnvironmentVariable);
+                if (!string.IsNullOrWhiteSpace(overrideUrl))
+                {
+                    opts.CdnBaseUrl = new Uri(overrideUrl);
+                }
+            });
+
+        services.AddHttpClient(RemoteProfileSource.HttpClientName)
+            .ConfigureHttpClient((sp, client) =>
+            {
+                RemoteProfileOptions opts = sp.GetRequiredService<IOptions<RemoteProfileOptions>>().Value;
+                client.BaseAddress = opts.CdnBaseUrl;
+                client.Timeout = opts.HttpTimeout;
+            });
+
         services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
         services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
         services.AddSingleton<IProjectProfileConfigStore, ProjectProfileConfigStore>();
