@@ -571,7 +571,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 {
                     var yaml = new SerializerBuilder()
                         .DisableAliases()
-                        .WithNamingConvention(new CamelCaseNamingConvention())
+                        .WithNamingConvention(CamelCaseNamingConvention.Instance)
                         .WithEventEmitter(e => new QuoteNumbersEventEmitter(e))
                         .Build();
                     var writer = new StringWriter();
@@ -832,6 +832,7 @@ namespace Azure.Functions.Cli.Kubernetes
             public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
             {
                 if (eventInfo.Source.Type == typeof(string) &&
+                    eventInfo.Source.Value is not null &&
                     (double.TryParse(eventInfo.Source.Value.ToString(), out _) ||
                      bool.TryParse(eventInfo.Source.Value.ToString(), out _)))
                 {

@@ -37,6 +37,12 @@ updates:
       - dependency-name: "Microsoft.Azure.Functions.PowerShellWorker.*"
       - dependency-name: "Microsoft.Azure.Functions.PythonWorker"
       - dependency-name: "Microsoft.Azure.WebJobs.Script.WebHost"
+      # These packages are transitive dependencies of the host and must stay
+      # pinned to the versions that ship with it. Only bump them when the
+      # host version is upgraded.
+      - dependency-name: "Azure.Identity"
+      - dependency-name: "Azure.Security.KeyVault.Secrets"
+      - dependency-name: "Microsoft.Identity.Client"
       # We intentionally stay on Microsoft.ApplicationInsights 2.x and do
       # not plan to move to v3.
       - dependency-name: "Microsoft.ApplicationInsights"
