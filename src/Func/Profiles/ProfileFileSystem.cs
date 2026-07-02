@@ -25,6 +25,7 @@ internal sealed class ProfileFileSystem : IProfileFileSystem
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(contents);
 
+        EnsureParentDirectory(path);
         return File.WriteAllTextAsync(path, contents, cancellationToken);
     }
 
@@ -33,17 +34,18 @@ internal sealed class ProfileFileSystem : IProfileFileSystem
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(contents);
 
+        EnsureParentDirectory(path);
         string tempPath = path + ".tmp." + Guid.NewGuid().ToString("N")[..8];
         await File.WriteAllTextAsync(tempPath, contents, cancellationToken);
         File.Move(tempPath, path, overwrite: true);
     }
 
-    public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken)
+    private static void EnsureParentDirectory(string filePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-
-        Directory.CreateDirectory(path);
-        return Task.CompletedTask;
+        string? directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
     }
-
 }

@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Reflection;
-using System.Security.Cryptography;
 using Azure.Functions.Cli.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -11,14 +9,17 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Fetches the profile registry from the CDN, falling back to a local cache.
 /// </summary>
-internal sealed class RemoteProfileSource : IProfileSource
+internal sealed class RemoteProfileSource(
+    IHttpClientFactory httpClientFactory,
+    ProfileDocumentParser parser,
+    IProfileFileSystem fileSystem,
+    CliConfigurationPathsOptions configurationPaths,
+    ILogger<RemoteProfileSource> logger) : IProfileSource
 {
     internal const string HttpClientName = "ProfileRegistry";
 
-    private const string ProdBaseUrl = "https://cdn.functions.azure.com";
-    private const string StagingBaseUrl = "https://cdn-staging.functions.azure.com";
-    private const string RegistryPath = "/public/cli/v5/profiles/v1/registry.json";
-    private const string ChecksumPath = "/public/cli/v5/profiles/v1/registry.json.sha256";
+    private static readonly Uri _registryRelativeUri = new("cli/v5/profiles/v1/registry.json", UriKind.Relative);
+    private static readonly Uri _checksumRelativeUri = new("cli/v5/profiles/v1/registry.json.sha256", UriKind.Relative);
 
     private const string CacheFileName = "registry.json";
     private const string CacheChecksumFileName = "registry.json.sha256";
@@ -29,29 +30,11 @@ internal sealed class RemoteProfileSource : IProfileSource
     private static readonly TimeSpan _stalenessWarningThreshold = TimeSpan.FromDays(7);
     private static readonly TimeSpan _fetchTimeout = TimeSpan.FromSeconds(10);
 
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ProfileDocumentParser _parser;
-    private readonly IProfileFileSystem _fileSystem;
-    private readonly CliConfigurationPathsOptions _configurationPaths;
-    private readonly ILogger<RemoteProfileSource> _logger;
-
-    public RemoteProfileSource(
-        IHttpClientFactory httpClientFactory,
-        ProfileDocumentParser parser,
-        IProfileFileSystem fileSystem,
-        CliConfigurationPathsOptions configurationPaths,
-        ILogger<RemoteProfileSource> logger)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _parser = parser ?? throw new ArgumentNullException(nameof(parser));
-        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-        _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    internal static string RegistryUrl => GetBaseUrl() + RegistryPath;
-
-    internal static string ChecksumUrl => GetBaseUrl() + ChecksumPath;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly ProfileDocumentParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
+    private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
+    private readonly ILogger<RemoteProfileSource> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<ProfileSourceSnapshot> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
     {
@@ -131,12 +114,11 @@ internal sealed class RemoteProfileSource : IProfileSource
         string? expectedChecksum = await _fileSystem.ReadAllTextIfExistsAsync(checksumPath, cancellationToken);
         if (expectedChecksum is null)
         {
-            // No checksum file — treat cache as unverifiable
             _logger.LogDebug("Cached profile registry has no checksum file; discarding.");
             return null;
         }
 
-        string actualChecksum = ComputeSha256(json);
+        string actualChecksum = Sha256Extensions.HashDataLowerHex(json);
         if (!string.Equals(actualChecksum, expectedChecksum.Trim(), StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Cached profile registry checksum mismatch; discarding corrupt cache.");
@@ -161,8 +143,8 @@ internal sealed class RemoteProfileSource : IProfileSource
             using HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
 
             // Fetch registry and checksum in parallel
-            Task<string> registryTask = client.GetStringAsync(RegistryUrl, cts.Token);
-            Task<string> checksumTask = client.GetStringAsync(ChecksumUrl, cts.Token);
+            Task<string> registryTask = client.GetStringAsync(_registryRelativeUri, cts.Token);
+            Task<string> checksumTask = client.GetStringAsync(_checksumRelativeUri, cts.Token);
 
             await Task.WhenAll(registryTask, checksumTask);
 
@@ -170,7 +152,7 @@ internal sealed class RemoteProfileSource : IProfileSource
             string expectedChecksum = (await checksumTask).Trim();
 
             // Validate checksum
-            string actualChecksum = ComputeSha256(registryJson);
+            string actualChecksum = Sha256Extensions.HashDataLowerHex(registryJson);
             if (!string.Equals(actualChecksum, expectedChecksum, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Profile registry checksum mismatch. Discarding remote fetch.");
@@ -179,11 +161,10 @@ internal sealed class RemoteProfileSource : IProfileSource
 
             // Persist to cache atomically: write to temp files then rename so
             // concurrent CLI processes never see a half-written cache.
-            await _fileSystem.EnsureDirectoryExistsAsync(cacheDir, cancellationToken);
-            await _fileSystem.WriteAllTextAtomicAsync(cachePath, registryJson, cancellationToken);
-            await _fileSystem.WriteAllTextAtomicAsync(cacheChecksumPath, expectedChecksum, cancellationToken);
+            await _fileSystem.WriteAllTextAtomicAsync(Path.Combine(cacheDir, CacheFileName), registryJson, cancellationToken);
+            await _fileSystem.WriteAllTextAtomicAsync(Path.Combine(cacheDir, CacheChecksumFileName), expectedChecksum, cancellationToken);
             // Meta written last: a partial write looks like an expired cache (safe).
-            await _fileSystem.WriteAllTextAtomicAsync(cacheMetaPath, DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
+            await _fileSystem.WriteAllTextAtomicAsync(Path.Combine(cacheDir, CacheMetaFileName), DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
 
             _logger.LogDebug("Profile registry fetched and cached from CDN.");
             return registryJson;
@@ -210,21 +191,5 @@ internal sealed class RemoteProfileSource : IProfileSource
         }
 
         return DateTimeOffset.TryParse(meta.Trim(), out DateTimeOffset ts) ? ts : null;
-    }
-
-    private static string GetBaseUrl()
-    {
-        string? version = typeof(RemoteProfileSource).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion;
-
-        bool isPrerelease = version?.Contains('-') == true;
-        return isPrerelease ? StagingBaseUrl : ProdBaseUrl;
-    }
-
-    private static string ComputeSha256(string content)
-    {
-        byte[] hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(content));
-        return Convert.ToHexStringLower(hash);
     }
 }

@@ -14,6 +14,9 @@ namespace Azure.Functions.Cli.Hosting;
 /// </summary>
 internal static class ProfileRegistration
 {
+    internal static readonly Uri ProdCdnBaseUri = new("https://cdn.functions.azure.com/public/");
+    internal static readonly Uri StagingCdnBaseUri = new("https://cdn-staging.functions.azure.com/public/");
+
     public static IServiceCollection AddProfiles(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -25,7 +28,10 @@ internal static class ProfileRegistration
         services.AddSingleton<IProfileSource, UserProfileSource>();
         services.AddSingleton<IProfileSource, RemoteProfileSource>();
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
-        services.AddHttpClient(RemoteProfileSource.HttpClientName);
+        services.AddHttpClient(RemoteProfileSource.HttpClientName, client =>
+        {
+            client.BaseAddress = ProdCdnBaseUri;
+        });
         services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
         services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
         services.AddSingleton<IProjectProfileConfigStore, ProjectProfileConfigStore>();

@@ -353,12 +353,6 @@ public sealed class ProfileCommandTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.CompletedTask;
-        }
-
         public void WriteAllText(string path, string contents)
             => _files[path] = contents;
 

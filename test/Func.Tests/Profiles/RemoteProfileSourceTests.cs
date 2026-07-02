@@ -180,7 +180,7 @@ public class RemoteProfileSourceTests
     {
         var factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient(RemoteProfileSource.HttpClientName)
-            .Returns(new HttpClient(handler));
+            .Returns(new HttpClient(handler) { BaseAddress = new Uri("https://cdn.functions.azure.com/public/") });
         return factory;
     }
 
@@ -223,11 +223,6 @@ public class RemoteProfileSourceTests
         public Task WriteAllTextAtomicAsync(string path, string contents, CancellationToken cancellationToken)
         {
             Files[path] = contents;
-            return Task.CompletedTask;
-        }
-
-        public Task EnsureDirectoryExistsAsync(string path, CancellationToken cancellationToken)
-        {
             return Task.CompletedTask;
         }
     }
