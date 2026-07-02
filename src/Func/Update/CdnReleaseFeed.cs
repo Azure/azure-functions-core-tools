@@ -34,13 +34,8 @@ internal sealed class CdnReleaseFeed(
             SemVersion? stable = TryParseVersion(manifest.Stable, "stable");
             SemVersion? preview = TryParseVersion(manifest.Preview, "preview");
 
-            SemVersion? best = (stable, preview) switch
-            {
-                (not null, not null) => SemVersion.PrecedenceComparer.Compare(preview, stable) > 0 ? preview : stable,
-                (not null, null) => stable,
-                (null, not null) => preview,
-                _ => null,
-            };
+            // PrecedenceComparer handles nulls — null sorts before any version.
+            SemVersion? best = SemVersion.PrecedenceComparer.Compare(preview, stable) > 0 ? preview : stable;
 
             if (best is null)
             {
@@ -55,13 +50,13 @@ internal sealed class CdnReleaseFeed(
             if (string.IsNullOrEmpty(manifest.Stable))
             {
                 throw new InvalidOperationException(
-                    $"Error reading version manifest from '{ManifestPath}': stable version is missing");
+                    $"Error reading version manifest from '{ManifestPath}': version is missing");
             }
 
             if (!SemVersion.TryParse(manifest.Stable, SemVersionStyles.Strict, out SemVersion? version))
             {
                 throw new InvalidOperationException(
-                    $"Error reading version manifest from '{ManifestPath}': invalid stable version '{manifest.Stable}'");
+                    $"Error reading version manifest from '{ManifestPath}': invalid version '{manifest.Stable}'");
             }
 
             return new Release(version, BuildDownloadUri(version));
@@ -74,6 +69,7 @@ internal sealed class CdnReleaseFeed(
 
         Uri downloadUri = BuildDownloadUri(version);
 
+        // Verify the artifact exists on CDN with a HEAD request.
         using var request = new HttpRequestMessage(HttpMethod.Head, downloadUri);
         using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
@@ -83,10 +79,14 @@ internal sealed class CdnReleaseFeed(
                 $"Version {version} not found on CDN at '{downloadUri}'");
         }
 
-        if (!response.IsSuccessStatusCode)
+        try
+        {
+            response.EnsureSuccessStatusCode();
+        }
+        catch (HttpRequestException ex)
         {
             throw new InvalidOperationException(
-                $"Error checking version {version} at '{downloadUri}': {response.StatusCode}");
+                $"Error checking version {version} at '{downloadUri}': {response.StatusCode}", ex);
         }
 
         return new Release(version, downloadUri);

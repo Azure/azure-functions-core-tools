@@ -69,7 +69,7 @@ public sealed class CdnReleaseFeedTests
         InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
 
-        Assert.Contains("stable version is missing", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("version is missing", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class CdnReleaseFeedTests
         InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
 
-        Assert.Contains("invalid stable version", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("invalid version", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
