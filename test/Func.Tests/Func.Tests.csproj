@@ -10,6 +10,10 @@
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Update/Fixtures/version.json" LogicalName="Azure.Functions.Cli.Tests.Update.Fixtures.version.json" />
+  </ItemGroup>
+
   <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->
   <ItemGroup>
     <ProjectReference Include="../Fixtures/Workloads.Tests.Fixtures.*/Workloads.Tests.Fixtures.*.csproj">
