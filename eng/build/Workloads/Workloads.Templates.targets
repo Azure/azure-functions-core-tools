@@ -8,14 +8,13 @@
       cdn (default)
         Downloads StaticContent files from the extension-bundle CDN for
         the channel selected by $(BundleChannel), filters
-        v1/templates/templates.json and/or v2/templates/templates.json by
+        v2/templates/templates.json by
         $(TemplatesStackLanguageFilter), and packs the result under
         tools/any/content/ of the workload nupkg. Skip the download with
         -p:SkipDownloadTemplates=true for dev / offline-only builds.
 
       static
         Packs files from $(MSBuildProjectDirectory)/content/v2/**/*.json
-        (and content/v1/**/*.json when $(IncludeV1Templates) is true)
         directly. No CDN access at pack time. Used when the templates
         workload owns its content in-repo (e.g. Node, see Templates
         Workload Spec §6.1, where the upstream bundle does not yet ship
@@ -26,7 +25,7 @@
 
     Per-csproj inputs:
       $(TemplatesContentSource)        cdn (default) | static. Picks the
-                                       source of the v1/v2 content.
+                                       source of the v2 content.
       $(BundleChannel)                 stable | preview | experimental.
                                        Same property the bundles workload
                                        uses; selects CDN id and bundle
@@ -41,18 +40,10 @@
                                        is static.
       $(TemplatesStackLanguageFilter)  Comma/semicolon allow-list of
                                        language values, matched
-                                       case-insensitively. Applied to v1
-                                       `metadata.language` and v2
-                                       top-level `language`. Required
-                                       when TemplatesContentSource=cdn
-                                       and any of $(IncludeV1Templates) /
+                                       case-insensitively. Applied to the
+                                       v2 top-level `language`. Required
+                                       when TemplatesContentSource=cdn and
                                        $(IncludeV2Templates) is true.
-      $(IncludeV1Templates)            true | false. Defaults true. Set
-                                       false for stacks that ship v2-only
-                                       (e.g. Python after the v2-only
-                                       cutover, Templates Workload Spec
-                                       §5.2 / §6.2). Also drops v1 from
-                                       static-mode packs.
       $(IncludeV2Templates)            true | false. Defaults true. Set
                                        false for stacks whose v2 content
                                        is not yet available.
@@ -81,7 +72,6 @@
   <PropertyGroup>
     <TemplatesContentSource Condition="'$(TemplatesContentSource)' == ''">cdn</TemplatesContentSource>
 
-    <IncludeV1Templates Condition="'$(IncludeV1Templates)' == ''">true</IncludeV1Templates>
     <IncludeV2Templates Condition="'$(IncludeV2Templates)' == ''">true</IncludeV2Templates>
   </PropertyGroup>
 
@@ -119,14 +109,13 @@
            Text="BundleChannel '$(BundleChannel)' is not one of stable|preview|experimental." />
     <Error Condition="'$(SourceBundleVersion)' == ''"
            Text="SourceBundleVersion must be set when TemplatesContentSource=cdn (the bundle version whose StaticContent the workload snapshots)." />
-    <Error Condition="'$(IncludeV1Templates)' != 'true' and '$(IncludeV2Templates)' != 'true'"
-           Text="At least one of IncludeV1Templates or IncludeV2Templates must be true; the templates workload would otherwise ship an empty payload." />
+    <Error Condition="'$(IncludeV2Templates)' != 'true'"
+           Text="IncludeV2Templates must be true; the templates workload would otherwise ship an empty payload." />
 
     <PropertyGroup>
       <_TplBaseUrl>https://cdn.functions.azure.com/public/ExtensionBundles/$(_BundleCdnId)/$(SourceBundleVersion)/StaticContent</_TplBaseUrl>
       <_TplDownloadedMarker>$(_TplStaging).downloaded</_TplDownloadedMarker>
       <_TplDownloadHash>$(_TplStaging).download.hash</_TplDownloadHash>
-      <_TplFilterV1Hash>$(_TplStaging).filter.v1.hash</_TplFilterV1Hash>
       <_TplFilterV2Hash>$(_TplStaging).filter.v2.hash</_TplFilterV2Hash>
     </PropertyGroup>
 
@@ -135,11 +124,7 @@
       forces a re-download (and re-filter) without a clean.
     -->
     <WriteLinesToFile File="$(_TplDownloadHash)"
-                      Lines="$(_TplBaseUrl)|v1=$(IncludeV1Templates)|v2=$(IncludeV2Templates)"
-                      Overwrite="true"
-                      WriteOnlyWhenDifferent="true" />
-    <WriteLinesToFile File="$(_TplFilterV1Hash)"
-                      Lines="$(TemplatesStackLanguageFilter)"
+                      Lines="$(_TplBaseUrl)|v2=$(IncludeV2Templates)"
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_TplFilterV2Hash)"
@@ -154,24 +139,6 @@
           BeforeTargets="GenerateNuspec;_GetPackageFiles"
           Inputs="$(MSBuildProjectFullPath);$(_TplDownloadHash)"
           Outputs="$(_TplDownloadedMarker)">
-    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
-                  SourceUrl="$(_TplBaseUrl)/v1/templates/templates.json"
-                  DestinationFolder="$(_TplStaging)v1/templates/"
-                  SkipUnchangedFiles="true" Retries="3" />
-    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
-                  SourceUrl="$(_TplBaseUrl)/v1/bindings/bindings.json"
-                  DestinationFolder="$(_TplStaging)v1/bindings/"
-                  SkipUnchangedFiles="true" Retries="3" />
-    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
-                  SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.json"
-                  DestinationFolder="$(_TplStaging)v1/resources/"
-                  SkipUnchangedFiles="true" Retries="3" />
-    <DownloadFile Condition="'$(IncludeV1Templates)' == 'true'"
-                  SourceUrl="$(_TplBaseUrl)/v1/resources/Resources.%(_TplLocale.Identity).json"
-                  DestinationFolder="$(_TplStaging)v1/resources/"
-                  SkipUnchangedFiles="true" Retries="3"
-                  ContinueOnError="true" />
-
     <DownloadFile Condition="'$(IncludeV2Templates)' == 'true'"
                   SourceUrl="$(_TplBaseUrl)/v2/templates/templates.json"
                   DestinationFolder="$(_TplStaging)v2/templates/"
@@ -193,20 +160,6 @@
     <Touch Files="$(_TplDownloadedMarker)" AlwaysCreate="true" />
   </Target>
 
-  <Target Name="FilterTemplatesByLanguage"
-          DependsOnTargets="DownloadTemplatesContent"
-          Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'cdn' and '$(IncludeV1Templates)' == 'true'"
-          BeforeTargets="_GetPackageFiles"
-          Inputs="$(_TplDownloadedMarker);$(_TplFilterV1Hash)"
-          Outputs="$(_TplStaging).filtered.v1">
-    <Error Condition="'$(TemplatesStackLanguageFilter)' == ''"
-           Text="TemplatesStackLanguageFilter must be set (e.g. 'JavaScript;TypeScript' for Node, 'Python' for Python)." />
-
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../scripts/filter-templates.ps1&quot; -Path &quot;$(_TplStaging)v1/templates/templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v1" />
-
-    <Touch Files="$(_TplStaging).filtered.v1" AlwaysCreate="true" />
-  </Target>
-
   <Target Name="FilterTemplatesByLanguageV2"
           DependsOnTargets="DownloadTemplatesContent"
           Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'cdn' and '$(IncludeV2Templates)' == 'true'"
@@ -216,7 +169,7 @@
     <Error Condition="'$(TemplatesStackLanguageFilter)' == ''"
            Text="TemplatesStackLanguageFilter must be set (e.g. 'JavaScript;TypeScript' for Node, 'Python' for Python)." />
 
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../scripts/filter-templates.ps1&quot; -Path &quot;$(_TplStaging)v2/templates/templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot; -Mode v2" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../scripts/filter-templates.ps1&quot; -Path &quot;$(_TplStaging)v2/templates/templates.json&quot; -Languages &quot;$(TemplatesStackLanguageFilter)&quot;" />
 
     <Touch Files="$(_TplStaging).filtered.v2" AlwaysCreate="true" />
   </Target>
@@ -245,13 +198,10 @@
   </Target>
 
   <Target Name="_AddTemplatesToPack"
-          DependsOnTargets="FilterTemplatesByLanguage;FilterTemplatesByLanguageV2;GenerateTemplatesWorkloadJson"
+          DependsOnTargets="FilterTemplatesByLanguageV2;GenerateTemplatesWorkloadJson"
           Condition="'$(SkipDownloadTemplates)' != 'true' and '$(TemplatesContentSource)' == 'cdn'"
           BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <None Condition="'$(IncludeV1Templates)' == 'true'"
-            Include="$(_TplStaging)v1/**/*.json"
-            Pack="true" PackagePath="tools/any/content/v1/" Visible="false" />
       <None Condition="'$(IncludeV2Templates)' == 'true'"
             Include="$(_TplStaging)v2/**/*.json"
             Pack="true" PackagePath="tools/any/content/v2/" Visible="false" />
@@ -261,7 +211,7 @@
   </Target>
 
   <!--
-    Static-mode pack: pull v1/v2 content from `$(MSBuildProjectDirectory)/content/`
+    Static-mode pack: pull v2 content from `$(MSBuildProjectDirectory)/content/`
     instead of downloading from the bundle CDN. The directory layout under
     content/ mirrors the nupkg layout under tools/any/content/.
 
@@ -320,14 +270,8 @@
           BeforeTargets="_GetPackageFiles">
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/content/v2/templates/templates.json') and '$(IncludeV2Templates)' == 'true'"
            Text="TemplatesContentSource=static but $(MSBuildProjectDirectory)/content/v2/templates/templates.json is missing." />
-    <Error Condition="!Exists('$(MSBuildProjectDirectory)/content/v1/templates/templates.json') and '$(IncludeV1Templates)' == 'true'"
-           Text="TemplatesContentSource=static but $(MSBuildProjectDirectory)/content/v1/templates/templates.json is missing." />
 
     <ItemGroup>
-      <None Condition="'$(IncludeV1Templates)' == 'true'"
-            Include="$(MSBuildProjectDirectory)/content/v1/**/*.json"
-            Pack="true" PackagePath="tools/any/content/v1/" Visible="false" />
-
       <!--
         v2 content with per-channel filter ON: pack the bundles/resources
         from the repo but the templates.json from the obj/-staged filtered
@@ -359,7 +303,7 @@
   <Target Name="_WarnSkipDownloadTemplatesOnPack"
           Condition="'$(SkipDownloadTemplates)' == 'true'"
           BeforeTargets="GenerateNuspec">
-    <Warning Text="SkipDownloadTemplates=true: the $(MSBuildProjectName) pack will ship without any templates payload (no v1/v2 JSON, no templates-workload.json). Intended for offline dev builds only; do not use for release packs." />
+    <Warning Text="SkipDownloadTemplates=true: the $(MSBuildProjectName) pack will ship without any templates payload (no v2 JSON, no templates-workload.json). Intended for offline dev builds only; do not use for release packs." />
   </Target>
 
 </Project>

@@ -24,7 +24,6 @@
       Templates Workload Spec §4.4.2.
     -->
     <TemplatesContentSource>static</TemplatesContentSource>
-    <IncludeV1Templates>false</IncludeV1Templates>
     <IncludeV2Templates>true</IncludeV2Templates>
     <FilterTemplatesByBundleChannel>true</FilterTemplatesByBundleChannel>
   </PropertyGroup>

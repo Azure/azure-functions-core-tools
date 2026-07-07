@@ -5,19 +5,13 @@
 
 .DESCRIPTION
     Reads the templates.json file at -Path (expected to be a JSON array of
-    template objects from a Functions extension bundle's StaticContent
-    subtree), keeps only entries whose language matches one of the values
-    in -Languages, and writes the filtered array back to -Path.
-
-    -Mode v1 (default) reads `metadata.language` on each entry (v1 schema:
-    `Template[]`).
-    -Mode v2 reads top-level `language` on each entry (v2 schema:
-    `NewTemplate[]`).
+    v2 template objects from a Functions extension bundle's StaticContent
+    subtree), keeps only entries whose top-level `language` matches one of
+    the values in -Languages, and writes the filtered array back to -Path.
 
     Matching is case-insensitive (PowerShell `-contains` semantics) so the
     same allow-list — e.g. `Python` or `JavaScript;TypeScript` — applies
-    cleanly to both v1 (`metadata.language: "Python"`) and v2
-    (`language: "python"`).
+    against the v2 `language` field (`language: "python"`).
 
     Used at templates-workload pack time to drop entries that don't belong
     to the current per-stack workload. See
@@ -30,11 +24,6 @@
     Comma- or semicolon-separated allow-list of language values
     (e.g. "JavaScript,TypeScript" for Node; "Python" for Python).
     Matching is case-insensitive.
-
-.PARAMETER Mode
-    Programming-model schema selector. `v1` reads `metadata.language`
-    (legacy `Template[]`). `v2` reads top-level `language`
-    (`NewTemplate[]`). Defaults to `v1` for backwards compatibility.
 #>
 [CmdletBinding()]
 param(
@@ -42,11 +31,7 @@ param(
     [string]$Path,
 
     [Parameter(Mandatory=$true)]
-    [string]$Languages,
-
-    [Parameter(Mandatory=$false)]
-    [ValidateSet('v1','v2')]
-    [string]$Mode = 'v1'
+    [string]$Languages
 )
 
 $ErrorActionPreference = 'Stop'
@@ -71,10 +56,7 @@ if ($all -isnot [System.Collections.IEnumerable] -or $all -is [string]) {
 }
 
 $beforeCount = @($all).Count
-$kept = switch ($Mode) {
-    'v1' { @($all | Where-Object { $allow -contains $_.metadata.language }) }
-    'v2' { @($all | Where-Object { $allow -contains $_.language }) }
-}
+$kept = @($all | Where-Object { $allow -contains $_.language })
 $afterCount = $kept.Count
 
 # ConvertTo-Json drops the array wrapper for 0- and 1-element collections.
@@ -92,4 +74,4 @@ else {
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText($Path, $json + "`n", $utf8NoBom)
 
-Write-Host "filter-templates ($Mode): $Path  kept $afterCount of $beforeCount entries (languages: $($allow -join ', '))."
+Write-Host "filter-templates: $Path  kept $afterCount of $beforeCount entries (languages: $($allow -join ', '))."
