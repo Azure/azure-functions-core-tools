@@ -19,20 +19,8 @@ jobs:
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
-  - pwsh: |
-      $diff = git diff --name-only origin/main...HEAD
-      if ($diff -match 'eng/build/Packages\.props') {
-        Write-Output "Packages.props changed, running worker version validation..."
-        Write-Output "##vso[task.setvariable variable=runWorkerValidation]true"
-      } else {
-        Write-Output "Packages.props not changed, skipping worker version validation."
-        Write-Output "##vso[task.setvariable variable=runWorkerValidation]false"
-      }
-    displayName: 'Check if worker validation needed'
-
   - pwsh: ./eng/scripts/validate-worker-versions.ps1
     displayName: 'Validate worker versions'
-    condition: eq(variables['runWorkerValidation'], 'true')
 
   - pwsh: ./eng/scripts/check-vulnerabilities.ps1
     displayName: 'Check for security vulnerabilities'
