@@ -90,6 +90,8 @@ internal sealed class DemoEventSource(TimeProvider? timeProvider = null) : IHost
 
     private TimeSpan Scale(TimeSpan ts) => TimeSpan.FromMilliseconds(ts.TotalMilliseconds * SpeedMultiplier);
 
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
     private static IEnumerable<(TimeSpan Delay, HostLogEntry Entry)> BuildTimeline(
         int burstCount,
         (string Name, string Trigger, string? Route, string[] Methods)[] extras)

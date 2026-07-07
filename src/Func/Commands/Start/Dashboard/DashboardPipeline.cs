@@ -59,13 +59,22 @@ internal sealed class DashboardPipeline(
         catch (OperationCanceledException) when (pipelineCts.IsCancellationRequested)
         {
             exitReason = "sigint";
-            if (_source is IHostEventStreamLifecycle lifecycle)
-            {
-                await lifecycle.RequestShutdownAsync(CancellationToken.None);
-            }
         }
         finally
         {
+            // Signal shutdown on every exit path; StartCommand's await using disposes the stream as a fallback.
+            if (_source is IHostEventStreamLifecycle lifecycle)
+            {
+                try
+                {
+                    await lifecycle.RequestShutdownAsync(CancellationToken.None);
+                }
+                catch
+                {
+                    // Best effort.
+                }
+            }
+
             if (_renderer is IDashboardShutdownRequester requester && shutdownHandler is not null)
             {
                 requester.ShutdownRequested -= shutdownHandler;

@@ -210,11 +210,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             initializationEvents = [.. initializationRenderer.Events];
         }
 
+        // Take ownership of the host stream now so any failure before pipeline completion still tears the process down.
+        await using IHostEventStream hostEventStream = initializationResult.EventStream;
+
         var state = new DashboardState();
 
         IDashboardRenderer renderer = CreateRenderer(mode, initializationResult.RunInfo);
 
-        IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, initializationResult.EventStream);
+        IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, hostEventStream);
         var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink);
         FunctionsProjectHostRunOutcome? outcome = null;
         // Stop any managed Azurite instance the orchestrator launched when
