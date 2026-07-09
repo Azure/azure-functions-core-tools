@@ -443,7 +443,7 @@ namespace Azure.Functions.Cli.Helpers
             var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armSite = await ArmHttpAsync<ArmWrapper<ArmWebsite>>(HttpMethod.Get, url, accessToken);
 
-            site.HostName = armSite.Properties.EnabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
+            site.HostName = armSite.Properties.DefaultHostName;
             site.ScmUri = armSite.Properties.EnabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
             site.Location = armSite.Location;
             site.Kind = armSite.Kind;

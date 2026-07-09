@@ -3,6 +3,7 @@
 
 using AwesomeAssertions;
 using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using RichardSzalay.MockHttp;
@@ -163,6 +164,29 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 result.Should().NotBeNull();
                 result.StorageAccountName.Should().Be(storageName);
                 result.StorageAccountKey.Should().Be("test-key");
+            }
+            finally
+            {
+                ArmClient.SetTestHandler(null);
+            }
+        }
+
+        [Fact]
+        public async Task LoadSiteObjectAsync_ShouldUseDefaultHostName()
+        {
+            try
+            {
+                var mockUrl = $"{ManagementUrl}{AppId}?api-version={ArmUriTemplates.WebsitesApiVersion}";
+
+                var mockHttp = new MockHttpMessageHandler();
+                mockHttp.When(HttpMethod.Get, mockUrl)
+                        .Respond("application/json", @"{'properties': {'defaultHostName': 'myapp.azurewebsites.net', 'enabledHostNames': ['custom.contoso.com', 'myapp.azurewebsites.net', 'myapp.scm.azurewebsites.net']}}");
+
+                ArmClient.SetTestHandler(mockHttp);
+
+                var result = await AzureHelper.LoadSiteObjectAsync(new Site(AppId), AccessToken, ManagementUrl);
+
+                result.HostName.Should().Be("myapp.azurewebsites.net");
             }
             finally
             {

@@ -7,6 +7,9 @@ namespace Azure.Functions.Cli.Arm.Models
 {
     internal class ArmWebsite
     {
+        [JsonProperty(PropertyName = "defaultHostName")]
+        public string DefaultHostName { get; set; }
+
         [JsonProperty(PropertyName = "enabledHostNames")]
         public IEnumerable<string> EnabledHostNames { get; set; }
 
