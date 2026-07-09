@@ -19,6 +19,13 @@
     <PackageVersion Include="System.Text.Json" Version="10.0.9" />
   </ItemGroup>
 
+  <!-- template engine -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.TemplateEngine.Abstractions" Version="10.0.301" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Edge" Version="10.0.301" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" Version="10.0.301" />
+  </ItemGroup>
+
   <!-- telemetry -->
   <ItemGroup>
     <PackageVersion Include="OpenTelemetry" Version="1.15.3" />

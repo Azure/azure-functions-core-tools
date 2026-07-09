@@ -35,6 +35,9 @@
   <ItemGroup>
     <PackageReference Include="NuGet.Packaging" />
     <PackageReference Include="NuGet.Protocol" />
+    <PackageReference Include="Microsoft.TemplateEngine.Abstractions" />
+    <PackageReference Include="Microsoft.TemplateEngine.Edge" />
+    <PackageReference Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" />
     <PackageReference Include="System.CommandLine" />
     <PackageReference Include="Spectre.Console" />
     <PackageReference Include="OpenTelemetry" />
