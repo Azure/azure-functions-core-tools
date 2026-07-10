@@ -1,0 +1,8 @@
+{
+  "FunctionsQuickstartDotNetAzd_name": "Azure Functions .NET (azd) quickstart",
+  "FunctionsQuickstartDotNetAzd_description": "A full .NET (isolated worker) Azure Functions project wired for the Azure Developer CLI (azd): HTTP-triggered functions, Bicep infrastructure, and dev-container/VS Code configuration.",
+
+  "trigger_functionName_label": "Function name",
+  "trigger_functionName_help": "The name of the HTTP function. Must start with a letter and contain only alphanumeric characters or underscores.",
+  "trigger_functionName_errorText": "Function names must start with a letter, end with a letter or number, and contain only letters, numbers, and underscores (max 128 chars)."
+}

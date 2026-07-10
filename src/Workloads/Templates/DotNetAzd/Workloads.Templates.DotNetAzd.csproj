@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>.NET (azd) Function Templates</Title>
+    <Description>Full-project azd quickstart template for .NET Azure Functions, consumed by the func CLI v2 template engine.</Description>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>dotnet-azd-templates</WorkloadAlias>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <!--
+    Whole-project (azd) scaffold shipped as a v2 template-engine payload.
+    Unlike the sibling Node/Python workloads this is not backed by an
+    extension bundle (.NET isolated resolves extensions via NuGet package
+    references), so there is no channel axis and no templates-workload.json
+    min-bundle manifest. The v2 content is authored in-repo and packed
+    directly under tools/any/content/v2/, mirroring the on-disk layout the
+    CLI core's V2PayloadReader expects.
+  -->
+  <ItemGroup>
+    <None Include="content/v2/**/*.json" Pack="true" PackagePath="tools/any/content/v2/" Visible="false" />
+  </ItemGroup>
+
+</Project>
