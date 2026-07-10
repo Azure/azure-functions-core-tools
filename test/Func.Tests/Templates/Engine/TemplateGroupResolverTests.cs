@@ -142,6 +142,85 @@ public class TemplateGroupResolverTests
         Assert.Equal("node", resolved.Stack);
     }
 
+    [Theory]
+    // Any accepted TypeScript token on the --language switch matches any accepted
+    // TypeScript token authored on the template's `language` tag: alias<->alias,
+    // alias<->canonical, and canonical<->canonical all resolve the same variant.
+    [InlineData("TypeScript", "TypeScript")] // canonical switch, canonical tag
+    [InlineData("ts", "TypeScript")]         // alias switch, canonical tag
+    [InlineData("TypeScript", "ts")]         // canonical switch, alias tag
+    [InlineData("ts", "ts")]                 // alias switch, alias tag
+    [InlineData("typescript", "TS")]         // case-insensitive on both sides
+    public void Resolve_LanguageAlias_MatchesSymmetricallyInAllPositions(
+        string switchLanguage,
+        string tagLanguage)
+    {
+        TemplateGroup group = SingleGroup(
+            Template("Func.Http.Node.Js", "Func.Http", "httptrigger", language: "JavaScript"),
+            Template("Func.Http.Node.Ts", "Func.Http", "httptrigger", language: tagLanguage));
+
+        TemplateVariantResolution resolution = _resolver.Resolve(group, switchLanguage);
+
+        TemplateVariantResolution.Resolved resolved = Assert.IsType<TemplateVariantResolution.Resolved>(resolution);
+        Assert.Equal("Func.Http.Node.Ts", resolved.Variant.Template.Identity);
+        Assert.Equal("node", resolved.Stack);
+    }
+
+    [Theory]
+    // C#/csharp behaves symmetrically regardless of which token labels the switch
+    // versus the tag, and matching is case-insensitive ('c#' == 'C#').
+    [InlineData("csharp", "C#")]
+    [InlineData("C#", "csharp")]
+    [InlineData("csharp", "csharp")]
+    [InlineData("c#", "C#")]
+    public void Resolve_CSharpAlias_MatchesSymmetrically(
+        string switchLanguage,
+        string tagLanguage)
+    {
+        TemplateGroup group = SingleGroup(
+            Template("Func.Http.Dotnet.Cs", "Func.Http", "httptrigger", language: tagLanguage),
+            Template("Func.Http.Dotnet.Fs", "Func.Http", "httptrigger", language: "F#"));
+
+        TemplateVariantResolution resolution = _resolver.Resolve(group, switchLanguage);
+
+        TemplateVariantResolution.Resolved resolved = Assert.IsType<TemplateVariantResolution.Resolved>(resolution);
+        Assert.Equal("Func.Http.Dotnet.Cs", resolved.Variant.Template.Identity);
+        Assert.Equal("dotnet", resolved.Stack);
+    }
+
+    [Fact]
+    public void Resolve_MultiLanguageStack_JavaScriptAndTypeScriptRemainDistinct()
+    {
+        // A Node group whose variants are tagged with aliases must still keep
+        // JavaScript and TypeScript apart: each request selects exactly its own
+        // variant rather than collapsing to a single language.
+        TemplateGroup group = SingleGroup(
+            Template("Func.Http.Node.Js", "Func.Http", "httptrigger", language: "js"),
+            Template("Func.Http.Node.Ts", "Func.Http", "httptrigger", language: "ts"));
+
+        TemplateVariantResolution.Resolved js =
+            Assert.IsType<TemplateVariantResolution.Resolved>(_resolver.Resolve(group, "JavaScript"));
+        Assert.Equal("Func.Http.Node.Js", js.Variant.Template.Identity);
+
+        TemplateVariantResolution.Resolved ts =
+            Assert.IsType<TemplateVariantResolution.Resolved>(_resolver.Resolve(group, "TypeScript"));
+        Assert.Equal("Func.Http.Node.Ts", ts.Variant.Template.Identity);
+    }
+
+    [Fact]
+    public void Resolve_MultiLanguageStack_WrongLanguageIsNoMatch()
+    {
+        // A language that matches neither variant of a multi-language stack yields
+        // NoMatch, confirming aliases never widen a group beyond its languages.
+        TemplateGroup group = SingleGroup(
+            Template("Func.Http.Node.Js", "Func.Http", "httptrigger", language: "JavaScript"),
+            Template("Func.Http.Node.Ts", "Func.Http", "httptrigger", language: "TypeScript"));
+
+        TemplateVariantResolution resolution = _resolver.Resolve(group, "python");
+
+        Assert.IsType<TemplateVariantResolution.NoMatch>(resolution);
+    }
+
     [Fact]
     public void Resolve_NoLanguage_SingleVariantResolves()
     {
