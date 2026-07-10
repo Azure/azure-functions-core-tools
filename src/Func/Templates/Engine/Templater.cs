@@ -39,12 +39,23 @@ internal class Templater
         _packageManager = new(settings);
     }
 
+    /// <summary>
+    /// The engine environment the host is bootstrapped with (settings location,
+    /// registered components, host params). Exposed for host wiring and tests.
+    /// </summary>
+    public IEngineEnvironmentSettings Settings => _settings;
+
+    public TemplateCreator Creator => _creator;
+
+    public TemplatePackageManager PackageManager => _packageManager;
+
     public static Templater Create(
-        ProjectResolutionResult projectResolution,
-        ExtensionBundleResolution bundleResolution,
+        ProjectResolutionResult? projectResolution = null,
+        ExtensionBundleResolution? bundleResolution = null,
         string? settingsLocation = null)
     {
-        ArgumentNullException.ThrowIfNull(projectResolution);
+        projectResolution ??= ProjectResolutionResults.NotResolved("No project resolution context provided");
+        bundleResolution ??= new ExtensionBundleResolution.NotResolved("No bundle resolution context provided");
         settingsLocation ??= Path.Combine(FuncHomeResolver.Resolve(), SettingsDirectoryName);
 
         Dictionary<string, string>? hostParams = null;
@@ -67,7 +78,9 @@ internal class Templater
 
         DefaultTemplateEngineHost host = CreateHost(hostParams);
         EngineEnvironmentSettings settings = new(host, settingsLocation: settingsLocation);
-        return new(settings);
+        Templater templater = new(settings);
+        templater.LoadDefaultComponents();
+        return templater;
     }
 
     public void LoadDefaultComponents()
@@ -80,11 +93,25 @@ internal class Templater
         {
             AddComponent(component.Type, component.Instance);
         }
+        foreach ((Type Type, IIdentifiedComponent Instance) component in FuncTemplateComponents.AllComponents)
+        {
+            AddComponent(component.Type, component.Instance);
+        }
     }
 
     public void AddComponent(Type interfaceType, IIdentifiedComponent component)
     {
         _settings.Components.AddComponent(interfaceType, component);
+    }
+
+    /// <summary>
+    /// Enumerates the templates installed in the func hive. Requires the
+    /// RunnableProjects generator components to be registered (see
+    /// <see cref="LoadDefaultComponents"/>); an empty hive yields an empty list.
+    /// </summary>
+    public Task<IReadOnlyList<ITemplateInfo>> GetTemplatesAsync(CancellationToken cancellationToken = default)
+    {
+        return _packageManager.GetTemplatesAsync(cancellationToken);
     }
 
     private static DefaultTemplateEngineHost CreateHost(Dictionary<string, string>? defaults)

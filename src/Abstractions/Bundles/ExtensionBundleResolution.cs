@@ -17,6 +17,9 @@ public abstract record ExtensionBundleResolution
     public sealed record Resolved(string BundleId, string Version, string Path, ExtensionBundleSupportedRuntimeWarning? RuntimeWarning)
         : ExtensionBundleResolution;
 
+    public sealed record NotResolved(string Message, ExtensionBundleSupportedRuntimeWarning? RuntimeWarning = null)
+        : ExtensionBundleResolution;
+
     /// <summary>
 
     /// No bundle workload is installed at any version.
