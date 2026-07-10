@@ -23,6 +23,7 @@ internal static class TemplatesServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<IFuncTemplateEngineHostFactory, FuncTemplateEngineHostFactory>();
+        services.AddSingleton<IFuncTemplateEngineBootstrapper, FuncTemplateEngineBootstrapper>();
         services.AddSingleton<IInstalledTemplatesWorkloads, InstalledTemplatesWorkloads>();
         services.AddSingleton<ITemplateEngineProviderRegistry, TemplateEngineProviderRegistry>();
         services.AddSingleton<TemplateOptionHydrator>();

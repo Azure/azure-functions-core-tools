@@ -26,5 +26,9 @@ internal interface IFuncTemplateEngineHostFactory
     /// <c>func</c>. Construction performs no filesystem work and does not touch
     /// the dotnet CLI hive.
     /// </summary>
-    public ITemplateEngineHost CreateHost();
+    /// <param name="hostParams">
+    /// Optional host-param defaults (e.g. resolved project context) surfaced
+    /// through <see cref="ITemplateEngineHost.TryGetHostParamDefault(string, out string?)"/>.
+    /// </param>
+    public ITemplateEngineHost CreateHost(IReadOnlyDictionary<string, string>? hostParams = null);
 }

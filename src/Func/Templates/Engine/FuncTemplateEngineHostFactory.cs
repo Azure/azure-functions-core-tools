@@ -43,6 +43,12 @@ internal sealed class FuncTemplateEngineHostFactory : IFuncTemplateEngineHostFac
 
     public string SettingsLocation { get; }
 
-    public ITemplateEngineHost CreateHost()
-        => new DefaultTemplateEngineHost(HostIdentifier, _version);
+    public ITemplateEngineHost CreateHost(IReadOnlyDictionary<string, string>? hostParams = null)
+    {
+        Dictionary<string, string>? defaults = hostParams is { Count: > 0 }
+            ? new Dictionary<string, string>(hostParams)
+            : null;
+
+        return new DefaultTemplateEngineHost(HostIdentifier, _version, defaults);
+    }
 }
