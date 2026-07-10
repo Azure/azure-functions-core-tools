@@ -35,6 +35,35 @@ internal static class BundleHelpers
             [ExperimentalLabel] = BundleChannel.Experimental
         };
 
+    private static readonly Dictionary<string, BundleChannel> _labelToChannelMap =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            [StableLabel] = BundleChannel.Stable,
+            [PreviewLabel] = BundleChannel.Preview,
+            [ExperimentalLabel] = BundleChannel.Experimental
+        };
+
+    /// <summary>
+    /// Resolves a bundle identifier to its <see cref="BundleChannel"/>. Accepts
+    /// either a full bundle id (e.g. <c>Microsoft.Azure.Functions.ExtensionBundle.Preview</c>)
+    /// or a short channel label (<c>stable</c>, <c>preview</c>, <c>experimental</c>).
+    /// </summary>
+    /// <param name="idOrLabel">The full bundle id or short channel label.</param>
+    /// <param name="channel">The resolved channel when the method returns <c>true</c>.</param>
+    /// <returns><c>true</c> if <paramref name="idOrLabel"/> was recognized; otherwise <c>false</c>.</returns>
+    public static bool TryResolveChannel(string idOrLabel, out BundleChannel channel)
+    {
+        if (!string.IsNullOrWhiteSpace(idOrLabel)
+            && (_bundleIdToChannelMap.TryGetValue(idOrLabel, out channel)
+                || _labelToChannelMap.TryGetValue(idOrLabel, out channel)))
+        {
+            return true;
+        }
+
+        channel = BundleChannel.Unknown;
+        return false;
+    }
+
     /// <summary>
     /// Converts a bundle channel to its display string.
     /// </summary>

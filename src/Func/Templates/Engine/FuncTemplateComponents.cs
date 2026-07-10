@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Constraints;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -12,10 +13,11 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// are registered here so <see cref="Templater.LoadDefaultComponents"/> loads
 /// them alongside the default RunnableProjects and Edge components.
 /// <para>
-/// The <c>func-extension-bundle</c> constraint factory is added to
-/// <see cref="AllComponents"/> once implemented (change
-/// <c>func-universal-template-engine</c>, group 2 — constraints). Until then
-/// the set is empty and no func-specific constraint gating is applied.
+/// The <c>func-extension-bundle</c> constraint factory
+/// (<see cref="FuncExtensionBundleConstraintFactory"/>) is registered in
+/// <see cref="AllComponents"/> so it is loaded alongside the default
+/// RunnableProjects and Edge components (change
+/// <c>func-universal-template-engine</c>, group 2 — constraints).
 /// </para>
 /// </summary>
 internal static class FuncTemplateComponents
@@ -27,5 +29,8 @@ internal static class FuncTemplateComponents
     /// lists consumed by <see cref="Templater.LoadDefaultComponents"/>.
     /// </summary>
     public static IReadOnlyList<(Type Type, IIdentifiedComponent Instance)> AllComponents { get; } =
-        Array.Empty<(Type, IIdentifiedComponent)>();
+        new (Type, IIdentifiedComponent)[]
+        {
+            (typeof(ITemplateConstraintFactory), new FuncExtensionBundleConstraintFactory()),
+        };
 }
