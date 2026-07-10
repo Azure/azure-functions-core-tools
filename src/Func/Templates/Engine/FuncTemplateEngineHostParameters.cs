@@ -21,4 +21,7 @@ internal static class FuncTemplateEngineHostParameters
 
     /// <summary>Resolved extension-bundle version the project targets.</summary>
     public const string Bundle = "func:bundle";
+
+    /// <summary>Resolved extension-bundle channel the project targets.</summary>
+    public const string BundleChannel = "func:bundle-channel";
 }
