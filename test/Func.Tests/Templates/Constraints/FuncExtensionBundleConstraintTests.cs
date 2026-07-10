@@ -2,12 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Bundles;
+using Azure.Functions.Cli.Templates.Constraints;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Edge;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests.Templates.Engine;
+namespace Azure.Functions.Cli.Tests.Templates.Constraints;
 
 public class FuncExtensionBundleConstraintTests : IDisposable
 {

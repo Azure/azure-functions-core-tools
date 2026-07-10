@@ -522,15 +522,24 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     }
 
     // Returns null when the resolver can't classify the directory or the
-    // resolved project doesn't surface a Language; adoption then writes the
-    // stack runtime without a language entry.
+    // resolved project's language is just its stack default (single-language
+    // stacks, where Language == StackName); adoption then writes the stack
+    // runtime without a redundant language entry. A distinct language (e.g. a
+    // .NET project's "C#"/"F#") is returned so adoption records it.
     private async Task<string?> DetectAdoptedLanguageAsync(WorkingDirectory workingDirectory, CancellationToken cancellationToken)
     {
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
             new ProjectResolutionContext(workingDirectory),
             cancellationToken);
 
-        return resolution is ProjectResolutionResult.Resolved resolved ? resolved.Project.Language : null;
+        if (resolution is not ProjectResolutionResult.Resolved resolved)
+        {
+            return null;
+        }
+
+        return string.Equals(resolved.Project.Language, resolved.Project.StackName, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : resolved.Project.Language;
     }
 
     // Resolves a candidate string (from --stack or local.settings.json) to

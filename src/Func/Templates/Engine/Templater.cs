@@ -1,13 +1,13 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Abstractions.Common;
 using Azure.Functions.Cli.Bundles;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 using Microsoft.TemplateEngine.Edge.Template;
-
-using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -76,35 +76,10 @@ internal class Templater
     }
 
     /// <summary>
-    /// Enumerates the templates installed in the func hive. Requires the
-    /// RunnableProjects generator components to be registered (see
-    /// <see cref="LoadDefaultComponents"/>); an empty hive yields an empty list.
+    /// Enumerates the templates installed in the func hive.
     /// </summary>
     public Task<IReadOnlyList<ITemplateInfo>> GetTemplatesAsync(CancellationToken cancellationToken = default)
     {
         return _packageManager.GetTemplatesAsync(cancellationToken);
-    }
-}
-
-internal class FuncTemplateEngineHost : DefaultTemplateEngineHost
-{
-    /// <summary>
-    /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
-    /// func-specific identifier (rather than the dotnet CLI's
-    /// <c>dotnetcli</c>) keeps host-owned template config and constraints
-    /// scoped to func.
-    /// </summary>
-    internal const string Identifier = "func";
-
-    private static readonly IReadOnlyList<(Type, IIdentifiedComponent)> _builtIns =
-    [
-        ..Components.AllComponents,
-        ..OrchestratorComponents.AllComponents,
-        ..FuncTemplateComponents.AllComponents,
-    ];
-
-    public FuncTemplateEngineHost(Dictionary<string, string>? defaults)
-        : base(Identifier, AssemblyCliVersionProvider.Instance.Version, defaults, _builtIns)
-    {
     }
 }

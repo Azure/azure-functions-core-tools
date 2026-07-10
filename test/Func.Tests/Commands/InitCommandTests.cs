@@ -1276,7 +1276,8 @@ public class InitCommandTests
 
         public override string StackDisplayName => StackName;
 
-        public override string? Language { get; } = language;
+        // A null test language models a single-language stack, which defaults to StackName.
+        public override string Language { get; } = language ?? stackName;
 
         public override bool SupportsExtensionBundles => false;
 

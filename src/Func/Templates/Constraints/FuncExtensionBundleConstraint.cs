@@ -5,11 +5,12 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using NuGet.Versioning;
 
-namespace Azure.Functions.Cli.Templates.Engine;
+namespace Azure.Functions.Cli.Templates.Constraints;
 
 /// <summary>
 /// <c>Microsoft.TemplateEngine</c> constraint factory for the

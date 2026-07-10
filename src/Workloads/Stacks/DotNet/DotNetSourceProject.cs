@@ -18,7 +18,7 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
 
     public string ProjectFilePath { get; } = projectFilePath ?? throw new ArgumentNullException(nameof(projectFilePath));
 
-    public override string? Language => Path.GetExtension(ProjectFilePath).Equals(".fsproj", StringComparison.OrdinalIgnoreCase)
+    public override string Language => Path.GetExtension(ProjectFilePath).Equals(".fsproj", StringComparison.OrdinalIgnoreCase)
         ? "F#"
         : "C#";
 

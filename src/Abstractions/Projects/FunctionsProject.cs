@@ -18,10 +18,13 @@ public abstract class FunctionsProject
     public abstract string StackDisplayName { get; }
 
     /// <summary>
-    /// Display name of the project's language (e.g. "C#", "TypeScript"), or
-    /// <c>null</c> for single-language stacks where the stack implies it.
+    /// Display name of the project's language (e.g. "C#", "TypeScript",
+    /// "Python"). Defaults to <see cref="StackName"/> for single-language
+    /// stacks where the stack implies the language; multi-language stacks
+    /// (e.g. .NET, Node) override it with the specific language. Always
+    /// non-null so template selection can resolve a language for every project.
     /// </summary>
-    public virtual string? Language => null;
+    public virtual string Language => StackName;
 
     public abstract bool SupportsExtensionBundles { get; }
 

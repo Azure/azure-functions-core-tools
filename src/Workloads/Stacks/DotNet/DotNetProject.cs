@@ -24,6 +24,13 @@ internal abstract class DotNetProject(WorkingDirectory workingDirectory) : Funct
 
     public override string StackDisplayName => DotNetStackDisplayName;
 
+    /// <summary>
+    /// Defaults to C#. A source project overrides this from its project file
+    /// extension; an output-only project (compiled binaries, no source) cannot
+    /// recover the original language, so C# is the pragmatic default.
+    /// </summary>
+    public override string Language => "C#";
+
     public override bool SupportsExtensionBundles => false;
 
     public override FunctionsWorkerReference WorkerReference
