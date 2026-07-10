@@ -24,9 +24,7 @@ internal static class FuncTemplateComponents
 {
     /// <summary>
     /// The func constraint factory component set registered on the host. Each
-    /// tuple pairs the engine component interface with the component instance,
-    /// matching the shape of the default RunnableProjects and Edge component
-    /// lists consumed by <see cref="Templater.LoadDefaultComponents"/>.
+    /// tuple pairs the engine component interface with the component instance.
     /// </summary>
     public static IReadOnlyList<(Type Type, IIdentifiedComponent Instance)> AllComponents { get; } =
         new (Type, IIdentifiedComponent)[]

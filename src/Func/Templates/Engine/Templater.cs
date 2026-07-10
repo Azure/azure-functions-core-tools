@@ -13,13 +13,6 @@ namespace Azure.Functions.Cli.Templates.Engine;
 
 internal class Templater
 {
-    /// <summary>
-    /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
-    /// func-specific identifier (rather than the dotnet CLI's
-    /// <c>dotnetcli</c>) keeps host-owned template config and constraints
-    /// scoped to func.
-    /// </summary>
-    internal const string HostIdentifier = "func";
 
     /// <summary>
     /// Sub-directory (under the func home) that holds the engine's settings,
@@ -62,7 +55,7 @@ internal class Templater
         if (projectResolution is ProjectResolutionResult.Resolved resolved)
         {
             string stack = resolved.Project.StackName.ToLowerInvariant();
-            string language = resolved.Project.Language?.ToLowerInvariant() ?? stack;
+            string language = resolved.Project.Language.ToLowerInvariant();
             hostParams = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 [FuncTemplateEngineHostParameters.Stack] = stack,
@@ -76,32 +69,10 @@ internal class Templater
             }
         }
 
-        DefaultTemplateEngineHost host = CreateHost(hostParams);
+        FuncTemplateEngineHost host = new(hostParams);
         EngineEnvironmentSettings settings = new(host, settingsLocation: settingsLocation);
         Templater templater = new(settings);
-        templater.LoadDefaultComponents();
         return templater;
-    }
-
-    public void LoadDefaultComponents()
-    {
-        foreach ((Type Type, IIdentifiedComponent Instance) component in OrchestratorComponents.AllComponents)
-        {
-            AddComponent(component.Type, component.Instance);
-        }
-        foreach ((Type Type, IIdentifiedComponent Instance) component in Components.AllComponents)
-        {
-            AddComponent(component.Type, component.Instance);
-        }
-        foreach ((Type Type, IIdentifiedComponent Instance) component in FuncTemplateComponents.AllComponents)
-        {
-            AddComponent(component.Type, component.Instance);
-        }
-    }
-
-    public void AddComponent(Type interfaceType, IIdentifiedComponent component)
-    {
-        _settings.Components.AddComponent(interfaceType, component);
     }
 
     /// <summary>
@@ -113,10 +84,27 @@ internal class Templater
     {
         return _packageManager.GetTemplatesAsync(cancellationToken);
     }
+}
 
-    private static DefaultTemplateEngineHost CreateHost(Dictionary<string, string>? defaults)
+internal class FuncTemplateEngineHost : DefaultTemplateEngineHost
+{
+    /// <summary>
+    /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
+    /// func-specific identifier (rather than the dotnet CLI's
+    /// <c>dotnetcli</c>) keeps host-owned template config and constraints
+    /// scoped to func.
+    /// </summary>
+    internal const string Identifier = "func";
+
+    private static readonly IReadOnlyList<(Type, IIdentifiedComponent)> _builtIns =
+    [
+        ..Components.AllComponents,
+        ..OrchestratorComponents.AllComponents,
+        ..FuncTemplateComponents.AllComponents,
+    ];
+
+    public FuncTemplateEngineHost(Dictionary<string, string>? defaults)
+        : base(Identifier, AssemblyCliVersionProvider.Instance.Version, defaults, _builtIns)
     {
-        string version = AssemblyCliVersionProvider.Instance.Version;
-        return new DefaultTemplateEngineHost(HostIdentifier, version, defaults);
     }
 }
