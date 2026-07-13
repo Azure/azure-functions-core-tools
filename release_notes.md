@@ -4,8 +4,8 @@
 
 - Host Runtime Version: 4.1051.300
 - In-Proc CLI:
-  - CLI Version: 4.6.0
-  - Host Runtime Version: 4.49.100 (includes 4.849.100, 4.649.100)
+  - CLI Version: 4.7.0
+  - Host Runtime Version: 4.51.100 (includes 4.851.100, 4.651.100)
 
 #### Changes
 
