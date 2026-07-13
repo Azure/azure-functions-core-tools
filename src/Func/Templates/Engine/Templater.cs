@@ -13,7 +13,6 @@ namespace Azure.Functions.Cli.Templates.Engine;
 
 internal class Templater
 {
-
     /// <summary>
     /// Sub-directory (under the func home) that holds the engine's settings,
     /// installed template packages, and caches.
