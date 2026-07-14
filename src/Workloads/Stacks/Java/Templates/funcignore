@@ -1,0 +1,8 @@
+.git*
+.vscode
+.idea
+local.settings.json
+src
+pom.xml
+target/*.jar
+!target/azure-functions

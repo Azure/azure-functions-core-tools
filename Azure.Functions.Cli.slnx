@@ -18,6 +18,7 @@
   <Folder Name="/src/Workloads/Stacks/">
     <Project Path="src/Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
     <Project Path="src/Workloads/Stacks/Go/Workloads.Go.csproj" />
+    <Project Path="src/Workloads/Stacks/Java/Workloads.Java.csproj" />
     <Project Path="src/Workloads/Stacks/Node/Workloads.Node.csproj" />
     <Project Path="src/Workloads/Stacks/PowerShell/Workloads.PowerShell.csproj" />
     <Project Path="src/Workloads/Stacks/Python/Workloads.Python.csproj" />
@@ -47,6 +48,7 @@
   <Folder Name="/test/Workloads/Stacks/">
     <Project Path="test/Workloads/Stacks/DotNet.Tests/Workloads.DotNet.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Go.Tests/Workloads.Go.Tests.csproj" />
+    <Project Path="test/Workloads/Stacks/Java.Tests/Workloads.Java.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/PowerShell.Tests/Workloads.PowerShell.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Python.Tests/Workloads.Python.Tests.csproj" />
