@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Tests.Commands.Setup;
 
 public sealed class SetupRunnerTests : IDisposable
 {
-    private static readonly string _hostPackageId = HostWorkloadPackage.CurrentPackageId;
+    private static readonly string _hostPackageId = HostWorkloadPackage.PackageId;
     private static readonly string _dotNetStackPackageId = "Azure.Functions.Cli.Workloads.DotNet";
 
     private readonly string _tempDir;
@@ -375,6 +375,47 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_IfNeeded_RecognizesInstalledRidPointerWorkload()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns([LogicalEntry(_hostPackageId, "4.0.0", "win-x64")]);
+        FakeCatalog catalog = Catalog();
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: ["host"], installPolicy: SetupInstallPolicy.IfNeeded),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(0, catalog.ResolveLatestCallCount);
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunAsync_Check_RecognizesExactRidPointerWorkloadVersion()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns([LogicalEntry(_hostPackageId, "4.0.0", "win-x64")]);
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.0.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: ["host"], check: true),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("not installed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RunAsync_LatestCompatibleCheck_FailsWhenLatestCompatibleIsMissing()
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
@@ -664,7 +705,7 @@ public sealed class SetupRunnerTests : IDisposable
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.StartsWith("Azure.Functions.Cli.Workloads.", StringComparison.OrdinalIgnoreCase)
                 && !id.StartsWith("Azure.Functions.Cli.Workloads.Workers.", StringComparison.OrdinalIgnoreCase)
-                && !id.StartsWith("Azure.Functions.Cli.Workloads.Host.", StringComparison.OrdinalIgnoreCase)
+                && !id.StartsWith(HostWorkloadPackage.PackageId, StringComparison.OrdinalIgnoreCase)
                 && !id.StartsWith("Azure.Functions.Cli.Workloads.ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
             Arg.Any<string?>(),
@@ -871,6 +912,21 @@ public sealed class SetupRunnerTests : IDisposable
             PackageVersion = version,
             Aliases = aliases ?? [],
             Kind = kind,
+        };
+
+    private static WorkloadEntry LogicalEntry(string pointerPackageId, string version, string runtimeIdentifier)
+        => new()
+        {
+            PackageId = $"{pointerPackageId}.{runtimeIdentifier}",
+            PackageVersion = version,
+            RuntimeIdentifier = runtimeIdentifier,
+            IsExplicitlyInstalled = false,
+            LogicalPackage = new LogicalPackage
+            {
+                PackageId = pointerPackageId,
+                PackageVersion = version,
+            },
+            Kind = WorkloadKind.Content,
         };
 
     private sealed class FakeCatalog : IWorkloadCatalog

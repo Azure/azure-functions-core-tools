@@ -290,6 +290,45 @@ public class WorkloadListCommandTests
     }
 
     [Fact]
+    public async Task List_Json_ProjectsLogicalAndPhysicalPointerDetails()
+    {
+        RuntimeWorkloadInfo loaded = NewInfo(
+            new FakeWorkload(displayName: "Physical implementation"),
+            "Pkg.Pointer.win-x64",
+            "2.0.0",
+            ["pointer"]);
+        var entry = new WorkloadEntry
+        {
+            PackageId = "Pkg.Pointer.win-x64",
+            PackageVersion = "2.0.0",
+            Aliases = ["pointer"],
+            RuntimeIdentifier = "win-x64",
+            IsExplicitlyInstalled = false,
+            LogicalPackage = new LogicalPackage
+            {
+                PackageId = "Pkg.Pointer",
+                PackageVersion = "2.0.0",
+                Aliases = ["pointer"],
+                DisplayName = "Pointer workload",
+                Description = "RID-selected workload",
+            },
+            InstallRefCount = 1,
+        };
+        var store = Substitute.For<IWorkloadStore>();
+        store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+
+        var cmd = new WorkloadListCommand(_interaction, Provider(loaded), store);
+        await InvokeAsync(cmd, "--json");
+
+        string jsonLine = _interaction.Lines.Single(line => line.StartsWith("JSON:", StringComparison.Ordinal));
+        Assert.Contains("\"packageId\":\"Pkg.Pointer\"", jsonLine);
+        Assert.Contains("\"physicalPackageId\":\"Pkg.Pointer.win-x64\"", jsonLine);
+        Assert.Contains("\"runtimeIdentifier\":\"win-x64\"", jsonLine);
+        Assert.Contains("\"ownership\":\"logical:Pkg.Pointer\"", jsonLine);
+        Assert.Contains("\"isExplicitlyInstalled\":false", jsonLine);
+    }
+
+    [Fact]
     public async Task List_HasJsonAndAllVersionsOptions()
     {
         var cmd = new WorkloadListCommand(_interaction, Provider(), Substitute.For<IWorkloadStore>());

@@ -134,6 +134,50 @@ public class WorkloadPruneCommandTests
     }
 
     [Fact]
+    public async Task Prune_LogicalPointer_KeepsHighestPointerVersion()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            LogicalEntry("Pkg.Pointer.win-x64", "1.0.0"),
+            LogicalEntry("Pkg.Pointer.win-x64", "2.0.0"),
+        ]);
+        _installer.UninstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                WorkloadOwnershipKind.Logical,
+                Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        int exit = await InvokeAsync(cmd, "pointer");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).UninstallAsync(
+            "Pkg.Pointer",
+            "1.0.0",
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(
+            "Pkg.Pointer",
+            "2.0.0",
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<CancellationToken>());
+
+        static WorkloadEntry LogicalEntry(string physicalPackageId, string version) => new()
+        {
+            PackageId = physicalPackageId,
+            PackageVersion = version,
+            IsExplicitlyInstalled = false,
+            LogicalPackage = new LogicalPackage
+            {
+                PackageId = "Pkg.Pointer",
+                PackageVersion = version,
+                Aliases = ["pointer"],
+            },
+        };
+    }
+
+    [Fact]
     public async Task Prune_WhitespaceArg_FailsValidation()
     {
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);

@@ -37,6 +37,8 @@ internal sealed class WorkloadRegistry
 /// </summary>
 internal sealed class WorkloadEntry
 {
+    private bool? _isExplicitlyInstalled;
+
     /// <summary>
     /// NuGet package id (e.g. <c>"Azure.Functions.Cli.Workloads.Dotnet"</c>).
     /// Matched case-insensitively.
@@ -78,11 +80,38 @@ internal sealed class WorkloadEntry
     public string Source { get; init; } = string.Empty;
 
     /// <summary>
-    /// Number of installs that brought this package in. An explicit
-    /// <c>func workload install &lt;id&gt;</c> bumps the count; each meta package
-    /// that lists this package as a member also bumps the count at meta install.
-    /// Explicit uninstall removes the entry regardless of the count; meta
-    /// uninstall decrements and removes only when the count hits zero.
+    /// Runtime identifier validated for a RID-specific implementation package.
+    /// Null for ordinary and legacy entries.
+    /// </summary>
+    public string? RuntimeIdentifier { get; init; }
+
+    /// <summary>
+    /// Whether this physical package has an explicit install owner. Defaults
+    /// to true so registry rows written by older CLIs retain their ownership.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsExplicitlyInstalled
+    {
+        get => _isExplicitlyInstalled ?? true;
+        init => _isExplicitlyInstalled = value;
+    }
+
+    [JsonPropertyName("isExplicitlyInstalled")]
+    public bool? PersistedIsExplicitlyInstalled
+    {
+        get => _isExplicitlyInstalled;
+        init => _isExplicitlyInstalled = value;
+    }
+
+    /// <summary>
+    /// Logical pointer package that selected this implementation, or null when
+    /// no pointer owner is attached.
+    /// </summary>
+    public LogicalPackage? LogicalPackage { get; init; }
+
+    /// <summary>
+    /// Number of distinct owners: explicit ownership, logical pointer ownership,
+    /// and meta owners. Repeating an install by the same owner is idempotent.
     /// Defaults to 1 for legacy entries that pre-date this field.
     /// </summary>
     public int InstallRefCount { get; init; } = 1;
@@ -94,6 +123,24 @@ internal sealed class WorkloadEntry
     /// for <see cref="WorkloadKind.Content"/>.
     /// </summary>
     public EntryPointSpec? EntryPoint { get; init; }
+}
+
+/// <summary>
+/// User-facing pointer package metadata persisted with its selected physical implementation.
+/// </summary>
+internal sealed class LogicalPackage
+{
+    public required string PackageId { get; init; }
+
+    public required string PackageVersion { get; init; }
+
+    public IReadOnlyList<string> Aliases { get; init; } = [];
+
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string Description { get; init; } = string.Empty;
+
+    public string Source { get; init; } = string.Empty;
 }
 
 /// <summary>

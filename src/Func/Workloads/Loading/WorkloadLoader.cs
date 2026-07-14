@@ -12,10 +12,19 @@ namespace Azure.Functions.Cli.Workloads.Loading;
 /// collectible <see cref="WorkloadLoadContext"/> so dependency versions
 /// don't collide across workloads.
 /// </summary>
-internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
+internal sealed class WorkloadLoader(
+    IWorkloadPaths paths,
+    IWorkloadRuntimeIdentifierProvider runtimeIdentifierProvider) : IWorkloadLoader
 {
     private readonly IWorkloadPaths _paths = paths
         ?? throw new ArgumentNullException(nameof(paths));
+    private readonly IWorkloadRuntimeIdentifierProvider _runtimeIdentifierProvider = runtimeIdentifierProvider
+        ?? throw new ArgumentNullException(nameof(runtimeIdentifierProvider));
+
+    public WorkloadLoader(IWorkloadPaths paths)
+        : this(paths, new WorkloadRuntimeIdentifierProvider())
+    {
+    }
 
     /// <inheritdoc />
     public IReadOnlyList<RuntimeWorkloadInfo> Load(IReadOnlyList<WorkloadEntry> entries)
@@ -25,11 +34,30 @@ internal sealed class WorkloadLoader(IWorkloadPaths paths) : IWorkloadLoader
         var results = new List<RuntimeWorkloadInfo>(entries.Count);
         foreach (WorkloadEntry entry in entries)
         {
-            results.Add(LoadEntry(entry));
+            try
+            {
+                results.Add(LoadEntry(entry));
+            }
+            catch (InvalidWorkloadException ex) when (HasRuntimeIdentifierMismatch(entry))
+            {
+                string logicalPackageId = entry.LogicalPackage?.PackageId ?? entry.PackageId;
+                throw new InvalidWorkloadException(
+                    $"{ex.Message} The installed implementation targets runtime identifier '{entry.RuntimeIdentifier}', " +
+                    $"but this machine uses '{_runtimeIdentifierProvider.Current}'. " +
+                    $"Run 'func workload update {logicalPackageId}' to install the matching implementation.",
+                    ex);
+            }
         }
 
         return results;
     }
+
+    private bool HasRuntimeIdentifierMismatch(WorkloadEntry entry)
+        => entry.RuntimeIdentifier is not null
+            && !string.Equals(
+                entry.RuntimeIdentifier,
+                _runtimeIdentifierProvider.Current,
+                StringComparison.OrdinalIgnoreCase);
 
     private RuntimeWorkloadInfo LoadEntry(WorkloadEntry entry)
     {

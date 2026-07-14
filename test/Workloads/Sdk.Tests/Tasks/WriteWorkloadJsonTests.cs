@@ -40,6 +40,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         doc.RootElement.GetProperty("kind").GetString().Should().Be("content");
         doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
         doc.RootElement.TryGetProperty("packages", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("runtimeIdentifier", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -67,8 +68,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
     public void Execute_WithInnerPackages_WritesPackagesMap()
     {
         string outputPath = Path.Combine(_tempDir, "workload.json");
-        WriteWorkloadJson task = CreateTask(outputPath, kind: "workload",
-            entryPointAssemblyPath: "W.dll", entryPointType: "W.Type");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "rid-pointer");
         task.InnerPackages =
         [
             CreateTaskItem("My.Package.win-x64", "win-x64"),
@@ -97,29 +97,25 @@ public sealed class WriteWorkloadJsonTests : IDisposable
     }
 
     [Fact]
-    public void Execute_EmptyEntryPointAssemblyPath_OmitsEntryPoint()
+    public void Execute_WorkloadWithEmptyEntryPointAssemblyPath_Fails()
     {
         string outputPath = Path.Combine(_tempDir, "workload.json");
         WriteWorkloadJson task = CreateTask(outputPath, kind: "workload",
             entryPointAssemblyPath: "", entryPointType: "Some.Type");
 
-        task.Execute();
-
-        JsonDocument doc = ParseOutput(outputPath);
-        doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
+        task.Execute().Should().BeFalse();
+        File.Exists(outputPath).Should().BeFalse();
     }
 
     [Fact]
-    public void Execute_EmptyEntryPointType_OmitsEntryPoint()
+    public void Execute_WorkloadWithEmptyEntryPointType_Fails()
     {
         string outputPath = Path.Combine(_tempDir, "workload.json");
         WriteWorkloadJson task = CreateTask(outputPath, kind: "workload",
             entryPointAssemblyPath: "Some.dll", entryPointType: "");
 
-        task.Execute();
-
-        JsonDocument doc = ParseOutput(outputPath);
-        doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
+        task.Execute().Should().BeFalse();
+        File.Exists(outputPath).Should().BeFalse();
     }
 
     [Fact]
@@ -133,6 +129,89 @@ public sealed class WriteWorkloadJsonTests : IDisposable
 
         JsonDocument doc = ParseOutput(outputPath);
         doc.RootElement.TryGetProperty("packages", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Execute_RidImplementation_WritesRuntimeIdentifier()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "content");
+        task.RuntimeIdentifier = "win-x64";
+
+        Assert.True(task.Execute());
+
+        JsonDocument doc = ParseOutput(outputPath);
+        Assert.Equal("win-x64", doc.RootElement.GetProperty("runtimeIdentifier").GetString());
+    }
+
+    [Fact]
+    public void Execute_RidPointerWithoutInnerPackages_Fails()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "rid-pointer");
+
+        Assert.False(task.Execute());
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void Execute_NonPointerWithInnerPackages_Fails()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "content");
+        task.InnerPackages = [CreateTaskItem("My.Package.win-x64", "win-x64")];
+
+        Assert.False(task.Execute());
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void Execute_PointerWithRuntimeIdentifier_Fails()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "rid-pointer");
+        task.RuntimeIdentifier = "win-x64";
+        task.InnerPackages = [CreateTaskItem("My.Package.win-x64", "win-x64")];
+
+        Assert.False(task.Execute());
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void Execute_UppercaseRuntimeIdentifier_Fails()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "content");
+        task.RuntimeIdentifier = "WIN-X64";
+
+        Assert.False(task.Execute());
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void Execute_PointerWithMismatchedImplementationId_Fails()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "rid-pointer");
+        task.InnerPackages = [CreateTaskItem("Other.Package.win-x64", "win-x64")];
+
+        Assert.False(task.Execute());
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void Execute_PointerWithDuplicateRuntimeIdentifiers_Fails()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "rid-pointer");
+        task.InnerPackages =
+        [
+            CreateTaskItem("My.Package.win-x64", "win-x64"),
+            CreateTaskItem("My.Package.WIN-X64", "WIN-X64"),
+        ];
+
+        Assert.False(task.Execute());
+        Assert.False(File.Exists(outputPath));
     }
 
     [Fact]
@@ -189,9 +268,9 @@ public sealed class WriteWorkloadJsonTests : IDisposable
     public void Execute_OutputIsValidJson()
     {
         string outputPath = Path.Combine(_tempDir, "workload.json");
-        WriteWorkloadJson task = CreateTask(outputPath, kind: "workload",
-            entryPointAssemblyPath: "Test.dll", entryPointType: "Test.Workload");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "rid-pointer");
         task.InnerPackages = [CreateTaskItem("Pkg.win-x64", "win-x64")];
+        task.PackageId = "Pkg";
 
         task.Execute();
 
@@ -213,6 +292,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
             OutputPath = outputPath,
             Schema = schema,
             Kind = kind,
+            PackageId = "My.Package",
             EntryPointAssemblyPath = entryPointAssemblyPath,
             EntryPointType = entryPointType,
             InnerPackages = [],

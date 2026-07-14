@@ -24,7 +24,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
 
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
     private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
-    private readonly string _packageId = string.IsNullOrWhiteSpace(packageId) ? HostWorkloadPackage.CurrentPackageId : packageId;
+    private readonly string _packageId = string.IsNullOrWhiteSpace(packageId) ? HostWorkloadPackage.PackageId : packageId;
 
     private readonly NuGetVersion _hostVersion = NuGetVersion.TryParse(hostVersion, out NuGetVersion? parsedHostVersion)
         ? parsedHostVersion
@@ -77,7 +77,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
         }
         catch (InvalidOperationException ex)
         {
-            string message = $"{ex.Message} Run 'func workload install {HostWorkloadPackage.CurrentPackageId} --exact --force' to repair the install.";
+            string message = $"{ex.Message} Run 'func workload install {HostWorkloadPackage.PackageId} --exact --force' to repair the install.";
             throw new GracefulException(message, isUserError: true, verboseMessage: ex.ToString());
         }
 

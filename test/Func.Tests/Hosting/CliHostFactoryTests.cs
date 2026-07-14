@@ -88,6 +88,28 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateHostAsync_IncompatibleRidWorkload_IsSkippedWithUpdateGuidance()
+    {
+        StageFixtureWorkload("withcommand.fixture.incompatible-rid", "1.0.0", CommandWorkloadType);
+        WriteRegistryWithRuntimeIdentifier(
+            "withcommand.fixture.incompatible-rid",
+            "1.0.0",
+            CommandWorkloadType,
+            "incompatible-rid");
+
+        var interaction = new TestInteractionService();
+
+        using IHost host = await StartHostAsync(interaction);
+        var rootCommand = Parser.CreateCommand(host.Services);
+
+        Assert.DoesNotContain(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
+        Assert.Contains(
+            interaction.Lines,
+            line => line.StartsWith("WARNING:", StringComparison.Ordinal)
+                && line.Contains("func workload update", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task CreateHostAsync_WhenWorkloadConfigureThrows_WarnsAndContinues()
     {
         StageFixtureWorkload("throwing.fixture", "1.0.0", ThrowingWorkloadType);
@@ -253,6 +275,33 @@ public sealed class CliHostFactoryTests : IDisposable
                     Type = e.TypeName,
                 },
             })],
+        };
+
+        Directory.CreateDirectory(_home);
+        string json = JsonSerializer.Serialize(registry, WorkloadJsonContext.Default.WorkloadRegistry);
+        File.WriteAllText(Path.Combine(_home, WorkloadPathsOptions.WorkloadRegistryFileName), json);
+    }
+
+    private void WriteRegistryWithRuntimeIdentifier(string packageId, string version, string typeName, string runtimeIdentifier)
+    {
+        WorkloadRegistry registry = new()
+        {
+            Workloads =
+            [
+                new WorkloadEntry
+                {
+                    PackageId = packageId,
+                    PackageVersion = version,
+                    RuntimeIdentifier = runtimeIdentifier,
+                    Aliases = [],
+                    Kind = WorkloadKind.Workload,
+                    EntryPoint = new EntryPointSpec
+                    {
+                        AssemblyPath = FixtureAssembly,
+                        Type = typeName,
+                    },
+                },
+            ],
         };
 
         Directory.CreateDirectory(_home);

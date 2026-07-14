@@ -379,6 +379,36 @@ public class WorkloadInstallCommandTests
     }
 
     [Fact]
+    public async Task Install_AlreadyInstalledLogicalAlias_HintsPointerIdentity()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload.win-x64",
+                PackageVersion = "1.2.3",
+                RuntimeIdentifier = "win-x64",
+                IsExplicitlyInstalled = false,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Test.Workload",
+                    PackageVersion = "1.2.3",
+                    Aliases = ["test"],
+                },
+            },
+        ]);
+
+        var cmd = NewInstall();
+        int exit = await InvokeAsync(cmd, "test");
+
+        Assert.Equal(1, exit);
+        Assert.Contains(_interaction.Lines, line =>
+            line.StartsWith("HINT:", StringComparison.Ordinal)
+            && line.Contains("func workload update Test.Workload", StringComparison.Ordinal)
+            && line.Contains("1.2.3", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Install_AlreadyInstalled_AliasMatch_NonInteractive_HintsCanonicalIdWhenNoAlias()
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
@@ -419,6 +449,41 @@ public class WorkloadInstallCommandTests
         exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "alias1", null, null, (bool?)null, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_PhysicalPackageWithOnlyLogicalOwnership_AddsExplicitOwnership()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload.win-x64",
+                PackageVersion = "1.0.0",
+                IsExplicitlyInstalled = false,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Test.Workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["test"],
+                },
+            },
+        ]);
+        StubCatalogResult(packageId: "Test.Workload.win-x64");
+
+        var cmd = NewInstall();
+        int exit = await InvokeAsync(cmd, "Test.Workload.win-x64", "--exact");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "Test.Workload.win-x64",
+            null,
+            null,
+            (bool?)null,
+            true,
+            false,
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

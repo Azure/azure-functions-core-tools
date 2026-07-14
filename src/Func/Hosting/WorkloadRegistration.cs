@@ -81,11 +81,16 @@ internal static class WorkloadRegistration
         CancellationToken cancellationToken)
     {
         var store = new WorkloadStore(paths);
-        var loader = new WorkloadLoader(paths);
+        var runtimeIdentifierProvider = new WorkloadRuntimeIdentifierProvider();
+        var loader = new WorkloadLoader(paths, runtimeIdentifierProvider);
 
         IReadOnlyList<WorkloadEntry> allEntries = await store.GetWorkloadsAsync(cancellationToken);
-        IReadOnlyList<WorkloadEntry> liveEntries = SelectLiveRuntimeEntries(allEntries);
-        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = CreateContentWorkloads(allEntries, paths);
+        IReadOnlyList<WorkloadEntry> compatibleEntries = SelectRuntimeCompatibleEntries(
+            allEntries,
+            runtimeIdentifierProvider.Current,
+            interaction);
+        IReadOnlyList<WorkloadEntry> liveEntries = SelectLiveRuntimeEntries(compatibleEntries);
+        IReadOnlyList<ContentWorkloadInfo> contentWorkloads = CreateContentWorkloads(compatibleEntries, paths);
 
         var runtimeWorkloads = new List<RuntimeWorkloadInfo>(liveEntries.Count);
         foreach (WorkloadEntry entry in liveEntries)
@@ -139,6 +144,31 @@ internal static class WorkloadRegistration
         }
 
         return runtimeWorkloads.Count;
+    }
+
+    private static IReadOnlyList<WorkloadEntry> SelectRuntimeCompatibleEntries(
+        IReadOnlyList<WorkloadEntry> entries,
+        string currentRuntimeIdentifier,
+        IInteractionService interaction)
+    {
+        List<WorkloadEntry> compatible = [];
+        foreach (WorkloadEntry entry in entries)
+        {
+            if (entry.RuntimeIdentifier is null
+                || string.Equals(entry.RuntimeIdentifier, currentRuntimeIdentifier, StringComparison.OrdinalIgnoreCase))
+            {
+                compatible.Add(entry);
+                continue;
+            }
+
+            string logicalPackageId = entry.LogicalPackage?.PackageId ?? entry.PackageId;
+            interaction.WriteWarning(
+                $"Workload '{logicalPackageId}@{entry.LogicalPackage?.PackageVersion ?? entry.PackageVersion}' targets runtime identifier " +
+                $"'{entry.RuntimeIdentifier}', but this machine uses '{currentRuntimeIdentifier}'. " +
+                $"Run 'func workload update {logicalPackageId}' to install the matching implementation.");
+        }
+
+        return compatible;
     }
 
     /// <summary>

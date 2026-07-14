@@ -122,10 +122,29 @@ internal interface IWorkloadInstaller
         IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
+    public Task<WorkloadUpdateResult> UpdateAsync(
+        string packageId,
+        NuGetVersion? targetInstalledVersion,
+        string? source,
+        bool? includePrerelease,
+        bool allowMajor,
+        WorkloadOwnershipKind ownership,
+        IProgress<WorkloadInstallProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Removes the install directory and registry entry for
     /// (<paramref name="packageId"/>, <paramref name="version"/>). Returns
     /// <c>true</c> when an entry was removed, <c>false</c> when none existed.
     /// </summary>
-    public Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default);
+    public Task<bool> UninstallAsync(
+        string packageId,
+        string version,
+        CancellationToken cancellationToken = default);
+
+    public Task<bool> UninstallAsync(
+        string packageId,
+        string version,
+        WorkloadOwnershipKind ownership,
+        CancellationToken cancellationToken = default);
 }

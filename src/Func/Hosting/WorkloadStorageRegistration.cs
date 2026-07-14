@@ -32,6 +32,7 @@ internal static class WorkloadStorageRegistration
         services.AddSingleton<IWorkloadStore, WorkloadStore>();
         services.AddSingleton<IWorkloadLoader, WorkloadLoader>();
         services.AddSingleton<IWorkloadMetadataReader, WorkloadMetadataReader>();
+        services.AddSingleton<IWorkloadRuntimeIdentifierProvider, WorkloadRuntimeIdentifierProvider>();
 
         return services;
     }

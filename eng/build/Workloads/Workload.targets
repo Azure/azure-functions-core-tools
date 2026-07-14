@@ -47,6 +47,7 @@
       <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' == ''">any</_WorkloadRidPath>
       <_WorkloadRidPath Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_WorkloadRidPath>
       <_WorkloadPackageContentRoot>tools/$(_WorkloadRidPath)/</_WorkloadPackageContentRoot>
+      <_WorkloadManifestRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != '' AND $(CreateRidSpecificWorkloadPackages)">$(RuntimeIdentifier)</_WorkloadManifestRuntimeIdentifier>
     </PropertyGroup>
   </Target>
 
@@ -69,10 +70,11 @@
   We hash the inputs into workload.json to determine if it needs to be regenerated.
   Does not use FileWrites as this is a pack-time operation. FileWrites are for build-time operations.
   -->
-  <Target Name="_GenerateWorkloadJsonCache" DependsOnTargets="_ResolveWorkloadEntryPoint;_ResolveRidSpecificWorkload" Outputs="$(_WorkloadJsonCacheFile)">
+  <Target Name="_GenerateWorkloadJsonCache" DependsOnTargets="_SetWorkloadProperties;_ResolveWorkloadEntryPoint;_ResolveRidSpecificWorkload">
     <ItemGroup>
       <_WorkloadJsonInputCacheToHash Include="$(WorkloadKind)" />
       <_WorkloadJsonInputCacheToHash Include="$(_FuncWorkloadSchema)" />
+      <_WorkloadJsonInputCacheToHash Include="$(_WorkloadManifestRuntimeIdentifier)" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(WorkloadKind)' == 'workload'">
@@ -104,8 +106,10 @@
       OutputPath="$(_WorkloadJsonFile)"
       Schema="$(_FuncWorkloadSchema)"
       Kind="$(WorkloadKind)"
+      PackageId="$(PackageId)"
       DisplayName="$(Title)"
       Description="$(Description)"
+      RuntimeIdentifier="$(_WorkloadManifestRuntimeIdentifier)"
       EntryPointAssemblyPath="$(WorkloadEntryPointAssembly)"
       EntryPointType="$(WorkloadEntryPointType)"
       InnerPackages="@(_WorkloadRidSpecificPackage)"/>

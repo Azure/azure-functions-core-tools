@@ -353,6 +353,66 @@ public class WorkloadUpdateCommandTests
     }
 
     [Fact]
+    public async Task Update_LogicalAlias_UpdatesPointerOwnership()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "test.workload.win-x64",
+                PackageVersion = "1.0.0",
+                RuntimeIdentifier = "win-x64",
+                IsExplicitlyInstalled = false,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "test.workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["demo"],
+                },
+            },
+        ]);
+        _installer.UpdateAsync(
+                "test.workload",
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<bool>(),
+                WorkloadOwnershipKind.Logical,
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new WorkloadUpdateResult(
+                new WorkloadEntry
+                {
+                    PackageId = "test.workload.win-x64",
+                    PackageVersion = "1.1.0",
+                    RuntimeIdentifier = "win-x64",
+                    IsExplicitlyInstalled = false,
+                    LogicalPackage = new LogicalPackage
+                    {
+                        PackageId = "test.workload",
+                        PackageVersion = "1.1.0",
+                        Aliases = ["demo"],
+                    },
+                },
+                "1.0.0",
+                NoUpdateAvailable: false));
+
+        var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
+        int exit = await InvokeAsync(cmd, "demo");
+
+        Assert.Equal(0, exit);
+        await _installer.Received(1).UpdateAsync(
+            "test.workload",
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool?>(),
+            Arg.Any<bool>(),
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Update_ExactSkipsAliasLookup_PassesArgumentThrough()
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new WorkloadEntry[]

@@ -80,7 +80,8 @@ internal sealed class DefaultFunctionsWorkerInstaller(
         CancellationToken cancellationToken)
     {
         WorkloadEntry entry = result.Entry;
-        if (!string.Equals(entry.PackageId, expectedPackageId, StringComparison.OrdinalIgnoreCase))
+        string installedPackageId = entry.LogicalPackage?.PackageId ?? entry.PackageId;
+        if (!string.Equals(installedPackageId, expectedPackageId, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidWorkloadException(
                 $"Expected worker workload package '{expectedPackageId}' but installed package '{entry.PackageId}'.");
