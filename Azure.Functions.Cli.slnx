@@ -29,6 +29,7 @@
   </Folder>
   <Folder Name="/src/Workloads/Workers/">
     <Project Path="src/Workloads/Workers/Go/Workloads.Workers.Go.csproj" />
+    <Project Path="src/Workloads/Workers/Java/Workloads.Workers.Java.csproj" />
     <Project Path="src/Workloads/Workers/Node/Workloads.Workers.Node.csproj" />
     <Project Path="src/Workloads/Workers/PowerShell/Workloads.Workers.PowerShell.csproj" />
     <Project Path="src/Workloads/Workers/Python/Workloads.Workers.Python.csproj" />

@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>Java Worker</Title>
+    <Description>Azure Functions CLI content workload that ships the Java language worker.</Description>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>java-worker</WorkloadAlias>
+    <PackageTags>func-worker</PackageTags>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeJavaWorkerContentInPack</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      TODO: Decouple from the upstream worker's precise package layout.
+      The plan is to include the JavaWorker package's assets normally (let
+      it wire up its content/None items via its build targets), then have a
+      target here transform those items and repack them under tools/any/. For
+      now we glob the restored package payload directly, which is brittle if
+      the upstream layout changes.
+
+      GeneratePathProperty exposes $(PkgMicrosoft_Azure_Functions_JavaWorker)
+      pointing at the restored package root. IncludeAssets=none keeps the
+      package's build targets and contentFiles from affecting this project.
+    -->
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" GeneratePathProperty="true" VersionOverride="$(WorkerVersion)">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>none</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Target Name="IncludeJavaWorkerContentInPack">
+    <Error Condition="'$(PkgMicrosoft_Azure_Functions_JavaWorker)' == ''"
+           Text="Microsoft.Azure.Functions.JavaWorker package path not resolved. Run 'dotnet restore' first." />
+    <ItemGroup>
+      <_JavaWorkerFile Include="$(PkgMicrosoft_Azure_Functions_JavaWorker)/contentFiles/any/any/workers/java/**/*" />
+      <TfmSpecificPackageFile Include="@(_JavaWorkerFile)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)"
+        Pack="true" PackagePath="tools/any/" />
+    </ItemGroup>
+  </Target>
+
+</Project>
