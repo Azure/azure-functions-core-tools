@@ -5,9 +5,9 @@
     Downloads and installs the Azure Functions CLI for the current platform.
 
 .DESCRIPTION
-    Downloads the func CLI from GitHub Releases, extracts it to the install dir,
-    drops a func5 wrapper for side-by-side use with Core Tools v4, and updates
-    PATH so 'func' / 'func5' are available in new terminals.
+    Downloads the func CLI from the Azure Functions CDN, extracts it to the
+    install dir, drops a func5 wrapper for side-by-side use with Core Tools v4,
+    and updates PATH so 'func' / 'func5' are available in new terminals.
 
     Piped usage:
         irm https://aka.ms/func-cli/install.ps1 | iex
@@ -18,9 +18,6 @@
 
 .PARAMETER Version
     Specific version to install. Defaults to latest 5.x stable release.
-
-.PARAMETER Source
-    GitHub repo to fetch releases from. Defaults to Azure/azure-functions-core-tools.
 
 .PARAMETER Prerelease
     Include pre-release versions when resolving latest.
@@ -43,7 +40,6 @@ param(
     [Alias('InstallDir')]
     [string] $InstallPath = "",
     [string] $Version = "",
-    [string] $Source = "Azure/azure-functions-core-tools",
     [switch] $Prerelease,
     [switch] $Force,
     [switch] $SkipPath,
@@ -59,6 +55,8 @@ $Script:UserAgent = 'func-cli-install.ps1/1.0'
 $Script:ArchiveDownloadTimeoutSec = 600
 $Script:HeadRequestTimeoutSec = 60
 $Script:DefaultInstallDir = Join-Path $HOME '.azure-functions'
+$Script:CdnBaseUrl = 'https://cdn.functions.azure.com'
+$Script:VersionManifestUrl = "$Script:CdnBaseUrl/public/cli/v5/version.json"
 
 # True when invoked as a file (pwsh -File ... or .\install.ps1), false when piped
 # into iex. We use this so a piped 'exit' doesn't kill the user's pwsh session.
@@ -101,12 +99,11 @@ if ($Help) {
 Azure Functions CLI installer
 
 DESCRIPTION:
-    Downloads and installs the func CLI for the current platform from GitHub Releases.
+    Downloads and installs the func CLI for the current platform from the Azure Functions CDN.
 
 PARAMETERS:
     -InstallPath <string>       Directory to install the CLI (default: `$HOME\.azure-functions)
     -Version <string>           Specific version to install (default: latest 5.x stable)
-    -Source <string>            GitHub repo to fetch releases from (default: Azure/azure-functions-core-tools)
     -Prerelease                 Include pre-release versions when resolving latest
     -Force                      Overwrite an existing installation
     -SkipPath                   Do not update PATH or shell profile
@@ -129,24 +126,6 @@ EXAMPLES:
 }
 
 if (-not $InstallPath) { $InstallPath = $Script:DefaultInstallDir }
-$repo = $Source
-$apiBase = "https://api.github.com/repos/$repo"
-
-# --- GitHub CLI detection ---
-
-# Prefer 'gh' when available and authenticated so API calls run against the user's
-# authenticated quota (5000/hr) instead of the anonymous 60/hr limit.
-$useGh = $false
-if (Get-Command gh -ErrorAction SilentlyContinue) {
-    & gh auth status *> $null
-    if ($LASTEXITCODE -eq 0) { $useGh = $true }
-}
-
-if ($useGh) {
-    Write-Message "Using GitHub CLI ('gh') for release metadata and asset download (authenticated, higher rate limit)."
-} else {
-    Write-Message "Using anonymous GitHub API requests. If you hit a rate limit, install and 'gh auth login' the GitHub CLI: https://cli.github.com"
-}
 
 # --- HTTP helpers ---
 
@@ -211,31 +190,64 @@ function Test-ContentType {
     return $true
 }
 
-function Get-GitHubReleases {
-    if ($useGh) { return & gh api "/repos/$repo/releases?per_page=50" | ConvertFrom-Json }
-    return (Invoke-SecureWebRequest -Uri "$apiBase/releases?per_page=50").Content | ConvertFrom-Json
+function Get-CdnManifest {
+    $response = Invoke-SecureWebRequest -Uri $Script:VersionManifestUrl -TimeoutSec $Script:HeadRequestTimeoutSec
+    return $response.Content | ConvertFrom-Json
 }
 
-function Get-GitHubReleaseAsset {
-    param([string] $Tag, [string] $AssetName, [string] $OutFile)
-    if ($useGh) {
-        & gh release download $Tag --repo $repo --pattern $AssetName --output $OutFile --clobber
-        if ($LASTEXITCODE -ne 0) { throw "gh release download failed with exit code $LASTEXITCODE" }
-        return
+# Compares two SemVer strings by precedence (SemVer 2.0 §11). Returns -1, 0, or 1.
+function Compare-SemVer {
+    param([string] $Left, [string] $Right)
+
+    function Split-SemVer([string] $v) {
+        $v = ($v -replace '^[vV]', '') -replace '\+.*$', ''
+        $core, $pre = $v -split '-', 2
+        $nums = $core -split '\.'
+        return [pscustomobject]@{
+            Major      = [int]($nums[0]); Minor = [int]($nums[1]); Patch = [int]($nums[2])
+            Prerelease = $pre
+        }
     }
-    $downloadUrl = "https://github.com/$repo/releases/download/$Tag/$AssetName"
-    if (-not (Test-ContentType -Uri $downloadUrl)) { throw "Refusing to download $downloadUrl (HTML response)." }
-    Invoke-SecureWebRequest -Uri $downloadUrl -OutFile $OutFile -TimeoutSec $Script:ArchiveDownloadTimeoutSec | Out-Null
+
+    $l = Split-SemVer $Left
+    $r = Split-SemVer $Right
+
+    foreach ($part in 'Major', 'Minor', 'Patch') {
+        if ($l.$part -ne $r.$part) { return [Math]::Sign($l.$part - $r.$part) }
+    }
+
+    # A version without a prerelease outranks one that has it.
+    if (-not $l.Prerelease -and -not $r.Prerelease) { return 0 }
+    if (-not $l.Prerelease) { return 1 }
+    if (-not $r.Prerelease) { return -1 }
+
+    $li = $l.Prerelease -split '\.'
+    $ri = $r.Prerelease -split '\.'
+    for ($i = 0; $i -lt [Math]::Max($li.Count, $ri.Count); $i++) {
+        if ($i -ge $li.Count) { return -1 }
+        if ($i -ge $ri.Count) { return 1 }
+        $a = $li[$i]; $b = $ri[$i]
+        $aNum = $a -match '^\d+$'; $bNum = $b -match '^\d+$'
+        if ($aNum -and $bNum) {
+            if ([int]$a -ne [int]$b) { return [Math]::Sign([int]$a - [int]$b) }
+        } elseif ($aNum) { return -1 }
+        elseif ($bNum) { return 1 }
+        else {
+            $cmp = [string]::CompareOrdinal($a, $b)
+            if ($cmp -ne 0) { return [Math]::Sign($cmp) }
+        }
+    }
+    return 0
 }
 
 # --- Platform detection ---
 
 if ($IsWindows -or $env:OS -eq 'Windows_NT') {
-    $os = 'win'; $ext = 'zip'
+    $os = 'win'
 } elseif ($IsMacOS) {
-    $os = 'osx'; $ext = 'tar.gz'
+    $os = 'osx'
 } else {
-    $os = 'linux'; $ext = 'tar.gz'
+    $os = 'linux'
 }
 
 $archEnum = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
@@ -245,41 +257,37 @@ switch ($archEnum) {
     default { Write-Message "Unsupported architecture: $archEnum" -Level Error; Exit-Script 1; return }
 }
 
-$assetName = "func-$os-$archStr.$ext"
-Write-Verbose "Resolved platform: $os-$archStr, asset: $assetName"
+$rid = "$os-$archStr"
+Write-Verbose "Resolved platform RID: $rid"
 
 # --- Resolve version ---
 
-if (-not $Version) {
+if ($Version) {
+    # CDN artifacts are named with a bare SemVer (no leading 'v').
+    $Version = $Version -replace '^[vV]', ''
+} else {
     $label = if ($Prerelease) { 'latest 5.x pre-release' } else { 'latest 5.x stable release' }
-    Write-Message "Resolving $label..."
+    Write-Message "Resolving $label from CDN..."
 
-    $releases = Get-GitHubReleases
-    $release = $releases |
-        Where-Object { $_.tag_name -match '^v?5\.' -and ($Prerelease -or -not $_.prerelease) } |
-        Select-Object -First 1
-
-    if (-not $release) {
-        if (-not $Prerelease) {
-            $prereleases = $releases | Where-Object { $_.tag_name -match '^v?5\.' -and $_.prerelease }
-            if ($prereleases) {
-                Write-Message 'No stable 5.x release found. Available pre-releases:' -Level Warning
-                $prereleases | Select-Object -First 5 | ForEach-Object { Write-Message "  $($_.tag_name)" }
-                Write-Message ''
-                Write-Message 'To install a pre-release, re-run with -Prerelease.'
-                Exit-Script 1; return
-            }
-        }
-        Write-Message 'Could not find a 5.x release.' -Level Error
-        Exit-Script 1; return
+    $manifest = Get-CdnManifest
+    if ($Prerelease -and $manifest.preview -and
+        (Compare-SemVer $manifest.preview $manifest.stable) -gt 0) {
+        $Version = $manifest.preview
+    } else {
+        $Version = $manifest.stable
     }
 
-    $Version = $release.tag_name
+    if (-not $Version) {
+        Write-Message 'Could not resolve a 5.x version from the CDN manifest.' -Level Error
+        Exit-Script 1; return
+    }
 }
 
-if ($Version -notlike 'v*') { $Version = "v$Version" }
+$assetExt = if ($os -eq 'win') { 'zip' } else { 'tar.gz' }
+$assetName = "Azure.Functions.Cli.$rid.$Version.$assetExt"
+$downloadUrl = "$Script:CdnBaseUrl/public/cli/v5/$Version/$assetName"
 
-Write-Message "Installing func CLI $Version ($os-$archStr)..."
+Write-Message "Installing func CLI $Version ($rid)..."
 
 # --- Check existing install ---
 
@@ -299,18 +307,20 @@ New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 try {
     $downloadPath = Join-Path $tempDir $assetName
 
-    if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName from release $Version and install func CLI")) {
+    if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName from CDN and install func CLI")) {
         Write-Message "Downloading $assetName..."
-        Get-GitHubReleaseAsset -Tag $Version -AssetName $assetName -OutFile $downloadPath
+        if (-not (Test-ContentType -Uri $downloadUrl)) { throw "Refusing to download $downloadUrl (HTML response)." }
+        Invoke-SecureWebRequest -Uri $downloadUrl -OutFile $downloadPath -TimeoutSec $Script:ArchiveDownloadTimeoutSec | Out-Null
         New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
 
-        if ($ext -eq 'zip') {
+        if ($os -eq 'win') {
             Expand-Archive -Path $downloadPath -DestinationPath $InstallPath -Force
         } else {
             tar -xzf $downloadPath -C $InstallPath
-            if ($os -eq 'osx') {
-                xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
-            }
+            if ($LASTEXITCODE -ne 0) { throw "Failed to extract $assetName (tar exit $LASTEXITCODE)." }
+        }
+        if ($os -eq 'osx') {
+            xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
         }
 
         # Drop func5 wrappers so v5 can be invoked side-by-side with a v4 'func' on PATH.
