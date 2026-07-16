@@ -78,8 +78,17 @@ internal sealed class ManifestCache(IOptions<QuickstartManifestOptions> options)
         }
         catch
         {
-            // Best-effort cleanup of the unique temp file.
-            try { File.Delete(tempPath); } catch { }
+            // Best-effort cleanup of the unique temp file before rethrowing the original failure.
+            try
+            {
+                File.Delete(tempPath);
+            }
+            catch
+            {
+                // Ignore: the temp file is uniquely named so a leftover is harmless, and we
+                // must not mask the original write/move exception being rethrown below.
+            }
+
             throw;
         }
     }

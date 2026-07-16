@@ -67,7 +67,16 @@ internal sealed class DefaultDotnetTemplateRunner : IDotnetTemplateRunner
         }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Ignore: the process may have already exited, and a failed kill must not
+                // mask the cancellation being rethrown below.
+            }
+
             throw;
         }
 
