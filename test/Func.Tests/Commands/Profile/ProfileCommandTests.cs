@@ -346,13 +346,6 @@ public sealed class ProfileCommandTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task WriteAllTextAtomicAsync(string path, string contents, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            WriteAllText(path, contents);
-            return Task.CompletedTask;
-        }
-
         public void WriteAllText(string path, string contents)
             => _files[path] = contents;
 

@@ -11,15 +11,13 @@ namespace Azure.Functions.Cli.Profiles;
 /// Fetches the profile registry from the CDN, falling back to a local cache.
 /// </summary>
 internal sealed class RemoteProfileSource(
-    IHttpClientFactory httpClientFactory,
+    HttpClient httpClient,
     IOptions<RemoteProfileOptions> options,
     ProfileDocumentParser parser,
     IProfileFileSystem fileSystem,
     CliConfigurationPathsOptions configurationPaths,
     ILogger<RemoteProfileSource> logger) : IProfileSource
 {
-    internal const string HttpClientName = "ProfileRegistry";
-
     private static readonly Uri _registryRelativeUri = new("cli/v5/profiles/v1/registry.json", UriKind.Relative);
     private static readonly Uri _checksumRelativeUri = new("cli/v5/profiles/v1/registry.json.sha256", UriKind.Relative);
 
@@ -30,7 +28,7 @@ internal sealed class RemoteProfileSource(
 
     private static readonly TimeSpan _stalenessWarningThreshold = TimeSpan.FromDays(7);
 
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly RemoteProfileOptions _options = (options ?? throw new ArgumentNullException(nameof(options))).Value;
     private readonly ProfileDocumentParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
     private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
@@ -138,14 +136,9 @@ internal sealed class RemoteProfileSource(
     {
         try
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(_options.HttpTimeout);
-
-            using HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
-
             // Fetch registry and checksum in parallel
-            Task<string> registryTask = client.GetStringAsync(_registryRelativeUri, cts.Token);
-            Task<string> checksumTask = client.GetStringAsync(_checksumRelativeUri, cts.Token);
+            Task<string> registryTask = _httpClient.GetStringAsync(_registryRelativeUri, cancellationToken);
+            Task<string> checksumTask = _httpClient.GetStringAsync(_checksumRelativeUri, cancellationToken);
 
             await Task.WhenAll(registryTask, checksumTask);
 
@@ -162,10 +155,10 @@ internal sealed class RemoteProfileSource(
 
             // Persist to cache atomically: write to temp files then rename so
             // concurrent CLI processes never see a half-written cache.
-            await _fileSystem.WriteAllTextAtomicAsync(Path.Combine(cacheDir, CacheFileName), registryJson, cancellationToken);
-            await _fileSystem.WriteAllTextAtomicAsync(Path.Combine(cacheDir, CacheChecksumFileName), expectedChecksum, cancellationToken);
+            await _fileSystem.WriteAllTextAsync(Path.Combine(cacheDir, CacheFileName), registryJson, cancellationToken);
+            await _fileSystem.WriteAllTextAsync(Path.Combine(cacheDir, CacheChecksumFileName), expectedChecksum, cancellationToken);
             // Meta written last: a partial write looks like an expired cache (safe).
-            await _fileSystem.WriteAllTextAtomicAsync(Path.Combine(cacheDir, CacheMetaFileName), DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
+            await _fileSystem.WriteAllTextAsync(Path.Combine(cacheDir, CacheMetaFileName), DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
 
             _logger.LogDebug("Profile registry fetched and cached from CDN.");
             return registryJson;

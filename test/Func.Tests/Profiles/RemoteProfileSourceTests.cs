@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Profiles;
@@ -43,10 +42,10 @@ public class RemoteProfileSourceTests
     {
         string checksum = ComputeSha256(_validRegistry);
         var handler = new FakeHttpMessageHandler(_validRegistry, checksum);
-        var httpClientFactory = CreateFactory(handler);
+        var httpClient = CreateHttpClient(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -64,10 +63,10 @@ public class RemoteProfileSourceTests
     public async Task LoadAsync_RejectsChecksumMismatch_ReturnsEmpty()
     {
         var handler = new FakeHttpMessageHandler(_validRegistry, "badhash");
-        var httpClientFactory = CreateFactory(handler);
+        var httpClient = CreateHttpClient(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -90,8 +89,8 @@ public class RemoteProfileSourceTests
 
         // Handler that would fail if called
         var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
-        var httpClientFactory = CreateFactory(handler);
-        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var httpClient = CreateHttpClient(handler);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -113,8 +112,8 @@ public class RemoteProfileSourceTests
         fileSystem.Files[Path.Combine(cacheDir, "registry.json.meta")] = DateTimeOffset.UtcNow.AddHours(-2).ToString("O");
 
         var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
-        var httpClientFactory = CreateFactory(handler);
-        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var httpClient = CreateHttpClient(handler);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -127,10 +126,10 @@ public class RemoteProfileSourceTests
     public async Task LoadAsync_ReturnsEmptyWhenNoRemoteOrCache()
     {
         var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
-        var httpClientFactory = CreateFactory(handler);
+        var httpClient = CreateHttpClient(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -152,8 +151,8 @@ public class RemoteProfileSourceTests
 
         // Remote also fails — should end up empty (no valid cache, no remote)
         var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
-        var httpClientFactory = CreateFactory(handler);
-        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var httpClient = CreateHttpClient(handler);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
@@ -168,21 +167,18 @@ public class RemoteProfileSourceTests
         cts.Cancel();
 
         var handler = new FakeHttpMessageHandler(_validRegistry, ComputeSha256(_validRegistry));
-        var httpClientFactory = CreateFactory(handler);
+        var httpClient = CreateHttpClient(handler);
         var fileSystem = new InMemoryProfileFileSystem();
         var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
-        var source = new RemoteProfileSource(httpClientFactory, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
 
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => source.LoadAsync(context, cts.Token));
     }
 
-    private static IHttpClientFactory CreateFactory(HttpMessageHandler handler)
+    private static HttpClient CreateHttpClient(HttpMessageHandler handler)
     {
-        var factory = Substitute.For<IHttpClientFactory>();
-        factory.CreateClient(RemoteProfileSource.HttpClientName)
-            .Returns(new HttpClient(handler) { BaseAddress = new Uri("https://cdn.functions.azure.com/public/") });
-        return factory;
+        return new HttpClient(handler) { BaseAddress = new Uri("https://cdn.functions.azure.com/public/") };
     }
 
     private sealed class FakeHttpMessageHandler(string? registryContent, string? checksumContent, bool shouldFail = false)
@@ -216,12 +212,6 @@ public class RemoteProfileSourceTests
         }
 
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
-        {
-            Files[path] = contents;
-            return Task.CompletedTask;
-        }
-
-        public Task WriteAllTextAtomicAsync(string path, string contents, CancellationToken cancellationToken)
         {
             Files[path] = contents;
             return Task.CompletedTask;

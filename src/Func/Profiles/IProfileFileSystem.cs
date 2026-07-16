@@ -14,13 +14,7 @@ internal interface IProfileFileSystem
     public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Writes a text file, creating parent directories if needed.
+    /// Writes a text file via temp-file-and-rename, creating parent directories if needed.
     /// </summary>
     public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Writes a text file atomically via temp-file-and-rename, creating parent directories if needed.
-    /// </summary>
-    public Task WriteAllTextAtomicAsync(string path, string contents, CancellationToken cancellationToken);
-
 }

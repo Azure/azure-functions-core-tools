@@ -8,10 +8,12 @@ namespace Azure.Functions.Cli.Profiles;
 /// </summary>
 internal sealed class RemoteProfileOptions
 {
+    internal static readonly Uri DefaultCdnBaseUrl = new("https://cdn.functions.azure.com/public/");
+
     /// <summary>
     /// CDN base URL from which the profile registry is fetched.
     /// </summary>
-    public Uri CdnBaseUrl { get; set; } = new("https://cdn.functions.azure.com/public/");
+    public Uri CdnBaseUrl { get; set; } = DefaultCdnBaseUrl;
 
     /// <summary>
     /// How long a cached registry is considered fresh before re-fetching.
