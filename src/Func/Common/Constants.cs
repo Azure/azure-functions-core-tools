@@ -13,6 +13,7 @@ internal static class Constants
     public const string DocsUrl = "https://aka.ms/func-cli";
     public const string GitHubUrl = "https://github.com/Azure/azure-functions-core-tools";
     public const string GitHubReleasesApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases";
+
     /// <summary>
     /// Env var users set to opt out of CLI telemetry. Matches the
     /// <c>FUNC_CLI_*</c> convention used elsewhere in v5.
@@ -25,6 +26,7 @@ internal static class Constants
     /// silently re-opted in after upgrading.
     /// </summary>
     public const string LegacyTelemetryOptOutEnvVar = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
+
     /// <summary>
     /// Prefix for the CLI environment variables, including those that bind into <c>IConfiguration</c>.
     /// </summary>
@@ -48,7 +50,6 @@ internal static class Constants
     /// </summary>
     public const string WorkloadsSourceEnvironmentVariable = "FUNC_CLI_WORKLOADS_SOURCE";
 
-    /// <summary>
     /// <summary>
     /// Environment variable that, when set, allows prerelease workload
     /// versions across catalog resolution and installation flows.
