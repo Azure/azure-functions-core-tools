@@ -70,6 +70,7 @@ internal sealed class EnsureAzuriteInitializationStep(
 
             case ManagedAzuriteResult.Started started:
                 context.State.ManagedAzurite = ManagedAzuriteHandle.Owning(started.Process, started.Mode);
+                context.State.AzuritePaths = started.Paths;
                 return StartInitializationStepResult.Completed(
                     $"Started managed Azurite ({started.Mode}). Data directory: {started.Paths.DataDirectory}");
 
