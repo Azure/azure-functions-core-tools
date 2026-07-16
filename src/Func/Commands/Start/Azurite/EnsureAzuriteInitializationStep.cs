@@ -70,7 +70,8 @@ internal sealed class EnsureAzuriteInitializationStep(
 
             case ManagedAzuriteResult.Started started:
                 context.State.ManagedAzurite = ManagedAzuriteHandle.Owning(started.Process, started.Mode);
-                return StartInitializationStepResult.Completed($"Started managed Azurite ({started.Mode}).");
+                return StartInitializationStepResult.Completed(
+                    $"Started managed Azurite ({started.Mode}). Data directory: {started.Paths.DataDirectory}");
 
             case ManagedAzuriteResult.Failed failed:
                 throw new GracefulException(failed.UserMessage, isUserError: true, verboseMessage: failed.VerboseDetail);

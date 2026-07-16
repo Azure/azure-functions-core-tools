@@ -155,6 +155,7 @@ public class ManagedAzuriteOrchestratorTests
         var started = result.Should().BeOfType<ManagedAzuriteResult.Started>().Subject;
         started.Mode.Should().Be(AzuriteLaunchMode.Native);
         started.Process.Should().BeSameAs(fake);
+        started.Paths.DataDirectory.Should().Be(Path.Combine(Path.GetTempPath(), "azurite-data"));
         await _launcher.Received(1).StartAsync(
             Arg.Is<AzuriteLaunchRequest>(r => r.Mode == AzuriteLaunchMode.Native && r.ExecutablePath == "/usr/bin/azurite"),
             Arg.Any<CancellationToken>());
@@ -215,8 +216,10 @@ public class ManagedAzuriteOrchestratorTests
             progress: null,
             CancellationToken.None);
 
-        result.Should().BeOfType<ManagedAzuriteResult.Failed>()
-            .Which.UserMessage.Should().Contain("did not become ready");
+        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
+        failed.UserMessage.Should().Contain("did not become ready");
+        failed.UserMessage.Should().Contain("Data directory:");
+        failed.UserMessage.Should().Contain("delete the data directory");
         fake.StopCalled.Should().BeTrue("Orchestrator must stop the process on timeout.");
     }
 
@@ -236,6 +239,8 @@ public class ManagedAzuriteOrchestratorTests
         var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
         failed.UserMessage.Should().Contain("Azurite exited before it was ready");
         failed.UserMessage.Should().Contain("ENOENT");
+        failed.UserMessage.Should().Contain("Data directory:");
+        failed.UserMessage.Should().Contain("delete the data directory");
     }
 
     [Fact]
