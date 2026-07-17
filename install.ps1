@@ -265,6 +265,10 @@ Write-Verbose "Resolved platform RID: $rid"
 if ($Version) {
     # CDN artifacts are named with a bare SemVer (no leading 'v').
     $Version = $Version -replace '^[vV]', ''
+    if ($Version -notmatch '^5\.') {
+        Write-Message "Only Azure Functions CLI 5.x versions are supported by this installer. Requested: $Version" -Level Error
+        Exit-Script 1; return
+    }
 } else {
     $label = if ($Prerelease) { 'latest 5.x pre-release' } else { 'latest 5.x stable release' }
     Write-Message "Resolving $label from CDN..."

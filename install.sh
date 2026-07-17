@@ -308,6 +308,10 @@ resolve_version() {
         # CDN artifacts are named with a bare SemVer (no leading 'v').
         VERSION="${VERSION#v}"
         VERSION="${VERSION#V}"
+        if [[ "$VERSION" != 5.* ]]; then
+            say_error "Only Azure Functions CLI 5.x versions are supported by this installer. Requested: ${VERSION}"
+            exit 1
+        fi
         return 0
     fi
 
@@ -318,8 +322,7 @@ resolve_version() {
     fi
 
     local manifest_json
-    manifest_json=$(curl -sSL --fail --tlsv1.2 --user-agent "$USER_AGENT" \
-        --max-time "$HEAD_REQUEST_TIMEOUT_SEC" "$VERSION_MANIFEST_URL") || {
+    manifest_json=$(secure_curl "$VERSION_MANIFEST_URL" /dev/stdout "$HEAD_REQUEST_TIMEOUT_SEC") || {
         say_error "Could not fetch version manifest from ${VERSION_MANIFEST_URL}"
         exit 1
     }
