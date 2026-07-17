@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Title>PowerShell Function Templates</Title>
+    <Description>PowerShell function templates for the func CLI. Compatible with Microsoft.Azure.Functions.ExtensionBundle (minBundle:$(MinBundleVersionRange)).</Description>
+    <PackageTags>minBundle:$(MinBundleVersionRange)</PackageTags>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>content</WorkloadKind>
+    <WorkloadAlias>powershell-templates</WorkloadAlias>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+    <TemplatesStackLanguageFilter>PowerShell</TemplatesStackLanguageFilter>
+  </PropertyGroup>
+
+  <Import Project="$(EngBuildRoot)Workloads/Workloads.Templates.targets" />
+
+</Project>
