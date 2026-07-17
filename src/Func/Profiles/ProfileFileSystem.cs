@@ -27,8 +27,17 @@ internal sealed class ProfileFileSystem : IProfileFileSystem
 
         EnsureParentDirectory(path);
         string tempPath = path + ".tmp." + Guid.NewGuid().ToString("N")[..8];
-        await File.WriteAllTextAsync(tempPath, contents, cancellationToken);
-        File.Move(tempPath, path, overwrite: true);
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, contents, cancellationToken);
+            File.Move(tempPath, path, overwrite: true);
+        }
+        finally
+        {
+            // Clean up the temp file if Move failed or was never reached.
+            try { File.Delete(tempPath); }
+            catch { /* Best-effort cleanup — file may already be gone after a successful Move. */ }
+        }
     }
 
     private static void EnsureParentDirectory(string filePath)
