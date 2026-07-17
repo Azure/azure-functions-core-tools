@@ -28,6 +28,18 @@ public class PowerShellWorkloadTests
     }
 
     [Fact]
+    public void Configure_AddsProjectFactory()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new PowerShellWorkload().Configure(builder);
+
+        builder.Received(1).AddProjectFactory(Arg.Any<PowerShellProjectFactory>());
+    }
+
+    [Fact]
     public void Configure_NullBuilder_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => new PowerShellWorkload().Configure(null!));

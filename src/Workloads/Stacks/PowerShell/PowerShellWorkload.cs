@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 
 /// <summary>
 /// Entry-point for the PowerShell workload. Registers PowerShell-specific
-/// services (project initializer today; project factory / commands later).
+/// services (project initializer, project factory).
 /// </summary>
 public sealed class PowerShellWorkload : Workload
 {
@@ -23,5 +23,6 @@ public sealed class PowerShellWorkload : Workload
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IProjectInitializer, PowerShellProjectInitializer>();
+        builder.AddProjectFactory(new PowerShellProjectFactory());
     }
 }
