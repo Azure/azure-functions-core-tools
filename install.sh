@@ -139,7 +139,10 @@ INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 # --- Platform detection ---
 
 detect_os() {
-    case "$(uname -s)" in
+    local os_name
+    os_name="$(uname -s)"
+
+    case "$os_name" in
         Linux*)
             if command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -q musl; then
                 printf "linux-musl"
@@ -148,8 +151,14 @@ detect_os() {
             fi
             ;;
         Darwin*) printf "osx" ;;
-        CYGWIN*|MINGW*|MSYS*) printf "win" ;;
-        *) return 1 ;;
+        CYGWIN*|MINGW*|MSYS*|Windows_NT)
+            say_error "install.sh does not support Windows. Run the PowerShell installer instead: irm https://aka.ms/func-cli/install.ps1 | iex"
+            return 1
+            ;;
+        *)
+            say_error "Unsupported OS: $os_name"
+            return 1
+            ;;
     esac
 }
 
@@ -161,7 +170,7 @@ detect_arch() {
     esac
 }
 
-OS=$(detect_os) || { say_error "Unsupported OS: $(uname -s)"; exit 1; }
+OS=$(detect_os)
 ARCH=$(detect_arch) || { say_error "Unsupported architecture: $(uname -m)"; exit 1; }
 
 if [[ "$OS" == "linux-musl" ]]; then
