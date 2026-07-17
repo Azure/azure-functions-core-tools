@@ -168,8 +168,15 @@ function Invoke-SecureWebRequest {
     return Invoke-WebRequest @params
 }
 
-function Test-ContentType {
-    param([string] $Uri)
+# HEAD-probe the CDN asset before downloading: give a clear error when the
+# requested version/RID is not published (404), and guard against HTML error
+# pages served with a 200. Transient HEAD failures fall through to the download.
+function Test-CdnAsset {
+    param(
+        [Parameter(Mandatory)] [string] $Uri,
+        [Parameter(Mandatory)] [string] $Version,
+        [Parameter(Mandatory)] [string] $Rid
+    )
     try {
         $response = Invoke-SecureWebRequest -Uri $Uri -Method 'Head' -TimeoutSec $Script:HeadRequestTimeoutSec
         $headers = $response.Headers
@@ -185,6 +192,15 @@ function Test-ContentType {
             }
         }
     } catch {
+        $statusCode = $null
+        if ($_.Exception.Response) {
+            try { $statusCode = [int]$_.Exception.Response.StatusCode } catch { $statusCode = $null }
+        }
+        if ($statusCode -eq 404) {
+            Write-Message "Azure Functions CLI $Version ($Rid) is not available on the CDN." -Level Error
+            Write-Message "Verify the version number, or omit -Version to install the latest 5.x release." -Level Error
+            return $false
+        }
         Write-Message "HEAD request failed, proceeding with download: $($_.Exception.Message)" -Level Verbose
     }
     return $true
@@ -291,6 +307,14 @@ $assetExt = if ($os -eq 'win') { 'zip' } else { 'tar.gz' }
 $assetName = "Azure.Functions.Cli.$rid.$Version.$assetExt"
 $downloadUrl = "$Script:CdnBaseUrl/public/cli/v5/$Version/$assetName"
 
+# Probe the CDN up front so an unavailable version fails with a clear message
+# instead of a raw download error. Skipped under -WhatIf (no network side effect).
+if (-not $WhatIfPreference) {
+    if (-not (Test-CdnAsset -Uri $downloadUrl -Version $Version -Rid $rid)) {
+        Exit-Script 1; return
+    }
+}
+
 Write-Message "Installing func CLI $Version ($rid)..."
 
 # --- Check existing install ---
@@ -313,7 +337,6 @@ try {
 
     if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName from CDN and install func CLI")) {
         Write-Message "Downloading $assetName..."
-        if (-not (Test-ContentType -Uri $downloadUrl)) { throw "Refusing to download $downloadUrl (HTML response)." }
         Invoke-SecureWebRequest -Uri $downloadUrl -OutFile $downloadPath -TimeoutSec $Script:ArchiveDownloadTimeoutSec | Out-Null
         New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
 

@@ -191,7 +191,6 @@ secure_curl() {
     local method="${4:-GET}"
 
     local args=(
-        --fail
         --show-error
         --location
         --tlsv1.2
@@ -205,11 +204,16 @@ secure_curl() {
     )
 
     if [[ "$method" == "HEAD" ]]; then
+        # No --fail: the caller inspects the status code (e.g. 404) to report a
+        # clear "version not available" message rather than a raw curl error.
         args+=(--silent --head)
-    elif [[ "$VERBOSE" == true ]]; then
-        args+=(--progress-bar)
     else
-        args+=(--silent)
+        args+=(--fail)
+        if [[ "$VERBOSE" == true ]]; then
+            args+=(--progress-bar)
+        else
+            args+=(--silent)
+        fi
     fi
 
     if [[ "$method" == "GET" ]]; then
@@ -220,16 +224,27 @@ secure_curl() {
     curl "${args[@]}" "$url"
 }
 
-# HEAD-probe to make sure we're about to download a binary, not an HTML error page.
+# HEAD-probe the asset before downloading: fail clearly when the requested
+# version/RID is not published (404), and guard against HTML error pages.
 validate_content_type() {
     local url="$1"
     local headers
 
-    say_verbose "Validating content type for $url"
+    say_verbose "Validating asset availability for $url"
 
     if ! headers=$(secure_curl "$url" /dev/null "$HEAD_REQUEST_TIMEOUT_SEC" "HEAD" 2>&1); then
         say_verbose "HEAD request failed; proceeding with download anyway."
         return 0
+    fi
+
+    # Take the status code from the final response (after any 3xx redirects).
+    local status
+    status=$(printf "%s\n" "$headers" | awk 'toupper($1) ~ /^HTTP/ { code = $2 } END { gsub(/\r/, "", code); print code }')
+
+    if [[ "$status" == "404" ]]; then
+        say_error "Azure Functions CLI ${VERSION} (${RID}) is not available on the CDN."
+        say_error "Verify the version number, or omit --version to install the latest 5.x release."
+        return 1
     fi
 
     # CDN asset URLs may return one or more 3xx redirects followed by a final 2xx.
