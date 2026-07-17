@@ -13,8 +13,8 @@ readonly USER_AGENT="func-cli-install.sh/1.0"
 readonly ARCHIVE_DOWNLOAD_TIMEOUT_SEC=600
 readonly HEAD_REQUEST_TIMEOUT_SEC=60
 readonly DEFAULT_INSTALL_DIR="$HOME/.azure-functions"
-readonly CDN_BASE_URL="https://cdn.functions.azure.com"
-readonly VERSION_MANIFEST_URL="${CDN_BASE_URL}/public/cli/v5/version.json"
+readonly DOWNLOAD_BASE_URL="https://cdn.functions.azure.com"
+readonly VERSION_MANIFEST_URL="${DOWNLOAD_BASE_URL}/public/cli/v5/version.json"
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
@@ -63,7 +63,7 @@ show_help() {
 Azure Functions CLI installer
 
 DESCRIPTION:
-    Downloads and installs the func CLI for the current platform from the Azure Functions CDN.
+    Downloads and installs the func CLI for the current platform.
     Automatically updates your shell profile so func is on PATH in new terminals.
 
 USAGE:
@@ -242,12 +242,12 @@ validate_content_type() {
     status=$(printf "%s\n" "$headers" | awk 'toupper($1) ~ /^HTTP/ { code = $2 } END { gsub(/\r/, "", code); print code }')
 
     if [[ "$status" == "404" ]]; then
-        say_error "Azure Functions CLI ${VERSION} (${RID}) is not available on the CDN."
+        say_error "Azure Functions CLI ${VERSION} (${RID}) is not available for download."
         say_error "Verify the version number, or omit --version to install the latest 5.x release."
         return 1
     fi
 
-    # CDN asset URLs may return one or more 3xx redirects followed by a final 2xx.
+    # Asset URLs may return one or more 3xx redirects followed by a final 2xx.
     # Look only at the final response block.
     local final_headers
     final_headers=$(printf "%s\n" "$headers" | awk '
@@ -320,7 +320,7 @@ semver_gt() {
 
 resolve_version() {
     if [[ -n "$VERSION" ]]; then
-        # CDN artifacts are named with a bare SemVer (no leading 'v').
+        # Release artifacts are named with a bare SemVer (no leading 'v').
         VERSION="${VERSION#v}"
         VERSION="${VERSION#V}"
         if [[ "$VERSION" != 5.* ]]; then
@@ -331,9 +331,9 @@ resolve_version() {
     fi
 
     if [[ "$PRERELEASE" == true ]]; then
-        say_info "Resolving latest 5.x pre-release from CDN..."
+        say_info "Resolving latest 5.x pre-release..."
     else
-        say_info "Resolving latest stable 5.x release from CDN..."
+        say_info "Resolving latest stable 5.x release..."
     fi
 
     local manifest_json
@@ -353,7 +353,7 @@ resolve_version() {
     fi
 
     if [[ -z "$VERSION" ]]; then
-        say_error "Could not resolve a 5.x version from the CDN manifest."
+        say_error "Could not resolve a 5.x version from the version manifest."
         exit 1
     fi
 }
@@ -361,7 +361,7 @@ resolve_version() {
 resolve_version
 
 ASSET_NAME="Azure.Functions.Cli.${RID}.${VERSION}.tar.gz"
-DOWNLOAD_URL="${CDN_BASE_URL}/public/cli/v5/${VERSION}/${ASSET_NAME}"
+DOWNLOAD_URL="${DOWNLOAD_BASE_URL}/public/cli/v5/${VERSION}/${ASSET_NAME}"
 
 say_info "Installing func CLI ${VERSION} (${RID})..."
 

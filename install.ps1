@@ -5,7 +5,7 @@
     Downloads and installs the Azure Functions CLI for the current platform.
 
 .DESCRIPTION
-    Downloads the func CLI from the Azure Functions CDN, extracts it to the
+    Downloads the func CLI, extracts it to the
     install dir, drops a func5 wrapper for side-by-side use with Core Tools v4,
     and updates PATH so 'func' / 'func5' are available in new terminals.
 
@@ -55,8 +55,8 @@ $Script:UserAgent = 'func-cli-install.ps1/1.0'
 $Script:ArchiveDownloadTimeoutSec = 600
 $Script:HeadRequestTimeoutSec = 60
 $Script:DefaultInstallDir = Join-Path $HOME '.azure-functions'
-$Script:CdnBaseUrl = 'https://cdn.functions.azure.com'
-$Script:VersionManifestUrl = "$Script:CdnBaseUrl/public/cli/v5/version.json"
+$Script:DownloadBaseUrl = 'https://cdn.functions.azure.com'
+$Script:VersionManifestUrl = "$Script:DownloadBaseUrl/public/cli/v5/version.json"
 
 # True when invoked as a file (pwsh -File ... or .\install.ps1), false when piped
 # into iex. We use this so a piped 'exit' doesn't kill the user's pwsh session.
@@ -99,7 +99,7 @@ if ($Help) {
 Azure Functions CLI installer
 
 DESCRIPTION:
-    Downloads and installs the func CLI for the current platform from the Azure Functions CDN.
+    Downloads and installs the func CLI for the current platform.
 
 PARAMETERS:
     -InstallPath <string>       Directory to install the CLI (default: `$HOME\.azure-functions)
@@ -168,10 +168,10 @@ function Invoke-SecureWebRequest {
     return Invoke-WebRequest @params
 }
 
-# HEAD-probe the CDN asset before downloading: give a clear error when the
+# HEAD-probe the asset before downloading: give a clear error when the
 # requested version/RID is not published (404), and guard against HTML error
 # pages served with a 200. Transient HEAD failures fall through to the download.
-function Test-CdnAsset {
+function Test-DownloadAsset {
     param(
         [Parameter(Mandatory)] [string] $Uri,
         [Parameter(Mandatory)] [string] $Version,
@@ -197,7 +197,7 @@ function Test-CdnAsset {
             try { $statusCode = [int]$_.Exception.Response.StatusCode } catch { $statusCode = $null }
         }
         if ($statusCode -eq 404) {
-            Write-Message "Azure Functions CLI $Version ($Rid) is not available on the CDN." -Level Error
+            Write-Message "Azure Functions CLI $Version ($Rid) is not available for download." -Level Error
             Write-Message "Verify the version number, or omit -Version to install the latest 5.x release." -Level Error
             return $false
         }
@@ -206,7 +206,7 @@ function Test-CdnAsset {
     return $true
 }
 
-function Get-CdnManifest {
+function Get-VersionManifest {
     $response = Invoke-SecureWebRequest -Uri $Script:VersionManifestUrl -TimeoutSec $Script:HeadRequestTimeoutSec
     return $response.Content | ConvertFrom-Json
 }
@@ -279,7 +279,7 @@ Write-Verbose "Resolved platform RID: $rid"
 # --- Resolve version ---
 
 if ($Version) {
-    # CDN artifacts are named with a bare SemVer (no leading 'v').
+    # Release artifacts are named with a bare SemVer (no leading 'v').
     $Version = $Version -replace '^[vV]', ''
     if ($Version -notmatch '^5\.') {
         Write-Message "Only Azure Functions CLI 5.x versions are supported by this installer. Requested: $Version" -Level Error
@@ -287,9 +287,9 @@ if ($Version) {
     }
 } else {
     $label = if ($Prerelease) { 'latest 5.x pre-release' } else { 'latest 5.x stable release' }
-    Write-Message "Resolving $label from CDN..."
+    Write-Message "Resolving $label..."
 
-    $manifest = Get-CdnManifest
+    $manifest = Get-VersionManifest
     if ($Prerelease -and $manifest.preview -and
         (Compare-SemVer $manifest.preview $manifest.stable) -gt 0) {
         $Version = $manifest.preview
@@ -298,19 +298,19 @@ if ($Version) {
     }
 
     if (-not $Version) {
-        Write-Message 'Could not resolve a 5.x version from the CDN manifest.' -Level Error
+        Write-Message 'Could not resolve a 5.x version from the version manifest.' -Level Error
         Exit-Script 1; return
     }
 }
 
 $assetExt = if ($os -eq 'win') { 'zip' } else { 'tar.gz' }
 $assetName = "Azure.Functions.Cli.$rid.$Version.$assetExt"
-$downloadUrl = "$Script:CdnBaseUrl/public/cli/v5/$Version/$assetName"
+$downloadUrl = "$Script:DownloadBaseUrl/public/cli/v5/$Version/$assetName"
 
-# Probe the CDN up front so an unavailable version fails with a clear message
+# Probe availability up front so an unavailable version fails with a clear message
 # instead of a raw download error. Skipped under -WhatIf (no network side effect).
 if (-not $WhatIfPreference) {
-    if (-not (Test-CdnAsset -Uri $downloadUrl -Version $Version -Rid $rid)) {
+    if (-not (Test-DownloadAsset -Uri $downloadUrl -Version $Version -Rid $rid)) {
         Exit-Script 1; return
     }
 }
@@ -335,7 +335,7 @@ New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 try {
     $downloadPath = Join-Path $tempDir $assetName
 
-    if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName from CDN and install func CLI")) {
+    if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName and install func CLI")) {
         Write-Message "Downloading $assetName..."
         Invoke-SecureWebRequest -Uri $downloadUrl -OutFile $downloadPath -TimeoutSec $Script:ArchiveDownloadTimeoutSec | Out-Null
         New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
