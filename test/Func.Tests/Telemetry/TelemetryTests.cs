@@ -3,7 +3,6 @@
 
 using System.Diagnostics;
 using Azure.Functions.Cli.Telemetry;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Telemetry;
 
@@ -14,8 +13,8 @@ public class TelemetryTests
     {
         // Default build has the all-zeros instrumentation key, so telemetry
         // is not configured.
-        Assert.False(CliTelemetry.TryGetConnectionString(out var connectionString));
-        Assert.Null(connectionString);
+        CliTelemetry.TryGetConnectionString(out var connectionString).Should().BeFalse();
+        connectionString.Should().BeNull();
     }
 
     [Theory]
@@ -29,7 +28,7 @@ public class TelemetryTests
 
         // We can't override the build-time key from a test, so we just
         // assert the helper agrees the opt-out wins regardless of key state.
-        Assert.False(CliTelemetry.TryGetConnectionString(out _));
+        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
     }
 
     [Theory]
@@ -66,7 +65,7 @@ public class TelemetryTests
         // an opt-out, so we fail safe toward not collecting telemetry.
         using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
 
-        Assert.False(CliTelemetry.TryGetConnectionString(out _));
+        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
     }
 
     private sealed class EnvVarScope : IDisposable
@@ -101,11 +100,11 @@ public class TelemetryTests
         using var listener = SubscribeListener();
 
         using var activity = CliTelemetry.Trace.StartCommandActivity();
-        Assert.NotNull(activity);
+        activity.Should().NotBeNull();
 
-        Assert.Equal(ActivityExtensions.CommandActivityName, activity.OperationName);
-        Assert.Equal(ActivityKind.Internal, activity.Kind);
-        Assert.Null(activity.GetTagItem(TelemetryConventions.CliCommandName));
+        activity.OperationName.Should().Be(ActivityExtensions.CommandActivityName);
+        activity.Kind.Should().Be(ActivityKind.Internal);
+        activity.GetTagItem(TelemetryConventions.CliCommandName).Should().BeNull();
     }
 
     [Fact]
@@ -114,14 +113,14 @@ public class TelemetryTests
         using var listener = SubscribeListener();
 
         using var activity = CliTelemetry.Trace.StartCommandActivity();
-        Assert.NotNull(activity);
+        activity.Should().NotBeNull();
 
         activity.SetCommandName("workload install");
 
-        Assert.Equal("workload install", activity.DisplayName);
-        Assert.Equal("workload install", activity.GetTagItem(TelemetryConventions.CliCommandName));
+        activity.DisplayName.Should().Be("workload install");
+        activity.GetTagItem(TelemetryConventions.CliCommandName).Should().Be("workload install");
         // Operation name (fixed at creation) is left alone — only DisplayName moves.
-        Assert.Equal(ActivityExtensions.CommandActivityName, activity.OperationName);
+        activity.OperationName.Should().Be(ActivityExtensions.CommandActivityName);
     }
 
     [Fact]
@@ -132,13 +131,13 @@ public class TelemetryTests
         using var listener = SubscribeListener();
 
         using var activity = CliTelemetry.Trace.StartCommandActivity();
-        Assert.NotNull(activity);
+        activity.Should().NotBeNull();
 
         activity.SetCommandName("workload");
         activity.SetCommandName("workload install");
 
-        Assert.Equal("workload install", activity.DisplayName);
-        Assert.Equal("workload install", activity.GetTagItem(TelemetryConventions.CliCommandName));
+        activity.DisplayName.Should().Be("workload install");
+        activity.GetTagItem(TelemetryConventions.CliCommandName).Should().Be("workload install");
     }
 
     [Fact]
@@ -147,13 +146,13 @@ public class TelemetryTests
         using var listener = SubscribeListener();
 
         using var activity = CliTelemetry.Trace.StartCommandActivity();
-        Assert.NotNull(activity);
+        activity.Should().NotBeNull();
 
         var ex = new InvalidOperationException("boom");
         activity.Fail(ex);
 
-        Assert.Equal(ActivityStatusCode.Error, activity.Status);
-        Assert.Equal("boom", activity.StatusDescription);
+        activity.Status.Should().Be(ActivityStatusCode.Error);
+        activity.StatusDescription.Should().Be("boom");
     }
 
     [Fact]
@@ -162,11 +161,11 @@ public class TelemetryTests
         var resource = CliTelemetry.CreateResourceBuilder().Build();
         var attrs = resource.Attributes.ToDictionary(kv => kv.Key, kv => kv.Value);
 
-        Assert.Equal(CliTelemetry.SourceName, attrs["service.name"]);
-        Assert.Equal(CliTelemetry.CliVersion, attrs["service.version"]);
-        Assert.True(attrs.ContainsKey("os.type"));
-        Assert.True(attrs.ContainsKey("os.architecture"));
-        Assert.True(attrs.ContainsKey("process.runtime.description"));
+        attrs["service.name"].Should().Be(CliTelemetry.SourceName);
+        attrs["service.version"].Should().Be(CliTelemetry.CliVersion);
+        attrs.ContainsKey("os.type").Should().BeTrue();
+        attrs.ContainsKey("os.architecture").Should().BeTrue();
+        attrs.ContainsKey("process.runtime.description").Should().BeTrue();
     }
 
     private static ActivityListener SubscribeListener()

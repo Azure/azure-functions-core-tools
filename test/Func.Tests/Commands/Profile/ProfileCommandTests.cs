@@ -2,14 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Options;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Profile;
 
@@ -39,10 +37,10 @@ public sealed class ProfileCommandTests : IDisposable
         var root = TestParser.CreateRoot(_interaction);
         Command? profileCommand = root.Subcommands.SingleOrDefault(c => c.Name == "profile");
 
-        Assert.NotNull(profileCommand);
-        Assert.Contains(profileCommand!.Subcommands, c => c.Name == "list");
-        Assert.Contains(profileCommand.Subcommands, c => c.Name == "show");
-        Assert.Contains(profileCommand.Subcommands, c => c.Name == "set");
+        profileCommand.Should().NotBeNull();
+        profileCommand!.Subcommands.Should().Contain(c => c.Name == "list");
+        profileCommand.Subcommands.Should().Contain(c => c.Name == "show");
+        profileCommand.Subcommands.Should().Contain(c => c.Name == "set");
     }
 
     [Fact]
@@ -56,12 +54,12 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, _tempDir);
 
-        Assert.Equal(0, exit);
-        Assert.Contains("  Project profiles    my-preview (default), flex", _interaction.Lines);
-        Assert.Contains("TABLE: [Name, Source, Host Version, Extension Bundle, Status]", _interaction.Lines);
-        Assert.Contains("  ROW: [flex, built-in, [4.0.0, 5.0.0), [3.0.0, 5.0.0), stable]", _interaction.Lines);
-        Assert.Contains("  ROW: [my-preview, user, [4.1.0, 5.0.0), -, stable]", _interaction.Lines);
-        Assert.Contains("  ROW: [staging, project, [4.0.0, 5.0.0), [3.0.0, 5.0.0), stable]", _interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("  Project profiles    my-preview (default), flex");
+        _interaction.Lines.Should().Contain("TABLE: [Name, Source, Host Version, Extension Bundle, Status]");
+        _interaction.Lines.Should().Contain("  ROW: [flex, built-in, [4.0.0, 5.0.0), [3.0.0, 5.0.0), stable]");
+        _interaction.Lines.Should().Contain("  ROW: [my-preview, user, [4.1.0, 5.0.0), -, stable]");
+        _interaction.Lines.Should().Contain("  ROW: [staging, project, [4.0.0, 5.0.0), [3.0.0, 5.0.0), stable]");
     }
 
     [Fact]
@@ -74,9 +72,9 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, "--source", "built-in", _tempDir);
 
-        Assert.Equal(0, exit);
-        string row = Assert.Single(_interaction.Lines, l => l.StartsWith("  ROW:"));
-        Assert.Equal("  ROW: [flex, built-in, [4.0.0, 5.0.0), -, stable]", row);
+        exit.Should().Be(0);
+        string row = _interaction.Lines.Should().ContainSingle(l => l.StartsWith("  ROW:")).Which;
+        row.Should().Be("  ROW: [flex, built-in, [4.0.0, 5.0.0), -, stable]");
     }
 
     [Fact]
@@ -88,12 +86,12 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, "--json", _tempDir);
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
         string json = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"defaultProfile\":\"flex\"", json);
-        Assert.Contains("\"name\":\"flex\"", json);
-        Assert.Contains("\"source\":\"built-in\"", json);
+        json.Should().Contain("\"defaultProfile\":\"flex\"");
+        json.Should().Contain("\"name\":\"flex\"");
+        json.Should().Contain("\"source\":\"built-in\"");
     }
 
     [Fact]
@@ -113,13 +111,13 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, "staging", _tempDir);
 
-        Assert.Equal(0, exit);
-        Assert.Contains("  Name    staging", _interaction.Lines);
-        Assert.Contains("  Source    project", _interaction.Lines);
-        Assert.Contains("  Host version    [4.0.0, 5.0.0)", _interaction.Lines);
-        Assert.Contains("  Extension bundle    [3.0.0, 5.0.0)", _interaction.Lines);
-        Assert.Contains("  Workers    node [4.0.0]", _interaction.Lines);
-        Assert.Contains("  Supported runtimes    node", _interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("  Name    staging");
+        _interaction.Lines.Should().Contain("  Source    project");
+        _interaction.Lines.Should().Contain("  Host version    [4.0.0, 5.0.0)");
+        _interaction.Lines.Should().Contain("  Extension bundle    [3.0.0, 5.0.0)");
+        _interaction.Lines.Should().Contain("  Workers    node [4.0.0]");
+        _interaction.Lines.Should().Contain("  Supported runtimes    node");
     }
 
     [Fact]
@@ -131,10 +129,10 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, "staging", "--raw", _tempDir);
 
-        Assert.Equal(0, exit);
-        Assert.Contains("  Name    staging", _interaction.Lines);
-        Assert.Contains("  Extends    flex", _interaction.Lines);
-        Assert.Contains("  Host version    -", _interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("  Name    staging");
+        _interaction.Lines.Should().Contain("  Extends    flex");
+        _interaction.Lines.Should().Contain("  Host version    -");
     }
 
     [Fact]
@@ -143,10 +141,9 @@ public sealed class ProfileCommandTests : IDisposable
         ProfileShowCommand command = CreateShowCommand(
             Source(ProfileSourceKind.BuiltIn, Profile("flex", hostRange: "[4.0.0, 5.0.0)")));
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(command, "missing", _tempDir));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(command, "missing", _tempDir)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("Profile 'missing' was not found.", ex.Message);
+        ex.Message.Should().Contain("Profile 'missing' was not found.");
     }
 
     [Fact]
@@ -158,14 +155,14 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, "flex", _tempDir);
 
-        Assert.Equal(0, exit);
-        Assert.Contains("SUCCESS: Profile 'flex' set as this project's default.", _interaction.Lines);
-        Assert.Contains("HINT: Added 'flex' to this project's profiles list.", _interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("SUCCESS: Profile 'flex' set as this project's default.");
+        _interaction.Lines.Should().Contain("HINT: Added 'flex' to this project's profiles list.");
         using JsonDocument document = ReadProjectConfig();
         JsonElement root = document.RootElement;
-        Assert.Equal("flex", root.GetProperty("defaultProfile").GetString());
-        JsonElement profile = Assert.Single(root.GetProperty("profiles").EnumerateArray());
-        Assert.Equal("flex", profile.GetString());
+        root.GetProperty("defaultProfile").GetString().Should().Be("flex");
+        JsonElement profile = root.GetProperty("profiles").EnumerateArray().Should().ContainSingle().Subject;
+        profile.GetString().Should().Be("flex");
     }
 
     [Fact]
@@ -186,14 +183,14 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, "staging", _tempDir);
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         using JsonDocument document = ReadProjectConfig();
         JsonElement root = document.RootElement;
-        Assert.Equal("node", root.GetProperty("stack").GetProperty("runtime").GetString());
-        Assert.Equal("staging", root.GetProperty("defaultProfile").GetString());
+        root.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+        root.GetProperty("defaultProfile").GetString().Should().Be("staging");
         string?[] profiles = [.. root.GetProperty("profiles").EnumerateArray().Select(p => p.GetString())];
         string?[] expectedProfiles = ["flex", "staging"];
-        Assert.Equal(expectedProfiles, profiles);
+        profiles.Should().Equal(expectedProfiles);
     }
 
     [Fact]
@@ -205,13 +202,13 @@ public sealed class ProfileCommandTests : IDisposable
 
         int exit = await InvokeAsync(command, "flex", _tempDir);
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("HINT: Added", StringComparison.Ordinal));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("HINT: Added", StringComparison.Ordinal));
         using JsonDocument document = ReadProjectConfig();
         JsonElement root = document.RootElement;
-        JsonElement profile = Assert.Single(root.GetProperty("profiles").EnumerateArray());
-        Assert.Equal("FLEX", profile.GetString());
-        Assert.Equal("FLEX", root.GetProperty("defaultProfile").GetString());
+        JsonElement profile = root.GetProperty("profiles").EnumerateArray().Should().ContainSingle().Subject;
+        profile.GetString().Should().Be("FLEX");
+        root.GetProperty("defaultProfile").GetString().Should().Be("FLEX");
     }
 
     [Fact]
@@ -220,11 +217,10 @@ public sealed class ProfileCommandTests : IDisposable
         ProfileSetCommand command = CreateSetCommand(
             Source(ProfileSourceKind.BuiltIn, Profile("flex")));
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(command, "missing", _tempDir));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(command, "missing", _tempDir)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("Profile 'missing' was not found.", ex.Message);
-        Assert.False(_fileSystem.Exists(ProjectConfigPath()));
+        ex.Message.Should().Contain("Profile 'missing' was not found.");
+        _fileSystem.Exists(ProjectConfigPath()).Should().BeFalse();
     }
 
     [Fact]
@@ -233,12 +229,11 @@ public sealed class ProfileCommandTests : IDisposable
         ProfileSetCommand command = CreateSetCommand(
             Source(ProfileSourceKind.BuiltIn, Profile("flex")));
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(command, "flex", _tempDir));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(command, "flex", _tempDir)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("Project not initialized.", ex.Message);
-        Assert.Contains("Run 'func init'", ex.Message);
-        Assert.False(_fileSystem.Exists(ProjectConfigPath()));
+        ex.Message.Should().Contain("Project not initialized.");
+        ex.Message.Should().Contain("Run 'func init'");
+        _fileSystem.Exists(ProjectConfigPath()).Should().BeFalse();
     }
 
     [Fact]
@@ -248,10 +243,9 @@ public sealed class ProfileCommandTests : IDisposable
         ProfileSetCommand command = CreateSetCommand(
             Source(ProfileSourceKind.BuiltIn, Profile("flex")));
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(command, "flex", _tempDir));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(command, "flex", _tempDir)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("contains invalid JSON", ex.Message);
+        ex.Message.Should().Contain("contains invalid JSON");
     }
 
     private ProfileListCommand CreateListCommand(ProjectProfileOptions options, params IProfileSource[] sources)

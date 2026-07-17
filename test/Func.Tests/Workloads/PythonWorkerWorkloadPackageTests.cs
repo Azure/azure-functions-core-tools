@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads;
 
@@ -14,7 +13,7 @@ public sealed class PythonWorkerWorkloadPackageTests
     [InlineData(" osx-arm64 ", "Azure.Functions.Cli.Workloads.Workers.Python.osx-arm64")]
     public void FromRuntimeIdentifier_AppendsLowercasedRid(string runtimeIdentifier, string expected)
     {
-        Assert.Equal(expected, PythonWorkerWorkloadPackage.FromRuntimeIdentifier(runtimeIdentifier));
+        PythonWorkerWorkloadPackage.FromRuntimeIdentifier(runtimeIdentifier).Should().Be(expected);
     }
 
     [Theory]
@@ -22,19 +21,19 @@ public sealed class PythonWorkerWorkloadPackageTests
     [InlineData("   ")]
     public void FromRuntimeIdentifier_RejectsBlankRid(string runtimeIdentifier)
     {
-        Assert.Throws<ArgumentException>(() => PythonWorkerWorkloadPackage.FromRuntimeIdentifier(runtimeIdentifier));
+        FluentActions.Invoking(() => PythonWorkerWorkloadPackage.FromRuntimeIdentifier(runtimeIdentifier)).Should().ThrowExactly<ArgumentException>();
     }
 
     [Fact]
     public void FromRuntimeIdentifier_RejectsNullRid()
     {
-        Assert.Throws<ArgumentNullException>(() => PythonWorkerWorkloadPackage.FromRuntimeIdentifier(null!));
+        FluentActions.Invoking(() => PythonWorkerWorkloadPackage.FromRuntimeIdentifier(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void CurrentPackageId_StartsWithPrefix()
     {
-        Assert.StartsWith(PythonWorkerWorkloadPackage.PackageIdPrefix, PythonWorkerWorkloadPackage.CurrentPackageId);
+        PythonWorkerWorkloadPackage.CurrentPackageId.Should().StartWith(PythonWorkerWorkloadPackage.PackageIdPrefix);
     }
 
     [Theory]
@@ -48,6 +47,6 @@ public sealed class PythonWorkerWorkloadPackageTests
     [InlineData("freebsd-x64", false)]
     public void IsSupported_MatchesPublishedRids(string runtimeIdentifier, bool expected)
     {
-        Assert.Equal(expected, PythonWorkerWorkloadPackage.IsSupported(runtimeIdentifier));
+        PythonWorkerWorkloadPackage.IsSupported(runtimeIdentifier).Should().Be(expected);
     }
 }

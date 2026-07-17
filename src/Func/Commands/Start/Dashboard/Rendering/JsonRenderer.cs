@@ -3,7 +3,6 @@
 
 using System.Buffers;
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.Events;

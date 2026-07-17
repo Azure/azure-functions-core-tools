@@ -5,7 +5,6 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Templates;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -38,11 +37,11 @@ public class NewCommandTests
         var cmd = new NewCommand(_runner);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
-        Assert.Contains("--name", optionNames);
-        Assert.Contains("--template", optionNames);
-        Assert.Contains("--force", optionNames);
-        Assert.Contains("--non-interactive", optionNames);
-        Assert.Contains("--list", optionNames);
+        optionNames.Should().Contain("--name");
+        optionNames.Should().Contain("--template");
+        optionNames.Should().Contain("--force");
+        optionNames.Should().Contain("--non-interactive");
+        optionNames.Should().Contain("--list");
     }
 
     [Fact]
@@ -51,15 +50,15 @@ public class NewCommandTests
         var root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
-        Assert.Contains("new", names);
+        names.Should().Contain("new");
     }
 
     [Fact]
     public void NewCommand_HasPathArgument()
     {
         var cmd = new NewCommand(_runner);
-        Assert.Single(cmd.Arguments);
-        Assert.Equal("path", cmd.Arguments[0].Name);
+        cmd.Arguments.Should().ContainSingle();
+        cmd.Arguments[0].Name.Should().Be("path");
     }
 
     // Single-dash typos like `-name` must surface as unrecognized options, not "needs a project".
@@ -72,9 +71,7 @@ public class NewCommandTests
             new[] { "new", "--template", "HttpTrigger-Python", "-name", "ttpt" },
             new ParserConfiguration { EnablePosixBundling = false });
 
-        Assert.Contains(
-            result.Errors,
-            e => e.Message.Contains("Unrecognized option '-name'", System.StringComparison.Ordinal));
+        result.Errors.Should().Contain(e => e.Message.Contains("Unrecognized option '-name'", System.StringComparison.Ordinal));
     }
 }
 

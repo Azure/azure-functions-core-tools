@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Python.Tests;
 
@@ -41,8 +40,8 @@ public class PythonProjectFactoryTests : IDisposable
     {
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
-        Assert.Equal("no Python project fingerprint found", notCreated.Reason);
+        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
+        notCreated.Reason.Should().Be("no Python project fingerprint found");
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(missing), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Theory]
@@ -67,7 +66,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.Created>(result);
+        result.Should().BeOfType<ProjectCreationResult.Created>();
     }
 
     [Fact]
@@ -79,7 +78,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -90,7 +89,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Theory]
@@ -106,12 +105,12 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("python", created.Project.StackName);
-        Assert.Equal("Python", created.Project.StackDisplayName);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Project.StackName.Should().Be("python");
+        created.Project.StackDisplayName.Should().Be("Python");
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        Assert.Equal("python", worker.WorkerRuntime);
-        Assert.NotNull(created.Reason);
+        worker.WorkerRuntime.Should().Be("python");
+        created.Reason.Should().NotBeNull();
     }
 
     [Fact]
@@ -125,8 +124,8 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("found pyproject.toml", created.Reason);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Reason.Should().Be("found pyproject.toml");
     }
 
     [Fact]
@@ -138,8 +137,8 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("found pyproject.toml", created.Reason);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Reason.Should().Be("found pyproject.toml");
     }
 
     [Fact]
@@ -150,8 +149,8 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Contains("*.py", created.Reason);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Reason.Should().Contain("*.py");
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -176,19 +175,18 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(workerResult);
-        Assert.Same(failure, notResolved.Failure);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
+        notResolved.Failure.Should().BeSameAs(failure);
     }
 
     [Fact]
     public async Task NullContext_throws()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new PythonProjectFactory().TryCreateProjectAsync(null!, default));
+        await FluentActions.Awaiting(() => new PythonProjectFactory().TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     private void WriteFile(string name, string contents)
@@ -202,7 +200,7 @@ public class PythonProjectFactoryTests : IDisposable
         FunctionsWorkerResolutionResult result = await project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
         return resolved.Worker;
     }
 

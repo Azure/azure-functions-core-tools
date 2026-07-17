@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -21,12 +20,12 @@ public class TemplatesChannelMapperTests
         ];
 
         InstalledTemplatesWorkload? stable = TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Stable);
-        Assert.NotNull(stable);
-        Assert.Equal("1.1.0", stable.PackageVersion);
+        stable.Should().NotBeNull();
+        stable.PackageVersion.Should().Be("1.1.0");
 
         InstalledTemplatesWorkload? preview = TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Preview);
-        Assert.NotNull(preview);
-        Assert.Equal("1.1.0-preview", preview.PackageVersion);
+        preview.Should().NotBeNull();
+        preview.PackageVersion.Should().Be("1.1.0-preview");
     }
 
     [Fact]
@@ -37,6 +36,6 @@ public class TemplatesChannelMapperTests
             new("node", "1.0.0", "/n/1.0.0"),
         ];
 
-        Assert.Null(TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Experimental));
+        TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Experimental).Should().BeNull();
     }
 }

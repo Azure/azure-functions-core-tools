@@ -3,7 +3,6 @@
 
 using Microsoft.Build.Framework;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Sdk.Tasks.Tests;
 
@@ -22,8 +21,8 @@ public class ResolveWorkloadCopyLocalTests
 
         bool result = task.Execute();
 
-        Assert.True(result);
-        Assert.Equal(2, task.WorkloadCopyLocal.Length);
+        result.Should().BeTrue();
+        task.WorkloadCopyLocal.Length.Should().Be(2);
     }
 
     [Fact]
@@ -41,8 +40,8 @@ public class ResolveWorkloadCopyLocalTests
 
         task.Execute();
 
-        Assert.Single(task.WorkloadCopyLocal);
-        Assert.Contains(task.WorkloadCopyLocal, i => i.ItemSpec == "lib/Keep.dll");
+        task.WorkloadCopyLocal.Should().ContainSingle();
+        task.WorkloadCopyLocal.Should().Contain(i => i.ItemSpec == "lib/Keep.dll");
     }
 
     [Fact]
@@ -62,8 +61,8 @@ public class ResolveWorkloadCopyLocalTests
 
         task.Execute();
 
-        Assert.Single(task.WorkloadCopyLocal);
-        Assert.Contains(task.WorkloadCopyLocal, i => i.ItemSpec == "lib/Keep.dll");
+        task.WorkloadCopyLocal.Should().ContainSingle();
+        task.WorkloadCopyLocal.Should().Contain(i => i.ItemSpec == "lib/Keep.dll");
     }
 
     [Fact]
@@ -80,7 +79,7 @@ public class ResolveWorkloadCopyLocalTests
 
         task.Execute();
 
-        Assert.Empty(task.WorkloadCopyLocal);
+        task.WorkloadCopyLocal.Should().BeEmpty();
     }
 
     [Fact]
@@ -93,7 +92,7 @@ public class ResolveWorkloadCopyLocalTests
 
         task.Execute();
 
-        Assert.Single(task.WorkloadCopyLocal);
+        task.WorkloadCopyLocal.Should().ContainSingle();
         task.WorkloadCopyLocal[0].Received().SetMetadata("TargetPath", "runtimes/win/MyLib.dll");
     }
 
@@ -107,7 +106,7 @@ public class ResolveWorkloadCopyLocalTests
 
         task.Execute();
 
-        Assert.Single(task.WorkloadCopyLocal);
+        task.WorkloadCopyLocal.Should().ContainSingle();
         task.WorkloadCopyLocal[0].Received().SetMetadata("TargetPath", "MyLib.dll");
     }
 
@@ -118,8 +117,8 @@ public class ResolveWorkloadCopyLocalTests
 
         bool result = task.Execute();
 
-        Assert.True(result);
-        Assert.Empty(task.WorkloadCopyLocal);
+        result.Should().BeTrue();
+        task.WorkloadCopyLocal.Should().BeEmpty();
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public class ResolveWorkloadCopyLocalTests
 
         task.Execute();
 
-        Assert.Single(task.WorkloadCopyLocal);
+        task.WorkloadCopyLocal.Should().ContainSingle();
     }
 
     [Fact]
@@ -154,8 +153,8 @@ public class ResolveWorkloadCopyLocalTests
 
         task.Execute();
 
-        Assert.Single(task.WorkloadCopyLocal);
-        Assert.Contains(task.WorkloadCopyLocal, i => i.ItemSpec == "lib/C.dll");
+        task.WorkloadCopyLocal.Should().ContainSingle();
+        task.WorkloadCopyLocal.Should().Contain(i => i.ItemSpec == "lib/C.dll");
     }
 
     private static ResolveWorkloadCopyLocal CreateTask(ITaskItem[] items, ITaskItem[] unifiedItems)

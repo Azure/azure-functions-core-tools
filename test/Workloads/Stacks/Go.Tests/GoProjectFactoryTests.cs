@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Go.Tests;
 
@@ -40,8 +39,8 @@ public class GoProjectFactoryTests : IDisposable
     {
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
-        Assert.Equal("no Go project fingerprint found", notCreated.Reason);
+        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
+        notCreated.Reason.Should().Be("no Go project fingerprint found");
     }
 
     [Theory]
@@ -53,7 +52,7 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.Created>(result);
+        result.Should().BeOfType<ProjectCreationResult.Created>();
     }
 
     [Fact]
@@ -64,7 +63,7 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -75,7 +74,7 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Theory]
@@ -88,12 +87,12 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("go", created.Project.StackName);
-        Assert.Equal("Go", created.Project.StackDisplayName);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Project.StackName.Should().Be("go");
+        created.Project.StackDisplayName.Should().Be("Go");
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        Assert.Equal("native", worker.WorkerRuntime);
-        Assert.NotNull(created.Reason);
+        worker.WorkerRuntime.Should().Be("native");
+        created.Reason.Should().NotBeNull();
     }
 
     [Fact]
@@ -105,8 +104,8 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("found go.mod", created.Reason);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Reason.Should().Be("found go.mod");
     }
 
     [Fact]
@@ -116,7 +115,7 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -131,19 +130,18 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(workerResult);
-        Assert.Same(failure, notResolved.Failure);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
+        notResolved.Failure.Should().BeSameAs(failure);
     }
 
     [Fact]
     public async Task NullContext_throws()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new GoProjectFactory().TryCreateProjectAsync(null!, default));
+        await FluentActions.Awaiting(() => new GoProjectFactory().TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     private void WriteFile(string name, string contents)
@@ -157,7 +155,7 @@ public class GoProjectFactoryTests : IDisposable
         FunctionsWorkerResolutionResult result = await project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
         return resolved.Worker;
     }
 

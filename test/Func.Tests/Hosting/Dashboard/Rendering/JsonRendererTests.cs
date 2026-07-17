@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -33,13 +32,13 @@ public class JsonRendererTests
         await renderer.DisposeAsync();
 
         IReadOnlyList<JsonDocument> records = ReadAll(stream);
-        Assert.NotEmpty(records);
+        records.Should().NotBeEmpty();
 
         foreach (var doc in records)
         {
-            Assert.Equal(1, doc.RootElement.GetProperty("schema_version").GetInt32());
-            Assert.False(string.IsNullOrEmpty(doc.RootElement.GetProperty("kind").GetString()));
-            Assert.False(string.IsNullOrEmpty(doc.RootElement.GetProperty("timestamp").GetString()));
+            doc.RootElement.GetProperty("schema_version").GetInt32().Should().Be(1);
+            string.IsNullOrEmpty(doc.RootElement.GetProperty("kind").GetString()).Should().BeFalse();
+            string.IsNullOrEmpty(doc.RootElement.GetProperty("timestamp").GetString()).Should().BeFalse();
         }
     }
 
@@ -62,7 +61,7 @@ public class JsonRendererTests
         await renderer.DisposeAsync();
 
         IReadOnlyList<JsonDocument> records = ReadAll(stream);
-        Assert.Equal("summary", records[^1].RootElement.GetProperty("kind").GetString());
+        records[^1].RootElement.GetProperty("kind").GetString().Should().Be("summary");
     }
 
     [Fact]
@@ -84,9 +83,9 @@ public class JsonRendererTests
         await renderer.DisposeAsync();
 
         IReadOnlyList<JsonDocument> records = ReadAll(stream);
-        Assert.True(records.Count >= 3, $"Expected at least 3 records, got {records.Count}");
-        Assert.Equal("log", records[0].RootElement.GetProperty("kind").GetString());
-        Assert.Equal("host_state_changed", records[1].RootElement.GetProperty("kind").GetString());
+        (records.Count >= 3).Should().BeTrue($"Expected at least 3 records, got {records.Count}");
+        records[0].RootElement.GetProperty("kind").GetString().Should().Be("log");
+        records[1].RootElement.GetProperty("kind").GetString().Should().Be("host_state_changed");
     }
 
     [Fact]
@@ -127,21 +126,21 @@ public class JsonRendererTests
             .Single(doc => doc.RootElement.GetProperty("kind").GetString() == "log")
             .RootElement
             .GetProperty("exception");
-        Assert.Equal("Microsoft.Azure.WebJobs.Host.FunctionInvocationException", logException.GetProperty("type").GetString());
-        Assert.Equal("outer stack", logException.GetProperty("stack").GetString());
-        Assert.Equal("Worker.UserException", logException.GetProperty("inner_exception").GetProperty("type").GetString());
-        Assert.Equal("inner stack", logException.GetProperty("inner_exception").GetProperty("stack").GetString());
+        logException.GetProperty("type").GetString().Should().Be("Microsoft.Azure.WebJobs.Host.FunctionInvocationException");
+        logException.GetProperty("stack").GetString().Should().Be("outer stack");
+        logException.GetProperty("inner_exception").GetProperty("type").GetString().Should().Be("Worker.UserException");
+        logException.GetProperty("inner_exception").GetProperty("stack").GetString().Should().Be("inner stack");
 
         JsonElement eventError = records
             .Single(doc => doc.RootElement.GetProperty("kind").GetString() == "invocation_completed")
             .RootElement
             .GetProperty("error");
-        Assert.Equal("Microsoft.Azure.WebJobs.Host.FunctionInvocationException", eventError.GetProperty("type").GetString());
-        Assert.Equal("Exception while executing function", eventError.GetProperty("message").GetString());
-        Assert.Equal("outer stack", eventError.GetProperty("stack").GetString());
-        Assert.Equal("Worker.UserException", eventError.GetProperty("inner_exception").GetProperty("type").GetString());
-        Assert.Equal("inner boom", eventError.GetProperty("inner_exception").GetProperty("message").GetString());
-        Assert.Equal("inner stack", eventError.GetProperty("inner_exception").GetProperty("stack").GetString());
+        eventError.GetProperty("type").GetString().Should().Be("Microsoft.Azure.WebJobs.Host.FunctionInvocationException");
+        eventError.GetProperty("message").GetString().Should().Be("Exception while executing function");
+        eventError.GetProperty("stack").GetString().Should().Be("outer stack");
+        eventError.GetProperty("inner_exception").GetProperty("type").GetString().Should().Be("Worker.UserException");
+        eventError.GetProperty("inner_exception").GetProperty("message").GetString().Should().Be("inner boom");
+        eventError.GetProperty("inner_exception").GetProperty("stack").GetString().Should().Be("inner stack");
     }
 
     [Fact]
@@ -168,11 +167,11 @@ public class JsonRendererTests
         await renderer.OnEventAsync(entry, [], default);
         await renderer.DisposeAsync();
 
-        JsonElement exception = Assert.Single(ReadAll(stream))
+        JsonElement exception = ReadAll(stream).Should().ContainSingle().Subject
             .RootElement
             .GetProperty("exception");
-        Assert.Equal("Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException", exception.GetProperty("type").GetString());
-        Assert.Equal("A connection string was not found. Please set your connection string.", exception.GetProperty("message").GetString());
+        exception.GetProperty("type").GetString().Should().Be("Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException");
+        exception.GetProperty("message").GetString().Should().Be("A connection string was not found. Please set your connection string.");
     }
 
     private static (JsonRenderer renderer, MemoryStream stream) NewRenderer()

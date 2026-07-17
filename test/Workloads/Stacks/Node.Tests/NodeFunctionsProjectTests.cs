@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;
 
@@ -42,7 +41,7 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.False(invoked);
+        invoked.Should().BeFalse();
     }
 
     [Fact]
@@ -58,8 +57,8 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.Single(commands);
-        Assert.Equal(new[] { "install" }, commands[0]);
+        commands.Should().ContainSingle();
+        commands[0].Should().Equal(["install"]);
     }
 
     [Fact]
@@ -76,7 +75,7 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.Empty(commands);
+        commands.Should().BeEmpty();
     }
 
     [Fact]
@@ -93,8 +92,8 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.Single(commands);
-        Assert.Equal(new[] { "run", "build" }, commands[0]);
+        commands.Should().ContainSingle();
+        commands[0].Should().Equal(["run", "build"]);
     }
 
     [Fact]
@@ -113,8 +112,8 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "added 42 packages");
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "npm warn deprecated");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "added 42 packages");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "npm warn deprecated");
     }
 
     [Fact]
@@ -130,13 +129,12 @@ public class NodeFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("install", ex.Message);
-        Assert.Contains("exit 1", ex.Message);
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "ENOENT");
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("install");
+        ex.Message.Should().Contain("exit 1");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "ENOENT");
     }
 
     [Fact]
@@ -153,7 +151,7 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
 
-        Assert.Empty(commands);
+        commands.Should().BeEmpty();
     }
 
     [Fact]
@@ -169,8 +167,8 @@ public class NodeFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
 
-        Assert.Single(commands);
-        Assert.Equal(new[] { "install" }, commands[0]);
+        commands.Should().ContainSingle();
+        commands[0].Should().Equal(["install"]);
     }
 
     [Fact]
@@ -179,8 +177,8 @@ public class NodeFunctionsProjectTests : IDisposable
         var ts = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "TypeScript");
         var js = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "JavaScript");
 
-        Assert.Equal("TypeScript", ts.Language);
-        Assert.Equal("JavaScript", js.Language);
+        ts.Language.Should().Be("TypeScript");
+        js.Language.Should().Be("JavaScript");
     }
 
     private NodeFunctionsProject CreateProject(Func<string, IReadOnlyList<string>, Action<string>, Action<string>, CancellationToken, Task<int>> runner)

@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
@@ -16,7 +15,7 @@ public class WorkloadPathsOptionsTests
         // path," so callers don't have to normalise themselves.
         var options = new WorkloadPathsOptions("relative/path");
 
-        Assert.Equal(Path.GetFullPath("relative/path"), options.Home);
+        options.Home.Should().Be(Path.GetFullPath("relative/path"));
     }
 
     [Theory]
@@ -25,7 +24,7 @@ public class WorkloadPathsOptionsTests
     [InlineData("   ")]
     public void Constructor_ThrowsForMissingHome(string? home)
     {
-        Assert.ThrowsAny<ArgumentException>(() => new WorkloadPathsOptions(home!));
+        FluentActions.Invoking(() => new WorkloadPathsOptions(home!)).Should().Throw<ArgumentException>();
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public class WorkloadPathsOptionsTests
     {
         var options = new WorkloadPathsOptions(Path.Combine(Path.GetTempPath(), "funcs"));
 
-        Assert.Equal(Path.Combine(options.Home, "workloads"), options.WorkloadsRoot);
+        options.WorkloadsRoot.Should().Be(Path.Combine(options.Home, "workloads"));
     }
 
     [Fact]
@@ -41,9 +40,7 @@ public class WorkloadPathsOptionsTests
     {
         var options = new WorkloadPathsOptions(Path.Combine(Path.GetTempPath(), "funcs"));
 
-        Assert.Equal(
-            Path.Combine(options.Home, WorkloadPathsOptions.WorkloadRegistryFileName),
-            options.WorkloadRegistryPath);
+        options.WorkloadRegistryPath.Should().Be(Path.Combine(options.Home, WorkloadPathsOptions.WorkloadRegistryFileName));
     }
 
     [Fact]
@@ -51,8 +48,6 @@ public class WorkloadPathsOptionsTests
     {
         var options = new WorkloadPathsOptions(Path.Combine(Path.GetTempPath(), "funcs"));
 
-        Assert.Equal(
-            Path.Combine(options.Home, "workloads", "Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"),
-            options.GetInstallDirectory("Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"));
+        options.GetInstallDirectory("Azure.Functions.Cli.Workloads.Dotnet", "1.2.3").Should().Be(Path.Combine(options.Home, "workloads", "Azure.Functions.Cli.Workloads.Dotnet", "1.2.3"));
     }
 }

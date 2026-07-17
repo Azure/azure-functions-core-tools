@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Spectre.Console;
 using Spectre.Console.Rendering;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -24,7 +23,7 @@ public class CompactFunctionSearchBuilderTests
 
         FunctionInfo[] matches = builder.GetMatches(functions, " ");
 
-        Assert.Same(functions, matches);
+        matches.Should().BeSameAs(functions);
     }
 
     [Fact]
@@ -40,8 +39,8 @@ public class CompactFunctionSearchBuilderTests
 
         FunctionInfo[] matches = builder.GetMatches(functions, "ord");
 
-        Assert.Single(matches);
-        Assert.Equal("QueueProcessor", matches[0].Name);
+        matches.Should().ContainSingle();
+        matches[0].Name.Should().Be("QueueProcessor");
     }
 
     [Fact]
@@ -52,8 +51,8 @@ public class CompactFunctionSearchBuilderTests
         IRenderable renderable = builder.Build("missing", [], visibleRows: 3, rowOffset: 0, selectedIndex: 0);
 
         string output = Render(renderable);
-        Assert.Contains("Search functions", output);
-        Assert.Contains("No functions match \"missing\"", output);
+        output.Should().Contain("Search functions");
+        output.Should().Contain("No functions match \"missing\"");
     }
 
     private static FunctionInfo CreateFunction(string name, string triggerType, string? route)

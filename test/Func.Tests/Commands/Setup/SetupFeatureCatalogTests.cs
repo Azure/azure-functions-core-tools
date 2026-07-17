@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Setup;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
 
@@ -20,8 +19,8 @@ public sealed class SetupFeatureCatalogTests
     {
         bool matched = SetupFeatureCatalog.TryGetFeatureForPackageId(packageId, out string feature);
 
-        Assert.True(matched);
-        Assert.Equal(expectedFeature, feature);
+        matched.Should().BeTrue();
+        feature.Should().Be(expectedFeature);
     }
 
     [Theory]
@@ -33,7 +32,7 @@ public sealed class SetupFeatureCatalogTests
     {
         bool matched = SetupFeatureCatalog.TryGetFeatureForPackageId(packageId, out string feature);
 
-        Assert.False(matched);
-        Assert.Equal(string.Empty, feature);
+        matched.Should().BeFalse();
+        feature.Should().Be(string.Empty);
     }
 }

@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.V2;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates.V2;
 
@@ -36,8 +35,8 @@ public class V2TemplateProjectionTests
 
         FunctionTemplateInfo? info = V2TemplateProjection.Project(template, EmptyPayload(), "node");
 
-        Assert.NotNull(info);
-        Assert.Equal("httpTrigger", info!.DefaultFunctionName);
+        info.Should().NotBeNull();
+        info!.DefaultFunctionName.Should().Be("httpTrigger");
     }
 
     [Fact]
@@ -69,8 +68,8 @@ public class V2TemplateProjectionTests
 
         FunctionTemplateInfo? info = V2TemplateProjection.Project(template, EmptyPayload(), "python");
 
-        Assert.NotNull(info);
-        Assert.Equal("http_trigger", info!.DefaultFunctionName);
+        info.Should().NotBeNull();
+        info!.DefaultFunctionName.Should().Be("http_trigger");
     }
 
     [Fact]
@@ -101,8 +100,8 @@ public class V2TemplateProjectionTests
 
         FunctionTemplateInfo? info = V2TemplateProjection.Project(template, EmptyPayload(), "node");
 
-        Assert.NotNull(info);
-        Assert.Null(info!.DefaultFunctionName);
+        info.Should().NotBeNull();
+        info!.DefaultFunctionName.Should().BeNull();
     }
 
     [Fact]
@@ -131,8 +130,8 @@ public class V2TemplateProjectionTests
 
         FunctionTemplateInfo? info = V2TemplateProjection.Project(template, EmptyPayload(), "node");
 
-        Assert.NotNull(info);
-        Assert.Null(info!.DefaultFunctionName);
+        info.Should().NotBeNull();
+        info!.DefaultFunctionName.Should().BeNull();
     }
 
     private static V2Payload EmptyPayload() =>

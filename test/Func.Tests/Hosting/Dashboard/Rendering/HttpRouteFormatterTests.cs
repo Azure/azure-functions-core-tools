@@ -1,15 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using NSubstitute;
-using NSubstitute.Extensions;
 using Spectre.Console;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -30,7 +26,7 @@ public class HttpRouteFormatterTests
         string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071", _theme);
 
         const string url = "http://localhost:7071/api/hello";
-        Assert.Equal($"GET,POST [underline blue link={url}]{url}[/]", result);
+        result.Should().Be($"GET,POST [underline blue link={url}]{url}[/]");
     }
 
     [Fact]
@@ -40,7 +36,7 @@ public class HttpRouteFormatterTests
 
         string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071/", _theme);
 
-        Assert.Contains("[underline blue link=http://localhost:7071/api/orders]", result);
+        result.Should().Contain("[underline blue link=http://localhost:7071/api/orders]");
     }
 
     [Fact]
@@ -50,8 +46,8 @@ public class HttpRouteFormatterTests
 
         string result = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri: null, _theme);
 
-        Assert.Equal("GET /api/hello", result);
-        Assert.DoesNotContain("[link=", result);
+        result.Should().Be("GET /api/hello");
+        result.Should().NotContain("[link=");
     }
 
     [Fact]
@@ -61,8 +57,8 @@ public class HttpRouteFormatterTests
 
         string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071", _theme);
 
-        Assert.Equal("my-queue", result);
-        Assert.DoesNotContain("[link=", result);
+        result.Should().Be("my-queue");
+        result.Should().NotContain("[link=");
     }
 
     [Fact]
@@ -72,8 +68,8 @@ public class HttpRouteFormatterTests
 
         string result = HttpRouteFormatter.FormatRouteMarkup(fn, "http://localhost:7071", _theme);
 
-        Assert.Equal("GET —", result);
-        Assert.DoesNotContain("[link=", result);
+        result.Should().Be("GET —");
+        result.Should().NotContain("[link=");
     }
 
     [Fact]
@@ -105,9 +101,9 @@ public class HttpRouteFormatterTests
         console.Markup(markup);
         string output = writer.ToString();
 
-        Assert.Contains("\u001b]8;", output);
-        Assert.Contains("http://localhost:7071/api/hello", output);
-        Assert.Contains("\u001b]8;;\u001b\\", output);
+        output.Should().Contain("\u001b]8;");
+        output.Should().Contain("http://localhost:7071/api/hello");
+        output.Should().Contain("\u001b]8;;\u001b\\");
     }
 
     private static FunctionInfo MakeFunction(string triggerType, string? route, IReadOnlyList<string> methods)

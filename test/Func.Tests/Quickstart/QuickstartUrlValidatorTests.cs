@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Quickstart;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Quickstart;
 
@@ -17,7 +16,7 @@ public sealed class QuickstartUrlValidatorTests
     [InlineData("https://github.com/microsoft/some-repo")]
     public void IsAllowed_AcceptsTrustedOrganizations(string url)
     {
-        Assert.True(QuickstartUrlValidator.IsAllowed(url));
+        QuickstartUrlValidator.IsAllowed(url).Should().BeTrue();
     }
 
     [Theory]
@@ -26,54 +25,54 @@ public sealed class QuickstartUrlValidatorTests
     [InlineData("   ")]
     public void IsAllowed_RejectsNullOrEmpty(string? url)
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed(url));
+        QuickstartUrlValidator.IsAllowed(url).Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsHttpScheme()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("http://github.com/Azure/some-repo"));
+        QuickstartUrlValidator.IsAllowed("http://github.com/Azure/some-repo").Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsNonGitHubHost()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("https://gitlab.com/Azure/some-repo"));
+        QuickstartUrlValidator.IsAllowed("https://gitlab.com/Azure/some-repo").Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsUntrustedOrganization()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("https://github.com/random-user/some-repo"));
+        QuickstartUrlValidator.IsAllowed("https://github.com/random-user/some-repo").Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsEmbeddedCredentials()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("https://user:pass@github.com/Azure/some-repo"));
+        QuickstartUrlValidator.IsAllowed("https://user:pass@github.com/Azure/some-repo").Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsInvalidUri()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("not-a-url"));
+        QuickstartUrlValidator.IsAllowed("not-a-url").Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsFileScheme()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("file:///c:/manifests/test.json"));
+        QuickstartUrlValidator.IsAllowed("file:///c:/manifests/test.json").Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsNonDefaultPort()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("https://github.com:8080/Azure/some-repo"));
+        QuickstartUrlValidator.IsAllowed("https://github.com:8080/Azure/some-repo").Should().BeFalse();
     }
 
     [Fact]
     public void IsAllowed_RejectsOrgWithoutRepo()
     {
-        Assert.False(QuickstartUrlValidator.IsAllowed("https://github.com/Azure"));
+        QuickstartUrlValidator.IsAllowed("https://github.com/Azure").Should().BeFalse();
     }
 }

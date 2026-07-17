@@ -13,7 +13,6 @@ using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
@@ -36,11 +35,11 @@ public class WorkloadInstallCommandTests
     public void Install_HasExpectedArgsAndOptions()
     {
         var cmd = NewInstall();
-        Assert.Single(cmd.Arguments, a => a.Name == "id");
-        Assert.Contains(cmd.Options, o => o.Name == "--force");
-        Assert.Contains(cmd.Options, o => o.Name == "--version");
-        Assert.Contains(cmd.Options, o => o.Name == "--source");
-        Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
+        cmd.Arguments.Should().ContainSingle(a => a.Name == "id");
+        cmd.Options.Should().Contain(o => o.Name == "--force");
+        cmd.Options.Should().Contain(o => o.Name == "--version");
+        cmd.Options.Should().Contain(o => o.Name == "--source");
+        cmd.Options.Should().Contain(o => o.Name == "--prerelease");
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "Test.Workload", null, null, (bool?)null, false, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
@@ -71,7 +70,7 @@ public class WorkloadInstallCommandTests
             "--exact",
             "--force");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "Test.Workload",
             Arg.Is<NuGetVersion>(v => v != null && v.ToNormalizedString() == "2.0.0-beta.1"),
@@ -91,7 +90,7 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload", "-v", "1.2.3", "-f");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "Test.Workload",
             Arg.Is<NuGetVersion>(v => v != null && v.ToNormalizedString() == "1.2.3"),
@@ -111,7 +110,7 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "test.workload", "-e");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "test.workload", null, null, (bool?)null, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
@@ -126,7 +125,7 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload", "--source", "/tmp/local-feed");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "Test.Workload", null, "/tmp/local-feed", (bool?)null, false, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
@@ -140,8 +139,8 @@ public class WorkloadInstallCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "Test.Workload", "--version", "not-semver"]);
 
-        Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("not a valid semver"));
+        parse.Errors.Should().NotBeEmpty();
+        parse.Errors.Should().Contain(e => e.Message.Contains("not a valid semver"));
     }
 
     [Fact]
@@ -153,7 +152,7 @@ public class WorkloadInstallCommandTests
 
         ParseResult parse = root.Parse([cmd.Name]);
 
-        Assert.NotEmpty(parse.Errors);
+        parse.Errors.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -165,8 +164,8 @@ public class WorkloadInstallCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "   "]);
 
-        Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("workload id is required"));
+        parse.Errors.Should().NotBeEmpty();
+        parse.Errors.Should().Contain(e => e.Message.Contains("workload id is required"));
     }
 
     [Fact]
@@ -177,10 +176,8 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.StartsWith("WARNING:")
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:")
                 && l.Contains("already installed")
                 && l.Contains("test.workload"));
     }
@@ -204,10 +201,8 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "test.content");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.StartsWith("SUCCESS:")
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("SUCCESS:")
                 && l.Contains("content at")
                 && l.Contains("api.nuget.org"));
     }
@@ -222,11 +217,10 @@ public class WorkloadInstallCommandTests
                 "myalias", new[] { "Pkg.A", "Pkg.B" }));
 
         var cmd = NewInstall();
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "myalias"));
-        Assert.Contains("myalias", ex.Message);
-        Assert.Contains("--exact", ex.Message);
-        Assert.True(ex.IsUserError);
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "myalias")).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Contain("myalias");
+        ex.Message.Should().Contain("--exact");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -238,10 +232,9 @@ public class WorkloadInstallCommandTests
             .Throws(new WorkloadPackageNotFoundException("not on any source"));
 
         var cmd = NewInstall();
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload"));
-        Assert.Contains("not on any source", ex.Message);
-        Assert.True(ex.IsUserError);
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Contain("not on any source");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -253,10 +246,9 @@ public class WorkloadInstallCommandTests
             .Throws(new InvalidWorkloadException("bad package"));
 
         var cmd = NewInstall();
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload"));
-        Assert.Equal("bad package", ex.Message);
-        Assert.True(ex.IsUserError);
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Be("bad package");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -269,11 +261,10 @@ public class WorkloadInstallCommandTests
                 "Workload 'x' version '1' is already installed at '/p' but is missing from the registry."));
 
         var cmd = NewInstall();
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload"));
-        Assert.Contains("missing from the registry", ex.Message);
-        Assert.Contains("--force", ex.Message);
-        Assert.True(ex.IsUserError);
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Contain("missing from the registry");
+        ex.Message.Should().Contain("--force");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -285,8 +276,7 @@ public class WorkloadInstallCommandTests
             .Throws(new NullReferenceException("oops"));
 
         var cmd = NewInstall();
-        await Assert.ThrowsAsync<NullReferenceException>(
-            () => InvokeAsync(cmd, "Test.Workload"));
+        await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<NullReferenceException>();
     }
 
     [Fact]
@@ -309,7 +299,7 @@ public class WorkloadInstallCommandTests
             var cmd = NewInstall();
             int exit = await InvokeAsync(cmd, tempPkg);
 
-            Assert.Equal(0, exit);
+            exit.Should().Be(0);
             await _installer.Received(1).InstallFromPackageAsync(
                 tempPkg, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
             await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(
@@ -337,11 +327,11 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(1, exit);
+        exit.Should().Be(1);
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
-        Assert.Contains(_interaction.Lines, l =>
+        _interaction.Lines.Should().Contain(l =>
             l.StartsWith("HINT:") && l.Contains("func workload update test"));
     }
 
@@ -361,8 +351,8 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "alias1");
 
-        Assert.Equal(1, exit);
-        Assert.Contains(_interaction.Lines, l =>
+        exit.Should().Be(1);
+        _interaction.Lines.Should().Contain(l =>
             l.StartsWith("HINT:") && l.Contains("alias1") && l.Contains("1.2.3"));
     }
 
@@ -382,8 +372,8 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(1, exit);
-        Assert.Contains(_interaction.Lines, l =>
+        exit.Should().Be(1);
+        _interaction.Lines.Should().Contain(l =>
             l.StartsWith("HINT:") && l.Contains("Test.Workload") && l.Contains("1.2.3"));
     }
 
@@ -404,7 +394,7 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "alias1", "--exact");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "alias1", null, null, (bool?)null, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
@@ -426,7 +416,7 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload", "--force");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "Test.Workload", null, null, (bool?)null, false, true, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
         await _store.DidNotReceive().GetWorkloadsAsync(Arg.Any<CancellationToken>());
@@ -463,13 +453,13 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
-        Assert.NotNull(captured);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("PROGRESS:", StringComparison.Ordinal) && l.Contains("Installing workload 'Test.Workload'", StringComparison.Ordinal));
-        Assert.Contains(_interaction.Lines, l => l == "PROGRESS: Resolving workload 'Test.Workload'");
-        Assert.Contains(_interaction.Lines, l => l == "PROGRESS: Downloading 'test.workload' 1.0.0");
-        Assert.Contains(_interaction.Lines, l => l == "PROGRESS: Extracting workload 'test.workload' 1.0.0");
-        Assert.Contains(_interaction.Lines, l => l == "PROGRESS: Registering workload 'test.workload' 1.0.0");
+        exit.Should().Be(0);
+        captured.Should().NotBeNull();
+        _interaction.Lines.Should().Contain(l => l.StartsWith("PROGRESS:", StringComparison.Ordinal) && l.Contains("Installing workload 'Test.Workload'", StringComparison.Ordinal));
+        _interaction.Lines.Should().Contain(l => l == "PROGRESS: Resolving workload 'Test.Workload'");
+        _interaction.Lines.Should().Contain(l => l == "PROGRESS: Downloading 'test.workload' 1.0.0");
+        _interaction.Lines.Should().Contain(l => l == "PROGRESS: Extracting workload 'test.workload' 1.0.0");
+        _interaction.Lines.Should().Contain(l => l == "PROGRESS: Registering workload 'test.workload' 1.0.0");
     }
 
     private void StubCatalogResult(bool alreadyInstalled = false, string packageId = "test.workload") =>
@@ -519,7 +509,7 @@ public class WorkloadInstallNextStepsHintTests
 
         await InvokeAsync(NewInstall(), packageId);
 
-        Assert.Contains(_interaction.Lines, l =>
+        _interaction.Lines.Should().Contain(l =>
             l.StartsWith("HINT:", StringComparison.Ordinal)
             && l.Contains("Next steps:", StringComparison.Ordinal)
             && l.Contains($"func setup --features {expectedFeature}", StringComparison.Ordinal));
@@ -532,7 +522,7 @@ public class WorkloadInstallNextStepsHintTests
 
         await InvokeAsync(NewInstall(), IInstalledBundleWorkloads.BundleWorkloadPackageId);
 
-        Assert.Contains(_interaction.Lines, l =>
+        _interaction.Lines.Should().Contain(l =>
             l.StartsWith("HINT:", StringComparison.Ordinal)
             && l.Contains("func setup --features runtime", StringComparison.Ordinal));
     }
@@ -545,7 +535,7 @@ public class WorkloadInstallNextStepsHintTests
 
         await InvokeAsync(NewInstall(), hostPackageId);
 
-        Assert.Contains(_interaction.Lines, l =>
+        _interaction.Lines.Should().Contain(l =>
             l.StartsWith("HINT:", StringComparison.Ordinal)
             && l.Contains("func setup --features host", StringComparison.Ordinal));
     }
@@ -557,7 +547,7 @@ public class WorkloadInstallNextStepsHintTests
 
         await InvokeAsync(NewInstall(), "Third.Party.Workload");
 
-        Assert.DoesNotContain(_interaction.Lines, l =>
+        _interaction.Lines.Should().NotContain(l =>
             l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Next steps:", StringComparison.Ordinal));
     }
 
@@ -568,7 +558,7 @@ public class WorkloadInstallNextStepsHintTests
 
         await InvokeAsync(NewInstall(), "Azure.Functions.Cli.Workloads.Workers.go");
 
-        Assert.DoesNotContain(_interaction.Lines, l =>
+        _interaction.Lines.Should().NotContain(l =>
             l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Next steps:", StringComparison.Ordinal));
     }
 
@@ -581,7 +571,7 @@ public class WorkloadInstallNextStepsHintTests
 
         await InvokeAsync(cmd, "Azure.Functions.Cli.Workloads.Workers.go");
 
-        Assert.DoesNotContain(nonInteractive.Lines, l =>
+        nonInteractive.Lines.Should().NotContain(l =>
             l.StartsWith("HINT:", StringComparison.Ordinal) && l.Contains("Next steps:", StringComparison.Ordinal));
     }
 

@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Quickstart;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Quickstart;
 
@@ -21,7 +20,7 @@ public class HttpTemplateFetcherTests
 
         string result = HttpTemplateFetcher.BuildArchiveUrl(entry);
 
-        Assert.Equal(expected, result);
+        result.Should().Be(expected);
     }
 
     [Fact]
@@ -31,8 +30,8 @@ public class HttpTemplateFetcherTests
 
         string result = HttpTemplateFetcher.BuildArchiveUrl(entry);
 
-        Assert.DoesNotContain("//archive", result);
-        Assert.Contains("/archive/refs/tags/v1.0.0.zip", result);
+        result.Should().NotContain("//archive");
+        result.Should().Contain("/archive/refs/tags/v1.0.0.zip");
     }
 
     [Fact]
@@ -40,9 +39,8 @@ public class HttpTemplateFetcherTests
     {
         QuickstartEntry entry = CreateEntry(repositoryUrl: "https://gitlab.com/org/repo");
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
-            () => HttpTemplateFetcher.BuildArchiveUrl(entry));
-        Assert.Contains("github.com", ex.Message);
+        InvalidOperationException ex = FluentActions.Invoking(() => HttpTemplateFetcher.BuildArchiveUrl(entry)).Should().ThrowExactly<InvalidOperationException>().Which;
+        ex.Message.Should().Contain("github.com");
     }
 
     [Fact]
@@ -55,8 +53,8 @@ public class HttpTemplateFetcherTests
         // Must contain exactly one occurrence of "refs/tags/"
         int firstIndex = result.IndexOf("refs/tags/", StringComparison.Ordinal);
         int secondIndex = result.IndexOf("refs/tags/", firstIndex + 1, StringComparison.Ordinal);
-        Assert.True(firstIndex >= 0, "URL should contain refs/tags/");
-        Assert.True(secondIndex < 0, "URL should not contain refs/tags/ twice");
+        (firstIndex >= 0).Should().BeTrue("URL should contain refs/tags/");
+        (secondIndex < 0).Should().BeTrue("URL should not contain refs/tags/ twice");
     }
 
     private static QuickstartEntry CreateEntry(

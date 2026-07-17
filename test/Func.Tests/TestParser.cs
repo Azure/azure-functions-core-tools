@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
-using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Workloads;

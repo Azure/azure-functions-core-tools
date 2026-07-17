@@ -10,6 +10,7 @@
   <!-- Enforce common packages for all test projects -->
   <!-- Intentionally use != false condition, so an explicit false value will skip the packages -->
   <ItemGroup Condition="'$(IsTestProject)' != 'false'">
+    <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
@@ -17,6 +18,9 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="NSubstitute" />
+
+    <Using Include="AwesomeAssertions" />
+    <Using Include="Xunit" />
   </ItemGroup>
 
 </Project>

@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -39,13 +38,13 @@ public class StartDashboardEventStreamFactoryTests
         IHostEventStream stream = factory.Create(OutputMode.Compact, initializationEvents, hostStream);
         HostLogEntry[] entries = await ReadAllAsync(stream);
 
-        Assert.Equal(2, entries.Length);
-        Assert.Equal("[startup]", entries[0].Category);
-        Assert.Equal("Resolve profile: None (no profile applied)", entries[0].Message);
-        Assert.Equal(LogLevel.Information, entries[0].Level);
-        Assert.Equal("start_initialization_step_completed", entries[0].GetAttribute<string>(HostLogAttributeKeys.CliEventKind));
-        Assert.Equal("Host.Startup", entries[1].Category);
-        Assert.Equal("Host ready", entries[1].Message);
+        entries.Length.Should().Be(2);
+        entries[0].Category.Should().Be("[startup]");
+        entries[0].Message.Should().Be("Resolve profile: None (no profile applied)");
+        entries[0].Level.Should().Be(LogLevel.Information);
+        entries[0].GetAttribute<string>(HostLogAttributeKeys.CliEventKind).Should().Be("start_initialization_step_completed");
+        entries[1].Category.Should().Be("Host.Startup");
+        entries[1].Message.Should().Be("Host ready");
     }
 
     [Theory]
@@ -66,7 +65,7 @@ public class StartDashboardEventStreamFactoryTests
 
         IHostEventStream stream = factory.Create(outputMode, initializationEvents, hostStream);
 
-        Assert.Same(hostStream, stream);
+        stream.Should().BeSameAs(hostStream);
     }
 
     [Fact]
@@ -78,10 +77,10 @@ public class StartDashboardEventStreamFactoryTests
 
         IHostEventStream stream = factory.Create(OutputMode.Compact, [], hostStream);
 
-        var lifecycle = Assert.IsAssignableFrom<IHostEventStreamLifecycle>(stream);
-        Assert.Equal(13, await lifecycle.WaitForExitAsync(CancellationToken.None));
+        var lifecycle = stream.Should().BeAssignableTo<IHostEventStreamLifecycle>().Subject;
+        (await lifecycle.WaitForExitAsync(CancellationToken.None)).Should().Be(13);
         await lifecycle.RequestShutdownAsync(CancellationToken.None);
-        Assert.True(hostStream.ShutdownRequested);
+        hostStream.ShutdownRequested.Should().BeTrue();
     }
 
     private static async Task<HostLogEntry[]> ReadAllAsync(IHostEventStream stream)

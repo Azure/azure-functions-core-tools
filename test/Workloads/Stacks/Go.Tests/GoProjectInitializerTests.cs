@@ -7,7 +7,6 @@ using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Go.Tests;
 
@@ -38,7 +37,7 @@ public class GoProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsGo()
     {
-        Assert.Equal("go", new GoProjectInitializer().Stack);
+        new GoProjectInitializer().Stack.Should().Be("go");
     }
 
     [Fact]
@@ -48,9 +47,9 @@ public class GoProjectInitializerTests : IDisposable
         IReadOnlyList<Option> options = new GoProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
-        Assert.Contains("--skip-go-mod-tidy", names);
-        Assert.Contains("--no-bundles", names);
-        Assert.Contains("--bundles-channel", names);
+        names.Should().Contain("--skip-go-mod-tidy");
+        names.Should().Contain("--no-bundles");
+        names.Should().Contain("--bundles-channel");
     }
 
     [Fact]
@@ -59,20 +58,20 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: "my-go-app", force: false);
 
         string goMod = File.ReadAllText(Path.Combine(_projectDir.FullName, "go.mod"));
-        Assert.Contains("module my-go-app", goMod);
-        Assert.Contains("go 1.24", goMod);
+        goMod.Should().Contain("module my-go-app");
+        goMod.Should().Contain("go 1.24");
         // go.mod intentionally omits a `require` line; `go mod tidy` resolves it from main.go imports.
-        Assert.DoesNotContain("require", goMod);
+        goMod.Should().NotContain("require");
 
         string mainGo = File.ReadAllText(Path.Combine(_projectDir.FullName, "main.go"));
-        Assert.Contains("github.com/azure/azure-functions-golang-worker/sdk", mainGo);
-        Assert.Contains("worker.Start", mainGo);
+        mainGo.Should().Contain("github.com/azure/azure-functions-golang-worker/sdk");
+        mainGo.Should().Contain("worker.Start");
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, ".funcignore")));
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")));
+        File.Exists(Path.Combine(_projectDir.FullName, ".funcignore")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")).Should().BeTrue();
 
         using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "local.settings.json")));
-        Assert.Equal("native", settings.RootElement.GetProperty("Values").GetProperty("FUNCTIONS_WORKER_RUNTIME").GetString());
+        settings.RootElement.GetProperty("Values").GetProperty("FUNCTIONS_WORKER_RUNTIME").GetString().Should().Be("native");
     }
 
     [Fact]
@@ -81,7 +80,7 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: null, force: false);
 
         string goMod = File.ReadAllText(Path.Combine(_projectDir.FullName, "go.mod"));
-        Assert.Matches(@"^module \S+", goMod);
+        goMod.Should().MatchRegex(@"^module \S+");
     }
 
     [Fact]
@@ -92,12 +91,12 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: "my-go-app", force: false);
 
         var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
-        Assert.NotNull(root);
-        Assert.Equal("2.0", root!["version"]!.GetValue<string>());
+        root.Should().NotBeNull();
+        root!["version"]!.GetValue<string>().Should().Be("2.0");
         JsonNode? bundle = root["extensionBundle"];
-        Assert.NotNull(bundle);
-        Assert.Equal("Microsoft.Azure.Functions.ExtensionBundle", bundle!["id"]!.GetValue<string>());
-        Assert.Equal("[4.*, 5.0.0)", bundle["version"]!.GetValue<string>());
+        bundle.Should().NotBeNull();
+        bundle!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle");
+        bundle["version"]!.GetValue<string>().Should().Be("[4.*, 5.0.0)");
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: "my-go-app", force: false);
 
         JsonNode? bundle = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")))!["extensionBundle"];
-        Assert.Equal("custom", bundle!["id"]!.GetValue<string>());
+        bundle!["id"]!.GetValue<string>().Should().Be("custom");
     }
 
     [Fact]
@@ -118,9 +117,7 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: "my-go-app", force: false);
 
         var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
-        Assert.Equal(
-            "Microsoft.Azure.Functions.ExtensionBundle",
-            root!["extensionBundle"]!["id"]!.GetValue<string>());
+        root!["extensionBundle"]!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle");
     }
 
     [Fact]
@@ -129,9 +126,7 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: "my-go-app", force: false, args: ["--bundles-channel", "Preview"]);
 
         var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
-        Assert.Equal(
-            "Microsoft.Azure.Functions.ExtensionBundle.Preview",
-            root!["extensionBundle"]!["id"]!.GetValue<string>());
+        root!["extensionBundle"]!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Preview");
     }
 
     [Fact]
@@ -140,9 +135,7 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: "my-go-app", force: false, args: ["--bundles-channel", "Experimental"]);
 
         var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
-        Assert.Equal(
-            "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
-            root!["extensionBundle"]!["id"]!.GetValue<string>());
+        root!["extensionBundle"]!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Experimental");
     }
 
     [Fact]
@@ -151,10 +144,10 @@ public class GoProjectInitializerTests : IDisposable
         await RunAsync(projectName: "my-go-app", force: false, args: ["--no-bundles"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
+        File.Exists(hostJsonPath).Should().BeTrue("host.json should be created even with --no-bundles");
         string content = File.ReadAllText(hostJsonPath);
-        Assert.Contains("\"version\"", content);
-        Assert.DoesNotContain("extensionBundle", content);
+        content.Should().Contain("\"version\"");
+        content.Should().NotContain("extensionBundle");
     }
 
     [Fact]
@@ -166,7 +159,7 @@ public class GoProjectInitializerTests : IDisposable
 
         await RunAsync(projectName: "my-go-app", force: false);
 
-        Assert.Equal(userEdit, File.ReadAllText(Path.Combine(_projectDir.FullName, "main.go")));
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "main.go")).Should().Be(userEdit);
     }
 
     [Fact]
@@ -177,7 +170,7 @@ public class GoProjectInitializerTests : IDisposable
 
         await RunAsync(projectName: "my-go-app", force: true);
 
-        Assert.Contains("worker.Start", File.ReadAllText(Path.Combine(_projectDir.FullName, "main.go")));
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "main.go")).Should().Contain("worker.Start");
     }
 
     [Fact]
@@ -196,7 +189,7 @@ public class GoProjectInitializerTests : IDisposable
         initializer.GetInitOptions(new InitOptionRegistry(root));
 
         await initializer.InitializeAsync(context, root.Parse("--skip-go-mod-tidy"));
-        Assert.Equal(0, calls);
+        calls.Should().Be(0);
     }
 
     [Fact]
@@ -215,7 +208,7 @@ public class GoProjectInitializerTests : IDisposable
         initializer.GetInitOptions(new InitOptionRegistry(root));
 
         await initializer.InitializeAsync(context, root.Parse(string.Empty));
-        Assert.Equal(1, calls);
+        calls.Should().Be(1);
     }
 
     private Task RunAsync(string? projectName, bool force, string[]? args = null)

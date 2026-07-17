@@ -4,7 +4,6 @@
 using System.Reflection;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Spectre.Console;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard;
 
@@ -18,7 +17,7 @@ public class FunctionPaletteTests
         var first = palette.GetColorFor("HttpTrigger1");
         var second = palette.GetColorFor("HttpTrigger1");
 
-        Assert.Equal(first, second);
+        second.Should().Be(first);
     }
 
     [Fact]
@@ -27,7 +26,7 @@ public class FunctionPaletteTests
         var a = new FunctionPalette();
         var b = new FunctionPalette();
 
-        Assert.Equal(a.GetColorFor("Login"), b.GetColorFor("Login"));
+        b.GetColorFor("Login").Should().Be(a.GetColorFor("Login"));
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public class FunctionPaletteTests
         }.Select(palette.GetColorFor).Distinct().ToList();
 
         // The expanded palette should provide useful variety for common apps.
-        Assert.True(colors.Count >= 8, $"Expected at least 8 distinct colors, got {colors.Count}: {string.Join(",", colors)}");
+        (colors.Count >= 8).Should().BeTrue($"Expected at least 8 distinct colors, got {colors.Count}: {string.Join(",", colors)}");
     }
 
     [Fact]
@@ -51,9 +50,9 @@ public class FunctionPaletteTests
     {
         string[] colors = GetPaletteColors();
 
-        Assert.True(colors.Length >= 32, $"Expected at least 32 palette entries, got {colors.Length}.");
-        Assert.Equal(colors.Length, colors.Distinct(StringComparer.OrdinalIgnoreCase).Count());
-        Assert.DoesNotContain(colors, static color => color.Contains("red", StringComparison.OrdinalIgnoreCase));
+        (colors.Length >= 32).Should().BeTrue($"Expected at least 32 palette entries, got {colors.Length}.");
+        colors.Distinct(StringComparer.OrdinalIgnoreCase).Count().Should().Be(colors.Length);
+        colors.Should().NotContain(static color => color.Contains("red", StringComparison.OrdinalIgnoreCase));
 
         var writer = new StringWriter();
         IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
@@ -68,7 +67,7 @@ public class FunctionPaletteTests
         {
             writer.GetStringBuilder().Clear();
             console.Write(new Markup($"[{color}]sample[/]"));
-            Assert.Equal("sample", writer.ToString());
+            writer.ToString().Should().Be("sample");
         }
     }
 

@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workers;
 
@@ -38,11 +37,11 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("node", resolved.Worker.Id.Value);
-        Assert.Equal("node", resolved.Worker.WorkerRuntime);
-        Assert.Equal(Path.Combine(workload.ContentRoot, "worker.config.json"), resolved.Worker.WorkerConfigPath);
-        Assert.Equal("3.13.0", resolved.Worker.Version);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Id.Value.Should().Be("node");
+        resolved.Worker.WorkerRuntime.Should().Be("node");
+        resolved.Worker.WorkerConfigPath.Should().Be(Path.Combine(workload.ContentRoot, "worker.config.json"));
+        resolved.Worker.Version.Should().Be("3.13.0");
     }
 
     [Fact]
@@ -57,9 +56,9 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("3.13.0", resolved.Worker.Version);
-        Assert.Equal(Path.Combine(newer.ContentRoot, "worker.config.json"), resolved.Worker.WorkerConfigPath);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Version.Should().Be("3.13.0");
+        resolved.Worker.WorkerConfigPath.Should().Be(Path.Combine(newer.ContentRoot, "worker.config.json"));
     }
 
     [Fact]
@@ -73,10 +72,10 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("node", resolved.Worker.Id.Value);
-        Assert.Equal("3.13.0", resolved.Worker.Version);
-        Assert.Equal(Path.Combine(workload.ContentRoot, "worker.config.json"), resolved.Worker.WorkerConfigPath);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Id.Value.Should().Be("node");
+        resolved.Worker.Version.Should().Be("3.13.0");
+        resolved.Worker.WorkerConfigPath.Should().Be(Path.Combine(workload.ContentRoot, "worker.config.json"));
     }
 
     [Fact]
@@ -90,10 +89,10 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("ruby"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("ruby", resolved.Worker.Id.Value);
-        Assert.Equal("ruby", resolved.Worker.WorkerRuntime);
-        Assert.Equal(Path.Combine(workload.ContentRoot, "worker.config.json"), resolved.Worker.WorkerConfigPath);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Id.Value.Should().Be("ruby");
+        resolved.Worker.WorkerRuntime.Should().Be("ruby");
+        resolved.Worker.WorkerConfigPath.Should().Be(Path.Combine(workload.ContentRoot, "worker.config.json"));
         _workloads.Received().GetContentWorkloadsByPackageId("Azure.Functions.Cli.Workloads.Workers.ruby");
     }
 
@@ -107,10 +106,10 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("python"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
         FunctionsWorkerResolutionFailure.NotInstalled failure =
-            Assert.IsType<FunctionsWorkerResolutionFailure.NotInstalled>(notResolved.Failure);
-        Assert.Equal("python", failure.WorkerId.Value);
+            notResolved.Failure.Should().BeOfType<FunctionsWorkerResolutionFailure.NotInstalled>().Subject;
+        failure.WorkerId.Value.Should().Be("python");
     }
 
     [Fact]
@@ -123,11 +122,11 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("ruby"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
         FunctionsWorkerResolutionFailure.NotInstalled failure =
-            Assert.IsType<FunctionsWorkerResolutionFailure.NotInstalled>(notResolved.Failure);
-        Assert.Equal("ruby", failure.WorkerId.Value);
-        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.ruby --exact", failure.Message);
+            notResolved.Failure.Should().BeOfType<FunctionsWorkerResolutionFailure.NotInstalled>().Subject;
+        failure.WorkerId.Value.Should().Be("ruby");
+        failure.Message.Should().Contain("func workload install Azure.Functions.Cli.Workloads.Workers.ruby --exact");
     }
 
     [Fact]
@@ -140,12 +139,12 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
         FunctionsWorkerResolutionFailure.MissingCompatibleVersion failure =
-            Assert.IsType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>(notResolved.Failure);
-        Assert.Equal("node", failure.WorkerId.Value);
-        Assert.Null(failure.VersionConstraint);
-        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.node --exact --force", failure.Message);
+            notResolved.Failure.Should().BeOfType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>().Subject;
+        failure.WorkerId.Value.Should().Be("node");
+        failure.VersionConstraint.Should().BeNull();
+        failure.Message.Should().Contain("func workload install Azure.Functions.Cli.Workloads.Workers.node --exact --force");
         _fileSystem.DidNotReceive().FileExists(Arg.Any<string>());
     }
 
@@ -159,10 +158,10 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("go"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("go", resolved.Worker.Id.Value);
-        Assert.Equal("go", resolved.Worker.WorkerRuntime);
-        Assert.Equal("0.1.0", resolved.Worker.Version);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Id.Value.Should().Be("go");
+        resolved.Worker.WorkerRuntime.Should().Be("go");
+        resolved.Worker.Version.Should().Be("0.1.0");
     }
 
     [Fact]
@@ -182,8 +181,8 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("3.13.0", resolved.Worker.Version);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Version.Should().Be("3.13.0");
     }
 
     [Fact]
@@ -200,11 +199,11 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
         FunctionsWorkerResolutionFailure.MissingCompatibleVersion failure =
-            Assert.IsType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>(notResolved.Failure);
-        Assert.Equal("[3.13.0]", failure.VersionConstraint);
-        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.node --exact", failure.Message);
+            notResolved.Failure.Should().BeOfType<FunctionsWorkerResolutionFailure.MissingCompatibleVersion>().Subject;
+        failure.VersionConstraint.Should().Be("[3.13.0]");
+        failure.Message.Should().Contain("func workload install Azure.Functions.Cli.Workloads.Workers.node --exact");
     }
 
     [Fact]
@@ -220,14 +219,14 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("python"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
+        FunctionsWorkerResolutionResult.NotResolved notResolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
         FunctionsWorkerResolutionFailure.InvalidInstallation failure =
-            Assert.IsType<FunctionsWorkerResolutionFailure.InvalidInstallation>(notResolved.Failure);
-        Assert.Equal("python", failure.WorkerId.Value);
-        Assert.Equal(PythonWorkerPackageId, failure.PackageId);
-        Assert.Equal("4.43.0", failure.PackageVersion);
-        Assert.Equal(workerConfigPath, failure.WorkerConfigPath);
-        Assert.Contains("func workload install Azure.Functions.Cli.Workloads.Workers.python --exact --force", failure.Message);
+            notResolved.Failure.Should().BeOfType<FunctionsWorkerResolutionFailure.InvalidInstallation>().Subject;
+        failure.WorkerId.Value.Should().Be("python");
+        failure.PackageId.Should().Be(PythonWorkerPackageId);
+        failure.PackageVersion.Should().Be("4.43.0");
+        failure.WorkerConfigPath.Should().Be(workerConfigPath);
+        failure.Message.Should().Contain("func workload install Azure.Functions.Cli.Workloads.Workers.python --exact --force");
     }
 
     [Fact]
@@ -237,8 +236,7 @@ public class DefaultFunctionsWorkerResolverTests
         source.Cancel();
         DefaultFunctionsWorkerResolver resolver = CreateResolver();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await resolver.ResolveWorkerAsync(new FunctionsWorkerId("node"), source.Token));
+        await FluentActions.Awaiting(async () => await resolver.ResolveWorkerAsync(new FunctionsWorkerId("node"), source.Token)).Should().ThrowAsync<OperationCanceledException>();
         _workloads.DidNotReceive().GetContentWorkloadsByPackageId(Arg.Any<string>());
     }
 
@@ -247,33 +245,31 @@ public class DefaultFunctionsWorkerResolverTests
     {
         DefaultFunctionsWorkerResolver resolver = CreateResolver();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            async () => await resolver.ResolveWorkerAsync(null!, CancellationToken.None));
+        await FluentActions.Awaiting(async () => await resolver.ResolveWorkerAsync(null!, CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
     public void Ctor_NullWorkloadProvider_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerResolver(null!, CreateContentResolver()));
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerResolver(null!, CreateContentResolver())).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Ctor_NullContentResolver_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerResolver(_workloads, null!));
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerResolver(_workloads, null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void ContentResolverCtor_NullWorkerConfigFileSystem_Throws()
     {
-        Assert.Throws<ArgumentNullException>(
-            () => new DefaultFunctionsWorkerContentResolver(null!, Options.Create(new WorkloadCatalogOptions())));
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerContentResolver(null!, Options.Create(new WorkloadCatalogOptions()))).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void ContentResolverCtor_NullCatalogOptions_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerContentResolver(_fileSystem, null!));
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerContentResolver(_fileSystem, null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -293,8 +289,8 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("3.13.0-preview.1", resolved.Worker.Version);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Version.Should().Be("3.13.0-preview.1");
     }
 
     [Fact]
@@ -311,7 +307,7 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(result);
+        result.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>();
     }
 
     private void UseContentWorkloads(params ContentWorkloadInfo[] workloads)

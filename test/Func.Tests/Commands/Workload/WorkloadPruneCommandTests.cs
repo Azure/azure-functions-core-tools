@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
@@ -20,8 +19,8 @@ public class WorkloadPruneCommandTests
     public void Prune_HasExpectedArgsAndOptions()
     {
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
-        Assert.Single(cmd.Arguments, a => a.Name == "id");
-        Assert.Contains(cmd.Options, o => o.Name == "--exact");
+        cmd.Arguments.Should().ContainSingle(a => a.Name == "id");
+        cmd.Options.Should().Contain(o => o.Name == "--exact");
     }
 
     [Fact]
@@ -32,8 +31,8 @@ public class WorkloadPruneCommandTests
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:") && l.Contains("No workloads installed"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("HINT:") && l.Contains("No workloads installed"));
         await _installer.DidNotReceive().UninstallAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -50,8 +49,8 @@ public class WorkloadPruneCommandTests
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:") && l.Contains("Nothing to prune"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("HINT:") && l.Contains("Nothing to prune"));
         await _installer.DidNotReceive().UninstallAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -71,7 +70,7 @@ public class WorkloadPruneCommandTests
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("Pkg.A", "1.5.0", Arg.Any<CancellationToken>());
         await _installer.Received(1).UninstallAsync("Pkg.A", "1.0.0", Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().UninstallAsync("Pkg.A", "2.0.0", Arg.Any<CancellationToken>());
@@ -93,7 +92,7 @@ public class WorkloadPruneCommandTests
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "Pkg.A");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("Pkg.A", "1.0.0", Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().UninstallAsync("Pkg.B", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -112,7 +111,7 @@ public class WorkloadPruneCommandTests
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "a");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("Pkg.A", "1.0.0", Arg.Any<CancellationToken>());
     }
 
@@ -128,8 +127,8 @@ public class WorkloadPruneCommandTests
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "a", "--exact");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("'a' is not installed"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("'a' is not installed"));
         await _installer.DidNotReceive().UninstallAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -140,7 +139,7 @@ public class WorkloadPruneCommandTests
         var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
         int exit = await InvokeAsync(cmd, "   ");
 
-        Assert.NotEqual(0, exit);
+        exit.Should().NotBe(0);
         await _store.DidNotReceive().GetWorkloadsAsync(Arg.Any<CancellationToken>());
     }
 

@@ -5,7 +5,6 @@ using System.Diagnostics;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -30,18 +29,18 @@ public class HostProcessEventStreamTests
         HostLogEntry[] entries = await ReadAllAsync(stream);
         int exitCode = await stream.WaitForExitAsync(CancellationToken.None);
 
-        Assert.Equal(23, exitCode);
-        Assert.True(process.Disposed);
-        Assert.Equal(3, entries.Length);
-        Assert.Equal("Host.Process", entries[0].Category);
-        Assert.Equal(LogLevel.Information, entries[0].Level);
-        Assert.Contains("http://localhost:7071", entries[0].Message);
-        Assert.Equal(HostProcessStreamNames.Cli, entries[0].GetAttribute<string>(HostLogAttributeKeys.Stream));
-        Assert.Contains(entries, entry =>
+        exitCode.Should().Be(23);
+        process.Disposed.Should().BeTrue();
+        entries.Length.Should().Be(3);
+        entries[0].Category.Should().Be("Host.Process");
+        entries[0].Level.Should().Be(LogLevel.Information);
+        entries[0].Message.Should().Contain("http://localhost:7071");
+        entries[0].GetAttribute<string>(HostLogAttributeKeys.Stream).Should().Be(HostProcessStreamNames.Cli);
+        entries.Should().Contain(entry =>
             entry.Message == "stdout line"
             && entry.Level == LogLevel.Information
             && entry.GetAttribute<string>(HostLogAttributeKeys.Stream) == HostProcessStreamNames.StandardOutput);
-        Assert.Contains(entries, entry =>
+        entries.Should().Contain(entry =>
             entry.Message == "stderr line"
             && entry.Level == LogLevel.Error
             && entry.GetAttribute<string>(HostLogAttributeKeys.Stream) == HostProcessStreamNames.StandardError);
@@ -59,9 +58,9 @@ public class HostProcessEventStreamTests
 
         await stream.RequestShutdownAsync(CancellationToken.None);
 
-        Assert.True(process.StandardInputDisposed);
-        Assert.True(process.KillTreeCalled);
-        Assert.True(process.Disposed);
+        process.StandardInputDisposed.Should().BeTrue();
+        process.KillTreeCalled.Should().BeTrue();
+        process.Disposed.Should().BeTrue();
     }
 
     [Fact]
@@ -76,9 +75,9 @@ public class HostProcessEventStreamTests
 
         await stream.DisposeAsync();
 
-        Assert.True(process.StandardInputDisposed);
-        Assert.True(process.KillTreeCalled);
-        Assert.True(process.Disposed);
+        process.StandardInputDisposed.Should().BeTrue();
+        process.KillTreeCalled.Should().BeTrue();
+        process.Disposed.Should().BeTrue();
     }
 
     [Fact]
@@ -94,7 +93,7 @@ public class HostProcessEventStreamTests
         await stream.DisposeAsync();
         await stream.DisposeAsync();
 
-        Assert.Equal(1, process.KillTreeCallCount);
+        process.KillTreeCallCount.Should().Be(1);
     }
 
     private static async Task<HostLogEntry[]> ReadAllAsync(IHostEventStream stream)

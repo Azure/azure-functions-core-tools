@@ -10,7 +10,6 @@ using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Workers;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -36,9 +35,9 @@ public class NewCommandRunnerTests
 
         int exitCode = await runner.ExecuteAsync(invocation, CancellationToken.None);
 
-        Assert.Equal(1, exitCode);
+        exitCode.Should().Be(1);
         int hits = interaction.Lines.Count(l => l.Contains("Cannot determine language for stack"));
-        Assert.True(hits == 1, $"expected the missing-language error to be rendered exactly once, but it was rendered {hits} times. Output:\n{interaction.AllOutput}");
+        (hits == 1).Should().BeTrue($"expected the missing-language error to be rendered exactly once, but it was rendered {hits} times. Output:\n{interaction.AllOutput}");
     }
 
     [Fact]
@@ -57,9 +56,9 @@ public class NewCommandRunnerTests
 
         int exitCode = await runner.ListAsync(invocation, CancellationToken.None);
 
-        Assert.Equal(1, exitCode);
+        exitCode.Should().Be(1);
         int hits = interaction.Lines.Count(l => l.Contains("Cannot determine language for stack"));
-        Assert.True(hits == 1, $"expected the missing-language error to be rendered exactly once, but it was rendered {hits} times. Output:\n{interaction.AllOutput}");
+        (hits == 1).Should().BeTrue($"expected the missing-language error to be rendered exactly once, but it was rendered {hits} times. Output:\n{interaction.AllOutput}");
     }
 
     [Fact]
@@ -85,10 +84,10 @@ public class NewCommandRunnerTests
 
         int exitCode = await runner.ListAsync(invocation, CancellationToken.None);
 
-        Assert.Equal(1, exitCode);
-        Assert.Contains(interaction.Lines, l =>
+        exitCode.Should().Be(1);
+        interaction.Lines.Should().Contain(l =>
             l.Contains("WARNING") && l.Contains("preview") && l.Contains(BundleHelpers.PreviewBundleId));
-        Assert.DoesNotContain(interaction.Lines, l =>
+        interaction.Lines.Should().NotContain(l =>
             l.Contains("No installed templates workload matches"));
     }
 
@@ -114,8 +113,8 @@ public class NewCommandRunnerTests
 
         int exitCode = await runner.ListAsync(invocation, CancellationToken.None);
 
-        Assert.Equal(1, exitCode);
-        Assert.Contains(interaction.Lines, l => l.Contains("No installed templates workload matches"));
+        exitCode.Should().Be(1);
+        interaction.Lines.Should().Contain(l => l.Contains("No installed templates workload matches"));
     }
 
     private static NewCommandRunner BuildRunnerForMissingLanguage(TestInteractionService interaction)

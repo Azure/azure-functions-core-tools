@@ -5,13 +5,10 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Commands.Setup;
-using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Update;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
-using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 

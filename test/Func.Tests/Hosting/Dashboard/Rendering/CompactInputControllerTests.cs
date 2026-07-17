@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -25,9 +24,9 @@ public class CompactInputControllerTests
             logScrollStep: 3,
             maxLogScrollOffset: 200);
 
-        Assert.True(result.Handled);
-        Assert.True(state.HelpOpen);
-        Assert.False(state.FunctionBrowserOpen);
+        result.Handled.Should().BeTrue();
+        state.HelpOpen.Should().BeTrue();
+        state.FunctionBrowserOpen.Should().BeFalse();
     }
 
     [Fact]
@@ -49,9 +48,9 @@ public class CompactInputControllerTests
             logScrollStep: 3,
             maxLogScrollOffset: 200);
 
-        Assert.True(result.Handled);
-        Assert.False(state.FunctionSearchOpen);
-        Assert.Equal("QueueProcessor", state.ActiveFunctionFilter);
+        result.Handled.Should().BeTrue();
+        state.FunctionSearchOpen.Should().BeFalse();
+        state.ActiveFunctionFilter.Should().Be("QueueProcessor");
     }
 
     [Fact]
@@ -68,9 +67,9 @@ public class CompactInputControllerTests
             logScrollStep: 3,
             maxLogScrollOffset: 200);
 
-        Assert.True(result.Handled);
-        Assert.True(result.ClearLogsRequested);
-        Assert.Equal(0, state.LogScrollOffset);
+        result.Handled.Should().BeTrue();
+        result.ClearLogsRequested.Should().BeTrue();
+        state.LogScrollOffset.Should().Be(0);
     }
 
     [Fact]
@@ -87,8 +86,8 @@ public class CompactInputControllerTests
             logScrollStep: 3,
             maxLogScrollOffset: 200);
 
-        Assert.True(result.Handled);
-        Assert.Equal(LogLevel.Warning, state.MinimumLogLevel);
+        result.Handled.Should().BeTrue();
+        state.MinimumLogLevel.Should().Be(LogLevel.Warning);
     }
 
     [Fact]
@@ -113,9 +112,9 @@ public class CompactInputControllerTests
             logScrollStep: 3,
             maxLogScrollOffset: 200);
 
-        Assert.True(upResult.Handled);
-        Assert.True(downResult.Handled);
-        Assert.Equal(2, state.LogScrollOffset);
+        upResult.Handled.Should().BeTrue();
+        downResult.Handled.Should().BeTrue();
+        state.LogScrollOffset.Should().Be(2);
     }
 
     [Fact]
@@ -140,9 +139,9 @@ public class CompactInputControllerTests
             logScrollStep: 3,
             maxLogScrollOffset: 200);
 
-        Assert.True(pageUpResult.Handled);
-        Assert.True(pageDownResult.Handled);
-        Assert.Equal(2, state.LogScrollOffset);
+        pageUpResult.Handled.Should().BeTrue();
+        pageDownResult.Handled.Should().BeTrue();
+        state.LogScrollOffset.Should().Be(2);
     }
 
     private static CompactInputController CreateController()

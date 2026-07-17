@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting;
 
@@ -18,7 +17,7 @@ public class FuncAliasNudgeTests
 
         new FuncAliasNudge(interaction, version).TryPrint(exitCode: 1, commandName: "init");
 
-        Assert.Contains(interaction.Lines, l => l.Contains("func5", StringComparison.Ordinal));
+        interaction.Lines.Should().Contain(l => l.Contains("func5", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -31,7 +30,7 @@ public class FuncAliasNudgeTests
 
         new FuncAliasNudge(interaction, version).TryPrint(exitCode: 0, commandName: commandName);
 
-        Assert.Contains(interaction.Lines, l => l.Contains("func5", StringComparison.Ordinal));
+        interaction.Lines.Should().Contain(l => l.Contains("func5", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -46,7 +45,7 @@ public class FuncAliasNudgeTests
 
         new FuncAliasNudge(interaction, version).TryPrint(exitCode: 0, commandName: commandName);
 
-        Assert.Empty(interaction.Lines);
+        interaction.Lines.Should().BeEmpty();
     }
 
     [Fact]
@@ -57,7 +56,7 @@ public class FuncAliasNudgeTests
 
         new FuncAliasNudge(interaction, version).TryPrint(exitCode: 1, commandName: "help");
 
-        Assert.Empty(interaction.Lines);
+        interaction.Lines.Should().BeEmpty();
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public class FuncAliasNudgeTests
 
         new FuncAliasNudge(interaction, version).TryPrint(exitCode: 1, commandName: "help");
 
-        Assert.Empty(interaction.Lines);
+        interaction.Lines.Should().BeEmpty();
     }
 
     [Fact]
@@ -77,8 +76,8 @@ public class FuncAliasNudgeTests
         var interaction = new InteractiveTestInteractionService();
         ICliVersionProvider version = Substitute.For<ICliVersionProvider>();
 
-        Assert.Throws<ArgumentNullException>(() => new FuncAliasNudge(null!, version));
-        Assert.Throws<ArgumentNullException>(() => new FuncAliasNudge(interaction, null!));
+        FluentActions.Invoking(() => new FuncAliasNudge(null!, version)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new FuncAliasNudge(interaction, null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     private static ICliVersionProvider Version(bool isPrerelease)

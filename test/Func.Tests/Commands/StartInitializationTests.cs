@@ -26,7 +26,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NuGet.Versioning;
 using Spectre.Console;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -71,11 +70,11 @@ public class StartInitializationTests : IDisposable
 
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
-        Assert.Equal(".NET", result.RunInfo.StackName);
-        Assert.Equal("4.834.0", result.HostVersion);
-        Assert.False(result.BundleRequired);
-        Assert.IsType<DemoEventSource>(result.EventStream);
-        Assert.Contains(renderer.Events, static ev =>
+        result.RunInfo.StackName.Should().Be(".NET");
+        result.HostVersion.Should().Be("4.834.0");
+        result.BundleRequired.Should().BeFalse();
+        result.EventStream.Should().BeOfType<DemoEventSource>();
+        renderer.Events.Any(static ev =>
             ev is StartInitializationStepStartedEvent
             {
                 Step:
@@ -83,13 +82,13 @@ public class StartInitializationTests : IDisposable
                     Id: InstallHostWorkloadInitializationStep.StepId,
                     DisplayKind: StartInitializationDisplayKind.Progress,
                 },
-            });
-        Assert.Contains(renderer.Events, static ev =>
+            }).Should().BeTrue();
+        renderer.Events.Any(static ev =>
             ev is StartInitializationProgressEvent
             {
                 StepId: InstallHostWorkloadInitializationStep.StepId,
                 Percent: 100,
-            });
+            }).Should().BeTrue();
     }
 
     [Fact]
@@ -114,9 +113,9 @@ public class StartInitializationTests : IDisposable
         int installStartedIndex = FindStartedStepIndex(renderer.Events, InstallHostWorkloadInitializationStep.StepId);
         int stackStartedIndex = FindStartedStepIndex(renderer.Events, ResolveFunctionsProjectInitializationStep.StepId);
 
-        Assert.True(validationCompletedIndex >= 0);
-        Assert.True(installStartedIndex > validationCompletedIndex);
-        Assert.True(stackStartedIndex > installStartedIndex);
+        (validationCompletedIndex >= 0).Should().BeTrue();
+        (installStartedIndex > validationCompletedIndex).Should().BeTrue();
+        (stackStartedIndex > installStartedIndex).Should().BeTrue();
     }
 
     [Fact]
@@ -142,12 +141,12 @@ public class StartInitializationTests : IDisposable
         int prepareStartedIndex = FindStartedStepIndex(renderer.Events, PrepareProjectHostRunInitializationStep.StepId);
         int startHostStartedIndex = FindStartedStepIndex(renderer.Events, StartHostInitializationStep.StepId);
 
-        Assert.True(prepareStartedIndex >= 0);
-        Assert.True(startHostStartedIndex > prepareStartedIndex);
-        Assert.Same(project, result.Project);
-        Assert.Same(result.HostRunContext, project.PreparedContexts.Single());
-        Assert.Equal(startupDirectory.FullName, result.HostRunContext.StartupDirectory.FullName);
-        Assert.Equal("dotnet-isolated", result.HostRunContext.WorkerRuntime);
+        (prepareStartedIndex >= 0).Should().BeTrue();
+        (startHostStartedIndex > prepareStartedIndex).Should().BeTrue();
+        result.Project.Should().BeSameAs(project);
+        project.PreparedContexts.Single().Should().BeSameAs(result.HostRunContext);
+        result.HostRunContext.StartupDirectory.FullName.Should().Be(startupDirectory.FullName);
+        result.HostRunContext.WorkerRuntime.Should().Be("dotnet-isolated");
     }
 
     [Fact]
@@ -191,9 +190,9 @@ public class StartInitializationTests : IDisposable
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
         IDictionary<string, string> env = result.HostRunContext.EnvironmentVariables;
-        Assert.Equal("yes", env["FROM_LOCAL"]);
-        Assert.Equal("node", env["FUNCTIONS_WORKER_RUNTIME"]);
-        Assert.Equal(workerDir, env["languageWorkers__node__workerDirectory"]);
+        env["FROM_LOCAL"].Should().Be("yes");
+        env["FUNCTIONS_WORKER_RUNTIME"].Should().Be("node");
+        env["languageWorkers__node__workerDirectory"].Should().Be(workerDir);
     }
 
     [Fact]
@@ -233,7 +232,7 @@ public class StartInitializationTests : IDisposable
 
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
-        Assert.Same(eventStream, result.EventStream);
+        result.EventStream.Should().BeSameAs(eventStream);
         await hostProcessRunner.Received(1).StartAsync(
             Arg.Is<HostProcessStartContext>(startContext =>
                 ReferenceEquals(startContext.HostWorkload, hostWorkload)
@@ -293,14 +292,14 @@ public class StartInitializationTests : IDisposable
 
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
-        Assert.Equal("local-dev", result.HostVersion);
-        Assert.Same(eventStream, result.EventStream);
-        Assert.NotNull(capturedStartContext);
+        result.HostVersion.Should().Be("local-dev");
+        result.EventStream.Should().BeSameAs(eventStream);
+        capturedStartContext.Should().NotBeNull();
         HostProcessStartContext startContext = capturedStartContext!;
-        Assert.Equal(contentRoot, startContext.HostWorkload.ContentRoot);
-        Assert.Equal("Azure.Functions.Cli.Workloads.Host.local", startContext.HostWorkload.PackageId);
-        Assert.Contains("host", startContext.HostWorkload.Aliases);
-        Assert.Equal(-1, FindStartedStepIndex(renderer.Events, InstallHostWorkloadInitializationStep.StepId));
+        startContext.HostWorkload.ContentRoot.Should().Be(contentRoot);
+        startContext.HostWorkload.PackageId.Should().Be("Azure.Functions.Cli.Workloads.Host.local");
+        startContext.HostWorkload.Aliases.Should().Contain("host");
+        FindStartedStepIndex(renderer.Events, InstallHostWorkloadInitializationStep.StepId).Should().Be(-1);
     }
 
     [Fact]
@@ -322,15 +321,14 @@ public class StartInitializationTests : IDisposable
             demoMode: false);
         var renderer = new RecordingStartInitializationRenderer();
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => runner.RunAsync(context, renderer, CancellationToken.None));
+        GracefulException ex = (await FluentActions.Awaiting(() => runner.RunAsync(context, renderer, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains(ValidateHostWorkloadInitializationStep.HostContentRootEnvironmentVariable, ex.Message);
-        Assert.Contains("host executable was not found", ex.Message);
-        Assert.Contains(renderer.Events, ev => ev is StartInitializationStepFailedEvent failed
+        ex.Message.Should().Contain(ValidateHostWorkloadInitializationStep.HostContentRootEnvironmentVariable);
+        ex.Message.Should().Contain("host executable was not found");
+        renderer.Events.Any(ev => ev is StartInitializationStepFailedEvent failed
             && failed.StepId == ValidateHostWorkloadInitializationStep.StepId
             && failed.Message is not null
-            && failed.Message.Contains("host executable was not found", StringComparison.Ordinal));
+            && failed.Message.Contains("host executable was not found", StringComparison.Ordinal)).Should().BeTrue();
     }
 
     [Fact]
@@ -382,8 +380,8 @@ public class StartInitializationTests : IDisposable
 
         StartInitializationResult result = await runner.RunAsync(context, renderer, CancellationToken.None);
 
-        Assert.Equal("flex", result.RunInfo.ProfileName);
-        Assert.Equal("4.1000.0", result.HostVersion);
+        result.RunInfo.ProfileName.Should().Be("flex");
+        result.HostVersion.Should().Be("4.1000.0");
         await hostWorkloadResolver.Received(1).ResolveAsync(
             Arg.Is<HostWorkloadResolutionContext>(hostContext =>
                 ReferenceEquals(hostContext.ProfileHostVersionRange, hostRange)),
@@ -443,9 +441,9 @@ public class StartInitializationTests : IDisposable
             renderer,
             CancellationToken.None);
 
-        Assert.Equal("node", result.Worker.WorkerRuntime);
-        Assert.Equal("3.13.0", result.Worker.Version);
-        Assert.Same(installedWorker, result.Worker);
+        result.Worker.WorkerRuntime.Should().Be("node");
+        result.Worker.Version.Should().Be("3.13.0");
+        result.Worker.Should().BeSameAs(installedWorker);
         await workerResolver.Received(1).ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>());
         await workerInstaller.Received(1)
             .InstallAsync(workerId, Arg.Is<IReadOnlyDictionary<string, VersionRange>>(ranges => HasWorkerRange(ranges, workerRange)), Arg.Any<CancellationToken>());
@@ -489,10 +487,9 @@ public class StartInitializationTests : IDisposable
             demoSpeedMultiplier: 0.001,
             demoAutoExit: true);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None));
+        GracefulException ex = (await FluentActions.Awaiting(() => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("does not support the detected runtime 'node'", ex.Message);
+        ex.Message.Should().Contain("does not support the detected runtime 'node'");
     }
 
     [Fact]
@@ -514,10 +511,9 @@ public class StartInitializationTests : IDisposable
             demoSpeedMultiplier: 0.001,
             demoAutoExit: true);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None));
+        GracefulException ex = (await FluentActions.Awaiting(() => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains(workerFailure.Message, ex.Message);
+        ex.Message.Should().Contain(workerFailure.Message);
         await projectResolver.Received(1).ResolveProjectAsync(
             Arg.Any<ProjectResolutionContext>(),
             Arg.Any<CancellationToken>());
@@ -547,14 +543,14 @@ public class StartInitializationTests : IDisposable
 
         string[] lines = Encoding.UTF8.GetString(stream.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.Equal(2, lines.Length);
+        lines.Length.Should().Be(2);
         using var started = JsonDocument.Parse(lines[0]);
-        Assert.Equal("start_initialization_started", started.RootElement.GetProperty("kind").GetString());
-        Assert.Equal("none", started.RootElement.GetProperty("profile").GetString());
+        started.RootElement.GetProperty("kind").GetString().Should().Be("start_initialization_started");
+        started.RootElement.GetProperty("profile").GetString().Should().Be("none");
         using var progress = JsonDocument.Parse(lines[1]);
-        Assert.Equal("start_initialization_progress", progress.RootElement.GetProperty("kind").GetString());
-        Assert.Equal(customStepId, progress.RootElement.GetProperty("step").GetString());
-        Assert.Equal(50, progress.RootElement.GetProperty("percent").GetDouble());
+        progress.RootElement.GetProperty("kind").GetString().Should().Be("start_initialization_progress");
+        progress.RootElement.GetProperty("step").GetString().Should().Be(customStepId);
+        progress.RootElement.GetProperty("percent").GetDouble().Should().Be(50);
     }
 
     [Fact]
@@ -571,15 +567,15 @@ public class StartInitializationTests : IDisposable
 
         string[] lines = Encoding.UTF8.GetString(stream.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.Equal(2, lines.Length);
+        lines.Length.Should().Be(2);
         using var log = JsonDocument.Parse(lines[0]);
-        Assert.Equal("start_initialization_log", log.RootElement.GetProperty("kind").GetString());
-        Assert.Equal("prepare", log.RootElement.GetProperty("step").GetString());
-        Assert.Equal("npm output", log.RootElement.GetProperty("line").GetString());
-        Assert.Equal("warning", log.RootElement.GetProperty("severity").GetString());
+        log.RootElement.GetProperty("kind").GetString().Should().Be("start_initialization_log");
+        log.RootElement.GetProperty("step").GetString().Should().Be("prepare");
+        log.RootElement.GetProperty("line").GetString().Should().Be("npm output");
+        log.RootElement.GetProperty("severity").GetString().Should().Be("warning");
         using var failed = JsonDocument.Parse(lines[1]);
-        Assert.Equal("start_initialization_step_failed", failed.RootElement.GetProperty("kind").GetString());
-        Assert.Equal("build failed", failed.RootElement.GetProperty("message").GetString());
+        failed.RootElement.GetProperty("kind").GetString().Should().Be("start_initialization_step_failed");
+        failed.RootElement.GetProperty("message").GetString().Should().Be("build failed");
     }
 
     [Fact]
@@ -591,7 +587,7 @@ public class StartInitializationTests : IDisposable
 
         await renderer.OnEventAsync(logEvent, CancellationToken.None);
 
-        Assert.Contains("[init] prepare  npm output", interaction.Lines);
+        interaction.Lines.Should().Contain("[init] prepare  npm output");
     }
 
     [Fact]
@@ -641,12 +637,12 @@ public class StartInitializationTests : IDisposable
         JsonElement root = document.RootElement;
         JsonElement profileDetails = root.GetProperty("profile_details");
 
-        Assert.Equal("start_initialization_completed", root.GetProperty("kind").GetString());
-        Assert.Equal("node", root.GetProperty("worker_runtime").GetString());
-        Assert.Equal("flex", profileDetails.GetProperty("name").GetString());
-        Assert.Equal("[1.8.1, 4.1048.200)", profileDetails.GetProperty("host_version_range").GetString());
-        Assert.Equal("[3.13.0]", profileDetails.GetProperty("worker_version_ranges").GetProperty("node").GetString());
-        Assert.Equal("warning", profileDetails.GetProperty("diagnostics")[0].GetProperty("severity").GetString());
+        root.GetProperty("kind").GetString().Should().Be("start_initialization_completed");
+        root.GetProperty("worker_runtime").GetString().Should().Be("node");
+        profileDetails.GetProperty("name").GetString().Should().Be("flex");
+        profileDetails.GetProperty("host_version_range").GetString().Should().Be("[1.8.1, 4.1048.200)");
+        profileDetails.GetProperty("worker_version_ranges").GetProperty("node").GetString().Should().Be("[3.13.0]");
+        profileDetails.GetProperty("diagnostics")[0].GetProperty("severity").GetString().Should().Be("warning");
     }
 
     [Fact]
@@ -707,14 +703,14 @@ public class StartInitializationTests : IDisposable
         string output = writer.ToString();
         string completedIcon = console.Profile.Capabilities.Unicode ? "\u2713" : "[x]";
 
-        Assert.Contains("Azure Functions CLI", output);
-        Assert.Contains("5.0.0-test", output);
-        Assert.Contains(completedIcon, output);
-        Assert.Contains("Resolve profile...", output);
-        Assert.Contains("Install host workload", output);
-        Assert.Contains(" 50%", output);
-        Assert.DoesNotContain("\u001b[2J", output);
-        Assert.Contains("Preparing download", output);
+        output.Should().Contain("Azure Functions CLI");
+        output.Should().Contain("5.0.0-test");
+        output.Should().Contain(completedIcon);
+        output.Should().Contain("Resolve profile...");
+        output.Should().Contain("Install host workload");
+        output.Should().Contain(" 50%");
+        output.Should().NotContain("\u001b[2J");
+        output.Should().Contain("Preparing download");
     }
 
     [Fact]
@@ -736,11 +732,11 @@ public class StartInitializationTests : IDisposable
         await WaitForOutputAsync(writer, output => output.Contains("entry 12", StringComparison.Ordinal));
         string runningOutput = writer.ToString();
 
-        Assert.Contains("running npm install", runningOutput);
-        Assert.DoesNotContain("entry 01", runningOutput);
-        Assert.DoesNotContain("entry 02", runningOutput);
-        Assert.Contains("entry 03", runningOutput);
-        Assert.Contains("entry 12", runningOutput);
+        runningOutput.Should().Contain("running npm install");
+        runningOutput.Should().NotContain("entry 01");
+        runningOutput.Should().NotContain("entry 02");
+        runningOutput.Should().Contain("entry 03");
+        runningOutput.Should().Contain("entry 12");
 
         await renderer.OnEventAsync(new StartInitializationStepCompletedEvent(DateTimeOffset.UnixEpoch, "prepare", "ready"), CancellationToken.None);
         await WaitForOutputAsync(writer, output => output.Contains("ready", StringComparison.Ordinal));
@@ -748,12 +744,12 @@ public class StartInitializationTests : IDisposable
         await renderer.DisposeAsync();
 
         string completedOutput = writer.ToString();
-        Assert.Contains("ready", completedOutput);
+        completedOutput.Should().Contain("ready");
 
         // On success the log area collapses entirely. The old collapsed summary row was the only place a
         // line count was followed by an ellipsis ("N lines…"), so its absence guards the full collapse.
         string ellipsis = console.Profile.Capabilities.Unicode ? "\u2026" : "...";
-        Assert.DoesNotContain($"lines{ellipsis}", completedOutput);
+        completedOutput.Should().NotContain($"lines{ellipsis}");
     }
 
     [Fact]
@@ -776,8 +772,8 @@ public class StartInitializationTests : IDisposable
         await renderer.DisposeAsync();
 
         string output = writer.ToString();
-        Assert.Contains("3 lines", output);
-        Assert.Contains("line 3", output);
+        output.Should().Contain("3 lines");
+        output.Should().Contain("line 3");
     }
 
     [Fact]
@@ -801,8 +797,8 @@ public class StartInitializationTests : IDisposable
         string output = writer.ToString();
 
         // No single rendered line should reach the untruncated length, so the full run never appears.
-        Assert.DoesNotContain(longLine, output);
-        Assert.Contains(ellipsis, output);
+        output.Should().NotContain(longLine);
+        output.Should().Contain(ellipsis);
     }
 
     [Fact]
@@ -823,9 +819,9 @@ public class StartInitializationTests : IDisposable
 
         string output = writer.ToString();
 
-        Assert.Contains("build failed", output);
-        Assert.Contains("error tail", output);
-        Assert.DoesNotContain("1 lines", output);
+        output.Should().Contain("build failed");
+        output.Should().Contain("error tail");
+        output.Should().NotContain("1 lines");
     }
 
     [Fact]
@@ -842,7 +838,7 @@ public class StartInitializationTests : IDisposable
 
             await renderer.OnEventAsync(startedEvent, CancellationToken.None);
 
-            Assert.DoesNotContain("\u001b[2J", writer.ToString());
+            writer.ToString().Should().NotContain("\u001b[2J");
         }
         finally
         {
@@ -876,8 +872,8 @@ public class StartInitializationTests : IDisposable
                 renderedFrameCount = spinner.Frames.Distinct().Count(frame => output.Contains(frame, StringComparison.Ordinal));
             }
 
-            Assert.True(renderedFrameCount >= 2, $"Expected multiple spinner frames, but saw {renderedFrameCount}. Output: {output}");
-            Assert.DoesNotContain("\r\u001b[2K", output);
+            (renderedFrameCount >= 2).Should().BeTrue($"Expected multiple spinner frames, but saw {renderedFrameCount}. Output: {output}");
+            output.Should().NotContain("\r\u001b[2K");
         }
         finally
         {
@@ -924,13 +920,13 @@ public class StartInitializationTests : IDisposable
 
             await Task.Delay(300);
 
-            Assert.True(statusIndex >= 0, $"Expected status output before prompt. Output: {outputDuringPrompt}");
-            Assert.True(promptIndex > statusIndex, $"Expected prompt to render after status output. Output: {outputDuringPrompt}");
-            Assert.DoesNotContain("\r\u001b[2K", outputDuringPrompt[statusIndex..promptIndex]);
-            Assert.Equal(outputDuringPrompt, writer.ToString());
+            (statusIndex >= 0).Should().BeTrue($"Expected status output before prompt. Output: {outputDuringPrompt}");
+            (promptIndex > statusIndex).Should().BeTrue($"Expected prompt to render after status output. Output: {outputDuringPrompt}");
+            outputDuringPrompt[statusIndex..promptIndex].Should().NotContain("\r\u001b[2K");
+            writer.ToString().Should().Be(outputDuringPrompt);
 
             promptResult.SetResult(true);
-            Assert.True(await confirmTask);
+            (await confirmTask).Should().BeTrue();
             await WaitForOutputAsync(writer, output => output.Length > outputDuringPrompt.Length);
         }
         finally
@@ -1033,7 +1029,7 @@ public class StartInitializationTests : IDisposable
             await Task.Delay(100);
         }
 
-        Assert.True(predicate(output), $"Expected output condition was not met. Output: {output}");
+        predicate(output).Should().BeTrue($"Expected output condition was not met. Output: {output}");
     }
 
     private static DemoStartInitializationRunner CreateRunner(

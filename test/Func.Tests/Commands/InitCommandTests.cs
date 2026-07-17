@@ -11,7 +11,6 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -53,10 +52,10 @@ public class InitCommandTests
         var cmd = CreateCommand([]);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
-        Assert.Contains("--stack", optionNames);
-        Assert.Contains("--name", optionNames);
-        Assert.Contains("--language", optionNames);
-        Assert.Contains("--force", optionNames);
+        optionNames.Should().Contain("--stack");
+        optionNames.Should().Contain("--name");
+        optionNames.Should().Contain("--language");
+        optionNames.Should().Contain("--force");
     }
 
     [Fact]
@@ -65,8 +64,8 @@ public class InitCommandTests
         var cmd = CreateCommand([]);
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        Assert.Contains("Set up a stack", description);
-        Assert.Contains("func setup --features", description);
+        description.Should().Contain("Set up a stack");
+        description.Should().Contain("func setup --features");
     }
 
     [Fact]
@@ -76,7 +75,7 @@ public class InitCommandTests
             [new FakeProjectInitializer("Python"), new FakeProjectInitializer("dotnet"), new FakeProjectInitializer("node")]);
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        Assert.Contains("Supported values: dotnet, node, python.", description);
+        description.Should().Contain("Supported values: dotnet, node, python.");
     }
 
     [Fact]
@@ -84,7 +83,7 @@ public class InitCommandTests
     {
         var cmd = CreateCommand([]);
 
-        Assert.Contains("func workload search --stack", cmd.GetHelpFooterHint() ?? string.Empty);
+        (cmd.GetHelpFooterHint() ?? string.Empty).Should().Contain("func workload search --stack");
     }
 
     [Fact]
@@ -93,15 +92,15 @@ public class InitCommandTests
         var root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
-        Assert.Contains("init", names);
+        names.Should().Contain("init");
     }
 
     [Fact]
     public void InitCommand_HasPathArgument()
     {
         var cmd = CreateCommand([]);
-        Assert.Single(cmd.Arguments);
-        Assert.Equal("path", cmd.Arguments[0].Name);
+        cmd.Arguments.Should().ContainSingle();
+        cmd.Arguments[0].Name.Should().Be("path");
     }
 
     [Fact]
@@ -110,7 +109,7 @@ public class InitCommandTests
         // Even when --stack is missing, InitCommand creates the target
         // directory before validating (directory creation is unconditional).
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
-        Assert.False(Directory.Exists(newDir));
+        Directory.Exists(newDir).Should().BeFalse();
 
         try
         {
@@ -120,8 +119,8 @@ public class InitCommandTests
             var exitCode = await result.InvokeAsync();
 
             // No --stack provided → exit 1, but directory was still created.
-            Assert.Equal(1, exitCode);
-            Assert.True(Directory.Exists(newDir));
+            exitCode.Should().Be(1);
+            Directory.Exists(newDir).Should().BeTrue();
         }
         finally
         {
@@ -142,16 +141,16 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
 
-            Assert.Equal(0, exitCode);
-            Assert.True(initializer.WasInvoked);
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeTrue();
 
             string configPath = Path.Combine(newDir, ".func", "config.json");
-            Assert.True(File.Exists(configPath), $"Expected .func/config.json at {configPath}.");
+            File.Exists(configPath).Should().BeTrue($"Expected .func/config.json at {configPath}.");
 
             using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
             JsonElement stack = doc.RootElement.GetProperty("stack");
-            Assert.Equal("python", stack.GetProperty("runtime").GetString());
-            Assert.Equal("python", stack.GetProperty("language").GetString());
+            stack.GetProperty("runtime").GetString().Should().Be("python");
+            stack.GetProperty("language").GetString().Should().Be("python");
         }
         finally
         {
@@ -175,10 +174,8 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
 
-            Assert.Equal(0, exitCode);
-            Assert.Contains(
-                _interaction.Lines,
-                line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+            exitCode.Should().Be(0);
+            _interaction.Lines.Should().Contain(line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
         }
         finally
         {
@@ -201,10 +198,8 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
 
-            Assert.Equal(0, exitCode);
-            Assert.DoesNotContain(
-                _interaction.Lines,
-                line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+            exitCode.Should().Be(0);
+            _interaction.Lines.Should().NotContain(line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
         }
         finally
         {
@@ -225,10 +220,8 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
 
-            Assert.Equal(0, exitCode);
-            Assert.DoesNotContain(
-                _interaction.Lines,
-                line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+            exitCode.Should().Be(0);
+            _interaction.Lines.Should().NotContain(line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
         }
         finally
         {
@@ -253,9 +246,9 @@ public class InitCommandTests
 
             // Folder is already a Functions project (.func/config.json present);
             // command refuses without --force, initializer never runs.
-            Assert.Equal(1, exitCode);
-            Assert.False(initializer.WasInvoked);
-            Assert.Equal(existingContent, File.ReadAllText(configPath));
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(configPath).Should().Be(existingContent);
         }
         finally
         {
@@ -276,13 +269,13 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("dotnet");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "dotnet");
 
-            Assert.Equal(0, exitCode);
+            exitCode.Should().Be(0);
 
             string configPath = Path.Combine(newDir, ".func", "config.json");
             using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
             JsonElement stack = doc.RootElement.GetProperty("stack");
-            Assert.Equal("dotnet", stack.GetProperty("runtime").GetString());
-            Assert.False(stack.TryGetProperty("language", out _));
+            stack.GetProperty("runtime").GetString().Should().Be("dotnet");
+            stack.TryGetProperty("language", out _).Should().BeFalse();
         }
         finally
         {
@@ -344,10 +337,10 @@ public class InitCommandTests
         {
             int exitCode = await RunInitAsync(newDir, initializers: []);
 
-            Assert.Equal(1, exitCode);
+            exitCode.Should().Be(1);
 
-            WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
-            Assert.Equal(WorkloadHintKind.NoWorkloadsInstalled, hint.Kind);
+            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
+            hint.Kind.Should().Be(WorkloadHintKind.NoWorkloadsInstalled);
         }
         finally
         {
@@ -364,12 +357,12 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "ruby");
 
-            Assert.Equal(1, exitCode);
-            Assert.False(initializer.WasInvoked);
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
 
-            WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
-            Assert.Equal(WorkloadHintKind.NoMatchingStack, hint.Kind);
-            Assert.Equal("ruby", hint.RequestedStack);
+            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
+            hint.Kind.Should().Be(WorkloadHintKind.NoMatchingStack);
+            hint.RequestedStack.Should().Be("ruby");
         }
         finally
         {
@@ -387,12 +380,12 @@ public class InitCommandTests
             var node = new FakeProjectInitializer("node");
             int exitCode = await RunInitAsync(newDir, [python, node]);
 
-            Assert.Equal(1, exitCode);
-            Assert.False(python.WasInvoked);
-            Assert.False(node.WasInvoked);
+            exitCode.Should().Be(1);
+            python.WasInvoked.Should().BeFalse();
+            node.WasInvoked.Should().BeFalse();
 
-            WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
-            Assert.Equal(WorkloadHintKind.AmbiguousStackChoice, hint.Kind);
+            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
+            hint.Kind.Should().Be(WorkloadHintKind.AmbiguousStackChoice);
         }
         finally
         {
@@ -409,13 +402,13 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null);
 
-            Assert.Equal(0, exitCode);
-            Assert.True(initializer.WasInvoked);
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeTrue();
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
 
-            WorkloadHint hint = Assert.Single(_hintRenderer.Hints);
-            Assert.Equal(WorkloadHintKind.AutoSelectedSoleWorkload, hint.Kind);
-            Assert.Equal("python", hint.RequestedStack);
+            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
+            hint.Kind.Should().Be(WorkloadHintKind.AutoSelectedSoleWorkload);
+            hint.RequestedStack.Should().Be("python");
         }
         finally
         {
@@ -432,12 +425,12 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "python");
 
-            Assert.Equal(0, exitCode);
-            Assert.True(initializer.WasInvoked);
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeTrue();
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: "python");
 
             // No hint rendered when --stack matched directly.
-            Assert.Empty(_hintRenderer.Hints);
+            _hintRenderer.Hints.Should().BeEmpty();
         }
         finally
         {
@@ -464,12 +457,12 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
-            Assert.Equal(0, exitCode);
+            exitCode.Should().Be(0);
             // Scaffolding is skipped: existing files survive untouched and the
             // initializer is not invoked.
-            Assert.False(initializer.WasInvoked);
-            Assert.Equal(existingContent, File.ReadAllText(hostPath));
-            Assert.True(File.Exists(userFile));
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(hostPath).Should().Be(existingContent);
+            File.Exists(userFile).Should().BeTrue();
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
         }
         finally
@@ -492,9 +485,9 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
-            Assert.Equal(1, exitCode);
-            Assert.False(initializer.WasInvoked);
-            Assert.Equal("{}", File.ReadAllText(Path.Combine(newDir, ".func", "config.json")));
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(Path.Combine(newDir, ".func", "config.json")).Should().Be("{}");
         }
         finally
         {
@@ -515,8 +508,8 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
 
-            Assert.Equal(0, exitCode);
-            Assert.True(initializer.WasInvoked);
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeTrue();
         }
         finally
         {
@@ -544,11 +537,11 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
 
-            Assert.Equal(0, exitCode);
-            Assert.False(File.Exists(Path.Combine(newDir, "package.json")));
-            Assert.False(File.Exists(Path.Combine(newDir, "requirements.txt")));
-            Assert.False(Directory.Exists(Path.Combine(newDir, "node_modules")));
-            Assert.True(File.Exists(Path.Combine(newDir, ".git", "HEAD")));
+            exitCode.Should().Be(0);
+            File.Exists(Path.Combine(newDir, "package.json")).Should().BeFalse();
+            File.Exists(Path.Combine(newDir, "requirements.txt")).Should().BeFalse();
+            Directory.Exists(Path.Combine(newDir, "node_modules")).Should().BeFalse();
+            File.Exists(Path.Combine(newDir, ".git", "HEAD")).Should().BeTrue();
         }
         finally
         {
@@ -568,8 +561,8 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python", force: true);
 
-            Assert.Equal(0, exitCode);
-            Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("--force will delete"));
+            exitCode.Should().Be(0);
+            _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("--force will delete"));
         }
         finally
         {
@@ -593,8 +586,8 @@ public class InitCommandTests
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
             int exitCode = await RunInitAsync(newDir, [dotnet], language: null, stack: null);
 
-            Assert.Equal(0, exitCode);
-            Assert.False(dotnet.WasInvoked);
+            exitCode.Should().Be(0);
+            dotnet.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
         }
         finally
@@ -619,8 +612,8 @@ public class InitCommandTests
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
 
-            Assert.Equal(0, exitCode);
-            Assert.False(dotnet.WasInvoked);
+            exitCode.Should().Be(0);
+            dotnet.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
         }
         finally
@@ -648,8 +641,8 @@ public class InitCommandTests
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
 
-            Assert.Equal(0, exitCode);
-            Assert.False(dotnet.WasInvoked);
+            exitCode.Should().Be(0);
+            dotnet.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
         }
         finally
@@ -674,8 +667,8 @@ public class InitCommandTests
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, [python], language: null, stack: null);
 
-            Assert.Equal(0, exitCode);
-            Assert.False(python.WasInvoked);
+            exitCode.Should().Be(0);
+            python.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
         }
         finally
@@ -701,10 +694,10 @@ public class InitCommandTests
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, [python], language: null, stack: null);
 
-            Assert.Equal(1, exitCode);
-            Assert.False(python.WasInvoked);
-            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
-            Assert.Contains(_interaction.Lines, l =>
+            exitCode.Should().Be(1);
+            python.WasInvoked.Should().BeFalse();
+            File.Exists(Path.Combine(newDir, ".func", "config.json")).Should().BeFalse();
+            _interaction.Lines.Should().Contain(l =>
                 l.StartsWith("ERROR:")
                 && l.Contains("'ruby' stack is not installed")
                 && l.Contains("func setup --features <stack>"));
@@ -729,11 +722,11 @@ public class InitCommandTests
             var node = new FakeProjectInitializer("node");
             int exitCode = await RunInitAsync(newDir, [python, node], language: null, stack: "node");
 
-            Assert.Equal(1, exitCode);
-            Assert.False(python.WasInvoked);
-            Assert.False(node.WasInvoked);
-            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
-            Assert.Contains(_interaction.Lines, l => l.Contains("conflicts") && l.Contains("python") && l.Contains("node"));
+            exitCode.Should().Be(1);
+            python.WasInvoked.Should().BeFalse();
+            node.WasInvoked.Should().BeFalse();
+            File.Exists(Path.Combine(newDir, ".func", "config.json")).Should().BeFalse();
+            _interaction.Lines.Should().Contain(l => l.Contains("conflicts") && l.Contains("python") && l.Contains("node"));
         }
         finally
         {
@@ -754,8 +747,8 @@ public class InitCommandTests
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, python, language: null, stack: "python");
 
-            Assert.Equal(0, exitCode);
-            Assert.False(python.WasInvoked);
+            exitCode.Should().Be(0);
+            python.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
         }
         finally
@@ -781,10 +774,10 @@ public class InitCommandTests
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, python, language: null);
 
-            Assert.Equal(1, exitCode);
-            Assert.False(python.WasInvoked);
-            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
-            Assert.Contains(_interaction.Lines, l =>
+            exitCode.Should().Be(1);
+            python.WasInvoked.Should().BeFalse();
+            File.Exists(Path.Combine(newDir, ".func", "config.json")).Should().BeFalse();
+            _interaction.Lines.Should().Contain(l =>
                 l.StartsWith("ERROR:") && l.Contains("Couldn't detect the project's stack"));
         }
         finally
@@ -812,10 +805,10 @@ public class InitCommandTests
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
 
-            Assert.Equal(0, exitCode);
-            Assert.False(python.WasInvoked);
+            exitCode.Should().Be(0);
+            python.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "python", expectedLanguage: null);
-            Assert.Contains(interactive.Lines, l =>
+            interactive.Lines.Should().Contain(l =>
                 l.StartsWith("SELECT:") && l.Contains("Adopting an existing project"));
         }
         finally
@@ -839,10 +832,10 @@ public class InitCommandTests
             var python = new FakeProjectInitializer("python");
             int exitCode = await RunInitAsync(newDir, [python], language: null, stack: "ruby");
 
-            Assert.Equal(1, exitCode);
-            Assert.False(python.WasInvoked);
-            Assert.False(File.Exists(Path.Combine(newDir, ".func", "config.json")));
-            Assert.Contains(_interaction.Lines, l =>
+            exitCode.Should().Be(1);
+            python.WasInvoked.Should().BeFalse();
+            File.Exists(Path.Combine(newDir, ".func", "config.json")).Should().BeFalse();
+            _interaction.Lines.Should().Contain(l =>
                 l.StartsWith("ERROR:")
                 && l.Contains("'ruby' stack is not installed")
                 && l.Contains("func setup --features <stack>"));
@@ -868,8 +861,8 @@ public class InitCommandTests
             var node = new FakeProjectInitializer("node");
             int exitCode = await RunInitAsync(newDir, node, language: null, stack: "node", force: true);
 
-            Assert.Equal(0, exitCode);
-            Assert.True(node.WasInvoked);
+            exitCode.Should().Be(0);
+            node.WasInvoked.Should().BeTrue();
             AssertConfigJsonHasShape(newDir, expectedStack: "node", expectedLanguage: null);
         }
         finally
@@ -893,27 +886,27 @@ public class InitCommandTests
     private static void AssertConfigJsonHasShape(string directory, string? expectedStack, string? expectedLanguage)
     {
         string configPath = Path.Combine(directory, ".func", "config.json");
-        Assert.True(File.Exists(configPath), $"Expected .func/config.json at {configPath}.");
+        File.Exists(configPath).Should().BeTrue($"Expected .func/config.json at {configPath}.");
 
         using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
         if (expectedStack is null)
         {
-            Assert.False(doc.RootElement.TryGetProperty("stack", out _));
+            doc.RootElement.TryGetProperty("stack", out _).Should().BeFalse();
         }
         else
         {
-            Assert.Equal(expectedStack, doc.RootElement.GetProperty("stack").GetProperty("runtime").GetString());
+            doc.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be(expectedStack);
         }
         if (expectedLanguage is null)
         {
             if (doc.RootElement.TryGetProperty("stack", out JsonElement stack))
             {
-                Assert.False(stack.TryGetProperty("language", out _));
+                stack.TryGetProperty("language", out _).Should().BeFalse();
             }
         }
         else
         {
-            Assert.Equal(expectedLanguage, doc.RootElement.GetProperty("stack").GetProperty("language").GetString());
+            doc.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be(expectedLanguage);
         }
     }
 
@@ -934,9 +927,9 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("node", ["JavaScript", "TypeScript"]);
             int exitCode = await RunInitAsync(newDir, initializer, language: "python", stack: "node");
 
-            Assert.Equal(1, exitCode);
-            Assert.False(initializer.WasInvoked);
-            Assert.Contains(_interaction.Lines, l => l.Contains("not supported", StringComparison.OrdinalIgnoreCase));
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().Contain(l => l.Contains("not supported", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
@@ -953,7 +946,7 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("python", ["Python"]);
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "python");
 
-            Assert.Equal(0, exitCode);
+            exitCode.Should().Be(0);
 
             // With a single supported language, the stack runtime implies the
             // language; the config skips the redundant 'language' field.
@@ -974,9 +967,9 @@ public class InitCommandTests
             var initializer = new FakeProjectInitializer("node", ["JavaScript", "TypeScript"]);
             int exitCode = await RunInitAsync(newDir, initializer, language: null, stack: "node");
 
-            Assert.Equal(1, exitCode);
-            Assert.False(initializer.WasInvoked);
-            Assert.Contains(_interaction.Lines, l => l.Contains("--language", StringComparison.Ordinal));
+            exitCode.Should().Be(1);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().Contain(l => l.Contains("--language", StringComparison.Ordinal));
         }
         finally
         {
@@ -999,8 +992,8 @@ public class InitCommandTests
         var cmd = CreateCommand([first, second]);
 
         int matches = cmd.Options.Count(o => o.Name == "--no-bundles");
-        Assert.Equal(1, matches);
-        Assert.Same(first.ContributedOptions[0], second.ContributedOptions[0]);
+        matches.Should().Be(1);
+        second.ContributedOptions[0].Should().BeSameAs(first.ContributedOptions[0]);
     }
 
     [Fact]
@@ -1031,8 +1024,8 @@ public class InitCommandTests
                 stack: "python",
                 extraArgs: ["--no-bundles"]);
 
-            Assert.Equal(0, exitCode);
-            Assert.True(observed);
+            exitCode.Should().Be(0);
+            observed.Should().BeTrue();
         }
         finally
         {
@@ -1050,12 +1043,12 @@ public class InitCommandTests
             "python",
             optionFactory: r => [r.GetOrAdd(new Option<string>("--no-bundles"))]);
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            CreateCommand([first, second]));
+        var ex = FluentActions.Invoking(() =>
+            CreateCommand([first, second])).Should().ThrowExactly<InvalidOperationException>().Which;
 
-        Assert.Contains("python", ex.Message);
-        Assert.Contains("node", ex.Message);
-        Assert.Contains("--no-bundles", ex.Message);
+        ex.Message.Should().Contain("python");
+        ex.Message.Should().Contain("node");
+        ex.Message.Should().Contain("--no-bundles");
     }
 
     [Fact]
@@ -1069,12 +1062,12 @@ public class InitCommandTests
             "go",
             optionFactory: r => [r.GetOrAdd(new Option<string>("--clean", "-c"))]);
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            CreateCommand([first, second]));
+        var ex = FluentActions.Invoking(() =>
+            CreateCommand([first, second])).Should().ThrowExactly<InvalidOperationException>().Which;
 
-        Assert.Contains("-c", ex.Message);
-        Assert.Contains("--clean", ex.Message);
-        Assert.Contains("--bundles-channel", ex.Message);
+        ex.Message.Should().Contain("-c");
+        ex.Message.Should().Contain("--clean");
+        ex.Message.Should().Contain("--bundles-channel");
     }
 
     [Fact]
@@ -1101,8 +1094,8 @@ public class InitCommandTests
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
 
-            Assert.Equal(0, exitCode);
-            Assert.False(dotnet.WasInvoked);
+            exitCode.Should().Be(0);
+            dotnet.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
         }
         finally
@@ -1128,7 +1121,7 @@ public class InitCommandTests
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet");
 
-            Assert.Equal(0, exitCode);
+            exitCode.Should().Be(0);
             AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: null);
         }
         finally
@@ -1161,7 +1154,7 @@ public class InitCommandTests
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: "F#", stack: "dotnet");
 
-            Assert.Equal(0, exitCode);
+            exitCode.Should().Be(0);
             AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "f#");
         }
         finally
@@ -1198,13 +1191,13 @@ public class InitCommandTests
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
 
-            Assert.Equal(0, exitCode);
-            Assert.False(dotnet.WasInvoked);
+            exitCode.Should().Be(0);
+            dotnet.WasInvoked.Should().BeFalse();
             AssertConfigJsonHasShape(newDir, expectedStack: "dotnet", expectedLanguage: "c#");
 
             using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(newDir, ".func", "config.json")));
-            Assert.True(doc.RootElement.TryGetProperty("profiles", out JsonElement profiles));
-            Assert.True(profiles.GetProperty("keep").GetBoolean());
+            doc.RootElement.TryGetProperty("profiles", out JsonElement profiles).Should().BeTrue();
+            profiles.GetProperty("keep").GetBoolean().Should().BeTrue();
         }
         finally
         {
@@ -1230,9 +1223,9 @@ public class InitCommandTests
 
             int exitCode = await RunInitAsync(newDir, python, language: null, stack: null);
 
-            Assert.Equal(1, exitCode);
-            Assert.False(python.WasInvoked);
-            Assert.Contains(_interaction.Lines, l => l.Contains("already contains a Functions project", StringComparison.OrdinalIgnoreCase));
+            exitCode.Should().Be(1);
+            python.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().Contain(l => l.Contains("already contains a Functions project", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
@@ -1256,8 +1249,8 @@ public class InitCommandTests
 
             int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: null);
 
-            Assert.Equal(1, exitCode);
-            Assert.False(dotnet.WasInvoked);
+            exitCode.Should().Be(1);
+            dotnet.WasInvoked.Should().BeFalse();
         }
         finally
         {

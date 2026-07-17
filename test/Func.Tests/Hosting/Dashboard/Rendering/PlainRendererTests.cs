@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
-using System.Text;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
@@ -10,7 +8,6 @@ using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -29,9 +26,9 @@ public class PlainRendererTests
         const string expectedOsc8Open = "\u001b]8;;" + url + "\u001b\\";
         const string expectedOsc8Close = "\u001b]8;;\u001b\\";
 
-        Assert.Contains(expectedOsc8Open, output);
-        Assert.Contains(expectedOsc8Close, output);
-        Assert.Contains("GET,POST " + expectedOsc8Open + url + expectedOsc8Close, output);
+        output.Should().Contain(expectedOsc8Open);
+        output.Should().Contain(expectedOsc8Close);
+        output.Should().Contain("GET,POST " + expectedOsc8Open + url + expectedOsc8Close);
     }
 
     [Fact]
@@ -43,8 +40,8 @@ public class PlainRendererTests
         await PumpScenarioAsync(renderer);
 
         string output = writer.ToString();
-        Assert.Contains("GET,POST http://localhost:7071/api/hello", output);
-        Assert.DoesNotContain("\u001b]8;", output);
+        output.Should().Contain("GET,POST http://localhost:7071/api/hello");
+        output.Should().NotContain("\u001b]8;");
     }
 
     [Fact]
@@ -67,9 +64,9 @@ public class PlainRendererTests
         await renderer.OnEventAsync(entry, state.Observe(entry), default);
 
         string output = writer.ToString();
-        Assert.Contains("QueueProcessor", output);
-        Assert.Contains("my-queue", output);
-        Assert.DoesNotContain("\u001b]8;", output);
+        output.Should().Contain("QueueProcessor");
+        output.Should().Contain("my-queue");
+        output.Should().NotContain("\u001b]8;");
     }
 
     [Fact]
@@ -99,9 +96,9 @@ public class PlainRendererTests
         await renderer.OnEventAsync(entry, state.Observe(entry), default);
 
         string output = writer.ToString();
-        Assert.Contains("[invocation end]", output);
-        Assert.Contains("WorkerProcessExitException", output);
-        Assert.Equal(1, CountOccurrences(output, "A connection string was not found."));
+        output.Should().Contain("[invocation end]");
+        output.Should().Contain("WorkerProcessExitException");
+        CountOccurrences(output, "A connection string was not found.").Should().Be(1);
     }
 
     [Fact]
@@ -127,9 +124,9 @@ public class PlainRendererTests
         await renderer.OnEventAsync(entry, state.Observe(entry), default);
 
         string output = writer.ToString();
-        Assert.DoesNotContain("Grpc", output);
-        Assert.Contains("WorkerProcessExitException", output);
-        Assert.Contains("A connection string was not found.", output);
+        output.Should().NotContain("Grpc");
+        output.Should().Contain("WorkerProcessExitException");
+        output.Should().Contain("A connection string was not found.");
     }
 
     [Fact]
@@ -147,8 +144,8 @@ public class PlainRendererTests
         await renderer.OnEventAsync(entry, state.Observe(entry), default);
 
         string output = writer.ToString();
-        Assert.DoesNotContain("Grpc", output);
-        Assert.Contains("A connection string was not found.", output);
+        output.Should().NotContain("Grpc");
+        output.Should().Contain("A connection string was not found.");
     }
 
     private static async Task PumpScenarioAsync(PlainRenderer renderer)

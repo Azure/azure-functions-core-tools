@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Azure.Functions.Cli.Bundles.Tests;
 
@@ -16,10 +15,10 @@ public class ExtensionBundleResolverTests
         ExtensionBundleResolution result = await Build([Row("4.10.0"), Row("4.22.0")])
             .ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
 
-        ExtensionBundleResolution.Resolved resolved = Assert.IsType<ExtensionBundleResolution.Resolved>(result);
-        Assert.Equal("4.22.0", resolved.Version);
-        Assert.Equal(BundleId, resolved.BundleId);
-        Assert.EndsWith(Path.Combine("tools", "any"), resolved.Path);
+        ExtensionBundleResolution.Resolved resolved = result.Should().BeOfType<ExtensionBundleResolution.Resolved>().Subject;
+        resolved.Version.Should().Be("4.22.0");
+        resolved.BundleId.Should().Be(BundleId);
+        resolved.Path.Should().EndWith(Path.Combine("tools", "any"));
     }
 
     [Fact]
@@ -28,8 +27,8 @@ public class ExtensionBundleResolverTests
         ExtensionBundleResolution result = await Build([Row("4.10.0"), Row("4.22.0"), Row("5.1.0")])
             .ResolveAsync(Context(host: "[4.0.0, 6.0.0)", profile: "[4.15.0, 5.0.0)"));
 
-        ExtensionBundleResolution.Resolved resolved = Assert.IsType<ExtensionBundleResolution.Resolved>(result);
-        Assert.Equal("4.22.0", resolved.Version);
+        result.Should().BeOfType<ExtensionBundleResolution.Resolved>()
+            .Which.Version.Should().Be("4.22.0");
     }
 
     [Fact]
@@ -38,9 +37,9 @@ public class ExtensionBundleResolverTests
         ExtensionBundleResolution result = await Build([Row("3.30.0"), Row("4.10.0")])
             .ResolveAsync(Context(host: "[3.*, 4.0.0)", profile: "[4.*, 5.0.0)"));
 
-        ExtensionBundleResolution.EmptyIntersection empty = Assert.IsType<ExtensionBundleResolution.EmptyIntersection>(result);
-        Assert.Equal("3.30.0", empty.HighestVersionSatisfyingHostJsonOnly);
-        Assert.Contains("[3.*, 4.0.0)", empty.Hint);
+        ExtensionBundleResolution.EmptyIntersection empty = result.Should().BeOfType<ExtensionBundleResolution.EmptyIntersection>().Subject;
+        empty.HighestVersionSatisfyingHostJsonOnly.Should().Be("3.30.0");
+        empty.Hint.Should().Contain("[3.*, 4.0.0)");
     }
 
     [Fact]
@@ -49,9 +48,9 @@ public class ExtensionBundleResolverTests
         ExtensionBundleResolution result = await Build([Row("4.10.0")])
             .ResolveAsync(Context(host: "[5.0.0, 6.0.0)"));
 
-        ExtensionBundleResolution.NoCompatibleInstall none = Assert.IsType<ExtensionBundleResolution.NoCompatibleInstall>(result);
-        Assert.Contains("4.10.0", none.Hint);
-        Assert.Contains("func workload install", none.Hint);
+        ExtensionBundleResolution.NoCompatibleInstall none = result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>().Subject;
+        none.Hint.Should().Contain("4.10.0");
+        none.Hint.Should().Contain("func workload install");
     }
 
     [Fact]
@@ -59,8 +58,8 @@ public class ExtensionBundleResolverTests
     {
         ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
 
-        ExtensionBundleResolution.WorkloadMissing missing = Assert.IsType<ExtensionBundleResolution.WorkloadMissing>(result);
-        Assert.Contains("func workload install", missing.Hint);
+        ExtensionBundleResolution.WorkloadMissing missing = result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>().Subject;
+        missing.Hint.Should().Contain("func workload install");
     }
 
     [Fact]
@@ -68,8 +67,8 @@ public class ExtensionBundleResolverTests
     {
         ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)", workerRuntime: "go"));
 
-        ExtensionBundleResolution.WorkloadMissing missing = Assert.IsType<ExtensionBundleResolution.WorkloadMissing>(result);
-        Assert.Contains("func setup --features go", missing.Hint);
+        ExtensionBundleResolution.WorkloadMissing missing = result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>().Subject;
+        missing.Hint.Should().Contain("func setup --features go");
     }
 
     [Fact]
@@ -78,8 +77,8 @@ public class ExtensionBundleResolverTests
         ExtensionBundleResolution result = await Build([Row("4.10.0")])
             .ResolveAsync(Context(host: "[5.0.0, 6.0.0)", workerRuntime: "node"));
 
-        ExtensionBundleResolution.NoCompatibleInstall none = Assert.IsType<ExtensionBundleResolution.NoCompatibleInstall>(result);
-        Assert.Contains("func setup --features node", none.Hint);
+        ExtensionBundleResolution.NoCompatibleInstall none = result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>().Subject;
+        none.Hint.Should().Contain("func setup --features node");
     }
 
     [Fact]
@@ -88,9 +87,9 @@ public class ExtensionBundleResolverTests
         var telemetry = new RecordingTelemetry();
         await Build([Row("4.22.0")], telemetry).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
 
-        BundleResolveEvent evt = Assert.Single(telemetry.Events);
-        Assert.Equal(BundleResolveReason.Ok, evt.Reason);
-        Assert.Equal("4.22.0", evt.ResolvedVersion);
+        BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
+        evt.Reason.Should().Be(BundleResolveReason.Ok);
+        evt.ResolvedVersion.Should().Be("4.22.0");
     }
 
     [Fact]
@@ -99,8 +98,8 @@ public class ExtensionBundleResolverTests
         var telemetry = new RecordingTelemetry();
         await Build([], telemetry).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
 
-        BundleResolveEvent evt = Assert.Single(telemetry.Events);
-        Assert.Equal(BundleResolveReason.WorkloadMissing, evt.Reason);
+        BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
+        evt.Reason.Should().Be(BundleResolveReason.WorkloadMissing);
     }
 
     [Fact]
@@ -109,8 +108,8 @@ public class ExtensionBundleResolverTests
         var telemetry = new RecordingTelemetry();
         await Build([Row("4.22.0")], telemetry).ResolveAsync(Context(host: "[3.*, 4.0.0)", profile: "[4.*, 5.0.0)"));
 
-        BundleResolveEvent evt = Assert.Single(telemetry.Events);
-        Assert.Equal(BundleResolveReason.EmptyIntersection, evt.Reason);
+        BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
+        evt.Reason.Should().Be(BundleResolveReason.EmptyIntersection);
     }
 
     [Fact]
@@ -119,8 +118,8 @@ public class ExtensionBundleResolverTests
         var telemetry = new RecordingTelemetry();
         await Build([Row("3.0.0")], telemetry).ResolveAsync(Context(host: "[5.0.0, 6.0.0)"));
 
-        BundleResolveEvent evt = Assert.Single(telemetry.Events);
-        Assert.Equal(BundleResolveReason.NoCompatibleInstall, evt.Reason);
+        BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
+        evt.Reason.Should().Be(BundleResolveReason.NoCompatibleInstall);
     }
 
     private static ExtensionBundleResolver Build(IReadOnlyList<InstalledBundleWorkload> rows, IBundleResolveTelemetry? telemetry = null)

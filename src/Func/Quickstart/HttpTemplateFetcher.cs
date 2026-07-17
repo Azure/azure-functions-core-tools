@@ -3,7 +3,6 @@
 
 using System.IO.Compression;
 using System.Net;
-using System.Net.Http;
 using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Logging;
 

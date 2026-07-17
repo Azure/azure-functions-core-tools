@@ -1,7 +1,6 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Xunit;
 using NSubstitute;
 using Microsoft.Build.Framework;
 using Azure.Functions.Cli.Workloads.Sdk.Tests;
@@ -22,7 +21,7 @@ public class ResolveWorkloadEntryTests
 
         resolveWorkloadEntry.Execute();
 
-        Assert.Equal("Azure.Functions.Cli.Workloads.DotNet.DotNetWorkload", resolveWorkloadEntry.WorkloadType);
+        resolveWorkloadEntry.WorkloadType.Should().Be("Azure.Functions.Cli.Workloads.DotNet.DotNetWorkload");
     }
 
 
@@ -38,6 +37,6 @@ public class ResolveWorkloadEntryTests
 
         resolveWorkloadEntry.Execute();
 
-        Assert.Empty(resolveWorkloadEntry.WorkloadType);
+        resolveWorkloadEntry.WorkloadType.Should().BeEmpty();
     }
 }

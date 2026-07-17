@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Quickstart;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Quickstart;
 
@@ -32,8 +31,8 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "Python");
 
-        Assert.Single(results);
-        Assert.Equal("python-entry", results[0].Id);
+        results.Should().ContainSingle();
+        results[0].Id.Should().Be("python-entry");
     }
 
     [Fact]
@@ -43,7 +42,7 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "python");
 
-        Assert.Single(results);
+        results.Should().ContainSingle();
     }
 
     [Fact]
@@ -57,8 +56,8 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(resource: "timer");
 
-        Assert.Single(results);
-        Assert.Equal("timer-entry", results[0].Id);
+        results.Should().ContainSingle();
+        results[0].Id.Should().Be("timer-entry");
     }
 
     [Fact]
@@ -72,8 +71,8 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(iac: "bicep");
 
-        Assert.Single(results);
-        Assert.Equal("bicep-entry", results[0].Id);
+        results.Should().ContainSingle();
+        results[0].Id.Should().Be("bicep-entry");
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(search: "python");
 
-        Assert.Single(results);
+        results.Should().ContainSingle();
     }
 
     [Fact]
@@ -93,7 +92,7 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(search: "openai");
 
-        Assert.Single(results);
+        results.Should().ContainSingle();
     }
 
     [Fact]
@@ -103,7 +102,7 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(search: "Deploy with");
 
-        Assert.Single(results);
+        results.Should().ContainSingle();
     }
 
     [Fact]
@@ -113,7 +112,7 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(search: "terraform");
 
-        Assert.Single(results);
+        results.Should().ContainSingle();
     }
 
     [Fact]
@@ -128,8 +127,8 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "Python", resource: "http");
 
-        Assert.Single(results);
-        Assert.Equal("match", results[0].Id);
+        results.Should().ContainSingle();
+        results[0].Id.Should().Be("match");
     }
 
     [Fact]
@@ -144,9 +143,9 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter();
 
-        Assert.Equal("high-priority", results[0].Id);
-        Assert.Equal("mid-priority", results[1].Id);
-        Assert.Equal("low-priority", results[2].Id);
+        results[0].Id.Should().Be("high-priority");
+        results[1].Id.Should().Be("mid-priority");
+        results[2].Id.Should().Be("low-priority");
     }
 
     [Fact]
@@ -160,8 +159,8 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter();
 
-        Assert.Equal(2, results.Count);
-        Assert.Equal("b", results[0].Id);
+        results.Count.Should().Be(2);
+        results[0].Id.Should().Be("b");
     }
 
     [Fact]
@@ -171,7 +170,7 @@ public sealed class QuickstartManifestTests
 
         IReadOnlyList<QuickstartEntry> results = manifest.Filter(language: "Go");
 
-        Assert.Empty(results);
+        results.Should().BeEmpty();
     }
 }
 

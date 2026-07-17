@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Projects;
 
@@ -23,9 +22,9 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
 
-        ProjectResolutionResult.Resolved resolved = Assert.IsType<ProjectResolutionResult.Resolved>(result);
-        Assert.Same(project, resolved.Project);
-        Assert.Equal("matched", resolved.Message);
+        ProjectResolutionResult.Resolved resolved = result.Should().BeOfType<ProjectResolutionResult.Resolved>().Subject;
+        resolved.Project.Should().BeSameAs(project);
+        resolved.Message.Should().Be("matched");
     }
 
     [Fact]
@@ -38,9 +37,9 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
 
-        ProjectResolutionResult.Resolved resolved = Assert.IsType<ProjectResolutionResult.Resolved>(result);
-        Assert.Same(project, resolved.Project);
-        Assert.Equal("matched second", resolved.Message);
+        ProjectResolutionResult.Resolved resolved = result.Should().BeOfType<ProjectResolutionResult.Resolved>().Subject;
+        resolved.Project.Should().BeSameAs(project);
+        resolved.Message.Should().Be("matched second");
         await second.Received(1).TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
     }
 
@@ -56,8 +55,8 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
 
-        ProjectResolutionResult.Resolved resolved = Assert.IsType<ProjectResolutionResult.Resolved>(result);
-        Assert.Same(firstProject, resolved.Project);
+        ProjectResolutionResult.Resolved resolved = result.Should().BeOfType<ProjectResolutionResult.Resolved>().Subject;
+        resolved.Project.Should().BeSameAs(firstProject);
         await second.DidNotReceive().TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
     }
 
@@ -76,9 +75,9 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
 
-        ProjectResolutionResult.NotResolved notResolved = Assert.IsType<ProjectResolutionResult.NotResolved>(result);
-        Assert.Equal("missing worker", notResolved.Message);
-        Assert.Same(failure, notResolved.Failure);
+        ProjectResolutionResult.NotResolved notResolved = result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Subject;
+        notResolved.Message.Should().Be("missing worker");
+        notResolved.Failure.Should().BeSameAs(failure);
         await second.DidNotReceive().TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
     }
 
@@ -90,8 +89,8 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
 
-        ProjectResolutionResult.NotResolved notResolved = Assert.IsType<ProjectResolutionResult.NotResolved>(result);
-        Assert.Contains("No installed workload recognized", notResolved.Message);
+        ProjectResolutionResult.NotResolved notResolved = result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Subject;
+        notResolved.Message.Should().Contain("No installed workload recognized");
     }
 
     [Fact]

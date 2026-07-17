@@ -4,15 +4,12 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
-using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
@@ -29,13 +26,13 @@ public class WorkloadUpdateCommandTests
     public void Update_HasExpectedArgsAndOptions()
     {
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
-        Assert.Single(cmd.Arguments, a => a.Name == "id");
-        Assert.Contains(cmd.Options, o => o.Name == "--version");
-        Assert.Contains(cmd.Options, o => o.Name == "--all");
-        Assert.Contains(cmd.Options, o => o.Name == "--major");
-        Assert.Contains(cmd.Options, o => o.Name == "--source");
-        Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
-        Assert.Contains(cmd.Options, o => o.Name == "--exact");
+        cmd.Arguments.Should().ContainSingle(a => a.Name == "id");
+        cmd.Options.Should().Contain(o => o.Name == "--version");
+        cmd.Options.Should().Contain(o => o.Name == "--all");
+        cmd.Options.Should().Contain(o => o.Name == "--major");
+        cmd.Options.Should().Contain(o => o.Name == "--source");
+        cmd.Options.Should().Contain(o => o.Name == "--prerelease");
+        cmd.Options.Should().Contain(o => o.Name == "--exact");
     }
 
     [Fact]
@@ -47,7 +44,7 @@ public class WorkloadUpdateCommandTests
 
         ParseResult parse = root.Parse([cmd.Name]);
 
-        Assert.NotEmpty(parse.Errors);
+        parse.Errors.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -59,7 +56,7 @@ public class WorkloadUpdateCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "test.workload", "--all"]);
 
-        Assert.NotEmpty(parse.Errors);
+        parse.Errors.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -71,8 +68,8 @@ public class WorkloadUpdateCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "--all", "--version", "1.0.0"]);
 
-        Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("--version cannot be combined with --all"));
+        parse.Errors.Should().NotBeEmpty();
+        parse.Errors.Should().Contain(e => e.Message.Contains("--version cannot be combined with --all"));
     }
 
     [Fact]
@@ -84,8 +81,8 @@ public class WorkloadUpdateCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "--all", "--exact"]);
 
-        Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("--exact cannot be combined with --all"));
+        parse.Errors.Should().NotBeEmpty();
+        parse.Errors.Should().Contain(e => e.Message.Contains("--exact cannot be combined with --all"));
     }
 
     [Fact]
@@ -97,7 +94,7 @@ public class WorkloadUpdateCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "   "]);
 
-        Assert.NotEmpty(parse.Errors);
+        parse.Errors.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -109,8 +106,8 @@ public class WorkloadUpdateCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "Test.Workload", "--version", "not-semver"]);
 
-        Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("not a valid semver"));
+        parse.Errors.Should().NotBeEmpty();
+        parse.Errors.Should().Contain(e => e.Message.Contains("not a valid semver"));
     }
 
     [Fact]
@@ -128,10 +125,8 @@ public class WorkloadUpdateCommandTests
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.StartsWith("SUCCESS:")
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("SUCCESS:")
                 && l.Contains("Updated workload")
                 && l.Contains("test.workload")
                 && l.Contains("from 1.0.0 to 1.1.0"));
@@ -152,10 +147,8 @@ public class WorkloadUpdateCommandTests
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.Contains("already at the latest")
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.Contains("already at the latest")
                 && l.Contains("test.workload")
                 && l.Contains("1.0.0"));
     }
@@ -180,7 +173,7 @@ public class WorkloadUpdateCommandTests
             "--source", "https://example/v3/index.json",
             "--prerelease");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UpdateAsync(
             "Test.Workload",
             Arg.Is<NuGetVersion>(v => v != null && v.ToNormalizedString() == "1.0.0"),
@@ -200,11 +193,10 @@ public class WorkloadUpdateCommandTests
             .Throws(new InvalidOperationException("Workload 'test.workload' is not installed."));
 
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload"));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("not installed", ex.Message);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("not installed");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -216,10 +208,9 @@ public class WorkloadUpdateCommandTests
             .Throws(new WorkloadPackageNotFoundException("nope"));
 
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload"));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -231,8 +222,8 @@ public class WorkloadUpdateCommandTests
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--all");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("HINT:") && l.Contains("No workloads installed"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("HINT:") && l.Contains("No workloads installed"));
         await _installer.DidNotReceive().UpdateAsync(
             Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
@@ -267,15 +258,15 @@ public class WorkloadUpdateCommandTests
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--all");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UpdateAsync(
             "a.workload", Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
         await _installer.Received(1).UpdateAsync(
             "b.workload", Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("SUCCESS:") && l.Contains("a.workload"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("b.workload"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("SUCCESS:") && l.Contains("a.workload"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("b.workload"));
     }
 
     [Fact]
@@ -303,9 +294,9 @@ public class WorkloadUpdateCommandTests
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--all");
 
-        Assert.Equal(1, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("ERROR:") && l.Contains("a.workload"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("SUCCESS:") && l.Contains("b.workload"));
+        exit.Should().Be(1);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("ERROR:") && l.Contains("a.workload"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("SUCCESS:") && l.Contains("b.workload"));
     }
 
     [Fact]
@@ -324,10 +315,8 @@ public class WorkloadUpdateCommandTests
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.StartsWith("HINT:")
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("HINT:")
                 && l.Contains("No version of 'test.workload'")
                 && l.Contains("--source"));
     }
@@ -356,7 +345,7 @@ public class WorkloadUpdateCommandTests
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "demo");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UpdateAsync(
             "test.workload",
             Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
@@ -382,10 +371,9 @@ public class WorkloadUpdateCommandTests
             .Throws(new InvalidOperationException("Workload 'demo' is not installed."));
 
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "demo", "--exact"));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "demo", "--exact")).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("not installed", ex.Message);
+        ex.Message.Should().Contain("not installed");
         await _installer.DidNotReceive().UpdateAsync(
             "test.workload",
             Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
@@ -402,13 +390,12 @@ public class WorkloadUpdateCommandTests
         });
 
         var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "shared"));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "shared")).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("matches multiple installed workloads", ex.Message);
-        Assert.Contains("a.workload", ex.Message);
-        Assert.Contains("b.workload", ex.Message);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("matches multiple installed workloads");
+        ex.Message.Should().Contain("a.workload");
+        ex.Message.Should().Contain("b.workload");
+        ex.IsUserError.Should().BeTrue();
         await _installer.DidNotReceive().UpdateAsync(
             Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());

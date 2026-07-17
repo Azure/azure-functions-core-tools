@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Azurite;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite;
 
@@ -21,8 +20,8 @@ public class AzureWebJobsStorageClassifierTests
     {
         var result = _classifier.Classify(value);
 
-        Assert.Equal(AzureWebJobsStorageClassification.NotLocal, result.Classification);
-        Assert.Null(result.Endpoints);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.NotLocal);
+        result.Endpoints.Should().BeNull();
     }
 
     [Fact]
@@ -30,8 +29,8 @@ public class AzureWebJobsStorageClassifierTests
     {
         var result = _classifier.Classify("UseDevelopmentStorage=true");
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
-        Assert.Null(result.Endpoints);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
+        result.Endpoints.Should().BeNull();
     }
 
     [Fact]
@@ -39,7 +38,7 @@ public class AzureWebJobsStorageClassifierTests
     {
         var result = _classifier.Classify("usedevelopmentstorage=TRUE");
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
     }
 
     [Fact]
@@ -48,7 +47,7 @@ public class AzureWebJobsStorageClassifierTests
         var result = _classifier.Classify(
             "UseDevelopmentStorage=true;DevelopmentStorageProxyUri=http://127.0.0.1");
 
-        Assert.Equal(AzureWebJobsStorageClassification.UserConfiguredAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.UserConfiguredAzurite);
     }
 
     [Fact]
@@ -63,12 +62,12 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
-        Assert.NotNull(result.Endpoints);
-        Assert.Equal("devstoreaccount1", result.Endpoints!.AccountName);
-        Assert.Equal(10000, result.Endpoints.BlobEndpoint.Port);
-        Assert.Equal(10001, result.Endpoints.QueueEndpoint.Port);
-        Assert.Equal(10002, result.Endpoints.TableEndpoint.Port);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
+        result.Endpoints.Should().NotBeNull();
+        result.Endpoints!.AccountName.Should().Be("devstoreaccount1");
+        result.Endpoints.BlobEndpoint.Port.Should().Be(10000);
+        result.Endpoints.QueueEndpoint.Port.Should().Be(10001);
+        result.Endpoints.TableEndpoint.Port.Should().Be(10002);
     }
 
     [Fact]
@@ -83,8 +82,8 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
-        Assert.Equal(20000, result.Endpoints!.BlobEndpoint.Port);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
+        result.Endpoints!.BlobEndpoint.Port.Should().Be(20000);
     }
 
     [Fact]
@@ -99,7 +98,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.UserConfiguredAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.UserConfiguredAzurite);
     }
 
     [Fact]
@@ -114,9 +113,9 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.UserConfiguredAzurite, result.Classification);
-        Assert.NotNull(result.Endpoints);
-        Assert.Equal("account1", result.Endpoints!.AccountName);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.UserConfiguredAzurite);
+        result.Endpoints.Should().NotBeNull();
+        result.Endpoints!.AccountName.Should().Be("account1");
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.UserConfiguredAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.UserConfiguredAzurite);
     }
 
     [Fact]
@@ -143,8 +142,8 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.UserConfiguredAzurite, result.Classification);
-        Assert.Null(result.Endpoints);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.UserConfiguredAzurite);
+        result.Endpoints.Should().BeNull();
     }
 
     [Fact]
@@ -155,7 +154,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.NotLocal, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.NotLocal);
     }
 
     [Fact]
@@ -165,7 +164,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.NotLocal, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.NotLocal);
     }
 
     [Fact]
@@ -179,7 +178,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.NotLocal, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.NotLocal);
     }
 
     [Fact]
@@ -191,7 +190,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.NotLocal, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.NotLocal);
     }
 
     [Fact]
@@ -203,7 +202,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
     }
 
     [Fact]
@@ -215,8 +214,8 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
-        Assert.Equal("devstoreaccount1", result.Endpoints!.AccountName);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
+        result.Endpoints!.AccountName.Should().Be("devstoreaccount1");
     }
 
     [Fact]
@@ -229,7 +228,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
     }
 
     [Theory]
@@ -241,7 +240,7 @@ public class AzureWebJobsStorageClassifierTests
     [InlineData("foo.localhost")]
     [InlineData("account1.blob.localhost")]
     public void IsLocalHost_RecognizesLocalHosts(string host)
-        => Assert.True(AzureWebJobsStorageClassifier.IsLocalHost(host));
+        => AzureWebJobsStorageClassifier.IsLocalHost(host).Should().BeTrue();
 
     [Theory]
     [InlineData("myaccount.blob.core.windows.net")]
@@ -249,7 +248,7 @@ public class AzureWebJobsStorageClassifierTests
     [InlineData("")]
     [InlineData("10.0.0.1")]
     public void IsLocalHost_RejectsNonLocalHosts(string host)
-        => Assert.False(AzureWebJobsStorageClassifier.IsLocalHost(host));
+        => AzureWebJobsStorageClassifier.IsLocalHost(host).Should().BeFalse();
 
     [Fact]
     public void Classify_LocalhostByName_IsManageable()
@@ -260,7 +259,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.ManageableAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.ManageableAzurite);
     }
 
     [Fact]
@@ -273,7 +272,7 @@ public class AzureWebJobsStorageClassifierTests
 
         var result = _classifier.Classify(cs);
 
-        Assert.Equal(AzureWebJobsStorageClassification.UserConfiguredAzurite, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.UserConfiguredAzurite);
     }
 
     [Fact]
@@ -281,6 +280,6 @@ public class AzureWebJobsStorageClassifierTests
     {
         var result = _classifier.Classify("garbage-without-equals");
 
-        Assert.Equal(AzureWebJobsStorageClassification.NotLocal, result.Classification);
+        result.Classification.Should().Be(AzureWebJobsStorageClassification.NotLocal);
     }
 }

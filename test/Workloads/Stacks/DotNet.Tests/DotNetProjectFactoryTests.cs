@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
@@ -37,8 +36,8 @@ public class DotNetProjectFactoryTests : IDisposable
     {
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
-        Assert.Equal("no .NET project file or build output found", notCreated.Reason);
+        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
+        notCreated.Reason.Should().Be("no .NET project file or build output found");
     }
 
     [Theory]
@@ -50,13 +49,13 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        DotNetSourceProject sourceProject = Assert.IsType<DotNetSourceProject>(created.Project);
-        Assert.Equal($"found {fileName}", created.Reason);
-        Assert.Equal("dotnet", sourceProject.StackName);
-        Assert.Equal(".NET", sourceProject.StackDisplayName);
-        Assert.False(sourceProject.SupportsExtensionBundles);
-        Assert.Equal(Path.Combine(_projectDir.FullName, fileName), sourceProject.ProjectFilePath);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        DotNetSourceProject sourceProject = created.Project.Should().BeOfType<DotNetSourceProject>().Subject;
+        created.Reason.Should().Be($"found {fileName}");
+        sourceProject.StackName.Should().Be("dotnet");
+        sourceProject.StackDisplayName.Should().Be(".NET");
+        sourceProject.SupportsExtensionBundles.Should().BeFalse();
+        sourceProject.ProjectFilePath.Should().Be(Path.Combine(_projectDir.FullName, fileName));
     }
 
     [Theory]
@@ -68,8 +67,8 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal($"found {fileName}", created.Reason);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Reason.Should().Be($"found {fileName}");
     }
 
     [Fact]
@@ -80,8 +79,8 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
-        Assert.Equal("multiple .NET project files found; cannot determine which to use", notCreated.Reason);
+        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
+        notCreated.Reason.Should().Be("multiple .NET project files found; cannot determine which to use");
     }
 
     [Fact]
@@ -92,15 +91,14 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(context, default);
 
-        ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
-        Assert.Equal("directory does not exist", notCreated.Reason);
+        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
+        notCreated.Reason.Should().Be("directory does not exist");
     }
 
     [Fact]
     public async Task NullContext_throws()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(null!, default));
+        await FluentActions.Awaiting(() => new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -111,7 +109,7 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -123,9 +121,9 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.IsType<DotNetOutputProject>(created.Project);
-        Assert.Equal("found .NET build output (host.json, worker.config.json, .azurefunctions)", created.Reason);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Project.Should().BeOfType<DotNetOutputProject>();
+        created.Reason.Should().Be("found .NET build output (host.json, worker.config.json, .azurefunctions)");
     }
 
     [Fact]
@@ -136,7 +134,7 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -147,7 +145,7 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -161,8 +159,8 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.IsType<DotNetSourceProject>(created.Project);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Project.Should().BeOfType<DotNetSourceProject>();
     }
 
     private void WriteFile(string name, string contents)

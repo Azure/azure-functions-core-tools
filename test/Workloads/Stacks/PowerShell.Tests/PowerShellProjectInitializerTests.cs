@@ -6,7 +6,6 @@ using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.PowerShell.Tests;
 
@@ -15,13 +14,13 @@ public class PowerShellProjectInitializerTests
     [Fact]
     public void Stack_IsPowerShell()
     {
-        Assert.Equal("powershell", new PowerShellProjectInitializer().Stack);
+        new PowerShellProjectInitializer().Stack.Should().Be("powershell");
     }
 
     [Fact]
     public void SupportedLanguages_ContainsPowerShell()
     {
-        Assert.Equal("PowerShell", Assert.Single(new PowerShellProjectInitializer().SupportedLanguages));
+        new PowerShellProjectInitializer().SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
     }
 
     [Fact]
@@ -30,13 +29,13 @@ public class PowerShellProjectInitializerTests
         RootCommand root = [];
         IReadOnlyList<Option> options = new PowerShellProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
 
-        Assert.Equal(4, options.Count);
+        options.Count.Should().Be(4);
     }
 
     [Fact]
     public void GetInitOptions_NullRegistry_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new PowerShellProjectInitializer().GetInitOptions(null!));
+        FluentActions.Invoking(() => new PowerShellProjectInitializer().GetInitOptions(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -62,15 +61,15 @@ public class PowerShellProjectInitializerTests
 
             await initializer.InitializeAsync(context, root.Parse([]));
 
-            Assert.True(File.Exists(Path.Combine(tempDir, "host.json")));
-            Assert.True(File.Exists(Path.Combine(tempDir, "local.settings.json")));
-            Assert.True(File.Exists(Path.Combine(tempDir, "profile.ps1")));
-            Assert.True(File.Exists(Path.Combine(tempDir, ".gitignore")));
-            Assert.False(File.Exists(Path.Combine(tempDir, "requirements.psd1")));
+            File.Exists(Path.Combine(tempDir, "host.json")).Should().BeTrue();
+            File.Exists(Path.Combine(tempDir, "local.settings.json")).Should().BeTrue();
+            File.Exists(Path.Combine(tempDir, "profile.ps1")).Should().BeTrue();
+            File.Exists(Path.Combine(tempDir, ".gitignore")).Should().BeTrue();
+            File.Exists(Path.Combine(tempDir, "requirements.psd1")).Should().BeFalse();
 
             string localSettings = File.ReadAllText(Path.Combine(tempDir, "local.settings.json"));
-            Assert.Contains("powershell", localSettings);
-            Assert.Contains("7.4", localSettings);
+            localSettings.Should().Contain("powershell");
+            localSettings.Should().Contain("7.4");
         }
         finally
         {
@@ -100,15 +99,15 @@ public class PowerShellProjectInitializerTests
 
             await initializer.InitializeAsync(context, root.Parse(["--managed-dependencies"]));
 
-            Assert.True(File.Exists(Path.Combine(tempDir, "requirements.psd1")));
+            File.Exists(Path.Combine(tempDir, "requirements.psd1")).Should().BeTrue();
             string requirements = File.ReadAllText(Path.Combine(tempDir, "requirements.psd1"));
-            Assert.Contains("12", requirements);
-            Assert.DoesNotContain("MAJOR_VERSION", requirements);
+            requirements.Should().Contain("12");
+            requirements.Should().NotContain("MAJOR_VERSION");
 
             // host.json should contain managedDependency
             string hostJson = File.ReadAllText(Path.Combine(tempDir, "host.json"));
             JsonObject host = JsonNode.Parse(hostJson)!.AsObject();
-            Assert.True(host.ContainsKey("managedDependency"));
+            host.ContainsKey("managedDependency").Should().BeTrue();
         }
         finally
         {
@@ -140,7 +139,7 @@ public class PowerShellProjectInitializerTests
 
             string hostJson = File.ReadAllText(Path.Combine(tempDir, "host.json"));
             JsonObject host = JsonNode.Parse(hostJson)!.AsObject();
-            Assert.False(host.ContainsKey("extensionBundle"));
+            host.ContainsKey("extensionBundle").Should().BeFalse();
         }
         finally
         {
@@ -155,8 +154,7 @@ public class PowerShellProjectInitializerTests
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => initializer.InitializeAsync(null!, root.Parse([])));
+        await FluentActions.Awaiting(() => initializer.InitializeAsync(null!, root.Parse([]))).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -182,8 +180,8 @@ public class PowerShellProjectInitializerTests
             await initializer.InitializeAsync(context, root.Parse(["--runtime-version", "7.6"]));
 
             string localSettings = File.ReadAllText(Path.Combine(tempDir, "local.settings.json"));
-            Assert.Contains("\"7.6\"", localSettings);
-            Assert.DoesNotContain("7.4", localSettings);
+            localSettings.Should().Contain("\"7.6\"");
+            localSettings.Should().NotContain("7.4");
         }
         finally
         {
@@ -211,8 +209,7 @@ public class PowerShellProjectInitializerTests
                 Language: null,
                 Force: false);
 
-            await Assert.ThrowsAsync<ArgumentException>(
-                () => initializer.InitializeAsync(context, root.Parse(["--runtime-version", "6.0"])));
+            await FluentActions.Awaiting(() => initializer.InitializeAsync(context, root.Parse(["--runtime-version", "6.0"]))).Should().ThrowAsync<ArgumentException>();
         }
         finally
         {
@@ -233,8 +230,7 @@ public class PowerShellProjectInitializerTests
             Language: null,
             Force: false);
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => initializer.InitializeAsync(context, null!));
+        await FluentActions.Awaiting(() => initializer.InitializeAsync(context, null!)).Should().ThrowAsync<ArgumentNullException>();
     }
 }
 

@@ -11,7 +11,6 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Configuration;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workers;
 
@@ -65,12 +64,10 @@ public class DefaultFunctionsWorkerInstallerTests
 
         FunctionsWorkerInstallResult result = await installer.InstallAsync(workerId, workerRanges, CancellationToken.None);
 
-        Assert.Equal(WorkerRuntime, result.Worker.WorkerRuntime);
-        Assert.Equal("3.13.0", result.Worker.Version);
-        Assert.False(result.WorkloadInstallResult.AlreadyInstalled);
-        Assert.Equal(
-            Path.Combine(GetInstallDirectory("3.13.0"), "tools", "any", "worker.config.json"),
-            result.Worker.WorkerConfigPath);
+        result.Worker.WorkerRuntime.Should().Be(WorkerRuntime);
+        result.Worker.Version.Should().Be("3.13.0");
+        result.WorkloadInstallResult.AlreadyInstalled.Should().BeFalse();
+        result.Worker.WorkerConfigPath.Should().Be(Path.Combine(GetInstallDirectory("3.13.0"), "tools", "any", "worker.config.json"));
         await _workloadInstaller.Received(1).InstallFromCatalogAsync(
             WorkerPackageId,
             Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "3.13.0"),
@@ -100,8 +97,8 @@ public class DefaultFunctionsWorkerInstallerTests
 
         FunctionsWorkerInstallResult result = await installer.InstallAsync(workerId, new Dictionary<string, VersionRange>(), CancellationToken.None);
 
-        Assert.True(result.WorkloadInstallResult.AlreadyInstalled);
-        Assert.Equal("3.14.0", result.Worker.Version);
+        result.WorkloadInstallResult.AlreadyInstalled.Should().BeTrue();
+        result.Worker.Version.Should().Be("3.14.0");
         await _workloadInstaller.Received(1).InstallFromCatalogAsync(
             WorkerPackageId,
             version: null,
@@ -131,11 +128,10 @@ public class DefaultFunctionsWorkerInstallerTests
             .Returns((ResolvedPackage?)null);
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 
-        WorkloadPackageNotFoundException exception = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
-            async () => await installer.InstallAsync(workerId, workerRanges, CancellationToken.None));
+        WorkloadPackageNotFoundException exception = (await FluentActions.Awaiting(async () => await installer.InstallAsync(workerId, workerRanges, CancellationToken.None)).Should().ThrowAsync<WorkloadPackageNotFoundException>()).Which;
 
-        Assert.Contains(WorkerPackageId, exception.Message);
-        Assert.Contains("[3.13.0]", exception.Message);
+        exception.Message.Should().Contain(WorkerPackageId);
+        exception.Message.Should().Contain("[3.13.0]");
     }
 
     [Fact]
@@ -155,10 +151,9 @@ public class DefaultFunctionsWorkerInstallerTests
             .Returns(new WorkloadInstallResult(entry, AlreadyInstalled: false));
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 
-        InvalidWorkloadException exception = await Assert.ThrowsAsync<InvalidWorkloadException>(
-            async () => await installer.InstallAsync(workerId, new Dictionary<string, VersionRange>(), CancellationToken.None));
+        InvalidWorkloadException exception = (await FluentActions.Awaiting(async () => await installer.InstallAsync(workerId, new Dictionary<string, VersionRange>(), CancellationToken.None)).Should().ThrowAsync<InvalidWorkloadException>()).Which;
 
-        Assert.Contains("kind 'content'", exception.Message);
+        exception.Message.Should().Contain("kind 'content'");
     }
 
     [Fact]
@@ -166,8 +161,7 @@ public class DefaultFunctionsWorkerInstallerTests
     {
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            async () => await installer.InstallAsync(null!, new Dictionary<string, VersionRange>(), CancellationToken.None));
+        await FluentActions.Awaiting(async () => await installer.InstallAsync(null!, new Dictionary<string, VersionRange>(), CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -175,8 +169,7 @@ public class DefaultFunctionsWorkerInstallerTests
     {
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            async () => await installer.InstallAsync(new FunctionsWorkerId(WorkerRuntime), null!, CancellationToken.None));
+        await FluentActions.Awaiting(async () => await installer.InstallAsync(new FunctionsWorkerId(WorkerRuntime), null!, CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -184,10 +177,10 @@ public class DefaultFunctionsWorkerInstallerTests
     {
         var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()));
 
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerInstaller(null!, _workloadInstaller, _workloadPaths, contentResolver));
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, null!, _workloadPaths, contentResolver));
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, null!, contentResolver));
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, _workloadPaths, null!));
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(null!, _workloadInstaller, _workloadPaths, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, null!, _workloadPaths, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, null!, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, _workloadPaths, null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     private DefaultFunctionsWorkerInstaller CreateInstaller()

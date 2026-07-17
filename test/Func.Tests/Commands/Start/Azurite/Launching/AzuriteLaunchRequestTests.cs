@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite.Launching;
 
@@ -11,75 +10,75 @@ public class AzuriteLaunchRequestTests
     [Fact]
     public void Constructor_NativeMode_WithoutExecutablePath_Throws()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new AzuriteLaunchRequest(
+        var ex = FluentActions.Invoking(() => new AzuriteLaunchRequest(
             mode: AzuriteLaunchMode.Native,
             blobPort: 10000,
             queuePort: 10001,
             tablePort: 10002,
             dataPath: "/tmp/data",
-            logPath: "/tmp/log/azurite.log"));
+            logPath: "/tmp/log/azurite.log")).Should().ThrowExactly<ArgumentException>().Which;
 
-        Assert.Equal("executablePath", ex.ParamName);
+        ex.ParamName.Should().Be("executablePath");
     }
 
     [Fact]
     public void Constructor_DockerMode_WithoutImage_Throws()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new AzuriteLaunchRequest(
+        var ex = FluentActions.Invoking(() => new AzuriteLaunchRequest(
             mode: AzuriteLaunchMode.Docker,
             blobPort: 10000,
             queuePort: 10001,
             tablePort: 10002,
             dataPath: "/tmp/data",
             logPath: "/tmp/log/azurite.log",
-            containerName: "func-azurite-test"));
+            containerName: "func-azurite-test")).Should().ThrowExactly<ArgumentException>().Which;
 
-        Assert.Equal("dockerImage", ex.ParamName);
+        ex.ParamName.Should().Be("dockerImage");
     }
 
     [Fact]
     public void Constructor_DockerMode_WithoutContainerName_Throws()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new AzuriteLaunchRequest(
+        var ex = FluentActions.Invoking(() => new AzuriteLaunchRequest(
             mode: AzuriteLaunchMode.Docker,
             blobPort: 10000,
             queuePort: 10001,
             tablePort: 10002,
             dataPath: "/tmp/data",
             logPath: "/tmp/log/azurite.log",
-            dockerImage: AzuriteDockerImage.Default));
+            dockerImage: AzuriteDockerImage.Default)).Should().ThrowExactly<ArgumentException>().Which;
 
-        Assert.Equal("containerName", ex.ParamName);
+        ex.ParamName.Should().Be("containerName");
     }
 
     [Fact]
     public void Constructor_MissingDataPath_Throws()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new AzuriteLaunchRequest(
+        var ex = FluentActions.Invoking(() => new AzuriteLaunchRequest(
             mode: AzuriteLaunchMode.Native,
             blobPort: 10000,
             queuePort: 10001,
             tablePort: 10002,
             dataPath: string.Empty,
             logPath: "/tmp/log/azurite.log",
-            executablePath: "/usr/local/bin/azurite"));
+            executablePath: "/usr/local/bin/azurite")).Should().ThrowExactly<ArgumentException>().Which;
 
-        Assert.Equal("dataPath", ex.ParamName);
+        ex.ParamName.Should().Be("dataPath");
     }
 
     [Fact]
     public void Constructor_MissingLogPath_Throws()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new AzuriteLaunchRequest(
+        var ex = FluentActions.Invoking(() => new AzuriteLaunchRequest(
             mode: AzuriteLaunchMode.Native,
             blobPort: 10000,
             queuePort: 10001,
             tablePort: 10002,
             dataPath: "/tmp/data",
             logPath: string.Empty,
-            executablePath: "/usr/local/bin/azurite"));
+            executablePath: "/usr/local/bin/azurite")).Should().ThrowExactly<ArgumentException>().Which;
 
-        Assert.Equal("logPath", ex.ParamName);
+        ex.ParamName.Should().Be("logPath");
     }
 
     [Fact]
@@ -94,13 +93,13 @@ public class AzuriteLaunchRequestTests
             logPath: "/var/log/azurite.log",
             executablePath: "/usr/local/bin/azurite");
 
-        Assert.Equal(AzuriteLaunchMode.Native, request.Mode);
-        Assert.Equal("/usr/local/bin/azurite", request.ExecutablePath);
-        Assert.Null(request.DockerImage);
-        Assert.Null(request.ContainerName);
-        Assert.Equal(20000, request.BlobPort);
-        Assert.Equal(20001, request.QueuePort);
-        Assert.Equal(20002, request.TablePort);
+        request.Mode.Should().Be(AzuriteLaunchMode.Native);
+        request.ExecutablePath.Should().Be("/usr/local/bin/azurite");
+        request.DockerImage.Should().BeNull();
+        request.ContainerName.Should().BeNull();
+        request.BlobPort.Should().Be(20000);
+        request.QueuePort.Should().Be(20001);
+        request.TablePort.Should().Be(20002);
     }
 
     [Fact]
@@ -116,9 +115,9 @@ public class AzuriteLaunchRequestTests
             dockerImage: AzuriteDockerImage.Default,
             containerName: "func-azurite-abc");
 
-        Assert.Equal(AzuriteLaunchMode.Docker, request.Mode);
-        Assert.Equal(AzuriteDockerImage.Default, request.DockerImage);
-        Assert.Equal("func-azurite-abc", request.ContainerName);
-        Assert.Null(request.ExecutablePath);
+        request.Mode.Should().Be(AzuriteLaunchMode.Docker);
+        request.DockerImage.Should().Be(AzuriteDockerImage.Default);
+        request.ContainerName.Should().Be("func-azurite-abc");
+        request.ExecutablePath.Should().BeNull();
     }
 }

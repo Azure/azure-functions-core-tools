@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Python.Tests;
 
@@ -59,11 +58,11 @@ public class PythonFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.Equal(Path.Combine(_projectDir.FullName, PythonFunctionsProject.DefaultVenvFolderName), venvCreatedAt);
-        Assert.NotNull(pipUsed);
-        Assert.Contains(PythonFunctionsProject.DefaultVenvFolderName, pipUsed!);
-        Assert.Equal(Path.Combine(_projectDir.FullName, "requirements.txt"), requirementsUsed);
-        Assert.Equal("1", context.EnvironmentVariables[PythonFunctionsProject.IsolateWorkerDepsEnvVar]);
+        venvCreatedAt.Should().Be(Path.Combine(_projectDir.FullName, PythonFunctionsProject.DefaultVenvFolderName));
+        pipUsed.Should().NotBeNull();
+        pipUsed!.Should().Contain(PythonFunctionsProject.DefaultVenvFolderName);
+        requirementsUsed.Should().Be(Path.Combine(_projectDir.FullName, "requirements.txt"));
+        context.EnvironmentVariables[PythonFunctionsProject.IsolateWorkerDepsEnvVar].Should().Be("1");
     }
 
     [Fact]
@@ -85,7 +84,7 @@ public class PythonFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.False(venvCreated);
+        venvCreated.Should().BeFalse();
     }
 
     [Fact]
@@ -110,7 +109,7 @@ public class PythonFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.False(pipRan);
+        pipRan.Should().BeFalse();
     }
 
     [Fact]
@@ -135,8 +134,8 @@ public class PythonFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "created virtual environment");
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "venv warning");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "created virtual environment");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "venv warning");
     }
 
     [Fact]
@@ -156,13 +155,12 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("venv", ex.Message);
-        Assert.Contains("exit 1", ex.Message);
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "python not found");
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("venv");
+        ex.Message.Should().Contain("exit 1");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "python not found");
     }
 
     [Fact]
@@ -187,13 +185,12 @@ public class PythonFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("pip install", ex.Message);
-        Assert.Contains("exit 2", ex.Message);
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "invalid spec");
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("pip install");
+        ex.Message.Should().Contain("exit 2");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "invalid spec");
     }
 
     [Fact]
@@ -219,8 +216,8 @@ public class PythonFunctionsProjectTests : IDisposable
             Path.Combine(_projectDir.FullName, PythonFunctionsProject.DefaultVenvFolderName),
             "python");
 
-        Assert.Equal(expectedExe, context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar]);
-        Assert.Equal("3.12", context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar]);
+        context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar].Should().Be(expectedExe);
+        context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be("3.12");
     }
 
     [Fact]
@@ -241,8 +238,8 @@ public class PythonFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.False(context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerRuntimeVersionEnvVar));
-        Assert.True(context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerExecutablePathEnvVar));
+        context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerRuntimeVersionEnvVar).Should().BeFalse();
+        context.EnvironmentVariables.ContainsKey(PythonFunctionsProject.WorkerExecutablePathEnvVar).Should().BeTrue();
     }
 
     [Fact]
@@ -273,10 +270,10 @@ public class PythonFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.False(venvCreated);
-        Assert.NotNull(pipUsed);
-        Assert.Contains("my-shared-env", pipUsed!);
-        Assert.Contains("my-shared-env", context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar]);
+        venvCreated.Should().BeFalse();
+        pipUsed.Should().NotBeNull();
+        pipUsed!.Should().Contain("my-shared-env");
+        context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar].Should().Contain("my-shared-env");
     }
 
     [Theory]
@@ -308,9 +305,9 @@ public class PythonFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.False(venvCreated);
-        Assert.NotNull(pipUsed);
-        Assert.Contains(folderName, pipUsed!);
+        venvCreated.Should().BeFalse();
+        pipUsed.Should().NotBeNull();
+        pipUsed!.Should().Contain(folderName);
     }
 
     private FunctionsProjectHostRunContext CreateContext()

@@ -2,10 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Go.Tests;
 
@@ -22,15 +20,15 @@ public class GoWorkloadTests
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        Assert.IsType<GoProjectInitializer>(initializer);
-        Assert.Equal("go", initializer.Stack);
-        Assert.Equal("Go", Assert.Single(initializer.SupportedLanguages));
+        initializer.Should().BeOfType<GoProjectInitializer>();
+        initializer.Stack.Should().Be("go");
+        initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("Go");
     }
 
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new GoWorkload().Configure(null!));
+        FluentActions.Invoking(() => new GoWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]

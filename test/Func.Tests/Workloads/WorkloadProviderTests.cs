@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads;
 
@@ -21,10 +20,10 @@ public class WorkloadProviderTests
 
         // Materialized once at construction, so repeated calls return the
         // same list instance and never re-enumerate the source.
-        Assert.Same(first, second);
-        Assert.Equal(2, first.Count);
-        Assert.Same(a, first[0]);
-        Assert.Same(b, first[1]);
+        second.Should().BeSameAs(first);
+        first.Count.Should().Be(2);
+        first[0].Should().BeSameAs(a);
+        first[1].Should().BeSameAs(b);
     }
 
     [Fact]
@@ -38,10 +37,10 @@ public class WorkloadProviderTests
         IReadOnlyList<RuntimeWorkloadInfo> runtimeWorkloads = provider.GetRuntimeWorkloads();
         IReadOnlyList<ContentWorkloadInfo> contentWorkloads = provider.GetContentWorkloads();
 
-        Assert.Same(runtimeWorkloads, provider.GetRuntimeWorkloads());
-        Assert.Same(contentWorkloads, provider.GetContentWorkloads());
-        Assert.Same(runtime, Assert.Single(runtimeWorkloads));
-        Assert.Same(content, Assert.Single(contentWorkloads));
+        provider.GetRuntimeWorkloads().Should().BeSameAs(runtimeWorkloads);
+        provider.GetContentWorkloads().Should().BeSameAs(contentWorkloads);
+        runtimeWorkloads.Should().ContainSingle().Subject.Should().BeSameAs(runtime);
+        contentWorkloads.Should().ContainSingle().Subject.Should().BeSameAs(content);
     }
 
     [Fact]
@@ -57,13 +56,10 @@ public class WorkloadProviderTests
         IReadOnlyList<RuntimeWorkloadInfo> runtimeWorkloads = provider.GetRuntimeWorkloadsByPackageId("pkg.shared");
         IReadOnlyList<ContentWorkloadInfo> contentWorkloads = provider.GetContentWorkloadsByPackageId("PKG.SHARED");
 
-        Assert.Same(runtimeWorkloads, provider.GetRuntimeWorkloadsByPackageId("Pkg.Shared"));
-        Assert.Same(contentWorkloads, provider.GetContentWorkloadsByPackageId("pkg.shared"));
-        Assert.Same(runtimeMatch, Assert.Single(runtimeWorkloads));
-        Assert.Collection(
-            contentWorkloads,
-            workload => Assert.Same(contentOld, workload),
-            workload => Assert.Same(contentNew, workload));
+        provider.GetRuntimeWorkloadsByPackageId("Pkg.Shared").Should().BeSameAs(runtimeWorkloads);
+        provider.GetContentWorkloadsByPackageId("pkg.shared").Should().BeSameAs(contentWorkloads);
+        runtimeWorkloads.Should().ContainSingle().Subject.Should().BeSameAs(runtimeMatch);
+        contentWorkloads.Should().SatisfyRespectively(workload => workload.Should().BeSameAs(contentOld), workload => workload.Should().BeSameAs(contentNew));
     }
 
     [Fact]
@@ -75,8 +71,8 @@ public class WorkloadProviderTests
                 TestWorkloads.CreateContentInfo("Pkg.Content"),
             ]);
 
-        Assert.Empty(provider.GetRuntimeWorkloadsByPackageId("Pkg.Missing"));
-        Assert.Empty(provider.GetContentWorkloadsByPackageId("Pkg.Missing"));
+        provider.GetRuntimeWorkloadsByPackageId("Pkg.Missing").Should().BeEmpty();
+        provider.GetContentWorkloadsByPackageId("Pkg.Missing").Should().BeEmpty();
     }
 
     [Theory]
@@ -87,7 +83,7 @@ public class WorkloadProviderTests
     {
         var provider = new WorkloadProvider([]);
 
-        Assert.ThrowsAny<ArgumentException>(() => provider.GetRuntimeWorkloadsByPackageId(packageId!));
+        FluentActions.Invoking(() => provider.GetRuntimeWorkloadsByPackageId(packageId!)).Should().Throw<ArgumentException>();
     }
 
     [Theory]
@@ -98,12 +94,12 @@ public class WorkloadProviderTests
     {
         var provider = new WorkloadProvider([]);
 
-        Assert.ThrowsAny<ArgumentException>(() => provider.GetContentWorkloadsByPackageId(packageId!));
+        FluentActions.Invoking(() => provider.GetContentWorkloadsByPackageId(packageId!)).Should().Throw<ArgumentException>();
     }
 
     [Fact]
     public void Ctor_NullWorkloads_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new WorkloadProvider(null!));
+        FluentActions.Invoking(() => new WorkloadProvider(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 }

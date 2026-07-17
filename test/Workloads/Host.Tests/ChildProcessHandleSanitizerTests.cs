@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Workloads.Host.Interop;
 using Azure.Functions.Cli.Workloads.Host.Startup;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Host.Tests;
 
@@ -15,7 +14,7 @@ public sealed class ChildProcessHandleSanitizerTests
 
     [Fact]
     public void Constructor_NullNativeHandleApi_Throws()
-        => Assert.Throws<ArgumentNullException>(() => new ChildProcessHandleSanitizer(null!));
+        => FluentActions.Invoking(() => new ChildProcessHandleSanitizer(null!)).Should().ThrowExactly<ArgumentNullException>();
 
     [Fact]
     public void DisableInheritanceOnOpenHandles_ClearsInheritOnlyOnInheritableHandles()
@@ -31,7 +30,7 @@ public sealed class ChildProcessHandleSanitizerTests
 
         int disabledCount = sanitizer.DisableInheritanceOnOpenHandles();
 
-        Assert.Equal(2, disabledCount);
+        disabledCount.Should().Be(2);
         nativeHandleApi.Received(1).TryDisableInheritance((nint)0x10);
         nativeHandleApi.Received(1).TryDisableInheritance((nint)0x20);
         nativeHandleApi.DidNotReceive().TryDisableInheritance((nint)0x30);
@@ -51,7 +50,7 @@ public sealed class ChildProcessHandleSanitizerTests
 
         int disabledCount = sanitizer.DisableInheritanceOnOpenHandles();
 
-        Assert.Equal(1, disabledCount);
+        disabledCount.Should().Be(1);
         nativeHandleApi.Received(1).TryDisableInheritance((nint)0x20);
     }
 
@@ -64,7 +63,7 @@ public sealed class ChildProcessHandleSanitizerTests
 
         int disabledCount = sanitizer.DisableInheritanceOnOpenHandles();
 
-        Assert.Equal(0, disabledCount);
+        disabledCount.Should().Be(0);
         nativeHandleApi.DidNotReceive().TryDisableInheritance(Arg.Any<nint>());
     }
 

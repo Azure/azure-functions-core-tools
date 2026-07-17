@@ -4,7 +4,6 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Projects;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
@@ -34,7 +33,7 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsDotNet()
     {
-        Assert.Equal("dotnet", CreateInitializer().Stack);
+        CreateInitializer().Stack.Should().Be("dotnet");
     }
 
     [Fact]
@@ -44,26 +43,26 @@ public class DotNetProjectInitializerTests : IDisposable
         RootCommand root = [];
         IReadOnlyList<Option> options = initializer.GetInitOptions(new InitOptionRegistry(root));
 
-        Assert.Single(options);
-        Assert.Same(initializer.FrameworkOption, options[0]);
+        options.Should().ContainSingle();
+        options[0].Should().BeSameAs(initializer.FrameworkOption);
     }
 
     [Fact]
     public void SupportedLanguages_ReturnsExpectedLanguages()
     {
-        Assert.Equal(["C#", "F#"], CreateInitializer().SupportedLanguages);
+        CreateInitializer().SupportedLanguages.Should().Equal(["C#", "F#"]);
     }
 
     [Fact]
     public void TemplatesPackageName_IsCorrect()
     {
-        Assert.Equal("Microsoft.Azure.Functions.Worker.ProjectTemplates", DotNetProjectInitializer.TemplatesPackageName);
+        DotNetProjectInitializer.TemplatesPackageName.Should().Be("Microsoft.Azure.Functions.Worker.ProjectTemplates");
     }
 
     [Fact]
     public void DefaultFramework_IsNet10()
     {
-        Assert.Equal("net10.0", DotNetProjectInitializer.DefaultFramework);
+        DotNetProjectInitializer.DefaultFramework.Should().Be("net10.0");
     }
 
     [Theory]
@@ -79,19 +78,19 @@ public class DotNetProjectInitializerTests : IDisposable
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
-        Assert.Equal(expected, CreateInitializer().NormalizeLanguage(input));
+        CreateInitializer().NormalizeLanguage(input).Should().Be(expected);
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullRunner()
     {
-        Assert.Throws<ArgumentNullException>(() => new DotNetProjectInitializer(null!, _hivePathProvider));
+        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullHivePathProvider()
     {
-        Assert.Throws<ArgumentNullException>(() => new DotNetProjectInitializer(_dotnetCli, null!));
+        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]

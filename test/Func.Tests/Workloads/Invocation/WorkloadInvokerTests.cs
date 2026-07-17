@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Invocation;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Invocation;
 
@@ -24,7 +23,7 @@ public sealed class WorkloadInvokerTests
             return Task.CompletedTask;
         }, CancellationToken.None);
 
-        Assert.Equal(1, calls);
+        calls.Should().Be(1);
     }
 
     [Fact]
@@ -32,7 +31,7 @@ public sealed class WorkloadInvokerTests
     {
         int result = await _invoker.InvokeAsync(_workload, _ => Task.FromResult(42), CancellationToken.None);
 
-        Assert.Equal(42, result);
+        result.Should().Be(42);
     }
 
     [Fact]
@@ -40,14 +39,14 @@ public sealed class WorkloadInvokerTests
     {
         GracefulException original = new("boom", isUserError: true, verboseMessage: "v");
 
-        GracefulException thrown = await Assert.ThrowsAsync<GracefulException>(() =>
-            _invoker.InvokeAsync(_workload, _ => throw original, CancellationToken.None));
+        GracefulException thrown = (await FluentActions.Awaiting(() =>
+            _invoker.InvokeAsync(_workload, _ => throw original, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
         // Must remain a plain GracefulException (not the protocol subclass).
-        Assert.IsType<GracefulException>(thrown);
-        Assert.Equal("[Pkg.Acme] boom", thrown.Message);
-        Assert.True(thrown.IsUserError);
-        Assert.Equal("v", thrown.VerboseMessage);
+        thrown.Should().BeOfType<GracefulException>();
+        thrown.Message.Should().Be("[Pkg.Acme] boom");
+        thrown.IsUserError.Should().BeTrue();
+        thrown.VerboseMessage.Should().Be("v");
     }
 
     [Fact]
@@ -55,14 +54,14 @@ public sealed class WorkloadInvokerTests
     {
         InvalidOperationException original = new("oops");
 
-        WorkloadProtocolException thrown = await Assert.ThrowsAsync<WorkloadProtocolException>(() =>
-            _invoker.InvokeAsync(_workload, _ => throw original, CancellationToken.None));
+        WorkloadProtocolException thrown = (await FluentActions.Awaiting(() =>
+            _invoker.InvokeAsync(_workload, _ => throw original, CancellationToken.None)).Should().ThrowAsync<WorkloadProtocolException>()).Which;
 
-        Assert.Contains("[Pkg.Acme] error: oops", thrown.Message);
-        Assert.Contains("Please file an issue against the workload.", thrown.Message);
-        Assert.Same(original, thrown.OriginalException);
-        Assert.Same(_workload, thrown.Workload);
-        Assert.False(thrown.IsUserError);
+        thrown.Message.Should().Contain("[Pkg.Acme] error: oops");
+        thrown.Message.Should().Contain("Please file an issue against the workload.");
+        thrown.OriginalException.Should().BeSameAs(original);
+        thrown.Workload.Should().BeSameAs(_workload);
+        thrown.IsUserError.Should().BeFalse();
     }
 
     [Fact]
@@ -71,14 +70,14 @@ public sealed class WorkloadInvokerTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        OperationCanceledException thrown = await Assert.ThrowsAsync<OperationCanceledException>(() =>
+        OperationCanceledException thrown = (await FluentActions.Awaiting(() =>
             _invoker.InvokeAsync(_workload, ct =>
             {
                 ct.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
-            }, cts.Token));
+            }, cts.Token)).Should().ThrowAsync<OperationCanceledException>()).Which;
 
-        Assert.IsAssignableFrom<OperationCanceledException>(thrown);
+        thrown.Should().BeAssignableTo<OperationCanceledException>();
         // Cancellation is not a workload error: not wrapped, not graceful.
     }
 
@@ -87,10 +86,10 @@ public sealed class WorkloadInvokerTests
     {
         GracefulException original = new("nope");
 
-        GracefulException thrown = await Assert.ThrowsAsync<GracefulException>(() =>
-            _invoker.InvokeAsync<int>(_workload, _ => throw original, CancellationToken.None));
+        GracefulException thrown = (await FluentActions.Awaiting(() =>
+            _invoker.InvokeAsync<int>(_workload, _ => throw original, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Equal("[Pkg.Acme] nope", thrown.Message);
+        thrown.Message.Should().Be("[Pkg.Acme] nope");
     }
 
     [Fact]
@@ -98,24 +97,24 @@ public sealed class WorkloadInvokerTests
     {
         InvalidOperationException original = new("kaboom");
 
-        WorkloadProtocolException thrown = await Assert.ThrowsAsync<WorkloadProtocolException>(() =>
-            _invoker.InvokeAsync<int>(_workload, _ => throw original, CancellationToken.None));
+        WorkloadProtocolException thrown = (await FluentActions.Awaiting(() =>
+            _invoker.InvokeAsync<int>(_workload, _ => throw original, CancellationToken.None)).Should().ThrowAsync<WorkloadProtocolException>()).Which;
 
-        Assert.Contains("[Pkg.Acme] error: kaboom", thrown.Message);
-        Assert.Same(original, thrown.OriginalException);
+        thrown.Message.Should().Contain("[Pkg.Acme] error: kaboom");
+        thrown.OriginalException.Should().BeSameAs(original);
     }
 
     [Fact]
     public async Task InvokeAsync_NullWorkload_Throws()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _invoker.InvokeAsync(null!, _ => Task.CompletedTask, CancellationToken.None));
+        await FluentActions.Awaiting(() =>
+            _invoker.InvokeAsync(null!, _ => Task.CompletedTask, CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
     public async Task InvokeAsync_NullOperation_Throws()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _invoker.InvokeAsync(_workload, null!, CancellationToken.None));
+        await FluentActions.Awaiting(() =>
+            _invoker.InvokeAsync(_workload, null!, CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 }

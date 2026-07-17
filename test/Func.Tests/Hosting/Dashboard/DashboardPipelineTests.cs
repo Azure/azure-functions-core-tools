@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard;
 
@@ -26,10 +25,10 @@ public class DashboardPipelineTests
 
         int exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(0, exitCode);
-        Assert.NotNull(renderer.Summary);
-        Assert.Equal("sigint", renderer.Summary.ExitReason);
-        Assert.True(renderer.Disposed);
+        exitCode.Should().Be(0);
+        renderer.Summary.Should().NotBeNull();
+        renderer.Summary.ExitReason.Should().Be("sigint");
+        renderer.Disposed.Should().BeTrue();
     }
 
     [Fact]
@@ -42,10 +41,10 @@ public class DashboardPipelineTests
 
         int exitCode = await pipeline.RunAsync(CancellationToken.None);
 
-        Assert.Equal(42, exitCode);
-        Assert.True(source.WaitForExitCalled);
-        Assert.NotNull(renderer.Summary);
-        Assert.Equal("source_completed", renderer.Summary.ExitReason);
+        exitCode.Should().Be(42);
+        source.WaitForExitCalled.Should().BeTrue();
+        renderer.Summary.Should().NotBeNull();
+        renderer.Summary.ExitReason.Should().Be("source_completed");
     }
 
     [Fact]
@@ -62,10 +61,10 @@ public class DashboardPipelineTests
 
         int exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(0, exitCode);
-        Assert.True(source.ShutdownRequested);
-        Assert.NotNull(renderer.Summary);
-        Assert.Equal("sigint", renderer.Summary.ExitReason);
+        exitCode.Should().Be(0);
+        source.ShutdownRequested.Should().BeTrue();
+        renderer.Summary.Should().NotBeNull();
+        renderer.Summary.ExitReason.Should().Be("sigint");
     }
 
     [Fact]
@@ -96,9 +95,9 @@ public class DashboardPipelineTests
         int exitCode = await pipeline.RunAsync(CancellationToken.None);
 
         string output = writer.ToString();
-        Assert.Equal(0, exitCode);
-        Assert.Contains("[error] Function.HttpTrigger1: Invocation failed", output);
-        Assert.Contains("invocation_completed HttpTrigger1 invocation-1 failed duration_ms=42", output);
+        exitCode.Should().Be(0);
+        output.Should().Contain("[error] Function.HttpTrigger1: Invocation failed");
+        output.Should().Contain("invocation_completed HttpTrigger1 invocation-1 failed duration_ms=42");
     }
 
     [Fact]
@@ -119,10 +118,9 @@ public class DashboardPipelineTests
             Exception: null,
             HostLogEntry.EmptyAttributes));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => pipeline.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5)));
+        await FluentActions.Awaiting(() => pipeline.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5))).Should().ThrowAsync<InvalidOperationException>();
 
-        Assert.True(source.ShutdownRequested);
+        source.ShutdownRequested.Should().BeTrue();
     }
 
     private sealed class ThrowingRenderer : IDashboardRenderer

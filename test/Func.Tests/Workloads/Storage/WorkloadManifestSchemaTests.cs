@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
@@ -35,7 +34,7 @@ public class WorkloadManifestSchemaTests : IDisposable
     [Fact]
     public void CurrentSchema_IsV1Url()
     {
-        Assert.Equal(V1Schema, WorkloadManifestSchema.CurrentRegistrySchema);
+        WorkloadManifestSchema.CurrentRegistrySchema.Should().Be(V1Schema);
     }
 
     [Fact]
@@ -45,11 +44,11 @@ public class WorkloadManifestSchemaTests : IDisposable
 
         string json = await File.ReadAllTextAsync(_registryPath);
 
-        Assert.Contains($"\"$schema\":\"{V1Schema}\"", json);
+        json.Should().Contain($"\"$schema\":\"{V1Schema}\"");
         int schemaIdx = json.IndexOf("\"$schema\"", StringComparison.Ordinal);
         int workloadsIdx = json.IndexOf("\"workloads\"", StringComparison.Ordinal);
-        Assert.True(schemaIdx >= 0 && workloadsIdx >= 0);
-        Assert.True(schemaIdx < workloadsIdx, "$schema must appear before workloads.");
+        (schemaIdx >= 0 && workloadsIdx >= 0).Should().BeTrue();
+        (schemaIdx < workloadsIdx).Should().BeTrue("$schema must appear before workloads.");
     }
 
     [Fact]
@@ -66,7 +65,7 @@ public class WorkloadManifestSchemaTests : IDisposable
 
         IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync();
 
-        Assert.Single(workloads);
+        workloads.Should().ContainSingle();
     }
 
     [Fact]
@@ -84,7 +83,7 @@ public class WorkloadManifestSchemaTests : IDisposable
 
         IReadOnlyList<WorkloadEntry> workloads = await _store.GetWorkloadsAsync();
 
-        Assert.Single(workloads);
+        workloads.Should().ContainSingle();
     }
 
     [Fact]
@@ -97,15 +96,14 @@ public class WorkloadManifestSchemaTests : IDisposable
             }
             """);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => _store.GetWorkloadsAsync());
+        GracefulException ex = (await FluentActions.Awaiting(() => _store.GetWorkloadsAsync()).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("v999", ex.Message);
-        Assert.Contains("not supported", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Supported schemas", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(WorkloadManifestSchema.RegistryV1Schema, ex.Message);
-        Assert.Contains("updating the CLI", ex.Message, StringComparison.OrdinalIgnoreCase);
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("v999");
+        ex.Message.Should().ContainEquivalentOf("not supported");
+        ex.Message.Should().ContainEquivalentOf("Supported schemas");
+        ex.Message.Should().Contain(WorkloadManifestSchema.RegistryV1Schema);
+        ex.Message.Should().ContainEquivalentOf("updating the CLI");
     }
 
     [Fact]
@@ -117,7 +115,7 @@ public class WorkloadManifestSchemaTests : IDisposable
 
         string json = await File.ReadAllTextAsync(_registryPath);
 
-        Assert.Contains($"\"$schema\":\"{V1Schema}\"", json);
+        json.Should().Contain($"\"$schema\":\"{V1Schema}\"");
     }
 
     private static WorkloadEntry NewEntry(string packageId, string version) => new()

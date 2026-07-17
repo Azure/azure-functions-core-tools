@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
-using Azure.Functions.Cli;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
@@ -12,7 +11,6 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Spectre.Console;
 using Spectre.Console.Rendering;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -28,10 +26,10 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
-        Assert.Contains("⚡ Azure Functions CLI", output);
-        Assert.Contains("Host: 4.834.0", output);
-        Assert.Contains("Profile: flex", output);
-        Assert.Contains("Stack: .NET", output);
+        output.Should().Contain("⚡ Azure Functions CLI");
+        output.Should().Contain("Host: 4.834.0");
+        output.Should().Contain("Profile: flex");
+        output.Should().Contain("Stack: .NET");
     }
 
     [Fact]
@@ -43,12 +41,12 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
 
         string output = writer.ToString();
-        Assert.Contains("12 functions", output);
-        Assert.Contains("↑/↓, PgUp/PgDn logs", output);
-        Assert.DoesNotContain("Fn+↑/↓", output);
-        Assert.DoesNotContain("Ctrl+U/D", output);
-        Assert.Contains("L:info", output);
-        Assert.Contains("q/Ctrl+C", output);
+        output.Should().Contain("12 functions");
+        output.Should().Contain("↑/↓, PgUp/PgDn logs");
+        output.Should().NotContain("Fn+↑/↓");
+        output.Should().NotContain("Ctrl+U/D");
+        output.Should().Contain("L:info");
+        output.Should().Contain("q/Ctrl+C");
     }
 
     [Fact]
@@ -61,7 +59,7 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
 
         string output = writer.ToString();
-        Assert.Contains("?/Esc close", output);
+        output.Should().Contain("?/Esc close");
     }
 
     [Fact]
@@ -74,26 +72,26 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
-        Assert.Contains("Help", output);
-        Assert.Contains("Available compact-mode controls", output);
-        Assert.Contains("Toggle this help panel", output);
-        Assert.Contains("Search functions by name", output);
-        Assert.Contains("Scroll logs line by line", output);
-        Assert.Contains("Clear visible log output", output);
-        Assert.Contains("Cycle the active function filter", output);
-        Assert.Contains("Toggle errors-only log view", output);
-        Assert.Contains("Set visible log level", output);
-        Assert.Contains("Scroll logs", output);
-        Assert.Contains("PgUp/PgDn", output);
-        Assert.DoesNotContain("Fn+↑/↓", output);
-        Assert.DoesNotContain("Ctrl+U/D", output);
-        Assert.DoesNotContain("Open the configured log file", output);
-        Assert.DoesNotContain("Coming soon", output);
-        Assert.DoesNotContain("c clear logs", output);
-        Assert.DoesNotContain("e errors only", output);
-        Assert.DoesNotContain("1/2/3 log level", output);
-        Assert.DoesNotContain("q quit", output);
-        Assert.DoesNotContain("/ search", output);
+        output.Should().Contain("Help");
+        output.Should().Contain("Available compact-mode controls");
+        output.Should().Contain("Toggle this help panel");
+        output.Should().Contain("Search functions by name");
+        output.Should().Contain("Scroll logs line by line");
+        output.Should().Contain("Clear visible log output");
+        output.Should().Contain("Cycle the active function filter");
+        output.Should().Contain("Toggle errors-only log view");
+        output.Should().Contain("Set visible log level");
+        output.Should().Contain("Scroll logs");
+        output.Should().Contain("PgUp/PgDn");
+        output.Should().NotContain("Fn+↑/↓");
+        output.Should().NotContain("Ctrl+U/D");
+        output.Should().NotContain("Open the configured log file");
+        output.Should().NotContain("Coming soon");
+        output.Should().NotContain("c clear logs");
+        output.Should().NotContain("e errors only");
+        output.Should().NotContain("1/2/3 log level");
+        output.Should().NotContain("q quit");
+        output.Should().NotContain("/ search");
     }
 
     [Fact]
@@ -106,8 +104,8 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.Contains("Help", output);
-        Assert.True(CountRenderedLines(output) <= console.Profile.Height);
+        output.Should().Contain("Help");
+        (CountRenderedLines(output) <= console.Profile.Height).Should().BeTrue();
     }
 
     [Fact]
@@ -121,10 +119,10 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
-        Assert.Contains("Search functions", output);
-        Assert.Contains("extra2", output);
-        Assert.Contains("HttpExtra2", output);
-        Assert.DoesNotContain("HttpExtra1 ", output);
+        output.Should().Contain("Search functions");
+        output.Should().Contain("extra2");
+        output.Should().Contain("HttpExtra2");
+        output.Should().NotContain("HttpExtra1 ");
     }
 
     [Fact]
@@ -138,8 +136,8 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.Contains("Search functions", output);
-        Assert.True(CountRenderedLines(output) <= console.Profile.Height);
+        output.Should().Contain("Search functions");
+        (CountRenderedLines(output) <= console.Profile.Height).Should().BeTrue();
     }
 
     [Fact]
@@ -152,11 +150,11 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
-        Assert.Contains("Functions (12)", output);
-        Assert.Contains("HttpExtra1", output);
-        Assert.Contains("HttpExtra7", output);
-        Assert.Contains("Up/Down navigate", output);
-        Assert.Contains("Enter filter", output);
+        output.Should().Contain("Functions (12)");
+        output.Should().Contain("HttpExtra1");
+        output.Should().Contain("HttpExtra7");
+        output.Should().Contain("Up/Down navigate");
+        output.Should().Contain("Enter filter");
     }
 
     [Fact]
@@ -168,15 +166,15 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
-        Assert.Contains("HttpExtra3", output);
-        Assert.Contains("◉ Active", output);
-        Assert.Contains("HttpExtra2", output);
-        Assert.Contains("✗ Error", output);
-        Assert.Contains("HttpExtra1", output);
-        Assert.Contains("+7 more", output);
-        Assert.Contains("press t to view all", output);
-        Assert.True(output.IndexOf("HttpExtra3", StringComparison.Ordinal) < output.IndexOf("HttpExtra2", StringComparison.Ordinal));
-        Assert.True(output.IndexOf("HttpExtra2", StringComparison.Ordinal) < output.IndexOf("HttpExtra1", StringComparison.Ordinal));
+        output.Should().Contain("HttpExtra3");
+        output.Should().Contain("◉ Active");
+        output.Should().Contain("HttpExtra2");
+        output.Should().Contain("✗ Error");
+        output.Should().Contain("HttpExtra1");
+        output.Should().Contain("+7 more");
+        output.Should().Contain("press t to view all");
+        (output.IndexOf("HttpExtra3", StringComparison.Ordinal) < output.IndexOf("HttpExtra2", StringComparison.Ordinal)).Should().BeTrue();
+        (output.IndexOf("HttpExtra2", StringComparison.Ordinal) < output.IndexOf("HttpExtra1", StringComparison.Ordinal)).Should().BeTrue();
     }
 
     [Fact]
@@ -188,9 +186,9 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
-        Assert.Contains("20 functions", output);
-        Assert.Contains("ready", output);
-        Assert.DoesNotContain("press t to view all", output);
+        output.Should().Contain("20 functions");
+        output.Should().Contain("ready");
+        output.Should().NotContain("press t to view all");
     }
 
     [Fact]
@@ -200,14 +198,14 @@ public class CompactRendererFunctionBrowserTests
         var state = BuildState(functionCount: 12);
         SetPrivate(renderer, "_state", state);
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('t', ConsoleKey.T)));
-        Assert.True((bool)GetPrivate(renderer, "_functionBrowserOpen")!);
+        InvokePrivate<bool>(renderer, "HandleKey", Key('t', ConsoleKey.T)).Should().BeTrue();
+        ((bool)GetPrivate(renderer, "_functionBrowserOpen")!).Should().BeTrue();
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.DownArrow)));
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.DownArrow)).Should().BeTrue();
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)).Should().BeTrue();
 
-        Assert.False((bool)GetPrivate(renderer, "_functionBrowserOpen")!);
-        Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+        ((bool)GetPrivate(renderer, "_functionBrowserOpen")!).Should().BeFalse();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpExtra2");
     }
 
     [Fact]
@@ -217,14 +215,14 @@ public class CompactRendererFunctionBrowserTests
         SetPrivate(renderer, "_state", BuildState(functionCount: 12));
         SetPrivate(renderer, "_functionBrowserOpen", true);
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('?', ConsoleKey.Oem2)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('?', ConsoleKey.Oem2)).Should().BeTrue();
 
-        Assert.True((bool)GetPrivate(renderer, "_helpOpen")!);
-        Assert.False((bool)GetPrivate(renderer, "_functionBrowserOpen")!);
+        ((bool)GetPrivate(renderer, "_helpOpen")!).Should().BeTrue();
+        ((bool)GetPrivate(renderer, "_functionBrowserOpen")!).Should().BeFalse();
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('?', ConsoleKey.Oem2)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('?', ConsoleKey.Oem2)).Should().BeTrue();
 
-        Assert.False((bool)GetPrivate(renderer, "_helpOpen")!);
+        ((bool)GetPrivate(renderer, "_helpOpen")!).Should().BeFalse();
     }
 
     [Fact]
@@ -234,9 +232,9 @@ public class CompactRendererFunctionBrowserTests
         SetPrivate(renderer, "_state", BuildState(functionCount: 12));
         SetPrivate(renderer, "_helpOpen", true);
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\u001b', ConsoleKey.Escape)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\u001b', ConsoleKey.Escape)).Should().BeTrue();
 
-        Assert.False((bool)GetPrivate(renderer, "_helpOpen")!);
+        ((bool)GetPrivate(renderer, "_helpOpen")!).Should().BeFalse();
     }
 
     [Fact]
@@ -246,9 +244,9 @@ public class CompactRendererFunctionBrowserTests
         SetPrivate(renderer, "_state", BuildState(functionCount: 12));
         SetPrivate(renderer, "_activeFunctionFilter", "HttpExtra1");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('a', ConsoleKey.A)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('a', ConsoleKey.A)).Should().BeTrue();
 
-        Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
+        GetPrivate(renderer, "_activeFunctionFilter").Should().BeNull();
     }
 
     [Fact]
@@ -271,12 +269,12 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.Equal("HttpTrigger1", GetPrivate(renderer, "_activeFunctionFilter"));
-        Assert.Contains("Filter HttpTrigger1", output);
-        Assert.Contains("selected before recycle", output);
-        Assert.Contains("selected after recycle", output);
-        Assert.DoesNotContain("other before recycle", output);
-        Assert.DoesNotContain("other after recycle", output);
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpTrigger1");
+        output.Should().Contain("Filter HttpTrigger1");
+        output.Should().Contain("selected before recycle");
+        output.Should().Contain("selected after recycle");
+        output.Should().NotContain("other before recycle");
+        output.Should().NotContain("other after recycle");
     }
 
     [Fact]
@@ -288,14 +286,14 @@ public class CompactRendererFunctionBrowserTests
 
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
-        Assert.Contains("first compact log", writer.ToString());
+        writer.ToString().Should().Contain("first compact log");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('c', ConsoleKey.C)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('c', ConsoleKey.C)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.DoesNotContain("first compact log", output);
-        Assert.Contains("Waiting for events", output);
+        output.Should().NotContain("first compact log");
+        output.Should().Contain("Waiting for events");
     }
 
     [Fact]
@@ -309,24 +307,24 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.Contains("info compact log", output);
-        Assert.Contains("error compact log", output);
+        output.Should().Contain("info compact log");
+        output.Should().Contain("error compact log");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('e', ConsoleKey.E)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('e', ConsoleKey.E)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         output = writer.ToString();
-        Assert.DoesNotContain("info compact log", output);
-        Assert.Contains("error compact log", output);
-        Assert.Contains("Errors only", output);
+        output.Should().NotContain("info compact log");
+        output.Should().Contain("error compact log");
+        output.Should().Contain("Errors only");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('e', ConsoleKey.E)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('e', ConsoleKey.E)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         output = writer.ToString();
-        Assert.Contains("info compact log", output);
-        Assert.Contains("error compact log", output);
-        Assert.DoesNotContain("Errors only", output);
+        output.Should().Contain("info compact log");
+        output.Should().Contain("error compact log");
+        output.Should().NotContain("Errors only");
     }
 
     [Fact]
@@ -335,17 +333,17 @@ public class CompactRendererFunctionBrowserTests
         (CompactRenderer renderer, _, _) = NewRenderer();
         SetPrivate(renderer, "_state", BuildState(functionCount: 3));
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
-        Assert.Equal("HttpExtra1", GetPrivate(renderer, "_activeFunctionFilter"));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)).Should().BeTrue();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpExtra1");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
-        Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)).Should().BeTrue();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpExtra2");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
-        Assert.Equal("HttpTrigger1", GetPrivate(renderer, "_activeFunctionFilter"));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)).Should().BeTrue();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpTrigger1");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)));
-        Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('f', ConsoleKey.F)).Should().BeTrue();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().BeNull();
     }
 
     [Fact]
@@ -357,32 +355,32 @@ public class CompactRendererFunctionBrowserTests
         await renderer.OnEventAsync(Log("HttpTrigger1", "warning compact log", LogLevel.Warning), [], CancellationToken.None);
         await renderer.OnEventAsync(Log("HttpTrigger1", "error compact log", LogLevel.Error), [], CancellationToken.None);
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('2', ConsoleKey.D2)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('2', ConsoleKey.D2)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.DoesNotContain("info compact log", output);
-        Assert.Contains("warning compact log", output);
-        Assert.Contains("error compact log", output);
-        Assert.Contains("L:warn", output);
+        output.Should().NotContain("info compact log");
+        output.Should().Contain("warning compact log");
+        output.Should().Contain("error compact log");
+        output.Should().Contain("L:warn");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('3', ConsoleKey.D3)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('3', ConsoleKey.D3)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         output = writer.ToString();
-        Assert.DoesNotContain("info compact log", output);
-        Assert.DoesNotContain("warning compact log", output);
-        Assert.Contains("error compact log", output);
-        Assert.Contains("L:error", output);
+        output.Should().NotContain("info compact log");
+        output.Should().NotContain("warning compact log");
+        output.Should().Contain("error compact log");
+        output.Should().Contain("L:error");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('1', ConsoleKey.D1)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('1', ConsoleKey.D1)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         output = writer.ToString();
-        Assert.Contains("info compact log", output);
-        Assert.Contains("warning compact log", output);
-        Assert.Contains("error compact log", output);
-        Assert.Contains("L:info", output);
+        output.Should().Contain("info compact log");
+        output.Should().Contain("warning compact log");
+        output.Should().Contain("error compact log");
+        output.Should().Contain("L:info");
     }
 
     [Fact]
@@ -393,9 +391,9 @@ public class CompactRendererFunctionBrowserTests
         bool requested = false;
         renderer.ShutdownRequested += () => requested = true;
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('q', ConsoleKey.Q)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('q', ConsoleKey.Q)).Should().BeTrue();
 
-        Assert.True(requested);
+        requested.Should().BeTrue();
     }
 
     [Fact]
@@ -404,7 +402,7 @@ public class CompactRendererFunctionBrowserTests
         (CompactRenderer renderer, _, _) = NewRenderer();
         SetPrivate(renderer, "_state", BuildState(functionCount: 3));
 
-        Assert.False(InvokePrivate<bool>(renderer, "HandleKey", Key('l', ConsoleKey.L)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('l', ConsoleKey.L)).Should().BeFalse();
     }
 
     [Fact]
@@ -420,33 +418,33 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.DoesNotContain("compact log 01", output);
-        Assert.Contains("compact log 20", output);
+        output.Should().NotContain("compact log 01");
+        output.Should().Contain("compact log 20");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageUp)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageUp)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         output = writer.ToString();
-        Assert.Contains("compact log 01", output);
-        Assert.DoesNotContain("compact log 20", output);
-        Assert.Contains("Scrollback", output);
+        output.Should().Contain("compact log 01");
+        output.Should().NotContain("compact log 20");
+        output.Should().Contain("Scrollback");
 
         await renderer.OnEventAsync(Log("HttpTrigger1", "compact log 21"), [], CancellationToken.None);
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         output = writer.ToString();
-        Assert.Contains("compact log 01", output);
-        Assert.DoesNotContain("compact log 21", output);
+        output.Should().Contain("compact log 01");
+        output.Should().NotContain("compact log 21");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.End)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.End)).Should().BeTrue();
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         output = writer.ToString();
-        Assert.DoesNotContain("compact log 01", output);
-        Assert.Contains("compact log 21", output);
+        output.Should().NotContain("compact log 01");
+        output.Should().Contain("compact log 21");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageUp)));
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageDown)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageUp)).Should().BeTrue();
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.PageDown)).Should().BeTrue();
     }
 
     [Fact]
@@ -460,8 +458,8 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
 
         string output = writer.ToString();
-        Assert.Contains("Function", output);
-        Assert.True(CountRenderedLines(output) <= console.Profile.Height);
+        output.Should().Contain("Function");
+        (CountRenderedLines(output) <= console.Profile.Height).Should().BeTrue();
     }
 
     [Fact]
@@ -470,16 +468,16 @@ public class CompactRendererFunctionBrowserTests
         (CompactRenderer renderer, _, _) = NewRenderer();
         SetPrivate(renderer, "_state", BuildState(functionCount: 12));
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)).Should().BeTrue();
         foreach (char c in "extra2")
         {
-            Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))));
+            InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))).Should().BeTrue();
         }
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)).Should().BeTrue();
 
-        Assert.False((bool)GetPrivate(renderer, "_functionSearchOpen")!);
-        Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+        ((bool)GetPrivate(renderer, "_functionSearchOpen")!).Should().BeFalse();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpExtra2");
     }
 
     [Fact]
@@ -488,16 +486,16 @@ public class CompactRendererFunctionBrowserTests
         (CompactRenderer renderer, _, _) = NewRenderer();
         SetPrivate(renderer, "_state", BuildState(functionCount: 12));
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)).Should().BeTrue();
         foreach (char c in "extra")
         {
-            Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))));
+            InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))).Should().BeTrue();
         }
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.DownArrow)));
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\0', ConsoleKey.DownArrow)).Should().BeTrue();
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)).Should().BeTrue();
 
-        Assert.Equal("HttpExtra2", GetPrivate(renderer, "_activeFunctionFilter"));
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpExtra2");
     }
 
     [Fact]
@@ -507,12 +505,12 @@ public class CompactRendererFunctionBrowserTests
         SetPrivate(renderer, "_state", BuildState(functionCount: 12));
         SetPrivate(renderer, "_activeFunctionFilter", "HttpTrigger1");
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('x', ConsoleKey.X)));
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('\u001b', ConsoleKey.Escape)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)).Should().BeTrue();
+        InvokePrivate<bool>(renderer, "HandleKey", Key('x', ConsoleKey.X)).Should().BeTrue();
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\u001b', ConsoleKey.Escape)).Should().BeTrue();
 
-        Assert.False((bool)GetPrivate(renderer, "_functionSearchOpen")!);
-        Assert.Equal("HttpTrigger1", GetPrivate(renderer, "_activeFunctionFilter"));
+        ((bool)GetPrivate(renderer, "_functionSearchOpen")!).Should().BeFalse();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().Be("HttpTrigger1");
     }
 
     [Fact]
@@ -521,16 +519,16 @@ public class CompactRendererFunctionBrowserTests
         (CompactRenderer renderer, _, _) = NewRenderer();
         SetPrivate(renderer, "_state", BuildState(functionCount: 12));
 
-        Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('/', ConsoleKey.Oem2)).Should().BeTrue();
         foreach (char c in "zzz")
         {
-            Assert.True(InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))));
+            InvokePrivate<bool>(renderer, "HandleKey", Key(c, CharToConsoleKey(c))).Should().BeTrue();
         }
 
-        Assert.False(InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)));
+        InvokePrivate<bool>(renderer, "HandleKey", Key('\r', ConsoleKey.Enter)).Should().BeFalse();
 
-        Assert.True((bool)GetPrivate(renderer, "_functionSearchOpen")!);
-        Assert.Null(GetPrivate(renderer, "_activeFunctionFilter"));
+        ((bool)GetPrivate(renderer, "_functionSearchOpen")!).Should().BeTrue();
+        GetPrivate(renderer, "_activeFunctionFilter").Should().BeNull();
     }
 
     [Fact]
@@ -542,9 +540,9 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
 
         string output = writer.ToString();
-        Assert.Contains("↑/↓, Fn+↑/↓ logs", output);
-        Assert.DoesNotContain("PgUp/PgDn", output);
-        Assert.DoesNotContain("Ctrl+U/D", output);
+        output.Should().Contain("↑/↓, Fn+↑/↓ logs");
+        output.Should().NotContain("PgUp/PgDn");
+        output.Should().NotContain("Ctrl+U/D");
     }
 
     [Fact]
@@ -557,9 +555,9 @@ public class CompactRendererFunctionBrowserTests
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildHeader", snapshot));
 
         string output = writer.ToString();
-        Assert.Contains("Fn+↑/↓", output);
-        Assert.DoesNotContain("PgUp/PgDn", output);
-        Assert.DoesNotContain("Ctrl+U/D", output);
+        output.Should().Contain("Fn+↑/↓");
+        output.Should().NotContain("PgUp/PgDn");
+        output.Should().NotContain("Ctrl+U/D");
     }
 
     [Fact]
@@ -573,9 +571,9 @@ public class CompactRendererFunctionBrowserTests
         string output = writer.ToString();
         int enterIndex = output.IndexOf("\u001b[?1049h\u001b[H", StringComparison.Ordinal);
         int exitIndex = output.IndexOf("\u001b[?1049l", StringComparison.Ordinal);
-        Assert.NotEqual(-1, enterIndex);
-        Assert.NotEqual(-1, exitIndex);
-        Assert.True(enterIndex < exitIndex);
+        enterIndex.Should().NotBe(-1);
+        exitIndex.Should().NotBe(-1);
+        (enterIndex < exitIndex).Should().BeTrue();
     }
 
     [Fact]
@@ -587,8 +585,8 @@ public class CompactRendererFunctionBrowserTests
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
-        Assert.DoesNotContain("\u001b[?1049h", output);
-        Assert.DoesNotContain("\u001b[?1049l", output);
+        output.Should().NotContain("\u001b[?1049h");
+        output.Should().NotContain("\u001b[?1049l");
     }
 
     [Fact]
@@ -600,8 +598,8 @@ public class CompactRendererFunctionBrowserTests
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
-        Assert.DoesNotContain("\u001b[?1049h", output);
-        Assert.DoesNotContain("\u001b[?1049l", output);
+        output.Should().NotContain("\u001b[?1049h");
+        output.Should().NotContain("\u001b[?1049l");
     }
 
     private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(

@@ -5,7 +5,6 @@ using System.Text;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Configuration;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Profiles;
 
@@ -29,8 +28,8 @@ public sealed class ProjectProfileOptionsSetupTests : IDisposable
 
         setup.Configure(options);
 
-        Assert.Empty(options.Profiles);
-        Assert.Null(options.DefaultProfile);
+        options.Profiles.Should().BeEmpty();
+        options.DefaultProfile.Should().BeNull();
     }
 
     [Fact]
@@ -50,8 +49,8 @@ public sealed class ProjectProfileOptionsSetupTests : IDisposable
 
         setup.Configure(_dir.FullName, options);
 
-        Assert.Equal(["flex", "linux-premium"], options.Profiles);
-        Assert.Equal("linux-premium", options.DefaultProfile);
+        options.Profiles.Should().Equal(["flex", "linux-premium"]);
+        options.DefaultProfile.Should().Be("linux-premium");
     }
 
     [Fact]
@@ -71,8 +70,8 @@ public sealed class ProjectProfileOptionsSetupTests : IDisposable
 
         setup.Configure(_dir.FullName, options);
 
-        Assert.Empty(options.Profiles);
-        Assert.Null(options.DefaultProfile);
+        options.Profiles.Should().BeEmpty();
+        options.DefaultProfile.Should().BeNull();
     }
 
     [Fact]
@@ -87,9 +86,9 @@ public sealed class ProjectProfileOptionsSetupTests : IDisposable
         var setup = new ProjectProfileOptionsSetup(configuration);
         ProjectProfileOptions options = new();
 
-        ProfileConfigurationException ex = Assert.Throws<ProfileConfigurationException>(() => setup.Configure(options));
+        ProfileConfigurationException ex = FluentActions.Invoking(() => setup.Configure(options)).Should().ThrowExactly<ProfileConfigurationException>().Which;
 
-        Assert.Contains("more than once", ex.Message, StringComparison.OrdinalIgnoreCase);
+        ex.Message.Should().ContainEquivalentOf("more than once");
     }
 
     [Fact]
@@ -104,10 +103,10 @@ public sealed class ProjectProfileOptionsSetupTests : IDisposable
         var setup = new ProjectProfileOptionsSetup(configuration);
         ProjectProfileOptions options = new();
 
-        ProfileConfigurationException ex = Assert.Throws<ProfileConfigurationException>(() => setup.Configure(options));
+        ProfileConfigurationException ex = FluentActions.Invoking(() => setup.Configure(options)).Should().ThrowExactly<ProfileConfigurationException>().Which;
 
-        Assert.Contains("unsupported schema", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(ProfileSchemas.ProjectConfigV1, ex.Message);
+        ex.Message.Should().ContainEquivalentOf("unsupported schema");
+        ex.Message.Should().Contain(ProfileSchemas.ProjectConfigV1);
     }
 
     private void WriteProjectConfig(string contents)

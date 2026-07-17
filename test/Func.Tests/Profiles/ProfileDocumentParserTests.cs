@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Profiles;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Profiles;
 
@@ -34,11 +33,11 @@ public class ProfileDocumentParserTests
         ProfileSourceSnapshot snapshot = _parser.ParseBuiltInRegistry(json, Source(ProfileSourceKind.BuiltIn));
 
         ProfileDefinition profile = snapshot.Profiles["flex"];
-        Assert.Equal(new DateTimeOffset(2025, 1, 2, 3, 4, 5, TimeSpan.Zero), snapshot.GeneratedAt);
-        Assert.Equal("[1.8.1, 4.1048.200)", profile.Host!.Version);
-        Assert.Equal("[3.0.0, 5.0.0)", profile.ExtensionBundle!.Version);
-        Assert.Equal("[3.13.0]", profile.Workers!["node"]!.Version);
-        Assert.Equal(["node", "python"], profile.SupportedRuntimes);
+        snapshot.GeneratedAt.Should().Be(new DateTimeOffset(2025, 1, 2, 3, 4, 5, TimeSpan.Zero));
+        profile.Host!.Version.Should().Be("[1.8.1, 4.1048.200)");
+        profile.ExtensionBundle!.Version.Should().Be("[3.0.0, 5.0.0)");
+        profile.Workers!["node"]!.Version.Should().Be("[3.13.0]");
+        profile.SupportedRuntimes.Should().Equal(["node", "python"]);
     }
 
     [Fact]
@@ -50,10 +49,9 @@ public class ProfileDocumentParserTests
             }
             """;
 
-        ProfileConfigurationException ex = Assert.Throws<ProfileConfigurationException>(
-            () => _parser.ParseBuiltInRegistry(json, Source(ProfileSourceKind.BuiltIn)));
+        ProfileConfigurationException ex = FluentActions.Invoking(() => _parser.ParseBuiltInRegistry(json, Source(ProfileSourceKind.BuiltIn))).Should().ThrowExactly<ProfileConfigurationException>().Which;
 
-        Assert.Contains(ProfileSchemas.BuiltInRegistryV1, ex.Message);
+        ex.Message.Should().Contain(ProfileSchemas.BuiltInRegistryV1);
     }
 
     [Fact]
@@ -65,11 +63,10 @@ public class ProfileDocumentParserTests
             }
             """;
 
-        ProfileConfigurationException ex = Assert.Throws<ProfileConfigurationException>(
-            () => _parser.ParseCustomProfiles(json, Source(ProfileSourceKind.Project)));
+        ProfileConfigurationException ex = FluentActions.Invoking(() => _parser.ParseCustomProfiles(json, Source(ProfileSourceKind.Project))).Should().ThrowExactly<ProfileConfigurationException>().Which;
 
-        Assert.Contains("unsupported schema", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(ProfileSchemas.CustomProfilesV1, ex.Message);
+        ex.Message.Should().ContainEquivalentOf("unsupported schema");
+        ex.Message.Should().Contain(ProfileSchemas.CustomProfilesV1);
     }
 
     [Fact]
@@ -83,11 +80,10 @@ public class ProfileDocumentParserTests
             }
             """;
 
-        ProfileConfigurationException ex = Assert.Throws<ProfileConfigurationException>(
-            () => _parser.ParseCustomProfiles(json, Source(ProfileSourceKind.Project)));
+        ProfileConfigurationException ex = FluentActions.Invoking(() => _parser.ParseCustomProfiles(json, Source(ProfileSourceKind.Project))).Should().ThrowExactly<ProfileConfigurationException>().Which;
 
-        Assert.Contains("invalid NuGet version range", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("host.version", ex.Message);
+        ex.Message.Should().ContainEquivalentOf("invalid NuGet version range");
+        ex.Message.Should().Contain("host.version");
     }
 
     [Fact]
@@ -101,10 +97,9 @@ public class ProfileDocumentParserTests
             }
             """;
 
-        ProfileConfigurationException ex = Assert.Throws<ProfileConfigurationException>(
-            () => _parser.ParseCustomProfiles(json, Source(ProfileSourceKind.Project)));
+        ProfileConfigurationException ex = FluentActions.Invoking(() => _parser.ParseCustomProfiles(json, Source(ProfileSourceKind.Project))).Should().ThrowExactly<ProfileConfigurationException>().Which;
 
-        Assert.Contains("unsupported status", ex.Message, StringComparison.OrdinalIgnoreCase);
+        ex.Message.Should().ContainEquivalentOf("unsupported status");
     }
 
     [Fact]
@@ -123,7 +118,7 @@ public class ProfileDocumentParserTests
 
         ProfileSourceSnapshot snapshot = _parser.ParseCustomProfiles(json, Source(ProfileSourceKind.Project));
 
-        Assert.True(snapshot.Profiles.ContainsKey("flex"));
+        snapshot.Profiles.ContainsKey("flex").Should().BeTrue();
     }
 
     private static ProfileSourceInfo Source(ProfileSourceKind kind)
