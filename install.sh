@@ -272,8 +272,8 @@ semver_gt() {
     local i
     for i in 0 1 2; do
         local av="${an[i]:-0}" bv="${bn[i]:-0}"
-        ((av > bv)) && return 0
-        ((av < bv)) && return 1
+        ((10#$av > 10#$bv)) && return 0
+        ((10#$av < 10#$bv)) && return 1
     done
 
     # Cores are equal: a build without a prerelease outranks one with it.
