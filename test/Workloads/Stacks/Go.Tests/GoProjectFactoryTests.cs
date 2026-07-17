@@ -39,8 +39,8 @@ public class GoProjectFactoryTests : IDisposable
     {
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
-        notCreated.Reason.Should().Be("no Go project fingerprint found");
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>()
+            .Which.Reason.Should().Be("no Go project fingerprint found");
     }
 
     [Theory]
@@ -104,8 +104,7 @@ public class GoProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new GoProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Reason.Should().Be("found go.mod");
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found go.mod");
     }
 
     [Fact]
@@ -134,8 +133,8 @@ public class GoProjectFactoryTests : IDisposable
         FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.NotResolved notResolved = workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
-        notResolved.Failure.Should().BeSameAs(failure);
+        workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>()
+            .Which.Failure.Should().BeSameAs(failure);
     }
 
     [Fact]

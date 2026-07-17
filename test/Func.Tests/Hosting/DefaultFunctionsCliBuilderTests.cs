@@ -56,8 +56,7 @@ public class DefaultFunctionsCliBuilderTests
 
         var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
         var external = resolved.OfType<ExternalCommand>().Should().ContainSingle().Subject;
-        var source = external.Source.Should().BeOfType<GenericTestCommand>().Subject;
-        source.Payload.Value.Should().Be("from-di");
+        external.Source.Should().BeOfType<GenericTestCommand>().Which.Payload.Value.Should().Be("from-di");
     }
 
     [Fact]
@@ -96,8 +95,7 @@ public class DefaultFunctionsCliBuilderTests
 
         var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
         var external = resolved.OfType<ExternalCommand>().Should().ContainSingle().Subject;
-        var source = external.Source.Should().BeOfType<GenericTestCommand>().Subject;
-        source.Payload.Value.Should().Be("from-di");
+        external.Source.Should().BeOfType<GenericTestCommand>().Which.Payload.Value.Should().Be("from-di");
     }
 
     [Fact]

@@ -54,8 +54,8 @@ public sealed class RawHostLogCaptureProviderTests
         exception.GetProperty("type").GetString().Should().Be(typeof(InvalidOperationException).FullName);
         exception.GetProperty("message").GetString().Should().Be("Something failed");
 
-        JsonElement capturedScope = root.GetProperty("scopes").EnumerateArray().Should().ContainSingle().Subject;
-        capturedScope.GetProperty("values").GetProperty("ScopeKey").GetString().Should().Be("ScopeValue");
+        root.GetProperty("scopes").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("values").GetProperty("ScopeKey").GetString().Should().Be("ScopeValue");
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class RawHostLogCaptureProviderTests
 
         string line = File.ReadAllLines(capturePath).Should().ContainSingle().Subject;
         using var document = JsonDocument.Parse(line);
-        JsonElement capturedScope = document.RootElement.GetProperty("scopes").EnumerateArray().Should().ContainSingle().Subject;
-        capturedScope.GetProperty("values").GetProperty("InvocationId").GetString().Should().Be("abc123");
+        document.RootElement.GetProperty("scopes").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("values").GetProperty("InvocationId").GetString().Should().Be("abc123");
     }
 }

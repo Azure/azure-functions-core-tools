@@ -58,8 +58,7 @@ public class AzuriteProbeTests : IAsyncLifetime
             handler = inner;
         }
 
-        var sockets = handler.Should().BeOfType<SocketsHttpHandler>().Subject;
-        sockets.UseProxy.Should().BeFalse();
+        handler.Should().BeOfType<SocketsHttpHandler>().Which.UseProxy.Should().BeFalse();
     }
 
     [Fact]

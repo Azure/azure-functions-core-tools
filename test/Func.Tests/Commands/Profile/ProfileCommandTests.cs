@@ -161,8 +161,7 @@ public sealed class ProfileCommandTests : IDisposable
         using JsonDocument document = ReadProjectConfig();
         JsonElement root = document.RootElement;
         root.GetProperty("defaultProfile").GetString().Should().Be("flex");
-        JsonElement profile = root.GetProperty("profiles").EnumerateArray().Should().ContainSingle().Subject;
-        profile.GetString().Should().Be("flex");
+        root.GetProperty("profiles").EnumerateArray().Should().ContainSingle().Which.GetString().Should().Be("flex");
     }
 
     [Fact]
@@ -206,8 +205,7 @@ public sealed class ProfileCommandTests : IDisposable
         _interaction.Lines.Should().NotContain(l => l.StartsWith("HINT: Added", StringComparison.Ordinal));
         using JsonDocument document = ReadProjectConfig();
         JsonElement root = document.RootElement;
-        JsonElement profile = root.GetProperty("profiles").EnumerateArray().Should().ContainSingle().Subject;
-        profile.GetString().Should().Be("FLEX");
+        root.GetProperty("profiles").EnumerateArray().Should().ContainSingle().Which.GetString().Should().Be("FLEX");
         root.GetProperty("defaultProfile").GetString().Should().Be("FLEX");
     }
 

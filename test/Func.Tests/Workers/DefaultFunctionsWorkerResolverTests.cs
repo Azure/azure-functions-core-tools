@@ -181,8 +181,7 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
-        resolved.Worker.Version.Should().Be("3.13.0");
+        result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Which.Worker.Version.Should().Be("3.13.0");
     }
 
     [Fact]
@@ -289,8 +288,8 @@ public class DefaultFunctionsWorkerResolverTests
             new FunctionsWorkerId("node"),
             CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
-        resolved.Worker.Version.Should().Be("3.13.0-preview.1");
+        result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>()
+            .Which.Worker.Version.Should().Be("3.13.0-preview.1");
     }
 
     [Fact]

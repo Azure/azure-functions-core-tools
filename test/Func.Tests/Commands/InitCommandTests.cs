@@ -339,8 +339,7 @@ public class InitCommandTests
 
             exitCode.Should().Be(1);
 
-            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
-            hint.Kind.Should().Be(WorkloadHintKind.NoWorkloadsInstalled);
+            _hintRenderer.Hints.Should().ContainSingle().Which.Kind.Should().Be(WorkloadHintKind.NoWorkloadsInstalled);
         }
         finally
         {
@@ -384,8 +383,7 @@ public class InitCommandTests
             python.WasInvoked.Should().BeFalse();
             node.WasInvoked.Should().BeFalse();
 
-            WorkloadHint hint = _hintRenderer.Hints.Should().ContainSingle().Subject;
-            hint.Kind.Should().Be(WorkloadHintKind.AmbiguousStackChoice);
+            _hintRenderer.Hints.Should().ContainSingle().Which.Kind.Should().Be(WorkloadHintKind.AmbiguousStackChoice);
         }
         finally
         {

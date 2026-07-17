@@ -36,8 +36,8 @@ public class DotNetProjectFactoryTests : IDisposable
     {
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
-        notCreated.Reason.Should().Be("no .NET project file or build output found");
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>()
+            .Which.Reason.Should().Be("no .NET project file or build output found");
     }
 
     [Theory]
@@ -67,8 +67,7 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Reason.Should().Be($"found {fileName}");
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be($"found {fileName}");
     }
 
     [Fact]
@@ -79,8 +78,8 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
-        notCreated.Reason.Should().Be("multiple .NET project files found; cannot determine which to use");
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>()
+            .Which.Reason.Should().Be("multiple .NET project files found; cannot determine which to use");
     }
 
     [Fact]
@@ -91,8 +90,8 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(context, default);
 
-        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
-        notCreated.Reason.Should().Be("directory does not exist");
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>()
+            .Which.Reason.Should().Be("directory does not exist");
     }
 
     [Fact]
@@ -159,8 +158,8 @@ public class DotNetProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Project.Should().BeOfType<DotNetSourceProject>();
+        result.Should().BeOfType<ProjectCreationResult.Created>()
+            .Which.Project.Should().BeOfType<DotNetSourceProject>();
     }
 
     private void WriteFile(string name, string contents)

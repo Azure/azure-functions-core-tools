@@ -58,8 +58,8 @@ public class ExtensionBundleResolverTests
     {
         ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
 
-        ExtensionBundleResolution.WorkloadMissing missing = result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>().Subject;
-        missing.Hint.Should().Contain("func workload install");
+        result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>()
+            .Which.Hint.Should().Contain("func workload install");
     }
 
     [Fact]
@@ -67,8 +67,8 @@ public class ExtensionBundleResolverTests
     {
         ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)", workerRuntime: "go"));
 
-        ExtensionBundleResolution.WorkloadMissing missing = result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>().Subject;
-        missing.Hint.Should().Contain("func setup --features go");
+        result.Should().BeOfType<ExtensionBundleResolution.WorkloadMissing>()
+            .Which.Hint.Should().Contain("func setup --features go");
     }
 
     [Fact]
@@ -77,8 +77,8 @@ public class ExtensionBundleResolverTests
         ExtensionBundleResolution result = await Build([Row("4.10.0")])
             .ResolveAsync(Context(host: "[5.0.0, 6.0.0)", workerRuntime: "node"));
 
-        ExtensionBundleResolution.NoCompatibleInstall none = result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>().Subject;
-        none.Hint.Should().Contain("func setup --features node");
+        result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>()
+            .Which.Hint.Should().Contain("func setup --features node");
     }
 
     [Fact]
@@ -98,8 +98,7 @@ public class ExtensionBundleResolverTests
         var telemetry = new RecordingTelemetry();
         await Build([], telemetry).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
 
-        BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
-        evt.Reason.Should().Be(BundleResolveReason.WorkloadMissing);
+        telemetry.Events.Should().ContainSingle().Which.Reason.Should().Be(BundleResolveReason.WorkloadMissing);
     }
 
     [Fact]
@@ -108,8 +107,7 @@ public class ExtensionBundleResolverTests
         var telemetry = new RecordingTelemetry();
         await Build([Row("4.22.0")], telemetry).ResolveAsync(Context(host: "[3.*, 4.0.0)", profile: "[4.*, 5.0.0)"));
 
-        BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
-        evt.Reason.Should().Be(BundleResolveReason.EmptyIntersection);
+        telemetry.Events.Should().ContainSingle().Which.Reason.Should().Be(BundleResolveReason.EmptyIntersection);
     }
 
     [Fact]
@@ -118,8 +116,7 @@ public class ExtensionBundleResolverTests
         var telemetry = new RecordingTelemetry();
         await Build([Row("3.0.0")], telemetry).ResolveAsync(Context(host: "[5.0.0, 6.0.0)"));
 
-        BundleResolveEvent evt = telemetry.Events.Should().ContainSingle().Subject;
-        evt.Reason.Should().Be(BundleResolveReason.NoCompatibleInstall);
+        telemetry.Events.Should().ContainSingle().Which.Reason.Should().Be(BundleResolveReason.NoCompatibleInstall);
     }
 
     private static ExtensionBundleResolver Build(IReadOnlyList<InstalledBundleWorkload> rows, IBundleResolveTelemetry? telemetry = null)

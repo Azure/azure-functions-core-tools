@@ -166,8 +166,8 @@ public class DotNetEngineProviderTests : IDisposable
             new System.CommandLine.RootCommand().Parse(string.Empty),
             CancellationToken.None);
 
-        var failed = result.Should().BeOfType<TemplateApplicationResult.Failed>().Subject;
-        failed.Failure.Should().BeOfType<TemplateApplicationFailure.ProviderError>();
+        result.Should().BeOfType<TemplateApplicationResult.Failed>()
+            .Which.Failure.Should().BeOfType<TemplateApplicationFailure.ProviderError>();
     }
 
     [Fact]

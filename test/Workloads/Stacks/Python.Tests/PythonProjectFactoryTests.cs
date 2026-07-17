@@ -40,8 +40,8 @@ public class PythonProjectFactoryTests : IDisposable
     {
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = result.Should().BeOfType<ProjectCreationResult.NotCreated>().Subject;
-        notCreated.Reason.Should().Be("no Python project fingerprint found");
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>()
+            .Which.Reason.Should().Be("no Python project fingerprint found");
     }
 
     [Fact]
@@ -124,8 +124,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Reason.Should().Be("found pyproject.toml");
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found pyproject.toml");
     }
 
     [Fact]
@@ -137,8 +136,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Reason.Should().Be("found pyproject.toml");
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found pyproject.toml");
     }
 
     [Fact]
@@ -149,8 +147,7 @@ public class PythonProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new PythonProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
-        created.Reason.Should().Contain("*.py");
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Contain("*.py");
     }
 
     [Fact]
@@ -179,8 +176,8 @@ public class PythonProjectFactoryTests : IDisposable
         FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.NotResolved notResolved = workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>().Subject;
-        notResolved.Failure.Should().BeSameAs(failure);
+        workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>()
+            .Which.Failure.Should().BeSameAs(failure);
     }
 
     [Fact]

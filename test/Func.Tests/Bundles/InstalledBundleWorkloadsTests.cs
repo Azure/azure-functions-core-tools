@@ -69,7 +69,6 @@ public class InstalledBundleWorkloadsTests
 
         IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store, paths).ListInstalledAsync();
 
-        InstalledBundleWorkload row = result.Should().ContainSingle().Subject;
-        row.InstallDirectory.Should().Be("/home/.func/workloads/bundles/4.35.0");
+        result.Should().ContainSingle().Which.InstallDirectory.Should().Be("/home/.func/workloads/bundles/4.35.0");
     }
 }

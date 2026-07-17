@@ -135,8 +135,8 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
-        failed.UserMessage.Should().Contain("another process is using the Azurite ports");
+        result.Should().BeOfType<ManagedAzuriteResult.Failed>()
+            .Which.UserMessage.Should().Contain("another process is using the Azurite ports");
     }
 
     [Fact]
@@ -175,8 +175,7 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var started = result.Should().BeOfType<ManagedAzuriteResult.Started>().Subject;
-        started.Mode.Should().Be(AzuriteLaunchMode.Docker);
+        result.Should().BeOfType<ManagedAzuriteResult.Started>().Which.Mode.Should().Be(AzuriteLaunchMode.Docker);
         await _launcher.Received(1).StartAsync(
             Arg.Is<AzuriteLaunchRequest>(r => r.Mode == AzuriteLaunchMode.Docker),
             Arg.Any<CancellationToken>());
@@ -216,8 +215,8 @@ public class ManagedAzuriteOrchestratorTests
             progress: null,
             CancellationToken.None);
 
-        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
-        failed.UserMessage.Should().Contain("did not become ready");
+        result.Should().BeOfType<ManagedAzuriteResult.Failed>()
+            .Which.UserMessage.Should().Contain("did not become ready");
         fake.StopCalled.Should().BeTrue("Orchestrator must stop the process on timeout.");
     }
 

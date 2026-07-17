@@ -52,8 +52,8 @@ public sealed class NuGetProtocolSourceClientTests
             }
             """);
 
-        CatalogSearchResult only = NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle().Subject;
-        only.Aliases.Should().Equal(["node", "nodejs"]);
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle()
+            .Which.Aliases.Should().Equal(["node", "nodejs"]);
     }
 
     [Fact]

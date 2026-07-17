@@ -74,8 +74,7 @@ public class ExternalCommandTests
 
         var middleSub = external.Subcommands.Should().ContainSingle().Subject;
         middleSub.Name.Should().Be("middle");
-        var leafSub = middleSub.Subcommands.Should().ContainSingle().Subject;
-        leafSub.Name.Should().Be("leaf");
+        middleSub.Subcommands.Should().ContainSingle().Which.Name.Should().Be("leaf");
     }
 
     [Fact]

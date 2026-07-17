@@ -60,8 +60,7 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.Installed installed = result.Should().BeOfType<HostWorkloadResolution.Installed>().Subject;
-        installed.Workload.Should().BeSameAs(selectedHost);
+        result.Should().BeOfType<HostWorkloadResolution.Installed>().Which.Workload.Should().BeSameAs(selectedHost);
     }
 
     [Fact]
@@ -75,8 +74,7 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.Installed installed = result.Should().BeOfType<HostWorkloadResolution.Installed>().Subject;
-        installed.Workload.Should().BeSameAs(currentRidHost);
+        result.Should().BeOfType<HostWorkloadResolution.Installed>().Which.Workload.Should().BeSameAs(currentRidHost);
     }
 
     [Fact]
@@ -162,8 +160,8 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.InstallRequired installRequired = result.Should().BeOfType<HostWorkloadResolution.InstallRequired>().Subject;
-        installRequired.HostVersion.Should().Be("[1.8.1, 4.1048.200)");
+        result.Should().BeOfType<HostWorkloadResolution.InstallRequired>()
+            .Which.HostVersion.Should().Be("[1.8.1, 4.1048.200)");
         await _workloadCatalog.DidNotReceive().SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
         await _workloadCatalog.DidNotReceive().ResolveLatestVersionInRangeAsync(
             Arg.Any<string>(),

@@ -65,8 +65,7 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0", entryAssembly: "second.dll"));
 
         var workloads = await _store.GetWorkloadsAsync();
-        var installed = workloads.Should().ContainSingle().Subject;
-        installed.EntryPoint!.AssemblyPath.Should().Be("second.dll");
+        workloads.Should().ContainSingle().Which.EntryPoint!.AssemblyPath.Should().Be("second.dll");
     }
 
     [Fact]
@@ -76,8 +75,7 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(NewEntry("azure.functions.cli.workloads.dotnet", "1.0.0", entryAssembly: "lower.dll"));
 
         var workloads = await _store.GetWorkloadsAsync();
-        var installed = workloads.Should().ContainSingle().Subject;
-        installed.EntryPoint!.AssemblyPath.Should().Be("lower.dll");
+        workloads.Should().ContainSingle().Which.EntryPoint!.AssemblyPath.Should().Be("lower.dll");
     }
 
     [Fact]
@@ -98,8 +96,7 @@ public class WorkloadStoreTests : IDisposable
 
         removed.Should().BeTrue();
         var workloads = await _store.GetWorkloadsAsync();
-        var installed = workloads.Should().ContainSingle().Subject;
-        installed.PackageVersion.Should().Be("2.0.0");
+        workloads.Should().ContainSingle().Which.PackageVersion.Should().Be("2.0.0");
     }
 
     [Fact]

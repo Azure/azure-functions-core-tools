@@ -55,8 +55,7 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
 
-        ProjectResolutionResult.Resolved resolved = result.Should().BeOfType<ProjectResolutionResult.Resolved>().Subject;
-        resolved.Project.Should().BeSameAs(firstProject);
+        result.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.Should().BeSameAs(firstProject);
         await second.DidNotReceive().TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
     }
 
@@ -89,8 +88,8 @@ public sealed class FunctionsProjectResolverTests
 
         ProjectResolutionResult result = await resolver.ResolveProjectAsync(CreateContext(), CancellationToken.None);
 
-        ProjectResolutionResult.NotResolved notResolved = result.Should().BeOfType<ProjectResolutionResult.NotResolved>().Subject;
-        notResolved.Message.Should().Contain("No installed workload recognized");
+        result.Should().BeOfType<ProjectResolutionResult.NotResolved>()
+            .Which.Message.Should().Contain("No installed workload recognized");
     }
 
     [Fact]

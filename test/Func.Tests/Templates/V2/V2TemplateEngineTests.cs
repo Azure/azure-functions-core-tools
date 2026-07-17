@@ -94,8 +94,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var existed = result.Should().BeOfType<TemplateApplicationResult.AlreadyExists>().Subject;
-        existed.ExistingFiles.Should().ContainSingle();
+        result.Should().BeOfType<TemplateApplicationResult.AlreadyExists>()
+            .Which.ExistingFiles.Should().ContainSingle();
         File.ReadAllText(target).Should().Be("preexisting");
     }
 
@@ -212,8 +212,8 @@ public class V2TemplateEngineTests : IDisposable
             force: false);
 
         var failed = result.Should().BeOfType<TemplateApplicationResult.Failed>().Subject;
-        var invalid = failed.Failure.Should().BeOfType<TemplateApplicationFailure.InvalidPrompt>().Subject;
-        invalid.PromptId.Should().Be("queueName");
+        failed.Failure.Should().BeOfType<TemplateApplicationFailure.InvalidPrompt>()
+            .Which.PromptId.Should().Be("queueName");
     }
 
     [Fact]
@@ -236,8 +236,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var failed = result.Should().BeOfType<TemplateApplicationResult.Failed>().Subject;
-        failed.Failure.Should().BeOfType<TemplateApplicationFailure.ProviderError>();
+        result.Should().BeOfType<TemplateApplicationResult.Failed>()
+            .Which.Failure.Should().BeOfType<TemplateApplicationFailure.ProviderError>();
     }
 
     [Theory]
@@ -302,9 +302,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = result.Should().BeOfType<TemplateApplicationResult.Created>().Subject;
         string expectedPath = Path.GetFullPath(Path.Combine(_workingDir, "src", "functions", $"{sanitized}.py"));
-        created.Files.Single().Should().Be(expectedPath);
+        result.Should().BeOfType<TemplateApplicationResult.Created>().Which.Files.Single().Should().Be(expectedPath);
 
         string content = File.ReadAllText(expectedPath);
         content.Should().Contain($"def {sanitized}(");
@@ -375,9 +374,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = result.Should().BeOfType<TemplateApplicationResult.Created>().Subject;
         string expectedPath = Path.GetFullPath(Path.Combine(_workingDir, "src", "functions", "HttpTrigger_Python.ts"));
-        created.Files.Single().Should().Be(expectedPath);
+        result.Should().BeOfType<TemplateApplicationResult.Created>().Which.Files.Single().Should().Be(expectedPath);
 
         string content = File.ReadAllText(expectedPath);
         content.Should().Contain("export async function HttpTrigger_Python(");
@@ -398,9 +396,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = result.Should().BeOfType<TemplateApplicationResult.Created>().Subject;
         string target = Path.GetFullPath(Path.Combine(_workingDir, "function_app.py"));
-        created.Files.Single().Should().Be(target);
+        result.Should().BeOfType<TemplateApplicationResult.Created>().Which.Files.Single().Should().Be(target);
 
         string content = File.ReadAllText(target);
         content.Should().StartWith("# fresh app skeleton");
@@ -423,8 +420,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = result.Should().BeOfType<TemplateApplicationResult.Created>().Subject;
-        created.Files.Single().Should().Be(Path.GetFullPath(target));
+        result.Should().BeOfType<TemplateApplicationResult.Created>()
+            .Which.Files.Single().Should().Be(Path.GetFullPath(target));
 
         string content = File.ReadAllText(target);
         content.Should().StartWith("# preexisting");
