@@ -24,7 +24,6 @@ internal static class ProfileRegistration
         services.AddSingleton<IProfileFileSystem, ProfileFileSystem>();
         services.AddSingleton<IProfileSource, ProjectProfileSource>();
         services.AddSingleton<IProfileSource, UserProfileSource>();
-        services.AddSingleton<IProfileSource, BuiltInProfileSource>();
 
         services.AddOptions<RemoteProfileOptions>()
             .Configure(opts =>
@@ -43,6 +42,8 @@ internal static class ProfileRegistration
             client.Timeout = opts.HttpTimeout;
         });
         services.AddSingleton<IProfileSource>(sp => sp.GetRequiredService<RemoteProfileSource>());
+
+        services.AddSingleton<IProfileSource, BuiltInProfileSource>();
 
         services.AddSingleton<IConfigureOptions<ProjectProfileOptions>, ProjectProfileOptionsSetup>();
         services.AddSingleton<IConfigureOptions<UserProfilePreferenceOptions>, UserProfilePreferenceOptionsSetup>();
