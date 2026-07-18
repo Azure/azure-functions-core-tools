@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workers;
 using static Azure.Functions.Cli.Projects.ProjectCreationResults;
 
 namespace Azure.Functions.Cli.Workloads.PowerShell;
@@ -13,8 +12,6 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 /// </summary>
 internal sealed class PowerShellProjectFactory : IFunctionsProjectFactory
 {
-    private static readonly FunctionsWorkerId _workerId = new("powershell");
-
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
