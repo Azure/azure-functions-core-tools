@@ -176,10 +176,10 @@ namespace Azure.Functions.Cli.Arm
         /// </summary>
         internal static string GetRedactedRequestString(string requestString)
         {
-            return AuthorizationHeaderRegex().Replace(requestString, "[REDACTED]");
+            return AuthorizationHeaderRegex().Replace(requestString, "$1[REDACTED]");
         }
 
-        [GeneratedRegex(@"(?<=\bAuthorization:\s)[^\r\n]+", RegexOptions.IgnoreCase)]
+        [GeneratedRegex(@"(?m)^([ \t]*Authorization:[ \t]*)[^\r\n]+", RegexOptions.IgnoreCase)]
         private static partial Regex AuthorizationHeaderRegex();
     }
 }

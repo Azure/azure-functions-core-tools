@@ -53,5 +53,15 @@ namespace Azure.Functions.Cli.UnitTests.ArmTests
             result.Should().Contain("[REDACTED]");
             result.Should().NotContain("my-secret-token");
         }
+
+        [Fact]
+        public void GetRedactedRequestString_DoesNotRedactProxyAuthorizationHeader()
+        {
+            var input = "Method: GET, RequestUri: 'https://management.azure.com/subscriptions', Version: 1.1, Content: <null>, Headers:\r\n{\r\n  Proxy-Authorization: Bearer proxy-secret-token\r\n}";
+
+            var result = LoggingHandler.GetRedactedRequestString(input);
+
+            result.Should().Contain("Proxy-Authorization: Bearer proxy-secret-token");
+        }
     }
 }
