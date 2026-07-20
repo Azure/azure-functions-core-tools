@@ -205,7 +205,11 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         {
             case PollOutcomeKind.Ready:
                 progress?.Report($"Azurite ready ({poll.Elapsed.TotalSeconds:0.0}s)");
-                return new ManagedAzuriteResult.Started(process, mode, endpoints);
+                _logger.LogInformation(
+                    "Managed Azurite data directory: {DataDirectory}. Log file: {LogFilePath}.",
+                    paths.DataDirectory,
+                    paths.LogFilePath);
+                return new ManagedAzuriteResult.Started(process, mode, endpoints, paths);
 
             case PollOutcomeKind.ProcessExited:
                 await SafeDisposeAsync(process);
@@ -439,7 +443,10 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         }
 
         sb.AppendLine();
-        sb.Append($"Log file: {paths.LogFilePath}");
+        sb.AppendLine($"Data directory: {paths.DataDirectory}");
+        sb.AppendLine($"Log file: {paths.LogFilePath}");
+        sb.AppendLine();
+        sb.Append("To reset Azurite state, delete the data directory above, then run 'func start' again.");
         if (!string.IsNullOrWhiteSpace(stderrTail))
         {
             sb.AppendLine();
@@ -461,7 +468,10 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         sb.AppendLine($"  Queue: {endpoints.QueueEndpoint}");
         sb.AppendLine($"  Table: {endpoints.TableEndpoint}");
         sb.AppendLine();
-        sb.Append($"Log file: {paths.LogFilePath}");
+        sb.AppendLine($"Data directory: {paths.DataDirectory}");
+        sb.AppendLine($"Log file: {paths.LogFilePath}");
+        sb.AppendLine();
+        sb.Append("To reset Azurite state, delete the data directory above, then run 'func start' again.");
         return sb.ToString();
     }
 
