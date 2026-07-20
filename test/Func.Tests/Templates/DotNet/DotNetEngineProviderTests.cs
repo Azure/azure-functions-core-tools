@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.DotNet;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates.DotNet;
 
@@ -37,7 +36,7 @@ public class DotNetEngineProviderTests : IDisposable
             new TemplateListContext(new Cli.Common.WorkingDirectory(new DirectoryInfo(_installDir), false), "dotnet", "csharp"),
             CancellationToken.None);
 
-        Assert.Empty(templates);
+        templates.Should().BeEmpty();
     }
 
     [Fact]
@@ -58,11 +57,11 @@ public class DotNetEngineProviderTests : IDisposable
 
         // Two records (C# + F# variants of HttpTrigger sharing groupIdentity)
         // collapse to a single FunctionTemplateInfo whose Languages list both.
-        var info = Assert.Single(templates);
-        Assert.Equal("http", info.Id);
-        Assert.Equal(EngineIds.DotNet, info.EngineId);
-        Assert.Contains("c#", info.Languages, StringComparer.OrdinalIgnoreCase);
-        Assert.Contains("f#", info.Languages, StringComparer.OrdinalIgnoreCase);
+        var info = templates.Should().ContainSingle().Subject;
+        info.Id.Should().Be("http");
+        info.EngineId.Should().Be(EngineIds.DotNet);
+        info.Languages.Should().Contain(x => string.Equals(x, "c#", StringComparison.OrdinalIgnoreCase));
+        info.Languages.Should().Contain(x => string.Equals(x, "f#", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public class DotNetEngineProviderTests : IDisposable
             new TemplateListContext(new Cli.Common.WorkingDirectory(new DirectoryInfo(_installDir), false), "dotnet", "csharp"),
             CancellationToken.None);
 
-        Assert.Single(csharp);
+        csharp.Should().ContainSingle();
     }
 
     [Fact]
@@ -125,7 +124,7 @@ public class DotNetEngineProviderTests : IDisposable
             new System.CommandLine.RootCommand().Parse(string.Empty),
             CancellationToken.None);
 
-        Assert.IsType<TemplateApplicationResult.Created>(result);
+        result.Should().BeOfType<TemplateApplicationResult.Created>();
     }
 
     [Fact]
@@ -167,8 +166,8 @@ public class DotNetEngineProviderTests : IDisposable
             new System.CommandLine.RootCommand().Parse(string.Empty),
             CancellationToken.None);
 
-        var failed = Assert.IsType<TemplateApplicationResult.Failed>(result);
-        Assert.IsType<TemplateApplicationFailure.ProviderError>(failed.Failure);
+        result.Should().BeOfType<TemplateApplicationResult.Failed>()
+            .Which.Failure.Should().BeOfType<TemplateApplicationFailure.ProviderError>();
     }
 
     [Fact]
@@ -211,8 +210,8 @@ public class DotNetEngineProviderTests : IDisposable
             new System.CommandLine.RootCommand().Parse(string.Empty),
             CancellationToken.None);
 
-        Assert.NotNull(capturedArgs);
-        Assert.Contains("--force", capturedArgs!);
+        capturedArgs.Should().NotBeNull();
+        capturedArgs!.Should().Contain("--force");
     }
 
     [Fact]
@@ -255,8 +254,8 @@ public class DotNetEngineProviderTests : IDisposable
             new System.CommandLine.RootCommand().Parse(string.Empty),
             CancellationToken.None);
 
-        Assert.NotNull(capturedArgs);
-        Assert.DoesNotContain("--force", capturedArgs!);
+        capturedArgs.Should().NotBeNull();
+        capturedArgs!.Should().NotContain("--force");
     }
 
     private static void WriteFixture(string installDir)

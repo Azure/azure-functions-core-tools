@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.Options;
-using Xunit;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
@@ -17,8 +16,8 @@ public sealed class PackageSourceProviderTests
 
         PackageSource source = provider.GetSource("https://example.test/v3/index.json");
 
-        Assert.False(source.IsLocal);
-        Assert.Equal("https://example.test/v3/index.json", source.Source);
+        source.IsLocal.Should().BeFalse();
+        source.Source.Should().Be("https://example.test/v3/index.json");
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public sealed class PackageSourceProviderTests
 
         PackageSource source = provider.GetSource("https://override.test/v3/index.json");
 
-        Assert.Equal("https://override.test/v3/index.json", source.Source);
+        source.Source.Should().Be("https://override.test/v3/index.json");
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public sealed class PackageSourceProviderTests
 
         PackageSource source = provider.GetSource();
 
-        Assert.Equal("https://configured.test/v3/index.json", source.Source);
+        source.Source.Should().Be("https://configured.test/v3/index.json");
     }
 
     [Fact]
@@ -48,8 +47,8 @@ public sealed class PackageSourceProviderTests
 
         PackageSource source = provider.GetSource();
 
-        Assert.False(source.IsLocal);
-        Assert.Equal(PackageSourceProvider.DefaultSourceUrl, source.Source);
+        source.IsLocal.Should().BeFalse();
+        source.Source.Should().Be(PackageSourceProvider.DefaultSourceUrl);
     }
 
     [Theory]
@@ -61,8 +60,8 @@ public sealed class PackageSourceProviderTests
     {
         PackageSourceProvider provider = NewProvider();
 
-        ArgumentException ex = Assert.Throws<ArgumentException>(() => provider.GetSource(value));
-        Assert.Contains("not a supported NuGet feed", ex.Message, StringComparison.OrdinalIgnoreCase);
+        ArgumentException ex = FluentActions.Invoking(() => provider.GetSource(value)).Should().ThrowExactly<ArgumentException>().Which;
+        ex.Message.Should().ContainEquivalentOf("not a supported NuGet feed");
     }
 
     [Fact]
@@ -70,7 +69,7 @@ public sealed class PackageSourceProviderTests
     {
         PackageSourceProvider provider = NewProvider("ftp://unsupported.example/feed");
 
-        Assert.Throws<ArgumentException>(() => provider.GetSource());
+        FluentActions.Invoking(() => provider.GetSource()).Should().ThrowExactly<ArgumentException>();
     }
 
     private static PackageSourceProvider NewProvider(string? source = null)

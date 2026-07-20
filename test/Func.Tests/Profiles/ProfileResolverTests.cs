@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Profiles;
 
@@ -25,9 +24,9 @@ public class ProfileResolverTests
 
         ProfileResolution resolution = await resolver.ResolveAsync(Context(), CancellationToken.None);
 
-        Assert.IsType<ProfileResolution.None>(resolution);
-        Assert.Empty(resolution.Diagnostics);
-        Assert.Equal(0, source.LoadCount);
+        resolution.Should().BeOfType<ProfileResolution.None>();
+        resolution.Diagnostics.Should().BeEmpty();
+        source.LoadCount.Should().Be(0);
     }
 
     [Fact]
@@ -45,10 +44,10 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver, requestedProfile: "flex");
 
-        Assert.Equal("flex", resolution.Profile.Name);
-        ProfileDiagnostic diagnostic = Assert.Single(resolution.Diagnostics);
-        Assert.Equal(ProfileDiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Contains("not declared", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        resolution.Profile.Name.Should().Be("flex");
+        ProfileDiagnostic diagnostic = resolution.Diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Severity.Should().Be(ProfileDiagnosticSeverity.Warning);
+        diagnostic.Message.Should().ContainEquivalentOf("not declared");
     }
 
     [Fact]
@@ -68,8 +67,8 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver);
 
-        Assert.Equal("linux-premium", resolution.Profile.Name);
-        Assert.True(resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("2.5.0")));
+        resolution.Profile.Name.Should().Be("linux-premium");
+        resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("2.5.0")).Should().BeTrue();
     }
 
     [Fact]
@@ -90,7 +89,7 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver);
 
-        Assert.Equal("linux-premium", resolution.Profile.Name);
+        resolution.Profile.Name.Should().Be("linux-premium");
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver);
 
-        Assert.Equal("flex", resolution.Profile.Name);
+        resolution.Profile.Name.Should().Be("flex");
     }
 
     [Fact]
@@ -124,7 +123,7 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver, canPrompt: true);
 
-        Assert.Equal("linux-premium", resolution.Profile.Name);
+        resolution.Profile.Name.Should().Be("linux-premium");
     }
 
     [Fact]
@@ -144,10 +143,10 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver);
 
-        Assert.Equal("flex", resolution.Profile.Name);
-        ProfileDiagnostic diagnostic = Assert.Single(resolution.Diagnostics);
-        Assert.Equal(ProfileDiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Contains("will be ignored", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        resolution.Profile.Name.Should().Be("flex");
+        ProfileDiagnostic diagnostic = resolution.Diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Severity.Should().Be(ProfileDiagnosticSeverity.Warning);
+        diagnostic.Message.Should().ContainEquivalentOf("will be ignored");
     }
 
     [Fact]
@@ -166,8 +165,8 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver, canPrompt: true);
 
-        Assert.Equal("flex", resolution.Profile.Name);
-        Assert.Contains(_interaction.Lines, line => line.StartsWith("SELECT: Select an Azure Functions profile", StringComparison.Ordinal));
+        resolution.Profile.Name.Should().Be("flex");
+        _interaction.Lines.Should().Contain(line => line.StartsWith("SELECT: Select an Azure Functions profile", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -183,11 +182,10 @@ public class ProfileResolverTests
         ]);
         ProfileResolver resolver = CreateResolver(source);
 
-        ProfileConfigurationException ex = await Assert.ThrowsAsync<ProfileConfigurationException>(
-            () => resolver.ResolveAsync(Context(canPrompt: false), CancellationToken.None));
+        ProfileConfigurationException ex = (await FluentActions.Awaiting(() => resolver.ResolveAsync(Context(canPrompt: false), CancellationToken.None)).Should().ThrowAsync<ProfileConfigurationException>()).Which;
 
-        Assert.Contains("--profile", ex.Message);
-        Assert.Contains("defaultProfile", ex.Message);
+        ex.Message.Should().Contain("--profile");
+        ex.Message.Should().Contain("defaultProfile");
     }
 
     [Fact]
@@ -206,9 +204,9 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver, requestedProfile: "shared");
 
-        Assert.Equal(ProfileSourceKind.Project, resolution.Profile.Source.Kind);
-        Assert.True(resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("3.5.0")));
-        Assert.False(resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("2.5.0")));
+        resolution.Profile.Source.Kind.Should().Be(ProfileSourceKind.Project);
+        resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("3.5.0")).Should().BeTrue();
+        resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("2.5.0")).Should().BeFalse();
     }
 
     [Fact]
@@ -237,12 +235,12 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver, requestedProfile: "child");
 
-        Assert.True(resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("2.0.0")));
-        Assert.True(resolution.Profile.ExtensionBundleVersionRange!.Satisfies(NuGetVersion.Parse("5.5.0")));
-        Assert.Equal(["node", "python"], resolution.Profile.SupportedRuntimes);
-        Assert.True(resolution.Profile.WorkerVersionRanges["node"].Satisfies(NuGetVersion.Parse("3.13.0")));
-        Assert.True(resolution.Profile.WorkerVersionRanges["go"].Satisfies(NuGetVersion.Parse("1.0.0")));
-        Assert.False(resolution.Profile.WorkerVersionRanges.ContainsKey("python"));
+        resolution.Profile.HostVersionRange.Satisfies(NuGetVersion.Parse("2.0.0")).Should().BeTrue();
+        resolution.Profile.ExtensionBundleVersionRange!.Satisfies(NuGetVersion.Parse("5.5.0")).Should().BeTrue();
+        resolution.Profile.SupportedRuntimes.Should().Equal(["node", "python"]);
+        resolution.Profile.WorkerVersionRanges["node"].Satisfies(NuGetVersion.Parse("3.13.0")).Should().BeTrue();
+        resolution.Profile.WorkerVersionRanges["go"].Satisfies(NuGetVersion.Parse("1.0.0")).Should().BeTrue();
+        resolution.Profile.WorkerVersionRanges.ContainsKey("python").Should().BeFalse();
     }
 
     [Fact]
@@ -254,10 +252,9 @@ public class ProfileResolverTests
         ]);
         ProfileResolver resolver = CreateResolver(source);
 
-        ProfileConfigurationException ex = await Assert.ThrowsAsync<ProfileConfigurationException>(
-            () => resolver.ResolveAsync(Context(requestedProfile: "a"), CancellationToken.None));
+        ProfileConfigurationException ex = (await FluentActions.Awaiting(() => resolver.ResolveAsync(Context(requestedProfile: "a"), CancellationToken.None)).Should().ThrowAsync<ProfileConfigurationException>()).Which;
 
-        Assert.Contains("Circular profile inheritance", ex.Message);
+        ex.Message.Should().Contain("Circular profile inheritance");
     }
 
     [Fact]
@@ -270,10 +267,10 @@ public class ProfileResolverTests
 
         ProfileResolution.Resolved resolution = await ResolveProfileAsync(resolver, requestedProfile: "linux-consumption");
 
-        ProfileDiagnostic diagnostic = Assert.Single(resolution.Diagnostics);
-        Assert.Equal(ProfileDiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Contains("deprecated", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("https://example.test/deprecation", diagnostic.Message);
+        ProfileDiagnostic diagnostic = resolution.Diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Severity.Should().Be(ProfileDiagnosticSeverity.Warning);
+        diagnostic.Message.Should().ContainEquivalentOf("deprecated");
+        diagnostic.Message.Should().Contain("https://example.test/deprecation");
     }
 
     private ProfileResolver CreateResolver(params IProfileSource[] sources)
@@ -293,7 +290,7 @@ public class ProfileResolverTests
             Context(requestedProfile, canPrompt),
             CancellationToken.None);
 
-        return Assert.IsType<ProfileResolution.Resolved>(resolution);
+        return resolution.Should().BeOfType<ProfileResolution.Resolved>().Subject;
     }
 
     private ProfileResolutionContext Context(string? requestedProfile = null, bool canPrompt = false)

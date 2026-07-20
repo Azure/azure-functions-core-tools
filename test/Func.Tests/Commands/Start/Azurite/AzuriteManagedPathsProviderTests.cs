@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Configuration;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite;
 
@@ -19,8 +18,8 @@ public class AzuriteManagedPathsProviderTests
         AzuriteManagedPaths paths = provider.GetPaths();
 
         string expectedRoot = Path.Combine(configurationPaths.Home, "azurite");
-        Assert.Equal(Path.Combine(expectedRoot, "data"), paths.DataDirectory);
-        Assert.Equal(Path.Combine(expectedRoot, "azurite.log"), paths.LogFilePath);
+        paths.DataDirectory.Should().Be(Path.Combine(expectedRoot, "data"));
+        paths.LogFilePath.Should().Be(Path.Combine(expectedRoot, "azurite.log"));
     }
 
     [Fact]
@@ -32,8 +31,8 @@ public class AzuriteManagedPathsProviderTests
         var provider = new AzuriteManagedPathsProvider(configurationPaths);
         AzuriteManagedPaths paths = provider.GetPaths();
 
-        Assert.False(Directory.Exists(paths.DataDirectory));
-        Assert.False(Directory.Exists(Path.GetDirectoryName(paths.LogFilePath)!));
+        Directory.Exists(paths.DataDirectory).Should().BeFalse();
+        Directory.Exists(Path.GetDirectoryName(paths.LogFilePath)!).Should().BeFalse();
     }
 
     [Fact]
@@ -47,13 +46,13 @@ public class AzuriteManagedPathsProviderTests
 
         await provider.EnsureCreatedAsync(paths, CancellationToken.None);
 
-        Assert.True(Directory.Exists(paths.DataDirectory));
-        Assert.True(Directory.Exists(Path.GetDirectoryName(paths.LogFilePath)!));
+        Directory.Exists(paths.DataDirectory).Should().BeTrue();
+        Directory.Exists(Path.GetDirectoryName(paths.LogFilePath)!).Should().BeTrue();
     }
 
     [Fact]
     public void Constructor_NullConfigurationPaths_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new AzuriteManagedPathsProvider(null!));
+        FluentActions.Invoking(() => new AzuriteManagedPathsProvider(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 }

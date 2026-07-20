@@ -2,10 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
@@ -18,7 +16,7 @@ public class DotNetWorkloadTests
         var workload = new DotNetWorkload();
 
         // Act & Assert
-        Assert.Equal(".NET Stack", workload.DisplayName);
+        workload.DisplayName.Should().Be(".NET Stack");
     }
 
     [Fact]
@@ -28,7 +26,7 @@ public class DotNetWorkloadTests
         var workload = new DotNetWorkload();
 
         // Act & Assert
-        Assert.Equal("Azure Functions CLI tooling for .NET (C#) projects.", workload.Description);
+        workload.Description.Should().Be("Azure Functions CLI tooling for .NET (C#) projects.");
     }
 
     [Fact]
@@ -42,15 +40,15 @@ public class DotNetWorkloadTests
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        Assert.IsType<DotNetProjectInitializer>(initializer);
-        Assert.Equal("dotnet", initializer.Stack);
-        Assert.Equal(["C#", "F#"], initializer.SupportedLanguages);
+        initializer.Should().BeOfType<DotNetProjectInitializer>();
+        initializer.Stack.Should().Be("dotnet");
+        initializer.SupportedLanguages.Should().Equal(["C#", "F#"]);
     }
 
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DotNetWorkload().Configure(null!));
+        FluentActions.Invoking(() => new DotNetWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]

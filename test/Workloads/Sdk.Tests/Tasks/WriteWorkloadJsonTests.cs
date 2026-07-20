@@ -4,7 +4,6 @@
 using System.Text.Json;
 using Microsoft.Build.Framework;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Sdk.Tasks.Tests;
 
@@ -33,14 +32,14 @@ public sealed class WriteWorkloadJsonTests : IDisposable
 
         bool result = task.Execute();
 
-        Assert.True(result);
-        Assert.True(File.Exists(outputPath));
+        result.Should().BeTrue();
+        File.Exists(outputPath).Should().BeTrue();
 
         JsonDocument doc = ParseOutput(outputPath);
-        Assert.Equal("https://example.com/schema.json", doc.RootElement.GetProperty("$schema").GetString());
-        Assert.Equal("content", doc.RootElement.GetProperty("kind").GetString());
-        Assert.False(doc.RootElement.TryGetProperty("entryPoint", out _));
-        Assert.False(doc.RootElement.TryGetProperty("packages", out _));
+        doc.RootElement.GetProperty("$schema").GetString().Should().Be("https://example.com/schema.json");
+        doc.RootElement.GetProperty("kind").GetString().Should().Be("content");
+        doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("packages", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -55,13 +54,13 @@ public sealed class WriteWorkloadJsonTests : IDisposable
 
         bool result = task.Execute();
 
-        Assert.True(result);
+        result.Should().BeTrue();
         JsonDocument doc = ParseOutput(outputPath);
-        Assert.Equal("workload", doc.RootElement.GetProperty("kind").GetString());
+        doc.RootElement.GetProperty("kind").GetString().Should().Be("workload");
 
         JsonElement entryPoint = doc.RootElement.GetProperty("entryPoint");
-        Assert.Equal("My.Workload.dll", entryPoint.GetProperty("assemblyPath").GetString());
-        Assert.Equal("My.Namespace.MyWorkload", entryPoint.GetProperty("type").GetString());
+        entryPoint.GetProperty("assemblyPath").GetString().Should().Be("My.Workload.dll");
+        entryPoint.GetProperty("type").GetString().Should().Be("My.Namespace.MyWorkload");
     }
 
     [Fact]
@@ -78,11 +77,11 @@ public sealed class WriteWorkloadJsonTests : IDisposable
 
         bool result = task.Execute();
 
-        Assert.True(result);
+        result.Should().BeTrue();
         JsonDocument doc = ParseOutput(outputPath);
         JsonElement packages = doc.RootElement.GetProperty("packages");
-        Assert.Equal("My.Package.win-x64", packages.GetProperty("win-x64").GetString());
-        Assert.Equal("My.Package.linux-x64", packages.GetProperty("linux-x64").GetString());
+        packages.GetProperty("win-x64").GetString().Should().Be("My.Package.win-x64");
+        packages.GetProperty("linux-x64").GetString().Should().Be("My.Package.linux-x64");
     }
 
     [Fact]
@@ -94,7 +93,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         task.Execute();
 
         JsonDocument doc = ParseOutput(outputPath);
-        Assert.False(doc.RootElement.TryGetProperty("entryPoint", out _));
+        doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         task.Execute();
 
         JsonDocument doc = ParseOutput(outputPath);
-        Assert.False(doc.RootElement.TryGetProperty("entryPoint", out _));
+        doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -120,7 +119,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         task.Execute();
 
         JsonDocument doc = ParseOutput(outputPath);
-        Assert.False(doc.RootElement.TryGetProperty("entryPoint", out _));
+        doc.RootElement.TryGetProperty("entryPoint", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -133,7 +132,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         task.Execute();
 
         JsonDocument doc = ParseOutput(outputPath);
-        Assert.False(doc.RootElement.TryGetProperty("packages", out _));
+        doc.RootElement.TryGetProperty("packages", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -145,9 +144,9 @@ public sealed class WriteWorkloadJsonTests : IDisposable
 
         bool result = task.Execute();
 
-        Assert.True(result);
-        Assert.True(Directory.Exists(nestedDir));
-        Assert.True(File.Exists(outputPath));
+        result.Should().BeTrue();
+        Directory.Exists(nestedDir).Should().BeTrue();
+        File.Exists(outputPath).Should().BeTrue();
     }
 
     [Fact]
@@ -166,7 +165,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         task2.Execute();
 
         DateTime secondWriteTime = File.GetLastWriteTimeUtc(outputPath);
-        Assert.Equal(firstWriteTime, secondWriteTime);
+        secondWriteTime.Should().Be(firstWriteTime);
     }
 
     [Fact]
@@ -183,7 +182,7 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         task2.Execute();
 
         string contentAfter = File.ReadAllText(outputPath);
-        Assert.NotEqual(contentBefore, contentAfter);
+        contentAfter.Should().NotBe(contentBefore);
     }
 
     [Fact]

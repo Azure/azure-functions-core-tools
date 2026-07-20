@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.V2;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates.V2;
 
@@ -58,13 +57,13 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = Assert.IsType<TemplateApplicationResult.Created>(result);
+        var created = result.Should().BeOfType<TemplateApplicationResult.Created>().Subject;
         string expectedPath = Path.GetFullPath(Path.Combine(_workingDir, "src", "functions", "MyHttp.js"));
-        Assert.Single(created.Files);
-        Assert.Equal(expectedPath, created.Files[0]);
-        Assert.True(File.Exists(expectedPath));
+        created.Files.Should().ContainSingle();
+        created.Files[0].Should().Be(expectedPath);
+        File.Exists(expectedPath).Should().BeTrue();
         string content = File.ReadAllText(expectedPath);
-        Assert.Contains("hello MyHttp", content);
+        content.Should().Contain("hello MyHttp");
     }
 
     [Fact]
@@ -95,9 +94,9 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var existed = Assert.IsType<TemplateApplicationResult.AlreadyExists>(result);
-        Assert.Single(existed.ExistingFiles);
-        Assert.Equal("preexisting", File.ReadAllText(target));
+        result.Should().BeOfType<TemplateApplicationResult.AlreadyExists>()
+            .Which.ExistingFiles.Should().ContainSingle();
+        File.ReadAllText(target).Should().Be("preexisting");
     }
 
     [Fact]
@@ -128,8 +127,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: true);
 
-        Assert.IsType<TemplateApplicationResult.Created>(result);
-        Assert.Equal("new content", File.ReadAllText(target));
+        result.Should().BeOfType<TemplateApplicationResult.Created>();
+        File.ReadAllText(target).Should().Be("new content");
     }
 
     [Fact]
@@ -176,8 +175,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        Assert.IsType<TemplateApplicationResult.Created>(result);
-        Assert.Equal("auth=anonymous", File.ReadAllText(Path.Combine(_workingDir, "config.txt")));
+        result.Should().BeOfType<TemplateApplicationResult.Created>();
+        File.ReadAllText(Path.Combine(_workingDir, "config.txt")).Should().Be("auth=anonymous");
     }
 
     [Fact]
@@ -212,9 +211,9 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var failed = Assert.IsType<TemplateApplicationResult.Failed>(result);
-        var invalid = Assert.IsType<TemplateApplicationFailure.InvalidPrompt>(failed.Failure);
-        Assert.Equal("queueName", invalid.PromptId);
+        var failed = result.Should().BeOfType<TemplateApplicationResult.Failed>().Subject;
+        failed.Failure.Should().BeOfType<TemplateApplicationFailure.InvalidPrompt>()
+            .Which.PromptId.Should().Be("queueName");
     }
 
     [Fact]
@@ -237,8 +236,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var failed = Assert.IsType<TemplateApplicationResult.Failed>(result);
-        Assert.IsType<TemplateApplicationFailure.ProviderError>(failed.Failure);
+        result.Should().BeOfType<TemplateApplicationResult.Failed>()
+            .Which.Failure.Should().BeOfType<TemplateApplicationFailure.ProviderError>();
     }
 
     [Theory]
@@ -251,7 +250,7 @@ public class V2TemplateEngineTests : IDisposable
     [InlineData("already_valid", "already_valid")]
     public void SanitizeFunctionIdentifier_ProducesValidIdentifier(string input, string expected)
     {
-        Assert.Equal(expected, V2TemplateEngine.SanitizeFunctionIdentifier(input));
+        V2TemplateEngine.SanitizeFunctionIdentifier(input).Should().Be(expected);
     }
 
     [Theory]
@@ -303,13 +302,12 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = Assert.IsType<TemplateApplicationResult.Created>(result);
         string expectedPath = Path.GetFullPath(Path.Combine(_workingDir, "src", "functions", $"{sanitized}.py"));
-        Assert.Equal(expectedPath, created.Files.Single());
+        result.Should().BeOfType<TemplateApplicationResult.Created>().Which.Files.Single().Should().Be(expectedPath);
 
         string content = File.ReadAllText(expectedPath);
-        Assert.Contains($"def {sanitized}(", content);
-        Assert.DoesNotContain($"def {functionName}(", content);
+        content.Should().Contain($"def {sanitized}(");
+        content.Should().NotContain($"def {functionName}(");
     }
 
     [Fact]
@@ -376,14 +374,13 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = Assert.IsType<TemplateApplicationResult.Created>(result);
         string expectedPath = Path.GetFullPath(Path.Combine(_workingDir, "src", "functions", "HttpTrigger_Python.ts"));
-        Assert.Equal(expectedPath, created.Files.Single());
+        result.Should().BeOfType<TemplateApplicationResult.Created>().Which.Files.Single().Should().Be(expectedPath);
 
         string content = File.ReadAllText(expectedPath);
-        Assert.Contains("export async function HttpTrigger_Python(", content);
-        Assert.Contains("handler: HttpTrigger_Python", content);
-        Assert.DoesNotContain("HttpTrigger-Python", content);
+        content.Should().Contain("export async function HttpTrigger_Python(");
+        content.Should().Contain("handler: HttpTrigger_Python");
+        content.Should().NotContain("HttpTrigger-Python");
     }
 
     [Fact]
@@ -399,13 +396,12 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = Assert.IsType<TemplateApplicationResult.Created>(result);
         string target = Path.GetFullPath(Path.Combine(_workingDir, "function_app.py"));
-        Assert.Equal(target, created.Files.Single());
+        result.Should().BeOfType<TemplateApplicationResult.Created>().Which.Files.Single().Should().Be(target);
 
         string content = File.ReadAllText(target);
-        Assert.StartsWith("# fresh app skeleton", content);
-        Assert.DoesNotContain("@app.route", content);
+        content.Should().StartWith("# fresh app skeleton");
+        content.Should().NotContain("@app.route");
     }
 
     [Fact]
@@ -424,12 +420,12 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        var created = Assert.IsType<TemplateApplicationResult.Created>(result);
-        Assert.Equal(Path.GetFullPath(target), created.Files.Single());
+        result.Should().BeOfType<TemplateApplicationResult.Created>()
+            .Which.Files.Single().Should().Be(Path.GetFullPath(target));
 
         string content = File.ReadAllText(target);
-        Assert.StartsWith("# preexisting", content);
-        Assert.Contains("@app.route(MyFn)", content);
+        content.Should().StartWith("# preexisting");
+        content.Should().Contain("@app.route(MyFn)");
     }
 
     [Fact]
@@ -450,10 +446,10 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        Assert.IsType<TemplateApplicationResult.Created>(result);
+        result.Should().BeOfType<TemplateApplicationResult.Created>();
         string content = File.ReadAllText(target);
-        Assert.DoesNotContain("prior_no_newline@app.route", content);
-        Assert.Matches(@"prior_no_newline\r?\n@app\.route\(Next\)", content);
+        content.Should().NotContain("prior_no_newline@app.route");
+        content.Should().MatchRegex(@"prior_no_newline\r?\n@app\.route\(Next\)");
     }
 
     [Fact]
@@ -502,8 +498,8 @@ public class V2TemplateEngineTests : IDisposable
             workingDirectory: new DirectoryInfo(_workingDir),
             force: false);
 
-        Assert.IsType<TemplateApplicationResult.Created>(result);
-        Assert.Equal("blueprint body", File.ReadAllText(Path.Combine(_workingDir, "blueprint.py")));
+        result.Should().BeOfType<TemplateApplicationResult.Created>();
+        File.ReadAllText(Path.Combine(_workingDir, "blueprint.py")).Should().Be("blueprint body");
     }
 
     private static NewTemplate MakeCreateOrAppendTemplate() => new()

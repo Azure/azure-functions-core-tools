@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
@@ -50,7 +49,7 @@ public class DotNetSourceProjectTests : IDisposable
         await project.PrepareForHostRunAsync(context, default);
 
         string expectedDir = Path.GetDirectoryName(assemblyPath)!;
-        Assert.Equal(expectedDir, context.StartupDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar));
+        context.StartupDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar).Should().Be(expectedDir);
     }
 
     [Fact]
@@ -75,12 +74,8 @@ public class DotNetSourceProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.Contains(
-            reporter.Logs,
-            entry => entry.Severity == FunctionsProjectReportSeverity.Info && entry.Line == "Build succeeded.");
-        Assert.Contains(
-            reporter.Logs,
-            entry => entry.Severity == FunctionsProjectReportSeverity.Error && entry.Line == "warning XYZ: heads up");
+        reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Info && entry.Line == "Build succeeded.");
+        reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Error && entry.Line == "warning XYZ: heads up");
     }
 
     [Fact]
@@ -112,7 +107,7 @@ public class DotNetSourceProjectTests : IDisposable
             Arg.Any<CancellationToken>());
 
         string expectedDir = Path.GetDirectoryName(assemblyPath)!;
-        Assert.Equal(expectedDir, context.StartupDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar));
+        context.StartupDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar).Should().Be(expectedDir);
     }
 
     [Fact]
@@ -130,12 +125,11 @@ public class DotNetSourceProjectTests : IDisposable
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("--no-build", ex.Message);
-        Assert.Contains("MyApp", ex.Message);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("--no-build");
+        ex.Message.Should().Contain("MyApp");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -151,12 +145,11 @@ public class DotNetSourceProjectTests : IDisposable
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("dotnet build", ex.Message);
-        Assert.Contains("exit 1", ex.Message);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("dotnet build");
+        ex.Message.Should().Contain("exit 1");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -170,11 +163,10 @@ public class DotNetSourceProjectTests : IDisposable
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("output directory", ex.Message);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("output directory");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -190,12 +182,11 @@ public class DotNetSourceProjectTests : IDisposable
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext();
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("dotnet build", ex.Message);
-        Assert.Contains("exit 1", ex.Message);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("dotnet build");
+        ex.Message.Should().Contain("exit 1");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -206,8 +197,7 @@ public class DotNetSourceProjectTests : IDisposable
 
         DotNetSourceProject project = CreateProject(projectFile);
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => project.PrepareForHostRunAsync(null!, default));
+        await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -221,8 +211,7 @@ public class DotNetSourceProjectTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => project.PrepareForHostRunAsync(context, cts.Token));
+        await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, cts.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -233,12 +222,11 @@ public class DotNetSourceProjectTests : IDisposable
 
         DotNetSourceProject project = CreateProject(projectFile);
 
-        GracefulException ex = Assert.Throws<GracefulException>(
-            () => project.ParseTargetResult("not json at all", "Build"));
+        GracefulException ex = FluentActions.Invoking(() => project.ParseTargetResult("not json at all", "Build")).Should().ThrowExactly<GracefulException>().Which;
 
-        Assert.Contains("not valid JSON", ex.Message);
-        Assert.IsAssignableFrom<System.Text.Json.JsonException>(ex.InnerException);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("not valid JSON");
+        ex.InnerException.Should().BeAssignableTo<System.Text.Json.JsonException>();
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -259,11 +247,10 @@ public class DotNetSourceProjectTests : IDisposable
             }
             """;
 
-        GracefulException ex = Assert.Throws<GracefulException>(
-            () => project.ParseTargetResult(json, "Build"));
+        GracefulException ex = FluentActions.Invoking(() => project.ParseTargetResult(json, "Build")).Should().ThrowExactly<GracefulException>().Which;
 
-        Assert.Contains("output directory", ex.Message);
-        Assert.True(ex.IsUserError);
+        ex.Message.Should().Contain("output directory");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Theory]
@@ -275,7 +262,7 @@ public class DotNetSourceProjectTests : IDisposable
         string projectFile = Path.Combine(_projectDir.FullName, projectFileName);
         DotNetSourceProject project = CreateProject(projectFile);
 
-        Assert.Equal(expectedLanguage, project.Language);
+        project.Language.Should().Be(expectedLanguage);
     }
 
     private DotNetSourceProject CreateProject(string projectFile)

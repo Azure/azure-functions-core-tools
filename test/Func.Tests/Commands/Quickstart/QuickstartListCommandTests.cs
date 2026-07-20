@@ -5,7 +5,6 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Quickstart;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Quickstart;
 
@@ -24,12 +23,12 @@ public class QuickstartListCommandTests
         QuickstartListCommand cmd = CreateCommand();
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
-        Assert.Contains("--stack", optionNames);
-        Assert.Contains("--language", optionNames);
-        Assert.Contains("--resource", optionNames);
-        Assert.Contains("--iac", optionNames);
-        Assert.Contains("--search", optionNames);
-        Assert.Contains("--json", optionNames);
+        optionNames.Should().Contain("--stack");
+        optionNames.Should().Contain("--language");
+        optionNames.Should().Contain("--resource");
+        optionNames.Should().Contain("--iac");
+        optionNames.Should().Contain("--search");
+        optionNames.Should().Contain("--json");
     }
 
     [Fact]
@@ -39,8 +38,8 @@ public class QuickstartListCommandTests
         Option<string?> stackOption = cmd.StackOption;
         string description = stackOption.Description ?? string.Empty;
 
-        Assert.Contains("Set up a stack", description);
-        Assert.Contains("func setup --features", description);
+        description.Should().Contain("Set up a stack");
+        description.Should().Contain("func setup --features");
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public class QuickstartListCommandTests
             QuickstartTestHelpers.CreateProvider(stack: "node"));
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        Assert.Contains("Supported values: dotnet, node, python.", description);
+        description.Should().Contain("Supported values: dotnet, node, python.");
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public class QuickstartListCommandTests
     {
         QuickstartListCommand cmd = CreateCommand();
 
-        Assert.Contains("func workload search --stack", cmd.GetHelpFooterHint() ?? string.Empty);
+        (cmd.GetHelpFooterHint() ?? string.Empty).Should().Contain("func workload search --stack");
     }
 
     [Fact]
@@ -71,7 +70,7 @@ public class QuickstartListCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "--stack", "missing");
 
-        Assert.Equal(1, exit);
+        exit.Should().Be(1);
     }
 
     [Fact]
@@ -86,9 +85,9 @@ public class QuickstartListCommandTests
 
         int exit = await InvokeAsync(CreateCommand());
 
-        Assert.Equal(0, exit);
-        Assert.Contains("TABLE: [ID, Name, Description]", _interaction.Lines);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("JSON:"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("TABLE: [ID, Name, Description]");
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("JSON:"));
     }
 
     [Fact]
@@ -102,12 +101,12 @@ public class QuickstartListCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "--json");
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"id\":\"http-py\"", jsonLine);
-        Assert.Contains("\"name\":\"HTTP Trigger\"", jsonLine);
-        Assert.Contains("\"description\":\"A Python HTTP trigger\"", jsonLine);
+        jsonLine.Should().Contain("\"id\":\"http-py\"");
+        jsonLine.Should().Contain("\"name\":\"HTTP Trigger\"");
+        jsonLine.Should().Contain("\"description\":\"A Python HTTP trigger\"");
     }
 
     [Fact]
@@ -121,9 +120,9 @@ public class QuickstartListCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "--json");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"description\":\"\"", jsonLine);
+        jsonLine.Should().Contain("\"description\":\"\"");
     }
 
     [Fact]
@@ -136,8 +135,8 @@ public class QuickstartListCommandTests
 
         int exit = await InvokeAsync(CreateCommand());
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.Contains("No templates match"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.Contains("No templates match"));
     }
 
     [Fact]
@@ -155,7 +154,7 @@ public class QuickstartListCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "--language", "unknown");
 
-        Assert.Equal(1, exit);
+        exit.Should().Be(1);
     }
 
     // --- helpers ---

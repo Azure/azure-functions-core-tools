@@ -7,7 +7,6 @@ using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Python.Tests;
 
@@ -38,7 +37,7 @@ public class PythonProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsPython()
     {
-        Assert.Equal("python", new PythonProjectInitializer().Stack);
+        new PythonProjectInitializer().Stack.Should().Be("python");
     }
 
     [Theory]
@@ -51,16 +50,15 @@ public class PythonProjectInitializerTests : IDisposable
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
-        Assert.Equal(expected, new PythonProjectInitializer().NormalizeLanguage(input));
+        new PythonProjectInitializer().NormalizeLanguage(input).Should().Be(expected);
     }
 
     [Fact]
     public async Task InitializeAsync_UnsupportedLanguage_Throws()
     {
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => RunAsync(force: false, language: "ruby"));
+        ArgumentException ex = (await FluentActions.Awaiting(() => RunAsync(force: false, language: "ruby")).Should().ThrowAsync<ArgumentException>()).Which;
 
-        Assert.Contains("ruby", ex.Message);
+        ex.Message.Should().Contain("ruby");
     }
 
     [Fact]
@@ -68,7 +66,7 @@ public class PythonProjectInitializerTests : IDisposable
     {
         await RunAsync(force: false, language: "py");
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "function_app.py")));
+        File.Exists(Path.Combine(_projectDir.FullName, "function_app.py")).Should().BeTrue();
     }
 
     [Fact]
@@ -78,8 +76,8 @@ public class PythonProjectInitializerTests : IDisposable
         IReadOnlyList<Option> options = new PythonProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
-        Assert.Contains("--no-bundles", names);
-        Assert.Contains("--bundles-channel", names);
+        names.Should().Contain("--no-bundles");
+        names.Should().Contain("--bundles-channel");
     }
 
     [Fact]
@@ -87,18 +85,18 @@ public class PythonProjectInitializerTests : IDisposable
     {
         await RunAsync(force: false);
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "function_app.py")));
-        Assert.Contains("FunctionApp", File.ReadAllText(Path.Combine(_projectDir.FullName, "function_app.py")));
+        File.Exists(Path.Combine(_projectDir.FullName, "function_app.py")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "function_app.py")).Should().Contain("FunctionApp");
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "requirements.txt")));
-        Assert.Contains("azure-functions", File.ReadAllText(Path.Combine(_projectDir.FullName, "requirements.txt")));
+        File.Exists(Path.Combine(_projectDir.FullName, "requirements.txt")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "requirements.txt")).Should().Contain("azure-functions");
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "getting_started.md")));
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")));
+        File.Exists(Path.Combine(_projectDir.FullName, "getting_started.md")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")).Should().BeTrue();
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "local.settings.json")));
+        File.Exists(Path.Combine(_projectDir.FullName, "local.settings.json")).Should().BeTrue();
         var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "local.settings.json")));
-        Assert.Equal("python", settings.RootElement.GetProperty("Values").GetProperty("FUNCTIONS_WORKER_RUNTIME").GetString());
+        settings.RootElement.GetProperty("Values").GetProperty("FUNCTIONS_WORKER_RUNTIME").GetString().Should().Be("python");
     }
 
     [Fact]
@@ -112,12 +110,12 @@ public class PythonProjectInitializerTests : IDisposable
         await RunAsync(force: false);
 
         var root = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")));
-        Assert.NotNull(root);
-        Assert.Equal("2.0", root!["version"]!.GetValue<string>());
+        root.Should().NotBeNull();
+        root!["version"]!.GetValue<string>().Should().Be("2.0");
         JsonNode? bundle = root["extensionBundle"];
-        Assert.NotNull(bundle);
-        Assert.Equal("Microsoft.Azure.Functions.ExtensionBundle", bundle!["id"]!.GetValue<string>());
-        Assert.Equal("[4.*, 5.0.0)", bundle["version"]!.GetValue<string>());
+        bundle.Should().NotBeNull();
+        bundle!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle");
+        bundle["version"]!.GetValue<string>().Should().Be("[4.*, 5.0.0)");
     }
 
     [Fact]
@@ -129,7 +127,7 @@ public class PythonProjectInitializerTests : IDisposable
         await RunAsync(force: false);
 
         JsonNode? bundle = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")))!["extensionBundle"];
-        Assert.Equal("custom", bundle!["id"]!.GetValue<string>());
+        bundle!["id"]!.GetValue<string>().Should().Be("custom");
     }
 
     [Fact]
@@ -142,7 +140,7 @@ public class PythonProjectInitializerTests : IDisposable
 
         await RunAsync(force: false);
 
-        Assert.Equal(userEdit, File.ReadAllText(Path.Combine(_projectDir.FullName, "function_app.py")));
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "function_app.py")).Should().Be(userEdit);
     }
 
     [Fact]
@@ -153,7 +151,7 @@ public class PythonProjectInitializerTests : IDisposable
 
         await RunAsync(force: true);
 
-        Assert.Contains("FunctionApp", File.ReadAllText(Path.Combine(_projectDir.FullName, "function_app.py")));
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "function_app.py")).Should().Contain("FunctionApp");
     }
 
     [Fact]
@@ -162,10 +160,10 @@ public class PythonProjectInitializerTests : IDisposable
         await RunAsync(force: false, args: ["--no-bundles"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
+        File.Exists(hostJsonPath).Should().BeTrue("host.json should be created even with --no-bundles");
         string content = File.ReadAllText(hostJsonPath);
-        Assert.Contains("\"version\"", content);
-        Assert.DoesNotContain("extensionBundle", content);
+        content.Should().Contain("\"version\"");
+        content.Should().NotContain("extensionBundle");
     }
 
     [Fact]
@@ -175,9 +173,7 @@ public class PythonProjectInitializerTests : IDisposable
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
         var root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
-        Assert.Equal(
-            "Microsoft.Azure.Functions.ExtensionBundle.Preview",
-            root!["extensionBundle"]!["id"]!.GetValue<string>());
+        root!["extensionBundle"]!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Preview");
     }
 
     [Fact]
@@ -187,9 +183,7 @@ public class PythonProjectInitializerTests : IDisposable
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
         var root = JsonNode.Parse(File.ReadAllText(hostJsonPath));
-        Assert.Equal(
-            "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
-            root!["extensionBundle"]!["id"]!.GetValue<string>());
+        root!["extensionBundle"]!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Experimental");
     }
 
     private Task RunAsync(bool force, string[]? args = null, string? language = null)

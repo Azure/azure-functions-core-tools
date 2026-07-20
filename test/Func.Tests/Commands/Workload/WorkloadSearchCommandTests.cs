@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Workloads.Catalog;
 using NSubstitute;
 using NuGet.Versioning;
-using Xunit;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
@@ -25,10 +24,10 @@ public class WorkloadSearchCommandTests
     public void Search_HasExpectedArgsAndOptions()
     {
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
-        Assert.Single(cmd.Arguments, a => a.Name == "query");
-        Assert.Contains(cmd.Options, o => o.Name == "--source");
-        Assert.Contains(cmd.Options, o => o.Name == "--prerelease");
-        Assert.Contains(cmd.Options, o => o.Name == "--stack");
+        cmd.Arguments.Should().ContainSingle(a => a.Name == "query");
+        cmd.Options.Should().Contain(o => o.Name == "--source");
+        cmd.Options.Should().Contain(o => o.Name == "--prerelease");
+        cmd.Options.Should().Contain(o => o.Name == "--stack");
     }
 
     [Fact]
@@ -60,12 +59,12 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--stack");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         // Stack workload's display name appears as a card heading.
-        Assert.Contains("Python", _interaction.Lines);
+        _interaction.Lines.Should().Contain("Python");
         // Filtered-out packages don't appear anywhere.
-        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.host"));
-        Assert.DoesNotContain(_interaction.Lines, l => l.Contains("workloads.nokind"));
+        _interaction.Lines.Should().NotContain(l => l.Contains("workloads.host"));
+        _interaction.Lines.Should().NotContain(l => l.Contains("workloads.nokind"));
     }
 
     [Fact]
@@ -76,8 +75,8 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("No workloads found"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("No workloads found"));
     }
 
     [Fact]
@@ -95,16 +94,16 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
-        Assert.Contains("Python", _interaction.Lines);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.2.3"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Package ID:") && l.EndsWith("func.workload.python"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Alias:") && l.EndsWith("python"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith("Python workload"));
-        Assert.Contains("HINT: Showing 1 result.", _interaction.Lines);
-        Assert.Contains("HINT: Run 'func workload install <alias | package id>' to install one (stable by default).", _interaction.Lines);
-        Assert.Contains("HINT: When several versions or channels exist, pass --version (-v) to install a specific one.", _interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
+        _interaction.Lines.Should().Contain("Python");
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("1.2.3"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Package ID:") && l.EndsWith("func.workload.python"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Alias:") && l.EndsWith("python"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Description:") && l.EndsWith("Python workload"));
+        _interaction.Lines.Should().Contain("HINT: Showing 1 result.");
+        _interaction.Lines.Should().Contain("HINT: Run 'func workload install <alias | package id>' to install one (stable by default).");
+        _interaction.Lines.Should().Contain("HINT: When several versions or channels exist, pass --version (-v) to install a specific one.");
     }
 
     [Fact]
@@ -122,9 +121,7 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.StartsWith("Aliases:") && l.EndsWith("dotnet, dotnet-isolated"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Aliases:") && l.EndsWith("dotnet, dotnet-isolated"));
     }
 
     [Fact]
@@ -143,12 +140,12 @@ public class WorkloadSearchCommandTests
         await InvokeAsync(cmd);
 
         // Title missing: heading falls back to package id.
-        Assert.Contains("no.alias.pkg", _interaction.Lines);
+        _interaction.Lines.Should().Contain("no.alias.pkg");
         // Alias line present, value empty.
         string aliasLine = _interaction.Lines.Single(l => l.StartsWith("Alias:"));
-        Assert.Equal("Alias:", aliasLine.TrimEnd());
+        aliasLine.TrimEnd().Should().Be("Alias:");
         // No description -> placeholder shown on the Description: line.
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith("(no description)"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Description:") && l.EndsWith("(no description)"));
     }
 
     [Fact]
@@ -163,9 +160,9 @@ public class WorkloadSearchCommandTests
 
         int firstHeading = _interaction.Lines.ToList().FindIndex(l => l == "A");
         int secondHeading = _interaction.Lines.ToList().FindIndex(l => l == "B");
-        Assert.InRange(firstHeading, 0, secondHeading - 1);
+        firstHeading.Should().BeInRange(0, secondHeading - 1);
         // Blank line separator between cards.
-        Assert.Equal(string.Empty, _interaction.Lines[secondHeading - 1]);
+        _interaction.Lines[secondHeading - 1].Should().Be(string.Empty);
     }
 
     [Fact]
@@ -186,7 +183,7 @@ public class WorkloadSearchCommandTests
 
         // Card layout keeps the description on its own Description: line and
         // emits the full string verbatim rather than truncating it.
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith(longDesc));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Description:") && l.EndsWith(longDesc));
     }
 
     [Fact]
@@ -206,9 +203,7 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         await InvokeAsync(cmd);
 
-        Assert.Contains(
-            "HINT: Showing 20 results. More may be available, refine your query.",
-            _interaction.Lines);
+        _interaction.Lines.Should().Contain("HINT: Showing 20 results. More may be available, refine your query.");
     }
 
     [Fact]
@@ -225,12 +220,12 @@ public class WorkloadSearchCommandTests
             "--source", "https://example/v3/index.json",
             "--prerelease");
 
-        Assert.Equal(0, exit);
-        Assert.NotNull(captured);
-        Assert.Equal("python", captured!.Filter);
-        Assert.True(captured.IncludePrerelease);
-        Assert.Equal("https://example/v3/index.json", captured.Source);
-        Assert.Equal(20, captured.Take);
+        exit.Should().Be(0);
+        captured.Should().NotBeNull();
+        captured!.Filter.Should().Be("python");
+        captured.IncludePrerelease.Should().BeTrue();
+        captured.Source.Should().Be("https://example/v3/index.json");
+        captured.Take.Should().Be(20);
     }
 
     [Fact]
@@ -245,12 +240,12 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.NotNull(captured);
-        Assert.Null(captured!.Filter);
-        Assert.False(captured.IncludePrerelease);
-        Assert.Null(captured.Source);
-        Assert.Equal(20, captured.Take);
+        exit.Should().Be(0);
+        captured.Should().NotBeNull();
+        captured!.Filter.Should().BeNull();
+        captured.IncludePrerelease.Should().BeFalse();
+        captured.Source.Should().BeNull();
+        captured.Take.Should().Be(20);
     }
 
     [Fact]
@@ -268,14 +263,14 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--json");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("JSON:"));
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Version:"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("JSON:"));
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("Version:"));
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"packageId\":\"func.workload.python\"", jsonLine);
-        Assert.Contains("\"latestVersion\":\"1.2.3\"", jsonLine);
-        Assert.Contains("\"aliases\":[\"python\"]", jsonLine);
+        jsonLine.Should().Contain("\"packageId\":\"func.workload.python\"");
+        jsonLine.Should().Contain("\"latestVersion\":\"1.2.3\"");
+        jsonLine.Should().Contain("\"aliases\":[\"python\"]");
     }
 
     [Fact]
@@ -300,16 +295,16 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--prerelease");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         // One card per channel. Channel-label line is emitted on expansion
         // so users can tell which row matches `--version` for which channel.
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("4.42.0-preview.1"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("4.40.0-experimental.2"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("4.35.0"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("preview"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("experimental"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("stable"));
-        Assert.Contains("HINT: Showing 3 results.", _interaction.Lines);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("4.42.0-preview.1"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("4.40.0-experimental.2"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("4.35.0"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("preview"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("experimental"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("stable"));
+        _interaction.Lines.Should().Contain("HINT: Showing 3 results.");
     }
 
     [Fact]
@@ -336,10 +331,10 @@ public class WorkloadSearchCommandTests
 
         // Latest stable wins out over earlier stable, latest preview wins
         // out over earlier prereleases on the same channel.
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("2.1.0-preview.2"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("2.0.0"));
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("2.0.0-preview.5"));
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.5.0"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("2.1.0-preview.2"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("2.0.0"));
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("Version:") && l.EndsWith("2.0.0-preview.5"));
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("Version:") && l.EndsWith("1.5.0"));
     }
 
     [Fact]
@@ -360,7 +355,7 @@ public class WorkloadSearchCommandTests
         // ListVersionsAsync is not called when prerelease is off, the
         // server-side search filter already gives us the stable row.
         await _catalog.DidNotReceiveWithAnyArgs().ListVersionsAsync(default!, default, default);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("Channel:"));
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("Channel:"));
     }
 
     [Fact]
@@ -380,9 +375,9 @@ public class WorkloadSearchCommandTests
         var cmd = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
         int exit = await InvokeAsync(cmd, "--prerelease");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.0.0-preview"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Channel:") && l.EndsWith("preview"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("1.0.0-preview"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Channel:") && l.EndsWith("preview"));
     }
 
     [Theory]
@@ -393,7 +388,7 @@ public class WorkloadSearchCommandTests
     [InlineData("1.0.0-rc.1+build.5", "rc")]
     public void GetChannel_ParsesPrereleaseLabel(string version, string expectedChannel)
     {
-        Assert.Equal(expectedChannel, WorkloadSearchCommand.GetChannel(NuGetVersion.Parse(version)));
+        WorkloadSearchCommand.GetChannel(NuGetVersion.Parse(version)).Should().Be(expectedChannel);
     }
 
     private void StubSearch(params CatalogSearchResult[] results)

@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Templates;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -14,9 +13,9 @@ public class TemplateEngineProviderRegistryTests
     {
         var registry = new TemplateEngineProviderRegistry([]);
 
-        Assert.Null(registry.TryGet(EngineIds.V2));
-        Assert.Null(registry.TryGet(EngineIds.DotNet));
-        Assert.Empty(registry.Providers);
+        registry.TryGet(EngineIds.V2).Should().BeNull();
+        registry.TryGet(EngineIds.DotNet).Should().BeNull();
+        registry.Providers.Should().BeEmpty();
     }
 
     [Fact]
@@ -26,8 +25,8 @@ public class TemplateEngineProviderRegistryTests
         ITemplateEngineProvider dotnet = FakeProvider(EngineIds.DotNet);
         var registry = new TemplateEngineProviderRegistry([v2, dotnet]);
 
-        Assert.Same(v2, registry.TryGet(EngineIds.V2));
-        Assert.Same(dotnet, registry.TryGet(EngineIds.DotNet));
+        registry.TryGet(EngineIds.V2).Should().BeSameAs(v2);
+        registry.TryGet(EngineIds.DotNet).Should().BeSameAs(dotnet);
     }
 
     [Fact]
@@ -36,8 +35,8 @@ public class TemplateEngineProviderRegistryTests
         ITemplateEngineProvider v2 = FakeProvider(EngineIds.V2);
         var registry = new TemplateEngineProviderRegistry([v2]);
 
-        Assert.Same(v2, registry.TryGet("V2"));
-        Assert.Same(v2, registry.TryGet("v2"));
+        registry.TryGet("V2").Should().BeSameAs(v2);
+        registry.TryGet("v2").Should().BeSameAs(v2);
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public class TemplateEngineProviderRegistryTests
         ITemplateEngineProvider a = FakeProvider(EngineIds.V2);
         ITemplateEngineProvider b = FakeProvider(EngineIds.V2);
 
-        Assert.Throws<InvalidOperationException>(() => new TemplateEngineProviderRegistry([a, b]));
+        FluentActions.Invoking(() => new TemplateEngineProviderRegistry([a, b])).Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Fact]
@@ -54,7 +53,7 @@ public class TemplateEngineProviderRegistryTests
     {
         ITemplateEngineProvider bad = FakeProvider(string.Empty);
 
-        Assert.Throws<InvalidOperationException>(() => new TemplateEngineProviderRegistry([bad]));
+        FluentActions.Invoking(() => new TemplateEngineProviderRegistry([bad])).Should().ThrowExactly<InvalidOperationException>();
     }
 
     private static ITemplateEngineProvider FakeProvider(string engineId)

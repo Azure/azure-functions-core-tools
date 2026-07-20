@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Projects;
 
@@ -20,8 +19,8 @@ public sealed class FunctionsProjectHostRunContextTests
             "dotnet-isolated",
             environmentVariables);
 
-        Assert.Equal("dotnet-isolated", context.WorkerRuntime);
-        Assert.Equal("dotnet-isolated", environmentVariables[FunctionsProjectHostRunContext.WorkerRuntimeEnvironmentVariable]);
+        context.WorkerRuntime.Should().Be("dotnet-isolated");
+        environmentVariables[FunctionsProjectHostRunContext.WorkerRuntimeEnvironmentVariable].Should().Be("dotnet-isolated");
     }
 
     [Fact]
@@ -34,10 +33,8 @@ public sealed class FunctionsProjectHostRunContextTests
 
         context.WorkerRuntime = "python";
 
-        Assert.Equal("python", context.WorkerRuntime);
-        Assert.Equal(
-            "python",
-            context.EnvironmentVariables[FunctionsProjectHostRunContext.WorkerRuntimeEnvironmentVariable]);
+        context.WorkerRuntime.Should().Be("python");
+        context.EnvironmentVariables[FunctionsProjectHostRunContext.WorkerRuntimeEnvironmentVariable].Should().Be("python");
     }
 
     [Fact]
@@ -50,7 +47,7 @@ public sealed class FunctionsProjectHostRunContextTests
 
         context.EnvironmentVariables.Remove(FunctionsProjectHostRunContext.WorkerRuntimeEnvironmentVariable);
 
-        Assert.Throws<InvalidOperationException>(() => context.WorkerRuntime);
+        FluentActions.Invoking(() => context.WorkerRuntime).Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Fact]
@@ -61,7 +58,7 @@ public sealed class FunctionsProjectHostRunContextTests
             "dotnet-isolated",
             new Dictionary<string, string>());
 
-        Assert.Throws<ArgumentNullException>(() => context.StartupDirectory = null!);
+        FluentActions.Invoking(() => context.StartupDirectory = null!).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -72,8 +69,8 @@ public sealed class FunctionsProjectHostRunContextTests
             "dotnet-isolated",
             new Dictionary<string, string>());
 
-        Assert.NotNull(context.Reporter);
-        Assert.IsType<NullFunctionsProjectHostRunReporter>(context.Reporter);
+        context.Reporter.Should().NotBeNull();
+        context.Reporter.Should().BeOfType<NullFunctionsProjectHostRunReporter>();
     }
 
     [Fact]
@@ -84,7 +81,7 @@ public sealed class FunctionsProjectHostRunContextTests
             "dotnet-isolated",
             new Dictionary<string, string>());
 
-        Assert.Throws<ArgumentNullException>(() => context.Reporter = null!);
+        FluentActions.Invoking(() => context.Reporter = null!).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]

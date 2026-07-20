@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite;
 
@@ -42,8 +41,8 @@ public class DockerAvailabilityProbeTests
 
         DockerAvailability result = await CreateSut().ProbeAsync(CancellationToken.None);
 
-        Assert.Equal(DockerAvailabilityStatus.Available, result.Status);
-        Assert.Equal("Docker version 24.0.7, build afdd53b", result.Version);
+        result.Status.Should().Be(DockerAvailabilityStatus.Available);
+        result.Version.Should().Be("Docker version 24.0.7, build afdd53b");
     }
 
     [Fact]
@@ -54,8 +53,8 @@ public class DockerAvailabilityProbeTests
 
         DockerAvailability result = await CreateSut().ProbeAsync(CancellationToken.None);
 
-        Assert.Equal(DockerAvailabilityStatus.ExecutableNotFound, result.Status);
-        Assert.Null(result.Version);
+        result.Status.Should().Be(DockerAvailabilityStatus.ExecutableNotFound);
+        result.Version.Should().BeNull();
 
         await _processRunner.DidNotReceive().RunAsync(
             Arg.Is<ProcessRunRequest>(r => IsInfoCall(r)),
@@ -72,9 +71,9 @@ public class DockerAvailabilityProbeTests
 
         DockerAvailability result = await CreateSut().ProbeAsync(CancellationToken.None);
 
-        Assert.Equal(DockerAvailabilityStatus.DaemonUnavailable, result.Status);
-        Assert.Contains("Cannot connect to the Docker daemon.", result.Reason);
-        Assert.Equal("Docker version 24.0.7", result.Version);
+        result.Status.Should().Be(DockerAvailabilityStatus.DaemonUnavailable);
+        result.Reason.Should().Contain("Cannot connect to the Docker daemon.");
+        result.Version.Should().Be("Docker version 24.0.7");
     }
 
     [Fact]
@@ -87,8 +86,8 @@ public class DockerAvailabilityProbeTests
 
         DockerAvailability result = await CreateSut().ProbeAsync(CancellationToken.None);
 
-        Assert.Equal(DockerAvailabilityStatus.CommandFailed, result.Status);
-        Assert.Contains("docker info", result.Reason);
+        result.Status.Should().Be(DockerAvailabilityStatus.CommandFailed);
+        result.Reason.Should().Contain("docker info");
     }
 
     [Fact]
@@ -97,7 +96,6 @@ public class DockerAvailabilityProbeTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => CreateSut().ProbeAsync(cts.Token));
+        await FluentActions.Awaiting(() => CreateSut().ProbeAsync(cts.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 }

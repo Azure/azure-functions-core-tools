@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Quickstart;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Quickstart;
 
@@ -48,45 +47,45 @@ public class QuickstartScaffolderTests : IDisposable
         await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None);
 
         // init → remote add → fetch → checkout → cat-file → rev-parse → rev-list = 7 calls
-        Assert.Equal(7, _gitRunner.Calls.Count);
+        _gitRunner.Calls.Count.Should().Be(7);
 
         // Call 1: git init <tempDir>
-        Assert.Contains("init", _gitRunner.Calls[0].Arguments);
+        _gitRunner.Calls[0].Arguments.Should().Contain("init");
 
         // Call 2: git -C <tempDir> remote add origin -- <url>
         IReadOnlyList<string> remoteArgs = _gitRunner.Calls[1].Arguments;
-        Assert.Contains("remote", remoteArgs);
-        Assert.Contains("add", remoteArgs);
-        Assert.Contains("origin", remoteArgs);
+        remoteArgs.Should().Contain("remote");
+        remoteArgs.Should().Contain("add");
+        remoteArgs.Should().Contain("origin");
 
         // Call 3: git -C <tempDir> fetch --depth 1 --no-tags origin refs/tags/v1.0.0:refs/tags/v1.0.0
         IReadOnlyList<string> fetchArgs = _gitRunner.Calls[2].Arguments;
-        Assert.Contains("fetch", fetchArgs);
-        Assert.Contains("--depth", fetchArgs);
-        Assert.Contains("--no-tags", fetchArgs);
-        Assert.Contains("refs/tags/v1.0.0:refs/tags/v1.0.0", fetchArgs);
+        fetchArgs.Should().Contain("fetch");
+        fetchArgs.Should().Contain("--depth");
+        fetchArgs.Should().Contain("--no-tags");
+        fetchArgs.Should().Contain("refs/tags/v1.0.0:refs/tags/v1.0.0");
 
         // Call 4: git -C <tempDir> checkout --detach refs/tags/v1.0.0
         IReadOnlyList<string> checkoutArgs = _gitRunner.Calls[3].Arguments;
-        Assert.Contains("checkout", checkoutArgs);
-        Assert.Contains("--detach", checkoutArgs);
-        Assert.Contains("refs/tags/v1.0.0", checkoutArgs);
+        checkoutArgs.Should().Contain("checkout");
+        checkoutArgs.Should().Contain("--detach");
+        checkoutArgs.Should().Contain("refs/tags/v1.0.0");
 
         // Call 5: git -C <tempDir> cat-file -t refs/tags/v1.0.0
         IReadOnlyList<string> catFileArgs = _gitRunner.Calls[4].Arguments;
-        Assert.Contains("cat-file", catFileArgs);
-        Assert.Contains("-t", catFileArgs);
-        Assert.Contains("refs/tags/v1.0.0", catFileArgs);
+        catFileArgs.Should().Contain("cat-file");
+        catFileArgs.Should().Contain("-t");
+        catFileArgs.Should().Contain("refs/tags/v1.0.0");
 
         // Call 6: git -C <tempDir> rev-parse HEAD
         IReadOnlyList<string> revParseArgs = _gitRunner.Calls[5].Arguments;
-        Assert.Contains("rev-parse", revParseArgs);
-        Assert.Contains("HEAD", revParseArgs);
+        revParseArgs.Should().Contain("rev-parse");
+        revParseArgs.Should().Contain("HEAD");
 
         // Call 7: git -C <tempDir> rev-list -n 1 refs/tags/v1.0.0
         IReadOnlyList<string> revListArgs = _gitRunner.Calls[6].Arguments;
-        Assert.Contains("rev-list", revListArgs);
-        Assert.Contains("refs/tags/v1.0.0", revListArgs);
+        revListArgs.Should().Contain("rev-list");
+        revListArgs.Should().Contain("refs/tags/v1.0.0");
     }
 
     [Fact]
@@ -94,9 +93,8 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(gitRef: "refs/heads/main");
 
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("not a tag ref", ex.Message);
+        ArgumentException ex = (await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>()).Which;
+        ex.Message.Should().Contain("not a tag ref");
     }
 
     [Fact]
@@ -104,9 +102,8 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(gitRef: "v1.0.0");
 
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("not a tag ref", ex.Message);
+        ArgumentException ex = (await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>()).Which;
+        ex.Message.Should().Contain("not a tag ref");
     }
 
     [Fact]
@@ -114,9 +111,8 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(gitRef: null);
 
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("no GitRef", ex.Message);
+        ArgumentException ex = (await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>()).Which;
+        ex.Message.Should().Contain("no GitRef");
     }
 
     [Fact]
@@ -124,9 +120,8 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(gitRef: "  ");
 
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("no GitRef", ex.Message);
+        ArgumentException ex = (await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>()).Which;
+        ex.Message.Should().Contain("no GitRef");
     }
 
     [Fact]
@@ -144,9 +139,8 @@ public class QuickstartScaffolderTests : IDisposable
             NullLogger<QuickstartScaffolder>.Instance);
         QuickstartEntry entry = CreateEntry();
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("lightweight tag", ex.Message);
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
+        ex.Message.Should().Contain("lightweight tag");
     }
 
     [Fact]
@@ -156,8 +150,8 @@ public class QuickstartScaffolderTests : IDisposable
 
         await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None);
 
-        Assert.False(Directory.Exists(Path.Combine(_targetDir, ".git")));
-        Assert.False(Directory.Exists(Path.Combine(_targetDir, ".github")));
+        Directory.Exists(Path.Combine(_targetDir, ".git")).Should().BeFalse();
+        Directory.Exists(Path.Combine(_targetDir, ".github")).Should().BeFalse();
     }
 
     [Fact]
@@ -167,8 +161,8 @@ public class QuickstartScaffolderTests : IDisposable
 
         await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None);
 
-        Assert.True(File.Exists(Path.Combine(_targetDir, "host.json")));
-        Assert.True(File.Exists(Path.Combine(_targetDir, "function_app.py")));
+        File.Exists(Path.Combine(_targetDir, "host.json")).Should().BeTrue();
+        File.Exists(Path.Combine(_targetDir, "function_app.py")).Should().BeTrue();
     }
 
     [Fact]
@@ -178,8 +172,8 @@ public class QuickstartScaffolderTests : IDisposable
 
         await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None);
 
-        Assert.True(File.Exists(Path.Combine(_targetDir, "starter.txt")));
-        Assert.False(File.Exists(Path.Combine(_targetDir, "host.json")));
+        File.Exists(Path.Combine(_targetDir, "starter.txt")).Should().BeTrue();
+        File.Exists(Path.Combine(_targetDir, "host.json")).Should().BeFalse();
     }
 
     [Fact]
@@ -190,8 +184,8 @@ public class QuickstartScaffolderTests : IDisposable
         await _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Auto, CancellationToken.None);
 
         // init → remote add → fetch → checkout → cat-file → rev-parse → rev-list = 7 calls
-        Assert.Equal(7, _gitRunner.Calls.Count);
-        Assert.Contains("init", _gitRunner.Calls[0].Arguments);
+        _gitRunner.Calls.Count.Should().Be(7);
+        _gitRunner.Calls[0].Arguments.Should().Contain("init");
     }
 
     [Fact]
@@ -211,10 +205,9 @@ public class QuickstartScaffolderTests : IDisposable
 
         // HTTP mode will fail because we didn't set up a real HttpClient,
         // but we can verify it didn't try git
-        await Assert.ThrowsAnyAsync<Exception>(
-            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Auto, CancellationToken.None));
+        await FluentActions.Awaiting(() => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Auto, CancellationToken.None)).Should().ThrowAsync<Exception>();
 
-        Assert.Empty(noGitRunner.Calls);
+        noGitRunner.Calls.Should().BeEmpty();
     }
 
     [Fact]
@@ -222,8 +215,7 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(gitRef: "--upload-pack=evil");
 
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>();
     }
 
     [Theory]
@@ -233,9 +225,8 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(folderPath: folderPath);
 
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
-        Assert.Contains("relative path", ex.Message);
+        ArgumentException ex = (await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>()).Which;
+        ex.Message.Should().Contain("relative path");
     }
 
     [Fact]
@@ -253,9 +244,8 @@ public class QuickstartScaffolderTests : IDisposable
             NullLogger<QuickstartScaffolder>.Instance);
         QuickstartEntry entry = CreateEntry(repositoryUrl: "https://gitlab.com/org/repo");
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Http, CancellationToken.None));
-        Assert.Contains("github.com", ex.Message);
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Http, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
+        ex.Message.Should().Contain("github.com");
     }
 
     [Fact]
@@ -263,15 +253,13 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(folderPath: "../etc/passwd");
 
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]
     public async Task ScaffoldAsync_NullEntry_ThrowsArgumentNullException()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => _scaffolder.ScaffoldAsync(null!, _targetDir, FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(null!, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -279,8 +267,7 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry(folderPath: "nonexistent/path");
 
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(
-            () => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<DirectoryNotFoundException>();
     }
 
     [Fact]
@@ -288,8 +275,7 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => _scaffolder.ScaffoldAsync(entry, null!, FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, null!, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -297,8 +283,7 @@ public class QuickstartScaffolderTests : IDisposable
     {
         QuickstartEntry entry = CreateEntry();
 
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => _scaffolder.ScaffoldAsync(entry, "   ", FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(entry, "   ", FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -314,8 +299,7 @@ public class QuickstartScaffolderTests : IDisposable
         QuickstartEntry entry = CreateEntry();
 
         // init fails → GitRunnerException propagates directly (not wrapped)
-        await Assert.ThrowsAsync<GitRunnerException>(
-            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<GitRunnerException>();
     }
 
     [Fact]
@@ -324,8 +308,7 @@ public class QuickstartScaffolderTests : IDisposable
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => _scaffolder.ScaffoldAsync(CreateEntry(), _targetDir, FetchMode.Git, cts.Token));
+        await FluentActions.Awaiting(() => _scaffolder.ScaffoldAsync(CreateEntry(), _targetDir, FetchMode.Git, cts.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -342,11 +325,10 @@ public class QuickstartScaffolderTests : IDisposable
             NullLogger<QuickstartScaffolder>.Instance);
         QuickstartEntry entry = CreateEntry();
 
-        await Assert.ThrowsAsync<GitRunnerException>(
-            () => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None));
+        await FluentActions.Awaiting(() => scaffolder.ScaffoldAsync(entry, _targetDir, FetchMode.Git, CancellationToken.None)).Should().ThrowAsync<GitRunnerException>();
 
         string[] tempDirsAfter = Directory.GetDirectories(Path.GetTempPath(), "func-quickstart-*");
-        Assert.Equal(tempDirsBefore.Length, tempDirsAfter.Length);
+        tempDirsAfter.Length.Should().Be(tempDirsBefore.Length);
     }
 
     private const string FakeCommitHash = "abc123def456";

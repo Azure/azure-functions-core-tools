@@ -6,7 +6,6 @@ using System.Text.Json;
 using Azure.Functions.Cli.Workloads.Host.Logging;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Host.Tests;
 
@@ -50,18 +49,18 @@ public sealed class HostStructuredEventWriterTests
 
         using var document = JsonDocument.Parse(writer.ToString());
         JsonElement root = document.RootElement;
-        Assert.Equal(HostStructuredEventWriter.Source, root.GetProperty("source").GetString());
-        Assert.Equal(1, root.GetProperty("schema_version").GetInt32());
-        Assert.Equal("log", root.GetProperty("record_type").GetString());
-        Assert.Equal("Host.General", root.GetProperty("category").GetString());
-        Assert.Equal("information", root.GetProperty("level").GetString());
-        Assert.Equal(529, root.GetProperty("event_id").GetProperty("id").GetInt32());
-        Assert.Equal("HostStateChanged", root.GetProperty("event_id").GetProperty("name").GetString());
-        Assert.Equal("Host state changed from Initialized to Running", root.GetProperty("message").GetString());
-        Assert.Equal("ready", root.GetProperty("attributes").GetProperty("host.state").GetString());
-        Assert.Equal(12.5, root.GetProperty("attributes").GetProperty("duration_ms").GetDouble());
-        Assert.Equal("Running", root.GetProperty("state").GetProperty("NewState").GetString());
-        Assert.Equal("trace-1", root.GetProperty("scopes")[0].GetProperty("values").GetProperty("TraceId").GetString());
+        root.GetProperty("source").GetString().Should().Be(HostStructuredEventWriter.Source);
+        root.GetProperty("schema_version").GetInt32().Should().Be(1);
+        root.GetProperty("record_type").GetString().Should().Be("log");
+        root.GetProperty("category").GetString().Should().Be("Host.General");
+        root.GetProperty("level").GetString().Should().Be("information");
+        root.GetProperty("event_id").GetProperty("id").GetInt32().Should().Be(529);
+        root.GetProperty("event_id").GetProperty("name").GetString().Should().Be("HostStateChanged");
+        root.GetProperty("message").GetString().Should().Be("Host state changed from Initialized to Running");
+        root.GetProperty("attributes").GetProperty("host.state").GetString().Should().Be("ready");
+        root.GetProperty("attributes").GetProperty("duration_ms").GetDouble().Should().Be(12.5);
+        root.GetProperty("state").GetProperty("NewState").GetString().Should().Be("Running");
+        root.GetProperty("scopes")[0].GetProperty("values").GetProperty("TraceId").GetString().Should().Be("trace-1");
     }
 
     [Theory]
@@ -74,7 +73,7 @@ public sealed class HostStructuredEventWriterTests
     [InlineData("Function.HttpTrigger1.User", "Function.HttpTrigger1.User")]
     public void NormalizeCategory_AppliesKnownPrefixRules(string category, string expected)
     {
-        Assert.Equal(expected, HostStructuredEventWriter.NormalizeCategory(category));
+        HostStructuredEventWriter.NormalizeCategory(category).Should().Be(expected);
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class HostStructuredEventWriterTests
             writer: writer);
 
         using var document = JsonDocument.Parse(writer.ToString());
-        Assert.Equal("ScriptStartupTypeLocator", document.RootElement.GetProperty("category").GetString());
+        document.RootElement.GetProperty("category").GetString().Should().Be("ScriptStartupTypeLocator");
     }
 
     [Fact]
@@ -111,12 +110,12 @@ public sealed class HostStructuredEventWriterTests
 
         using var document = JsonDocument.Parse(writer.ToString());
         JsonElement exceptionJson = document.RootElement.GetProperty("exception");
-        Assert.Equal(typeof(InvalidOperationException).FullName, exceptionJson.GetProperty("type").GetString());
-        Assert.Equal("outer failure", exceptionJson.GetProperty("message").GetString());
+        exceptionJson.GetProperty("type").GetString().Should().Be(typeof(InvalidOperationException).FullName);
+        exceptionJson.GetProperty("message").GetString().Should().Be("outer failure");
 
         JsonElement innerExceptionJson = exceptionJson.GetProperty("inner_exception");
-        Assert.Equal(typeof(Exception).FullName, innerExceptionJson.GetProperty("type").GetString());
-        Assert.Equal("inner failure", innerExceptionJson.GetProperty("message").GetString());
+        innerExceptionJson.GetProperty("type").GetString().Should().Be(typeof(Exception).FullName);
+        innerExceptionJson.GetProperty("message").GetString().Should().Be("inner failure");
     }
 
     [Fact]
@@ -147,28 +146,28 @@ public sealed class HostStructuredEventWriterTests
 
         using var document = JsonDocument.Parse(writer.ToString());
         JsonElement attributes = document.RootElement.GetProperty("attributes");
-        Assert.Equal("function_discovered", attributes.GetProperty("cli.event_kind").GetString());
-        Assert.Equal("HttpTrigger1", attributes.GetProperty("function.name").GetString());
-        Assert.Equal(@"C:\functions\HttpTrigger1", attributes.GetProperty("function.id").GetString());
-        Assert.Equal("http", attributes.GetProperty("function.trigger_type").GetString());
-        Assert.Equal("/api/widgets/{id}", attributes.GetProperty("function.route").GetString());
-        Assert.Equal("dotnet-isolated", attributes.GetProperty("function.language").GetString());
-        Assert.Equal("run.csx", attributes.GetProperty("function.script_file").GetString());
-        Assert.Equal("Functions.HttpTrigger1.Run", attributes.GetProperty("function.entry_point").GetString());
+        attributes.GetProperty("cli.event_kind").GetString().Should().Be("function_discovered");
+        attributes.GetProperty("function.name").GetString().Should().Be("HttpTrigger1");
+        attributes.GetProperty("function.id").GetString().Should().Be(@"C:\functions\HttpTrigger1");
+        attributes.GetProperty("function.trigger_type").GetString().Should().Be("http");
+        attributes.GetProperty("function.route").GetString().Should().Be("/api/widgets/{id}");
+        attributes.GetProperty("function.language").GetString().Should().Be("dotnet-isolated");
+        attributes.GetProperty("function.script_file").GetString().Should().Be("run.csx");
+        attributes.GetProperty("function.entry_point").GetString().Should().Be("Functions.HttpTrigger1.Run");
 
         JsonElement methods = attributes.GetProperty("function.http_methods");
-        Assert.Equal("GET", methods[0].GetString());
-        Assert.Equal("POST", methods[1].GetString());
+        methods[0].GetString().Should().Be("GET");
+        methods[1].GetString().Should().Be("POST");
 
         JsonElement binding = attributes.GetProperty("function.bindings")[0];
-        Assert.Equal("req", binding.GetProperty("name").GetString());
-        Assert.Equal("httpTrigger", binding.GetProperty("type").GetString());
-        Assert.Equal("In", binding.GetProperty("direction").GetString());
-        Assert.True(binding.GetProperty("is_trigger").GetBoolean());
-        Assert.False(binding.TryGetProperty("connection", out _));
-        Assert.False(binding.TryGetProperty("route", out _));
-        Assert.False(binding.TryGetProperty("methods", out _));
-        Assert.False(binding.TryGetProperty("customSecret", out _));
+        binding.GetProperty("name").GetString().Should().Be("req");
+        binding.GetProperty("type").GetString().Should().Be("httpTrigger");
+        binding.GetProperty("direction").GetString().Should().Be("In");
+        binding.GetProperty("is_trigger").GetBoolean().Should().BeTrue();
+        binding.TryGetProperty("connection", out _).Should().BeFalse();
+        binding.TryGetProperty("route", out _).Should().BeFalse();
+        binding.TryGetProperty("methods", out _).Should().BeFalse();
+        binding.TryGetProperty("customSecret", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -194,15 +193,15 @@ public sealed class HostStructuredEventWriterTests
 
         using var document = JsonDocument.Parse(stdout.ToString());
         JsonElement attributes = document.RootElement.GetProperty("attributes");
-        Assert.Equal("HttpTrigger1", attributes.GetProperty("function.name").GetString());
-        Assert.Equal("abc123", attributes.GetProperty("function.invocation_id").GetString());
-        Assert.Equal("invocation_completed", attributes.GetProperty("cli.event_kind").GetString());
-        Assert.Equal("failed", attributes.GetProperty("function.result").GetString());
-        Assert.Equal(7, attributes.GetProperty("duration_ms").GetDouble());
-        Assert.Equal("trace-1", attributes.GetProperty("trace_id").GetString());
-        Assert.Equal("span-1", attributes.GetProperty("span_id").GetString());
-        Assert.Equal("parent-1", attributes.GetProperty("parent_span_id").GetString());
-        Assert.Equal(string.Empty, stderr.ToString());
+        attributes.GetProperty("function.name").GetString().Should().Be("HttpTrigger1");
+        attributes.GetProperty("function.invocation_id").GetString().Should().Be("abc123");
+        attributes.GetProperty("cli.event_kind").GetString().Should().Be("invocation_completed");
+        attributes.GetProperty("function.result").GetString().Should().Be("failed");
+        attributes.GetProperty("duration_ms").GetDouble().Should().Be(7);
+        attributes.GetProperty("trace_id").GetString().Should().Be("trace-1");
+        attributes.GetProperty("span_id").GetString().Should().Be("span-1");
+        attributes.GetProperty("parent_span_id").GetString().Should().Be("parent-1");
+        stderr.ToString().Should().Be(string.Empty);
     }
 
     [Fact]
@@ -224,8 +223,8 @@ public sealed class HostStructuredEventWriterTests
 
         using var document = JsonDocument.Parse(stdout.ToString());
         JsonElement attributes = document.RootElement.GetProperty("attributes");
-        Assert.Equal("host_state_changed", attributes.GetProperty("cli.event_kind").GetString());
-        Assert.Equal("ready", attributes.GetProperty("host.state").GetString());
+        attributes.GetProperty("cli.event_kind").GetString().Should().Be("host_state_changed");
+        attributes.GetProperty("host.state").GetString().Should().Be("ready");
     }
 
     [Fact]
@@ -248,11 +247,11 @@ public sealed class HostStructuredEventWriterTests
             42.25);
 
         using var document = JsonDocument.Parse(stdout.ToString());
-        Assert.Equal("SystemTraceMiddleware", document.RootElement.GetProperty("category").GetString());
+        document.RootElement.GetProperty("category").GetString().Should().Be("SystemTraceMiddleware");
         JsonElement attributes = document.RootElement.GetProperty("attributes");
-        Assert.Equal("GET", attributes.GetProperty("http.method").GetString());
-        Assert.Equal("http://localhost/api/HttpTrigger1", attributes.GetProperty("http.target").GetString());
-        Assert.Equal(200, attributes.GetProperty("http.status_code").GetInt32());
-        Assert.Equal(42.25, attributes.GetProperty("duration_ms").GetDouble());
+        attributes.GetProperty("http.method").GetString().Should().Be("GET");
+        attributes.GetProperty("http.target").GetString().Should().Be("http://localhost/api/HttpTrigger1");
+        attributes.GetProperty("http.status_code").GetInt32().Should().Be(200);
+        attributes.GetProperty("duration_ms").GetDouble().Should().Be(42.25);
     }
 }

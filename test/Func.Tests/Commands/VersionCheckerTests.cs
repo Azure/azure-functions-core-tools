@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -17,7 +16,7 @@ public class VersionCheckerTests
 
         // Should not throw — returns null on cancellation
         var result = await VersionChecker.CheckForUpdateAsync(cts.Token);
-        Assert.Null(result);
+        result.Should().BeNull();
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public class VersionCheckerTests
         // Result can be null (offline/current) or a version string — both are valid
         if (result is not null)
         {
-            Assert.True(Version.TryParse(result, out _), $"Expected valid version, got: {result}");
+            Version.TryParse(result, out _).Should().BeTrue($"Expected valid version, got: {result}");
         }
     }
 
@@ -46,7 +45,7 @@ public class VersionCheckerTests
 
             string? result = await VersionChecker.CheckForUpdateAsync(paths, CancellationToken.None);
 
-            Assert.Equal("9999.0.0", result);
+            result.Should().Be("9999.0.0");
         }
         finally
         {

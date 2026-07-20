@@ -4,7 +4,6 @@
 using System.Buffers;
 using System.Globalization;
 using System.Text.Json;
-using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Projects;
 

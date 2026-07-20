@@ -7,7 +7,6 @@ using NSubstitute;
 using NuGet.Common;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
-using Xunit;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
@@ -33,9 +32,9 @@ public sealed class NuGetProtocolSourceClientTests
             }
             """);
 
-        CatalogSearchResult only = Assert.Single(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
-        Assert.Equal("workloads.python", only.PackageId);
-        Assert.Equal(["python"], only.Aliases);
+        CatalogSearchResult only = NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle().Subject;
+        only.PackageId.Should().Be("workloads.python");
+        only.Aliases.Should().Equal(["python"]);
     }
 
     [Fact]
@@ -53,8 +52,8 @@ public sealed class NuGetProtocolSourceClientTests
             }
             """);
 
-        CatalogSearchResult only = Assert.Single(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
-        Assert.Equal(["node", "nodejs"], only.Aliases);
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle()
+            .Which.Aliases.Should().Equal(["node", "nodejs"]);
     }
 
     [Fact]
@@ -72,10 +71,10 @@ public sealed class NuGetProtocolSourceClientTests
 
         var results = NuGetProtocolSourceClient.ParseV3Hits(response, _source);
 
-        Assert.Equal(3, results.Count);
-        Assert.Equal("workload", results.Single(r => r.PackageId == "workloads.python").Kind);
-        Assert.Equal("content", results.Single(r => r.PackageId == "workloads.host").Kind);
-        Assert.Null(results.Single(r => r.PackageId == "workloads.nokind").Kind);
+        results.Count.Should().Be(3);
+        results.Single(r => r.PackageId == "workloads.python").Kind.Should().Be("workload");
+        results.Single(r => r.PackageId == "workloads.host").Kind.Should().Be("content");
+        results.Single(r => r.PackageId == "workloads.nokind").Kind.Should().BeNull();
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class NuGetProtocolSourceClientTests
             }
             """);
 
-        Assert.Empty(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().BeEmpty();
     }
 
     [Fact]
@@ -99,7 +98,7 @@ public sealed class NuGetProtocolSourceClientTests
     {
         var response = JObject.Parse("""{ "totalHits": 0 }""");
 
-        Assert.Empty(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().BeEmpty();
     }
 
     [Fact]
@@ -132,10 +131,10 @@ public sealed class NuGetProtocolSourceClientTests
 
         var results = NuGetProtocolSourceClient.ParseV3Hits(response, _source);
 
-        Assert.Equal(2, results.Count);
-        Assert.Contains(results, r => r.PackageId == "workloads.python");
-        Assert.Contains(results, r => r.PackageId == "workloads.nopackagetypes");
-        Assert.DoesNotContain(results, r => r.PackageId == "azure.functions.cli.abstractions");
+        results.Count.Should().Be(2);
+        results.Should().Contain(r => r.PackageId == "workloads.python");
+        results.Should().Contain(r => r.PackageId == "workloads.nopackagetypes");
+        results.Should().NotContain(r => r.PackageId == "azure.functions.cli.abstractions");
     }
 
     [Fact]
@@ -153,7 +152,7 @@ public sealed class NuGetProtocolSourceClientTests
             }
             """);
 
-        Assert.Single(NuGetProtocolSourceClient.ParseV3Hits(response, _source));
+        NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle();
     }
 
 
@@ -176,9 +175,7 @@ public sealed class NuGetProtocolSourceClientTests
         NuGetProtocolSourceClient client = NewClient(findResource: find);
         IReadOnlyList<NuGetVersion> versions = await client.ListVersionsAsync("Workloads.Python", CancellationToken.None);
 
-        Assert.Equal(
-            [NuGetVersion.Parse("1.0.0"), NuGetVersion.Parse("2.0.0"), NuGetVersion.Parse("2.0.0-beta.1")],
-            versions);
+        versions.Should().Equal([NuGetVersion.Parse("1.0.0"), NuGetVersion.Parse("2.0.0"), NuGetVersion.Parse("2.0.0-beta.1")]);
     }
 
     [Fact]
@@ -189,7 +186,7 @@ public sealed class NuGetProtocolSourceClientTests
             .Returns(Task.FromResult<IEnumerable<NuGetVersion>>(null!));
 
         NuGetProtocolSourceClient client = NewClient(findResource: find);
-        Assert.Empty(await client.ListVersionsAsync("workload.absent", CancellationToken.None));
+        (await client.ListVersionsAsync("workload.absent", CancellationToken.None)).Should().BeEmpty();
     }
 
     [Fact]
@@ -217,10 +214,10 @@ public sealed class NuGetProtocolSourceClientTests
             NuGetVersion.Parse("1.2.3"),
             CancellationToken.None);
 
-        Assert.True(stream.CanSeek);
+        stream.CanSeek.Should().BeTrue();
         var copied = new MemoryStream();
         await stream.CopyToAsync(copied);
-        Assert.Equal(payload, copied.ToArray());
+        copied.ToArray().Should().Equal(payload);
     }
 
     [Fact]
@@ -238,8 +235,7 @@ public sealed class NuGetProtocolSourceClientTests
 
         NuGetProtocolSourceClient client = NewClient(findResource: find);
 
-        await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
-            () => client.OpenPackageAsync("workload.absent", NuGetVersion.Parse("1.0.0"), CancellationToken.None));
+        await FluentActions.Awaiting(() => client.OpenPackageAsync("workload.absent", NuGetVersion.Parse("1.0.0"), CancellationToken.None)).Should().ThrowAsync<WorkloadPackageNotFoundException>();
     }
 
     private static NuGetProtocolSourceClient NewClient(FindPackageByIdResource? findResource = null)

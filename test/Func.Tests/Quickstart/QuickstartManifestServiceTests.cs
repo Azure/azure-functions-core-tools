@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Quickstart;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Quickstart;
 
@@ -34,8 +33,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("http-python", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("http-python");
         cache.Received(1).WriteManifest(manifest);
         cache.Received(1).WriteMeta(Arg.Any<ManifestCacheMeta>());
     }
@@ -52,8 +51,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("cached-entry", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("cached-entry");
     }
 
     [Fact]
@@ -74,8 +73,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("fresh-entry", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("fresh-entry");
         cache.Received(1).WriteManifest(freshManifest);
     }
 
@@ -91,8 +90,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("existing-entry", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("existing-entry");
         cache.Received(1).WriteMeta(Arg.Is<ManifestCacheMeta>(m => m.ETag == "\"etag1\""));
     }
 
@@ -108,8 +107,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("stale-entry", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("stale-entry");
     }
 
     [Fact]
@@ -120,7 +119,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpRequestException("Network unreachable"), cache);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetManifestAsync());
+        await FluentActions.Awaiting(() => service.GetManifestAsync()).Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
@@ -138,8 +137,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("has-ref", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("has-ref");
     }
 
     [Fact]
@@ -157,8 +156,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("full-ref", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("full-ref");
     }
 
     [Fact]
@@ -176,8 +175,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("tagged", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("tagged");
     }
 
     [Fact]
@@ -200,8 +199,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("trusted", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("trusted");
     }
 
     [Fact]
@@ -220,7 +219,7 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Equal(3, result.Entries.Count);
+        result.Entries.Count.Should().Be(3);
     }
 
     [Fact]
@@ -236,8 +235,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("cached", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("cached");
     }
 
     [Fact]
@@ -256,8 +255,8 @@ public sealed class QuickstartManifestServiceTests
 
             QuickstartManifest result = await service.GetManifestAsync();
 
-            Assert.Single(result.Entries);
-            Assert.Equal("local-entry", result.Entries[0].Id);
+            result.Entries.Should().ContainSingle();
+            result.Entries[0].Id.Should().Be("local-entry");
         }
         finally
         {
@@ -274,7 +273,7 @@ public sealed class QuickstartManifestServiceTests
         QuickstartManifestService service = CreateService(
             new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() => service.GetManifestAsync());
+        await FluentActions.Awaiting(() => service.GetManifestAsync()).Should().ThrowAsync<FileNotFoundException>();
     }
 
     [Fact]
@@ -290,11 +289,10 @@ public sealed class QuickstartManifestServiceTests
             QuickstartManifestService service = CreateService(
                 new HttpResponseMessage(HttpStatusCode.InternalServerError), cache);
 
-            InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => service.GetManifestAsync());
+            InvalidOperationException ex = (await FluentActions.Awaiting(() => service.GetManifestAsync()).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-            Assert.Contains("empty or malformed", ex.Message);
-            Assert.IsType<System.Text.Json.JsonException>(ex.InnerException);
+            ex.Message.Should().Contain("empty or malformed");
+            ex.InnerException.Should().BeOfType<System.Text.Json.JsonException>();
         }
         finally
         {
@@ -316,8 +314,8 @@ public sealed class QuickstartManifestServiceTests
 
         QuickstartManifest result = await service.GetManifestAsync();
 
-        Assert.Single(result.Entries);
-        Assert.Equal("cdn-entry", result.Entries[0].Id);
+        result.Entries.Should().ContainSingle();
+        result.Entries[0].Id.Should().Be("cdn-entry");
     }
 
     private QuickstartManifestService CreateService(HttpResponseMessage response, IManifestCache cache)

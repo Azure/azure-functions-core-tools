@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands;
 

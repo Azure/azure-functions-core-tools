@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Discovery;
 
@@ -46,10 +45,10 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         WorkloadMetadata metadata = _reader.Read(_tempDir);
 
-        Assert.Equal(SchemaUrl, metadata.Schema);
-        Assert.Equal(WorkloadKind.Workload, metadata.Kind);
-        Assert.Equal("Foo.dll", metadata.EntryPoint!.AssemblyPath);
-        Assert.Equal("Foo.MyWorkload", metadata.EntryPoint.Type);
+        metadata.Schema.Should().Be(SchemaUrl);
+        metadata.Kind.Should().Be(WorkloadKind.Workload);
+        metadata.EntryPoint!.AssemblyPath.Should().Be("Foo.dll");
+        metadata.EntryPoint.Type.Should().Be("Foo.MyWorkload");
     }
 
     [Fact]
@@ -70,7 +69,7 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         WorkloadMetadata metadata = _reader.Read(_tempDir);
 
-        Assert.Equal(WorkloadKind.Workload, metadata.Kind);
+        metadata.Kind.Should().Be(WorkloadKind.Workload);
     }
 
     [Fact]
@@ -88,8 +87,8 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         WorkloadMetadata metadata = _reader.Read(_tempDir);
 
-        Assert.Equal(WorkloadKind.Content, metadata.Kind);
-        Assert.Null(metadata.EntryPoint);
+        metadata.Kind.Should().Be(WorkloadKind.Content);
+        metadata.EntryPoint.Should().BeNull();
     }
 
     [Fact]
@@ -107,8 +106,8 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         WorkloadMetadata metadata = _reader.Read(_tempDir);
 
-        Assert.Equal("Functions Host", metadata.DisplayName);
-        Assert.Equal("Azure Functions host payload.", metadata.Description);
+        metadata.DisplayName.Should().Be("Functions Host");
+        metadata.Description.Should().Be("Azure Functions host payload.");
     }
 
     [Fact]
@@ -124,8 +123,8 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         WorkloadMetadata metadata = _reader.Read(_tempDir);
 
-        Assert.Equal(WorkloadKind.Meta, metadata.Kind);
-        Assert.Null(metadata.EntryPoint);
+        metadata.Kind.Should().Be(WorkloadKind.Meta);
+        metadata.EntryPoint.Should().BeNull();
     }
 
     [Theory]
@@ -147,11 +146,10 @@ public class WorkloadMetadataReaderTests : IDisposable
             }
             """);
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains(kind, ex.Message);
-        Assert.Contains("entryPoint", ex.Message);
+        ex.Message.Should().Contain(kind);
+        ex.Message.Should().Contain("entryPoint");
     }
 
     [Fact]
@@ -169,21 +167,19 @@ public class WorkloadMetadataReaderTests : IDisposable
             }
             """);
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains("schema", ex.Message);
-        Assert.Contains("v999", ex.Message);
+        ex.Message.Should().Contain("schema");
+        ex.Message.Should().Contain("v999");
     }
 
     [Fact]
     public void Read_Throws_WhenManifestMissing()
     {
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains(_tempDir, ex.Message);
-        Assert.Contains(WorkloadMetadataReader.MetadataFileName, ex.Message);
+        ex.Message.Should().Contain(_tempDir);
+        ex.Message.Should().Contain(WorkloadMetadataReader.MetadataFileName);
     }
 
     [Fact]
@@ -191,11 +187,10 @@ public class WorkloadMetadataReaderTests : IDisposable
     {
         WriteMetadata("{ not valid json");
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains(WorkloadMetadataReader.MetadataFileName, ex.Message);
-        Assert.IsType<System.Text.Json.JsonException>(ex.InnerException);
+        ex.Message.Should().Contain(WorkloadMetadataReader.MetadataFileName);
+        ex.InnerException.Should().BeOfType<System.Text.Json.JsonException>();
     }
 
     [Fact]
@@ -210,10 +205,9 @@ public class WorkloadMetadataReaderTests : IDisposable
             }
             """);
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains("entryPoint", ex.Message);
+        ex.Message.Should().Contain("entryPoint");
     }
 
     [Fact]
@@ -231,10 +225,9 @@ public class WorkloadMetadataReaderTests : IDisposable
             }
             """);
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains("assemblyPath", ex.Message);
+        ex.Message.Should().Contain("assemblyPath");
     }
 
     [Fact]
@@ -252,10 +245,9 @@ public class WorkloadMetadataReaderTests : IDisposable
             }
             """);
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains("type", ex.Message);
+        ex.Message.Should().Contain("type");
     }
 
     [Fact]
@@ -263,10 +255,9 @@ public class WorkloadMetadataReaderTests : IDisposable
     {
         string missing = Path.Combine(_tempDir, "does-not-exist");
 
-        DirectoryNotFoundException ex = Assert.Throws<DirectoryNotFoundException>(
-            () => _reader.Read(missing));
+        DirectoryNotFoundException ex = FluentActions.Invoking(() => _reader.Read(missing)).Should().ThrowExactly<DirectoryNotFoundException>().Which;
 
-        Assert.Contains(missing, ex.Message);
+        ex.Message.Should().Contain(missing);
     }
 
     [Theory]
@@ -286,11 +277,10 @@ public class WorkloadMetadataReaderTests : IDisposable
             }
             """);
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains("absolute", ex.Message);
-        Assert.Contains("assemblyPath", ex.Message);
+        ex.Message.Should().Contain("absolute");
+        ex.Message.Should().Contain("assemblyPath");
     }
 
     [Theory]
@@ -311,11 +301,10 @@ public class WorkloadMetadataReaderTests : IDisposable
             }
             """);
 
-        InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(
-            () => _reader.Read(_tempDir));
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.Contains("..", ex.Message);
-        Assert.Contains("assemblyPath", ex.Message);
+        ex.Message.Should().Contain("..");
+        ex.Message.Should().Contain("assemblyPath");
     }
 
     [Fact]
@@ -328,13 +317,9 @@ public class WorkloadMetadataReaderTests : IDisposable
         // surfaces here.
         WorkloadMetadata metadata = _reader.Read(AppContext.BaseDirectory);
 
-        Assert.Equal(WorkloadKind.Workload, metadata.Kind);
-        Assert.Equal(
-            "Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.dll",
-            metadata.EntryPoint!.AssemblyPath);
-        Assert.Equal(
-            "Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.StubWorkload",
-            metadata.EntryPoint.Type);
+        metadata.Kind.Should().Be(WorkloadKind.Workload);
+        metadata.EntryPoint!.AssemblyPath.Should().Be("Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.dll");
+        metadata.EntryPoint.Type.Should().Be("Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.StubWorkload");
     }
 
     private void WriteMetadata(string json)

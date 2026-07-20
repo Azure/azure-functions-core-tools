@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Common;
 
@@ -28,8 +27,8 @@ public class WorkingDirectoryTests : IDisposable
     {
         var workingDirectory = WorkingDirectory.FromCwd();
 
-        Assert.False(workingDirectory.WasExplicit);
-        Assert.Equal(Directory.GetCurrentDirectory(), workingDirectory.Info.FullName);
+        workingDirectory.WasExplicit.Should().BeFalse();
+        workingDirectory.Info.FullName.Should().Be(Directory.GetCurrentDirectory());
     }
 
     [Fact]
@@ -37,31 +36,31 @@ public class WorkingDirectoryTests : IDisposable
     {
         var workingDirectory = WorkingDirectory.FromExplicit(_tempDir);
 
-        Assert.True(workingDirectory.WasExplicit);
-        Assert.Equal(_tempDir, workingDirectory.Info.FullName);
+        workingDirectory.WasExplicit.Should().BeTrue();
+        workingDirectory.Info.FullName.Should().Be(_tempDir);
     }
 
     [Fact]
     public void Exists_ReflectsDirectoryState()
     {
         var workingDirectory = WorkingDirectory.FromExplicit(_tempDir);
-        Assert.False(workingDirectory.Exists);
+        workingDirectory.Exists.Should().BeFalse();
 
         Directory.CreateDirectory(_tempDir);
         workingDirectory.Info.Refresh();
-        Assert.True(workingDirectory.Exists);
+        workingDirectory.Exists.Should().BeTrue();
     }
 
     [Fact]
     public void CreateIfNotExists_CreatesMissingDirectory()
     {
         var workingDirectory = WorkingDirectory.FromExplicit(_tempDir);
-        Assert.False(workingDirectory.Exists);
+        workingDirectory.Exists.Should().BeFalse();
 
         workingDirectory.CreateIfNotExists();
 
-        Assert.True(Directory.Exists(_tempDir));
-        Assert.True(workingDirectory.Exists);
+        Directory.Exists(_tempDir).Should().BeTrue();
+        workingDirectory.Exists.Should().BeTrue();
     }
 
     [Fact]
@@ -73,6 +72,6 @@ public class WorkingDirectoryTests : IDisposable
         workingDirectory.CreateIfNotExists();
         workingDirectory.CreateIfNotExists();
 
-        Assert.True(Directory.Exists(_tempDir));
+        Directory.Exists(_tempDir).Should().BeTrue();
     }
 }

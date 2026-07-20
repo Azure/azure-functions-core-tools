@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
@@ -26,8 +25,8 @@ public class WorkloadUninstallCommandTests
         var cmd = NewCommand();
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("not installed"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("not installed"));
         await _installer.DidNotReceive().UninstallAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -42,9 +41,9 @@ public class WorkloadUninstallCommandTests
         var cmd = NewCommand();
         int exit = await InvokeAsync(cmd, "Test.Workload");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("Test.Workload", "1.0.0", Arg.Any<CancellationToken>());
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("SUCCESS:") && l.Contains("1.0.0"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("SUCCESS:") && l.Contains("1.0.0"));
     }
 
     [Fact]
@@ -53,11 +52,10 @@ public class WorkloadUninstallCommandTests
         StubInstalled(("Test.Workload", "1.0.0"), ("Test.Workload", "2.0.0"));
 
         var cmd = NewCommand();
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload"));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("Multiple versions", ex.Message);
-        Assert.Contains("--all-versions", ex.Message);
+        ex.Message.Should().Contain("Multiple versions");
+        ex.Message.Should().Contain("--all-versions");
     }
 
     [Fact]
@@ -80,11 +78,10 @@ public class WorkloadUninstallCommandTests
         StubInstalled(("Test.Workload", "1.0.0"));
 
         var cmd = NewCommand();
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "Test.Workload", "--version", "9.9.9"));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload", "--version", "9.9.9")).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("9.9.9", ex.Message);
-        Assert.Contains("Installed versions: 1.0.0", ex.Message);
+        ex.Message.Should().Contain("9.9.9");
+        ex.Message.Should().Contain("Installed versions: 1.0.0");
     }
 
     [Fact]
@@ -138,8 +135,8 @@ public class WorkloadUninstallCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "Test.Workload", "--all-versions", "--version", "1.0.0"]);
 
-        Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("--all-versions and --version"));
+        parse.Errors.Should().NotBeEmpty();
+        parse.Errors.Should().Contain(e => e.Message.Contains("--all-versions and --version"));
     }
 
     [Fact]
@@ -151,8 +148,8 @@ public class WorkloadUninstallCommandTests
 
         ParseResult parse = root.Parse([cmd.Name, "   "]);
 
-        Assert.NotEmpty(parse.Errors);
-        Assert.Contains(parse.Errors, e => e.Message.Contains("workload id is required"));
+        parse.Errors.Should().NotBeEmpty();
+        parse.Errors.Should().Contain(e => e.Message.Contains("workload id is required"));
     }
 
     [Fact]
@@ -165,7 +162,7 @@ public class WorkloadUninstallCommandTests
         var cmd = NewCommand();
         int exit = await InvokeAsync(cmd, "test.workload");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("Test.Workload", "1.0.0", Arg.Any<CancellationToken>());
     }
 
@@ -179,7 +176,7 @@ public class WorkloadUninstallCommandTests
         var cmd = NewCommand();
         int exit = await InvokeAsync(cmd, "stub");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("Test.Workload", "1.0.0", Arg.Any<CancellationToken>());
     }
 
@@ -193,7 +190,7 @@ public class WorkloadUninstallCommandTests
         var cmd = NewCommand();
         int exit = await InvokeAsync(cmd, "STUB");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("Test.Workload", "1.0.0", Arg.Any<CancellationToken>());
     }
 
@@ -205,12 +202,11 @@ public class WorkloadUninstallCommandTests
             (PackageId: "Second.Workload", Version: "1.0.0", Aliases: new[] { "shared" }));
 
         var cmd = NewCommand();
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => InvokeAsync(cmd, "shared"));
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "shared")).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("matches multiple installed workloads", ex.Message);
-        Assert.Contains("First.Workload", ex.Message);
-        Assert.Contains("Second.Workload", ex.Message);
+        ex.Message.Should().Contain("matches multiple installed workloads");
+        ex.Message.Should().Contain("First.Workload");
+        ex.Message.Should().Contain("Second.Workload");
     }
 
     [Fact]
@@ -225,8 +221,8 @@ public class WorkloadUninstallCommandTests
         var cmd = NewCommand();
         int exit = await InvokeAsync(cmd, "shared", "--exact");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("not installed"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("not installed"));
         await _installer.DidNotReceive().UninstallAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -244,7 +240,7 @@ public class WorkloadUninstallCommandTests
         var cmd = NewCommand();
         int exit = await InvokeAsync(cmd, "First.Workload", "-e");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         await _installer.Received(1).UninstallAsync("First.Workload", "1.0.0", Arg.Any<CancellationToken>());
     }
 

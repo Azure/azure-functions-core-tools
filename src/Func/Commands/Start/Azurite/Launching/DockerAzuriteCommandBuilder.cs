@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
-using System.IO;
 
 namespace Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 

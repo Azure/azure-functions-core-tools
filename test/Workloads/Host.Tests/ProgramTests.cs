@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Xunit;
-
 namespace Azure.Functions.Cli.Workloads.Host.Tests;
 
 public sealed class ProgramTests
@@ -16,11 +14,11 @@ public sealed class ProgramTests
         Task monitorTask = Program.StartStandardInputClosedMonitorAsync(reader, shutdownTokenSource);
 
         await reader.WaitForReadAsync();
-        Assert.False(monitorTask.IsCompleted);
+        monitorTask.IsCompleted.Should().BeFalse();
 
         reader.Release();
         await monitorTask.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True(shutdownTokenSource.IsCancellationRequested);
+        shutdownTokenSource.IsCancellationRequested.Should().BeTrue();
     }
 
     private sealed class BlockingTextReader : TextReader

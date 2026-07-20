@@ -10,7 +10,6 @@ using NuGet.Common;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
-using Xunit;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Catalog;
@@ -28,9 +27,9 @@ public sealed class WorkloadCatalogTests
 
         IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(new CatalogSearchQuery());
 
-        CatalogSearchResult only = Assert.Single(results);
-        Assert.Equal("alpha", only.PackageId);
-        Assert.Equal(_defaultSource.Name, only.Source.Name);
+        CatalogSearchResult only = results.Should().ContainSingle().Subject;
+        only.PackageId.Should().Be("alpha");
+        only.Source.Name.Should().Be(_defaultSource.Name);
     }
 
     [Fact]
@@ -50,7 +49,7 @@ public sealed class WorkloadCatalogTests
 
         IReadOnlyList<CatalogSearchResult> results = await catalog.SearchAsync(new CatalogSearchQuery { Source = _altSource.Source });
 
-        Assert.Equal("override-pkg", Assert.Single(results).PackageId);
+        results.Should().ContainSingle().Subject.PackageId.Should().Be("override-pkg");
     }
 
     [Fact]
@@ -61,9 +60,9 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: false);
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("1.5.0"), resolved!.Version);
-        Assert.Equal(_defaultSource.Name, resolved.Source.Name);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("1.5.0"));
+        resolved.Source.Name.Should().Be(_defaultSource.Name);
     }
 
     [Fact]
@@ -74,7 +73,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: true);
 
-        Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+        resolved!.Version.Should().Be(V("2.0.0-beta.1"));
     }
 
     [Fact]
@@ -86,7 +85,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: null);
 
-        Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+        resolved!.Version.Should().Be(V("2.0.0-beta.1"));
     }
 
     [Fact]
@@ -97,9 +96,9 @@ public sealed class WorkloadCatalogTests
 
         await catalog.SearchAsync(new CatalogSearchQuery { IncludePrerelease = null });
 
-        var fakeClient = Assert.IsType<FakeClient>(client);
-        Assert.NotNull(fakeClient.LastSearchUri);
-        Assert.Contains("prerelease=true", fakeClient.LastSearchUri!.Query, StringComparison.OrdinalIgnoreCase);
+        var fakeClient = client.Should().BeOfType<FakeClient>().Subject;
+        fakeClient.LastSearchUri.Should().NotBeNull();
+        fakeClient.LastSearchUri!.Query.Should().ContainEquivalentOf("prerelease=true");
     }
 
     [Fact]
@@ -112,7 +111,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("alpha", range, includePrerelease: null);
 
-        Assert.Equal(V("2.0.0-beta.1"), resolved!.Version);
+        resolved!.Version.Should().Be(V("2.0.0-beta.1"));
     }
 
     [Fact]
@@ -130,8 +129,8 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("node", range, includePrerelease: null);
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("3.13.0-preview.1"), resolved!.Version);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("3.13.0-preview.1"));
     }
 
     [Fact]
@@ -144,7 +143,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("node", range, includePrerelease: false);
 
-        Assert.Null(resolved);
+        resolved.Should().BeNull();
     }
 
     [Theory]
@@ -167,7 +166,7 @@ public sealed class WorkloadCatalogTests
 
         setup.Configure(options);
 
-        Assert.Equal(expected, options.IncludePrerelease);
+        options.IncludePrerelease.Should().Be(expected);
     }
 
     [Theory]
@@ -186,7 +185,7 @@ public sealed class WorkloadCatalogTests
 
         setup.Configure(options);
 
-        Assert.True(options.IncludePrerelease);
+        options.IncludePrerelease.Should().BeTrue();
     }
 
     [Fact]
@@ -201,7 +200,7 @@ public sealed class WorkloadCatalogTests
 
         setup.Configure(options);
 
-        Assert.False(options.IncludePrerelease);
+        options.IncludePrerelease.Should().BeFalse();
     }
 
     [Fact]
@@ -216,7 +215,7 @@ public sealed class WorkloadCatalogTests
 
         setup.Configure(options);
 
-        Assert.False(options.IncludePrerelease);
+        options.IncludePrerelease.Should().BeFalse();
     }
 
     [Fact]
@@ -230,7 +229,7 @@ public sealed class WorkloadCatalogTests
 
         setup.Configure(options);
 
-        Assert.Equal("https://source.test/v3/index.json", options.Source);
+        options.Source.Should().Be("https://source.test/v3/index.json");
     }
 
     [Fact]
@@ -242,7 +241,7 @@ public sealed class WorkloadCatalogTests
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync(
             "alpha", includePrerelease: false, currentVersion: V("1.0.0"), allowMajor: false);
 
-        Assert.Equal(V("1.5.0"), resolved!.Version);
+        resolved!.Version.Should().Be(V("1.5.0"));
     }
 
     [Fact]
@@ -253,7 +252,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionAsync("alpha", includePrerelease: false);
 
-        Assert.Null(resolved);
+        resolved.Should().BeNull();
     }
 
     [Fact]
@@ -266,9 +265,9 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionInRangeAsync("alpha", range, includePrerelease: false);
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("4.1048.199"), resolved!.Version);
-        Assert.Equal(_defaultSource.Name, resolved.Source.Name);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("4.1048.199"));
+        resolved.Source.Name.Should().Be(_defaultSource.Name);
     }
 
     [Fact]
@@ -279,8 +278,8 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: null);
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("1.5.0"), resolved!.Version);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("1.5.0"));
     }
 
     [Fact]
@@ -292,8 +291,8 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "preview");
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("2.0.0-preview.3"), resolved!.Version);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("2.0.0-preview.3"));
     }
 
     [Fact]
@@ -305,8 +304,8 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "experimental");
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("2.5.0-experimental.2"), resolved!.Version);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("2.5.0-experimental.2"));
     }
 
     [Fact]
@@ -317,7 +316,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "preview");
 
-        Assert.Null(resolved);
+        resolved.Should().BeNull();
     }
 
     [Fact]
@@ -329,8 +328,8 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveLatestVersionOnChannelAsync("alpha", prereleaseLabel: "preview", versionRange: range);
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("4.10.0-preview.1"), resolved!.Version);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("4.10.0-preview.1"));
     }
 
     [Fact]
@@ -341,9 +340,9 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("2.0.0"));
 
-        Assert.NotNull(resolved);
-        Assert.Equal(V("2.0.0"), resolved!.Version);
-        Assert.Equal(_defaultSource.Name, resolved.Source.Name);
+        resolved.Should().NotBeNull();
+        resolved!.Version.Should().Be(V("2.0.0"));
+        resolved.Source.Name.Should().Be(_defaultSource.Name);
     }
 
     [Fact]
@@ -354,7 +353,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveVersionAsync("alpha", V("9.9.9"));
 
-        Assert.Null(resolved);
+        resolved.Should().BeNull();
     }
 
     [Fact]
@@ -365,7 +364,7 @@ public sealed class WorkloadCatalogTests
 
         ResolvedPackage? resolved = await catalog.ResolveVersionAsync("Alpha", V("1.0.0"));
 
-        Assert.Equal("alpha", resolved!.PackageId);
+        resolved!.PackageId.Should().Be("alpha");
     }
 
     [Fact]
@@ -390,7 +389,7 @@ public sealed class WorkloadCatalogTests
 
         var copied = new MemoryStream();
         await result.CopyToAsync(copied);
-        Assert.Equal(payload, copied.ToArray());
+        copied.ToArray().Should().Equal(payload);
     }
 
     [Fact]
@@ -405,8 +404,7 @@ public sealed class WorkloadCatalogTests
         WorkloadCatalog catalog = NewCatalog(
             (_defaultSource, new NuGetProtocolSourceClient(TestRepository.Build(_defaultSource, find))));
 
-        await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
-            () => catalog.DownloadAsync(new ResolvedPackage("alpha", V("1.0.0"), _defaultSource)));
+        await FluentActions.Awaiting(() => catalog.DownloadAsync(new ResolvedPackage("alpha", V("1.0.0"), _defaultSource))).Should().ThrowAsync<WorkloadPackageNotFoundException>();
     }
 
     private static NuGetVersion V(string v) => NuGetVersion.Parse(v);

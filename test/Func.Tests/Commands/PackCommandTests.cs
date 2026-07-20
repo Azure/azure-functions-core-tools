@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -15,7 +14,7 @@ public class PackCommandTests
     {
         var command = new PackCommand(_interaction);
 
-        Assert.True(command.Hidden);
+        command.Hidden.Should().BeTrue();
     }
 
     [Fact]
@@ -26,10 +25,10 @@ public class PackCommandTests
 
         var exitCode = await parseResult.InvokeAsync();
 
-        Assert.NotEqual(0, exitCode);
-        Assert.Contains("not supported yet", _interaction.AllOutput);
-        Assert.Contains("v4", _interaction.AllOutput);
-        Assert.Contains("functions-run-local", _interaction.AllOutput);
+        exitCode.Should().NotBe(0);
+        _interaction.AllOutput.Should().Contain("not supported yet");
+        _interaction.AllOutput.Should().Contain("v4");
+        _interaction.AllOutput.Should().Contain("functions-run-local");
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public class PackCommandTests
 
         var exitCode = await parseResult.InvokeAsync();
 
-        Assert.NotEqual(0, exitCode);
-        Assert.Contains("not supported yet", _interaction.AllOutput);
+        exitCode.Should().NotBe(0);
+        _interaction.AllOutput.Should().Contain("not supported yet");
     }
 }

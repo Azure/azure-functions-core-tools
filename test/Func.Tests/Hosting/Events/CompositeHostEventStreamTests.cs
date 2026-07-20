@@ -3,7 +3,6 @@
 
 using System.Runtime.CompilerServices;
 using Azure.Functions.Cli.Hosting.Events;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Events;
 
@@ -19,9 +18,9 @@ public class CompositeHostEventStreamTests
 
         await composite.DisposeAsync();
 
-        Assert.True(first.Disposed);
-        Assert.True(second.Disposed);
-        Assert.True(third.Disposed);
+        first.Disposed.Should().BeTrue();
+        second.Disposed.Should().BeTrue();
+        third.Disposed.Should().BeTrue();
     }
 
     [Fact]
@@ -32,10 +31,10 @@ public class CompositeHostEventStreamTests
         var third = new TrackingEventStream();
         var composite = new CompositeHostEventStream([first, second, third]);
 
-        await Assert.ThrowsAsync<AggregateException>(async () => await composite.DisposeAsync());
+        await FluentActions.Awaiting(async () => await composite.DisposeAsync()).Should().ThrowAsync<AggregateException>();
 
-        Assert.True(first.Disposed);
-        Assert.True(third.Disposed);
+        first.Disposed.Should().BeTrue();
+        third.Disposed.Should().BeTrue();
     }
 
     private sealed class TrackingEventStream : IHostEventStream

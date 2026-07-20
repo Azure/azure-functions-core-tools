@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -48,22 +47,22 @@ public class HostProcessStartInfoFactoryTests : IDisposable
 
         HostProcessLaunchInfo launchInfo = factory.Create(context);
 
-        Assert.Equal(Path.Combine(_contentRoot.FullName, GetExecutableName()), launchInfo.StartInfo.FileName);
-        Assert.Equal(_startupDirectory.FullName, launchInfo.StartInfo.WorkingDirectory);
-        Assert.False(launchInfo.StartInfo.UseShellExecute);
-        Assert.True(launchInfo.StartInfo.RedirectStandardInput);
-        Assert.True(launchInfo.StartInfo.RedirectStandardOutput);
-        Assert.True(launchInfo.StartInfo.RedirectStandardError);
-        Assert.Equal(HostProcessStartInfoFactory.DefaultPort, launchInfo.Port);
-        Assert.Equal(new Uri("http://0.0.0.0:7071"), launchInfo.ListenUri);
-        Assert.Equal(new Uri("http://localhost:7071"), launchInfo.LocalBaseUri);
-        Assert.Equal(["--enable-auth", "--urls", "http://0.0.0.0:7071"], launchInfo.StartInfo.ArgumentList);
-        Assert.Equal("custom-value", launchInfo.StartInfo.Environment["CUSTOM_ENV"]);
-        Assert.Equal(_startupDirectory.FullName, launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.ScriptRootEnvironmentVariable]);
-        Assert.Equal("Development", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AzureFunctionsEnvironmentVariable]);
-        Assert.Equal("localhost:7071", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable]);
-        Assert.Equal("true", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AspNetCoreSuppressStatusMessagesEnvironmentVariable]);
-        Assert.Equal("None", launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable]);
+        launchInfo.StartInfo.FileName.Should().Be(Path.Combine(_contentRoot.FullName, GetExecutableName()));
+        launchInfo.StartInfo.WorkingDirectory.Should().Be(_startupDirectory.FullName);
+        launchInfo.StartInfo.UseShellExecute.Should().BeFalse();
+        launchInfo.StartInfo.RedirectStandardInput.Should().BeTrue();
+        launchInfo.StartInfo.RedirectStandardOutput.Should().BeTrue();
+        launchInfo.StartInfo.RedirectStandardError.Should().BeTrue();
+        launchInfo.Port.Should().Be(HostProcessStartInfoFactory.DefaultPort);
+        launchInfo.ListenUri.Should().Be(new Uri("http://0.0.0.0:7071"));
+        launchInfo.LocalBaseUri.Should().Be(new Uri("http://localhost:7071"));
+        launchInfo.StartInfo.ArgumentList.Should().Equal(["--enable-auth", "--urls", "http://0.0.0.0:7071"]);
+        launchInfo.StartInfo.Environment["CUSTOM_ENV"].Should().Be("custom-value");
+        launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.ScriptRootEnvironmentVariable].Should().Be(_startupDirectory.FullName);
+        launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AzureFunctionsEnvironmentVariable].Should().Be("Development");
+        launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable].Should().Be("localhost:7071");
+        launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AspNetCoreSuppressStatusMessagesEnvironmentVariable].Should().Be("true");
+        launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable].Should().Be("None");
     }
 
     [Fact]
@@ -78,10 +77,10 @@ public class HostProcessStartInfoFactoryTests : IDisposable
 
         HostProcessLaunchInfo launchInfo = factory.Create(context);
 
-        Assert.Equal(9090, launchInfo.Port);
-        Assert.Equal(new Uri("http://0.0.0.0:9090"), launchInfo.ListenUri);
-        Assert.Equal(new Uri("http://localhost:9090"), launchInfo.LocalBaseUri);
-        Assert.Equal(["--urls", "http://0.0.0.0:9090"], launchInfo.StartInfo.ArgumentList);
+        launchInfo.Port.Should().Be(9090);
+        launchInfo.ListenUri.Should().Be(new Uri("http://0.0.0.0:9090"));
+        launchInfo.LocalBaseUri.Should().Be(new Uri("http://localhost:9090"));
+        launchInfo.StartInfo.ArgumentList.Should().Equal(["--urls", "http://0.0.0.0:9090"]);
     }
 
     [Theory]
@@ -92,9 +91,9 @@ public class HostProcessStartInfoFactoryTests : IDisposable
         var factory = new HostProcessStartInfoFactory();
         HostProcessStartContext context = CreateContext(port: port, enableAuth: false);
 
-        var exception = Assert.Throws<GracefulException>(() => factory.Create(context));
+        var exception = FluentActions.Invoking(() => factory.Create(context)).Should().ThrowExactly<GracefulException>().Which;
 
-        Assert.Contains("--port", exception.Message);
+        exception.Message.Should().Contain("--port");
     }
 
     private HostProcessStartContext CreateContext(

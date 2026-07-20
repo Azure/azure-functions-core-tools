@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard;
 
@@ -27,10 +26,10 @@ public class DashboardStateTests
 
         IReadOnlyList<DashboardEvent> events = state.Observe(entry);
 
-        var ev = Assert.Single(events.OfType<HostStateChangedEvent>());
-        Assert.Equal(HostLifecycleState.Starting, ev.From);
-        Assert.Equal(HostLifecycleState.Ready, ev.To);
-        Assert.Equal(1241.0, ev.DurationMs);
+        var ev = events.OfType<HostStateChangedEvent>().Should().ContainSingle().Subject;
+        ev.From.Should().Be(HostLifecycleState.Starting);
+        ev.To.Should().Be(HostLifecycleState.Ready);
+        ev.DurationMs.Should().Be(1241.0);
     }
 
     [Fact]
@@ -52,12 +51,12 @@ public class DashboardStateTests
 
         IReadOnlyList<DashboardEvent> events = state.Observe(entry);
 
-        Assert.Single(events.OfType<FunctionDiscoveredEvent>());
+        events.OfType<FunctionDiscoveredEvent>().Should().ContainSingle();
         DashboardSnapshot snap = state.Snapshot();
-        var fn = Assert.Single(snap.Functions);
-        Assert.Equal("HttpTrigger1", fn.Name);
-        Assert.Equal("http", fn.TriggerType);
-        Assert.Equal(["GET", "POST"], fn.HttpMethods);
+        var fn = snap.Functions.Should().ContainSingle().Subject;
+        fn.Name.Should().Be("HttpTrigger1");
+        fn.TriggerType.Should().Be("http");
+        fn.HttpMethods.Should().Equal(["GET", "POST"]);
     }
 
     [Fact]
@@ -77,8 +76,8 @@ public class DashboardStateTests
                 [HostLogAttributeKeys.FunctionInvocationId] = "id-1",
             }));
 
-        Assert.Equal(FunctionStatus.Active, state.Snapshot().Functions[0].Status);
-        Assert.Equal(1, state.Snapshot().ActiveInvocationCount);
+        state.Snapshot().Functions[0].Status.Should().Be(FunctionStatus.Active);
+        state.Snapshot().ActiveInvocationCount.Should().Be(1);
 
         IReadOnlyList<DashboardEvent> events = state.Observe(MakeEntry(
             "Function.HttpTrigger1",
@@ -93,13 +92,13 @@ public class DashboardStateTests
                 [HostLogAttributeKeys.DurationMs] = 12.0,
             }));
 
-        Assert.Single(events.OfType<InvocationCompletedEvent>());
+        events.OfType<InvocationCompletedEvent>().Should().ContainSingle();
         DashboardSnapshot snap = state.Snapshot();
-        Assert.Equal(1, snap.TotalInvocations);
-        Assert.Equal(1, snap.SucceededInvocations);
-        Assert.Equal(0, snap.FailedInvocations);
-        Assert.Equal(0, snap.ActiveInvocationCount);
-        Assert.Equal(FunctionStatus.Ready, snap.Functions[0].Status);
+        snap.TotalInvocations.Should().Be(1);
+        snap.SucceededInvocations.Should().Be(1);
+        snap.FailedInvocations.Should().Be(0);
+        snap.ActiveInvocationCount.Should().Be(0);
+        snap.Functions[0].Status.Should().Be(FunctionStatus.Ready);
     }
 
     [Fact]
@@ -128,21 +127,21 @@ public class DashboardStateTests
             exception: new InvalidOperationException("placeholder"),
             exceptionDetails: exceptionDetails));
 
-        var completed = Assert.Single(events.OfType<InvocationCompletedEvent>());
-        Assert.Equal("Microsoft.Azure.WebJobs.Host.FunctionInvocationException", completed.ErrorType);
-        Assert.Equal("Exception while executing function", completed.ErrorMessage);
-        Assert.Equal("Worker.UserException", completed.Error?.InnerException?.Type);
-        Assert.Equal("inner boom", completed.Error?.InnerException?.Message);
+        var completed = events.OfType<InvocationCompletedEvent>().Should().ContainSingle().Subject;
+        completed.ErrorType.Should().Be("Microsoft.Azure.WebJobs.Host.FunctionInvocationException");
+        completed.ErrorMessage.Should().Be("Exception while executing function");
+        (completed.Error?.InnerException?.Type).Should().Be("Worker.UserException");
+        (completed.Error?.InnerException?.Message).Should().Be("inner boom");
 
         DashboardSnapshot snap = state.Snapshot();
-        Assert.Equal(FunctionStatus.Error, snap.Functions[0].Status);
-        Assert.Equal(1, snap.Functions[0].TotalErrors);
-        Assert.Equal(1, snap.FailedInvocations);
+        snap.Functions[0].Status.Should().Be(FunctionStatus.Error);
+        snap.Functions[0].TotalErrors.Should().Be(1);
+        snap.FailedInvocations.Should().Be(1);
         const string ExpectedLastErrorMessage =
             "Microsoft.Azure.WebJobs.Host.FunctionInvocationException: Exception while executing function" +
             " ---> Worker.UserException: inner boom";
-        Assert.Equal(ExpectedLastErrorMessage, snap.Functions[0].LastErrorMessage);
-        Assert.True(snap.ErrorCount > 0);
+        snap.Functions[0].LastErrorMessage.Should().Be(ExpectedLastErrorMessage);
+        (snap.ErrorCount > 0).Should().BeTrue();
     }
 
     [Fact]
@@ -160,7 +159,7 @@ public class DashboardStateTests
                 [HostLogAttributeKeys.HostState] = "recycling",
             }));
 
-        Assert.Single(state.Snapshot().Functions); // not yet cleared
+        state.Snapshot().Functions.Should().ContainSingle(); // not yet cleared
 
         state.Observe(MakeEntry(
             "Host.Lifecycle",
@@ -172,7 +171,7 @@ public class DashboardStateTests
                 [HostLogAttributeKeys.HostState] = "ready",
             }));
 
-        Assert.Empty(state.Snapshot().Functions);
+        state.Snapshot().Functions.Should().BeEmpty();
     }
 
     [Fact]
@@ -195,10 +194,10 @@ public class DashboardStateTests
 
         SummaryEvent summary = state.BuildSummary("sigint", DateTimeOffset.UtcNow);
 
-        Assert.Equal("sigint", summary.ExitReason);
-        Assert.Equal(1, summary.FunctionCount);
-        Assert.Equal(1, summary.TotalInvocations);
-        Assert.Equal(1, summary.SucceededInvocations);
+        summary.ExitReason.Should().Be("sigint");
+        summary.FunctionCount.Should().Be(1);
+        summary.TotalInvocations.Should().Be(1);
+        summary.SucceededInvocations.Should().Be(1);
     }
 
     private static HostLogEntry DiscoverHttp(string name) => MakeEntry(

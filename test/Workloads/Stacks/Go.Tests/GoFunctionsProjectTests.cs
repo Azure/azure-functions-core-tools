@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Go.Tests;
 
@@ -48,11 +47,11 @@ public class GoFunctionsProjectTests : IDisposable
         await project.PrepareForHostRunAsync(context, default);
 
         string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
-        Assert.Equal(_projectDir.FullName, observedRoot);
-        Assert.Equal(Path.Combine(_projectDir.FullName, "bin", expectedName), observedOutput);
+        observedRoot.Should().Be(_projectDir.FullName);
+        observedOutput.Should().Be(Path.Combine(_projectDir.FullName, "bin", expectedName));
         // StartupDirectory must remain the project root so the host finds host.json
         // and the worker's `defaultExecutablePath = bin/app` resolves correctly.
-        Assert.Equal(_projectDir.FullName, context.StartupDirectory.FullName);
+        context.StartupDirectory.FullName.Should().Be(_projectDir.FullName);
     }
 
     [Fact]
@@ -72,8 +71,8 @@ public class GoFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "compiling example.com/myapp");
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "go: warning");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Info && e.Line == "compiling example.com/myapp");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "go: warning");
     }
 
     [Fact]
@@ -88,13 +87,12 @@ public class GoFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("go build", ex.Message);
-        Assert.Contains("exit 1", ex.Message);
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "compile error");
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("go build");
+        ex.Message.Should().Contain("exit 1");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "compile error");
     }
 
     [Fact]
@@ -110,8 +108,8 @@ public class GoFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext(skipBuild: true);
         await project.PrepareForHostRunAsync(context, default);
 
-        Assert.False(invoked);
-        Assert.Equal(_projectDir.FullName, context.StartupDirectory.FullName);
+        invoked.Should().BeFalse();
+        context.StartupDirectory.FullName.Should().Be(_projectDir.FullName);
     }
 
     [Fact]
@@ -120,11 +118,10 @@ public class GoFunctionsProjectTests : IDisposable
         GoFunctionsProject project = CreateProject((_, _, _, _, _) => Task.FromResult(0));
         project.ReadGoVersion = _ => Task.FromResult<(int, int)?>(null);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(CreateContext(), default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("Could not find a Go installation", ex.Message);
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("Could not find a Go installation");
     }
 
     [Fact]
@@ -133,11 +130,10 @@ public class GoFunctionsProjectTests : IDisposable
         GoFunctionsProject project = CreateProject((_, _, _, _, _) => Task.FromResult(0));
         project.ReadGoVersion = _ => Task.FromResult<(int, int)?>((1, 21));
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(CreateContext(), default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(CreateContext(), default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("Go 1.21 is not supported", ex.Message);
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("Go 1.21 is not supported");
     }
 
     [Fact]
@@ -159,9 +155,9 @@ public class GoFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(), default);
 
-        Assert.Equal(2, calls.Count);
-        Assert.Equal($"tidy:{_projectDir.FullName}", calls[0]);
-        Assert.Equal("build", calls[1]);
+        calls.Count.Should().Be(2);
+        calls[0].Should().Be($"tidy:{_projectDir.FullName}");
+        calls[1].Should().Be("build");
     }
 
     [Fact]
@@ -177,13 +173,12 @@ public class GoFunctionsProjectTests : IDisposable
         FunctionsProjectHostRunContext context = CreateContext();
         context.Reporter = reporter;
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => project.PrepareForHostRunAsync(context, default));
+        GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("go mod tidy", ex.Message);
-        Assert.Contains("exit 1", ex.Message);
-        Assert.Contains(reporter.Logs, e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "module not found");
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("go mod tidy");
+        ex.Message.Should().Contain("exit 1");
+        reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "module not found");
     }
 
     [Fact]
@@ -199,7 +194,7 @@ public class GoFunctionsProjectTests : IDisposable
 
         await project.PrepareForHostRunAsync(CreateContext(skipBuild: true), default);
 
-        Assert.False(tidyInvoked);
+        tidyInvoked.Should().BeFalse();
     }
 
     private GoFunctionsProject CreateProject(Func<string, string, Action<string>, Action<string>, CancellationToken, Task<int>> runner)

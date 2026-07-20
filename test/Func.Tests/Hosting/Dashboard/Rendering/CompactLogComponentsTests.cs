@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using Spectre.Console.Rendering;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -25,10 +24,10 @@ public class CompactLogComponentsTests
 
         CompactLogLine[] lines = buffer.Snapshot();
 
-        Assert.Equal(2, lines.Length);
-        Assert.Equal("Second", lines[0].FunctionName);
-        Assert.Equal("Third", lines[1].FunctionName);
-        Assert.True(lines[1].IsError);
+        lines.Length.Should().Be(2);
+        lines[0].FunctionName.Should().Be("Second");
+        lines[1].FunctionName.Should().Be("Third");
+        lines[1].IsError.Should().BeTrue();
     }
 
     [Fact]
@@ -49,10 +48,10 @@ public class CompactLogComponentsTests
 
         CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
 
-        Assert.Equal("HttpTrigger1", line.FunctionName);
-        Assert.False(line.IsError);
-        Assert.Equal(LogLevel.Warning, line.Level);
-        Assert.Contains("Queue depth is high", Render(line.Renderable));
+        line.FunctionName.Should().Be("HttpTrigger1");
+        line.IsError.Should().BeFalse();
+        line.Level.Should().Be(LogLevel.Warning);
+        Render(line.Renderable).Should().Contain("Queue depth is high");
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public class CompactLogComponentsTests
 
         CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
 
-        Assert.True(line.RenderRows(width: 80).Count > 1);
+        (line.RenderRows(width: 80).Count > 1).Should().BeTrue();
     }
 
     [Fact]
@@ -102,12 +101,12 @@ public class CompactLogComponentsTests
 
         CompactLogLine line = formatter.Format(entry, events, listenUri: null)!;
 
-        Assert.Equal("HttpTrigger1", line.FunctionName);
-        Assert.True(line.IsError);
-        Assert.Equal(LogLevel.Error, line.Level);
+        line.FunctionName.Should().Be("HttpTrigger1");
+        line.IsError.Should().BeTrue();
+        line.Level.Should().Be(LogLevel.Error);
         string output = Render(line.Renderable);
-        Assert.Contains("InvalidOperationException", output);
-        Assert.Contains("Boom", output);
+        output.Should().Contain("InvalidOperationException");
+        output.Should().Contain("Boom");
     }
 
     [Fact]
@@ -134,13 +133,13 @@ public class CompactLogComponentsTests
         CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
 
         string output = RenderRows(line);
-        Assert.Null(line.FunctionName);
-        Assert.True(line.IsError);
-        Assert.Equal(LogLevel.Error, line.Level);
-        Assert.DoesNotContain("Grpc", output);
-        Assert.Contains("Language Worker Process exited.", output);
-        Assert.Contains("Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException", output);
-        Assert.Contains("A connection string was not found.", output);
+        line.FunctionName.Should().BeNull();
+        line.IsError.Should().BeTrue();
+        line.Level.Should().Be(LogLevel.Error);
+        output.Should().NotContain("Grpc");
+        output.Should().Contain("Language Worker Process exited.");
+        output.Should().Contain("Microsoft.Azure.WebJobs.Script.Workers.WorkerProcessExitException");
+        output.Should().Contain("A connection string was not found.");
     }
 
     [Fact]
@@ -161,8 +160,8 @@ public class CompactLogComponentsTests
 
         CompactLogLine? line = formatter.Format(entry, [], listenUri: null);
 
-        Assert.NotNull(line);
-        Assert.Contains("A connection string was not found.", RenderRows(line));
+        line.Should().NotBeNull();
+        RenderRows(line).Should().Contain("A connection string was not found.");
     }
 
     [Fact]
@@ -180,7 +179,7 @@ public class CompactLogComponentsTests
 
         CompactLogLine? line = formatter.Format(entry, [], listenUri: null);
 
-        Assert.Null(line);
+        line.Should().BeNull();
     }
 
     [Fact]
@@ -202,9 +201,9 @@ public class CompactLogComponentsTests
         CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
 
         string output = RenderRows(line);
-        Assert.Null(line.FunctionName);
-        Assert.Contains("Initialization", output);
-        Assert.Contains("Resolving host workload", output);
+        line.FunctionName.Should().BeNull();
+        output.Should().Contain("Initialization");
+        output.Should().Contain("Resolving host workload");
     }
 
     [Fact]
@@ -223,9 +222,9 @@ public class CompactLogComponentsTests
         CompactLogLine line = formatter.Format(entry, [], listenUri: null)!;
 
         string output = RenderRows(line);
-        Assert.Null(line.FunctionName);
-        Assert.DoesNotContain("Initialization", output);
-        Assert.Contains("Reading host configuration", output);
+        line.FunctionName.Should().BeNull();
+        output.Should().NotContain("Initialization");
+        output.Should().Contain("Reading host configuration");
     }
 
     private static string Render(IRenderable renderable)

@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Common;
 
@@ -29,7 +28,7 @@ public class DirectoryGuardTests : IDisposable
     {
         bool result = DirectoryGuard.HasNonGitContent(new DirectoryInfo(_tempDir));
 
-        Assert.False(result);
+        result.Should().BeFalse();
     }
 
     [Fact]
@@ -39,7 +38,7 @@ public class DirectoryGuardTests : IDisposable
 
         bool result = DirectoryGuard.HasNonGitContent(new DirectoryInfo(_tempDir));
 
-        Assert.False(result);
+        result.Should().BeFalse();
     }
 
     [Fact]
@@ -49,7 +48,7 @@ public class DirectoryGuardTests : IDisposable
 
         bool result = DirectoryGuard.HasNonGitContent(new DirectoryInfo(_tempDir));
 
-        Assert.True(result);
+        result.Should().BeTrue();
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public class DirectoryGuardTests : IDisposable
 
         bool result = DirectoryGuard.HasNonGitContent(new DirectoryInfo(_tempDir));
 
-        Assert.True(result);
+        result.Should().BeTrue();
     }
 
     [Fact]
@@ -78,11 +77,11 @@ public class DirectoryGuardTests : IDisposable
         DirectoryGuard.ClearExceptGit(new DirectoryInfo(_tempDir));
 
         // Assert
-        Assert.True(Directory.Exists(gitDir));
-        Assert.True(File.Exists(Path.Combine(gitDir, "HEAD")));
-        Assert.False(File.Exists(Path.Combine(_tempDir, "host.json")));
-        Assert.False(File.Exists(Path.Combine(_tempDir, "local.settings.json")));
-        Assert.False(Directory.Exists(Path.Combine(_tempDir, "src")));
+        Directory.Exists(gitDir).Should().BeTrue();
+        File.Exists(Path.Combine(gitDir, "HEAD")).Should().BeTrue();
+        File.Exists(Path.Combine(_tempDir, "host.json")).Should().BeFalse();
+        File.Exists(Path.Combine(_tempDir, "local.settings.json")).Should().BeFalse();
+        Directory.Exists(Path.Combine(_tempDir, "src")).Should().BeFalse();
     }
 
     [Fact]
@@ -94,18 +93,18 @@ public class DirectoryGuardTests : IDisposable
 
         DirectoryGuard.ClearExceptGit(new DirectoryInfo(_tempDir));
 
-        Assert.False(File.Exists(filePath));
+        File.Exists(filePath).Should().BeFalse();
     }
 
     [Fact]
     public void HasNonGitContent_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => DirectoryGuard.HasNonGitContent(null!));
+        FluentActions.Invoking(() => DirectoryGuard.HasNonGitContent(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void ClearExceptGit_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => DirectoryGuard.ClearExceptGit(null!));
+        FluentActions.Invoking(() => DirectoryGuard.ClearExceptGit(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 }

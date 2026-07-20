@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.FirstRun;
 
@@ -39,7 +38,7 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     [Fact]
     public async Task IsFirstRunAsync_ReturnsTrue_WhenMarkerMissingAndNoWorkloads()
     {
-        Assert.True(await _store.IsFirstRunAsync());
+        (await _store.IsFirstRunAsync()).Should().BeTrue();
     }
 
     [Fact]
@@ -47,13 +46,13 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         WriteEmptyWorkloadRegistry();
 
-        Assert.False(await _store.IsFirstRunAsync());
+        (await _store.IsFirstRunAsync()).Should().BeFalse();
     }
 
     [Fact]
     public async Task GetStateAsync_ReturnsNeverPrompted_WhenMarkerMissingAndNoWorkloads()
     {
-        Assert.Equal(FirstRunState.NeverPrompted, await _store.GetStateAsync());
+        (await _store.GetStateAsync()).Should().Be(FirstRunState.NeverPrompted);
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         await _store.MarkCompleteAsync(CancellationToken.None);
 
-        Assert.Equal(FirstRunState.MarkerWithoutWorkloads, await _store.GetStateAsync());
+        (await _store.GetStateAsync()).Should().Be(FirstRunState.MarkerWithoutWorkloads);
     }
 
     [Fact]
@@ -69,10 +68,10 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         WriteEmptyWorkloadRegistry();
 
-        Assert.Equal(FirstRunState.WorkloadsInstalled, await _store.GetStateAsync());
+        (await _store.GetStateAsync()).Should().Be(FirstRunState.WorkloadsInstalled);
 
         await _store.MarkCompleteAsync(CancellationToken.None);
-        Assert.Equal(FirstRunState.WorkloadsInstalled, await _store.GetStateAsync());
+        (await _store.GetStateAsync()).Should().Be(FirstRunState.WorkloadsInstalled);
     }
 
     [Fact]
@@ -80,30 +79,30 @@ public sealed class FileFirstRunStateStoreTests : IDisposable
     {
         await _store.MarkCompleteAsync(CancellationToken.None);
 
-        Assert.False(await _store.IsFirstRunAsync());
-        Assert.True(File.Exists(Path.Combine(_tempHome, FileFirstRunStateStore.MarkerFileName)));
+        (await _store.IsFirstRunAsync()).Should().BeFalse();
+        File.Exists(Path.Combine(_tempHome, FileFirstRunStateStore.MarkerFileName)).Should().BeTrue();
     }
 
     [Fact]
     public async Task MarkCompleteAsync_CreatesHomeDirectory_WhenMissing()
     {
-        Assert.False(Directory.Exists(_tempHome));
+        Directory.Exists(_tempHome).Should().BeFalse();
 
         await _store.MarkCompleteAsync(CancellationToken.None);
 
-        Assert.True(Directory.Exists(_tempHome));
+        Directory.Exists(_tempHome).Should().BeTrue();
     }
 
     [Fact]
     public void Constructor_ThrowsArgumentNullException_ForNullPaths()
     {
-        Assert.Throws<ArgumentNullException>(() => new FileFirstRunStateStore(null!, _workloadPaths));
+        FluentActions.Invoking(() => new FileFirstRunStateStore(null!, _workloadPaths)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Constructor_ThrowsArgumentNullException_ForNullWorkloadPaths()
     {
-        Assert.Throws<ArgumentNullException>(() => new FileFirstRunStateStore(new CliConfigurationPathsOptions(_tempHome), null!));
+        FluentActions.Invoking(() => new FileFirstRunStateStore(new CliConfigurationPathsOptions(_tempHome), null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     private void WriteEmptyWorkloadRegistry()

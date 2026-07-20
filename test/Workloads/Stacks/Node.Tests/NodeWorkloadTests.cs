@@ -2,10 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;
 
@@ -22,15 +20,15 @@ public class NodeWorkloadTests
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        Assert.IsType<NodeProjectInitializer>(initializer);
-        Assert.Equal("node", initializer.Stack);
-        Assert.Equal(["JavaScript", "TypeScript"], initializer.SupportedLanguages);
+        initializer.Should().BeOfType<NodeProjectInitializer>();
+        initializer.Stack.Should().Be("node");
+        initializer.SupportedLanguages.Should().Equal(["JavaScript", "TypeScript"]);
     }
 
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new NodeWorkload().Configure(null!));
+        FluentActions.Invoking(() => new NodeWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]

@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Projects;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Bundles.Tests;
 
@@ -16,7 +15,7 @@ public class BundleHelpersTests
     public void GetBundleChannel_StableVersion_ReturnsStable(string version)
     {
         var v = NuGetVersion.Parse(version);
-        Assert.Equal(BundleChannel.Stable, BundleHelpers.GetBundleChannel(v));
+        BundleHelpers.GetBundleChannel(v).Should().Be(BundleChannel.Stable);
     }
 
     [Theory]
@@ -27,7 +26,7 @@ public class BundleHelpersTests
     public void GetBundleChannel_PreviewLabel_ReturnsPreview(string version)
     {
         var v = NuGetVersion.Parse(version);
-        Assert.Equal(BundleChannel.Preview, BundleHelpers.GetBundleChannel(v));
+        BundleHelpers.GetBundleChannel(v).Should().Be(BundleChannel.Preview);
     }
 
     [Theory]
@@ -38,7 +37,7 @@ public class BundleHelpersTests
     public void GetBundleChannel_ExperimentalLabel_ReturnsExperimental(string version)
     {
         var v = NuGetVersion.Parse(version);
-        Assert.Equal(BundleChannel.Experimental, BundleHelpers.GetBundleChannel(v));
+        BundleHelpers.GetBundleChannel(v).Should().Be(BundleChannel.Experimental);
     }
 
     [Theory]
@@ -50,7 +49,7 @@ public class BundleHelpersTests
     public void GetBundleChannel_UnknownPrereleaseLabel_ReturnsStable(string version)
     {
         var v = NuGetVersion.Parse(version);
-        Assert.Equal(BundleChannel.Stable, BundleHelpers.GetBundleChannel(v));
+        BundleHelpers.GetBundleChannel(v).Should().Be(BundleChannel.Stable);
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public class BundleHelpersTests
     {
         // Only the first release label is checked; "preview" is first here.
         var v = NuGetVersion.Parse("5.0.0-preview.experimental.1");
-        Assert.Equal(BundleChannel.Preview, BundleHelpers.GetBundleChannel(v));
+        BundleHelpers.GetBundleChannel(v).Should().Be(BundleChannel.Preview);
     }
 
     [Fact]
@@ -66,7 +65,7 @@ public class BundleHelpersTests
     {
         // Only the first release label is checked; "experimental" is first here.
         var v = NuGetVersion.Parse("5.0.0-experimental.preview.1");
-        Assert.Equal(BundleChannel.Experimental, BundleHelpers.GetBundleChannel(v));
+        BundleHelpers.GetBundleChannel(v).Should().Be(BundleChannel.Experimental);
     }
 
     // --- GetBundleChannel(string bundleId) ---
@@ -74,19 +73,22 @@ public class BundleHelpersTests
     [Fact]
     public void GetBundleChannelByBundleId_StableId_ReturnsStable()
     {
-        Assert.Equal(BundleChannel.Stable, BundleHelpers.GetBundleChannel(BundleHelpers.StableBundleId));
+        BundleHelpers.GetBundleChannel(BundleHelpers.StableBundleId)
+            .Should().Be(BundleChannel.Stable);
     }
 
     [Fact]
     public void GetBundleChannelByBundleId_PreviewId_ReturnsPreview()
     {
-        Assert.Equal(BundleChannel.Preview, BundleHelpers.GetBundleChannel(BundleHelpers.PreviewBundleId));
+        BundleHelpers.GetBundleChannel(BundleHelpers.PreviewBundleId)
+            .Should().Be(BundleChannel.Preview);
     }
 
     [Fact]
     public void GetBundleChannelByBundleId_ExperimentalId_ReturnsExperimental()
     {
-        Assert.Equal(BundleChannel.Experimental, BundleHelpers.GetBundleChannel(BundleHelpers.ExperimentalBundleId));
+        BundleHelpers.GetBundleChannel(BundleHelpers.ExperimentalBundleId)
+            .Should().Be(BundleChannel.Experimental);
     }
 
     [Theory]
@@ -97,7 +99,7 @@ public class BundleHelpersTests
     {
         // Should not throw — case-insensitive matching.
         var channel = BundleHelpers.GetBundleChannel(bundleId);
-        Assert.Equal(expectedChannel, channel);
+        channel.Should().Be(expectedChannel);
     }
 
     [Theory]
@@ -106,7 +108,8 @@ public class BundleHelpersTests
     [InlineData("Microsoft.Azure.Functions.ExtensionBundle.Unknown")]
     public void GetBundleChannelByBundleId_InvalidId_Throws(string bundleId)
     {
-        Assert.Throws<ArgumentException>(() => BundleHelpers.GetBundleChannel(bundleId));
+        FluentActions.Invoking(() => BundleHelpers.GetBundleChannel(bundleId))
+            .Should().ThrowExactly<ArgumentException>();
     }
 
     // --- TryGetBundleChannel ---
@@ -118,8 +121,8 @@ public class BundleHelpersTests
     public void TryGetBundleChannel_KnownId_ReturnsTrueWithChannel(string bundleId, BundleChannel expected)
     {
         var result = BundleHelpers.TryGetBundleChannel(bundleId, out var channel);
-        Assert.True(result);
-        Assert.Equal(expected, channel);
+        result.Should().BeTrue();
+        channel.Should().Be(expected);
     }
 
     [Theory]
@@ -127,7 +130,7 @@ public class BundleHelpersTests
     [InlineData("MICROSOFT.AZURE.FUNCTIONS.EXTENSIONBUNDLE.PREVIEW")]
     public void TryGetBundleChannel_CaseInsensitive_ReturnsTrue(string bundleId)
     {
-        Assert.True(BundleHelpers.TryGetBundleChannel(bundleId, out _));
+        BundleHelpers.TryGetBundleChannel(bundleId, out _).Should().BeTrue();
     }
 
     [Theory]
@@ -136,8 +139,8 @@ public class BundleHelpersTests
     public void TryGetBundleChannel_UnknownId_ReturnsFalseWithUnknown(string bundleId)
     {
         var result = BundleHelpers.TryGetBundleChannel(bundleId, out var channel);
-        Assert.False(result);
-        Assert.Equal(BundleChannel.Unknown, channel);
+        result.Should().BeFalse();
+        channel.Should().Be(BundleChannel.Unknown);
     }
 
     // --- ToDisplayString ---
@@ -149,13 +152,14 @@ public class BundleHelpersTests
     [InlineData(BundleChannel.Experimental, "experimental")]
     public void ToDisplayString_ReturnsExpected(BundleChannel channel, string expected)
     {
-        Assert.Equal(expected, channel.ToDisplayString());
+        channel.ToDisplayString().Should().Be(expected);
     }
 
     [Fact]
     public void ToDisplayString_InvalidChannel_Throws()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ((BundleChannel)99).ToDisplayString());
+        FluentActions.Invoking(() => ((BundleChannel)99).ToDisplayString())
+            .Should().ThrowExactly<ArgumentOutOfRangeException>();
     }
 
     // --- ToPrereleaseLabel ---
@@ -163,7 +167,7 @@ public class BundleHelpersTests
     [Fact]
     public void ToPrereleaseLabel_Stable_ReturnsNull()
     {
-        Assert.Null(BundleChannel.Stable.ToPrereleaseLabel());
+        BundleChannel.Stable.ToPrereleaseLabel().Should().BeNull();
     }
 
     [Theory]
@@ -171,7 +175,7 @@ public class BundleHelpersTests
     [InlineData(BundleChannel.Experimental, "experimental")]
     public void ToPrereleaseLabel_PrereleaseChannel_ReturnsLabel(BundleChannel channel, string expected)
     {
-        Assert.Equal(expected, channel.ToPrereleaseLabel());
+        channel.ToPrereleaseLabel().Should().Be(expected);
     }
 
     [Theory]
@@ -179,7 +183,8 @@ public class BundleHelpersTests
     [InlineData((BundleChannel)99)]
     public void ToPrereleaseLabel_InvalidChannel_Throws(BundleChannel channel)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => channel.ToPrereleaseLabel());
+        FluentActions.Invoking(() => channel.ToPrereleaseLabel())
+            .Should().ThrowExactly<ArgumentOutOfRangeException>();
     }
 
     // --- MatchesChannel ---
@@ -193,13 +198,14 @@ public class BundleHelpersTests
     [InlineData("1.5.0", BundleChannel.Preview, false)]
     public void MatchesChannel_ReturnsExpected(string version, BundleChannel channel, bool expected)
     {
-        Assert.Equal(expected, BundleHelpers.MatchesChannel(NuGetVersion.Parse(version), channel));
+        BundleHelpers.MatchesChannel(NuGetVersion.Parse(version), channel).Should().Be(expected);
     }
 
     [Fact]
     public void MatchesChannel_NullVersion_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => BundleHelpers.MatchesChannel(null!, BundleChannel.Stable));
+        FluentActions.Invoking(() => BundleHelpers.MatchesChannel(null!, BundleChannel.Stable))
+            .Should().ThrowExactly<ArgumentNullException>();
     }
 
     // --- GetBundleChannel(NuGetVersion) null guard ---
@@ -207,6 +213,7 @@ public class BundleHelpersTests
     [Fact]
     public void GetBundleChannelByVersion_Null_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => BundleHelpers.GetBundleChannel((NuGetVersion)null!));
+        FluentActions.Invoking(() => BundleHelpers.GetBundleChannel((NuGetVersion)null!))
+            .Should().ThrowExactly<ArgumentNullException>();
     }
 }

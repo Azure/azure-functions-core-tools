@@ -4,7 +4,6 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Workloads;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads;
 
@@ -16,8 +15,8 @@ public class ExternalCommandTests
         var source = new TestWorkloads.StubFuncCommand("deploy", "Deploy the app.");
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), source);
 
-        Assert.Equal("deploy", external.Name);
-        Assert.Equal("Deploy the app.", external.Description);
+        external.Name.Should().Be("deploy");
+        external.Description.Should().Be("Deploy the app.");
     }
 
     [Fact]
@@ -30,11 +29,11 @@ public class ExternalCommandTests
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), source);
 
         var parserOptions = external.Options.Select(o => o.Name).ToList();
-        Assert.Contains("--stack", parserOptions);
-        Assert.Contains("--verbose", parserOptions);
+        parserOptions.Should().Contain("--stack");
+        parserOptions.Should().Contain("--verbose");
 
         var stackOption = external.Options.Single(o => o.Name == "--stack");
-        Assert.Contains("-s", stackOption.Aliases);
+        stackOption.Aliases.Should().Contain("-s");
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public class ExternalCommandTests
 
         var typed = (Option<int>)external.Options.Single(o => o.Name == "--port");
         var parseResult = external.Parse(string.Empty);
-        Assert.Equal(7071, parseResult.GetValue(typed));
+        parseResult.GetValue(typed).Should().Be(7071);
     }
 
     [Fact]
@@ -60,8 +59,8 @@ public class ExternalCommandTests
 
         var pathArg = external.Arguments.Single(a => a.Name == "path");
         var nameArg = external.Arguments.Single(a => a.Name == "name");
-        Assert.Equal(ArgumentArity.ZeroOrOne, pathArg.Arity);
-        Assert.Equal(ArgumentArity.ExactlyOne, nameArg.Arity);
+        pathArg.Arity.Should().Be(ArgumentArity.ZeroOrOne);
+        nameArg.Arity.Should().Be(ArgumentArity.ExactlyOne);
     }
 
     [Fact]
@@ -73,10 +72,9 @@ public class ExternalCommandTests
 
         var external = new ExternalCommand(TestWorkloads.CreateInfo(), top);
 
-        var middleSub = Assert.Single(external.Subcommands);
-        Assert.Equal("middle", middleSub.Name);
-        var leafSub = Assert.Single(middleSub.Subcommands);
-        Assert.Equal("leaf", leafSub.Name);
+        var middleSub = external.Subcommands.Should().ContainSingle().Subject;
+        middleSub.Name.Should().Be("middle");
+        middleSub.Subcommands.Should().ContainSingle().Which.Name.Should().Be("leaf");
     }
 
     [Fact]
@@ -86,10 +84,9 @@ public class ExternalCommandTests
         var b = new FuncCommandOption<string>("--name", null, "second");
         var source = new TestWorkloads.StubFuncCommand("deploy", options: [a, b]);
 
-        var ex = Assert.Throws<WorkloadOperationException>(
-            () => new ExternalCommand(TestWorkloads.CreateInfo("Workload.A"), source));
-        Assert.Contains("Workload.A", ex.Message);
-        Assert.Contains("--name", ex.Message);
+        var ex = FluentActions.Invoking(() => new ExternalCommand(TestWorkloads.CreateInfo("Workload.A"), source)).Should().ThrowExactly<WorkloadOperationException>().Which;
+        ex.Message.Should().Contain("Workload.A");
+        ex.Message.Should().Contain("--name");
     }
 
     [Fact]
@@ -99,9 +96,8 @@ public class ExternalCommandTests
         var b = new FuncCommandOption<string>("--second", "-x", "second");
         var source = new TestWorkloads.StubFuncCommand("deploy", options: [a, b]);
 
-        var ex = Assert.Throws<WorkloadOperationException>(
-            () => new ExternalCommand(TestWorkloads.CreateInfo(), source));
-        Assert.Contains("-x", ex.Message);
+        var ex = FluentActions.Invoking(() => new ExternalCommand(TestWorkloads.CreateInfo(), source)).Should().ThrowExactly<WorkloadOperationException>().Which;
+        ex.Message.Should().Contain("-x");
     }
 
     [Fact]
@@ -111,9 +107,8 @@ public class ExternalCommandTests
         var b = new FuncCommandArgument<string>("path", "second");
         var source = new TestWorkloads.StubFuncCommand("deploy", arguments: [a, b]);
 
-        var ex = Assert.Throws<WorkloadOperationException>(
-            () => new ExternalCommand(TestWorkloads.CreateInfo(), source));
-        Assert.Contains("path", ex.Message);
+        var ex = FluentActions.Invoking(() => new ExternalCommand(TestWorkloads.CreateInfo(), source)).Should().ThrowExactly<WorkloadOperationException>().Which;
+        ex.Message.Should().Contain("path");
     }
 
     [Fact]
@@ -123,9 +118,8 @@ public class ExternalCommandTests
         var b = new TestWorkloads.StubFuncCommand("dup");
         var source = new TestWorkloads.StubFuncCommand("parent", subcommands: [a, b]);
 
-        var ex = Assert.Throws<WorkloadOperationException>(
-            () => new ExternalCommand(TestWorkloads.CreateInfo(), source));
-        Assert.Contains("dup", ex.Message);
+        var ex = FluentActions.Invoking(() => new ExternalCommand(TestWorkloads.CreateInfo(), source)).Should().ThrowExactly<WorkloadOperationException>().Which;
+        ex.Message.Should().Contain("dup");
     }
 
     [Fact]
@@ -136,23 +130,21 @@ public class ExternalCommandTests
         var source = new TestWorkloads.StubFuncCommand("deploy", options: [a, b]);
         var workload = TestWorkloads.CreateInfo("Workload.B");
 
-        var ex = Assert.Throws<WorkloadOperationException>(
-            () => new ExternalCommand(workload, source));
-        Assert.Same(workload, ex.Workload);
+        var ex = FluentActions.Invoking(() => new ExternalCommand(workload, source)).Should().ThrowExactly<WorkloadOperationException>().Which;
+        ex.Workload.Should().BeSameAs(workload);
     }
 
     [Fact]
     public void Ctor_NullSourceCommand_Throws()
     {
-        Assert.Throws<ArgumentNullException>(
-            () => new ExternalCommand(TestWorkloads.CreateInfo(), null!));
+        FluentActions.Invoking(() => new ExternalCommand(TestWorkloads.CreateInfo(), null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Ctor_NullWorkload_Throws()
     {
         var source = new TestWorkloads.StubFuncCommand("ok");
-        Assert.Throws<ArgumentNullException>(() => new ExternalCommand(null!, source));
+        FluentActions.Invoking(() => new ExternalCommand(null!, source)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -173,8 +165,8 @@ public class ExternalCommandTests
         var parseResult = external.Parse("--stack dotnet");
         var exit = await parseResult.InvokeAsync();
 
-        Assert.Equal(0, exit);
-        Assert.Equal("dotnet", captured);
+        exit.Should().Be(0);
+        captured.Should().Be("dotnet");
     }
 
     [Fact]
@@ -194,7 +186,7 @@ public class ExternalCommandTests
 
         await external.Parse("my-app").InvokeAsync();
 
-        Assert.Equal("my-app", captured);
+        captured.Should().Be("my-app");
     }
 
     [Fact]
@@ -214,7 +206,7 @@ public class ExternalCommandTests
 
         await external.Parse(string.Empty).InvokeAsync();
 
-        Assert.Equal(7071, captured);
+        captured.Should().Be(7071);
     }
 
     [Fact]
@@ -243,8 +235,8 @@ public class ExternalCommandTests
 
         await external.Parse("--name foo").InvokeAsync();
 
-        Assert.IsType<ArgumentException>(captured);
-        Assert.Contains("--name", captured!.Message);
+        captured.Should().BeOfType<ArgumentException>();
+        captured!.Message.Should().Contain("--name");
     }
 
     [Fact]
@@ -269,6 +261,6 @@ public class ExternalCommandTests
 
         await external.Parse(string.Empty).InvokeAsync();
 
-        Assert.IsType<ArgumentNullException>(captured);
+        captured.Should().BeOfType<ArgumentNullException>();
     }
 }

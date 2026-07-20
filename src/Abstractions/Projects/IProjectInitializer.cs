@@ -4,7 +4,6 @@
 using System.CommandLine;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Projects;
 

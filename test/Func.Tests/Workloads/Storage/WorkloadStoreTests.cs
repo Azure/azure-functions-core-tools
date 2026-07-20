@@ -5,7 +5,6 @@ using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
@@ -35,7 +34,7 @@ public class WorkloadStoreTests : IDisposable
     {
         var workloads = await _store.GetWorkloadsAsync();
 
-        Assert.Empty(workloads);
+        workloads.Should().BeEmpty();
     }
 
     [Fact]
@@ -44,9 +43,9 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));
 
         var workloads = await _store.GetWorkloadsAsync();
-        var installed = Assert.Single(workloads);
-        Assert.Equal("Azure.Functions.Cli.Workloads.Dotnet", installed.PackageId);
-        Assert.Equal("1.0.0", installed.PackageVersion);
+        var installed = workloads.Should().ContainSingle().Subject;
+        installed.PackageId.Should().Be("Azure.Functions.Cli.Workloads.Dotnet");
+        installed.PackageVersion.Should().Be("1.0.0");
     }
 
     [Fact]
@@ -56,9 +55,7 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "2.0.0"));
 
         var workloads = await _store.GetWorkloadsAsync();
-        Assert.Equal(
-            ["1.0.0", "2.0.0"],
-            workloads.Select(w => w.PackageVersion).OrderBy(v => v));
+        workloads.Select(w => w.PackageVersion).OrderBy(v => v).Should().Equal(["1.0.0", "2.0.0"]);
     }
 
     [Fact]
@@ -68,8 +65,7 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0", entryAssembly: "second.dll"));
 
         var workloads = await _store.GetWorkloadsAsync();
-        var installed = Assert.Single(workloads);
-        Assert.Equal("second.dll", installed.EntryPoint!.AssemblyPath);
+        workloads.Should().ContainSingle().Which.EntryPoint!.AssemblyPath.Should().Be("second.dll");
     }
 
     [Fact]
@@ -79,8 +75,7 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(NewEntry("azure.functions.cli.workloads.dotnet", "1.0.0", entryAssembly: "lower.dll"));
 
         var workloads = await _store.GetWorkloadsAsync();
-        var installed = Assert.Single(workloads);
-        Assert.Equal("lower.dll", installed.EntryPoint!.AssemblyPath);
+        workloads.Should().ContainSingle().Which.EntryPoint!.AssemblyPath.Should().Be("lower.dll");
     }
 
     [Fact]
@@ -88,7 +83,7 @@ public class WorkloadStoreTests : IDisposable
     {
         var removed = await _store.RemoveWorkloadAsync("does.not.exist", "1.0.0");
 
-        Assert.False(removed);
+        removed.Should().BeFalse();
     }
 
     [Fact]
@@ -99,10 +94,9 @@ public class WorkloadStoreTests : IDisposable
 
         var removed = await _store.RemoveWorkloadAsync("PKG", "1.0.0");
 
-        Assert.True(removed);
+        removed.Should().BeTrue();
         var workloads = await _store.GetWorkloadsAsync();
-        var installed = Assert.Single(workloads);
-        Assert.Equal("2.0.0", installed.PackageVersion);
+        workloads.Should().ContainSingle().Which.PackageVersion.Should().Be("2.0.0");
     }
 
     [Fact]
@@ -123,11 +117,11 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(entry);
         var actual = (await _store.GetWorkloadsAsync()).Single();
 
-        Assert.Equal(entry.PackageId, actual.PackageId);
-        Assert.Equal(entry.PackageVersion, actual.PackageVersion);
-        Assert.Equal(entry.Aliases, actual.Aliases);
-        Assert.Equal(entry.EntryPoint!.AssemblyPath, actual.EntryPoint!.AssemblyPath);
-        Assert.Equal(entry.EntryPoint.Type, actual.EntryPoint.Type);
+        actual.PackageId.Should().Be(entry.PackageId);
+        actual.PackageVersion.Should().Be(entry.PackageVersion);
+        actual.Aliases.Should().Equal(entry.Aliases);
+        actual.EntryPoint!.AssemblyPath.Should().Be(entry.EntryPoint!.AssemblyPath);
+        actual.EntryPoint.Type.Should().Be(entry.EntryPoint.Type);
     }
 
     [Fact]
@@ -140,15 +134,15 @@ public class WorkloadStoreTests : IDisposable
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(_paths.WorkloadRegistryPath));
         var workloads = doc.RootElement.GetProperty("workloads");
 
-        Assert.Equal(JsonValueKind.Array, workloads.ValueKind);
-        Assert.Equal(3, workloads.GetArrayLength());
+        workloads.ValueKind.Should().Be(JsonValueKind.Array);
+        workloads.GetArrayLength().Should().Be(3);
 
         // Each entry carries its own packageId / packageVersion now that the
         // outer shape is a list rather than a nested dictionary.
         foreach (var element in workloads.EnumerateArray())
         {
-            Assert.True(element.TryGetProperty("packageId", out _));
-            Assert.True(element.TryGetProperty("packageVersion", out _));
+            element.TryGetProperty("packageId", out _).Should().BeTrue();
+            element.TryGetProperty("packageVersion", out _).Should().BeTrue();
         }
     }
 
@@ -158,10 +152,9 @@ public class WorkloadStoreTests : IDisposable
         Directory.CreateDirectory(_tempHome);
         File.WriteAllText(_paths.WorkloadRegistryPath, "{ not valid json");
 
-        var ex = await Assert.ThrowsAsync<GracefulException>(
-            () => _store.SaveWorkloadAsync(NewEntry("a", "1.0.0")));
-        Assert.True(ex.IsUserError);
-        Assert.Contains(_paths.WorkloadRegistryPath, ex.Message);
+        var ex = (await FluentActions.Awaiting(() => _store.SaveWorkloadAsync(NewEntry("a", "1.0.0"))).Should().ThrowAsync<GracefulException>()).Which;
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain(_paths.WorkloadRegistryPath);
     }
 
     [Fact]
@@ -170,7 +163,7 @@ public class WorkloadStoreTests : IDisposable
         await _store.SaveWorkloadAsync(NewEntry("a", "1.0.0"));
 
         var stragglers = Directory.GetFiles(_tempHome, "*.json.tmp");
-        Assert.Empty(stragglers);
+        stragglers.Should().BeEmpty();
     }
 
     [Fact]
@@ -185,11 +178,10 @@ public class WorkloadStoreTests : IDisposable
         // test that actually proves the atomic-rename guarantee.
         var failingStore = new ThrowingSerializeStore(_paths);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => failingStore.SaveWorkloadAsync(NewEntry("would-be-second", "2.0.0")));
+        await FluentActions.Awaiting(() => failingStore.SaveWorkloadAsync(NewEntry("would-be-second", "2.0.0"))).Should().ThrowAsync<InvalidOperationException>();
 
-        Assert.Equal(baselineBytes, File.ReadAllBytes(_paths.WorkloadRegistryPath));
-        Assert.Empty(Directory.GetFiles(_tempHome, "*.json.tmp"));
+        File.ReadAllBytes(_paths.WorkloadRegistryPath).Should().Equal(baselineBytes);
+        Directory.GetFiles(_tempHome, "*.json.tmp").Should().BeEmpty();
     }
 
     private static WorkloadEntry NewEntry(string packageId, string version, string entryAssembly = "x.dll")

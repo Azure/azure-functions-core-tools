@@ -4,7 +4,6 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Telemetry;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Telemetry;
 
@@ -15,8 +14,7 @@ public class CommandNameResolverTests
     {
         var rootCommand = new FuncRootCommand();
 
-        Assert.Throws<ArgumentNullException>(
-            () => CommandNameResolver.ResolveCommandName(null!, rootCommand));
+        FluentActions.Invoking(() => CommandNameResolver.ResolveCommandName(null!, rootCommand)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -25,8 +23,7 @@ public class CommandNameResolverTests
         var rootCommand = new FuncRootCommand();
         ParseResult parseResult = rootCommand.Parse([]);
 
-        Assert.Throws<ArgumentNullException>(
-            () => CommandNameResolver.ResolveCommandName(parseResult, null!));
+        FluentActions.Invoking(() => CommandNameResolver.ResolveCommandName(parseResult, null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -38,7 +35,7 @@ public class CommandNameResolverTests
 
         string name = CommandNameResolver.ResolveCommandName(parseResult, rootCommand);
 
-        Assert.Equal("help", name);
+        name.Should().Be("help");
     }
 
     [Fact]
@@ -50,7 +47,7 @@ public class CommandNameResolverTests
 
         string name = CommandNameResolver.ResolveCommandName(parseResult, rootCommand);
 
-        Assert.Equal("version", name);
+        name.Should().Be("version");
     }
 
     [Fact]
@@ -63,7 +60,7 @@ public class CommandNameResolverTests
 
         string name = CommandNameResolver.ResolveCommandName(parseResult, rootCommand);
 
-        Assert.Equal("init", name);
+        name.Should().Be("init");
     }
 
     [Fact]
@@ -78,7 +75,7 @@ public class CommandNameResolverTests
 
         string name = CommandNameResolver.ResolveCommandName(parseResult, rootCommand);
 
-        Assert.Equal("workload list", name);
+        name.Should().Be("workload list");
     }
 
     [Fact]
@@ -96,7 +93,7 @@ public class CommandNameResolverTests
 
         string name = CommandNameResolver.ResolveCommandName(parseResult, rootCommand);
 
-        Assert.Equal("workload remote add", name);
+        name.Should().Be("workload remote add");
     }
 
     [Fact]
@@ -111,7 +108,7 @@ public class CommandNameResolverTests
 
         string name = CommandNameResolver.ResolveCommandName(parseResult, rootCommand);
 
-        Assert.Equal("init", name);
+        name.Should().Be("init");
     }
 
     [Fact]
@@ -122,10 +119,10 @@ public class CommandNameResolverTests
         var rootCommand = new FuncRootCommand();
         ParseResult parseResult = rootCommand.Parse(["badcommand"]);
 
-        Assert.NotEmpty(parseResult.Errors);
+        parseResult.Errors.Should().NotBeEmpty();
 
         string name = CommandNameResolver.ResolveCommandName(parseResult, rootCommand);
 
-        Assert.Equal("unknown", name);
+        name.Should().Be("unknown");
     }
 }

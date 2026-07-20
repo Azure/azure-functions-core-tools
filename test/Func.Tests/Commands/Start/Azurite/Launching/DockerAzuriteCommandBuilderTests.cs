@@ -1,9 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite.Launching;
 
@@ -24,7 +22,7 @@ public class DockerAzuriteCommandBuilderTests
 
         var (fileName, args) = DockerAzuriteCommandBuilder.Build(request);
 
-        Assert.Equal("docker", fileName);
+        fileName.Should().Be("docker");
 
         string expectedLogDir = Path.GetDirectoryName("/var/log/azurite/azurite.log")!;
         string[] expected =
@@ -52,7 +50,7 @@ public class DockerAzuriteCommandBuilderTests
             "--debug", "/logs/azurite.log",
         ];
 
-        Assert.Equal(expected, args);
+        args.Should().Equal(expected);
     }
 
     [Fact]
@@ -70,9 +68,9 @@ public class DockerAzuriteCommandBuilderTests
 
         var (_, args) = DockerAzuriteCommandBuilder.Build(request);
 
-        Assert.Contains("127.0.0.1:21000:10000", args);
-        Assert.Contains("127.0.0.1:21001:10001", args);
-        Assert.Contains("127.0.0.1:21002:10002", args);
+        args.Should().Contain("127.0.0.1:21000:10000");
+        args.Should().Contain("127.0.0.1:21001:10001");
+        args.Should().Contain("127.0.0.1:21002:10002");
     }
 
     [Fact]
@@ -93,8 +91,8 @@ public class DockerAzuriteCommandBuilderTests
 
         var (_, args) = DockerAzuriteCommandBuilder.Build(request);
 
-        Assert.Contains($"{logDir}:/logs", args);
-        Assert.DoesNotContain(logPath + ":/logs", args);
+        args.Should().Contain($"{logDir}:/logs");
+        args.Should().NotContain(logPath + ":/logs");
     }
 
     [Fact]
@@ -112,8 +110,8 @@ public class DockerAzuriteCommandBuilderTests
 
         var (_, args) = DockerAzuriteCommandBuilder.Build(request);
 
-        Assert.Contains(AzuriteDockerImage.Default, args);
-        Assert.Equal("mcr.microsoft.com/azure-storage/azurite:3.35.0", AzuriteDockerImage.Default);
+        args.Should().Contain(AzuriteDockerImage.Default);
+        AzuriteDockerImage.Default.Should().Be("mcr.microsoft.com/azure-storage/azurite:3.35.0");
     }
 
     [Fact]
@@ -131,7 +129,7 @@ public class DockerAzuriteCommandBuilderTests
 
         var (fileName, _) = DockerAzuriteCommandBuilder.Build(request, dockerCommand: "/usr/local/bin/podman");
 
-        Assert.Equal("/usr/local/bin/podman", fileName);
+        fileName.Should().Be("/usr/local/bin/podman");
     }
 
     [Fact]
@@ -146,6 +144,6 @@ public class DockerAzuriteCommandBuilderTests
             logPath: "/d/azurite.log",
             executablePath: "/azurite");
 
-        Assert.Throws<ArgumentException>(() => DockerAzuriteCommandBuilder.Build(request));
+        FluentActions.Invoking(() => DockerAzuriteCommandBuilder.Build(request)).Should().ThrowExactly<ArgumentException>();
     }
 }

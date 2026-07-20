@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Profiles;
 
@@ -23,9 +22,9 @@ public class UserProfileSourceTests
 
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
 
-        Assert.Equal(ProfileSourceKind.User, snapshot.Source.Kind);
-        Assert.Equal("~/.azure-functions/profiles.json", snapshot.Source.DisplayName);
-        Assert.Equal(expectedPath, snapshot.Source.Path);
+        snapshot.Source.Kind.Should().Be(ProfileSourceKind.User);
+        snapshot.Source.DisplayName.Should().Be("~/.azure-functions/profiles.json");
+        snapshot.Source.Path.Should().Be(expectedPath);
         await fileSystem.Received(1).ReadAllTextIfExistsAsync(expectedPath, CancellationToken.None);
     }
 }

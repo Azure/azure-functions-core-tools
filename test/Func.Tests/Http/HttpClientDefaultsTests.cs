@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Http;
 
@@ -30,9 +29,9 @@ public sealed class HttpClientDefaultsTests
 
         await client.GetAsync("https://example.com");
 
-        Assert.NotNull(capturedUserAgent);
-        Assert.StartsWith("AzureFunctionsCli/", capturedUserAgent);
-        Assert.Contains("(", capturedUserAgent);
+        capturedUserAgent.Should().NotBeNull();
+        capturedUserAgent.Should().StartWith("AzureFunctionsCli/");
+        capturedUserAgent.Should().Contain("(");
     }
 
     [Fact]
@@ -56,8 +55,8 @@ public sealed class HttpClientDefaultsTests
 
         await client.GetAsync("https://example.com");
 
-        Assert.NotNull(capturedUserAgent);
-        Assert.StartsWith("AzureFunctionsCli/", capturedUserAgent);
+        capturedUserAgent.Should().NotBeNull();
+        capturedUserAgent.Should().StartWith("AzureFunctionsCli/");
     }
 
     [Fact]
@@ -81,9 +80,9 @@ public sealed class HttpClientDefaultsTests
 
         await client.GetAsync("https://example.com");
 
-        Assert.NotNull(capturedUserAgent);
+        capturedUserAgent.Should().NotBeNull();
         // Format: AzureFunctionsCli/{version} ({os})
-        Assert.Matches(@"^AzureFunctionsCli/\S+ \(.+\)$", capturedUserAgent);
+        capturedUserAgent.Should().MatchRegex(@"^AzureFunctionsCli/\S+ \(.+\)$");
     }
 
     private sealed class CapturingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)

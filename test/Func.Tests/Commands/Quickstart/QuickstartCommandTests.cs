@@ -1,11 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Quickstart;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Quickstart;
 
@@ -30,14 +28,14 @@ public class QuickstartCommandTests
 
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
-        Assert.Contains("--stack", optionNames);
-        Assert.Contains("--language", optionNames);
-        Assert.Contains("--template", optionNames);
-        Assert.Contains("--resource", optionNames);
-        Assert.Contains("--iac", optionNames);
-        Assert.Contains("--search", optionNames);
-        Assert.Contains("--fetch", optionNames);
-        Assert.Contains("--force", optionNames);
+        optionNames.Should().Contain("--stack");
+        optionNames.Should().Contain("--language");
+        optionNames.Should().Contain("--template");
+        optionNames.Should().Contain("--resource");
+        optionNames.Should().Contain("--iac");
+        optionNames.Should().Contain("--search");
+        optionNames.Should().Contain("--fetch");
+        optionNames.Should().Contain("--force");
     }
 
     [Fact]
@@ -46,8 +44,8 @@ public class QuickstartCommandTests
         QuickstartCommand cmd = CreateCommand();
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        Assert.Contains("Set up a stack", description);
-        Assert.Contains("func setup --features", description);
+        description.Should().Contain("Set up a stack");
+        description.Should().Contain("func setup --features");
     }
 
     [Fact]
@@ -59,7 +57,7 @@ public class QuickstartCommandTests
             QuickstartTestHelpers.CreateProvider(stack: "node"));
         string description = cmd.StackOption.Description ?? string.Empty;
 
-        Assert.Contains("Supported values: dotnet, node, python.", description);
+        description.Should().Contain("Supported values: dotnet, node, python.");
     }
 
     [Fact]
@@ -67,7 +65,7 @@ public class QuickstartCommandTests
     {
         QuickstartCommand cmd = CreateCommand();
 
-        Assert.Contains("func workload search --stack", cmd.GetHelpFooterHint() ?? string.Empty);
+        (cmd.GetHelpFooterHint() ?? string.Empty).Should().Contain("func workload search --stack");
     }
 
     [Fact]
@@ -77,8 +75,8 @@ public class QuickstartCommandTests
 
         var subcommandNames = cmd.Subcommands.Select(c => c.Name).ToList();
 
-        Assert.Contains("list", subcommandNames);
-        Assert.Contains("info", subcommandNames);
+        subcommandNames.Should().Contain("list");
+        subcommandNames.Should().Contain("info");
     }
 
     [Fact]
@@ -86,8 +84,8 @@ public class QuickstartCommandTests
     {
         QuickstartCommand cmd = CreateCommand();
 
-        Assert.Single(cmd.Arguments);
-        Assert.Equal("path", cmd.Arguments[0].Name);
+        cmd.Arguments.Should().ContainSingle();
+        cmd.Arguments[0].Name.Should().Be("path");
     }
 
     [Fact]
@@ -96,6 +94,6 @@ public class QuickstartCommandTests
         var root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
-        Assert.Contains("quickstart", names);
+        names.Should().Contain("quickstart");
     }
 }

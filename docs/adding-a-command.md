@@ -152,7 +152,6 @@ Create a test file in `test/Func.Tests/Commands/`:
 // test/Func.Tests/Commands/DeployCommandTests.cs
 
 using Azure.Functions.Cli.Commands;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 

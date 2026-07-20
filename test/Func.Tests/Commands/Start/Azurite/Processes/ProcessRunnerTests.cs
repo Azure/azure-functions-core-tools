@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite.Processes;
 
@@ -31,10 +30,10 @@ public class ProcessRunnerTests
             new ProcessRunRequest(fileName, args, WorkingDirectory: null, _defaultTimeout),
             CancellationToken.None);
 
-        Assert.False(outcome.ExecutableNotFound);
-        Assert.False(outcome.TimedOut);
-        Assert.Equal(0, outcome.ExitCode);
-        Assert.Contains("hello", outcome.StandardOutput);
+        outcome.ExecutableNotFound.Should().BeFalse();
+        outcome.TimedOut.Should().BeFalse();
+        outcome.ExitCode.Should().Be(0);
+        outcome.StandardOutput.Should().Contain("hello");
     }
 
     [Fact]
@@ -46,9 +45,9 @@ public class ProcessRunnerTests
             new ProcessRunRequest(fileName, args, WorkingDirectory: null, _defaultTimeout),
             CancellationToken.None);
 
-        Assert.Equal(7, outcome.ExitCode);
-        Assert.False(outcome.TimedOut);
-        Assert.False(outcome.ExecutableNotFound);
+        outcome.ExitCode.Should().Be(7);
+        outcome.TimedOut.Should().BeFalse();
+        outcome.ExecutableNotFound.Should().BeFalse();
     }
 
     [Fact]
@@ -62,8 +61,8 @@ public class ProcessRunnerTests
                 Timeout: _defaultTimeout),
             CancellationToken.None);
 
-        Assert.True(outcome.ExecutableNotFound);
-        Assert.Null(outcome.ExitCode);
+        outcome.ExecutableNotFound.Should().BeTrue();
+        outcome.ExitCode.Should().BeNull();
     }
 
     [Fact]
@@ -77,7 +76,7 @@ public class ProcessRunnerTests
             new ProcessRunRequest(fileName, args, WorkingDirectory: null, Timeout: TimeSpan.FromMilliseconds(250)),
             CancellationToken.None);
 
-        Assert.True(outcome.TimedOut);
-        Assert.Null(outcome.ExitCode);
+        outcome.TimedOut.Should().BeTrue();
+        outcome.ExitCode.Should().BeNull();
     }
 }

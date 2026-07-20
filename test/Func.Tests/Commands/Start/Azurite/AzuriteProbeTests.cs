@@ -2,13 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite;
 
@@ -61,8 +58,7 @@ public class AzuriteProbeTests : IAsyncLifetime
             handler = inner;
         }
 
-        var sockets = Assert.IsType<SocketsHttpHandler>(handler);
-        Assert.False(sockets.UseProxy);
+        handler.Should().BeOfType<SocketsHttpHandler>().Which.UseProxy.Should().BeFalse();
     }
 
     [Fact]
@@ -92,10 +88,10 @@ public class AzuriteProbeTests : IAsyncLifetime
 
         var result = await probe.ProbeAsync(endpoints, CancellationToken.None);
 
-        Assert.Equal(AzuriteProbeStatus.Ready, result.Status);
-        Assert.All(result.Endpoints, o =>
-            Assert.Equal(AzuriteEndpointStatus.Ready, o.Status));
-        Assert.Contains(result.Endpoints, o => o.RequestId == "abc-123");
+        result.Status.Should().Be(AzuriteProbeStatus.Ready);
+        result.Endpoints.Should().AllSatisfy(o =>
+            o.Status.Should().Be(AzuriteEndpointStatus.Ready));
+        result.Endpoints.Should().Contain(o => o.RequestId == "abc-123");
     }
 
     [Fact]
@@ -110,8 +106,8 @@ public class AzuriteProbeTests : IAsyncLifetime
 
         var outcome = await ProbeSingleAsync(uri);
 
-        Assert.Equal(AzuriteEndpointStatus.Ready, outcome.Status);
-        Assert.Equal("AuthenticationFailed", outcome.ErrorCode);
+        outcome.Status.Should().Be(AzuriteEndpointStatus.Ready);
+        outcome.ErrorCode.Should().Be("AuthenticationFailed");
     }
 
     [Fact]
@@ -128,7 +124,7 @@ public class AzuriteProbeTests : IAsyncLifetime
 
         var outcome = await ProbeSingleAsync(uri);
 
-        Assert.Equal(AzuriteEndpointStatus.Ready, outcome.Status);
+        outcome.Status.Should().Be(AzuriteEndpointStatus.Ready);
     }
 
     [Fact]
@@ -146,9 +142,9 @@ public class AzuriteProbeTests : IAsyncLifetime
 
         var result = await probe.ProbeAsync(endpoints, CancellationToken.None);
 
-        Assert.Equal(AzuriteProbeStatus.PortConflict, result.Status);
-        Assert.All(result.Endpoints, o =>
-            Assert.Equal(AzuriteEndpointStatus.PortConflict, o.Status));
+        result.Status.Should().Be(AzuriteProbeStatus.PortConflict);
+        result.Endpoints.Should().AllSatisfy(o =>
+            o.Status.Should().Be(AzuriteEndpointStatus.PortConflict));
     }
 
     [Fact]
@@ -164,9 +160,9 @@ public class AzuriteProbeTests : IAsyncLifetime
 
         var result = await probe.ProbeAsync(endpoints, CancellationToken.None);
 
-        Assert.Equal(AzuriteProbeStatus.NotListening, result.Status);
-        Assert.All(result.Endpoints, o =>
-            Assert.Equal(AzuriteEndpointStatus.NotListening, o.Status));
+        result.Status.Should().Be(AzuriteProbeStatus.NotListening);
+        result.Endpoints.Should().AllSatisfy(o =>
+            o.Status.Should().Be(AzuriteEndpointStatus.NotListening));
     }
 
     [Fact]
@@ -192,12 +188,12 @@ public class AzuriteProbeTests : IAsyncLifetime
 
         var result = await probe.ProbeAsync(endpoints, CancellationToken.None);
 
-        Assert.Equal(AzuriteProbeStatus.Partial, result.Status);
+        result.Status.Should().Be(AzuriteProbeStatus.Partial);
 
         var byService = result.Endpoints.ToDictionary(o => o.Service);
-        Assert.Equal(AzuriteEndpointStatus.Ready, byService[AzuriteService.Blob].Status);
-        Assert.Equal(AzuriteEndpointStatus.Ready, byService[AzuriteService.Queue].Status);
-        Assert.Equal(AzuriteEndpointStatus.NotListening, byService[AzuriteService.Table].Status);
+        byService[AzuriteService.Blob].Status.Should().Be(AzuriteEndpointStatus.Ready);
+        byService[AzuriteService.Queue].Status.Should().Be(AzuriteEndpointStatus.Ready);
+        byService[AzuriteService.Table].Status.Should().Be(AzuriteEndpointStatus.NotListening);
     }
 
     [Fact]
@@ -216,12 +212,12 @@ public class AzuriteProbeTests : IAsyncLifetime
 
         var result = await probe.ProbeAsync(endpoints, CancellationToken.None);
 
-        Assert.Equal(AzuriteProbeStatus.Partial, result.Status);
+        result.Status.Should().Be(AzuriteProbeStatus.Partial);
 
         var byService = result.Endpoints.ToDictionary(o => o.Service);
-        Assert.Equal(AzuriteEndpointStatus.NotListening, byService[AzuriteService.Blob].Status);
-        Assert.Equal(AzuriteEndpointStatus.PortConflict, byService[AzuriteService.Queue].Status);
-        Assert.Equal(AzuriteEndpointStatus.PortConflict, byService[AzuriteService.Table].Status);
+        byService[AzuriteService.Blob].Status.Should().Be(AzuriteEndpointStatus.NotListening);
+        byService[AzuriteService.Queue].Status.Should().Be(AzuriteEndpointStatus.PortConflict);
+        byService[AzuriteService.Table].Status.Should().Be(AzuriteEndpointStatus.PortConflict);
     }
 
     [Fact]
@@ -237,8 +233,7 @@ public class AzuriteProbeTests : IAsyncLifetime
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => probe.ProbeAsync(endpoints, cts.Token));
+        await FluentActions.Awaiting(() => probe.ProbeAsync(endpoints, cts.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 
     private async Task<AzuriteEndpointProbeOutcome> ProbeSingleAsync(Uri uri)

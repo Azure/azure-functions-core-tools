@@ -2,15 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.CommandLine.Invocation;
-using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
 
@@ -39,16 +35,16 @@ public sealed class SetupCommandTests : IDisposable
         var cmd = new SetupCommand(Substitute.For<ISetupRunner>(), Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions()));
         IReadOnlyList<string> optionNames = cmd.Options.Select(o => o.Name).ToArray();
 
-        Assert.Contains("--features", optionNames);
-        Assert.Contains("--profile", optionNames);
-        Assert.Contains("--profiles", optionNames);
-        Assert.Contains("--install-policy", optionNames);
-        Assert.Contains("--source", optionNames);
-        Assert.Contains("--prerelease", optionNames);
-        Assert.Contains("--non-interactive", optionNames);
-        Assert.Contains("--yes", optionNames);
-        Assert.Contains("--check", optionNames);
-        Assert.Contains("--output", optionNames);
+        optionNames.Should().Contain("--features");
+        optionNames.Should().Contain("--profile");
+        optionNames.Should().Contain("--profiles");
+        optionNames.Should().Contain("--install-policy");
+        optionNames.Should().Contain("--source");
+        optionNames.Should().Contain("--prerelease");
+        optionNames.Should().Contain("--non-interactive");
+        optionNames.Should().Contain("--yes");
+        optionNames.Should().Contain("--check");
+        optionNames.Should().Contain("--output");
     }
 
     [Fact]
@@ -57,8 +53,8 @@ public sealed class SetupCommandTests : IDisposable
         var cmd = new SetupCommand(Substitute.For<ISetupRunner>(), Microsoft.Extensions.Options.Options.Create(new Azure.Functions.Cli.Workloads.Catalog.WorkloadCatalogOptions()));
         string description = cmd.FeaturesOption.Description ?? string.Empty;
 
-        Assert.Contains("dotnet", description);
-        Assert.DoesNotContain("dotnet-isolated", description);
+        description.Should().Contain("dotnet");
+        description.Should().NotContain("dotnet-isolated");
     }
 
     [Fact]
@@ -66,7 +62,7 @@ public sealed class SetupCommandTests : IDisposable
     {
         var root = TestParser.CreateRoot(_interaction);
 
-        Assert.Contains(root.Subcommands, command => command.Name == "setup");
+        root.Subcommands.Should().Contain(command => command.Name == "setup");
     }
 
     [Fact]
@@ -87,7 +83,7 @@ public sealed class SetupCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(0, exitCode);
+        exitCode.Should().Be(0);
         await setupRunner.Received(1).RunAsync(
             Arg.Is<SetupCommandOptions>(options =>
                 options.WorkingDirectory.FullName == new DirectoryInfo(_tempDir).FullName
@@ -109,10 +105,9 @@ public sealed class SetupCommandTests : IDisposable
         var root = TestParser.CreateRoot(_interaction);
         ParseResult result = root.Parse($"setup \"{_tempDir}\" --install-policy always");
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }));
+        GracefulException ex = (await FluentActions.Awaiting(() => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false })).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("--install-policy", ex.Message);
-        Assert.Contains("always", ex.Message);
+        ex.Message.Should().Contain("--install-policy");
+        ex.Message.Should().Contain("always");
     }
 }

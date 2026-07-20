@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Loading;
 
@@ -28,7 +27,7 @@ public class WorkloadLoaderTests
 
         var loaded = loader.Load([]);
 
-        Assert.Empty(loaded);
+        loaded.Should().BeEmpty();
     }
 
     [Fact]
@@ -38,9 +37,9 @@ public class WorkloadLoaderTests
 
         var loaded = loader.Load([FixtureEntry(FixturePackageId)]);
 
-        var item = Assert.Single(loaded);
-        Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
-        Assert.Equal(FixturePackageId, item.PackageId);
+        var item = loaded.Should().ContainSingle().Subject;
+        item.Instance.GetType().FullName.Should().Be(FixtureTypeName);
+        item.PackageId.Should().Be(FixturePackageId);
     }
 
     [Fact]
@@ -49,11 +48,11 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "DoesNotExist.dll");
 
-        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
+        var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
-        Assert.Contains("DoesNotExist.dll", ex.Message);
-        Assert.Contains(AppContext.BaseDirectory, ex.Message);
+        ex.Message.Should().StartWith($"[{FixturePackageId}]");
+        ex.Message.Should().Contain("DoesNotExist.dll");
+        ex.Message.Should().Contain(AppContext.BaseDirectory);
     }
 
     [Fact]
@@ -62,11 +61,11 @@ public class WorkloadLoaderTests
         var loader = new WorkloadLoader(StubPaths());
         var entry = FixtureEntry(FixturePackageId, typeNameOverride: "Some.Missing.Type");
 
-        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
+        var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
-        Assert.Contains("Some.Missing.Type", ex.Message);
-        Assert.Contains(AppContext.BaseDirectory, ex.Message);
+        ex.Message.Should().StartWith($"[{FixturePackageId}]");
+        ex.Message.Should().Contain("Some.Missing.Type");
+        ex.Message.Should().Contain(AppContext.BaseDirectory);
     }
 
     [Fact]
@@ -77,12 +76,12 @@ public class WorkloadLoaderTests
             FixturePackageId,
             typeNameOverride: "Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.NotAWorkload");
 
-        var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
+        var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-        Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
-        Assert.Contains("NotAWorkload", ex.Message);
-        Assert.Contains(nameof(Workload), ex.Message);
-        Assert.Contains(AppContext.BaseDirectory, ex.Message);
+        ex.Message.Should().StartWith($"[{FixturePackageId}]");
+        ex.Message.Should().Contain("NotAWorkload");
+        ex.Message.Should().Contain(nameof(Workload));
+        ex.Message.Should().Contain(AppContext.BaseDirectory);
     }
 
     [Fact]
@@ -97,13 +96,13 @@ public class WorkloadLoaderTests
 
         var loaded = loader.Load(entries);
 
-        Assert.Equal(2, loaded.Count);
+        loaded.Count.Should().Be(2);
         var ctxA = AssemblyLoadContext.GetLoadContext(loaded[0].Instance.GetType().Assembly);
         var ctxB = AssemblyLoadContext.GetLoadContext(loaded[1].Instance.GetType().Assembly);
-        Assert.NotNull(ctxA);
-        Assert.NotNull(ctxB);
-        Assert.NotSame(ctxA, ctxB);
-        Assert.NotSame(AssemblyLoadContext.Default, ctxA);
+        ctxA.Should().NotBeNull();
+        ctxB.Should().NotBeNull();
+        ctxB.Should().NotBeSameAs(ctxA);
+        ctxA.Should().NotBeSameAs(AssemblyLoadContext.Default);
     }
 
     [Fact]
@@ -114,10 +113,8 @@ public class WorkloadLoaderTests
         var loaded = loader.Load([FixtureEntry("collectible-fixture")]);
 
         var ctx = AssemblyLoadContext.GetLoadContext(loaded[0].Instance.GetType().Assembly);
-        Assert.NotNull(ctx);
-        Assert.True(
-            ctx!.IsCollectible,
-            "WorkloadLoadContext must be collectible so a single CLI invocation can release the workload's DLL handle.");
+        ctx.Should().NotBeNull();
+        ctx!.IsCollectible.Should().BeTrue("WorkloadLoadContext must be collectible so a single CLI invocation can release the workload's DLL handle.");
     }
 
     [Fact]
@@ -133,9 +130,9 @@ public class WorkloadLoaderTests
         // have failed; this test pins that contract.
         var hostWorkload = typeof(Workload);
         var workloadBase = loaded[0].Instance.GetType().BaseType;
-        Assert.NotNull(workloadBase);
-        Assert.Same(hostWorkload, workloadBase);
-        Assert.Same(hostWorkload.Assembly, workloadBase!.Assembly);
+        workloadBase.Should().NotBeNull();
+        workloadBase.Should().BeSameAs(hostWorkload);
+        workloadBase!.Assembly.Should().BeSameAs(hostWorkload.Assembly);
     }
 
     [Fact]
@@ -154,14 +151,14 @@ public class WorkloadLoaderTests
 
         var loaded = loader.Load([SdkFixtureEntry(SdkFixturePackageId)]);
 
-        var item = Assert.Single(loaded);
-        Assert.Equal(SdkFixtureTypeName, item.Instance.GetType().FullName);
+        var item = loaded.Should().ContainSingle().Subject;
+        item.Instance.GetType().FullName.Should().Be(SdkFixtureTypeName);
 
         var hostWorkload = typeof(Workload);
         var workloadBase = item.Instance.GetType().BaseType;
-        Assert.NotNull(workloadBase);
-        Assert.Same(hostWorkload, workloadBase);
-        Assert.Same(hostWorkload.Assembly, workloadBase!.Assembly);
+        workloadBase.Should().NotBeNull();
+        workloadBase.Should().BeSameAs(hostWorkload);
+        workloadBase!.Assembly.Should().BeSameAs(hostWorkload.Assembly);
     }
 
     [Fact]
@@ -182,13 +179,13 @@ public class WorkloadLoaderTests
         var resolved = resolver.ResolveAssemblyToPath(
             new System.Reflection.AssemblyName("Azure.Functions.Cli.Abstractions"));
 
-        Assert.Null(resolved);
+        resolved.Should().BeNull();
     }
 
     [Fact]
     public void Ctor_NullPaths_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new WorkloadLoader(null!));
+        FluentActions.Invoking(() => new WorkloadLoader(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -211,9 +208,9 @@ public class WorkloadLoaderTests
 
             var loaded = loader.Load([entry]);
 
-            var item = Assert.Single(loaded);
-            Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
-            Assert.Equal(tempDir, item.ContentRoot);
+            var item = loaded.Should().ContainSingle().Subject;
+            item.Instance.GetType().FullName.Should().Be(FixtureTypeName);
+            item.ContentRoot.Should().Be(tempDir);
             UnloadAndRelease(item.LoadContext);
         }
         finally
@@ -243,9 +240,9 @@ public class WorkloadLoaderTests
 
             var loaded = loader.Load([entry]);
 
-            var item = Assert.Single(loaded);
-            Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
-            Assert.Equal(subDir, item.ContentRoot);
+            var item = loaded.Should().ContainSingle().Subject;
+            item.Instance.GetType().FullName.Should().Be(FixtureTypeName);
+            item.ContentRoot.Should().Be(subDir);
             UnloadAndRelease(item.LoadContext);
         }
         finally
@@ -276,10 +273,10 @@ public class WorkloadLoaderTests
 
             var loaded = loader.Load([entry]);
 
-            var item = Assert.Single(loaded);
-            Assert.Equal(FixtureTypeName, item.Instance.GetType().FullName);
+            var item = loaded.Should().ContainSingle().Subject;
+            item.Instance.GetType().FullName.Should().Be(FixtureTypeName);
             // ContentRoot is the directory of the resolved assembly — should be the install root.
-            Assert.Equal(tempDir, item.ContentRoot);
+            item.ContentRoot.Should().Be(tempDir);
             UnloadAndRelease(item.LoadContext);
         }
         finally
@@ -309,10 +306,10 @@ public class WorkloadLoaderTests
             var loader = new WorkloadLoader(paths);
             var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: $"../{FixtureAssemblyFile}");
 
-            var ex = Assert.Throws<InvalidWorkloadException>(() => loader.Load([entry]));
+            var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
-            Assert.StartsWith($"[{FixturePackageId}]", ex.Message);
-            Assert.Contains("outside the install directory", ex.Message);
+            ex.Message.Should().StartWith($"[{FixturePackageId}]");
+            ex.Message.Should().Contain("outside the install directory");
         }
         finally
         {

@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.V2;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates.V2;
 
@@ -37,7 +36,7 @@ public class V2EngineProviderTests : IDisposable
             new TemplateListContext(new Cli.Common.WorkingDirectory(new DirectoryInfo(_workloadHome), false), "node", "javascript"),
             CancellationToken.None);
 
-        Assert.Empty(templates);
+        templates.Should().BeEmpty();
     }
 
     [Fact]
@@ -54,12 +53,12 @@ public class V2EngineProviderTests : IDisposable
             new TemplateListContext(new Cli.Common.WorkingDirectory(new DirectoryInfo(_workloadHome), false), "node", null),
             CancellationToken.None);
 
-        var http = Assert.Single(templates);
-        Assert.Equal("HttpTrigger-JavaScript", http.Id);
-        Assert.Equal(EngineIds.V2, http.EngineId);
-        Assert.Equal("node", http.Stack);
-        Assert.Equal("HTTP trigger", http.DisplayName);
-        Assert.Equal("HttpTrigger", http.DefaultFunctionName);
+        var http = templates.Should().ContainSingle().Subject;
+        http.Id.Should().Be("HttpTrigger-JavaScript");
+        http.EngineId.Should().Be(EngineIds.V2);
+        http.Stack.Should().Be("node");
+        http.DisplayName.Should().Be("HTTP trigger");
+        http.DefaultFunctionName.Should().Be("HttpTrigger");
     }
 
     [Fact]
@@ -77,7 +76,7 @@ public class V2EngineProviderTests : IDisposable
             CancellationToken.None);
 
         // The fixture template has language="javascript"; "typescript" filter drops it.
-        Assert.Empty(typescriptOnly);
+        typescriptOnly.Should().BeEmpty();
     }
 
     [Fact]
@@ -96,8 +95,8 @@ public class V2EngineProviderTests : IDisposable
 
         // BlobTrigger-TypeScript and DurableFunctionsOrchestrator-JavaScript
         // are on the hidden list; only the HTTP trigger should remain.
-        Assert.Single(templates);
-        Assert.Equal("HttpTrigger-JavaScript", templates[0].Id);
+        templates.Should().ContainSingle();
+        templates[0].Id.Should().Be("HttpTrigger-JavaScript");
     }
 
     private static void WriteFixturePayload(string installDir)
