@@ -14,7 +14,12 @@ namespace Azure.Functions.Cli.Common
                 IsSelfHost = true,
                 ScriptPath = scriptPath,
                 LogPath = Path.Combine(Path.GetTempPath(), "LogFiles", "Application", "Functions"),
-                SecretsPath = Path.Combine(Path.GetTempPath(), "secrets", "functions", "secrets")
+                SecretsPath = Path.Combine(Path.GetTempPath(), "secrets", "functions", "secrets"),
+
+                // host.json is optional. When the project has no host.json, run the host with a
+                // read-only file system so it does not synthesize and write a default host.json
+                // to the user's project directory (it uses an in-memory default config instead).
+                IsFileSystemReadOnly = !File.Exists(Path.Combine(scriptPath, ScriptConstants.HostMetadataFileName))
             };
         }
     }

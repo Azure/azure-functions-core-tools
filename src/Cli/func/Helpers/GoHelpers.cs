@@ -295,11 +295,15 @@ namespace Azure.Functions.Cli.Helpers
         internal static IEnumerable<string> GetPackFiles(string functionAppRoot)
         {
             functionAppRoot ??= Environment.CurrentDirectory;
-            return new[]
+
+            // host.json is optional; only include it in the allowlist when it exists.
+            var hostJsonPath = Path.Combine(functionAppRoot, Constants.HostJsonFileName);
+            if (FileSystemHelpers.FileExists(hostJsonPath))
             {
-                Path.Combine(functionAppRoot, Constants.HostJsonFileName),
-                Path.Combine(functionAppRoot, GoBinDir, GoBinaryName),
-            };
+                yield return hostJsonPath;
+            }
+
+            yield return Path.Combine(functionAppRoot, GoBinDir, GoBinaryName);
         }
 
         /// <summary>

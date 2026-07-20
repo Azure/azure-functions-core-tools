@@ -68,12 +68,14 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
         }
 
         [Fact]
-        public void ValidateCustomHandlerFunctionApp_MissingHostJson_Throws()
+        public void ValidateCustomHandlerFunctionApp_MissingHostJson_DoesNotThrow()
         {
+            // host.json is optional. When it is absent, pack should surface a non-blocking
+            // warning and skip custom handler validation rather than failing.
             var action = new CustomPackSubcommandAction();
             var options = new PackOptions();
-            var ex = Assert.Throws<CliException>(() => action.ValidateFunctionApp(_tempDirectory, options));
-            Assert.Contains("host.json", ex.Message);
+            var ex = Record.Exception(() => action.ValidateFunctionApp(_tempDirectory, options));
+            Assert.Null(ex);
         }
     }
 }

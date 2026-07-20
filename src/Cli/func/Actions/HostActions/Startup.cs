@@ -94,6 +94,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 o.LogPath = _hostOptions.LogPath;
                 o.IsSelfHost = _hostOptions.IsSelfHost;
                 o.SecretsPath = _hostOptions.SecretsPath;
+
+                // Only force read-only (never clear it), so a real read-only deployment
+                // detected by the host is preserved. This prevents the host from writing a
+                // default host.json to the project when the project doesn't have one.
+                if (_hostOptions.IsFileSystemReadOnly)
+                {
+                    o.IsFileSystemReadOnly = true;
+                }
             });
 
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));

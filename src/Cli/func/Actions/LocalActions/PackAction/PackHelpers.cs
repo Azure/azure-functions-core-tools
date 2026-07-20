@@ -41,9 +41,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         public static void ValidateFunctionAppRoot(string functionAppRoot)
         {
+            // host.json is optional and Core Tools no longer adds one, so its absence is not a
+            // hard error. The package is built from whatever the project contains.
             if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, ScriptConstants.HostMetadataFileName)))
             {
-                throw new CliException($"Can't find {Path.Combine(functionAppRoot, ScriptConstants.HostMetadataFileName)}");
+                ColoredConsole.WriteLine(WarningColor($"No {ScriptConstants.HostMetadataFileName} found in {functionAppRoot}. The package will be created without one."));
             }
         }
 

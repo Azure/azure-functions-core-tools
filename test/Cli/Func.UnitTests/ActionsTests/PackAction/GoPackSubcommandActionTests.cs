@@ -39,15 +39,15 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
         }
 
         [Fact]
-        public void ValidateFunctionApp_MissingHostJson_ThrowsCliException()
+        public void ValidateFunctionApp_MissingHostJson_DoesNotThrow()
         {
+            // host.json is optional. Go pack should still validate on go.mod alone.
             File.WriteAllText(Path.Combine(_tempDirectory, "go.mod"), "module example.com/test\n\ngo 1.24\n");
 
             var action = new GoPackSubcommandAction();
             var validate = () => action.ValidateFunctionApp(_tempDirectory, new PackOptions());
 
-            validate.Should().Throw<CliException>()
-                .Which.Message.Should().Contain("host.json");
+            validate.Should().NotThrow();
         }
 
         [Fact]
