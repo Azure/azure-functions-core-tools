@@ -179,7 +179,7 @@ namespace Azure.Functions.Cli.Arm
             return AuthorizationHeaderRegex().Replace(requestString, "[REDACTED]");
         }
 
-        [System.Text.RegularExpressions.GeneratedRegex(@"(?<=\bAuthorization:\s)[^\r\n]+", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
-        private static partial System.Text.RegularExpressions.Regex AuthorizationHeaderRegex();
+        [GeneratedRegex(@"(?<=\bAuthorization:\s)[^\r\n]+", RegexOptions.IgnoreCase)]
+        private static partial Regex AuthorizationHeaderRegex();
     }
 }

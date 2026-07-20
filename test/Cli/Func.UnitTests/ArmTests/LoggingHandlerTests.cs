@@ -50,6 +50,7 @@ namespace Azure.Functions.Cli.UnitTests.ArmTests
 
             var result = LoggingHandler.GetRedactedRequestString(input);
 
+            result.Should().Contain("[REDACTED]");
             result.Should().NotContain("my-secret-token");
         }
     }
