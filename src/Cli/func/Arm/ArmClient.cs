@@ -3,6 +3,7 @@
 
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Newtonsoft.Json;
@@ -137,7 +138,7 @@ namespace Azure.Functions.Cli.Arm
     }
 
     // https://stackoverflow.com/a/18925296
-    public class LoggingHandler : DelegatingHandler
+    public partial class LoggingHandler : DelegatingHandler
     {
         public LoggingHandler(HttpMessageHandler innerHandler)
             : base(innerHandler)
@@ -147,7 +148,7 @@ namespace Azure.Functions.Cli.Arm
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             ColoredConsole.WriteLine(DarkGray("Request:"));
-            ColoredConsole.WriteLine(DarkGray(request.ToString()));
+            ColoredConsole.WriteLine(DarkGray(GetRedactedRequestString(request.ToString())));
             if (request.Content != null)
             {
                 ColoredConsole.WriteLine(DarkGray(await request.Content.ReadAsStringAsync()));
@@ -168,5 +169,17 @@ namespace Azure.Functions.Cli.Arm
 
             return response;
         }
+
+        /// <summary>
+        /// Replaces the <c>Authorization</c> header value in a pre-serialized HTTP request string
+        /// with <c>[REDACTED]</c> to prevent Bearer tokens from appearing in debug output.
+        /// </summary>
+        internal static string GetRedactedRequestString(string requestString)
+        {
+            return AuthorizationHeaderRegex().Replace(requestString, "[REDACTED]");
+        }
+
+        [System.Text.RegularExpressions.GeneratedRegex(@"(?<=\bAuthorization:\s)[^\r\n]+", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+        private static partial System.Text.RegularExpressions.Regex AuthorizationHeaderRegex();
     }
 }
