@@ -13,6 +13,7 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Configuration;
@@ -209,7 +210,7 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["dotnet-isolated"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["dotnet"], profiles: ["flex"]), CancellationToken.None);
 
@@ -264,7 +265,7 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["python"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(Options(features: [requestedFeature], profiles: ["flex"]), CancellationToken.None);
 
@@ -286,7 +287,7 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["python"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(
             Options(features: ["dotnet"], profiles: ["flex"], outputMode: SetupOutputMode.Json),
@@ -438,7 +439,7 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["python"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(
             Options(
