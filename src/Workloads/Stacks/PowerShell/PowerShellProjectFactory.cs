@@ -49,8 +49,10 @@ internal sealed class PowerShellProjectFactory : IFunctionsProjectFactory
             return "found requirements.psd1";
         }
 
-        // Fallback: any *.ps1 at the project root.
-        if (Directory.EnumerateFiles(root, "*.ps1", SearchOption.TopDirectoryOnly).Any())
+        // Fallback: any *.ps1 at the project root. Filter by exact extension
+        // because on Windows the 3-char pattern also matches .ps1xml files.
+        if (Directory.EnumerateFiles(root, "*.ps1", SearchOption.TopDirectoryOnly)
+                .Any(f => Path.GetExtension(f).Equals(".ps1", StringComparison.OrdinalIgnoreCase)))
         {
             return "found *.ps1 file";
         }

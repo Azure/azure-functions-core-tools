@@ -103,6 +103,16 @@ public class PowerShellProjectFactoryTests : IDisposable
         Assert.IsType<ProjectCreationResult.NotCreated>(result);
     }
 
+    [Fact]
+    public async Task Ps1xml_file_alone_does_not_match()
+    {
+        WriteFile("MyModule.Format.ps1xml", "<Configuration />");
+
+        ProjectCreationResult result = await new PowerShellProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+
+        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+    }
+
     [Theory]
     [InlineData("profile.ps1", "# profile", "found profile.ps1")]
     [InlineData("requirements.psd1", "@{}", "found requirements.psd1")]

@@ -15,18 +15,20 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 /// </summary>
 internal sealed class PowerShellFunctionsProject : FunctionsProject
 {
+    internal const string WorkloadId = "powershell";
+
     private readonly WorkingDirectory _workingDirectory;
     private readonly FunctionsWorkerReference _workerReference;
 
     public PowerShellFunctionsProject(WorkingDirectory workingDirectory)
     {
         _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        _workerReference = FunctionsWorkerReference.FromWorkload("powershell");
+        _workerReference = FunctionsWorkerReference.FromWorkload(WorkloadId);
     }
 
     public override WorkingDirectory WorkingDirectory => _workingDirectory;
 
-    public override string StackName => "powershell";
+    public override string StackName => WorkloadId;
 
     public override string StackDisplayName => "PowerShell";
 
