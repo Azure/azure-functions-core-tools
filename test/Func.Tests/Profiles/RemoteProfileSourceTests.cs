@@ -176,6 +176,96 @@ public class RemoteProfileSourceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => source.LoadAsync(context, cts.Token));
     }
 
+    [Fact]
+    public async Task LoadAsync_ChecksumValidButMalformedRemote_ReturnsEmptyAndDoesNotCache()
+    {
+        // Content that hashes fine but is not a valid profile registry
+        string malformedJson = """{ "not": "a registry" }""";
+        string checksum = ComputeSha256(malformedJson);
+        var handler = new FakeHttpMessageHandler(malformedJson, checksum);
+        var httpClient = CreateHttpClient(handler);
+        var fileSystem = new InMemoryProfileFileSystem();
+        var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+
+        var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
+        ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
+
+        // Should fall through to empty, not throw
+        Assert.Empty(snapshot.Profiles);
+
+        // Should not have persisted the malformed content to cache
+        string cachePath = Path.Combine(configPaths.Home, "profiles", "registry.json");
+        Assert.False(fileSystem.Files.ContainsKey(cachePath));
+    }
+
+    [Fact]
+    public async Task LoadAsync_ChecksumValidButMalformedCache_InvalidatesAndReturnsEmpty()
+    {
+        // Content that hashes fine but is not a valid profile registry
+        string malformedJson = """{ "bogus": true }""";
+        string checksum = ComputeSha256(malformedJson);
+        var fileSystem = new InMemoryProfileFileSystem();
+        var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+
+        // Pre-populate cache with checksum-valid but malformed content
+        string cacheDir = Path.Combine(configPaths.Home, "profiles");
+        string cachePath = Path.Combine(cacheDir, "registry.json");
+        string checksumPath = Path.Combine(cacheDir, "registry.json.sha256");
+        string metaPath = Path.Combine(cacheDir, "registry.json.meta");
+        fileSystem.Files[cachePath] = malformedJson;
+        fileSystem.Files[checksumPath] = checksum;
+        fileSystem.Files[metaPath] = DateTimeOffset.UtcNow.ToString("O");
+
+        // Remote also fails
+        var handler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
+        var httpClient = CreateHttpClient(handler);
+        var source = new RemoteProfileSource(httpClient, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+
+        var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
+        ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
+
+        // Should not throw, should return empty
+        Assert.Empty(snapshot.Profiles);
+
+        // Cache should be invalidated so it doesn't poison future runs
+        Assert.False(fileSystem.Files.ContainsKey(cachePath));
+        Assert.False(fileSystem.Files.ContainsKey(checksumPath));
+        Assert.False(fileSystem.Files.ContainsKey(metaPath));
+    }
+
+    [Fact]
+    public async Task LoadAsync_MalformedCacheDoesNotPoisonSecondCall()
+    {
+        string malformedJson = """{ "not": "valid" }""";
+        string malformedChecksum = ComputeSha256(malformedJson);
+        var fileSystem = new InMemoryProfileFileSystem();
+        var configPaths = new CliConfigurationPathsOptions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+
+        // Pre-populate cache with malformed content
+        string cacheDir = Path.Combine(configPaths.Home, "profiles");
+        fileSystem.Files[Path.Combine(cacheDir, "registry.json")] = malformedJson;
+        fileSystem.Files[Path.Combine(cacheDir, "registry.json.sha256")] = malformedChecksum;
+        fileSystem.Files[Path.Combine(cacheDir, "registry.json.meta")] = DateTimeOffset.UtcNow.ToString("O");
+
+        // First call: remote fails, cache is malformed → empty + cache invalidated
+        var failHandler = new FakeHttpMessageHandler(null!, null!, shouldFail: true);
+        var httpClient1 = CreateHttpClient(failHandler);
+        var source1 = new RemoteProfileSource(httpClient1, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
+        ProfileSourceSnapshot first = await source1.LoadAsync(context, CancellationToken.None);
+        Assert.Empty(first.Profiles);
+
+        // Second call: remote succeeds with valid content → works
+        string validChecksum = ComputeSha256(_validRegistry);
+        var successHandler = new FakeHttpMessageHandler(_validRegistry, validChecksum);
+        var httpClient2 = CreateHttpClient(successHandler);
+        var source2 = new RemoteProfileSource(httpClient2, Options.Create(new RemoteProfileOptions()), new ProfileDocumentParser(), fileSystem, configPaths, NullLogger<RemoteProfileSource>.Instance);
+        ProfileSourceSnapshot second = await source2.LoadAsync(context, CancellationToken.None);
+
+        Assert.Contains("flex", second.Profiles.Keys);
+    }
+
     private static HttpClient CreateHttpClient(HttpMessageHandler handler)
     {
         return new HttpClient(handler) { BaseAddress = new Uri("https://cdn.functions.azure.com/public/") };
@@ -214,6 +304,12 @@ public class RemoteProfileSourceTests
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
         {
             Files[path] = contents;
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteIfExistsAsync(string path)
+        {
+            Files.Remove(path);
             return Task.CompletedTask;
         }
     }

@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Profile;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Profiles;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -256,20 +257,20 @@ public sealed class ProfileCommandTests : IDisposable
 
     private ProfileListCommand CreateListCommand(ProjectProfileOptions options, params IProfileSource[] sources)
     {
-        var catalog = new ProfileCatalog(sources);
+        var catalog = new ProfileCatalog(sources, NullLogger<ProfileCatalog>.Instance);
         var optionsMonitor = new TestOptionsMonitor<ProjectProfileOptions>(options);
         return new ProfileListCommand(_interaction, catalog, optionsMonitor);
     }
 
     private ProfileShowCommand CreateShowCommand(params IProfileSource[] sources)
     {
-        var catalog = new ProfileCatalog(sources);
+        var catalog = new ProfileCatalog(sources, NullLogger<ProfileCatalog>.Instance);
         return new ProfileShowCommand(_interaction, catalog);
     }
 
     private ProfileSetCommand CreateSetCommand(params IProfileSource[] sources)
     {
-        var catalog = new ProfileCatalog(sources);
+        var catalog = new ProfileCatalog(sources, NullLogger<ProfileCatalog>.Instance);
         var store = new ProjectProfileConfigStore(_fileSystem);
         return new ProfileSetCommand(_interaction, catalog, store);
     }
@@ -343,6 +344,12 @@ public sealed class ProfileCommandTests : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             WriteAllText(path, contents);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteIfExistsAsync(string path)
+        {
+            _files.Remove(path);
             return Task.CompletedTask;
         }
 

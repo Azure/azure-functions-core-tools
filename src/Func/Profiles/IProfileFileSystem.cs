@@ -17,4 +17,9 @@ internal interface IProfileFileSystem
     /// Writes a text file via temp-file-and-rename, creating parent directories if needed.
     /// </summary>
     public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes a file if it exists; does nothing if the file is already absent.
+    /// </summary>
+    public Task DeleteIfExistsAsync(string path);
 }

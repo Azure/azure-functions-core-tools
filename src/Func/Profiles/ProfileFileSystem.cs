@@ -40,6 +40,18 @@ internal sealed class ProfileFileSystem : IProfileFileSystem
         }
     }
 
+    public Task DeleteIfExistsAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private static void EnsureParentDirectory(string filePath)
     {
         string? directory = Path.GetDirectoryName(filePath);

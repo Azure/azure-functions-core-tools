@@ -4,6 +4,7 @@
 using System.Text;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NuGet.Versioning;
 using Xunit;
@@ -278,7 +279,7 @@ public class ProfileResolverTests
 
     private ProfileResolver CreateResolver(params IProfileSource[] sources)
     {
-        var catalog = new ProfileCatalog(sources);
+        var catalog = new ProfileCatalog(sources, NullLogger<ProfileCatalog>.Instance);
         var projectOptionsMonitor = new TestOptionsMonitor<ProjectProfileOptions>(_projectProfileOptions);
         var userOptionsMonitor = new TestOptionsMonitor<UserProfilePreferenceOptions>(_userProfilePreferenceOptions);
         return new ProfileResolver(catalog, projectOptionsMonitor, userOptionsMonitor, _interaction);

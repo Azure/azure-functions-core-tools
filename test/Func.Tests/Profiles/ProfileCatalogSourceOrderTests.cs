@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Profiles;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Profiles;
@@ -50,7 +51,7 @@ public class ProfileCatalogSourceOrderTests
         var remoteSource = new FakeProfileSource(_remoteRegistry, parser, "remote registry");
         var builtInSource = new FakeProfileSource(_bundledRegistry, parser, "bundled registry");
 
-        var catalog = new ProfileCatalog([remoteSource, builtInSource]);
+        var catalog = new ProfileCatalog([remoteSource, builtInSource], NullLogger<ProfileCatalog>.Instance);
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
 
         // Act
@@ -71,7 +72,7 @@ public class ProfileCatalogSourceOrderTests
         var remoteSource = new EmptyProfileSource();
         var builtInSource = new FakeProfileSource(_bundledRegistry, parser, "bundled registry");
 
-        var catalog = new ProfileCatalog([remoteSource, builtInSource]);
+        var catalog = new ProfileCatalog([remoteSource, builtInSource], NullLogger<ProfileCatalog>.Instance);
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
 
         // Act
@@ -91,7 +92,7 @@ public class ProfileCatalogSourceOrderTests
         var remoteSource = new FakeProfileSource(_remoteRegistry, parser, "remote registry");
         var builtInSource = new FakeProfileSource(_bundledRegistry, parser, "bundled registry");
 
-        var catalog = new ProfileCatalog([remoteSource, builtInSource]);
+        var catalog = new ProfileCatalog([remoteSource, builtInSource], NullLogger<ProfileCatalog>.Instance);
         var context = new ProfileSourceContext(new DirectoryInfo(Path.GetTempPath()));
 
         // Act

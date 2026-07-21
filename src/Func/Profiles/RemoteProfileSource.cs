@@ -48,9 +48,13 @@ internal sealed class RemoteProfileSource(
         string? cachedJson = await TryLoadValidatedCacheAsync(cachePath, cacheChecksumPath, cacheMetaPath, cancellationToken);
         if (cachedJson is not null)
         {
-            _logger.LogDebug("Using cached profile registry (within TTL).");
             var cacheSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "cached registry", cachePath);
-            return _parser.ParseBuiltInRegistry(cachedJson, cacheSource);
+            ProfileSourceSnapshot? cached = TryParseRegistry(cachedJson, cacheSource, cachePath, cacheChecksumPath, cacheMetaPath);
+            if (cached is not null)
+            {
+                _logger.LogDebug("Using cached profile registry (within TTL).");
+                return cached;
+            }
         }
 
         // Try remote fetch
@@ -58,32 +62,72 @@ internal sealed class RemoteProfileSource(
         if (remoteJson is not null)
         {
             var remoteSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "remote registry", cachePath);
-            return _parser.ParseBuiltInRegistry(remoteJson, remoteSource);
+            ProfileSourceSnapshot? remote = TryParseRegistry(remoteJson, remoteSource, cachePath, cacheChecksumPath, cacheMetaPath);
+            if (remote is not null)
+            {
+                return remote;
+            }
         }
 
         // Fall back to stale cache (beyond TTL but still checksum-valid)
         string? staleCachedJson = await TryLoadValidatedCacheContentAsync(cachePath, cacheChecksumPath, cancellationToken);
         if (staleCachedJson is not null)
         {
-            DateTimeOffset? fetchTime = await ReadFetchTimestampAsync(cacheMetaPath, cancellationToken);
-            if (fetchTime is not null)
-            {
-                TimeSpan age = DateTimeOffset.UtcNow - fetchTime.Value;
-                if (age > _stalenessWarningThreshold)
-                {
-                    _logger.LogWarning("Profiles are {Days} days old. Host versions may not match current cloud deployments.", (int)age.TotalDays);
-                }
-            }
-
-            _logger.LogDebug("Using stale cached profile registry (remote fetch failed).");
             var staleCacheSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "cached registry (stale)", cachePath);
-            return _parser.ParseBuiltInRegistry(staleCachedJson, staleCacheSource);
+            ProfileSourceSnapshot? stale = TryParseRegistry(staleCachedJson, staleCacheSource, cachePath, cacheChecksumPath, cacheMetaPath);
+            if (stale is not null)
+            {
+                DateTimeOffset? fetchTime = await ReadFetchTimestampAsync(cacheMetaPath, cancellationToken);
+                if (fetchTime is not null)
+                {
+                    TimeSpan age = DateTimeOffset.UtcNow - fetchTime.Value;
+                    if (age > _stalenessWarningThreshold)
+                    {
+                        _logger.LogWarning("Profiles are {Days} days old. Host versions may not match current cloud deployments.", (int)age.TotalDays);
+                    }
+                }
+
+                _logger.LogDebug("Using stale cached profile registry (remote fetch failed).");
+                return stale;
+            }
         }
 
         // No remote, no cache — return empty so BuiltInProfileSource (bundled fallback) handles it
         _logger.LogDebug("No remote or cached profile registry available; deferring to bundled fallback.");
         var emptySource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "remote registry (unavailable)");
         return ProfileSourceSnapshot.Empty(emptySource);
+    }
+
+    /// <summary>
+    /// Attempts to parse the registry JSON; on failure logs the error, invalidates the cache, and returns null.
+    /// </summary>
+    private ProfileSourceSnapshot? TryParseRegistry(string json, ProfileSourceInfo source, string cachePath, string cacheChecksumPath, string cacheMetaPath)
+    {
+        try
+        {
+            return _parser.ParseBuiltInRegistry(json, source);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Profile registry content is malformed; invalidating cache.");
+            InvalidateCache(cachePath, cacheChecksumPath, cacheMetaPath);
+            return null;
+        }
+    }
+
+    private void InvalidateCache(string cachePath, string cacheChecksumPath, string cacheMetaPath)
+    {
+        try
+        {
+            _fileSystem.DeleteIfExistsAsync(cachePath).GetAwaiter().GetResult();
+            _fileSystem.DeleteIfExistsAsync(cacheChecksumPath).GetAwaiter().GetResult();
+            _fileSystem.DeleteIfExistsAsync(cacheMetaPath).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            // Best-effort: if we can't delete, next TTL expiry will retry.
+            _logger.LogDebug(ex, "Failed to delete poisoned cache files.");
+        }
     }
 
     private async Task<string?> TryLoadValidatedCacheAsync(string cachePath, string checksumPath, string metaPath, CancellationToken cancellationToken)
@@ -150,6 +194,19 @@ internal sealed class RemoteProfileSource(
             if (!string.Equals(actualChecksum, expectedChecksum, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Profile registry checksum mismatch. Discarding remote fetch.");
+                return null;
+            }
+
+            // Validate that the content is parseable before persisting to cache.
+            // This prevents checksum-valid but semantically malformed content from poisoning the cache.
+            var probeSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "remote registry (probe)");
+            try
+            {
+                _parser.ParseBuiltInRegistry(registryJson, probeSource);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Remote profile registry is checksum-valid but malformed; discarding.");
                 return null;
             }
 
