@@ -58,7 +58,7 @@ internal sealed class RemoteProfileSource(
         }
 
         // Try remote fetch
-        string? remoteJson = await TryFetchRemoteAsync(cacheDir, cachePath, cacheChecksumPath, cacheMetaPath, cancellationToken);
+        string? remoteJson = await TryFetchRemoteAsync(cachePath, cacheChecksumPath, cacheMetaPath, cancellationToken);
         if (remoteJson is not null)
         {
             var remoteSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "remote registry", cachePath);
@@ -172,7 +172,6 @@ internal sealed class RemoteProfileSource(
     }
 
     private async Task<string?> TryFetchRemoteAsync(
-        string cacheDir,
         string cachePath,
         string cacheChecksumPath,
         string cacheMetaPath,
@@ -212,10 +211,10 @@ internal sealed class RemoteProfileSource(
 
             // Persist to cache atomically: write to temp files then rename so
             // concurrent CLI processes never see a half-written cache.
-            await _fileSystem.WriteAllTextAsync(Path.Combine(cacheDir, CacheFileName), registryJson, cancellationToken);
-            await _fileSystem.WriteAllTextAsync(Path.Combine(cacheDir, CacheChecksumFileName), expectedChecksum, cancellationToken);
+            await _fileSystem.WriteAllTextAsync(cachePath, registryJson, cancellationToken);
+            await _fileSystem.WriteAllTextAsync(cacheChecksumPath, expectedChecksum, cancellationToken);
             // Meta written last: a partial write looks like an expired cache (safe).
-            await _fileSystem.WriteAllTextAsync(Path.Combine(cacheDir, CacheMetaFileName), DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
+            await _fileSystem.WriteAllTextAsync(cacheMetaPath, DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
 
             _logger.LogDebug("Profile registry fetched and cached from CDN.");
             return registryJson;
