@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Convenience helpers for SHA256 hashing.
 /// </summary>
-internal static class Sha256Extensions
+internal static class Sha256Helpers
 {
     /// <summary>
     /// Computes the SHA-256 hash of the UTF-8 encoded content and returns it as a lowercase hex string.

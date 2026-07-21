@@ -161,7 +161,7 @@ internal sealed class RemoteProfileSource(
             return null;
         }
 
-        string actualChecksum = Sha256Extensions.HashDataLowerHex(json);
+        string actualChecksum = Sha256Helpers.HashDataLowerHex(json);
         if (!string.Equals(actualChecksum, expectedChecksum.Trim(), StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Cached profile registry checksum mismatch; discarding corrupt cache.");
@@ -189,7 +189,7 @@ internal sealed class RemoteProfileSource(
             string expectedChecksum = (await checksumTask).Trim();
 
             // Validate checksum
-            string actualChecksum = Sha256Extensions.HashDataLowerHex(registryJson);
+            string actualChecksum = Sha256Helpers.HashDataLowerHex(registryJson);
             if (!string.Equals(actualChecksum, expectedChecksum, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Profile registry checksum mismatch. Discarding remote fetch.");
