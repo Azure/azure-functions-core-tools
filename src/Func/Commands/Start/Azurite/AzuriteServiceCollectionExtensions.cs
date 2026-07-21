@@ -73,6 +73,9 @@ internal static class AzuriteServiceCollectionExtensions
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<IAzuriteExecutableLocator, AzuriteExecutableLocator>();
         services.TryAddSingleton<IDockerAvailabilityProbe, DockerAvailabilityProbe>();
+        services.TryAddSingleton<IPortOwnershipStrategy>(
+            static _ => OperatingSystem.IsWindows() ? new WindowsPortOwnershipStrategy() : new UnixPortOwnershipStrategy());
+        services.TryAddSingleton<IListeningProcessInspector, ListeningProcessInspector>();
 
         return services;
     }
