@@ -1,210 +1,315 @@
 # Profile Release Process (Draft)
 
-**Status:** Draft
+**Status:** Draft — revised after initial design meeting (2026-07-15)
 
-## Overview
+## 1. Overview
 
-Profiles (`flex`, `windows-consumption`, etc.) are a **constraint set**
-that pins the host version range, extension bundle range, worker versions, and feature toggles a
-SKU supports (see `cli-profiles.md`). Those constraints are only correct if they
-track what is actually deployed to each SKU in the cloud. As the host rolls out
-in stages across clouds, the profile registry must be updated and
-re-published so the CLI never gets ahead of the host versions a customer's
-target SKU is running. The host workload associated with the latest in production must also be available before a SKU profile is released.
+Profiles (`flex`, `windows-consumption`, `windows-dedicated`, `linux-dedicated`,
+etc.) are a **constraint set** that pins the host version range, extension bundle
+range, worker versions, and feature toggles a SKU supports (see
+`cli-profiles.md`). Those constraints must track what is actually deployed to
+each SKU in the cloud, and the corresponding workloads must be available for
+local install before a profile advertises them.
 
-This doc captures how a **profile release** happens: when it is triggered, how it
-hooks into the host release pipeline, which host rollout milestone gates staging
-vs. public, and how we roll back, hotfix, and keep bundles/worker versions in
-sync. It builds on the component tag-and-pipeline model in
-`vnext-release-process.md` and the design in `cli-profiles.md`.
+This doc captures the end-to-end **profile release flow**: from host build
+through SKU deployment to profile publication. It builds on
+`vnext-release-process.md` (tag + pipeline mechanics) and `cli-profiles.md`
+(profile schema and CLI resolution).
 
-> This is an early draft. Open questions are called out inline as **Q:** and consolidated in [§Open questions](#open-questions).
+> Open questions are called out inline as **Q:** and consolidated in
+> [§8. Open questions](#8-open-questions).
 
-## How the host actually rolls out
+## 2. Background: how the host rolls out
 
-Before designing the profile release we have to match the host's real rollout
-shape:
-
-- **Promotion is manual and adoption-gated.** There is **no automated "rollout reached UD N" event** to
-  subscribe a pipeline to.
 - **The entire rollout is production.** There is no internal "staging" channel in
-  the host rollout. "Staging vs. public" is a *CLI-profile* construct we layer on
-  top; it must be defined against host **stages/clouds/adoption**, not against a
-  host staging feed.
-- **Release axis is host-type + cloud + OS, not SKU name.** The host ships per
-  host type (Out-Of-Proc, InProc8, InProc6, V3) and per cloud. **RU is
-  Windows-only**; Linux SKUs (CV1/Flex/Dedicated) roll out through separate repos
-  and pipelines. **Q:** Is it possible to track each defined SKU we support in the profiles? What can we use to track its progress and gate profile release steps? Which SKUs have pipeline hooks or stages we can take advantage of?
+  the host rollout. "Staging vs. public" is a *CLI-profile* construct we layer
+  on top.
+- **Each SKU has a dedicated pipeline** tied to a specific git tag. The
+  pipeline's pool config (or equivalent) is the source of truth for the exact
+  versions deployed per SKU. Windows Dedicated and Linux Dedicated are different
+  SKUs with separate pipelines.
+- **Pool config is the source of truth for Linux/Flex.** A pool config (JSON/XML)
+  lists each language (Python, .NET, Java, Node) and its image version. Each
+  Linux SKU (Flex Consumption, Linux Dedicated, CV1) has its own pool config and
+  EV2 pipeline that pushes it to Cosmos DB per deployment stage.
+- **Stack-level rollbacks are done within the pool config.** If a specific worker
+  (e.g. Python) has issues, the pool config is updated with N−1 for that stack
+  while N is kept for the rest.
 
-## Release model
+## 3. Profile channels
+
+Each SKU has **three profile channels**:
+
+| Channel | Description | Updated when | Scope |
+| --- | --- | --- | --- |
+| **Default (public)** | Versions matching public cloud deployment. Most customers target this. | End of each SKU completing public cloud release. | **GA** |
+| **Slow** | Lags behind default. Named with `-slow` suffix (e.g. `flex-slow`). | TBD | Post-GA — needs design |
+| **N−1** | Matches App Service N−1 release channel (previous host/bundle version). | When the default advances (previous default becomes N−1). | Post-GA — needs design |
+
+For GA, only the default channel is required. The slow and N−1 channels are not
+necessarily hooked into the automated host release pipeline and require further
+design with the respective release owners.
+
+Each channel has its own **registry** — a single `registry.json` file on CDN
+containing all SKU profiles for that channel (see [§5](#5-cdn-layout-and-cli-resolution)).
+
+- **Q:** Which SKUs support App Service N−1 channels today? Has this been
+  extended to Flex?
+
+## 4. Release flow
 
 ```
-host.official build ──► create-host-package (Site Extension zip)  ──► create staging host workload (?)
+host.official build ──► create-host-package (Site Extension zip)
         │
-        ▼
-  Windows: RU (Host + Extension Bundles) ──► EV2 staged rollout
-        Prod S0─S1─…─S5 
-  Linux:   separate build/publish pipelines
-        │                         │
-        ▼                         ▼
-  host workload: staging    host workload: public
-  profile: staging          profile: public
-  (early stage / low         (defined public milestone —
-   adoption reached)          e.g. Prod complete)
+        ├─► cut workloads (host + workers) ──► publish to internal/staging NuGet feed
+        │                                       └─► upload staging profile to staging CDN
+        │
+        ├─► Windows: RU (Host + Extension Bundles) ──► EV2 staged rollout
+        │
+        └─► Linux: EV2 pipeline (pool config per SKU)
+              │
+              ▼
+        per-SKU deployment (each SKU completes independently)
+              │
+              ▼
+        hook at end of each SKU completing release:
+              1. workload-promotion pipeline
+              2. profile-update pipeline
 ```
 
-A profile release is **downstream of the host rollout**: the profile registry's
-`host.version` range for a SKU should only advance once the host has actually
-reached the stage/adoption milestone that gates that SKU's profile channel.
+### 4.1 Workload build and staging
 
-- **Staging vs. public.** Profile updates land on a staging channel first, then
-  promote to public once the host reaches the gating milestone.
-  - **Q:** Which host milestone gates each channel? Because promotion is manual and
-    adoption-based (not UD-numbered), this must be expressed as a **stage/cloud +
-    adoption %** (e.g. staging = early Prod stage reached; public = Prod rollout
-    complete). 
-- **Per-SKU/OS cadence.** Windows and Linux SKUs get host bits from different
-  pipelines on different schedules, and the profile registry's per-SKU
-  `host.version` must be populated from **both paths** even though they share one
-  registry.
-  - **Q:** One pipeline updating all SKU entries, or per-path (Windows RU vs Linux)
-    pipelines feeding the registry?
+When the host is cut:
 
-## Hooking into the host release pipeline
+- All workloads (host + workers) are built and published to the **internal /
+  staging NuGet feed** via the existing per-component release pipelines
+  (`eng/ci/release/official-release.workload.*.yml`, tag-driven — see
+  `vnext-release-process.md`).
+- The **staging profile** is created and uploaded to the staging CDN. This is the
+  pre-release channel for internal validation.
 
-The profile release should be **driven by the host release**, not maintained by
-hand. The host release has well-defined artifact hand-off points we can hook:
+Workloads live on the internal feed until promoted. The "Publish to NuGet"
+checkbox in the existing pipeline controls whether a package goes to the public
+feed or stays internal-only for testing.
+
+> **Open design question:** Can the workload-promotion pipeline reuse existing
+> vnext pipeline infrastructure, or does it need new tooling?
+
+### 4.2 SKU completion hook
+
+At the **end of each SKU completing its public cloud release**, a hook triggers
+two pipelines in sequence:
 
 ```
-host.official build
-  └─ create-host-package  ──► Site Extension zip + build ID   ◄── version source of truth
-  └─ (Windows) RU build ──► rapidupdate.xml (Host + Extension Bundles)
-  └─ EV2 staged rollout (manual, adoption-gated promotions)
-        └─ hook into Profile release ──► update profile registry
+SKU completes release
+  │
+  ├─► 1. Workload-promotion pipeline
+  │       Inputs: list of workload package IDs + versions to promote
+  │       Behavior: promotes each workload from internal feed → public NuGet feed
+  │                 (skips if already on public feed — safe for multiple SKUs)
+  │
+  └─► 2. Profile-update pipeline (runs after promotion succeeds)
+          Inputs: profile-name, host-version, bundle-version, worker-versions, etc.
+          Behavior: verifies workloads on public feed, then updates registry.json
 ```
 
-- The **`create-host-package` / `host.official` build is the source of truth for
-  the version range** a profile should point at. Profile release consumes that
-  build's output rather than re-deriving versions.
-- **Trigger.** The cleanest automatic trigger is off the **`create-host-package`
-  build (or the Windows RU build ID)** — *not* "rollout reached a gating
-  UD," since they are not fully automated.
-  - **Q:** Do we trigger the profile-registry *update* at package build time and
-    hold the *public* promotion until the host reaches its public milestone?
+Separating these keeps each pipeline focused and independently reusable:
+- The **workload-promotion pipeline** only moves packages between feeds.
+- The **profile-update pipeline** only verifies workloads and writes profile data
+  to CDN. It can also be invoked outside of a release (e.g. emergency profile
+  fix, feature toggle change).
 
-### Prerequisite: the host workload must be published first
+The first SKU to complete deployment promotes the workloads; subsequent SKUs
+check for existence and skip promotion.
 
-A profile only pins a `host.version` range; the CLI resolves that range against
-**host workloads** (`Azure.Functions.Cli.Workload.Host`) and auto-installs the
-matching version from the workload feed when it isn't already present (see
-`cli-profiles.md` §13.1–§13.2). That creates a hard ordering constraint:
+No hooks between individual UDs are required — only at the end of each SKU
+completing its release. Slow and N−1 channel triggers need further design.
 
-- **The host workload package for the new host version must be built and available
-  on the CLI's workload feed/CDN *before* any profile advertises that version.** If
-  a profile's range advances ahead of the workload, `func start` resolves the
-  profile to a version it cannot download — auto-install fails and the profile is
-  effectively broken for every consumer on that channel.
-- This is a distinct artifact from the cloud-side Site Extension / RU package: the
-  host rollout makes the version *live in Azure*, but the **host workload** is what
-  makes the same version *installable locally by the CLI*. Both must exist, but it
-  is workload availability — not cloud rollout — that gates whether a profile can
-  safely name a version.
-- Practically, the profile release should verify (or be triggered by) **host
-  workload publication**, not just the host build or RU build. Publishing the
-  profile registry update and publishing the host workload should be ordered so the
-  workload is always the earlier (or same) step.
+### 4.3 Workload promotion
 
-> No existing doc fully specifies this ordering. `cli-release-story.md` notes only
-> that "the host workload will need to align with the host release cadence
-> (separate design)"; `cli-profiles.md` §13.2 covers the *runtime* "no matching
-> workload" case but assumes the workload is already on the feed. This doc is the
-> place to pin the release-time guarantee.
+The workload-promotion pipeline ensures all referenced workloads are on the
+public NuGet feed before the profile is updated. Workloads are distinct from
+cloud-side artifacts (Site Extension / RU package) — the host rollout makes a
+version *live in Azure*, but the **workload** is what makes it *installable
+locally by the CLI*. A profile must never reference a version that is not yet
+available on the target feed.
 
-## Worker versions
+> **Open design question:** What is the mechanism for promoting a workload from
+> internal to public feed? (NuGet push, feed view promotion, or re-queuing the
+> existing pipeline with "Publish to NuGet" checked?)
 
-Each profile (or the host it pins) implies a set of compatible worker versions per
-language. We need a deterministic source for "given this host, which worker
-versions are valid?"
+### 4.4 Profile registry update
 
-- The host release produces a **Site Extension package only** — the host build
-  pipelines do **not** show worker versions being emitted by `host.official` /
-  `create-host-package`. So "worker versions are an output of the host build" is
-  **not currently supported** and can't be assumed.
-- **Q:** What is the authoritative source for worker versions per host version? This
-  is an **open dependency**, not a solved input — options include the host
-  build/workload manifest (if extended to emit it) or a separate worker-version
-  registry.
-  - There is a step in the current v4 pipeline that checks worker versions by pulling GH releases of the host and checking the repo at that tag and inspecting files. This is limited by GH API unauthenticated requests limit.
+The profile-update pipeline is an **independent, reusable pipeline** that takes
+specific arguments and updates the profile registry in CDN storage.
 
-## Rollback and hotfix
+**Inputs:**
 
-Consistent with the rest of the release story (`cli-release-story.md`,
+| Parameter | Description |
+| --- | --- |
+| `profile-name` | The profile to update (e.g. `flex`, `windows-consumption`) |
+| `channel` | `staging` or `public` (determines which registry to target) |
+| `host-version` | The host version (or range upper bound) to set |
+| `bundle-version` | The extension bundle version (range upper bound) to set |
+| `worker-versions` | Map of worker runtime → version (e.g. `{python: "4.43.0", node: "3.13.0"}`) |
+| `generated-at` | Timestamp for the profile (for staleness detection) |
+
+**Behavior:**
+
+1. **Verify workload availability (precondition).** Query the target NuGet feed
+   and confirm every referenced workload version exists. If any is missing,
+   **fail with a clear error** — do not update the profile. This makes it
+   impossible to publish a broken profile regardless of invocation path.
+2. Fetch the target `registry.json` from CDN-backed storage.
+3. Locate the profile entry matching `profile-name` (or create if new).
+4. Update the version ranges per the input parameters.
+5. Write the updated `registry.json` back to storage.
+6. Regenerate and upload the detached `registry.json.sha256` checksum.
+
+Multiple SKU pipelines may update the same registry concurrently; the
+read-modify-write must use **optimistic concurrency** (e.g. ETag / blob lease).
+Each pipeline only touches its own profile entry, so conflicts should be rare.
+
+The `create-host-package` / `host.official` build is the **source of truth** for
+the host version range a profile should point at. This pipeline can also be
+invoked **outside of a release** (e.g. emergency profile fix, feature toggle
+change) without requiring a full host release — this is a key benefit of
+keeping it independent and parameterized.
+
+## 5. CDN layout and CLI resolution
+
+The profile registry follows `cli-profiles.md` §6.1: each channel has a **single
+`registry.json`** on CDN. The CLI resolves profiles using a three-tier fallback:
+
+```
+1. Remote fetch    → CDN registry (1-hour TTL cache)
+2. Local cache     → ~/.azure-functions/profiles/registry.json (warn if > 7 days old)
+3. Bundled fallback → registry.json shipped with CLI package (point-in-time snapshot)
+```
+
+The profile-update pipeline updates the CDN registry independently of CLI
+releases. Profiles stay current without requiring a new CLI release — the CLI
+picks up changes on its next remote fetch. The bundled copy is just an offline
+fallback, refreshed whenever the CLI itself ships.
+
+**GA scope:**
+
+```
+https://aka.ms/func-profiles              → registry.json (default / public)
+https://aka.ms/func-profiles-sha256       → registry.json.sha256
+```
+
+**Post-GA scope (needs design):**
+
+```
+https://aka.ms/func-profiles-slow         → registry.json (slow ring)
+https://aka.ms/func-profiles-slow-sha256  → registry.json.sha256
+https://aka.ms/func-profiles-n1           → registry.json (N−1 / App Service)
+https://aka.ms/func-profiles-n1-sha256    → registry.json.sha256
+```
+
+Each registry file uses the same schema (`$schema: func-profiles/v1/schema.json`).
+The CLI resolves which registry to fetch based on the profile name (e.g. `flex`
+→ default, `flex-slow` → slow). The exact naming and resolution convention needs
+to be finalized.
+
+Profile data can also be leveraged beyond the CLI (dashboards, public
+announcements about runtime versions per SKU, external tooling) since profiles
+contain the exact versions of every component across all SKUs.
+
+## 6. Component versioning
+
+### Host
+
+The host uses **roll-forward versioning**: the profile's `host.version` is a
+NuGet-style version range (e.g. `[4.1048.0, 4.1049.0)`) and the CLI resolves to
+the highest installed or available version within the range. A newer host patch
+can satisfy the profile constraint without a profile update.
+
+### Workers
+
+Worker workloads are independently versioned. The authoritative source for worker
+versions differs by platform:
+
+- **Linux/Flex:** Pool config lists each language and its image version.
+- **Windows:** The git tag + host repo file inspection (limited by GH API rate
+  limits — there is a step in the current v4 pipeline that checks worker
+  versions by pulling GH releases and inspecting files at that tag).
+
+**Per-stack discrepancies are not common but possible.** A specific stack can 
+be held back while others ship. The profile must cap to the
+**least common denominator** across all stacks in the SKU, unless per-stack
+granularity is added.
+
+Workers release with the host typically, but worker-only patches (same host,
+updated worker) are possible and translate to a worker workload update + profile
+update. The host build pipelines do **not** emit worker versions — worker
+version information comes from the pool config (Linux) or repo inspection
+(Windows), not from `host.official` / `create-host-package`.
+
+- **Q:** Can profiles support per-stack granularity so a SKU can release
+  bundles/host for all stacks except one held back?
+
+### Extension bundles
+
+On Windows, RU releases Host and Extension Bundles together. The profile's
+bundle range advances in lockstep with the host off the same RU build. For
+Linux, the pool config is the equivalent source.
+
+- **Exact version ranges, not wildcards.** The upper limit is the exact version
+  deployed in the cloud. Every bundles release requires the profile to be updated
+  via the SKU completion hook.
+
+## 7. Rollback and hotfix
+
+Consistent with the release story (`cli-release-story.md`,
 `vnext-release-process.md`): **roll forward, never retag.**
 
-- **Staging profiles are internal**, so rollbacks/hotfixes that occur before a
-  profile is promoted to public need not touch any public profile.
-- **Host rollback reaches published versions.** In the cloud, the host is rolled
-  back by **disabling a specific site-extension version** via the
-  `DisabledSiteExtensionVersions` hosting config, **per stamp/UD**. This is
-  roll-forward-compatible (no retag), but it creates a gap the
-  profile release must handle: **a public profile can still pin a host version that
-  has been disabled in-cloud.** The profile release must react to host
-  disables/hotfixes, not just to its own staging state.
-  - **Q:** When the host disables a version on some UDs/stamps, how does the profile
-    range max get corrected (roll the pinned range forward past the disabled
-    version)?
+- **Staging profiles are internal**, so rollbacks before public promotion don't
+  touch public profiles.
+- **Host rollback** is done by disabling a site-extension version
+  (`DisabledSiteExtensionVersions`), per stamp/UD. This is roll-forward-compatible
+  but means a **public profile can still pin a disabled host version.** The
+  profile must react to host disables/hotfixes.
+  - **Q:** How does the profile range max get corrected when the host disables a
+    version?
+- **Out-of-band profile changes** (feature toggle fix, typo'd range, emergency
+  constraint) can be made by invoking the profile-update pipeline directly
+  without a full host release. This is a key benefit of having an independent,
+  parameterized profile-update pipeline.
 
-## Extension bundle range
+## 8. Built-in profiles in the CLI
 
-This will not be common because it would depend on a major update of bundles.
+The CLI ships with a **bundled copy of the profile registry** so it can function
+offline or when CDN is unreachable. The resolution order is:
 
-On Windows, **RU releases the Host and Extension Bundles together**
-through the same pipeline and `rapidupdate.xml`. That
-gives a natural answer to "when do we update the bundle range?": the profile's
-bundle range can advance **in lockstep with the host, off the same RU
-build**.
+```
+1. Remote fetch    → CDN registry (1-hour TTL cache)
+2. Local cache     → ~/.azure-functions/profiles/registry.json (warn if > 7 days old)
+3. Bundled fallback → registry.json shipped with CLI package (point-in-time snapshot)
+```
 
-- **Q:** For Linux (no RU), what is the equivalent joined signal for
-  advancing the bundle range alongside the host?
+**Monthly CLI release cadence.** We plan to release the CLI on a monthly cadence.
+Before each release, an **agent skill** will fetch the latest public CDN
+`registry.json` and update the bundled profiles in the CLI source code (the
+workload hosting the built-in registry). This keeps the offline fallback
+reasonably fresh without manual intervention.
 
-## Profiles outside a release
+## 9. Open questions
 
-Most profile changes ride a host release, but some may not (e.g. tightening a
-feature toggle, fixing a typo'd range, an emergency constraint).
-
-- **Q:** Do we ever need to change profiles **outside of a release**? If so, what is
-  the lightweight path (and how does it interact with the staging → public gating)?
-
-This is the strongest argument for having a separate release pipeline for profilese instead of hooking into existing release pipeliens.
-
-## Built-in profiles in the CLI
-
-Built-in profiles ship as a cached/bundled registry the CLI falls back to offline
-(see `cli-profiles.md` §5). Today some of this lives close to the CLI (compare to
-how culture/region `.json` resources are embedded).
-
-- **Q:** Where do built-in profiles live — embedded in the CLI, another workload? Do we want/need them? Our order of pulling profilese is CDN, user, then "built-in". 
-- **Q:** How often should profiles be released? We can update profiles (merge new/updated profiles) into CLI but hold on releasing and wait for the monthly cadence. This will minimize releases needed (i.e. If Flex releases every week, then we would have to re-release CLI every week to update flex profile).
-- This ties to the profiles CDN and profile update pipeline work tracked in
-  [#5332](https://github.com/Azure/azure-functions-core-tools/issues/5332) and
-  [#5329](https://github.com/Azure/azure-functions-core-tools/issues/5329).
-
-## Open questions
-
-| # | Question |
-| --- | --- |
-| 1 | Do we hook profile releases into existing host pipelines/processes, stand up a **separate profile-release pipeline**, or a mix of both? |
-| 2 | Which host **stage/cloud + adoption milestone** gates each profile channel (staging vs. public), and does it differ per SKU/OS? |
-| 3 | How do we populate each SKU entry — one pipeline, or per-path (Windows RU vs Linux) pipelines feeding one registry? |
-| 4 | Exact trigger for the profile update — `create-host-package`/RU build ID or **host workload publication**, with public promotion held as a manual gate? |
-| 5 | Authoritative source for worker versions per host version (open dependency — host build does not currently emit them)? |
-| 6 | Bundle range rides the host via RU on Windows — what is the equivalent signal on Linux? |
-| 7 | How does a profile react when the host **disables** a published version (`DisabledSiteExtensionVersions`) or ships a hotfix? |
-| 8 | Do we ever change profiles outside of a release, and what is the lightweight path? |
-| 9 | Where do built-in profiles live — in CLI (current) or should they move (host workload)? |
+| # | Question | Status |
+| --- | --- | --- |
+| 1 | Authoritative source for worker versions per host version? | **Partially resolved:** Pool config for Linux/Flex; git tag inspection for Windows (limited by GH API rate limits). |
+| 2 | Where should built-in profiles live — CLI workload or host workload? | Open — affects bundling strategy and offline resolution. |
+| 3 | Which SKUs support App Service N−1 channels? Extended to Flex? | Open — affects N−1 registry scope. |
+| 4 | Per-stack granularity in profiles? | Open — not frequent but a possibility that stacks are held back. |
+| 5 | CDN registry naming and CLI resolution convention (how does CLI know which registry to fetch for a given profile?) | Partially resolved — default registry defined, slow/N−1 need finalization. |
+| 6 | Workload promotion mechanism (NuGet push, feed view promotion, or re-queue existing pipeline)? | Open |
 
 ## Related docs
 
 - `cli-profiles.md` — profile design and schema.
 - `vnext-release-process.md` — component tag + release pipeline mechanics.
 - `cli-release-story.md` — overall CLI/workload release philosophy and rollback stance.
+- [#5332](https://github.com/Azure/azure-functions-core-tools/issues/5332) — profiles CDN work.
+- [#5329](https://github.com/Azure/azure-functions-core-tools/issues/5329) — profile update pipeline work.
