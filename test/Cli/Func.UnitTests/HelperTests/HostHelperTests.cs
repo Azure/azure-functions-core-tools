@@ -14,16 +14,20 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
     public class HostHelperTests
     {
         [Fact]
-        public async Task GetCustomHandlerExecutable_Throws_When_HostJson_Missing()
+        public async Task GetCustomHandlerExecutable_Returns_Empty_When_HostJson_Missing()
         {
-            // Arrange
+            // host.json is optional. When it is absent there is no custom handler to resolve,
+            // so the helper returns empty rather than throwing.
             var fs = Substitute.For<IFileSystem>();
             fs.File.Exists(Arg.Any<string>()).Returns(false);
 
             using (FileSystemHelpers.Override(fs))
             {
-                // Act/Assert
-                await Assert.ThrowsAsync<InvalidOperationException>(() => HostHelpers.GetCustomHandlerExecutable());
+                // Act
+                var result = await HostHelpers.GetCustomHandlerExecutable();
+
+                // Assert
+                result.Should().BeEmpty();
             }
         }
 

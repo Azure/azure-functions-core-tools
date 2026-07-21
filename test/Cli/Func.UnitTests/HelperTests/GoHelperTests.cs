@@ -302,15 +302,36 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Fact]
-        public void GetPackFiles_ReturnsHostJsonAndAppBinary()
+        public void GetPackFiles_WhenHostJsonExists_ReturnsHostJsonAndAppBinary()
         {
+            var root = Path.Combine(Path.GetTempPath(), "func-go-files-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                File.WriteAllText(Path.Combine(root, "host.json"), "{}");
+
+                var files = GoHelpers.GetPackFiles(root).ToArray();
+
+                files.Should().HaveCount(2);
+                files.Should().Contain(Path.Combine(root, "host.json"));
+                files.Should().Contain(Path.Combine(root, GoHelpers.GoBinDir, GoHelpers.GoBinaryName));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void GetPackFiles_WhenHostJsonMissing_ReturnsOnlyAppBinary()
+        {
+            // host.json is optional; it is only included in the allowlist when present.
             var root = Path.Combine(Path.GetTempPath(), "func-go-files-" + Guid.NewGuid().ToString("N"));
 
             var files = GoHelpers.GetPackFiles(root).ToArray();
 
-            files.Should().HaveCount(2);
-            files.Should().Contain(Path.Combine(root, "host.json"));
-            files.Should().Contain(Path.Combine(root, GoHelpers.GoBinDir, GoHelpers.GoBinaryName));
+            files.Should().ContainSingle()
+                .Which.Should().Be(Path.Combine(root, GoHelpers.GoBinDir, GoHelpers.GoBinaryName));
         }
 
         // Builds a minimal 20-byte ELF identification region with EI_CLASS=64-bit, EI_DATA=little-endian
