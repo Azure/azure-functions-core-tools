@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli;
-using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+using Azure.Functions.Cli.Common.Processes;
 
 namespace Azure.Functions.Cli.Commands.Start.Azurite;
 

@@ -3,7 +3,7 @@
 
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
-using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+using Azure.Functions.Cli.Common.Processes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 

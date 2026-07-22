@@ -25,7 +25,7 @@ internal sealed class UpdateFileSystem : IUpdateFileSystem
 
     public async Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken)
     {
-        await using FileStream file = File.OpenWrite(filePath);
+        await using FileStream file = File.Create(filePath);
         await content.CopyToAsync(file, cancellationToken);
     }
 

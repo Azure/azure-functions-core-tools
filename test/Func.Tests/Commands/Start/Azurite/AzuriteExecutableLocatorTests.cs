@@ -3,7 +3,7 @@
 
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands.Start.Azurite;
-using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+using Azure.Functions.Cli.Common.Processes;
 using NSubstitute;
 using Xunit;
 

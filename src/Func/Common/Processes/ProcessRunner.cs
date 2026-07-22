@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
-namespace Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+namespace Azure.Functions.Cli.Common.Processes;
 
 /// <inheritdoc cref="IProcessRunner" />
 internal sealed class ProcessRunner : IProcessRunner

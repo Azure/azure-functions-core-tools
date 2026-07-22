@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
-using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Update;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -38,7 +38,10 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("5.1.0\n"));
 
-        fileSystem.DirectoryExists(Arg.Any<string>()).Returns(true);
+        // backupDir must not exist for the precondition check, but does exist
+        // later so the cleanup path deletes it.
+        fileSystem.DirectoryExists(FakeBackupDir).Returns(false, true);
+        fileSystem.DirectoryExists(Arg.Is<string>(p => p != FakeBackupDir)).Returns(true);
 
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
@@ -79,9 +82,9 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("4.0.0\n")); // wrong version
 
-        // installDir exists after successful swap; backupDir exists for restore
+        // backupDir must not exist for precondition, but exists during rollback
+        fileSystem.DirectoryExists(FakeBackupDir).Returns(false, true);
         fileSystem.DirectoryExists(FakeInstallDir).Returns(true);
-        fileSystem.DirectoryExists(FakeBackupDir).Returns(true);
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -105,9 +108,9 @@ public sealed class CliUpdaterTests
         fileSystem.When(fs => fs.MoveDirectory(FakeExtractDir, FakeInstallDir))
             .Throw(new IOException("disk full"));
 
-        // installDir does not exist (swap failed before creating it)
+        // backupDir must not exist for precondition, but exists during rollback
         fileSystem.DirectoryExists(FakeInstallDir).Returns(false);
-        fileSystem.DirectoryExists(FakeBackupDir).Returns(true);
+        fileSystem.DirectoryExists(FakeBackupDir).Returns(false, true);
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
@@ -116,6 +119,22 @@ public sealed class CliUpdaterTests
         // Rollback: backup restored since installDir doesn't exist
         fileSystem.DidNotReceive().DeleteDirectory(FakeInstallDir);
         fileSystem.Received(1).MoveDirectory(FakeBackupDir, FakeInstallDir);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_StaleBackupExists_ThrowsGracefulWithCleanupHint()
+    {
+        // Arrange
+        (CliUpdater updater, IUpdateFileSystem fileSystem, _, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        fileSystem.DirectoryExists(FakeBackupDir).Returns(true);
+
+        // Act + Assert
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.Contains("previous update backup", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

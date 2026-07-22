@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
-using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Logging;
 
@@ -32,6 +32,13 @@ internal sealed class CliUpdater(
 
         string installDir = GetInstallDirectory();
         string backupDir = installDir + ".backup";
+
+        if (_fileSystem.DirectoryExists(backupDir))
+        {
+            throw new GracefulException(
+                $"A previous update backup exists at '{backupDir}'. " +
+                "Delete it manually and run 'func update' again.");
+        }
 
         try
         {
