@@ -15,13 +15,14 @@ namespace Azure.Functions.Cli.Tests.Update;
 
 public sealed class CliUpdaterTests
 {
-    // Fixed paths used across tests so assertions can match specific calls.
-    private const string FakeProcessPath = "/fake/install/func";
-    private const string FakeInstallDir = "/fake/install";
-    private const string FakeBackupDir = "/fake/install.backup";
-    private const string FakeTempWorkDir = "/fake/tmp/work";
-    private const string FakeExtractDir = "/fake/tmp/extract";
-    private const string FakeZipPath = FakeTempWorkDir + "/func-update.zip";
+    // Build paths through the same System.IO APIs the production code uses so
+    // separators match on every platform (/ on Linux/macOS, \ on Windows).
+    private static readonly string FakeProcessPath = Path.GetFullPath(Path.Combine("/fake", "install", "func"));
+    private static readonly string FakeInstallDir = Path.GetDirectoryName(FakeProcessPath)!;
+    private static readonly string FakeBackupDir = FakeInstallDir + ".backup";
+    private static readonly string FakeTempWorkDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "work"));
+    private static readonly string FakeExtractDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "extract"));
+    private static readonly string FakeZipPath = Path.Combine(FakeTempWorkDir, "func-update.zip");
 
     private static readonly Release _stableRelease = new(
         SemVersion.Parse("5.1.0", SemVersionStyles.Strict),
