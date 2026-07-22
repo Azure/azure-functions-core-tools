@@ -3,9 +3,6 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Templates;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli;
 

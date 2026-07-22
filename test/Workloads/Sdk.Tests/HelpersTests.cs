@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Sdk.Tests;
 
@@ -16,8 +15,8 @@ public class HelpersTests
         using var mlc = MetadataLoadContext.Create(assemblyPath);
         Assembly asm = mlc.LoadFromAssemblyPath(assemblyPath);
 
-        Assert.NotNull(asm);
-        Assert.Equal("Azure.Functions.Cli.Workloads.DotNet", asm.GetName().Name);
+        asm.Should().NotBeNull();
+        asm.GetName().Name.Should().Be("Azure.Functions.Cli.Workloads.DotNet");
     }
 
     [Fact]
@@ -31,7 +30,7 @@ public class HelpersTests
         // The workload assembly references Abstractions — resolving its custom
         // attributes requires the Abstractions assembly to be loadable.
         CustomAttributeData[] attributes = [.. asm.GetCustomAttributesData()];
-        Assert.NotEmpty(attributes);
+        attributes.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public class HelpersTests
 
         bool found = asm.GetCustomAttributesData().Any(a => a.IsCliWorkloadAttribute());
 
-        Assert.True(found);
+        found.Should().BeTrue();
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public class HelpersTests
         IEnumerable<CustomAttributeData> nonWorkloadAttrs = asm.GetCustomAttributesData()
             .Where(a => !a.AttributeType.IsGenericType);
 
-        Assert.All(nonWorkloadAttrs, a => Assert.False(a.IsCliWorkloadAttribute()));
+        nonWorkloadAttrs.Should().AllSatisfy(a => a.IsCliWorkloadAttribute().Should().BeFalse());
     }
 
     [Fact]
@@ -73,6 +72,6 @@ public class HelpersTests
 
         bool found = asm.GetCustomAttributesData().Any(a => a.IsCliWorkloadAttribute());
 
-        Assert.False(found);
+        found.Should().BeFalse();
     }
 }

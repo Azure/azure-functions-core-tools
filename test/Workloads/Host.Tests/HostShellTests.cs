@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Xunit;
-
 namespace Azure.Functions.Cli.Workloads.Host.Tests;
 
 public sealed class HostShellTests
@@ -17,9 +15,9 @@ public sealed class HostShellTests
             ["--urls", "http://0.0.0.0:7072", "--hostid", "abc"],
             CancellationToken.None);
 
-        Assert.Equal(0, exitCode);
-        Assert.Equal(["--urls", "http://0.0.0.0:7072", "--hostid", "abc"], hostRunner.Args);
-        Assert.False(hostRunner.EnableAuth);
+        exitCode.Should().Be(0);
+        hostRunner.Args.Should().Equal(["--urls", "http://0.0.0.0:7072", "--hostid", "abc"]);
+        hostRunner.EnableAuth.Should().BeFalse();
     }
 
     [Fact]
@@ -32,8 +30,8 @@ public sealed class HostShellTests
             ["--urls", "http://0.0.0.0:7072", "--enable-auth", "--hostid", "abc"],
             CancellationToken.None);
 
-        Assert.Equal(["--urls", "http://0.0.0.0:7072", "--hostid", "abc"], hostRunner.Args);
-        Assert.True(hostRunner.EnableAuth);
+        hostRunner.Args.Should().Equal(["--urls", "http://0.0.0.0:7072", "--hostid", "abc"]);
+        hostRunner.EnableAuth.Should().BeTrue();
     }
 
     [Fact]
@@ -45,7 +43,7 @@ public sealed class HostShellTests
 
         await shell.RunAsync([], cancellationTokenSource.Token);
 
-        Assert.Equal(cancellationTokenSource.Token, hostRunner.CancellationToken);
+        hostRunner.CancellationToken.Should().Be(cancellationTokenSource.Token);
     }
 
     private sealed class TestHostRunner : IFunctionsHostRunner

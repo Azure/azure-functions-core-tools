@@ -1,10 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite.Launching;
 
@@ -48,11 +46,11 @@ public class AzuriteLauncherTests
         }
 
         var process = new System.Diagnostics.Process { StartInfo = psi };
-        Assert.True(process.Start(), "Failed to start sentinel process.");
+        process.Start().Should().BeTrue("Failed to start sentinel process.");
 
         await using IAzuriteProcess handle = new AzuriteProcess(process, AzuriteLaunchMode.Native);
 
-        Assert.True(handle.ProcessId > 0);
+        (handle.ProcessId > 0).Should().BeTrue();
 
         using var readCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         string? firstLine = null;
@@ -62,7 +60,7 @@ public class AzuriteLauncherTests
             break;
         }
 
-        Assert.Equal("started", firstLine?.Trim());
+        (firstLine?.Trim()).Should().Be("started");
 
         await handle.StopAsync(CancellationToken.None);
 
@@ -71,12 +69,12 @@ public class AzuriteLauncherTests
 
         // Force-killed processes return a non-zero exit code on Unix and an
         // OS-specific code on Windows. Either way, the process must have exited.
-        Assert.NotEqual(0, exitCode);
+        exitCode.Should().NotBe(0);
 
         // Verify request shape validation still passes for the parallel
         // happy-path AzuriteLaunchRequest. (Keeps the launch-request type
         // exercised even though we routed around the launcher.)
-        Assert.Equal(AzuriteLaunchMode.Native, request.Mode);
+        request.Mode.Should().Be(AzuriteLaunchMode.Native);
     }
 
     [Fact]
@@ -94,11 +92,10 @@ public class AzuriteLauncherTests
             logPath: Path.Combine(Path.GetTempPath(), "azurite-test.log"),
             executablePath: missingPath);
 
-        var ex = await Assert.ThrowsAsync<AzuriteLaunchException>(
-            () => launcher.StartAsync(request, CancellationToken.None));
+        var ex = (await FluentActions.Awaiting(() => launcher.StartAsync(request, CancellationToken.None)).Should().ThrowAsync<AzuriteLaunchException>()).Which;
 
-        Assert.Equal(AzuriteLaunchMode.Native, ex.Mode);
-        Assert.Equal(missingPath, ex.FileName);
+        ex.Mode.Should().Be(AzuriteLaunchMode.Native);
+        ex.FileName.Should().Be(missingPath);
     }
 
     [Fact]
@@ -121,7 +118,7 @@ public class AzuriteLauncherTests
         }
 
         var process = new System.Diagnostics.Process { StartInfo = psi };
-        Assert.True(process.Start());
+        process.Start().Should().BeTrue();
         int pid = process.Id;
 
         IAzuriteProcess handle = new AzuriteProcess(process, AzuriteLaunchMode.Native);
@@ -129,7 +126,7 @@ public class AzuriteLauncherTests
 
         // Give the OS a moment to reap.
         await Task.Delay(200);
-        Assert.False(IsProcessAlive(pid));
+        IsProcessAlive(pid).Should().BeFalse();
     }
 
     private static (string FileName, string CommandText) GetEchoSleepSentinel()

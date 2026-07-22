@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
@@ -9,7 +8,6 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite;
 
@@ -19,23 +17,23 @@ public class AzuriteServiceCollectionExtensionsTests
     public void AddAzuriteProbe_ResolvesIAzuriteProbe()
     {
         IServiceProvider provider = BaseServices().AddAzuriteProbe().BuildServiceProvider();
-        Assert.NotNull(provider.GetRequiredService<IAzuriteProbe>());
+        provider.GetRequiredService<IAzuriteProbe>().Should().NotBeNull();
     }
 
     [Fact]
     public void AddAzuriteManagedPaths_ResolvesPathsProviderAndClock()
     {
         IServiceProvider provider = BaseServices().AddAzuriteManagedPaths().BuildServiceProvider();
-        Assert.NotNull(provider.GetRequiredService<IAzuriteManagedPathsProvider>());
-        Assert.NotNull(provider.GetRequiredService<IClock>());
+        provider.GetRequiredService<IAzuriteManagedPathsProvider>().Should().NotBeNull();
+        provider.GetRequiredService<IClock>().Should().NotBeNull();
     }
 
     [Fact]
     public void AddAzuriteDiscovery_ResolvesLocatorAndDockerProbe()
     {
         IServiceProvider provider = BaseServices().AddAzuriteDiscovery().BuildServiceProvider();
-        Assert.NotNull(provider.GetRequiredService<IAzuriteExecutableLocator>());
-        Assert.NotNull(provider.GetRequiredService<IDockerAvailabilityProbe>());
+        provider.GetRequiredService<IAzuriteExecutableLocator>().Should().NotBeNull();
+        provider.GetRequiredService<IDockerAvailabilityProbe>().Should().NotBeNull();
     }
 
     [Fact]
@@ -43,7 +41,7 @@ public class AzuriteServiceCollectionExtensionsTests
     {
         IServiceCollection services = BaseServices().AddAzuriteDiscovery().AddAzuriteLauncher();
         IServiceProvider provider = services.BuildServiceProvider();
-        Assert.NotNull(provider.GetRequiredService<IAzuriteLauncher>());
+        provider.GetRequiredService<IAzuriteLauncher>().Should().NotBeNull();
     }
 
     [Fact]
@@ -51,13 +49,13 @@ public class AzuriteServiceCollectionExtensionsTests
     {
         IServiceProvider provider = BaseServices().AddManagedAzurite().BuildServiceProvider();
 
-        Assert.NotNull(provider.GetRequiredService<IManagedAzuriteOrchestrator>());
-        Assert.NotNull(provider.GetRequiredService<IAzureWebJobsStorageClassifier>());
-        Assert.NotNull(provider.GetRequiredService<IAzuriteProbe>());
-        Assert.NotNull(provider.GetRequiredService<IAzuriteExecutableLocator>());
-        Assert.NotNull(provider.GetRequiredService<IDockerAvailabilityProbe>());
-        Assert.NotNull(provider.GetRequiredService<IAzuriteLauncher>());
-        Assert.NotNull(provider.GetRequiredService<IAzuriteManagedPathsProvider>());
+        provider.GetRequiredService<IManagedAzuriteOrchestrator>().Should().NotBeNull();
+        provider.GetRequiredService<IAzureWebJobsStorageClassifier>().Should().NotBeNull();
+        provider.GetRequiredService<IAzuriteProbe>().Should().NotBeNull();
+        provider.GetRequiredService<IAzuriteExecutableLocator>().Should().NotBeNull();
+        provider.GetRequiredService<IDockerAvailabilityProbe>().Should().NotBeNull();
+        provider.GetRequiredService<IAzuriteLauncher>().Should().NotBeNull();
+        provider.GetRequiredService<IAzuriteManagedPathsProvider>().Should().NotBeNull();
     }
 
     private static IServiceCollection BaseServices()

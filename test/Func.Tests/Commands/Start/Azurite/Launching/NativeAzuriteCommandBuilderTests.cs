@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite.Launching;
 
@@ -22,7 +21,7 @@ public class NativeAzuriteCommandBuilderTests
 
         var (fileName, args) = NativeAzuriteCommandBuilder.Build(request);
 
-        Assert.Equal("/usr/local/bin/azurite", fileName);
+        fileName.Should().Be("/usr/local/bin/azurite");
 
         string[] expected =
         [
@@ -40,7 +39,7 @@ public class NativeAzuriteCommandBuilderTests
             "--debug", "/var/log/azurite.log",
         ];
 
-        Assert.Equal(expected, args);
+        args.Should().Equal(expected);
     }
 
     [Fact]
@@ -57,9 +56,9 @@ public class NativeAzuriteCommandBuilderTests
 
         var (_, args) = NativeAzuriteCommandBuilder.Build(request);
 
-        Assert.Contains("20000", args);
-        Assert.Contains("30000", args);
-        Assert.Contains("40000", args);
+        args.Should().Contain("20000");
+        args.Should().Contain("30000");
+        args.Should().Contain("40000");
     }
 
     [Fact]
@@ -75,6 +74,6 @@ public class NativeAzuriteCommandBuilderTests
             dockerImage: AzuriteDockerImage.Default,
             containerName: "func-azurite-x");
 
-        Assert.Throws<ArgumentException>(() => NativeAzuriteCommandBuilder.Build(request));
+        FluentActions.Invoking(() => NativeAzuriteCommandBuilder.Build(request)).Should().ThrowExactly<ArgumentException>();
     }
 }

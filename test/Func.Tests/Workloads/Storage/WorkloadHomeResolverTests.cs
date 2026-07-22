@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Storage;
-using Xunit;
 using AbstractionsConstants = Azure.Functions.Cli.Abstractions.Common.Constants;
 using FuncConstants = Azure.Functions.Cli.Common.Constants;
 
@@ -19,7 +18,7 @@ public class WorkloadHomeResolverTests
 
         string resolved = WithEnv(workloadsHome, funcHome, WorkloadHomeResolver.Resolve);
 
-        Assert.Equal(Path.GetFullPath(workloadsHome), resolved);
+        resolved.Should().Be(Path.GetFullPath(workloadsHome));
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public class WorkloadHomeResolverTests
 
         string resolved = WithEnv(null, funcHome, WorkloadHomeResolver.Resolve);
 
-        Assert.Equal(Path.GetFullPath(funcHome), resolved);
+        resolved.Should().Be(Path.GetFullPath(funcHome));
     }
 
     [Fact]
@@ -41,7 +40,7 @@ public class WorkloadHomeResolverTests
 
         string resolved = WithEnv(null, null, WorkloadHomeResolver.Resolve);
 
-        Assert.Equal(expected, resolved);
+        resolved.Should().Be(expected);
     }
 
     private static string WithEnv(string? workloadsHome, string? funcHome, Func<string> action)

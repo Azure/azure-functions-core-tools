@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.Globalization;
+using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
@@ -210,11 +211,27 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             initializationEvents = [.. initializationRenderer.Events];
         }
 
+        // Take ownership of the host stream now so any failure before pipeline completion still tears the process down.
+        await using IHostEventStream hostEventStream = initializationResult.EventStream;
+
         var state = new DashboardState();
 
         IDashboardRenderer renderer = CreateRenderer(mode, initializationResult.RunInfo);
 
-        IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, initializationResult.EventStream);
+        // When the CLI launched Azurite, watch host output for a 500 from the
+        // emulator and surface data-directory reset guidance (live and in the
+        // end-of-run summary). Inert for user-managed or disabled Azurite.
+        IHostEventStream hostStreamForDashboard = hostEventStream;
+        AzuriteFailureDetectingHostEventStream? azuriteFailureDetector = null;
+        string? azuriteResetGuidance = null;
+        if (initializationResult.AzuritePaths is { } azuritePaths)
+        {
+            azuriteResetGuidance = BuildAzuriteResetGuidance(azuritePaths);
+            azuriteFailureDetector = new AzuriteFailureDetectingHostEventStream(hostEventStream, azuriteResetGuidance);
+            hostStreamForDashboard = azuriteFailureDetector;
+        }
+
+        IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, hostStreamForDashboard);
         var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink);
         FunctionsProjectHostRunOutcome? outcome = null;
         // Stop any managed Azurite instance the orchestrator launched when
@@ -244,6 +261,14 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             {
                 await CompleteProjectHostRunAsync(initializationResult, outcome);
             }
+
+            // Repeat the managed-Azurite reset guidance after the dashboard has
+            // torn down so it is the last thing the user sees when the emulator
+            // returned a 500 during the run.
+            if (azuriteFailureDetector?.Detected == true && azuriteResetGuidance is not null)
+            {
+                _interaction.WriteWarning(azuriteResetGuidance);
+            }
         }
     }
 
@@ -267,6 +292,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
             _interaction.WriteWarning($"Project cleanup failed: {ex.Message}");
         }
     }
+
+    private static string BuildAzuriteResetGuidance(AzuriteManagedPaths paths)
+        => $"Managed Azurite returned a 500 (Internal Server Error), which usually means its data directory is "
+            + $"corrupted or in a bad state. Delete '{paths.DataDirectory}' to reset Azurite, then run 'func start' again. "
+            + $"Azurite debug log: '{paths.LogFilePath}'.";
 
     private HostStartupOptions GetHostStartupOptions(DirectoryInfo projectDirectory)
         => ProjectDirectoryResolver.IsProjectDirectory(projectDirectory)

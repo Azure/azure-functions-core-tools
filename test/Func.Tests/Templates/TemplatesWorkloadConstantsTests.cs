@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Templates;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -16,7 +15,7 @@ public class TemplatesWorkloadConstantsTests
     [InlineData("  python  ", "Azure.Functions.Cli.Workloads.Templates.Python")]
     public void GetPackageId_Title_Cases_The_Stack(string stack, string expected)
     {
-        Assert.Equal(expected, TemplatesWorkloadConstants.GetPackageId(stack));
+        TemplatesWorkloadConstants.GetPackageId(stack).Should().Be(expected);
     }
 
     [Theory]
@@ -25,6 +24,6 @@ public class TemplatesWorkloadConstantsTests
     [InlineData("   ")]
     public void GetPackageId_Empty_Stack_Throws(string? stack)
     {
-        Assert.Throws<ArgumentException>(() => TemplatesWorkloadConstants.GetPackageId(stack!));
+        FluentActions.Invoking(() => TemplatesWorkloadConstants.GetPackageId(stack!)).Should().ThrowExactly<ArgumentException>();
     }
 }

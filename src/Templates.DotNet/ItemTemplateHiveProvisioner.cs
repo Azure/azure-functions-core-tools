@@ -110,7 +110,16 @@ internal sealed class ItemTemplateHiveProvisioner(IItemTemplateHivePathProvider 
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            try { process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Ignore: the process may have already exited on timeout, and a failed kill
+                // must not mask the timeout error thrown below.
+            }
+
             throw new InvalidOperationException(
                 $"Provisioning the dotnet item-template hive timed out after {_installTimeout.TotalMinutes:0} minutes. Check your network and try again.");
         }

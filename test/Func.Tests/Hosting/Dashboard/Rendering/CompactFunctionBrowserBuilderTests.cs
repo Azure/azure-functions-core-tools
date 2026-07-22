@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Spectre.Console;
 using Spectre.Console.Rendering;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -19,7 +18,7 @@ public class CompactFunctionBrowserBuilderTests
 
         int totalRows = builder.GetTotalRows(functionCount: 5);
 
-        Assert.Equal(3, totalRows);
+        totalRows.Should().Be(3);
     }
 
     [Fact]
@@ -40,9 +39,9 @@ public class CompactFunctionBrowserBuilderTests
             selectedIndex: 0);
 
         string output = Render(renderable);
-        Assert.Contains("Functions (2)", output);
-        Assert.Contains("HttpTrigger (3)", output);
-        Assert.Contains("QueueProcessor", output);
+        output.Should().Contain("Functions (2)");
+        output.Should().Contain("HttpTrigger (3)");
+        output.Should().Contain("QueueProcessor");
     }
 
     [Fact]
@@ -53,8 +52,8 @@ public class CompactFunctionBrowserBuilderTests
         IRenderable renderable = builder.Build([], totalRows: 1, visibleRows: 1, rowOffset: 0, selectedIndex: 0);
 
         string output = Render(renderable);
-        Assert.Contains("Functions (0)", output);
-        Assert.Contains("No functions loaded yet", output);
+        output.Should().Contain("Functions (0)");
+        output.Should().Contain("No functions loaded yet");
     }
 
     private static FunctionInfo CreateFunction(string name, FunctionStatus status, int activeInvocations)

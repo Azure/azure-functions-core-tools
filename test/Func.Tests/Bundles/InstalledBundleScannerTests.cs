@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Bundles.Tests;
 
@@ -16,8 +15,8 @@ public class InstalledBundleScannerTests
     public async Task NoRows_ReportsZeroTotal()
     {
         ScanResult result = await Build([]).ScanAsync(StableId);
-        Assert.Equal(0, result.TotalInstalledRows);
-        Assert.Empty(result.FilteredVersions);
+        result.TotalInstalledRows.Should().Be(0);
+        result.FilteredVersions.Should().BeEmpty();
     }
 
     [Fact]
@@ -31,10 +30,10 @@ public class InstalledBundleScannerTests
             Row("4.24.0", "/d"),
         ]).ScanAsync(StableId);
 
-        Assert.Equal(4, result.TotalInstalledRows);
-        Assert.Equal(2, result.FilteredVersions.Count);
-        Assert.Equal(NuGetVersion.Parse("4.24.0"), result.FilteredVersions[0].Version);
-        Assert.Equal(NuGetVersion.Parse("4.22.0"), result.FilteredVersions[1].Version);
+        result.TotalInstalledRows.Should().Be(4);
+        result.FilteredVersions.Count.Should().Be(2);
+        result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.24.0"));
+        result.FilteredVersions[1].Version.Should().Be(NuGetVersion.Parse("4.22.0"));
     }
 
     [Fact]
@@ -48,8 +47,8 @@ public class InstalledBundleScannerTests
             Row("4.25.0-beta", "/d"),
         ]).ScanAsync(PreviewId);
 
-        Assert.Single(result.FilteredVersions);
-        Assert.Equal(NuGetVersion.Parse("4.23.0-preview"), result.FilteredVersions[0].Version);
+        result.FilteredVersions.Should().ContainSingle();
+        result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.23.0-preview"));
     }
 
     [Fact]
@@ -63,9 +62,9 @@ public class InstalledBundleScannerTests
             Row("4.25.0-experimental.2", "/d"),
         ]).ScanAsync(ExperimentalId);
 
-        Assert.Equal(2, result.FilteredVersions.Count);
-        Assert.Equal(NuGetVersion.Parse("4.25.0-experimental.2"), result.FilteredVersions[0].Version);
-        Assert.Equal(NuGetVersion.Parse("4.24.0-experimental.1"), result.FilteredVersions[1].Version);
+        result.FilteredVersions.Count.Should().Be(2);
+        result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.25.0-experimental.2"));
+        result.FilteredVersions[1].Version.Should().Be(NuGetVersion.Parse("4.24.0-experimental.1"));
     }
 
     [Fact]
@@ -73,7 +72,7 @@ public class InstalledBundleScannerTests
     {
         ScanResult result = await Build([Row("4.35.0", "/install/dir")]).ScanAsync(StableId);
 
-        Assert.Equal(Path.Combine("/install/dir", "tools", "any"), result.FilteredVersions[0].Path);
+        result.FilteredVersions[0].Path.Should().Be(Path.Combine("/install/dir", "tools", "any"));
     }
 
     [Fact]
@@ -85,8 +84,8 @@ public class InstalledBundleScannerTests
             Row("4.22.0", "/y"),
         ]).ScanAsync(StableId);
 
-        Assert.Single(result.FilteredVersions);
-        Assert.Equal(NuGetVersion.Parse("4.22.0"), result.FilteredVersions[0].Version);
+        result.FilteredVersions.Should().ContainSingle();
+        result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.22.0"));
     }
 
     [Fact]
@@ -99,8 +98,8 @@ public class InstalledBundleScannerTests
             Row("4.10.0", "/c"),
         ]).ScanAsync(StableId);
 
-        Assert.Equal(NuGetVersion.Parse("4.30.0"), result.FilteredVersions[0].Version);
-        Assert.Equal(NuGetVersion.Parse("4.10.0"), result.FilteredVersions[2].Version);
+        result.FilteredVersions[0].Version.Should().Be(NuGetVersion.Parse("4.30.0"));
+        result.FilteredVersions[2].Version.Should().Be(NuGetVersion.Parse("4.10.0"));
     }
 
     private static InstalledBundleScanner Build(IReadOnlyList<InstalledBundleWorkload> rows)

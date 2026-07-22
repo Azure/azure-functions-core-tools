@@ -12,7 +12,6 @@ using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -44,10 +43,10 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.Installed installed = Assert.IsType<HostWorkloadResolution.Installed>(result);
-        Assert.Same(selectedHost, installed.Workload);
-        Assert.Equal("4.1000.0", installed.HostVersion);
-        Assert.False(installed.ExplicitlyRequested);
+        HostWorkloadResolution.Installed installed = result.Should().BeOfType<HostWorkloadResolution.Installed>().Subject;
+        installed.Workload.Should().BeSameAs(selectedHost);
+        installed.HostVersion.Should().Be("4.1000.0");
+        installed.ExplicitlyRequested.Should().BeFalse();
     }
 
     [Fact]
@@ -61,8 +60,7 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.Installed installed = Assert.IsType<HostWorkloadResolution.Installed>(result);
-        Assert.Same(selectedHost, installed.Workload);
+        result.Should().BeOfType<HostWorkloadResolution.Installed>().Which.Workload.Should().BeSameAs(selectedHost);
     }
 
     [Fact]
@@ -76,8 +74,7 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.Installed installed = Assert.IsType<HostWorkloadResolution.Installed>(result);
-        Assert.Same(currentRidHost, installed.Workload);
+        result.Should().BeOfType<HostWorkloadResolution.Installed>().Which.Workload.Should().BeSameAs(currentRidHost);
     }
 
     [Fact]
@@ -89,10 +86,9 @@ public class HostWorkloadResolverTests
             ProfileHostVersionRange: VersionRange.Parse("[1.8.1, 4.1048.200)"),
             Offline: false);
 
-        HostWorkloadResolutionException ex = await Assert.ThrowsAsync<HostWorkloadResolutionException>(
-            () => resolver.ResolveAsync(context, CancellationToken.None));
+        HostWorkloadResolutionException ex = (await FluentActions.Awaiting(() => resolver.ResolveAsync(context, CancellationToken.None)).Should().ThrowAsync<HostWorkloadResolutionException>()).Which;
 
-        Assert.Contains("outside profile host range", ex.Message);
+        ex.Message.Should().Contain("outside profile host range");
     }
 
     [Fact]
@@ -108,9 +104,9 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.Installed installed = Assert.IsType<HostWorkloadResolution.Installed>(result);
-        Assert.True(installed.ExplicitlyRequested);
-        Assert.Same(requestedHost, installed.Workload);
+        HostWorkloadResolution.Installed installed = result.Should().BeOfType<HostWorkloadResolution.Installed>().Subject;
+        installed.ExplicitlyRequested.Should().BeTrue();
+        installed.Workload.Should().BeSameAs(requestedHost);
     }
 
     [Fact]
@@ -124,9 +120,9 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.InstallRequired installRequired = Assert.IsType<HostWorkloadResolution.InstallRequired>(result);
-        Assert.Equal("4.1000.0", installRequired.HostVersion);
-        Assert.Equal(_hostPackageId, installRequired.PackageId);
+        HostWorkloadResolution.InstallRequired installRequired = result.Should().BeOfType<HostWorkloadResolution.InstallRequired>().Subject;
+        installRequired.HostVersion.Should().Be("4.1000.0");
+        installRequired.PackageId.Should().Be(_hostPackageId);
     }
 
     [Fact]
@@ -148,9 +144,9 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.InstallRequired installRequired = Assert.IsType<HostWorkloadResolution.InstallRequired>(result);
-        Assert.Equal("4.1048.199", installRequired.HostVersion);
-        Assert.Equal(_hostPackageId, installRequired.PackageId);
+        HostWorkloadResolution.InstallRequired installRequired = result.Should().BeOfType<HostWorkloadResolution.InstallRequired>().Subject;
+        installRequired.HostVersion.Should().Be("4.1048.199");
+        installRequired.PackageId.Should().Be(_hostPackageId);
     }
 
     [Fact]
@@ -164,8 +160,8 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution result = await resolver.ResolveAsync(context, CancellationToken.None);
 
-        HostWorkloadResolution.InstallRequired installRequired = Assert.IsType<HostWorkloadResolution.InstallRequired>(result);
-        Assert.Equal("[1.8.1, 4.1048.200)", installRequired.HostVersion);
+        result.Should().BeOfType<HostWorkloadResolution.InstallRequired>()
+            .Which.HostVersion.Should().Be("[1.8.1, 4.1048.200)");
         await _workloadCatalog.DidNotReceive().SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
         await _workloadCatalog.DidNotReceive().ResolveLatestVersionInRangeAsync(
             Arg.Any<string>(),
@@ -192,11 +188,10 @@ public class HostWorkloadResolverTests
             Substitute.For<IProcessEnvironment>());
         StartInitializationStepContext context = NewStepContext(step, offline: true);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => step.ExecuteAsync(context, CancellationToken.None));
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.Contains("--offline", ex.Message);
-        Assert.Equal("4.1000.0", context.State.HostVersion);
+        ex.Message.Should().Contain("--offline");
+        context.State.HostVersion.Should().Be("4.1000.0");
     }
 
     [Fact]
@@ -218,8 +213,8 @@ public class HostWorkloadResolverTests
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Equal("No compatible host installed", result.Message);
-        Assert.IsType<InstallHostWorkloadInitializationStep>(context.DrainNextSteps().Single());
+        result.Message.Should().Be("No compatible host installed");
+        context.DrainNextSteps().Single().Should().BeOfType<InstallHostWorkloadInitializationStep>();
     }
 
     [Fact]
@@ -242,10 +237,10 @@ public class HostWorkloadResolverTests
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Equal("Installed host 4.1000.0", result.Message);
-        Assert.Equal("4.1000.0", context.State.HostVersion);
-        Assert.NotNull(context.State.HostWorkload);
-        Assert.Equal(_hostPackageId, context.State.HostWorkload.PackageId);
+        result.Message.Should().Be("Installed host 4.1000.0");
+        context.State.HostVersion.Should().Be("4.1000.0");
+        context.State.HostWorkload.Should().NotBeNull();
+        context.State.HostWorkload.PackageId.Should().Be(_hostPackageId);
         await installer.Received(1).InstallFromCatalogAsync(
             packageId: _hostPackageId,
             version: Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "4.1000.0"),
@@ -274,11 +269,10 @@ public class HostWorkloadResolverTests
         var step = new InstallHostWorkloadInitializationStep(installer, CreateWorkloadPaths(), _hostPackageId, "4.1000.0");
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => step.ExecuteAsync(context, CancellationToken.None));
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Equal("missing host", ex.Message);
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Be("missing host");
     }
 
     private void UseContentWorkloads(params ContentWorkloadInfo[] workloads)

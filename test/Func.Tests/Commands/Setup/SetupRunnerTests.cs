@@ -13,11 +13,11 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Configuration;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
 
@@ -75,7 +75,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, _hostPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.1.0"),
@@ -111,7 +111,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
 
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, _hostPackageId, StringComparison.OrdinalIgnoreCase)),
@@ -165,7 +165,7 @@ public sealed class SetupRunnerTests : IDisposable
             Options(features: ["dotnet"], source: source, includePrerelease: true),
             CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, _dotNetStackPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.0.0"),
@@ -210,12 +210,12 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["dotnet-isolated"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["dotnet"], profiles: ["flex"]), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("does not support runtime", StringComparison.OrdinalIgnoreCase));
+        result.ExitCode.Should().Be(0);
+        _interaction.Lines.Should().NotContain(line => line.Contains("does not support runtime", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]
@@ -232,24 +232,22 @@ public sealed class SetupRunnerTests : IDisposable
             Options(features: [requestedFeature], outputMode: SetupOutputMode.Json),
             CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         using var started = JsonDocument.Parse(_interaction.Lines[0]);
         JsonElement root = started.RootElement;
         string[] features = [.. root.GetProperty("features").EnumerateArray().Select(feature => feature.GetString()!)];
         string[] workerRuntimes = [.. root.GetProperty("worker_runtimes").EnumerateArray().Select(runtime => runtime.GetString()!)];
 
-        Assert.Equal(["dotnet"], features);
-        Assert.Empty(workerRuntimes);
-        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("dotnet-isolated", StringComparison.OrdinalIgnoreCase));
-        string stackLine = Assert.Single(
-            _interaction.Lines,
-            line => line.Contains("\"type\":\"dependency.detected\"", StringComparison.OrdinalIgnoreCase)
-                && line.Contains("\"dependency_type\":\"stack\"", StringComparison.OrdinalIgnoreCase));
+        features.Should().Equal(["dotnet"]);
+        workerRuntimes.Should().BeEmpty();
+        _interaction.Lines.Should().NotContain(line => line.Contains("dotnet-isolated", StringComparison.OrdinalIgnoreCase));
+        string stackLine = _interaction.Lines.Should().ContainSingle(line => line.Contains("\"type\":\"dependency.detected\"", StringComparison.OrdinalIgnoreCase)
+                && line.Contains("\"dependency_type\":\"stack\"", StringComparison.OrdinalIgnoreCase)).Which;
         using var stackEvent = JsonDocument.Parse(stackLine);
         JsonElement stackRoot = stackEvent.RootElement;
 
-        Assert.Equal("dotnet", stackRoot.GetProperty("name").GetString());
-        Assert.Equal(_dotNetStackPackageId, stackRoot.GetProperty("package_id").GetString(), ignoreCase: true);
+        stackRoot.GetProperty("name").GetString().Should().Be("dotnet");
+        stackRoot.GetProperty("package_id").GetString().Should().BeEquivalentTo(_dotNetStackPackageId);
     }
 
     [Theory]
@@ -267,13 +265,13 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["python"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(Options(features: [requestedFeature], profiles: ["flex"]), CancellationToken.None);
 
-        Assert.Equal(1, result.ExitCode);
-        Assert.Contains(_interaction.Lines, line => line.Contains("does not support runtime 'dotnet'", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("dotnet-isolated", StringComparison.OrdinalIgnoreCase));
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().Contain(line => line.Contains("does not support runtime 'dotnet'", StringComparison.OrdinalIgnoreCase));
+        _interaction.Lines.Should().NotContain(line => line.Contains("dotnet-isolated", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -289,21 +287,21 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["python"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(
             Options(features: ["dotnet"], profiles: ["flex"], outputMode: SetupOutputMode.Json),
             CancellationToken.None);
 
-        Assert.Equal(1, result.ExitCode);
-        string failureLine = Assert.Single(_interaction.Lines, line => line.Contains("\"status\":\"failed\"", StringComparison.OrdinalIgnoreCase));
+        result.ExitCode.Should().Be(1);
+        string failureLine = _interaction.Lines.Should().ContainSingle(line => line.Contains("\"status\":\"failed\"", StringComparison.OrdinalIgnoreCase)).Which;
         using var failure = JsonDocument.Parse(failureLine);
         JsonElement root = failure.RootElement;
 
-        Assert.Equal("runtime", root.GetProperty("dependency_type").GetString());
-        Assert.Equal("dotnet", root.GetProperty("name").GetString());
-        Assert.False(root.TryGetProperty("package_id", out _));
-        Assert.DoesNotContain("dotnet-isolated", failureLine, StringComparison.OrdinalIgnoreCase);
+        root.GetProperty("dependency_type").GetString().Should().Be("runtime");
+        root.GetProperty("name").GetString().Should().Be("dotnet");
+        root.TryGetProperty("package_id", out _).Should().BeFalse();
+        failureLine.Should().NotContainEquivalentOf("dotnet-isolated");
     }
 
     [Fact]
@@ -315,10 +313,10 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["host"], source: source), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Empty(catalog.SearchSources);
-        Assert.NotEmpty(catalog.ResolveSources);
-        Assert.All(catalog.ResolveSources, actual => Assert.Equal(source, actual));
+        result.ExitCode.Should().Be(0);
+        catalog.SearchSources.Should().BeEmpty();
+        catalog.ResolveSources.Should().NotBeEmpty();
+        catalog.ResolveSources.Should().AllSatisfy(actual => actual.Should().Be(source));
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, _hostPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.1.0"),
@@ -340,8 +338,8 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["host"]), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Empty(catalog.SearchSources);
+        result.ExitCode.Should().Be(0);
+        catalog.SearchSources.Should().BeEmpty();
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, _hostPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.1.0"),
@@ -363,8 +361,8 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["host"], installPolicy: SetupInstallPolicy.IfNeeded), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Equal(0, catalog.ResolveLatestCallCount);
+        result.ExitCode.Should().Be(0);
+        catalog.ResolveLatestCallCount.Should().Be(0);
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Any<string>(),
             Arg.Any<NuGetVersion?>(),
@@ -386,8 +384,8 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["host"], check: true), CancellationToken.None);
 
-        Assert.Equal(1, result.ExitCode);
-        Assert.Contains(_interaction.Lines, line => line.Contains("4.1.0") && line.Contains("not installed"));
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().Contain(line => line.Contains("4.1.0") && line.Contains("not installed"));
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Any<string>(),
             Arg.Any<NuGetVersion?>(),
@@ -414,14 +412,12 @@ public sealed class SetupRunnerTests : IDisposable
                 outputMode: SetupOutputMode.Json),
             CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         string[] eventTypes = [.. _interaction.Lines
             .Select(line => JsonDocument.Parse(line).RootElement.GetProperty("type").GetString()!)
         ];
 
-        Assert.Equal(
-            ["setup.started", "profile.started", "dependency.detected", "dependency.result", "profile.completed", "setup.completed"],
-            eventTypes);
+        eventTypes.Should().Equal(["setup.started", "profile.started", "dependency.detected", "dependency.result", "profile.completed", "setup.completed"]);
     }
 
     [Fact]
@@ -443,7 +439,7 @@ public sealed class SetupRunnerTests : IDisposable
                         SupportedRuntimes = ["python"],
                     }),
                 ]),
-            ]));
+            ], NullLogger<ProfileCatalog>.Instance));
 
         SetupRunResult result = await runner.RunAsync(
             Options(
@@ -453,8 +449,8 @@ public sealed class SetupRunnerTests : IDisposable
                 check: true),
             CancellationToken.None);
 
-        Assert.Equal(1, result.ExitCode);
-        Assert.Contains(_interaction.Lines, line => line.Contains("does not support runtime 'node'"));
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().Contain(line => line.Contains("does not support runtime 'node'"));
     }
 
     [Fact]
@@ -471,7 +467,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, nodeStack, StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -499,7 +495,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, nodeTemplates, StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -521,7 +517,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(includePrerelease: true), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.10.0"),
@@ -559,7 +555,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.11.0-preview.1"),
@@ -592,7 +588,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.10.0"),
@@ -602,9 +598,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
-        Assert.Contains(
-            _interaction.Lines,
-            line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+        _interaction.Lines.Should().Contain(line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -619,7 +613,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.12.0-experimental.3"),
@@ -648,12 +642,10 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(check: true), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.DoesNotContain(_interaction.Lines, line => line.Contains("extension bundle", StringComparison.Ordinal)
+        result.ExitCode.Should().Be(0);
+        _interaction.Lines.Should().NotContain(line => line.Contains("extension bundle", StringComparison.Ordinal)
             && line.Contains("not installed", StringComparison.Ordinal));
-        Assert.Contains(
-            _interaction.Lines,
-            line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
+        _interaction.Lines.Should().Contain(line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -668,7 +660,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["java"]), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.StartsWith("Azure.Functions.Cli.Workloads.", StringComparison.OrdinalIgnoreCase)
                 && !id.StartsWith("Azure.Functions.Cli.Workloads.Workers.", StringComparison.OrdinalIgnoreCase)
@@ -720,8 +712,8 @@ public sealed class SetupRunnerTests : IDisposable
                 SetupOutputMode.Plain),
             CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal));
+        result.ExitCode.Should().Be(0);
+        interactive.Lines.Should().Contain(line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal));
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, nodeStack, StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -741,7 +733,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["host"]), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.StartsWith("Azure.Functions.Cli.Workloads.Node", StringComparison.OrdinalIgnoreCase)
                 || id.StartsWith("Azure.Functions.Cli.Workloads.Python", StringComparison.OrdinalIgnoreCase)
@@ -797,11 +789,11 @@ public sealed class SetupRunnerTests : IDisposable
         // Installed stacks render as static "fake checkbox" lines above the
         // prompt with the uninstall hint, and are kept out of the multi-select
         // entirely so the user can't toggle them.
-        Assert.Contains(interactive.Lines, line => line.Contains("Already installed", StringComparison.Ordinal)
+        interactive.Lines.Should().Contain(line => line.Contains("Already installed", StringComparison.Ordinal)
             && line.Contains("func workload uninstall", StringComparison.Ordinal));
-        Assert.Contains(interactive.Lines, line => line.Contains("[✓] node", StringComparison.Ordinal));
-        Assert.DoesNotContain(interactive.Lines, line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node", StringComparison.Ordinal));
-        Assert.DoesNotContain(interactive.MultiSelectionChoices.SelectMany(g => g), c => c.Value == "node");
+        interactive.Lines.Should().Contain(line => line.Contains("[✓] node", StringComparison.Ordinal));
+        interactive.Lines.Should().NotContain(line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node", StringComparison.Ordinal));
+        interactive.MultiSelectionChoices.SelectMany(g => g).Should().NotContain(c => c.Value == "node");
     }
 
     [Fact]
@@ -825,7 +817,7 @@ public sealed class SetupRunnerTests : IDisposable
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
+        result.ExitCode.Should().Be(0);
         await firstRunStore.Received(1).MarkCompleteAsync(Arg.Any<CancellationToken>());
     }
 

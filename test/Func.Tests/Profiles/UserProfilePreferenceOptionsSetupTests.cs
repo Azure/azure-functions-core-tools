@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Configuration;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Profiles;
 
@@ -30,7 +29,7 @@ public sealed class UserProfilePreferenceOptionsSetupTests : IDisposable
 
         setup.Configure(options);
 
-        Assert.Equal("flex", options.DefaultProfile);
+        options.DefaultProfile.Should().Be("flex");
     }
 
     [Fact]
@@ -45,7 +44,7 @@ public sealed class UserProfilePreferenceOptionsSetupTests : IDisposable
 
         setup.Configure(options);
 
-        Assert.Null(options.DefaultProfile);
+        options.DefaultProfile.Should().BeNull();
     }
 
     private void WriteUserConfig(string contents)

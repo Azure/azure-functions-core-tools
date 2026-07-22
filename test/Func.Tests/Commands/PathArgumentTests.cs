@@ -3,7 +3,6 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -22,10 +21,10 @@ public class PathArgumentTests
 
         var workingDirectory = parseResult.GetValue(cmd.PathArgument!);
 
-        Assert.NotNull(workingDirectory);
-        Assert.True(workingDirectory!.WasExplicit);
-        Assert.Equal("/tmp/some-project", workingDirectory.OriginalPath);
-        Assert.EndsWith("some-project", workingDirectory.Info.Name);
+        workingDirectory.Should().NotBeNull();
+        workingDirectory!.WasExplicit.Should().BeTrue();
+        workingDirectory.OriginalPath.Should().Be("/tmp/some-project");
+        workingDirectory.Info.Name.Should().EndWith("some-project");
     }
 
     [Fact]
@@ -36,10 +35,10 @@ public class PathArgumentTests
 
         var workingDirectory = parseResult.GetValue(cmd.PathArgument!);
 
-        Assert.NotNull(workingDirectory);
-        Assert.False(workingDirectory!.WasExplicit);
-        Assert.Null(workingDirectory.OriginalPath);
-        Assert.Equal(Directory.GetCurrentDirectory(), workingDirectory.Info.FullName);
+        workingDirectory.Should().NotBeNull();
+        workingDirectory!.WasExplicit.Should().BeFalse();
+        workingDirectory.OriginalPath.Should().BeNull();
+        workingDirectory.Info.FullName.Should().Be(Directory.GetCurrentDirectory());
     }
 
     [Fact]
@@ -48,7 +47,7 @@ public class PathArgumentTests
         var cmd = new TestableCommand();
         var parseResult = cmd.Parse(["--bogus"]);
 
-        Assert.NotEmpty(parseResult.Errors);
+        parseResult.Errors.Should().NotBeEmpty();
     }
 
     private sealed class TestableCommand : FuncCliCommand

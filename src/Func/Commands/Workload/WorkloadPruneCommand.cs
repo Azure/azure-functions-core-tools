@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;

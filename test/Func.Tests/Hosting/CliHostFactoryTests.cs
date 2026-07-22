@@ -2,14 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
-using Azure.Functions.Cli;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting;
 
@@ -51,7 +49,7 @@ public sealed class CliHostFactoryTests : IDisposable
         HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
         using ServiceProvider provider = builder.Services.BuildServiceProvider();
 
-        Assert.NotNull(provider.GetRequiredService<IPlatform>());
+        provider.GetRequiredService<IPlatform>().Should().NotBeNull();
     }
 
     [Fact]
@@ -65,8 +63,8 @@ public sealed class CliHostFactoryTests : IDisposable
         using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
-        Assert.Contains(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
-        Assert.DoesNotContain(interaction.Lines, l => l.StartsWith("WARNING:", StringComparison.Ordinal));
+        rootCommand.Subcommands.Should().Contain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
+        interaction.Lines.Should().NotContain(l => l.StartsWith("WARNING:", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -83,10 +81,10 @@ public sealed class CliHostFactoryTests : IDisposable
         using IHost host = await StartHostAsync(interaction);
 
         IWorkloadProvider provider = host.Services.GetRequiredService<IWorkloadProvider>();
-        Assert.Single(provider.GetRuntimeWorkloads());
-        Assert.Equal(2, provider.GetContentWorkloads().Count);
-        Assert.Equal(3, provider.GetWorkloads().Count);
-        Assert.All(provider.GetContentWorkloads(), w => Assert.Equal(w.PackageId, w.DisplayName));
+        provider.GetRuntimeWorkloads().Should().ContainSingle();
+        provider.GetContentWorkloads().Count.Should().Be(2);
+        provider.GetWorkloads().Count.Should().Be(3);
+        provider.GetContentWorkloads().Should().AllSatisfy(w => w.DisplayName.Should().Be(w.PackageId));
     }
 
     [Fact]
@@ -100,14 +98,12 @@ public sealed class CliHostFactoryTests : IDisposable
         using IHost host = await StartHostAsync(interaction);
         var rootCommand = Parser.CreateCommand(host.Services);
 
-        Assert.Contains(
-            interaction.Lines,
-            l => l.StartsWith("WARNING:", StringComparison.Ordinal)
+        interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:", StringComparison.Ordinal)
                  && l.Contains("throwing.fixture@1.0.0", StringComparison.Ordinal)
                  && l.Contains("Boom from ThrowingWorkload", StringComparison.Ordinal));
 
         // Built-ins must still be there: a single misbehaving workload cannot brick the CLI.
-        Assert.Contains(rootCommand.Subcommands, c => string.Equals(c.Name, "version", StringComparison.OrdinalIgnoreCase));
+        rootCommand.Subcommands.Should().Contain(c => string.Equals(c.Name, "version", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -122,9 +118,9 @@ public sealed class CliHostFactoryTests : IDisposable
         var rootCommand = Parser.CreateCommand(host.Services);
 
         var workloads = host.Services.GetRequiredService<IWorkloadProvider>().GetWorkloads();
-        Assert.Empty(workloads);
-        Assert.DoesNotContain(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
-        Assert.DoesNotContain(interaction.Lines, l => l.StartsWith("WARNING:", StringComparison.Ordinal));
+        workloads.Should().BeEmpty();
+        rootCommand.Subcommands.Should().NotContain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
+        interaction.Lines.Should().NotContain(l => l.StartsWith("WARNING:", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -157,11 +153,11 @@ public sealed class CliHostFactoryTests : IDisposable
             var rootCommand = Parser.CreateCommand(host.Services);
 
             // The registered WorkloadPathsOptions wins: the staged workload's command is present.
-            Assert.Contains(rootCommand.Subcommands, c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
+            rootCommand.Subcommands.Should().Contain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
 
             // And the bound IWorkloadPaths reflects the override, not IConfiguration.
             var paths = host.Services.GetRequiredService<IWorkloadPaths>();
-            Assert.Equal(Path.GetFullPath(_home), paths.Home);
+            paths.Home.Should().Be(Path.GetFullPath(_home));
         }
         finally
         {

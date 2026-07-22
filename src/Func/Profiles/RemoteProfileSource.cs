@@ -1,0 +1,245 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Azure.Functions.Cli.Profiles;
+
+/// <summary>
+/// Fetches the profile registry from the CDN, falling back to a local cache.
+/// </summary>
+internal sealed class RemoteProfileSource(
+    HttpClient httpClient,
+    IOptions<RemoteProfileOptions> options,
+    ProfileDocumentParser parser,
+    IProfileFileSystem fileSystem,
+    CliConfigurationPathsOptions configurationPaths,
+    ILogger<RemoteProfileSource> logger) : IProfileSource
+{
+    private static readonly Uri _registryRelativeUri = new("cli/v5/profiles/v1/registry.json", UriKind.Relative);
+    private static readonly Uri _checksumRelativeUri = new("cli/v5/profiles/v1/registry.json.sha256", UriKind.Relative);
+
+    private const string CacheFileName = "registry.json";
+    private const string CacheChecksumFileName = "registry.json.sha256";
+    private const string CacheMetaFileName = "registry.json.meta";
+    private const string CacheDirectoryName = "profiles";
+
+    private static readonly TimeSpan _stalenessWarningThreshold = TimeSpan.FromDays(7);
+
+    private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    private readonly RemoteProfileOptions _options = (options ?? throw new ArgumentNullException(nameof(options))).Value;
+    private readonly ProfileDocumentParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
+    private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
+    private readonly ILogger<RemoteProfileSource> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+    public async Task<ProfileSourceSnapshot> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        string cacheDir = Path.Combine(_configurationPaths.Home, CacheDirectoryName);
+        string cachePath = Path.Combine(cacheDir, CacheFileName);
+        string cacheChecksumPath = Path.Combine(cacheDir, CacheChecksumFileName);
+        string cacheMetaPath = Path.Combine(cacheDir, CacheMetaFileName);
+
+        // Try cached registry first (within TTL, checksum-validated)
+        string? cachedJson = await TryLoadValidatedCacheAsync(cachePath, cacheChecksumPath, cacheMetaPath, cancellationToken);
+        if (cachedJson is not null)
+        {
+            var cacheSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "cached registry", cachePath);
+            ProfileSourceSnapshot? cached = TryParseRegistry(cachedJson, cacheSource, cachePath, cacheChecksumPath, cacheMetaPath);
+            if (cached is not null)
+            {
+                _logger.LogDebug("Using cached profile registry (within TTL).");
+                return cached;
+            }
+        }
+
+        // Try remote fetch
+        string? remoteJson = await TryFetchRemoteAsync(cachePath, cacheChecksumPath, cacheMetaPath, cancellationToken);
+        if (remoteJson is not null)
+        {
+            var remoteSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "remote registry", cachePath);
+            ProfileSourceSnapshot? remote = TryParseRegistry(remoteJson, remoteSource, cachePath, cacheChecksumPath, cacheMetaPath);
+            if (remote is not null)
+            {
+                return remote;
+            }
+        }
+
+        // Fall back to stale cache (beyond TTL but still checksum-valid)
+        string? staleCachedJson = await TryLoadValidatedCacheContentAsync(cachePath, cacheChecksumPath, cancellationToken);
+        if (staleCachedJson is not null)
+        {
+            var staleCacheSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "cached registry (stale)", cachePath);
+            ProfileSourceSnapshot? stale = TryParseRegistry(staleCachedJson, staleCacheSource, cachePath, cacheChecksumPath, cacheMetaPath);
+            if (stale is not null)
+            {
+                DateTimeOffset? fetchTime = await ReadFetchTimestampAsync(cacheMetaPath, cancellationToken);
+                if (fetchTime is not null)
+                {
+                    TimeSpan age = DateTimeOffset.UtcNow - fetchTime.Value;
+                    if (age > _stalenessWarningThreshold)
+                    {
+                        _logger.LogWarning("Profiles are {Days} days old. Host versions may not match current cloud deployments.", (int)age.TotalDays);
+                    }
+                }
+
+                _logger.LogDebug("Using stale cached profile registry (remote fetch failed).");
+                return stale;
+            }
+        }
+
+        // No remote, no cache — return empty so BuiltInProfileSource (bundled fallback) handles it
+        _logger.LogDebug("No remote or cached profile registry available; deferring to bundled fallback.");
+        var emptySource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "remote registry (unavailable)");
+        return ProfileSourceSnapshot.Empty(emptySource);
+    }
+
+    /// <summary>
+    /// Attempts to parse the registry JSON; on failure logs the error, invalidates the cache, and returns null.
+    /// </summary>
+    private ProfileSourceSnapshot? TryParseRegistry(string json, ProfileSourceInfo source, string cachePath, string cacheChecksumPath, string cacheMetaPath)
+    {
+        try
+        {
+            return _parser.ParseBuiltInRegistry(json, source);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Profile registry content is malformed; invalidating cache.");
+            InvalidateCache(cachePath, cacheChecksumPath, cacheMetaPath);
+            return null;
+        }
+    }
+
+    private void InvalidateCache(string cachePath, string cacheChecksumPath, string cacheMetaPath)
+    {
+        try
+        {
+            _fileSystem.DeleteIfExistsAsync(cachePath).GetAwaiter().GetResult();
+            _fileSystem.DeleteIfExistsAsync(cacheChecksumPath).GetAwaiter().GetResult();
+            _fileSystem.DeleteIfExistsAsync(cacheMetaPath).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            // Best-effort: if we can't delete, next TTL expiry will retry.
+            _logger.LogDebug(ex, "Failed to delete poisoned cache files.");
+        }
+    }
+
+    private async Task<string?> TryLoadValidatedCacheAsync(string cachePath, string checksumPath, string metaPath, CancellationToken cancellationToken)
+    {
+        DateTimeOffset? fetchTime = await ReadFetchTimestampAsync(metaPath, cancellationToken);
+        if (fetchTime is null)
+        {
+            return null;
+        }
+
+        if (DateTimeOffset.UtcNow - fetchTime.Value > _options.CacheTtl)
+        {
+            return null;
+        }
+
+        return await TryLoadValidatedCacheContentAsync(cachePath, checksumPath, cancellationToken);
+    }
+
+    private async Task<string?> TryLoadValidatedCacheContentAsync(string cachePath, string checksumPath, CancellationToken cancellationToken)
+    {
+        string? json = await _fileSystem.ReadAllTextIfExistsAsync(cachePath, cancellationToken);
+        if (json is null)
+        {
+            return null;
+        }
+
+        string? expectedChecksum = await _fileSystem.ReadAllTextIfExistsAsync(checksumPath, cancellationToken);
+        if (expectedChecksum is null)
+        {
+            _logger.LogDebug("Cached profile registry has no checksum file; discarding.");
+            return null;
+        }
+
+        string actualChecksum = Sha256Helpers.HashDataLowerHex(json);
+        if (!string.Equals(actualChecksum, expectedChecksum.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Cached profile registry checksum mismatch; discarding corrupt cache.");
+            return null;
+        }
+
+        return json;
+    }
+
+    private async Task<string?> TryFetchRemoteAsync(
+        string cachePath,
+        string cacheChecksumPath,
+        string cacheMetaPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Fetch registry and checksum in parallel
+            Task<string> registryTask = _httpClient.GetStringAsync(_registryRelativeUri, cancellationToken);
+            Task<string> checksumTask = _httpClient.GetStringAsync(_checksumRelativeUri, cancellationToken);
+
+            await Task.WhenAll(registryTask, checksumTask);
+
+            string registryJson = await registryTask;
+            string expectedChecksum = (await checksumTask).Trim();
+
+            // Validate checksum
+            string actualChecksum = Sha256Helpers.HashDataLowerHex(registryJson);
+            if (!string.Equals(actualChecksum, expectedChecksum, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Profile registry checksum mismatch. Discarding remote fetch.");
+                return null;
+            }
+
+            // Validate that the content is parseable before persisting to cache.
+            // This prevents checksum-valid but semantically malformed content from poisoning the cache.
+            var probeSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "remote registry (probe)");
+            try
+            {
+                _parser.ParseBuiltInRegistry(registryJson, probeSource);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Remote profile registry is checksum-valid but malformed; discarding.");
+                return null;
+            }
+
+            // Persist to cache atomically: write to temp files then rename so
+            // concurrent CLI processes never see a half-written cache.
+            await _fileSystem.WriteAllTextAsync(cachePath, registryJson, cancellationToken);
+            await _fileSystem.WriteAllTextAsync(cacheChecksumPath, expectedChecksum, cancellationToken);
+            // Meta written last: a partial write looks like an expired cache (safe).
+            await _fileSystem.WriteAllTextAsync(cacheMetaPath, DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
+
+            _logger.LogDebug("Profile registry fetched and cached from CDN.");
+            return registryJson;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // User-initiated cancellation (Ctrl+C) — propagate immediately
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            // Timeout or network failure — fall back gracefully
+            _logger.LogDebug(ex, "Failed to fetch profile registry from CDN.");
+            return null;
+        }
+    }
+
+    private async Task<DateTimeOffset?> ReadFetchTimestampAsync(string metaPath, CancellationToken cancellationToken)
+    {
+        string? meta = await _fileSystem.ReadAllTextIfExistsAsync(metaPath, cancellationToken);
+        if (meta is null)
+        {
+            return null;
+        }
+
+        return DateTimeOffset.TryParse(meta.Trim(), out DateTimeOffset ts) ? ts : null;
+    }
+}

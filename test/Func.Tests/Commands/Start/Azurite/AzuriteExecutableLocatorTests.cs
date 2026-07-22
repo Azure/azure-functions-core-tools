@@ -1,11 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Common.Processes;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite;
 
@@ -36,8 +34,7 @@ public class AzuriteExecutableLocatorTests
     {
         AzuriteExecutableLocator sut = CreateSut();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => sut.FindAsync(null!, CancellationToken.None));
+        await FluentActions.Awaiting(() => sut.FindAsync(null!, CancellationToken.None)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -53,10 +50,10 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(projectLocal, result!.FilePath);
-        Assert.Equal(AzuriteExecutableSource.ProjectLocal, result.Source);
-        Assert.Equal("3.30.0", result.Version);
+        result.Should().NotBeNull();
+        result!.FilePath.Should().Be(projectLocal);
+        result.Source.Should().Be(AzuriteExecutableSource.ProjectLocal);
+        result.Version.Should().Be("3.30.0");
     }
 
     [Fact]
@@ -72,9 +69,9 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(projectLocal, result!.FilePath);
-        Assert.Equal(AzuriteExecutableSource.ProjectLocal, result.Source);
+        result.Should().NotBeNull();
+        result!.FilePath.Should().Be(projectLocal);
+        result.Source.Should().Be(AzuriteExecutableSource.ProjectLocal);
     }
 
     [Fact]
@@ -91,9 +88,9 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(match, result!.FilePath);
-        Assert.Equal(AzuriteExecutableSource.Path, result.Source);
+        result.Should().NotBeNull();
+        result!.FilePath.Should().Be(match);
+        result.Source.Should().Be(AzuriteExecutableSource.Path);
     }
 
     [Fact]
@@ -116,8 +113,8 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(cmd, result!.FilePath);
+        result.Should().NotBeNull();
+        result!.FilePath.Should().Be(cmd);
     }
 
     [Fact]
@@ -134,8 +131,8 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(match, result!.FilePath);
+        result.Should().NotBeNull();
+        result!.FilePath.Should().Be(match);
 
         // Ensure we never asked about .cmd/.exe variants on Unix.
         _hostEnv.DidNotReceive().ExecutableExists(Arg.Is<string>(p =>
@@ -151,7 +148,7 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.Null(result);
+        result.Should().BeNull();
         await _processRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
     }
 
@@ -172,9 +169,9 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(projectLocal, result!.FilePath);
-        Assert.Null(result.Version);
+        result.Should().NotBeNull();
+        result!.FilePath.Should().Be(projectLocal);
+        result.Version.Should().BeNull();
     }
 
     [Fact]
@@ -189,8 +186,8 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Null(result!.Version);
+        result.Should().NotBeNull();
+        result!.Version.Should().BeNull();
     }
 
     [Fact]
@@ -204,8 +201,8 @@ public class AzuriteExecutableLocatorTests
 
         AzuriteExecutable? result = await CreateSut().FindAsync(ProjectRoot, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal("Azurite-Blob 3.30.0 (build 20250101)", result!.Version);
+        result.Should().NotBeNull();
+        result!.Version.Should().Be("Azurite-Blob 3.30.0 (build 20250101)");
     }
 
     [Fact]
@@ -215,7 +212,6 @@ public class AzuriteExecutableLocatorTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => CreateSut().FindAsync(ProjectRoot, cts.Token));
+        await FluentActions.Awaiting(() => CreateSut().FindAsync(ProjectRoot, cts.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 }

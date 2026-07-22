@@ -13,7 +13,6 @@ using NuGet.Frameworks;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
-using Xunit;
 using PackageSource = NuGet.Configuration.PackageSource;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Install;
@@ -47,18 +46,18 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
-        Assert.False(result.AlreadyInstalled);
-        Assert.Equal("test.workload", result.Entry.PackageId);
-        Assert.Equal("1.0.0", result.Entry.PackageVersion);
-        Assert.Equal(["test", "stub"], result.Entry.Aliases);
-        Assert.Equal("Test.dll", result.Entry.EntryPoint!.AssemblyPath);
-        Assert.Equal(Path.GetFullPath(nupkg), result.Entry.Source);
-        Assert.Equal(1, result.Entry.InstallRefCount);
+        result.AlreadyInstalled.Should().BeFalse();
+        result.Entry.PackageId.Should().Be("test.workload");
+        result.Entry.PackageVersion.Should().Be("1.0.0");
+        result.Entry.Aliases.Should().Equal(["test", "stub"]);
+        result.Entry.EntryPoint!.AssemblyPath.Should().Be("Test.dll");
+        result.Entry.Source.Should().Be(Path.GetFullPath(nupkg));
+        result.Entry.InstallRefCount.Should().Be(1);
 
         string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
-        Assert.True(Directory.Exists(installDir));
-        Assert.True(File.Exists(Path.Combine(installDir, "tools", "any", "Test.dll")));
-        Assert.True(File.Exists(nupkg), "Source .nupkg must be left in place.");
+        Directory.Exists(installDir).Should().BeTrue();
+        File.Exists(Path.Combine(installDir, "tools", "any", "Test.dll")).Should().BeTrue();
+        File.Exists(nupkg).Should().BeTrue("Source .nupkg must be left in place.");
 
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(e =>
@@ -81,7 +80,7 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
-        Assert.Empty(result.Entry.Aliases);
+        result.Entry.Aliases.Should().BeEmpty();
     }
 
     [Fact]
@@ -106,9 +105,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Select(p => Path.GetRelativePath(installDir, p).Replace(Path.DirectorySeparatorChar, '/'))
             .OrderBy(p => p, StringComparer.Ordinal)];
 
-        Assert.Equal(
-            new[] { "tools", "tools/any", "tools/any/Test.dll", "workload.json" },
-            entries);
+        entries.Should().Equal(["tools", "tools/any", "tools/any/Test.dll", "workload.json"]);
     }
 
     [Fact]
@@ -119,11 +116,10 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Returns(_ => throw new InvalidWorkloadException("missing workload.json"));
 
         WorkloadInstaller installer = NewInstaller();
-        InvalidWorkloadException ex = await Assert.ThrowsAsync<InvalidWorkloadException>(
-            () => installer.InstallFromPackageAsync(nupkg));
+        InvalidWorkloadException ex = (await FluentActions.Awaiting(() => installer.InstallFromPackageAsync(nupkg)).Should().ThrowAsync<InvalidWorkloadException>()).Which;
 
-        Assert.Contains("missing workload.json", ex.Message);
-        Assert.False(Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")));
+        ex.Message.Should().Contain("missing workload.json");
+        Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeFalse();
         await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
 
@@ -133,11 +129,10 @@ public sealed class WorkloadInstallerTests : IDisposable
         string nupkg = BuildNupkg(includeFuncCliWorkloadType: false);
 
         WorkloadInstaller installer = NewInstaller();
-        InvalidWorkloadException ex = await Assert.ThrowsAsync<InvalidWorkloadException>(
-            () => installer.InstallFromPackageAsync(nupkg));
+        InvalidWorkloadException ex = (await FluentActions.Awaiting(() => installer.InstallFromPackageAsync(nupkg)).Should().ThrowAsync<InvalidWorkloadException>()).Which;
 
-        Assert.Contains("FuncCliWorkload", ex.Message);
-        Assert.False(Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")));
+        ex.Message.Should().Contain("FuncCliWorkload");
+        Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeFalse();
         await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
 
@@ -145,9 +140,8 @@ public sealed class WorkloadInstallerTests : IDisposable
     public async Task InstallFromPackage_MissingFile_Throws()
     {
         WorkloadInstaller installer = NewInstaller();
-        FileNotFoundException ex = await Assert.ThrowsAsync<FileNotFoundException>(
-            () => installer.InstallFromPackageAsync(Path.Combine(_root, "missing.nupkg")));
-        Assert.Contains("does not exist", ex.Message);
+        FileNotFoundException ex = (await FluentActions.Awaiting(() => installer.InstallFromPackageAsync(Path.Combine(_root, "missing.nupkg"))).Should().ThrowAsync<FileNotFoundException>()).Which;
+        ex.Message.Should().Contain("does not exist");
     }
 
     [Fact]
@@ -174,8 +168,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
-        Assert.True(result.AlreadyInstalled);
-        Assert.Same(priorEntry, result.Entry);
+        result.AlreadyInstalled.Should().BeTrue();
+        result.Entry.Should().BeSameAs(priorEntry);
         await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
         await _store.DidNotReceive().RemoveWorkloadAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -198,8 +192,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
-        Assert.False(result.AlreadyInstalled);
-        Assert.False(File.Exists(stalePath));
+        result.AlreadyInstalled.Should().BeFalse();
+        File.Exists(stalePath).Should().BeFalse();
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(e => e.PackageId == "test.workload" && e.PackageVersion == "1.0.0"),
             Arg.Any<CancellationToken>());
@@ -220,10 +214,10 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg, force: true);
 
-        Assert.False(result.AlreadyInstalled);
-        Assert.Equal("test.workload", result.Entry.PackageId);
-        Assert.False(File.Exists(stalePath), "Stale files from the prior install must be gone after a forced reinstall.");
-        Assert.True(File.Exists(Path.Combine(installDir, "tools", "any", "Test.dll")));
+        result.AlreadyInstalled.Should().BeFalse();
+        result.Entry.PackageId.Should().Be("test.workload");
+        File.Exists(stalePath).Should().BeFalse("Stale files from the prior install must be gone after a forced reinstall.");
+        File.Exists(Path.Combine(installDir, "tools", "any", "Test.dll")).Should().BeTrue();
         await _store.Received(1).RemoveWorkloadAsync("test.workload", "1.0.0", Arg.Any<CancellationToken>());
         await _store.Received(1).SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
@@ -236,10 +230,9 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Returns<Task>(_ => throw new InvalidOperationException("disk full"));
 
         WorkloadInstaller installer = NewInstaller();
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => installer.InstallFromPackageAsync(nupkg));
+        await FluentActions.Awaiting(() => installer.InstallFromPackageAsync(nupkg)).Should().ThrowAsync<InvalidOperationException>();
 
-        Assert.False(Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")));
+        Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeFalse();
     }
 
     [Fact]
@@ -254,8 +247,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         bool removed = await installer.UninstallAsync("test.workload", "1.0.0");
 
-        Assert.True(removed);
-        Assert.False(Directory.Exists(installDir));
+        removed.Should().BeTrue();
+        Directory.Exists(installDir).Should().BeFalse();
     }
 
     [Fact]
@@ -269,8 +262,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         bool removed = await installer.UninstallAsync("test.workload", "1.0.0");
 
-        Assert.False(removed);
-        Assert.True(Directory.Exists(installDir));
+        removed.Should().BeFalse();
+        Directory.Exists(installDir).Should().BeTrue();
     }
 
     [Fact]
@@ -283,10 +276,10 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
-        Assert.Equal(WorkloadKind.Content, result.Entry.Kind);
-        Assert.Null(result.Entry.EntryPoint);
-        Assert.Equal("test.workload", result.Entry.DisplayName);
-        Assert.Equal("For tests.", result.Entry.Description);
+        result.Entry.Kind.Should().Be(WorkloadKind.Content);
+        result.Entry.EntryPoint.Should().BeNull();
+        result.Entry.DisplayName.Should().Be("test.workload");
+        result.Entry.Description.Should().Be("For tests.");
 
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(e =>
@@ -313,10 +306,10 @@ public sealed class WorkloadInstallerTests : IDisposable
             "test.workload", version: null, source: null,
             includePrerelease: false, exact: true, force: false);
 
-        Assert.False(result.AlreadyInstalled);
-        Assert.Equal("test.workload", result.Entry.PackageId);
-        Assert.Equal("1.0.0", result.Entry.PackageVersion);
-        Assert.True(Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")));
+        result.AlreadyInstalled.Should().BeFalse();
+        result.Entry.PackageId.Should().Be("test.workload");
+        result.Entry.PackageVersion.Should().Be("1.0.0");
+        Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeTrue();
         await _store.Received(1).SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
 
@@ -328,13 +321,12 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Returns((ResolvedPackage?)null);
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
-            () => installer.InstallFromCatalogAsync(
+        WorkloadPackageNotFoundException ex = (await FluentActions.Awaiting(() => installer.InstallFromCatalogAsync(
                 "test.workload", version: null, source: null,
-                includePrerelease: false, exact: true, force: false));
+                includePrerelease: false, exact: true, force: false)).Should().ThrowAsync<WorkloadPackageNotFoundException>()).Which;
 
-        Assert.Contains("test.workload", ex.Message);
-        Assert.Contains("--prerelease", ex.Message);
+        ex.Message.Should().Contain("test.workload");
+        ex.Message.Should().Contain("--prerelease");
         await _catalog.DidNotReceive().DownloadAsync(Arg.Any<ResolvedPackage>(), Arg.Any<CancellationToken>());
     }
 
@@ -346,13 +338,12 @@ public sealed class WorkloadInstallerTests : IDisposable
             .Returns((ResolvedPackage?)null);
 
         WorkloadInstaller installer = NewInstaller(includePrerelease: true);
-        WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
-            () => installer.InstallFromCatalogAsync(
+        WorkloadPackageNotFoundException ex = (await FluentActions.Awaiting(() => installer.InstallFromCatalogAsync(
                 "test.workload", version: null, source: null,
-                includePrerelease: null, exact: true, force: false));
+                includePrerelease: null, exact: true, force: false)).Should().ThrowAsync<WorkloadPackageNotFoundException>()).Which;
 
-        Assert.Contains("test.workload", ex.Message);
-        Assert.DoesNotContain("--prerelease", ex.Message);
+        ex.Message.Should().Contain("test.workload");
+        ex.Message.Should().NotContain("--prerelease");
         await _catalog.Received(1).ResolveLatestVersionAsync(
             "test.workload", true, null, true, null, Arg.Any<CancellationToken>());
         await _catalog.DidNotReceive().DownloadAsync(Arg.Any<ResolvedPackage>(), Arg.Any<CancellationToken>());
@@ -377,7 +368,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             "test.workload", requested, source: null,
             includePrerelease: false, exact: true, force: false);
 
-        Assert.Equal("1.0.0", result.Entry.PackageVersion);
+        result.Entry.PackageVersion.Should().Be("1.0.0");
     }
 
     [Fact]
@@ -386,11 +377,10 @@ public sealed class WorkloadInstallerTests : IDisposable
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
 
         WorkloadInstaller installer = NewInstaller();
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => installer.UpdateAsync(
-                "test.workload", null, null, false, allowMajor: false));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => installer.UpdateAsync(
+                "test.workload", null, null, false, allowMajor: false)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("not installed", ex.Message);
+        ex.Message.Should().Contain("not installed");
         await _catalog.DidNotReceive().ResolveLatestVersionAsync(
             Arg.Any<string>(), Arg.Any<bool?>(), Arg.Any<NuGetVersion?>(),
             Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
@@ -408,10 +398,10 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync("test.workload", null, null, false, allowMajor: false);
 
-        Assert.True(result.NoUpdateAvailable);
-        Assert.True(result.NoCandidateOnSource);
-        Assert.Equal("1.0.0", result.PreviousVersion);
-        Assert.Same(current, result.Entry);
+        result.NoUpdateAvailable.Should().BeTrue();
+        result.NoCandidateOnSource.Should().BeTrue();
+        result.PreviousVersion.Should().Be("1.0.0");
+        result.Entry.Should().BeSameAs(current);
         await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
         await _store.DidNotReceive().RemoveWorkloadAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -429,8 +419,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync("test.workload", null, null, false, allowMajor: false);
 
-        Assert.True(result.NoUpdateAvailable);
-        Assert.False(result.NoCandidateOnSource);
+        result.NoUpdateAvailable.Should().BeTrue();
+        result.NoCandidateOnSource.Should().BeFalse();
     }
 
     [Fact]
@@ -454,13 +444,13 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadUpdateResult result = await installer.UpdateAsync("test.workload", null, null, false, allowMajor: false);
 
-        Assert.False(result.NoUpdateAvailable);
-        Assert.Equal("1.0.0", result.PreviousVersion);
-        Assert.Equal("1.1.0", result.Entry.PackageVersion);
+        result.NoUpdateAvailable.Should().BeFalse();
+        result.PreviousVersion.Should().Be("1.0.0");
+        result.Entry.PackageVersion.Should().Be("1.1.0");
 
         string newDir = _paths.GetInstallDirectory("test.workload", "1.1.0");
-        Assert.True(Directory.Exists(newDir));
-        Assert.False(Directory.Exists(oldDir), "old install dir must be deleted after swap");
+        Directory.Exists(newDir).Should().BeTrue();
+        Directory.Exists(oldDir).Should().BeFalse("old install dir must be deleted after swap");
 
         Received.InOrder(() =>
         {
@@ -490,11 +480,11 @@ public sealed class WorkloadInstallerTests : IDisposable
             .ThrowsAsync(new IOException("network glitch"));
 
         WorkloadInstaller installer = NewInstaller();
-        await Assert.ThrowsAsync<IOException>(() => installer.UpdateAsync(
-            "test.workload", null, null, false, allowMajor: false));
+        await FluentActions.Awaiting(() => installer.UpdateAsync(
+            "test.workload", null, null, false, allowMajor: false)).Should().ThrowAsync<IOException>();
 
-        Assert.True(Directory.Exists(oldDir), "existing install must remain after staging failure");
-        Assert.True(File.Exists(Path.Combine(oldDir, "marker.txt")));
+        Directory.Exists(oldDir).Should().BeTrue("existing install must remain after staging failure");
+        File.Exists(Path.Combine(oldDir, "marker.txt")).Should().BeTrue();
         await _store.DidNotReceive().ReplaceWorkloadAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
@@ -506,12 +496,11 @@ public sealed class WorkloadInstallerTests : IDisposable
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current]);
 
         WorkloadInstaller installer = NewInstaller();
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => installer.UpdateAsync(
-                "test.workload", NuGetVersion.Parse("0.9.0"), null, false, allowMajor: false));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => installer.UpdateAsync(
+                "test.workload", NuGetVersion.Parse("0.9.0"), null, false, allowMajor: false)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("0.9.0", ex.Message);
-        Assert.Contains("not installed", ex.Message);
+        ex.Message.Should().Contain("0.9.0");
+        ex.Message.Should().Contain("not installed");
     }
 
     [Fact]
@@ -548,7 +537,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             "node-worker", version: null, source: null,
             includePrerelease: true, exact: false, force: false);
 
-        Assert.Equal("test.workload", result.Entry.PackageId);
+        result.Entry.PackageId.Should().Be("test.workload");
         await _catalog.Received(1).SearchAsync(
             Arg.Is<CatalogSearchQuery>(q => q.Filter == null),
             Arg.Any<CancellationToken>());
@@ -596,12 +585,9 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         await installer.InstallFromPackageAsync(nupkg, force: false, progress);
 
-        Assert.Collection(
-            reports,
-            r => Assert.Equal(WorkloadInstallPhase.Extracting, r.Phase),
-            r => Assert.Equal(WorkloadInstallPhase.Registering, r.Phase));
-        Assert.Contains("test.workload", reports[0].Description);
-        Assert.Contains("test.workload", reports[1].Description);
+        reports.Should().SatisfyRespectively(r => r.Phase.Should().Be(WorkloadInstallPhase.Extracting), r => r.Phase.Should().Be(WorkloadInstallPhase.Registering));
+        reports[0].Description.Should().Contain("test.workload");
+        reports[1].Description.Should().Contain("test.workload");
     }
 
     [Fact]
@@ -612,8 +598,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
-        Assert.Equal("Functions Host", result.Entry.DisplayName);
-        Assert.Equal("Azure Functions host workload.", result.Entry.Description);
+        result.Entry.DisplayName.Should().Be("Functions Host");
+        result.Entry.Description.Should().Be("Azure Functions host workload.");
 
         await _store.Received(1).SaveWorkloadAsync(
             Arg.Is<WorkloadEntry>(e =>
@@ -638,8 +624,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         WorkloadInstaller installer = NewInstaller();
         WorkloadInstallResult result = await installer.InstallFromPackageAsync(nupkg);
 
-        Assert.Equal("Manifest Name", result.Entry.DisplayName);
-        Assert.Equal("Manifest description.", result.Entry.Description);
+        result.Entry.DisplayName.Should().Be("Manifest Name");
+        result.Entry.Description.Should().Be("Manifest description.");
     }
 
     private sealed class RecordingProgress(List<WorkloadInstallProgress> sink) : IProgress<WorkloadInstallProgress>
@@ -682,7 +668,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             "python-worker", version: null, source: null,
             includePrerelease: true, exact: false, force: false);
 
-        Assert.NotNull(result);
+        result.Should().NotBeNull();
         await _catalog.Received(1).ResolveLatestVersionAsync(
             targetId.ToLowerInvariant(), true, null, true, null, Arg.Any<CancellationToken>());
     }
@@ -714,14 +700,13 @@ public sealed class WorkloadInstallerTests : IDisposable
             });
 
         WorkloadInstaller installer = NewInstaller();
-        WorkloadPackageNotFoundException ex = await Assert.ThrowsAsync<WorkloadPackageNotFoundException>(
-            () => installer.InstallFromCatalogAsync(
+        WorkloadPackageNotFoundException ex = (await FluentActions.Awaiting(() => installer.InstallFromCatalogAsync(
                 "python-worker", version: null, source: null,
-                includePrerelease: true, exact: false, force: false));
+                includePrerelease: true, exact: false, force: false)).Should().ThrowAsync<WorkloadPackageNotFoundException>()).Which;
 
-        Assert.Contains("python-worker", ex.Message);
-        Assert.Contains(ridA, ex.Message);
-        Assert.Contains(ridB, ex.Message);
+        ex.Message.Should().Contain("python-worker");
+        ex.Message.Should().Contain(ridA);
+        ex.Message.Should().Contain(ridB);
     }
 
     [Fact]
@@ -744,10 +729,9 @@ public sealed class WorkloadInstallerTests : IDisposable
             });
 
         WorkloadInstaller installer = NewInstaller();
-        await Assert.ThrowsAsync<AmbiguousPackageMatchException>(
-            () => installer.InstallFromCatalogAsync(
+        await FluentActions.Awaiting(() => installer.InstallFromCatalogAsync(
                 "shared-alias", version: null, source: null,
-                includePrerelease: true, exact: false, force: false));
+                includePrerelease: true, exact: false, force: false)).Should().ThrowAsync<AmbiguousPackageMatchException>();
     }
 
     [Fact]
@@ -774,7 +758,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             explicitId, version: null, source: null,
             includePrerelease: true, exact: true, force: false);
 
-        Assert.NotNull(result);
+        result.Should().NotBeNull();
         await _catalog.Received(1).ResolveLatestVersionAsync(
             explicitId, true, null, true, null, Arg.Any<CancellationToken>());
     }
@@ -816,11 +800,11 @@ public sealed class WorkloadInstallerTests : IDisposable
             _paths.GetInstallDirectory(result.Entry.PackageId, result.Entry.PackageVersion),
             "tools", "any", "Azure.Functions.Cli.Workloads.Host");
 
-        Assert.True(File.Exists(hostBinary));
+        File.Exists(hostBinary).Should().BeTrue();
         UnixFileMode mode = File.GetUnixFileMode(hostBinary);
-        Assert.True(mode.HasFlag(UnixFileMode.UserExecute));
-        Assert.True(mode.HasFlag(UnixFileMode.GroupExecute));
-        Assert.True(mode.HasFlag(UnixFileMode.OtherExecute));
+        mode.HasFlag(UnixFileMode.UserExecute).Should().BeTrue();
+        mode.HasFlag(UnixFileMode.GroupExecute).Should().BeTrue();
+        mode.HasFlag(UnixFileMode.OtherExecute).Should().BeTrue();
     }
 
     [Fact]
@@ -844,9 +828,9 @@ public sealed class WorkloadInstallerTests : IDisposable
             _paths.GetInstallDirectory(result.Entry.PackageId, result.Entry.PackageVersion),
             "tools", "any", "Azure.Functions.Cli.Workloads.Host");
 
-        Assert.True(File.Exists(payload));
+        File.Exists(payload).Should().BeTrue();
         UnixFileMode mode = File.GetUnixFileMode(payload);
-        Assert.False(mode.HasFlag(UnixFileMode.UserExecute));
+        mode.HasFlag(UnixFileMode.UserExecute).Should().BeFalse();
     }
 
     private string BuildNupkg(

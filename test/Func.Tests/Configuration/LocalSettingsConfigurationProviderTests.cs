@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Configuration;
 using Microsoft.Extensions.Configuration;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Configuration;
 
@@ -40,11 +39,11 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
             .Add(new LocalSettingsConfigurationSource(_dir, new LocalSettingsProvider()))
             .Build();
 
-        Assert.Equal("node", configuration["stack:runtime"]);
-        Assert.Equal("7073", configuration["HostStartup:Port"]);
-        Assert.Equal("*", configuration["HostStartup:Cors"]);
-        Assert.Equal("True", configuration["HostStartup:CorsCredentials"]);
-        Assert.Null(configuration["AzureWebJobsStorage"]);
+        configuration["stack:runtime"].Should().Be("node");
+        configuration["HostStartup:Port"].Should().Be("7073");
+        configuration["HostStartup:Cors"].Should().Be("*");
+        configuration["HostStartup:CorsCredentials"].Should().Be("True");
+        configuration["AzureWebJobsStorage"].Should().BeNull();
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         StackOptions options = new();
         new StackOptionsSetup(configuration).Configure(options);
 
-        Assert.Equal("python", options.Runtime);
+        options.Runtime.Should().Be("python");
     }
 
     [Fact]
@@ -90,7 +89,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         StackOptions options = new();
         new StackOptionsSetup(configuration).Configure(options);
 
-        Assert.Equal("project", options.Runtime);
+        options.Runtime.Should().Be("project");
     }
 
     [Fact]
@@ -113,7 +112,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         StackOptions options = new();
         new StackOptionsSetup(configuration).Configure(options);
 
-        Assert.Equal("local", options.Runtime);
+        options.Runtime.Should().Be("local");
     }
 
     [Fact]
@@ -127,7 +126,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         setup.Configure(_dir.FullName, options);
 
-        Assert.Equal("custom-runtime", options.Runtime);
+        options.Runtime.Should().Be("custom-runtime");
     }
 
     [Fact]
@@ -141,7 +140,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         setup.Configure(_dir.FullName, options);
 
-        Assert.Equal(7074, options.Port);
+        options.Port.Should().Be(7074);
     }
 
     [Fact]
@@ -154,9 +153,9 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         IConfiguration configuration = configurationProvider.GetProjectConfiguration(_dir);
 
-        Assert.Equal("project-profile", configuration["profiles:0"]);
-        Assert.Null(configuration["defaultProfile"]);
-        Assert.Equal("node", configuration["stack:runtime"]);
+        configuration["profiles:0"].Should().Be("project-profile");
+        configuration["defaultProfile"].Should().BeNull();
+        configuration["stack:runtime"].Should().Be("node");
     }
 
     [Fact]
@@ -169,7 +168,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         IConfiguration configuration = configurationProvider.GetEffectiveConfiguration(_dir);
 
-        Assert.Equal("project", configuration["stack:runtime"]);
+        configuration["stack:runtime"].Should().Be("project");
     }
 
     [Fact]
@@ -182,8 +181,8 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         WriteProjectConfig("""{"defaultProfile":"linux-premium"}""");
         IConfiguration secondConfiguration = configurationProvider.GetProjectConfiguration(_dir);
 
-        Assert.Same(firstConfiguration, secondConfiguration);
-        Assert.Equal("flex", secondConfiguration["defaultProfile"]);
+        secondConfiguration.Should().BeSameAs(firstConfiguration);
+        secondConfiguration["defaultProfile"].Should().Be("flex");
     }
 
     private void WriteSettings(string contents)

@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -18,10 +17,10 @@ public class HostProcessOutputParserTests
 
         HostLogEntry entry = parser.ParseLine(HostProcessStreamNames.StandardOutput, "Host started", DateTimeOffset.UnixEpoch);
 
-        Assert.Equal("Host.Process", entry.Category);
-        Assert.Equal(LogLevel.Information, entry.Level);
-        Assert.Equal("Host started", entry.Message);
-        Assert.Equal(HostProcessStreamNames.StandardOutput, entry.GetAttribute<string>(HostLogAttributeKeys.Stream));
+        entry.Category.Should().Be("Host.Process");
+        entry.Level.Should().Be(LogLevel.Information);
+        entry.Message.Should().Be("Host started");
+        entry.GetAttribute<string>(HostLogAttributeKeys.Stream).Should().Be(HostProcessStreamNames.StandardOutput);
     }
 
     [Fact]
@@ -31,9 +30,9 @@ public class HostProcessOutputParserTests
 
         HostLogEntry entry = parser.ParseLine(HostProcessStreamNames.StandardError, "Host failed", DateTimeOffset.UnixEpoch);
 
-        Assert.Equal(LogLevel.Error, entry.Level);
-        Assert.Equal("Host failed", entry.Message);
-        Assert.Equal(HostProcessStreamNames.StandardError, entry.GetAttribute<string>(HostLogAttributeKeys.Stream));
+        entry.Level.Should().Be(LogLevel.Error);
+        entry.Message.Should().Be("Host failed");
+        entry.GetAttribute<string>(HostLogAttributeKeys.Stream).Should().Be(HostProcessStreamNames.StandardError);
     }
 
     [Fact]
@@ -73,27 +72,27 @@ public class HostProcessOutputParserTests
             Minify(line),
             DateTimeOffset.UnixEpoch);
 
-        Assert.Equal(DateTimeOffset.Parse("2026-05-26T12:00:00.0000000+00:00"), entry.Timestamp);
-        Assert.Equal("Function.HttpTrigger1.User", entry.Category);
-        Assert.Equal(LogLevel.Warning, entry.Level);
-        Assert.Equal(42, entry.EventId.Id);
-        Assert.Equal("UserLog", entry.EventId.Name);
-        Assert.Equal("hello from user code", entry.Message);
-        Assert.Equal("HttpTrigger1", entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName));
-        Assert.Equal(HostProcessStreamNames.StandardOutput, entry.GetAttribute<string>(HostLogAttributeKeys.Stream));
-        Assert.Equal(12.5, entry.GetAttribute<double>(HostLogAttributeKeys.DurationMs));
-        Assert.Equal(202, entry.GetAttribute<int>(HostLogAttributeKeys.HttpStatusCode));
+        entry.Timestamp.Should().Be(DateTimeOffset.Parse("2026-05-26T12:00:00.0000000+00:00"));
+        entry.Category.Should().Be("Function.HttpTrigger1.User");
+        entry.Level.Should().Be(LogLevel.Warning);
+        entry.EventId.Id.Should().Be(42);
+        entry.EventId.Name.Should().Be("UserLog");
+        entry.Message.Should().Be("hello from user code");
+        entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName).Should().Be("HttpTrigger1");
+        entry.GetAttribute<string>(HostLogAttributeKeys.Stream).Should().Be(HostProcessStreamNames.StandardOutput);
+        entry.GetAttribute<double>(HostLogAttributeKeys.DurationMs).Should().Be(12.5);
+        entry.GetAttribute<int>(HostLogAttributeKeys.HttpStatusCode).Should().Be(202);
         string[]? methods = entry.GetAttribute<string[]>(HostLogAttributeKeys.FunctionHttpMethods);
-        Assert.NotNull(methods);
-        Assert.Equal(["get", "post"], methods);
-        Assert.Equal("boom", entry.Exception?.Message);
-        Assert.NotNull(entry.ExceptionDetails);
-        Assert.Equal("System.InvalidOperationException", entry.ExceptionDetails.Type);
-        Assert.Equal("remote stack", entry.ExceptionDetails.Stack);
-        Assert.NotNull(entry.ExceptionDetails.InnerException);
-        Assert.Equal("Worker.UserException", entry.ExceptionDetails.InnerException.Type);
-        Assert.Equal("inner boom", entry.ExceptionDetails.InnerException.Message);
-        Assert.Equal("inner stack", entry.ExceptionDetails.InnerException.Stack);
+        methods.Should().NotBeNull();
+        methods.Should().Equal(["get", "post"]);
+        (entry.Exception?.Message).Should().Be("boom");
+        entry.ExceptionDetails.Should().NotBeNull();
+        entry.ExceptionDetails.Type.Should().Be("System.InvalidOperationException");
+        entry.ExceptionDetails.Stack.Should().Be("remote stack");
+        entry.ExceptionDetails.InnerException.Should().NotBeNull();
+        entry.ExceptionDetails.InnerException.Type.Should().Be("Worker.UserException");
+        entry.ExceptionDetails.InnerException.Message.Should().Be("inner boom");
+        entry.ExceptionDetails.InnerException.Stack.Should().Be("inner stack");
     }
 
     [Fact]
@@ -116,11 +115,11 @@ public class HostProcessOutputParserTests
             Minify(line),
             DateTimeOffset.UnixEpoch);
 
-        Assert.Equal("HttpTrigger1", entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName));
-        Assert.Equal("11111111-1111-1111-1111-111111111111", entry.GetAttribute<string>(HostLogAttributeKeys.FunctionInvocationId));
-        Assert.Equal(CliEventKinds.InvocationCompleted, entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind));
-        Assert.Equal("succeeded", entry.GetAttribute<string>(HostLogAttributeKeys.FunctionResult));
-        Assert.Equal(123.45, entry.GetAttribute<double>(HostLogAttributeKeys.DurationMs));
+        entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName).Should().Be("HttpTrigger1");
+        entry.GetAttribute<string>(HostLogAttributeKeys.FunctionInvocationId).Should().Be("11111111-1111-1111-1111-111111111111");
+        entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind).Should().Be(CliEventKinds.InvocationCompleted);
+        entry.GetAttribute<string>(HostLogAttributeKeys.FunctionResult).Should().Be("succeeded");
+        entry.GetAttribute<double>(HostLogAttributeKeys.DurationMs).Should().Be(123.45);
     }
 
     [Fact]
@@ -133,11 +132,11 @@ public class HostProcessOutputParserTests
             "warn: Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService[12]",
             DateTimeOffset.UnixEpoch);
 
-        Assert.Equal(LogLevel.Warning, entry.Level);
-        Assert.Equal("Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService", entry.Category);
-        Assert.Equal(12, entry.EventId.Id);
-        Assert.Equal(string.Empty, entry.Message);
-        Assert.Equal(HostProcessStreamNames.StandardOutput, entry.GetAttribute<string>(HostLogAttributeKeys.Stream));
+        entry.Level.Should().Be(LogLevel.Warning);
+        entry.Category.Should().Be("Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService");
+        entry.EventId.Id.Should().Be(12);
+        entry.Message.Should().Be(string.Empty);
+        entry.GetAttribute<string>(HostLogAttributeKeys.Stream).Should().Be(HostProcessStreamNames.StandardOutput);
     }
 
     [Fact]
@@ -154,15 +153,15 @@ public class HostProcessOutputParserTests
             "      Executed 'Functions.HttpTrigger1' (Failed, Id=abc123, Duration=7ms)",
             DateTimeOffset.UnixEpoch);
 
-        Assert.Equal(LogLevel.Error, entry.Level);
-        Assert.Equal("Function.HttpTrigger1.User", entry.Category);
-        Assert.Equal(3, entry.EventId.Id);
-        Assert.Equal("Executed 'Functions.HttpTrigger1' (Failed, Id=abc123, Duration=7ms)", entry.Message);
-        Assert.Equal("HttpTrigger1", entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName));
-        Assert.Equal("abc123", entry.GetAttribute<string>(HostLogAttributeKeys.FunctionInvocationId));
-        Assert.Equal(CliEventKinds.InvocationCompleted, entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind));
-        Assert.Equal("failed", entry.GetAttribute<string>(HostLogAttributeKeys.FunctionResult));
-        Assert.Equal(7, entry.GetAttribute<double>(HostLogAttributeKeys.DurationMs));
+        entry.Level.Should().Be(LogLevel.Error);
+        entry.Category.Should().Be("Function.HttpTrigger1.User");
+        entry.EventId.Id.Should().Be(3);
+        entry.Message.Should().Be("Executed 'Functions.HttpTrigger1' (Failed, Id=abc123, Duration=7ms)");
+        entry.GetAttribute<string>(HostLogAttributeKeys.FunctionName).Should().Be("HttpTrigger1");
+        entry.GetAttribute<string>(HostLogAttributeKeys.FunctionInvocationId).Should().Be("abc123");
+        entry.GetAttribute<string>(HostLogAttributeKeys.CliEventKind).Should().Be(CliEventKinds.InvocationCompleted);
+        entry.GetAttribute<string>(HostLogAttributeKeys.FunctionResult).Should().Be("failed");
+        entry.GetAttribute<double>(HostLogAttributeKeys.DurationMs).Should().Be(7);
     }
 
     [Theory]
@@ -175,9 +174,9 @@ public class HostProcessOutputParserTests
 
         HostLogEntry entry = parser.ParseLine(HostProcessStreamNames.StandardOutput, line, DateTimeOffset.UnixEpoch);
 
-        Assert.Equal("Host.Process", entry.Category);
-        Assert.Equal(line, entry.Message);
-        Assert.Equal(HostProcessStreamNames.StandardOutput, entry.GetAttribute<string>(HostLogAttributeKeys.Stream));
+        entry.Category.Should().Be("Host.Process");
+        entry.Message.Should().Be(line);
+        entry.GetAttribute<string>(HostLogAttributeKeys.Stream).Should().Be(HostProcessStreamNames.StandardOutput);
     }
 
     private static string Minify(string json)

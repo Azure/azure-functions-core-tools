@@ -10,7 +10,6 @@ using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Initialization;
 
@@ -44,7 +43,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Equal("MyValue", context.State.HostRunContext!.EnvironmentVariables["MyKey"]);
+        context.State.HostRunContext!.EnvironmentVariables["MyKey"].Should().Be("MyValue");
         _interaction.DidNotReceiveWithAnyArgs().WriteWarning(default!);
     }
 
@@ -56,7 +55,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.False(context.State.HostRunContext!.EnvironmentVariables.ContainsKey(string.Empty));
+        context.State.HostRunContext!.EnvironmentVariables.ContainsKey(string.Empty).Should().BeFalse();
         _interaction.Received(1).WriteWarning(Arg.Is<string>(m => m.Contains("empty key", StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -68,8 +67,8 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.True(context.State.HostRunContext!.EnvironmentVariables.TryGetValue("ClearMe", out string? value));
-        Assert.Equal(string.Empty, value);
+        context.State.HostRunContext!.EnvironmentVariables.TryGetValue("ClearMe", out string? value).Should().BeTrue();
+        value.Should().Be(string.Empty);
         _interaction.DidNotReceiveWithAnyArgs().WriteWarning(default!);
     }
 
@@ -82,7 +81,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.False(context.State.HostRunContext!.EnvironmentVariables.ContainsKey("MyKey"));
+        context.State.HostRunContext!.EnvironmentVariables.ContainsKey("MyKey").Should().BeFalse();
         _interaction.Received(1).WriteWarning(Arg.Is<string>(m => m.Contains("MyKey") && m.Contains("already set", StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -95,8 +94,8 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.False(context.State.HostRunContext!.EnvironmentVariables.ContainsKey("MYKEY"));
-        Assert.False(context.State.HostRunContext!.EnvironmentVariables.ContainsKey("MyKey"));
+        context.State.HostRunContext!.EnvironmentVariables.ContainsKey("MYKEY").Should().BeFalse();
+        context.State.HostRunContext!.EnvironmentVariables.ContainsKey("MyKey").Should().BeFalse();
     }
 
     [Fact]
@@ -108,7 +107,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Equal("valueA", context.State.HostRunContext!.EnvironmentVariables["KeyA"]);
+        context.State.HostRunContext!.EnvironmentVariables["KeyA"].Should().Be("valueA");
         _interaction.DidNotReceiveWithAnyArgs().WriteWarning(default!);
     }
 
@@ -121,7 +120,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.False(context.State.HostRunContext!.EnvironmentVariables.ContainsKey("KeyB"));
+        context.State.HostRunContext!.EnvironmentVariables.ContainsKey("KeyB").Should().BeFalse();
         _interaction.Received(1).WriteWarning(Arg.Is<string>(s => s.Contains("KeyB")));
     }
 
@@ -140,9 +139,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
         IDictionary<string, string> env = context.State.HostRunContext!.EnvironmentVariables;
-        Assert.Equal("fromHost", env["HostKey"]);
-        Assert.Equal("fromBundle", env["BundleKey"]);
-        Assert.False(env.ContainsKey("MyKey"));
+        env["HostKey"].Should().Be("fromHost");
+        env["BundleKey"].Should().Be("fromBundle");
+        env.ContainsKey("MyKey").Should().BeFalse();
     }
 
     [Fact]
@@ -155,15 +154,15 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
-        Assert.NotNull(context.State.HostRunContext!.Reporter);
-        Assert.Contains(renderer.Events, ev => ev is StartInitializationProgressEvent progress
+        context.State.HostRunContext!.Reporter.Should().NotBeNull();
+        renderer.Events.Any(ev => ev is StartInitializationProgressEvent progress
             && progress.StepId == PrepareProjectHostRunInitializationStep.StepId
             && double.IsNaN(progress.Percent)
-            && progress.Message == "running npm install");
-        Assert.Contains(renderer.Events, ev => ev is StartInitializationLogEvent log
+            && progress.Message == "running npm install").Should().BeTrue();
+        renderer.Events.Any(ev => ev is StartInitializationLogEvent log
             && log.StepId == PrepareProjectHostRunInitializationStep.StepId
             && log.Line == "npm install output"
-            && log.Severity == FunctionsProjectReportSeverity.Warning);
+            && log.Severity == FunctionsProjectReportSeverity.Warning).Should().BeTrue();
     }
 
     [Fact]
@@ -177,14 +176,14 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         reporter.WriteLog("build output", FunctionsProjectReportSeverity.Error);
         await reporter.CompleteAsync();
 
-        Assert.Contains(renderer.Events, ev => ev is StartInitializationProgressEvent progress
+        renderer.Events.Any(ev => ev is StartInitializationProgressEvent progress
             && progress.StepId == "adapter_step"
             && double.IsNaN(progress.Percent)
-            && progress.Message == "building");
-        Assert.Contains(renderer.Events, ev => ev is StartInitializationLogEvent log
+            && progress.Message == "building").Should().BeTrue();
+        renderer.Events.Any(ev => ev is StartInitializationLogEvent log
             && log.StepId == "adapter_step"
             && log.Line == "build output"
-            && log.Severity == FunctionsProjectReportSeverity.Error);
+            && log.Severity == FunctionsProjectReportSeverity.Error).Should().BeTrue();
     }
 
     private void SetLocalSettings(Dictionary<string, string> values)

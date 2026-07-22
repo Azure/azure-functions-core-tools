@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Templates;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -22,9 +21,9 @@ public class NewCommandRendererTests
 
         renderer.RenderCatalogue("dotnet", "c#", templates);
 
-        Assert.Contains("TABLE: [NAME, TEMPLATE ID, DESCRIPTION]", interaction.Lines);
-        Assert.Contains("  ROW: [BlobTrigger, blob, blob desc]", interaction.Lines);
-        Assert.Contains("  ROW: [DurableFunctionsEntityClass, durableentityclass, entity desc]", interaction.Lines);
+        interaction.Lines.Should().Contain("TABLE: [NAME, TEMPLATE ID, DESCRIPTION]");
+        interaction.Lines.Should().Contain("  ROW: [BlobTrigger, blob, blob desc]");
+        interaction.Lines.Should().Contain("  ROW: [DurableFunctionsEntityClass, durableentityclass, entity desc]");
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public class NewCommandRendererTests
 
         renderer.RenderCatalogue("dotnet", null, templates);
 
-        Assert.Contains("  ROW: [anonymous, anonymous, no display]", interaction.Lines);
+        interaction.Lines.Should().Contain("  ROW: [anonymous, anonymous, no display]");
     }
 
     [Fact]
@@ -54,9 +53,7 @@ public class NewCommandRendererTests
             "c#",
             [MakeTemplate(id: "http", displayName: "HttpTrigger", description: "")]);
 
-        Assert.Contains(
-            interaction.Lines,
-            l => l.Contains("func new --template <TEMPLATE_ID> --name <function-name>", System.StringComparison.Ordinal));
+        interaction.Lines.Should().Contain(l => l.Contains("func new --template <TEMPLATE_ID> --name <function-name>", System.StringComparison.Ordinal));
     }
 
     private static FunctionTemplateInfo MakeTemplate(string id, string displayName, string? description) =>

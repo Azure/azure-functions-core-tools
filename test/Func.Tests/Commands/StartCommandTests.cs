@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
@@ -16,7 +15,6 @@ using Azure.Functions.Cli.Workers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -57,19 +55,19 @@ public class StartCommandTests : IDisposable
 
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
-        Assert.Contains("--port", optionNames);
-        Assert.Contains("--cors", optionNames);
-        Assert.Contains("--cors-credentials", optionNames);
-        Assert.Contains("--functions", optionNames);
-        Assert.Contains("--no-build", optionNames);
-        Assert.Contains("--enable-auth", optionNames);
-        Assert.Contains("--profile", optionNames);
-        Assert.Contains("--host-version", optionNames);
-        Assert.Contains("--offline", optionNames);
-        Assert.Contains("--output", optionNames);
-        Assert.Contains("--no-tui", optionNames);
-        Assert.Contains("--log-file", optionNames);
-        Assert.Contains("--demo", optionNames);
+        optionNames.Should().Contain("--port");
+        optionNames.Should().Contain("--cors");
+        optionNames.Should().Contain("--cors-credentials");
+        optionNames.Should().Contain("--functions");
+        optionNames.Should().Contain("--no-build");
+        optionNames.Should().Contain("--enable-auth");
+        optionNames.Should().Contain("--profile");
+        optionNames.Should().Contain("--host-version");
+        optionNames.Should().Contain("--offline");
+        optionNames.Should().Contain("--output");
+        optionNames.Should().Contain("--no-tui");
+        optionNames.Should().Contain("--log-file");
+        optionNames.Should().Contain("--demo");
     }
 
     [Fact]
@@ -78,8 +76,8 @@ public class StartCommandTests : IDisposable
         var root = TestParser.CreateRoot(_interaction);
         var runCommand = root.Subcommands.SingleOrDefault(c => c.Name == "run");
 
-        Assert.NotNull(runCommand);
-        Assert.Contains("start", runCommand!.Aliases);
+        runCommand.Should().NotBeNull();
+        runCommand!.Aliases.Should().Contain("start");
     }
 
     [Fact]
@@ -90,8 +88,8 @@ public class StartCommandTests : IDisposable
         var result = root.Parse($"run \"{nonExistent}\"");
 
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-        var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
-        Assert.Contains("does not exist", ex.Message);
+        var ex = (await FluentActions.Awaiting(() => result.InvokeAsync(config)).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Contain("does not exist");
     }
 
     [Fact]
@@ -104,9 +102,9 @@ public class StartCommandTests : IDisposable
         // Disable the default exception handler so GracefulException propagates,
         // matching production wiring.
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-        var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
-        Assert.Contains("does not exist", ex.Message);
-        Assert.Contains(nonExistent, ex.Message);
+        var ex = (await FluentActions.Awaiting(() => result.InvokeAsync(config)).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Contain("does not exist");
+        ex.Message.Should().Contain(nonExistent);
     }
 
     [Fact]
@@ -116,9 +114,9 @@ public class StartCommandTests : IDisposable
         var result = root.Parse($"start \"{_tempDir}\" --output=bogus");
 
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-        var ex = await Assert.ThrowsAsync<GracefulException>(() => result.InvokeAsync(config));
-        Assert.Contains("--output", ex.Message);
-        Assert.Contains("bogus", ex.Message);
+        var ex = (await FluentActions.Awaiting(() => result.InvokeAsync(config)).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Contain("--output");
+        ex.Message.Should().Contain("bogus");
     }
 
     [Fact]
@@ -146,7 +144,7 @@ public class StartCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(0, exitCode);
+        exitCode.Should().Be(0);
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context =>
                 context.Options.WorkingDirectory.Info.FullName == new DirectoryInfo(_tempDir).FullName
@@ -191,7 +189,7 @@ public class StartCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(0, exitCode);
+        exitCode.Should().Be(0);
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context => context.Options.DemoMode),
             Arg.Any<IStartInitializationRenderer>(),
@@ -223,7 +221,7 @@ public class StartCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(0, exitCode);
+        exitCode.Should().Be(0);
         options.Received(1).Get(new DirectoryInfo(_tempDir).FullName);
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context =>
@@ -258,7 +256,7 @@ public class StartCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(0, exitCode);
+        exitCode.Should().Be(0);
         options.DidNotReceive().Get(Arg.Any<string>());
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context => context.Options.Port == 9092),
@@ -290,13 +288,13 @@ public class StartCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(0, exitCode);
-        TestFunctionsProject project = Assert.IsType<TestFunctionsProject>(initializationResult.Project);
-        FunctionsProjectHostRunCompletionContext completion = Assert.Single(project.CompletionContexts);
-        Assert.Same(initializationResult.HostRunContext, completion.RunContext);
+        exitCode.Should().Be(0);
+        TestFunctionsProject project = initializationResult.Project.Should().BeOfType<TestFunctionsProject>().Subject;
+        FunctionsProjectHostRunCompletionContext completion = project.CompletionContexts.Should().ContainSingle().Subject;
+        completion.RunContext.Should().BeSameAs(initializationResult.HostRunContext);
         FunctionsProjectHostRunOutcome.Completed completed =
-            Assert.IsType<FunctionsProjectHostRunOutcome.Completed>(completion.Outcome);
-        Assert.Equal(0, completed.ExitCode);
+            completion.Outcome.Should().BeOfType<FunctionsProjectHostRunOutcome.Completed>().Subject;
+        completed.ExitCode.Should().Be(0);
     }
 
     [Fact]
@@ -322,12 +320,12 @@ public class StartCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(11, exitCode);
-        TestFunctionsProject project = Assert.IsType<TestFunctionsProject>(initializationResult.Project);
-        FunctionsProjectHostRunCompletionContext completion = Assert.Single(project.CompletionContexts);
+        exitCode.Should().Be(11);
+        TestFunctionsProject project = initializationResult.Project.Should().BeOfType<TestFunctionsProject>().Subject;
+        FunctionsProjectHostRunCompletionContext completion = project.CompletionContexts.Should().ContainSingle().Subject;
         FunctionsProjectHostRunOutcome.Completed completed =
-            Assert.IsType<FunctionsProjectHostRunOutcome.Completed>(completion.Outcome);
-        Assert.Equal(11, completed.ExitCode);
+            completion.Outcome.Should().BeOfType<FunctionsProjectHostRunOutcome.Completed>().Subject;
+        completed.ExitCode.Should().Be(11);
     }
 
     [Fact]
@@ -358,8 +356,8 @@ public class StartCommandTests : IDisposable
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        Assert.Equal(0, exitCode);
-        Assert.Contains("WARNING: Project cleanup failed: cleanup failed", _interaction.Lines);
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().Contain("WARNING: Project cleanup failed: cleanup failed");
     }
 
     private static StartInitializationResult CreateInitializationResult(IHostEventStream eventStream, TestFunctionsProject? project = null)
@@ -449,5 +447,7 @@ public class StartCommandTests : IDisposable
 
         public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
             => Task.FromResult(exitCode);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

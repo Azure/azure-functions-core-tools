@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
@@ -20,9 +19,9 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(), Substitute.For<IWorkloadStore>());
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.Contains("HINT: No workloads installed.", _interaction.Lines);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("HINT: No workloads installed.");
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
     }
 
     [Fact]
@@ -40,9 +39,9 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.Contains("TABLE: [Alias, Display Name, Version]", _interaction.Lines);
-        Assert.Contains("  ROW: [dotnet, .NET, 1.0.0]", _interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("TABLE: [Alias, Display Name, Version]");
+        _interaction.Lines.Should().Contain("  ROW: [dotnet, .NET, 1.0.0]");
     }
 
     [Fact]
@@ -59,10 +58,10 @@ public class WorkloadListCommandTests
         await InvokeAsync(cmd);
 
         var rows = _interaction.Lines.Where(l => l.StartsWith("  ROW:")).ToList();
-        Assert.Equal(3, rows.Count);
-        Assert.Contains(".NET", rows[0]);
-        Assert.Contains("Node.js", rows[1]);
-        Assert.Contains("Python", rows[2]);
+        rows.Count.Should().Be(3);
+        rows[0].Should().Contain(".NET");
+        rows[1].Should().Contain("Node.js");
+        rows[2].Should().Contain("Python");
     }
 
     [Fact]
@@ -81,8 +80,8 @@ public class WorkloadListCommandTests
         await InvokeAsync(cmd);
 
         string rowLine = _interaction.Lines.Single(l => l.StartsWith("  ROW:"));
-        Assert.StartsWith("  ROW: [, ", rowLine);
-        Assert.DoesNotContain(", -, ", rowLine);
+        rowLine.Should().StartWith("  ROW: [, ");
+        rowLine.Should().NotContain(", -, ");
     }
 
     [Fact]
@@ -98,10 +97,8 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         int exit = await InvokeAsync(cmd);
 
-        Assert.Equal(0, exit);
-        Assert.Contains(
-            "  ROW: [, Azure.Functions.Cli.Workloads.Host, 4.0.0]",
-            _interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("  ROW: [, Azure.Functions.Cli.Workloads.Host, 4.0.0]");
     }
 
     [Fact]
@@ -119,13 +116,13 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         int exit = await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
-        Assert.Contains(".NET Development Stack", _interaction.Lines);
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Version:") && l.EndsWith("1.0.0"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Package ID:") && l.EndsWith("Azure.Functions.Cli.Workloads.Dotnet"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Alias:") && l.EndsWith("dotnet"));
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith("C# / F# workload."));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
+        _interaction.Lines.Should().Contain(".NET Development Stack");
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Version:") && l.EndsWith("1.0.0"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Package ID:") && l.EndsWith("Azure.Functions.Cli.Workloads.Dotnet"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Alias:") && l.EndsWith("dotnet"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Description:") && l.EndsWith("C# / F# workload."));
     }
 
     [Fact]
@@ -146,7 +143,7 @@ public class WorkloadListCommandTests
 
         // Card now puts description inline next to its label, so the full
         // string lands at the end of that line verbatim.
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("Description:") && l.EndsWith(longDescription));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Description:") && l.EndsWith(longDescription));
     }
 
     [Fact]
@@ -164,9 +161,7 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         await InvokeAsync(cmd, includeRootVerbose: true, "--verbose");
 
-        Assert.Contains(
-            _interaction.Lines,
-            l => l.StartsWith("Aliases:") && l.EndsWith("dotnet, dotnet-isolated"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("Aliases:") && l.EndsWith("dotnet, dotnet-isolated"));
     }
 
     [Fact]
@@ -181,7 +176,7 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         await InvokeAsync(cmd);
 
-        Assert.Contains("HINT: 2 workloads installed.", _interaction.Lines);
+        _interaction.Lines.Should().Contain("HINT: 2 workloads installed.");
     }
 
     [Fact]
@@ -195,7 +190,7 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         await InvokeAsync(cmd);
 
-        Assert.Contains("HINT: 1 workload installed.", _interaction.Lines);
+        _interaction.Lines.Should().Contain("HINT: 1 workload installed.");
     }
 
     [Fact]
@@ -213,13 +208,13 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(workloads), Substitute.For<IWorkloadStore>());
         int exit = await InvokeAsync(cmd, "--json");
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"packageId\":\"Azure.Functions.Cli.Workloads.Dotnet\"", jsonLine);
-        Assert.Contains("\"packageVersion\":\"1.0.0\"", jsonLine);
+        jsonLine.Should().Contain("\"packageId\":\"Azure.Functions.Cli.Workloads.Dotnet\"");
+        jsonLine.Should().Contain("\"packageVersion\":\"1.0.0\"");
         // Loaded view omits the Loaded flag (null on the row, so JSON drops it).
-        Assert.DoesNotContain("\"loaded\"", jsonLine);
+        jsonLine.Should().NotContain("\"loaded\"");
     }
 
     [Fact]
@@ -256,17 +251,17 @@ public class WorkloadListCommandTests
         var cmd = new WorkloadListCommand(_interaction, Provider(loaded), store);
         int exit = await InvokeAsync(cmd, "--all-versions");
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("TABLE:"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("TABLE:"));
         // Header shows display name + alias in parentheses.
-        Assert.Contains(".NET (a)", _interaction.Lines);
+        _interaction.Lines.Should().Contain(".NET (a)");
         // Highest version first, marked as loaded.
         int loadedIndex = _interaction.Lines.ToList().FindIndex(l => l.Contains("2.0.0"));
         int olderIndex = _interaction.Lines.ToList().FindIndex(l => l.Contains("1.0.0"));
-        Assert.True(loadedIndex < olderIndex);
-        Assert.Contains("(loaded)", _interaction.Lines[loadedIndex]);
-        Assert.DoesNotContain("(loaded)", _interaction.Lines[olderIndex]);
-        Assert.Contains("HINT: 1 workload, 2 versions installed.", _interaction.Lines);
+        (loadedIndex < olderIndex).Should().BeTrue();
+        _interaction.Lines[loadedIndex].Should().Contain("(loaded)");
+        _interaction.Lines[olderIndex].Should().NotContain("(loaded)");
+        _interaction.Lines.Should().Contain("HINT: 1 workload, 2 versions installed.");
     }
 
     [Fact]
@@ -290,16 +285,16 @@ public class WorkloadListCommandTests
         await InvokeAsync(cmd, "--all-versions", "--json");
 
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"loaded\":true", jsonLine);
-        Assert.Contains("\"loaded\":false", jsonLine);
+        jsonLine.Should().Contain("\"loaded\":true");
+        jsonLine.Should().Contain("\"loaded\":false");
     }
 
     [Fact]
     public async Task List_HasJsonAndAllVersionsOptions()
     {
         var cmd = new WorkloadListCommand(_interaction, Provider(), Substitute.For<IWorkloadStore>());
-        Assert.Contains(cmd.Options, o => o.Name == "--json");
-        Assert.Contains(cmd.Options, o => o.Name == "--all-versions");
+        cmd.Options.Should().Contain(o => o.Name == "--json");
+        cmd.Options.Should().Contain(o => o.Name == "--all-versions");
         await Task.CompletedTask;
     }
 

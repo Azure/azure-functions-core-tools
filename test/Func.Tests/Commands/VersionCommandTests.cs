@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -29,9 +28,9 @@ public class VersionCommandTests
 
         var exitCode = await parseResult.InvokeAsync();
 
-        Assert.Equal(0, exitCode);
-        Assert.Single(_interaction.Lines);
-        Assert.Contains("5.0.0", _interaction.Lines[0]);
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().ContainSingle();
+        _interaction.Lines[0].Should().Contain("5.0.0");
     }
 
     [Fact]
@@ -39,8 +38,8 @@ public class VersionCommandTests
     {
         var provider = new AssemblyCliVersionProvider();
 
-        Assert.False(string.IsNullOrWhiteSpace(provider.Version));
-        Assert.Contains("5.0.0", provider.Version);
+        string.IsNullOrWhiteSpace(provider.Version).Should().BeFalse();
+        provider.Version.Should().Contain("5.0.0");
     }
 
     [Fact]
@@ -50,9 +49,9 @@ public class VersionCommandTests
 
         var exitCode = command.ExecuteDetailed();
 
-        Assert.Equal(0, exitCode);
-        Assert.Contains(_interaction.Lines, l => l.Contains("Azure Functions CLI"));
-        Assert.Contains("Version", _interaction.AllOutput);
-        Assert.Contains("Runtime", _interaction.AllOutput);
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.Contains("Azure Functions CLI"));
+        _interaction.AllOutput.Should().Contain("Version");
+        _interaction.AllOutput.Should().Contain("Runtime");
     }
 }

@@ -19,6 +19,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
     private readonly Task _stdoutTask;
     private readonly Task _stderrTask;
     private int _shutdownRequested;
+    private int _disposed;
 
     public HostProcessEventStream(
         IHostProcess process,
@@ -80,6 +81,44 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
 
     public Task<int> WaitForExitAsync(CancellationToken cancellationToken)
         => _exitTask.WaitAsync(cancellationToken);
+
+    /// <summary>
+    /// Idempotent, best-effort shutdown safe to call from <c>await using</c> on any exit path.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await RequestShutdownAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // Graceful shutdown failed; force-kill and let _exitTask complete so it doesn't go unobserved.
+            try
+            {
+                _process.KillTree();
+            }
+            catch
+            {
+                // Process already gone.
+            }
+
+            // _exitTask drains stdout/stderr and disposes _process in its finally block.
+            try
+            {
+                await _exitTask;
+            }
+            catch
+            {
+                // _exitTask may fault after KillTree; we only need it to finish, not succeed.
+            }
+        }
+    }
 
     private void WriteProcessStarted(HostProcessLaunchInfo launchInfo)
     {

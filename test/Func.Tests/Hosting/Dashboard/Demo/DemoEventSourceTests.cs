@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Hosting.Dashboard.Demo;
 using Azure.Functions.Cli.Hosting.Events;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Demo;
 
@@ -26,12 +25,12 @@ public class DemoEventSourceTests
 
         HashSet<string> distinctNames = await CollectDistinctDiscoveredNames(source);
 
-        Assert.Equal(5, distinctNames.Count);
-        Assert.Contains("HttpTrigger1", distinctNames);
-        Assert.Contains("QueueProcessor", distinctNames);
-        Assert.Contains("TimerCleanup", distinctNames);
-        Assert.Contains("HttpTriggerOrders", distinctNames);
-        Assert.Contains("BlobIngest", distinctNames);
+        distinctNames.Count.Should().Be(5);
+        distinctNames.Should().Contain("HttpTrigger1");
+        distinctNames.Should().Contain("QueueProcessor");
+        distinctNames.Should().Contain("TimerCleanup");
+        distinctNames.Should().Contain("HttpTriggerOrders");
+        distinctNames.Should().Contain("BlobIngest");
     }
 
     [Theory]
@@ -51,11 +50,11 @@ public class DemoEventSourceTests
 
         HashSet<string> distinctNames = await CollectDistinctDiscoveredNames(source);
 
-        Assert.Equal(functionCount, distinctNames.Count);
+        distinctNames.Count.Should().Be(functionCount);
         // Sequential extras start at HttpExtra1.
         for (int i = 1; i <= functionCount - 5; i++)
         {
-            Assert.Contains($"HttpExtra{i}", distinctNames);
+            distinctNames.Should().Contain($"HttpExtra{i}");
         }
     }
 
@@ -75,7 +74,7 @@ public class DemoEventSourceTests
 
         HashSet<string> distinctNames = await CollectDistinctDiscoveredNames(source);
 
-        Assert.Equal(5, distinctNames.Count);
+        distinctNames.Count.Should().Be(5);
     }
 
     private static async Task<HashSet<string>> CollectDistinctDiscoveredNames(DemoEventSource source)

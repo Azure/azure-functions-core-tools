@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -25,9 +24,9 @@ public class HelpCommandTests
     {
         var exitCode = _helpCommand.ShowGeneralHelp();
 
-        Assert.Equal(0, exitCode);
-        Assert.Contains("Azure Functions CLI", _interaction.AllOutput);
-        Assert.Contains("Usage", _interaction.AllOutput);
+        exitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("Azure Functions CLI");
+        _interaction.AllOutput.Should().Contain("Usage");
     }
 
     [Fact]
@@ -36,8 +35,8 @@ public class HelpCommandTests
         _helpCommand.ShowGeneralHelp();
 
         var output = _interaction.AllOutput;
-        Assert.Contains("version", output);
-        Assert.Contains("help", output);
+        output.Should().Contain("version");
+        output.Should().Contain("help");
     }
 
     [Fact]
@@ -45,8 +44,8 @@ public class HelpCommandTests
     {
         var exitCode = _helpCommand.ShowCommandHelp("version");
 
-        Assert.Equal(0, exitCode);
-        Assert.Contains("version", _interaction.AllOutput);
+        exitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("version");
     }
 
     [Fact]
@@ -54,8 +53,8 @@ public class HelpCommandTests
     {
         var exitCode = _helpCommand.ShowCommandHelp("nonexistent");
 
-        Assert.Equal(1, exitCode);
-        Assert.Contains("Unknown command", _interaction.AllOutput);
+        exitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("Unknown command");
     }
 
     [Fact]
@@ -69,7 +68,7 @@ public class HelpCommandTests
         _helpCommand.RenderCommandHelp(installCommand);
 
         var output = _interaction.AllOutput;
-        Assert.Contains("func workload install", output);
-        Assert.DoesNotContain("func install ", output);
+        output.Should().Contain("func workload install");
+        output.Should().NotContain("func install ");
     }
 }

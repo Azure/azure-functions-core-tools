@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Abstractions.Common;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Common;
 
@@ -18,7 +17,7 @@ public class FuncHomeResolverTests
 
         string resolved = WithEnv(null, FuncHomeResolver.Resolve);
 
-        Assert.Equal(expected, resolved);
+        resolved.Should().Be(expected);
     }
 
     [Theory]
@@ -32,7 +31,7 @@ public class FuncHomeResolverTests
 
         string resolved = WithEnv(blank, FuncHomeResolver.Resolve);
 
-        Assert.Equal(expected, resolved);
+        resolved.Should().Be(expected);
     }
 
     [Fact]
@@ -42,7 +41,7 @@ public class FuncHomeResolverTests
 
         string resolved = WithEnv(custom, FuncHomeResolver.Resolve);
 
-        Assert.Equal(Path.GetFullPath(custom), resolved);
+        resolved.Should().Be(Path.GetFullPath(custom));
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public class FuncHomeResolverTests
 
         string resolved = WithEnv(relative, FuncHomeResolver.Resolve);
 
-        Assert.Equal(Path.GetFullPath(relative), resolved);
+        resolved.Should().Be(Path.GetFullPath(relative));
     }
 
     private static string WithEnv(string? value, Func<string> action)

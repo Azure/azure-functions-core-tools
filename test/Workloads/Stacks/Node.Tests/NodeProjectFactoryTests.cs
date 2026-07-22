@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;
 
@@ -40,8 +39,8 @@ public class NodeProjectFactoryTests : IDisposable
     {
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.NotCreated notCreated = Assert.IsType<ProjectCreationResult.NotCreated>(result);
-        Assert.Equal("no Node project fingerprint found", notCreated.Reason);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>()
+            .Which.Reason.Should().Be("no Node project fingerprint found");
     }
 
     [Theory]
@@ -55,7 +54,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.Created>(result);
+        result.Should().BeOfType<ProjectCreationResult.Created>();
     }
 
     [Fact]
@@ -66,7 +65,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -77,7 +76,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Theory]
@@ -94,12 +93,12 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("node", created.Project.StackName);
-        Assert.Equal("Node.js", created.Project.StackDisplayName);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
+        created.Project.StackName.Should().Be("node");
+        created.Project.StackDisplayName.Should().Be("Node.js");
         IFunctionsWorker worker = await ResolveWorkerAsync(created.Project);
-        Assert.Equal("node", worker.WorkerRuntime);
-        Assert.NotNull(created.Reason);
+        worker.WorkerRuntime.Should().Be("node");
+        created.Reason.Should().NotBeNull();
     }
 
     [Theory]
@@ -116,8 +115,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal(expectedLanguage, created.Project.Language);
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Project.Language.Should().Be(expectedLanguage);
     }
 
     [Fact]
@@ -129,8 +127,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("TypeScript", created.Project.Language);
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Project.Language.Should().Be("TypeScript");
     }
 
     [Fact]
@@ -141,8 +138,8 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("package.json declares @azure/functions", created.Reason);
+        result.Should().BeOfType<ProjectCreationResult.Created>()
+            .Which.Reason.Should().Be("package.json declares @azure/functions");
     }
 
     [Fact]
@@ -153,8 +150,8 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("package.json declares @azure/functions", created.Reason);
+        result.Should().BeOfType<ProjectCreationResult.Created>()
+            .Which.Reason.Should().Be("package.json declares @azure/functions");
     }
 
     [Fact]
@@ -165,8 +162,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("found package.json", created.Reason);
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found package.json");
     }
 
     [Fact]
@@ -177,8 +173,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
-        Assert.Equal("found package.json", created.Reason);
+        result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found package.json");
     }
 
     [Fact]
@@ -188,7 +183,7 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        Assert.IsType<ProjectCreationResult.NotCreated>(result);
+        result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
 
     [Fact]
@@ -203,19 +198,18 @@ public class NodeProjectFactoryTests : IDisposable
 
         ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
 
-        ProjectCreationResult.Created created = Assert.IsType<ProjectCreationResult.Created>(result);
+        ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.NotResolved notResolved = Assert.IsType<FunctionsWorkerResolutionResult.NotResolved>(workerResult);
-        Assert.Same(failure, notResolved.Failure);
+        workerResult.Should().BeOfType<FunctionsWorkerResolutionResult.NotResolved>()
+            .Which.Failure.Should().BeSameAs(failure);
     }
 
     [Fact]
     public async Task NullContext_throws()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new NodeProjectFactory().TryCreateProjectAsync(null!, default));
+        await FluentActions.Awaiting(() => new NodeProjectFactory().TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     private void WriteFile(string name, string contents)
@@ -229,7 +223,7 @@ public class NodeProjectFactoryTests : IDisposable
         FunctionsWorkerResolutionResult result = await project.WorkerReference.ResolveWorkerAsync(
             new FunctionsWorkerResolutionContext(_workerResolver),
             default);
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
         return resolved.Worker;
     }
 

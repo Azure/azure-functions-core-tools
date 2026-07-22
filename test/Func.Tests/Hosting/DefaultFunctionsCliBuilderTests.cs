@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting;
 
@@ -19,13 +18,13 @@ public class DefaultFunctionsCliBuilderTests
         var services = new ServiceCollection();
         var builder = new DefaultFunctionsCliBuilder(services);
 
-        Assert.Same(services, builder.Services);
+        builder.Services.Should().BeSameAs(services);
     }
 
     [Fact]
     public void Ctor_NullServices_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DefaultFunctionsCliBuilder(null!));
+        FluentActions.Invoking(() => new DefaultFunctionsCliBuilder(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -39,10 +38,10 @@ public class DefaultFunctionsCliBuilderTests
         builder.RegisterCommand(stub);
 
         var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
-        var external = Assert.Single(resolved.OfType<ExternalCommand>());
-        Assert.Same(workload, external.Workload);
-        Assert.Same(stub, external.Source);
-        Assert.Equal("hello", external.Name);
+        var external = resolved.OfType<ExternalCommand>().Should().ContainSingle().Subject;
+        external.Workload.Should().BeSameAs(workload);
+        external.Source.Should().BeSameAs(stub);
+        external.Name.Should().Be("hello");
     }
 
     [Fact]
@@ -56,9 +55,8 @@ public class DefaultFunctionsCliBuilderTests
         builder.RegisterCommand<GenericTestCommand>();
 
         var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
-        var external = Assert.Single(resolved.OfType<ExternalCommand>());
-        var source = Assert.IsType<GenericTestCommand>(external.Source);
-        Assert.Equal("from-di", source.Payload.Value);
+        var external = resolved.OfType<ExternalCommand>().Should().ContainSingle().Subject;
+        external.Source.Should().BeOfType<GenericTestCommand>().Which.Payload.Value.Should().Be("from-di");
     }
 
     [Fact]
@@ -71,7 +69,7 @@ public class DefaultFunctionsCliBuilderTests
         builder.RegisterCommand<GenericTestCommand>();
 
         var sp = services.BuildServiceProvider();
-        Assert.Null(sp.GetService<GenericTestCommand>());
+        sp.GetService<GenericTestCommand>().Should().BeNull();
     }
 
     [Fact]
@@ -80,9 +78,9 @@ public class DefaultFunctionsCliBuilderTests
         var services = new ServiceCollection();
         var builder = new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo());
 
-        var ex = Assert.Throws<ArgumentException>(builder.RegisterCommand<AbstractFuncCommand>);
-        Assert.Contains("abstract command type", ex.Message);
-        Assert.Contains(nameof(AbstractFuncCommand), ex.Message);
+        var ex = FluentActions.Invoking(builder.RegisterCommand<AbstractFuncCommand>).Should().ThrowExactly<ArgumentException>().Which;
+        ex.Message.Should().Contain("abstract command type");
+        ex.Message.Should().Contain(nameof(AbstractFuncCommand));
     }
 
     [Fact]
@@ -96,9 +94,8 @@ public class DefaultFunctionsCliBuilderTests
         builder.RegisterCommand(typeof(GenericTestCommand));
 
         var resolved = services.BuildServiceProvider().GetServices<FuncCliCommand>().ToList();
-        var external = Assert.Single(resolved.OfType<ExternalCommand>());
-        var source = Assert.IsType<GenericTestCommand>(external.Source);
-        Assert.Equal("from-di", source.Payload.Value);
+        var external = resolved.OfType<ExternalCommand>().Should().ContainSingle().Subject;
+        external.Source.Should().BeOfType<GenericTestCommand>().Which.Payload.Value.Should().Be("from-di");
     }
 
     [Fact]
@@ -111,7 +108,7 @@ public class DefaultFunctionsCliBuilderTests
         builder.RegisterCommand(typeof(GenericTestCommand));
 
         var sp = services.BuildServiceProvider();
-        Assert.Null(sp.GetService<GenericTestCommand>());
+        sp.GetService<GenericTestCommand>().Should().BeNull();
     }
 
     [Fact]
@@ -119,7 +116,7 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        Assert.Throws<ArgumentNullException>(() => builder.RegisterCommand((Type)null!));
+        FluentActions.Invoking(() => builder.RegisterCommand((Type)null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -127,9 +124,9 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        var ex = Assert.Throws<ArgumentException>(() => builder.RegisterCommand(typeof(string)));
-        Assert.Contains("not assignable", ex.Message);
-        Assert.Contains(nameof(FuncCommand), ex.Message);
+        var ex = FluentActions.Invoking(() => builder.RegisterCommand(typeof(string))).Should().ThrowExactly<ArgumentException>().Which;
+        ex.Message.Should().Contain("not assignable");
+        ex.Message.Should().Contain(nameof(FuncCommand));
     }
 
     [Fact]
@@ -137,9 +134,9 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        var ex = Assert.Throws<ArgumentException>(() => builder.RegisterCommand(typeof(AbstractFuncCommand)));
-        Assert.Contains("abstract command type", ex.Message);
-        Assert.Contains(nameof(AbstractFuncCommand), ex.Message);
+        var ex = FluentActions.Invoking(() => builder.RegisterCommand(typeof(AbstractFuncCommand))).Should().ThrowExactly<ArgumentException>().Which;
+        ex.Message.Should().Contain("abstract command type");
+        ex.Message.Should().Contain(nameof(AbstractFuncCommand));
     }
 
     [Fact]
@@ -147,7 +144,7 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        Assert.Throws<ArgumentNullException>(() => builder.RegisterCommand((FuncCommand)null!));
+        FluentActions.Invoking(() => builder.RegisterCommand((FuncCommand)null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -155,9 +152,8 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => builder.RegisterCommand(new TestWorkloads.StubFuncCommand("oops")));
-        Assert.Contains("workload-scoped builder", ex.Message);
+        var ex = FluentActions.Invoking(() => builder.RegisterCommand(new TestWorkloads.StubFuncCommand("oops"))).Should().ThrowExactly<InvalidOperationException>().Which;
+        ex.Message.Should().Contain("workload-scoped builder");
     }
 
     [Fact]
@@ -165,7 +161,7 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
 
-        Assert.Throws<InvalidOperationException>(builder.RegisterCommand<GenericTestCommand>);
+        FluentActions.Invoking(builder.RegisterCommand<GenericTestCommand>).Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Fact]
@@ -173,7 +169,7 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
 
-        Assert.Throws<InvalidOperationException>(() => builder.RegisterCommand(typeof(GenericTestCommand)));
+        FluentActions.Invoking(() => builder.RegisterCommand(typeof(GenericTestCommand))).Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Fact]
@@ -186,9 +182,9 @@ public class DefaultFunctionsCliBuilderTests
 
         builder.AddProjectFactory(factory);
 
-        var registration = Assert.Single(services.BuildServiceProvider().GetServices<WorkloadProjectFactoryRegistration>());
-        Assert.Same(workload, registration.Workload);
-        Assert.Same(factory, registration.Factory);
+        var registration = services.BuildServiceProvider().GetServices<WorkloadProjectFactoryRegistration>().Should().ContainSingle().Subject;
+        registration.Workload.Should().BeSameAs(workload);
+        registration.Factory.Should().BeSameAs(factory);
     }
 
     [Fact]
@@ -196,7 +192,7 @@ public class DefaultFunctionsCliBuilderTests
     {
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
 
-        Assert.Throws<ArgumentNullException>(() => builder.AddProjectFactory(null!));
+        FluentActions.Invoking(() => builder.AddProjectFactory(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -205,8 +201,8 @@ public class DefaultFunctionsCliBuilderTests
         var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
         var factory = Substitute.For<IFunctionsProjectFactory>();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => builder.AddProjectFactory(factory));
-        Assert.Contains("workload-scoped builder", ex.Message);
+        var ex = FluentActions.Invoking(() => builder.AddProjectFactory(factory)).Should().ThrowExactly<InvalidOperationException>().Which;
+        ex.Message.Should().Contain("workload-scoped builder");
     }
 
     private sealed class GenericTestPayload(string value)

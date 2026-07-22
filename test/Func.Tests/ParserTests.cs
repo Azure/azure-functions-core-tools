@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests;
 
@@ -24,8 +23,8 @@ public class ParserTests
     {
         FuncRootCommand root = TestParser.CreateRoot(_interaction);
 
-        Assert.NotNull(root);
-        Assert.IsType<FuncRootCommand>(root);
+        root.Should().NotBeNull();
+        root.Should().BeOfType<FuncRootCommand>();
     }
 
     [Fact]
@@ -34,8 +33,8 @@ public class ParserTests
         FuncRootCommand root = TestParser.CreateRoot(_interaction);
         var names = root.Subcommands.Select(c => c.Name).ToList();
 
-        Assert.Contains("version", names);
-        Assert.Contains("help", names);
+        names.Should().Contain("version");
+        names.Should().Contain("help");
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public class ParserTests
         FuncRootCommand root = TestParser.CreateRoot(_interaction);
         var optionNames = root.Options.Select(o => o.Name).ToList();
 
-        Assert.Contains("--verbose", optionNames);
+        optionNames.Should().Contain("--verbose");
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public class ParserTests
         // -v is intentionally left free so subcommands can claim it.
         var root = (FuncRootCommand)TestParser.CreateRoot(_interaction);
 
-        Assert.DoesNotContain("-v", root.VerboseOption.Aliases);
+        root.VerboseOption.Aliases.Should().NotContain("-v");
     }
 
     [Theory]
@@ -64,7 +63,7 @@ public class ParserTests
         FuncRootCommand root = TestParser.CreateRoot(_interaction);
         ParseResult result = root.Parse(commandName);
 
-        Assert.Empty(result.Errors);
+        result.Errors.Should().BeEmpty();
     }
 
     // --- Workload command tracking ---
@@ -79,9 +78,9 @@ public class ParserTests
             builder => builder.RegisterCommand(new TestWorkloads.StubFuncCommand("workload-cmd", "wd")));
 
         ExternalCommand? added = root.Subcommands.OfType<ExternalCommand>().SingleOrDefault();
-        Assert.NotNull(added);
-        Assert.Equal("workload-cmd", added!.Name);
-        Assert.Same(workload, added.Workload);
+        added.Should().NotBeNull();
+        added!.Name.Should().Be("workload-cmd");
+        added.Workload.Should().BeSameAs(workload);
     }
 
     [Fact]
@@ -95,10 +94,10 @@ public class ParserTests
 
         // init is a built-in name; the workload registration is skipped.
         var initCommands = root.Subcommands.Where(c => c.Name == "init").ToList();
-        Assert.Single(initCommands);
-        Assert.IsNotType<ExternalCommand>(initCommands[0]);
+        initCommands.Should().ContainSingle();
+        initCommands[0].Should().NotBeOfType<ExternalCommand>();
 
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:") && l.Contains("Wl.Bar") && l.Contains("'init'"));
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("Wl.Bar") && l.Contains("'init'"));
     }
 
     [Fact]
@@ -117,8 +116,8 @@ public class ParserTests
 
         FuncRootCommand root = Parser.CreateCommand(services);
 
-        Assert.DoesNotContain(root.Subcommands, c => c.Name == "dup");
-        Assert.Contains(_interaction.Lines, l => l.StartsWith("WARNING:")
+        root.Subcommands.Should().NotContain(c => c.Name == "dup");
+        _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:")
             && l.Contains("Wl.A") && l.Contains("Wl.B") && l.Contains("'dup'"));
     }
 
@@ -130,9 +129,9 @@ public class ParserTests
             s.AddSingleton<FuncCliCommand, RogueFuncCliCommand>();
         });
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Parser.CreateCommand(services));
-        Assert.Contains(nameof(RogueFuncCliCommand), ex.Message);
-        Assert.Contains("rogue", ex.Message);
+        InvalidOperationException ex = FluentActions.Invoking(() => Parser.CreateCommand(services)).Should().ThrowExactly<InvalidOperationException>().Which;
+        ex.Message.Should().Contain(nameof(RogueFuncCliCommand));
+        ex.Message.Should().Contain("rogue");
     }
 
     [Fact]
@@ -147,8 +146,8 @@ public class ParserTests
 
         int exit = await parseResult.InvokeAsync();
 
-        Assert.Equal(0, exit);
-        Assert.NotEmpty(_interaction.Lines);
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotBeEmpty();
     }
 
     private sealed class RogueFuncCliCommand : FuncCliCommand

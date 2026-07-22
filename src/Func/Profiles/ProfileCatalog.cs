@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Microsoft.Extensions.Logging;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Profiles;
@@ -8,12 +9,14 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Default profile catalog over project, user, and built-in profile sources.
 /// </summary>
-internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IProfileCatalog
+internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources, ILogger<ProfileCatalog> logger) : IProfileCatalog
 {
     private const int MaxInheritanceDepth = 5;
 
     private readonly IReadOnlyList<IProfileSource> _sources =
         (sources ?? throw new ArgumentNullException(nameof(sources))).ToList();
+
+    private readonly ILogger<ProfileCatalog> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<IReadOnlyList<ProfileSourceSnapshot>> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
     {
@@ -23,7 +26,19 @@ internal sealed class ProfileCatalog(IEnumerable<IProfileSource> sources) : IPro
         foreach (IProfileSource source in _sources)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            snapshots.Add(await source.LoadAsync(context, cancellationToken));
+            try
+            {
+                snapshots.Add(await source.LoadAsync(context, cancellationToken));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Isolate per-source failures so one misbehaving source cannot take down all profile resolution.
+                _logger.LogWarning(ex, "Profile source {SourceType} failed to load; skipping.", source.GetType().Name);
+            }
         }
 
         return snapshots;

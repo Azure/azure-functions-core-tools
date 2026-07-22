@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Xunit;
-
 namespace Azure.Functions.Cli.Bundles.Tests;
 
 public class BundleHintBuilderTests
@@ -17,11 +15,11 @@ public class BundleHintBuilderTests
             highestVersionSatisfyingHostJsonOnly: "3.36.0",
             profileName: "stable");
 
-        Assert.Contains("[3.*, 4.0.0)", hint);
-        Assert.Contains("[4.*, 5.0.0)", hint);
-        Assert.Contains("stable", hint);
-        Assert.Contains("3.36.0", hint);
-        Assert.Contains("Widen", hint);
+        hint.Should().Contain("[3.*, 4.0.0)");
+        hint.Should().Contain("[4.*, 5.0.0)");
+        hint.Should().Contain("stable");
+        hint.Should().Contain("3.36.0");
+        hint.Should().Contain("Widen");
     }
 
     [Fact]
@@ -33,10 +31,10 @@ public class BundleHintBuilderTests
             ["4.10.0", "4.20.0"],
             suggestedVersion: "4.10.0");
 
-        Assert.Contains("4.10.0", hint);
-        Assert.Contains("4.20.0", hint);
-        Assert.Contains("[4.22.0, 5.0.0)", hint);
-        Assert.Contains($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.10.0 --force", hint);
+        hint.Should().Contain("4.10.0");
+        hint.Should().Contain("4.20.0");
+        hint.Should().Contain("[4.22.0, 5.0.0)");
+        hint.Should().Contain($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.10.0 --force");
     }
 
     [Fact]
@@ -48,8 +46,8 @@ public class BundleHintBuilderTests
             [],
             suggestedVersion: null);
 
-        Assert.Contains("No bundle workload is installed.", hint);
-        Assert.Contains("@<version>", hint);
+        hint.Should().Contain("No bundle workload is installed.");
+        hint.Should().Contain("@<version>");
     }
 
     [Fact]
@@ -57,8 +55,8 @@ public class BundleHintBuilderTests
     {
         string hint = BundleHintBuilder.WorkloadMissing();
 
-        Assert.Contains($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}", hint);
-        Assert.DoesNotContain("func setup", hint);
+        hint.Should().Contain($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}");
+        hint.Should().NotContain("func setup");
     }
 
     [Fact]
@@ -66,8 +64,8 @@ public class BundleHintBuilderTests
     {
         string hint = BundleHintBuilder.WorkloadMissing(workerRuntime: "go");
 
-        Assert.Contains("func workload install", hint);
-        Assert.Contains("func setup --features go", hint);
+        hint.Should().Contain("func workload install");
+        hint.Should().Contain("func setup --features go");
     }
 
     [Fact]
@@ -75,8 +73,8 @@ public class BundleHintBuilderTests
     {
         string hint = BundleHintBuilder.WorkloadMissing(workerRuntime: "ruby");
 
-        Assert.Contains("func workload install", hint);
-        Assert.DoesNotContain("func setup", hint);
+        hint.Should().Contain("func workload install");
+        hint.Should().NotContain("func setup");
     }
 
     [Fact]
@@ -89,7 +87,7 @@ public class BundleHintBuilderTests
             suggestedVersion: "4.10.0",
             workerRuntime: "node");
 
-        Assert.Contains("func setup --features node", hint);
+        hint.Should().Contain("func setup --features node");
     }
 
     [Fact]
@@ -104,6 +102,6 @@ public class BundleHintBuilderTests
             highestVersionSatisfyingHostJsonOnly: "3.36.0",
             profileName: "stable");
 
-        Assert.DoesNotContain("func setup", hint);
+        hint.Should().NotContain("func setup");
     }
 }

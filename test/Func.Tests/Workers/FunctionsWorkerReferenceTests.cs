@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Workers;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Workers;
 
@@ -24,7 +23,7 @@ public class FunctionsWorkerReferenceTests
 
         FunctionsWorkerResolutionResult result = await reference.ResolveWorkerAsync(context, CancellationToken.None);
 
-        Assert.Same(expected, result);
+        result.Should().BeSameAs(expected);
     }
 
     [Fact]
@@ -42,11 +41,11 @@ public class FunctionsWorkerReferenceTests
 
         FunctionsWorkerResolutionResult result = await reference.ResolveWorkerAsync(context, CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("go", resolved.Worker.Id.Value);
-        Assert.Equal("native", resolved.Worker.WorkerRuntime);
-        Assert.Equal("/workloads/go/worker.config.json", resolved.Worker.WorkerConfigPath);
-        Assert.Equal("1.0.0", resolved.Worker.Version);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Id.Value.Should().Be("go");
+        resolved.Worker.WorkerRuntime.Should().Be("native");
+        resolved.Worker.WorkerConfigPath.Should().Be("/workloads/go/worker.config.json");
+        resolved.Worker.Version.Should().Be("1.0.0");
     }
 
     [Fact]
@@ -62,23 +61,23 @@ public class FunctionsWorkerReferenceTests
 
         FunctionsWorkerResolutionResult result = await reference.ResolveWorkerAsync(context, CancellationToken.None);
 
-        Assert.Same(expected, result);
+        result.Should().BeSameAs(expected);
     }
 
     [Fact]
     public void FromWorkload_WithRuntimeOverride_RejectsNullWorkerId()
     {
-        Assert.Throws<ArgumentNullException>(() => FunctionsWorkerReference.FromWorkload(
+        FluentActions.Invoking(() => FunctionsWorkerReference.FromWorkload(
             (FunctionsWorkerId)null!,
-            workerRuntime: "native"));
+            workerRuntime: "native")).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void FromWorkload_WithRuntimeOverride_RejectsBlankRuntime()
     {
-        Assert.Throws<ArgumentException>(() => FunctionsWorkerReference.FromWorkload(
+        FluentActions.Invoking(() => FunctionsWorkerReference.FromWorkload(
             new FunctionsWorkerId("go"),
-            workerRuntime: "   "));
+            workerRuntime: "   ")).Should().ThrowExactly<ArgumentException>();
     }
 
     private static class FunctionsWorkerReferenceTestHelpers
@@ -108,54 +107,54 @@ public class FunctionsWorkerReferenceTests
 
         FunctionsWorkerResolutionResult result = await reference.ResolveWorkerAsync(context, CancellationToken.None);
 
-        FunctionsWorkerResolutionResult.Resolved resolved = Assert.IsType<FunctionsWorkerResolutionResult.Resolved>(result);
-        Assert.Equal("custom", resolved.Worker.Id.Value);
-        Assert.Equal("custom", resolved.Worker.WorkerRuntime);
-        Assert.Equal(WorkerConfigPath, resolved.Worker.WorkerConfigPath);
-        Assert.Equal("1.0.0", resolved.Worker.Version);
+        FunctionsWorkerResolutionResult.Resolved resolved = result.Should().BeOfType<FunctionsWorkerResolutionResult.Resolved>().Subject;
+        resolved.Worker.Id.Value.Should().Be("custom");
+        resolved.Worker.WorkerRuntime.Should().Be("custom");
+        resolved.Worker.WorkerConfigPath.Should().Be(WorkerConfigPath);
+        resolved.Worker.Version.Should().Be("1.0.0");
         _ = resolver.DidNotReceive().ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public void FromWorkerInfo_NullWorkerId_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => FunctionsWorkerReference.FromWorkerInfo(
+        FluentActions.Invoking(() => FunctionsWorkerReference.FromWorkerInfo(
             (FunctionsWorkerId)null!,
             "custom",
-            "worker.config.json"));
+            "worker.config.json")).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void FromWorkerInfo_EmptyWorkerRuntime_Throws()
     {
-        Assert.Throws<ArgumentException>(() => FunctionsWorkerReference.FromWorkerInfo(
+        FluentActions.Invoking(() => FunctionsWorkerReference.FromWorkerInfo(
             new FunctionsWorkerId("custom"),
             string.Empty,
-            "worker.config.json"));
+            "worker.config.json")).Should().ThrowExactly<ArgumentException>();
     }
 
     [Fact]
     public void FromWorkerInfo_EmptyWorkerConfigPath_Throws()
     {
-        Assert.Throws<ArgumentException>(() => FunctionsWorkerReference.FromWorkerInfo(
+        FluentActions.Invoking(() => FunctionsWorkerReference.FromWorkerInfo(
             new FunctionsWorkerId("custom"),
             "custom",
-            string.Empty));
+            string.Empty)).Should().ThrowExactly<ArgumentException>();
     }
 
     [Fact]
     public void FromWorkerInfo_NullVersion_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => FunctionsWorkerReference.FromWorkerInfo(
+        FluentActions.Invoking(() => FunctionsWorkerReference.FromWorkerInfo(
             new FunctionsWorkerId("custom"),
             "custom",
             "worker.config.json",
-            null!));
+            null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Ctor_NullResolver_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new FunctionsWorkerResolutionContext(null!));
+        FluentActions.Invoking(() => new FunctionsWorkerResolutionContext(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 }

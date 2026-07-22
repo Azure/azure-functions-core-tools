@@ -6,7 +6,6 @@ using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Host.Tests;
 
@@ -29,7 +28,7 @@ public sealed class HostStructuredScriptLoggingBuilderTests
 
         using ServiceProvider provider = services.BuildServiceProvider();
         IEnumerable<ILoggerProvider> loggerProviders = provider.GetRequiredService<IEnumerable<ILoggerProvider>>();
-        Assert.Contains(loggerProviders, static provider => provider is HostStructuredLoggerProvider);
+        loggerProviders.Should().Contain(static provider => provider is HostStructuredLoggerProvider);
     }
 
     [Theory]
@@ -94,7 +93,7 @@ public sealed class HostStructuredScriptLoggingBuilderTests
     }
 
     private static void AssertStructuredLogFilterResult(LoggerFilterOptions filterOptions, string category, LogLevel logLevel, bool expected)
-        => Assert.Contains(filterOptions.Rules, rule =>
+        => filterOptions.Rules.Any(rule =>
             string.Equals(rule.ProviderName, typeof(HostStructuredLoggerProvider).FullName, StringComparison.Ordinal)
-            && rule.Filter?.Invoke(rule.ProviderName, category, logLevel) == expected);
+            && rule.Filter?.Invoke(rule.ProviderName, category, logLevel) == expected).Should().BeTrue();
 }

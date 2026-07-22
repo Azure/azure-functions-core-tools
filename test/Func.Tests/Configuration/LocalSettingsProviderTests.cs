@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Configuration;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Configuration;
 
@@ -18,9 +17,9 @@ public sealed class LocalSettingsProviderTests : IDisposable
     {
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
-        Assert.Empty(snapshot.Values);
-        Assert.Null(snapshot.WorkerRuntime);
-        Assert.Null(snapshot.Host);
+        snapshot.Values.Should().BeEmpty();
+        snapshot.WorkerRuntime.Should().BeNull();
+        snapshot.Host.Should().BeNull();
     }
 
     [Fact]
@@ -44,13 +43,13 @@ public sealed class LocalSettingsProviderTests : IDisposable
 
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
-        Assert.Equal("python", snapshot.WorkerRuntime);
-        Assert.Equal("UseDevelopmentStorage=true", snapshot.Values["AzureWebJobsStorage"]);
-        Assert.False(snapshot.Values.ContainsKey("IgnoredNumber"));
-        Assert.NotNull(snapshot.Host);
-        Assert.Equal(7072, snapshot.Host!.LocalHttpPort);
-        Assert.Equal("http://localhost,http://example", snapshot.Host.Cors);
-        Assert.True(snapshot.Host.CorsCredentials);
+        snapshot.WorkerRuntime.Should().Be("python");
+        snapshot.Values["AzureWebJobsStorage"].Should().Be("UseDevelopmentStorage=true");
+        snapshot.Values.ContainsKey("IgnoredNumber").Should().BeFalse();
+        snapshot.Host.Should().NotBeNull();
+        snapshot.Host!.LocalHttpPort.Should().Be(7072);
+        snapshot.Host.Cors.Should().Be("http://localhost,http://example");
+        snapshot.Host.CorsCredentials.Should().BeTrue();
     }
 
     [Fact]
@@ -60,8 +59,8 @@ public sealed class LocalSettingsProviderTests : IDisposable
 
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
-        Assert.Empty(snapshot.Values);
-        Assert.Null(snapshot.WorkerRuntime);
+        snapshot.Values.Should().BeEmpty();
+        snapshot.WorkerRuntime.Should().BeNull();
     }
 
     [Fact]
@@ -73,14 +72,14 @@ public sealed class LocalSettingsProviderTests : IDisposable
         WriteSettings("""{"Values":{"FUNCTIONS_WORKER_RUNTIME":"node"}}""");
         LocalSettingsSnapshot second = _provider.Get(_dir);
 
-        Assert.Same(first, second);
-        Assert.Equal("python", second.WorkerRuntime);
+        second.Should().BeSameAs(first);
+        second.WorkerRuntime.Should().Be("python");
     }
 
     [Fact]
     public void Get_NullDirectory_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => _provider.Get(null!));
+        FluentActions.Invoking(() => _provider.Get(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     private void WriteSettings(string contents)

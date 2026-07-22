@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Bundles.Tests;
 
@@ -26,9 +25,9 @@ public class InstalledBundleWorkloadsTests
 
         IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store, paths).ListInstalledAsync();
 
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, r => r.PackageVersion == "4.35.0");
-        Assert.Contains(result, r => r.PackageVersion == "4.36.0");
+        result.Count.Should().Be(2);
+        result.Should().Contain(r => r.PackageVersion == "4.35.0");
+        result.Should().Contain(r => r.PackageVersion == "4.36.0");
     }
 
     [Fact]
@@ -48,7 +47,7 @@ public class InstalledBundleWorkloadsTests
         ]);
         paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns("/x");
 
-        Assert.Empty(await new InstalledBundleWorkloads(store, paths).ListInstalledAsync());
+        (await new InstalledBundleWorkloads(store, paths).ListInstalledAsync()).Should().BeEmpty();
     }
 
     [Fact]
@@ -70,7 +69,6 @@ public class InstalledBundleWorkloadsTests
 
         IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store, paths).ListInstalledAsync();
 
-        InstalledBundleWorkload row = Assert.Single(result);
-        Assert.Equal("/home/.func/workloads/bundles/4.35.0", row.InstallDirectory);
+        result.Should().ContainSingle().Which.InstallDirectory.Should().Be("/home/.func/workloads/bundles/4.35.0");
     }
 }

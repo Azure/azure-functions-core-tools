@@ -2,10 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.PowerShell.Tests;
 
@@ -22,15 +20,27 @@ public class PowerShellWorkloadTests
 
         ServiceProvider provider = services.BuildServiceProvider();
         IProjectInitializer initializer = provider.GetRequiredService<IProjectInitializer>();
-        Assert.IsType<PowerShellProjectInitializer>(initializer);
-        Assert.Equal("powershell", initializer.Stack);
-        Assert.Equal("PowerShell", Assert.Single(initializer.SupportedLanguages));
+        initializer.Should().BeOfType<PowerShellProjectInitializer>();
+        initializer.Stack.Should().Be("powershell");
+        initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
+    }
+
+    [Fact]
+    public void Configure_AddsProjectFactory()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new PowerShellWorkload().Configure(builder);
+
+        builder.Received(1).AddProjectFactory(Arg.Any<PowerShellProjectFactory>());
     }
 
     [Fact]
     public void Configure_NullBuilder_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new PowerShellWorkload().Configure(null!));
+        FluentActions.Invoking(() => new PowerShellWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -38,7 +48,7 @@ public class PowerShellWorkloadTests
     {
         PowerShellWorkload workload = new();
 
-        Assert.Equal("PowerShell Stack", workload.DisplayName);
-        Assert.Equal("Azure Functions CLI tooling for PowerShell projects.", workload.Description);
+        workload.DisplayName.Should().Be("PowerShell Stack");
+        workload.Description.Should().Be("Azure Functions CLI tooling for PowerShell projects.");
     }
 }

@@ -4,10 +4,10 @@ Repo-only notes for contributors. Not packaged into the nupkg.
 
 ## Programming model scope
 
-v1 (legacy) programming model templates are **not** shipped in the v5
-Python templates workload (Templates Workload Spec §5.2 / §6.2 / §7.1).
-Users still authoring against the v1 programming model should migrate
-to v2 or stay on v4 tooling.
+The Python templates workload ships v2 programming model templates
+only (Templates Workload Spec §5.2 / §6.2 / §7.1). Users still
+authoring against the legacy programming model should migrate to v2 or
+stay on v4 tooling.
 
 ## Versioning
 

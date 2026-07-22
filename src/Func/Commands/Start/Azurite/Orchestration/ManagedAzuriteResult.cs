@@ -33,9 +33,10 @@ internal abstract record ManagedAzuriteResult
     /// <summary>
     /// The CLI launched Azurite. <paramref name="Process"/> is the running
     /// handle; the caller is responsible for disposing it when the host run
-    /// ends.
+    /// ends. <paramref name="Paths"/> carries the managed data directory and
+    /// log file so callers can surface them for reset guidance.
     /// </summary>
-    public sealed record Started(IAzuriteProcess Process, AzuriteLaunchMode Mode, AzuriteEndpointTuple Endpoints) : ManagedAzuriteResult;
+    public sealed record Started(IAzuriteProcess Process, AzuriteLaunchMode Mode, AzuriteEndpointTuple Endpoints, AzuriteManagedPaths Paths) : ManagedAzuriteResult;
 
     /// <summary>
     /// Azurite cannot be made ready. <paramref name="UserMessage"/> is

@@ -12,7 +12,6 @@ using Azure.Functions.Cli.Workers;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NuGet.Versioning;
-using Xunit;
 
 namespace Azure.Functions.Cli.Bundles.Tests;
 
@@ -46,8 +45,8 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Equal("No extension bundle declared", result.Message);
-        Assert.Empty(context.State.BundleEnvVarsForHost);
+        result.Message.Should().Be("No extension bundle declared");
+        context.State.BundleEnvVarsForHost.Should().BeEmpty();
         await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
     }
 
@@ -61,7 +60,7 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Equal("No extension bundle declared", result.Message);
+        result.Message.Should().Be("No extension bundle declared");
         await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
     }
 
@@ -77,10 +76,9 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         ValidateExtensionBundleInitializationStep step = NewStep(resolver);
         StartInitializationStepContext context = NewContext();
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => step.ExecuteAsync(context, CancellationToken.None));
-        Assert.Equal("MISSING-HINT", ex.Message);
-        Assert.True(ex.IsUserError);
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Be("MISSING-HINT");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -102,10 +100,10 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Equal("Bundle Microsoft.Azure.Functions.ExtensionBundle 4.35.0", result.Message);
-        Assert.Equal("/install/4.35.0/tools/any", context.State.BundleDownloadPath);
-        Assert.Equal("/install/4.35.0/tools/any", context.State.BundleEnvVarsForHost[DownloadPathEnvVar]);
-        Assert.Equal("false", context.State.BundleEnvVarsForHost[EnsureLatestEnvVar]);
+        result.Message.Should().Be("Bundle Microsoft.Azure.Functions.ExtensionBundle 4.35.0");
+        context.State.BundleDownloadPath.Should().Be("/install/4.35.0/tools/any");
+        context.State.BundleEnvVarsForHost[DownloadPathEnvVar].Should().Be("/install/4.35.0/tools/any");
+        context.State.BundleEnvVarsForHost[EnsureLatestEnvVar].Should().Be("false");
     }
 
     [Fact]
@@ -149,10 +147,9 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         ValidateExtensionBundleInitializationStep step = NewStep(resolver);
         StartInitializationStepContext context = NewContext();
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => step.ExecuteAsync(context, CancellationToken.None));
-        Assert.Equal("RESOLVER-HINT", ex.Message);
-        Assert.True(ex.IsUserError);
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
+        ex.Message.Should().Be("RESOLVER-HINT");
+        ex.IsUserError.Should().BeTrue();
     }
 
     [Fact]
@@ -194,11 +191,10 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         ValidateExtensionBundleInitializationStep step = NewStep(resolver);
         StartInitializationStepContext context = NewContext();
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => step.ExecuteAsync(context, CancellationToken.None));
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("host.json is not valid JSON", ex.Message);
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("host.json is not valid JSON");
         await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
     }
 
@@ -210,11 +206,10 @@ public class ValidateExtensionBundleInitializationStepTests : IDisposable
         ValidateExtensionBundleInitializationStep step = NewStep(resolver);
         StartInitializationStepContext context = NewContext();
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => step.ExecuteAsync(context, CancellationToken.None));
+        GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("host.json extensionBundle must include", ex.Message);
+        ex.IsUserError.Should().BeTrue();
+        ex.Message.Should().Contain("host.json extensionBundle must include");
         await resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
     }
 

@@ -7,7 +7,6 @@ using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
-using Xunit;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;
 
@@ -38,7 +37,7 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsNode()
     {
-        Assert.Equal("node", new NodeProjectInitializer().Stack);
+        new NodeProjectInitializer().Stack.Should().Be("node");
     }
 
     [Theory]
@@ -53,16 +52,15 @@ public class NodeProjectInitializerTests : IDisposable
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
-        Assert.Equal(expected, new NodeProjectInitializer().NormalizeLanguage(input));
+        new NodeProjectInitializer().NormalizeLanguage(input).Should().Be(expected);
     }
 
     [Fact]
     public async Task InitializeAsync_UnsupportedLanguage_Throws()
     {
-        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => RunAsync(language: "ruby", force: false));
+        ArgumentException ex = (await FluentActions.Awaiting(() => RunAsync(language: "ruby", force: false)).Should().ThrowAsync<ArgumentException>()).Which;
 
-        Assert.Contains("ruby", ex.Message);
+        ex.Message.Should().Contain("ruby");
     }
 
     [Fact]
@@ -70,7 +68,7 @@ public class NodeProjectInitializerTests : IDisposable
     {
         await RunAsync(language: "ts", force: false);
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")));
+        File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")).Should().BeTrue();
     }
 
     [Fact]
@@ -78,8 +76,8 @@ public class NodeProjectInitializerTests : IDisposable
     {
         await RunAsync(language: "js", force: false);
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "package.json")));
-        Assert.False(File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")));
+        File.Exists(Path.Combine(_projectDir.FullName, "package.json")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")).Should().BeFalse();
     }
 
     [Fact]
@@ -89,9 +87,9 @@ public class NodeProjectInitializerTests : IDisposable
         IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
-        Assert.Contains("--no-bundles", names);
-        Assert.Contains("--bundles-channel", names);
-        Assert.Contains("--skip-npm-install", names);
+        names.Should().Contain("--no-bundles");
+        names.Should().Contain("--bundles-channel");
+        names.Should().Contain("--skip-npm-install");
     }
 
     [Fact]
@@ -99,11 +97,11 @@ public class NodeProjectInitializerTests : IDisposable
     {
         await RunAsync(language: null, force: false);
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "package.json")));
-        Assert.False(File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")));
+        File.Exists(Path.Combine(_projectDir.FullName, "package.json")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")).Should().BeFalse();
 
         using var pkg = JsonDocument.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")));
-        Assert.Equal("src/functions/*.js", pkg.RootElement.GetProperty("main").GetString());
+        pkg.RootElement.GetProperty("main").GetString().Should().Be("src/functions/*.js");
     }
 
     [Fact]
@@ -111,9 +109,9 @@ public class NodeProjectInitializerTests : IDisposable
     {
         await RunAsync(language: "typescript", force: false);
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")));
+        File.Exists(Path.Combine(_projectDir.FullName, "tsconfig.json")).Should().BeTrue();
         using var pkg = JsonDocument.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")));
-        Assert.Contains("tsc", pkg.RootElement.GetProperty("scripts").GetProperty("build").GetString());
+        pkg.RootElement.GetProperty("scripts").GetProperty("build").GetString().Should().Contain("tsc");
     }
 
     [Fact]
@@ -122,7 +120,7 @@ public class NodeProjectInitializerTests : IDisposable
         await RunAsync(language: null, force: false, projectName: "My Cool App");
 
         using var pkg = JsonDocument.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")));
-        Assert.Equal("my-cool-app", pkg.RootElement.GetProperty("name").GetString());
+        pkg.RootElement.GetProperty("name").GetString().Should().Be("my-cool-app");
     }
 
     [Fact]
@@ -130,12 +128,12 @@ public class NodeProjectInitializerTests : IDisposable
     {
         await RunAsync(language: null, force: false);
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, ".funcignore")));
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")));
-        Assert.True(Directory.Exists(Path.Combine(_projectDir.FullName, "src", "functions")));
+        File.Exists(Path.Combine(_projectDir.FullName, ".funcignore")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, ".gitignore")).Should().BeTrue();
+        Directory.Exists(Path.Combine(_projectDir.FullName, "src", "functions")).Should().BeTrue();
 
         using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "local.settings.json")));
-        Assert.Equal("node", settings.RootElement.GetProperty("Values").GetProperty("FUNCTIONS_WORKER_RUNTIME").GetString());
+        settings.RootElement.GetProperty("Values").GetProperty("FUNCTIONS_WORKER_RUNTIME").GetString().Should().Be("node");
     }
 
     [Fact]
@@ -146,8 +144,8 @@ public class NodeProjectInitializerTests : IDisposable
         await RunAsync(language: null, force: false);
 
         JsonNode? bundle = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")))!["extensionBundle"];
-        Assert.NotNull(bundle);
-        Assert.Equal("Microsoft.Azure.Functions.ExtensionBundle", bundle!["id"]!.GetValue<string>());
+        bundle.Should().NotBeNull();
+        bundle!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle");
     }
 
     [Fact]
@@ -159,7 +157,7 @@ public class NodeProjectInitializerTests : IDisposable
 
         await RunAsync(language: null, force: false);
 
-        Assert.Equal(userEdit, File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")));
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")).Should().Be(userEdit);
     }
 
     [Fact]
@@ -170,7 +168,7 @@ public class NodeProjectInitializerTests : IDisposable
 
         await RunAsync(language: null, force: true);
 
-        Assert.Contains("@azure/functions", File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")));
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "package.json")).Should().Contain("@azure/functions");
     }
 
     [Fact]
@@ -179,10 +177,10 @@ public class NodeProjectInitializerTests : IDisposable
         await RunAsync(language: null, force: false, args: ["--no-bundles"]);
 
         string hostJsonPath = Path.Combine(_projectDir.FullName, "host.json");
-        Assert.True(File.Exists(hostJsonPath), "host.json should be created even with --no-bundles");
+        File.Exists(hostJsonPath).Should().BeTrue("host.json should be created even with --no-bundles");
         string content = File.ReadAllText(hostJsonPath);
-        Assert.Contains("\"version\"", content);
-        Assert.DoesNotContain("extensionBundle", content);
+        content.Should().Contain("\"version\"");
+        content.Should().NotContain("extensionBundle");
     }
 
     [Fact]
@@ -191,7 +189,7 @@ public class NodeProjectInitializerTests : IDisposable
         await RunAsync(language: null, force: false, args: ["--bundles-channel", "Preview"]);
 
         JsonNode? bundle = JsonNode.Parse(File.ReadAllText(Path.Combine(_projectDir.FullName, "host.json")))!["extensionBundle"];
-        Assert.Equal("Microsoft.Azure.Functions.ExtensionBundle.Preview", bundle!["id"]!.GetValue<string>());
+        bundle!["id"]!.GetValue<string>().Should().Be("Microsoft.Azure.Functions.ExtensionBundle.Preview");
     }
 
     [Fact]
@@ -207,7 +205,7 @@ public class NodeProjectInitializerTests : IDisposable
             };
         });
 
-        Assert.Equal(1, npmCalls);
+        npmCalls.Should().Be(1);
     }
 
     [Fact]
@@ -223,7 +221,7 @@ public class NodeProjectInitializerTests : IDisposable
             };
         });
 
-        Assert.Equal(0, npmCalls);
+        npmCalls.Should().Be(0);
     }
 
     [Fact]
@@ -234,7 +232,7 @@ public class NodeProjectInitializerTests : IDisposable
             init.RunNpmInstall = (_, _) => Task.FromResult((1, "npm: command not found"));
         });
 
-        Assert.True(File.Exists(Path.Combine(_projectDir.FullName, "package.json")));
+        File.Exists(Path.Combine(_projectDir.FullName, "package.json")).Should().BeTrue();
     }
 
     private Task RunAsync(

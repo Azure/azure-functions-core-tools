@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
@@ -16,8 +15,8 @@ public class OutputModeResolverTests
         var interaction = Substitute.For<IInteractionService>();
         interaction.IsInteractive.Returns(true);
 
-        Assert.Equal(OutputMode.Json, OutputModeResolver.Resolve(OutputMode.Json, noTui: false, interaction));
-        Assert.Equal(OutputMode.Plain, OutputModeResolver.Resolve(OutputMode.Plain, noTui: false, interaction));
+        OutputModeResolver.Resolve(OutputMode.Json, noTui: false, interaction).Should().Be(OutputMode.Json);
+        OutputModeResolver.Resolve(OutputMode.Plain, noTui: false, interaction).Should().Be(OutputMode.Plain);
     }
 
     [Fact]
@@ -26,7 +25,7 @@ public class OutputModeResolverTests
         var interaction = Substitute.For<IInteractionService>();
         interaction.IsInteractive.Returns(true);
 
-        Assert.Equal(OutputMode.Plain, OutputModeResolver.Resolve(explicitMode: null, noTui: true, interaction));
+        OutputModeResolver.Resolve(explicitMode: null, noTui: true, interaction).Should().Be(OutputMode.Plain);
     }
 
     [Fact]
@@ -34,7 +33,7 @@ public class OutputModeResolverTests
     {
         var interaction = Substitute.For<IInteractionService>();
         interaction.IsInteractive.Returns(true);
-        Assert.Equal(OutputMode.Compact, OutputModeResolver.Resolve(null, noTui: false, interaction));
+        OutputModeResolver.Resolve(null, noTui: false, interaction).Should().Be(OutputMode.Compact);
     }
 
     [Fact]
@@ -42,7 +41,7 @@ public class OutputModeResolverTests
     {
         var interaction = Substitute.For<IInteractionService>();
         interaction.IsInteractive.Returns(false);
-        Assert.Equal(OutputMode.Plain, OutputModeResolver.Resolve(null, noTui: false, interaction));
+        OutputModeResolver.Resolve(null, noTui: false, interaction).Should().Be(OutputMode.Plain);
     }
 
     [Theory]
@@ -53,8 +52,8 @@ public class OutputModeResolverTests
     [InlineData("  compact  ", "compact")]
     public void TryParse_AcceptsKnownValues(string input, string expectedName)
     {
-        Assert.True(OutputModeResolver.TryParse(input, out var mode));
-        Assert.Equal(expectedName, mode.ToString().ToLowerInvariant());
+        OutputModeResolver.TryParse(input, out var mode).Should().BeTrue();
+        mode.ToString().ToLowerInvariant().Should().Be(expectedName);
     }
 
     [Theory]
@@ -63,6 +62,6 @@ public class OutputModeResolverTests
     [InlineData("dashboard")]
     public void TryParse_RejectsUnknownValues(string? input)
     {
-        Assert.False(OutputModeResolver.TryParse(input, out _));
+        OutputModeResolver.TryParse(input, out _).Should().BeFalse();
     }
 }

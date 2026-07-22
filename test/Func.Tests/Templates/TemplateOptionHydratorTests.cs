@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -20,7 +19,7 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(template);
 
-        Assert.Empty(options);
+        options.Should().BeEmpty();
     }
 
     [Fact]
@@ -40,11 +39,11 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
 
-        Option<string?> opt = Assert.IsType<Option<string?>>(Assert.Single(options));
-        Assert.Equal("--route", opt.Name);
-        Assert.Equal("Route template", opt.Description);
+        Option<string?> opt = options.Should().ContainSingle().Subject.Should().BeOfType<Option<string?>>().Subject;
+        opt.Name.Should().Be("--route");
+        opt.Description.Should().Be("Route template");
         // SCL exposes the factory; invoke it to confirm the default value.
-        Assert.NotNull(opt.DefaultValueFactory);
+        opt.DefaultValueFactory.Should().NotBeNull();
     }
 
     [Fact]
@@ -55,7 +54,7 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
 
-        Assert.Equal("--auth-level", options[0].Name);
+        options[0].Name.Should().Be("--auth-level");
     }
 
     [Theory]
@@ -71,7 +70,7 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
 
-        Assert.Equal(expectedOptionName, options[0].Name);
+        options[0].Name.Should().Be(expectedOptionName);
     }
 
     [Fact]
@@ -91,9 +90,9 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
 
-        Option<string?> opt = Assert.IsType<Option<string?>>(Assert.Single(options));
+        Option<string?> opt = options.Should().ContainSingle().Subject.Should().BeOfType<Option<string?>>().Subject;
         // SCL emits a validator for AcceptOnlyFromAmong; we just confirm the option exists with the expected name.
-        Assert.Equal("--auth-level", opt.Name);
+        opt.Name.Should().Be("--auth-level");
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
 
-        Assert.IsType<Option<bool>>(Assert.Single(options));
+        options.Should().ContainSingle().Subject.Should().BeOfType<Option<bool>>();
     }
 
     [Fact]
@@ -115,7 +114,7 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
 
-        Assert.Equal("--ns", options[0].Name);
+        options[0].Name.Should().Be("--ns");
     }
 
     [Fact]
@@ -126,7 +125,7 @@ public class TemplateOptionHydratorTests
 
         IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
 
-        Assert.Contains("-r", options[0].Aliases);
+        options[0].Aliases.Should().Contain("-r");
     }
 
     [Fact]
@@ -146,7 +145,7 @@ public class TemplateOptionHydratorTests
         // The hydrator wires a validator delegate that runs at parse time; we
         // confirm the option exists and is configured. End-to-end validation
         // is exercised once NewCommand actually parses a stage-B argv.
-        Assert.Single(options);
+        options.Should().ContainSingle();
     }
 
     private static FunctionTemplateInfo TemplateWithPrompts(

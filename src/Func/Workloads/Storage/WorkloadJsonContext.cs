@@ -3,7 +3,6 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Workloads.Storage;
 

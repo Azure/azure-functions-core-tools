@@ -5,7 +5,6 @@ using System.CommandLine;
 using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Quickstart;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Quickstart;
 
@@ -21,15 +20,15 @@ public class QuickstartInfoCommandTests
     public void QuickstartInfoCommand_HasJsonOption()
     {
         QuickstartInfoCommand cmd = CreateCommand();
-        Assert.Contains(cmd.Options, o => o.Name == "--json");
+        cmd.Options.Should().Contain(o => o.Name == "--json");
     }
 
     [Fact]
     public void QuickstartInfoCommand_HasTemplateIdArgument()
     {
         QuickstartInfoCommand cmd = CreateCommand();
-        Assert.Single(cmd.Arguments);
-        Assert.Equal("id", cmd.Arguments[0].Name);
+        cmd.Arguments.Should().ContainSingle();
+        cmd.Arguments[0].Name.Should().Be("id");
     }
 
     [Fact]
@@ -40,8 +39,8 @@ public class QuickstartInfoCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "nonexistent");
 
-        Assert.Equal(1, exit);
-        Assert.Contains(_interaction.Lines, l => l.Contains("not found"));
+        exit.Should().Be(1);
+        _interaction.Lines.Should().Contain(l => l.Contains("not found"));
     }
 
     [Fact]
@@ -57,11 +56,11 @@ public class QuickstartInfoCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "http-py");
 
-        Assert.Equal(0, exit);
-        Assert.DoesNotContain(_interaction.Lines, l => l.StartsWith("JSON:"));
-        Assert.Contains(_interaction.Lines, l => l.Contains("http-py"));
-        Assert.Contains(_interaction.Lines, l => l.Contains("Python"));
-        Assert.Contains(_interaction.Lines, l => l.Contains("http"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().NotContain(l => l.StartsWith("JSON:"));
+        _interaction.Lines.Should().Contain(l => l.Contains("http-py"));
+        _interaction.Lines.Should().Contain(l => l.Contains("Python"));
+        _interaction.Lines.Should().Contain(l => l.Contains("http"));
     }
 
     [Fact]
@@ -77,13 +76,13 @@ public class QuickstartInfoCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"id\":\"http-py\"", jsonLine);
-        Assert.Contains("\"name\":\"HTTP Trigger\"", jsonLine);
-        Assert.Contains("\"language\":\"Python\"", jsonLine);
-        Assert.Contains("\"resource\":\"http\"", jsonLine);
-        Assert.Contains("\"iac\":\"bicep\"", jsonLine);
+        jsonLine.Should().Contain("\"id\":\"http-py\"");
+        jsonLine.Should().Contain("\"name\":\"HTTP Trigger\"");
+        jsonLine.Should().Contain("\"language\":\"Python\"");
+        jsonLine.Should().Contain("\"resource\":\"http\"");
+        jsonLine.Should().Contain("\"iac\":\"bicep\"");
     }
 
     [Fact]
@@ -97,9 +96,9 @@ public class QuickstartInfoCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"language\":\"FSharp\"", jsonLine);
+        jsonLine.Should().Contain("\"language\":\"FSharp\"");
     }
 
     [Fact]
@@ -115,9 +114,9 @@ public class QuickstartInfoCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "http-py", "--json");
 
-        Assert.Equal(0, exit);
+        exit.Should().Be(0);
         string jsonLine = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
-        Assert.Contains("\"iac\":\"none\"", jsonLine);
+        jsonLine.Should().Contain("\"iac\":\"none\"");
     }
 
     [Fact]
@@ -133,8 +132,8 @@ public class QuickstartInfoCommandTests
 
         int exit = await InvokeAsync(CreateCommand(), "HTTP-PY");
 
-        Assert.Equal(0, exit);
-        Assert.Contains(_interaction.Lines, l => l.Contains("http-py"));
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain(l => l.Contains("http-py"));
     }
 
     // --- helpers ---

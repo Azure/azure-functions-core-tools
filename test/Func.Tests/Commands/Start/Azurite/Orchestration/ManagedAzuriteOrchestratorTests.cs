@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite.Orchestration;
 
@@ -74,7 +73,7 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await sut.EnsureReadyAsync(Request(disabled: true), progress: null, CancellationToken.None);
 
-        Assert.IsType<ManagedAzuriteResult.Disabled>(result);
+        result.Should().BeOfType<ManagedAzuriteResult.Disabled>();
         await _probe.DidNotReceive().ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>());
         await _locator.DidNotReceive().FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
@@ -87,7 +86,7 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        Assert.IsType<ManagedAzuriteResult.Disabled>(result);
+        result.Should().BeOfType<ManagedAzuriteResult.Disabled>();
         await _probe.DidNotReceive().ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>());
     }
 
@@ -99,7 +98,7 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        Assert.IsType<ManagedAzuriteResult.UserManaged>(result);
+        result.Should().BeOfType<ManagedAzuriteResult.UserManaged>();
         await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
     }
 
@@ -111,9 +110,9 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
-        Assert.Contains("cannot start this configuration automatically", failed.UserMessage);
-        Assert.Contains("Start Azurite", failed.UserMessage);
+        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
+        failed.UserMessage.Should().Contain("cannot start this configuration automatically");
+        failed.UserMessage.Should().Contain("Start Azurite");
     }
 
     [Fact]
@@ -124,7 +123,7 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        Assert.IsType<ManagedAzuriteResult.UserManaged>(result);
+        result.Should().BeOfType<ManagedAzuriteResult.UserManaged>();
         await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
     }
 
@@ -136,8 +135,8 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
-        Assert.Contains("another process is using the Azurite ports", failed.UserMessage);
+        result.Should().BeOfType<ManagedAzuriteResult.Failed>()
+            .Which.UserMessage.Should().Contain("another process is using the Azurite ports");
     }
 
     [Fact]
@@ -153,9 +152,10 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var started = Assert.IsType<ManagedAzuriteResult.Started>(result);
-        Assert.Equal(AzuriteLaunchMode.Native, started.Mode);
-        Assert.Same(fake, started.Process);
+        var started = result.Should().BeOfType<ManagedAzuriteResult.Started>().Subject;
+        started.Mode.Should().Be(AzuriteLaunchMode.Native);
+        started.Process.Should().BeSameAs(fake);
+        started.Paths.DataDirectory.Should().Be(Path.Combine(Path.GetTempPath(), "azurite-data"));
         await _launcher.Received(1).StartAsync(
             Arg.Is<AzuriteLaunchRequest>(r => r.Mode == AzuriteLaunchMode.Native && r.ExecutablePath == "/usr/bin/azurite"),
             Arg.Any<CancellationToken>());
@@ -176,8 +176,7 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var started = Assert.IsType<ManagedAzuriteResult.Started>(result);
-        Assert.Equal(AzuriteLaunchMode.Docker, started.Mode);
+        result.Should().BeOfType<ManagedAzuriteResult.Started>().Which.Mode.Should().Be(AzuriteLaunchMode.Docker);
         await _launcher.Received(1).StartAsync(
             Arg.Is<AzuriteLaunchRequest>(r => r.Mode == AzuriteLaunchMode.Docker),
             Arg.Any<CancellationToken>());
@@ -194,10 +193,10 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
-        Assert.Contains("Azurite is not running", failed.UserMessage);
-        Assert.Contains("npm install -g azurite", failed.UserMessage);
-        Assert.Contains("Docker Desktop", failed.UserMessage);
+        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
+        failed.UserMessage.Should().Contain("Azurite is not running");
+        failed.UserMessage.Should().Contain("npm install -g azurite");
+        failed.UserMessage.Should().Contain("Docker Desktop");
         await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
     }
 
@@ -217,9 +216,11 @@ public class ManagedAzuriteOrchestratorTests
             progress: null,
             CancellationToken.None);
 
-        var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
-        Assert.Contains("did not become ready", failed.UserMessage);
-        Assert.True(fake.StopCalled, "Orchestrator must stop the process on timeout.");
+        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
+        failed.UserMessage.Should().Contain("did not become ready");
+        failed.UserMessage.Should().Contain("Data directory:");
+        failed.UserMessage.Should().Contain("delete the data directory");
+        fake.StopCalled.Should().BeTrue("Orchestrator must stop the process on timeout.");
     }
 
     [Fact]
@@ -235,9 +236,11 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
-        var failed = Assert.IsType<ManagedAzuriteResult.Failed>(result);
-        Assert.Contains("Azurite exited before it was ready", failed.UserMessage);
-        Assert.Contains("ENOENT", failed.UserMessage);
+        var failed = result.Should().BeOfType<ManagedAzuriteResult.Failed>().Subject;
+        failed.UserMessage.Should().Contain("Azurite exited before it was ready");
+        failed.UserMessage.Should().Contain("ENOENT");
+        failed.UserMessage.Should().Contain("Data directory:");
+        failed.UserMessage.Should().Contain("delete the data directory");
     }
 
     [Fact]
@@ -260,7 +263,7 @@ public class ManagedAzuriteOrchestratorTests
         await Task.Delay(100);
         cts.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => resultTask);
+        await FluentActions.Awaiting(() => resultTask).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -279,12 +282,12 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress, CancellationToken.None);
 
-        Assert.IsType<ManagedAzuriteResult.Started>(result);
-        Assert.Contains(messages, m => m.Contains("checking AzureWebJobsStorage configuration", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(messages, m => m.Contains("checking for an existing Azurite endpoint", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(messages, m => m.Contains("looking for a local Azurite installation", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(messages, m => m.Contains("starting Azurite (native)", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(messages, m => m.Contains("Azurite ready", StringComparison.OrdinalIgnoreCase));
+        result.Should().BeOfType<ManagedAzuriteResult.Started>();
+        messages.Should().Contain(m => m.Contains("checking AzureWebJobsStorage configuration", StringComparison.OrdinalIgnoreCase));
+        messages.Should().Contain(m => m.Contains("checking for an existing Azurite endpoint", StringComparison.OrdinalIgnoreCase));
+        messages.Should().Contain(m => m.Contains("looking for a local Azurite installation", StringComparison.OrdinalIgnoreCase));
+        messages.Should().Contain(m => m.Contains("starting Azurite (native)", StringComparison.OrdinalIgnoreCase));
+        messages.Should().Contain(m => m.Contains("Azurite ready", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -301,9 +304,9 @@ public class ManagedAzuriteOrchestratorTests
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress, CancellationToken.None);
 
-        Assert.IsType<ManagedAzuriteResult.Failed>(result);
-        Assert.Contains(messages, m => m.Contains("looking for a local Azurite installation", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(messages, m => m.Contains("checking Docker availability", StringComparison.OrdinalIgnoreCase));
+        result.Should().BeOfType<ManagedAzuriteResult.Failed>();
+        messages.Should().Contain(m => m.Contains("looking for a local Azurite installation", StringComparison.OrdinalIgnoreCase));
+        messages.Should().Contain(m => m.Contains("checking Docker availability", StringComparison.OrdinalIgnoreCase));
     }
 
     private sealed class CapturingProgress(List<string> messages) : IProgress<string>

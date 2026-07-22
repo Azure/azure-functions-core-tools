@@ -1,8 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Events;
 using Azure.Functions.Cli.Profiles;
@@ -53,6 +53,13 @@ internal sealed class StartInitializationState
     /// </summary>
     public ManagedAzuriteHandle? ManagedAzurite { get; set; }
 
+    /// <summary>
+    /// On-disk paths for the managed Azurite instance the CLI launched, or
+    /// null when Azurite is user-managed, disabled, or non-local. Lets the
+    /// host run surface reset guidance if the emulator returns a 500.
+    /// </summary>
+    public AzuriteManagedPaths? AzuritePaths { get; set; }
+
     public StartInitializationResult ToResult(StartInitializationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -76,7 +83,8 @@ internal sealed class StartInitializationState
             worker,
             hostRunContext,
             CreateProfileInfo(),
-            ManagedAzurite);
+            ManagedAzurite,
+            AzuritePaths);
     }
 
     private StartInitializationProfileInfo? CreateProfileInfo()

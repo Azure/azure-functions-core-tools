@@ -2,12 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using Azure.Functions.Cli.Update;
 using Microsoft.Extensions.Logging.Abstractions;
 using Semver;
-using Xunit;
 
 namespace Azure.Functions.Cli.Tests.Update;
 
@@ -22,8 +20,8 @@ public sealed class CdnReleaseFeedTests
 
         Release latest = await feed.GetLatestAsync(includePrerelease: false, CancellationToken.None);
 
-        Assert.Equal("5.1.0", latest.Version.ToString());
-        Assert.False(latest.IsPrerelease);
+        latest.Version.ToString().Should().Be("5.1.0");
+        latest.IsPrerelease.Should().BeFalse();
     }
 
     [Fact]
@@ -35,8 +33,8 @@ public sealed class CdnReleaseFeedTests
 
         Release latest = await feed.GetLatestAsync(includePrerelease: true, CancellationToken.None);
 
-        Assert.Equal("5.2.0-preview.1", latest.Version.ToString());
-        Assert.True(latest.IsPrerelease);
+        latest.Version.ToString().Should().Be("5.2.0-preview.1");
+        latest.IsPrerelease.Should().BeTrue();
     }
 
     [Fact]
@@ -47,8 +45,8 @@ public sealed class CdnReleaseFeedTests
 
         Release latest = await feed.GetLatestAsync(includePrerelease: true, CancellationToken.None);
 
-        Assert.Equal("5.3.0", latest.Version.ToString());
-        Assert.False(latest.IsPrerelease);
+        latest.Version.ToString().Should().Be("5.3.0");
+        latest.IsPrerelease.Should().BeFalse();
     }
 
     [Fact]
@@ -58,7 +56,7 @@ public sealed class CdnReleaseFeedTests
 
         Release latest = await feed.GetLatestAsync(includePrerelease: true, CancellationToken.None);
 
-        Assert.Equal("5.1.0", latest.Version.ToString());
+        latest.Version.ToString().Should().Be("5.1.0");
     }
 
     [Fact]
@@ -66,10 +64,9 @@ public sealed class CdnReleaseFeedTests
     {
         CdnReleaseFeed feed = CreateFeed(RespondWithJson("""{"stable": null, "preview": "5.2.0-preview.1"}"""));
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("version is missing", ex.Message, StringComparison.Ordinal);
+        ex.Message.Should().Contain("version is missing");
     }
 
     [Fact]
@@ -77,10 +74,9 @@ public sealed class CdnReleaseFeedTests
     {
         CdnReleaseFeed feed = CreateFeed(RespondWithJson("""{"stable": "not-a-version", "preview": null}"""));
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("invalid version", ex.Message, StringComparison.Ordinal);
+        ex.Message.Should().Contain("invalid version");
     }
 
     [Fact]
@@ -90,9 +86,9 @@ public sealed class CdnReleaseFeedTests
 
         Release latest = await feed.GetLatestAsync(includePrerelease: false, CancellationToken.None);
 
-        Assert.Contains("5.1.0", latest.DownloadUrl.ToString(), StringComparison.Ordinal);
-        Assert.Contains("Azure.Functions.Cli.", latest.DownloadUrl.ToString(), StringComparison.Ordinal);
-        Assert.EndsWith(".zip", latest.DownloadUrl.ToString(), StringComparison.Ordinal);
+        latest.DownloadUrl.ToString().Should().Contain("5.1.0");
+        latest.DownloadUrl.ToString().Should().Contain("Azure.Functions.Cli.");
+        latest.DownloadUrl.ToString().Should().EndWith(".zip");
     }
 
     [Fact]
@@ -113,8 +109,8 @@ public sealed class CdnReleaseFeedTests
 
         Release result = await feed.GetVersionAsync(target, CancellationToken.None);
 
-        Assert.Equal("5.0.0-preview.1", result.Version.ToString());
-        Assert.True(result.IsPrerelease);
+        result.Version.ToString().Should().Be("5.0.0-preview.1");
+        result.IsPrerelease.Should().BeTrue();
     }
 
     [Fact]
@@ -133,10 +129,9 @@ public sealed class CdnReleaseFeedTests
         CdnReleaseFeed feed = CreateFeed(handler);
         var target = SemVersion.Parse("99.0.0", SemVersionStyles.Strict);
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => feed.GetVersionAsync(target, CancellationToken.None));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => feed.GetVersionAsync(target, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("not found", ex.Message, StringComparison.OrdinalIgnoreCase);
+        ex.Message.Should().ContainEquivalentOf("not found");
     }
 
     [Fact]
@@ -155,10 +150,9 @@ public sealed class CdnReleaseFeedTests
         CdnReleaseFeed feed = CreateFeed(handler);
         var target = SemVersion.Parse("5.0.0", SemVersionStyles.Strict);
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => feed.GetVersionAsync(target, CancellationToken.None));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => feed.GetVersionAsync(target, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("ServiceUnavailable", ex.Message, StringComparison.Ordinal);
+                ex.Message.Should().Contain("ServiceUnavailable");
     }
 
     [Fact]
@@ -169,10 +163,9 @@ public sealed class CdnReleaseFeedTests
 
         CdnReleaseFeed feed = CreateFeed(handler);
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("version.json", ex.Message, StringComparison.Ordinal);
+        ex.Message.Should().Contain("version.json");
     }
 
     [Fact]
@@ -183,10 +176,9 @@ public sealed class CdnReleaseFeedTests
 
         CdnReleaseFeed feed = CreateFeed(handler);
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
+        InvalidOperationException ex = (await FluentActions.Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>()).Which;
 
-        Assert.Contains("ServiceUnavailable", ex.Message, StringComparison.Ordinal);
+                ex.Message.Should().Contain("ServiceUnavailable");
     }
 
     [Fact]
@@ -198,8 +190,7 @@ public sealed class CdnReleaseFeedTests
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        await Assert.ThrowsAsync<TaskCanceledException>(
-            () => feed.GetLatestAsync(includePrerelease: false, cts.Token));
+        await FluentActions.Awaiting(() => feed.GetLatestAsync(includePrerelease: false, cts.Token)).Should().ThrowAsync<TaskCanceledException>();
     }
 
     private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> RespondWithManifest()
