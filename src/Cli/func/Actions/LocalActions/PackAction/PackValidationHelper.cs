@@ -132,20 +132,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
         }
 
         /// <summary>
-        /// Runs a host.json existence validation and displays results.
-        /// Throws CliException if validation fails.
+        /// Runs a host.json existence check and displays the result.
+        /// host.json is optional: the runtime does not require it and Core Tools no longer adds
+        /// one, so its absence is surfaced as a non-blocking warning rather than a failure.
         /// </summary>
         public static void RunHostJsonValidation(string directory)
         {
             var hostJsonExists = FileSystemHelpers.FileExists(Path.Combine(directory, Constants.HostJsonFileName));
-            DisplayValidationResult(
-                $"Validate {Constants.HostJsonFileName}",
-                hostJsonExists,
-                hostJsonExists ? null : string.Empty);
-            if (!hostJsonExists)
+            if (hostJsonExists)
             {
-                DisplayValidationEnd();
-                throw new CliException($"Required file '{Constants.HostJsonFileName}' not found in directory: {directory}");
+                DisplayValidationResult($"Validate {Constants.HostJsonFileName}", passed: true);
+            }
+            else
+            {
+                DisplayValidationWarning(
+                    $"Validate {Constants.HostJsonFileName}",
+                    $"No {Constants.HostJsonFileName} found in {directory}. The package will be created without one.");
             }
         }
 

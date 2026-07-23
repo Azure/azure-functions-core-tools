@@ -125,8 +125,12 @@ namespace Azure.Functions.Cli.Helpers
 
             using (var zip = new ZipArchive(memStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                var hostEntry = zip.CreateEntryFromFile(hostJsonPath, Constants.HostJsonFileName);
-                hostEntry.ExternalAttributes = unixReadWritePermissions;
+                // host.json is optional; only include it when the project actually has one.
+                if (FileSystemHelpers.FileExists(hostJsonPath))
+                {
+                    var hostEntry = zip.CreateEntryFromFile(hostJsonPath, Constants.HostJsonFileName);
+                    hostEntry.ExternalAttributes = unixReadWritePermissions;
+                }
 
                 // Place binary at root as 'app', not 'bin/app'
                 var appEntry = zip.CreateEntryFromFile(binaryPath, GoHelpers.GoBinaryName);

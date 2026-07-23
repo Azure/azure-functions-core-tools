@@ -264,5 +264,65 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 Directory.Delete(dir, recursive: true);
             }
         }
+
+        [Fact]
+        public async Task GetAppZipFile_MissingHostJson_PackageDoesNotContainHostJsonAndSourceUntouched()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+
+            try
+            {
+                // A Python v2 project with no host.json on disk.
+                File.WriteAllText(Path.Combine(dir, "function_app.py"), "import azure.functions as func\napp = func.FunctionApp()\n");
+
+                // noBuild:true keeps Python on the generic zip path (no pip/build required).
+                var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: true, WorkerRuntime.Python);
+
+                Assert.NotNull(stream);
+                using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+                // host.json is optional and Core Tools does not add one: the package must not
+                // contain a host.json when the project does not have one...
+                Assert.DoesNotContain(archive.Entries, e => e.FullName == "host.json");
+                Assert.Contains(archive.Entries, e => e.FullName == "function_app.py");
+
+                // ...and the user's source tree is left untouched.
+                Assert.False(File.Exists(Path.Combine(dir, "host.json")), "host.json should not be written to the source directory.");
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task GetAppZipFile_ExistingHostJson_IsIncludedUnchanged()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+
+            try
+            {
+                const string marker = "\"MARKER_EXISTING\": true";
+                File.WriteAllText(Path.Combine(dir, "host.json"), "{ \"version\": \"2.0\", " + marker + " }");
+                File.WriteAllText(Path.Combine(dir, "function_app.py"), "import azure.functions as func\napp = func.FunctionApp()\n");
+
+                var stream = await ZipHelper.GetAppZipFile(dir, buildNativeDeps: false, BuildOption.Default, noBuild: true, WorkerRuntime.Python);
+
+                Assert.NotNull(stream);
+                using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+                var hostEntries = archive.Entries.Where(e => e.FullName == "host.json").ToArray();
+
+                // Exactly one host.json, and it is the user's original content.
+                Assert.Single(hostEntries);
+                using var reader = new StreamReader(hostEntries[0].Open());
+                Assert.Contains(marker, reader.ReadToEnd());
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
     }
 }

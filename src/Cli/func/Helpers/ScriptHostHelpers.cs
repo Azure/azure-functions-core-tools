@@ -17,7 +17,16 @@ namespace Azure.Functions.Cli.Helpers
                 return startingDirectory;
             }
 
-            searchFiles = searchFiles ?? new List<string> { ScriptConstants.HostMetadataFileName };
+            // host.json is no longer strictly required in a Functions project (the runtime
+            // synthesizes a default when it is missing). Detect the project root using any of
+            // the common Functions project markers so publishing/packing works without host.json.
+            searchFiles = searchFiles ?? new List<string>
+            {
+                ScriptConstants.HostMetadataFileName,
+                Constants.LocalSettingsJsonFileName,
+                Constants.FuncIgnoreFile,
+                Constants.PySteinFunctionAppPy,
+            };
 
             if (searchFiles.Any(file => FileSystemHelpers.FileExists(Path.Combine(startingDirectory, file))))
             {

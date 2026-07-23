@@ -34,14 +34,25 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 dir =>
                 {
+                    var validateCustomHandlerTitle = "Validate Custom Handler Configuration";
+                    var hostJsonPath = Path.Combine(dir, Constants.HostJsonFileName);
+
+                    // host.json is optional. Without it there is no custom handler configuration
+                    // to validate, so surface a non-blocking warning instead of failing the pack.
+                    if (!FileSystemHelpers.FileExists(hostJsonPath))
+                    {
+                        PackValidationHelper.DisplayValidationWarning(
+                            validateCustomHandlerTitle,
+                            $"No {Constants.HostJsonFileName} found. Skipping custom handler configuration validation.");
+                        return;
+                    }
+
                     // Validate custom handler configuration and executable
                     try
                     {
-                        var hostJsonPath = Path.Combine(dir, Constants.HostJsonFileName);
                         var hostJsonContent = FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath).Result;
                         var hostConfig = JObject.Parse(hostJsonContent);
                         var customHandler = hostConfig["customHandler"];
-                        var validateCustomHandlerTitle = "Validate Custom Handler Configuration";
                         var configWarning = "No custom handler configuration found in host.json. Please visit https://aka.ms/custom-handler-host-json" +
                                             " to view examples on how to configure the app.";
 
