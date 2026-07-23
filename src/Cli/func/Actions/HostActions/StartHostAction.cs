@@ -217,7 +217,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 defaultBuilder
                 .UseKestrel(options =>
                 {
-                    options.Listen(IPAddress.Any, listenAddress.Port, listenOptins =>
+                    options.Listen(IPAddress.Loopback, listenAddress.Port, listenOptins =>
                     {
                         listenOptins.UseHttps(certificate);
                     });
@@ -921,7 +921,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             X509Certificate2 cert = UseHttps
                 ? await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
-            return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
+            return (new Uri($"{protocol}://127.0.0.1:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
 
         private void EnsureWorkerRuntimeIsSet()
