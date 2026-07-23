@@ -22,7 +22,7 @@ internal sealed class CliUpdater(
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
     private readonly ILogger<CliUpdater> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public async Task UpdateAsync(Release release, CancellationToken cancellationToken)
+    public async Task UpdateAsync(Release release, IProgress<UpdateProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(release);
 
@@ -43,9 +43,11 @@ internal sealed class CliUpdater(
         try
         {
             _logger.LogInformation("Downloading func {Version}.", release.Version);
-            await DownloadAsync(release, zipPath, cancellationToken);
+            progress?.Report(new UpdateProgress(UpdatePhase.Downloading));
+            await DownloadAsync(release, zipPath, progress, cancellationToken);
 
             _logger.LogInformation("Extracting update package.");
+            progress?.Report(new UpdateProgress(UpdatePhase.Extracting));
             try
             {
                 _fileSystem.ExtractZip(zipPath, extractDir);
@@ -57,6 +59,7 @@ internal sealed class CliUpdater(
                     ex);
             }
 
+            progress?.Report(new UpdateProgress(UpdatePhase.Installing));
             _fileSystem.MoveDirectory(installDir, backupDir);
 
             // Swap extracted files into place, then verify. Any failure after
@@ -65,6 +68,7 @@ internal sealed class CliUpdater(
             try
             {
                 _fileSystem.MoveDirectory(extractDir, installDir);
+                progress?.Report(new UpdateProgress(UpdatePhase.Verifying));
                 await VerifyAsync(release, installDir, cancellationToken);
                 installSucceeded = true;
             }
@@ -86,7 +90,7 @@ internal sealed class CliUpdater(
         }
     }
 
-    private async Task DownloadAsync(Release release, string zipPath, CancellationToken cancellationToken)
+    private async Task DownloadAsync(Release release, string zipPath, IProgress<UpdateProgress>? progress, CancellationToken cancellationToken)
     {
         HttpResponseMessage response;
         try
@@ -110,8 +114,17 @@ internal sealed class CliUpdater(
                     isUserError: true);
             }
 
+            long? totalBytes = response.Content.Headers.ContentLength;
             await using Stream content = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await _fileSystem.SaveStreamToFileAsync(zipPath, content, cancellationToken);
+
+            // Wrap the CDN stream so the underlying file writer sees a
+            // transparent Stream while we count bytes as they flow through.
+            // Reporting on Read (not after copy) is what enables live progress.
+            Stream source = progress is null
+                ? content
+                : new ProgressReadStream(content, totalBytes, progress);
+
+            await _fileSystem.SaveStreamToFileAsync(zipPath, source, cancellationToken);
         }
     }
 
