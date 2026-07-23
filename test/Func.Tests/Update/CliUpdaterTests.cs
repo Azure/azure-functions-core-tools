@@ -17,12 +17,12 @@ public sealed class CliUpdaterTests
 {
     // Build paths through the same System.IO APIs the production code uses so
     // separators match on every platform (/ on Linux/macOS, \ on Windows).
-    private static readonly string FakeProcessPath = Path.GetFullPath(Path.Combine("/fake", "install", "func"));
-    private static readonly string FakeInstallDir = Path.GetDirectoryName(FakeProcessPath)!;
-    private static readonly string FakeBackupDir = FakeInstallDir + ".backup";
-    private static readonly string FakeTempWorkDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "work"));
-    private static readonly string FakeExtractDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "extract"));
-    private static readonly string FakeZipPath = Path.Combine(FakeTempWorkDir, "func-update.zip");
+    private static readonly string _fakeProcessPath = Path.GetFullPath(Path.Combine("/fake", "install", "func"));
+    private static readonly string _fakeInstallDir = Path.GetDirectoryName(_fakeProcessPath)!;
+    private static readonly string _fakeBackupDir = _fakeInstallDir + ".backup";
+    private static readonly string _fakeTempWorkDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "work"));
+    private static readonly string _fakeExtractDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "extract"));
+    private static readonly string _fakeZipPath = Path.Combine(_fakeTempWorkDir, "func-update.zip");
 
     private static readonly Release _stableRelease = new(
         SemVersion.Parse("5.1.0", SemVersionStyles.Strict),
@@ -40,21 +40,21 @@ public sealed class CliUpdaterTests
 
         // backupDir must not exist for the precondition check, but does exist
         // later so the cleanup path deletes it.
-        fileSystem.DirectoryExists(FakeBackupDir).Returns(false, true);
-        fileSystem.DirectoryExists(Arg.Is<string>(p => p != FakeBackupDir)).Returns(true);
+        fileSystem.DirectoryExists(_fakeBackupDir).Returns(false, true);
+        fileSystem.DirectoryExists(Arg.Is<string>(p => p != _fakeBackupDir)).Returns(true);
 
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
         // Assert: backup, then swap into place
-        fileSystem.Received(1).MoveDirectory(FakeInstallDir, FakeBackupDir);
-        fileSystem.Received(1).MoveDirectory(FakeExtractDir, FakeInstallDir);
+        fileSystem.Received(1).MoveDirectory(_fakeInstallDir, _fakeBackupDir);
+        fileSystem.Received(1).MoveDirectory(_fakeExtractDir, _fakeInstallDir);
 
         // Verify was run
         await processRunner.Received(1).RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>());
 
         // Backup cleaned up on success
-        fileSystem.Received(1).DeleteDirectory(FakeBackupDir);
+        fileSystem.Received(1).DeleteDirectory(_fakeBackupDir);
     }
 
     [Fact]
@@ -83,8 +83,8 @@ public sealed class CliUpdaterTests
             .Returns(OkOutcome("4.0.0\n")); // wrong version
 
         // backupDir must not exist for precondition, but exists during rollback
-        fileSystem.DirectoryExists(FakeBackupDir).Returns(false, true);
-        fileSystem.DirectoryExists(FakeInstallDir).Returns(true);
+        fileSystem.DirectoryExists(_fakeBackupDir).Returns(false, true);
+        fileSystem.DirectoryExists(_fakeInstallDir).Returns(true);
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -93,8 +93,8 @@ public sealed class CliUpdaterTests
         Assert.Contains("Verification failed", ex.Message, StringComparison.OrdinalIgnoreCase);
 
         // Rollback: remove the bad install and restore the backup
-        fileSystem.Received(1).DeleteDirectory(FakeInstallDir);
-        fileSystem.Received(1).MoveDirectory(FakeBackupDir, FakeInstallDir);
+        fileSystem.Received(1).DeleteDirectory(_fakeInstallDir);
+        fileSystem.Received(1).MoveDirectory(_fakeBackupDir, _fakeInstallDir);
     }
 
     [Fact]
@@ -105,20 +105,20 @@ public sealed class CliUpdaterTests
             httpHandler: SuccessDownloadHandler());
 
         // The swap (extractDir → installDir) throws; the backup (installDir → backupDir) succeeds.
-        fileSystem.When(fs => fs.MoveDirectory(FakeExtractDir, FakeInstallDir))
+        fileSystem.When(fs => fs.MoveDirectory(_fakeExtractDir, _fakeInstallDir))
             .Throw(new IOException("disk full"));
 
         // backupDir must not exist for precondition, but exists during rollback
-        fileSystem.DirectoryExists(FakeInstallDir).Returns(false);
-        fileSystem.DirectoryExists(FakeBackupDir).Returns(false, true);
+        fileSystem.DirectoryExists(_fakeInstallDir).Returns(false);
+        fileSystem.DirectoryExists(_fakeBackupDir).Returns(false, true);
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
             () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
 
         // Rollback: backup restored since installDir doesn't exist
-        fileSystem.DidNotReceive().DeleteDirectory(FakeInstallDir);
-        fileSystem.Received(1).MoveDirectory(FakeBackupDir, FakeInstallDir);
+        fileSystem.DidNotReceive().DeleteDirectory(_fakeInstallDir);
+        fileSystem.Received(1).MoveDirectory(_fakeBackupDir, _fakeInstallDir);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class CliUpdaterTests
         (CliUpdater updater, IUpdateFileSystem fileSystem, _, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
-        fileSystem.DirectoryExists(FakeBackupDir).Returns(true);
+        fileSystem.DirectoryExists(_fakeBackupDir).Returns(true);
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -146,8 +146,8 @@ public sealed class CliUpdaterTests
         ICliEnvironment environment = Substitute.For<ICliEnvironment>();
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
 
-        fileSystem.CreateTempDirectory().Returns(FakeTempWorkDir, FakeExtractDir);
-        environment.ProcessPath.Returns(FakeProcessPath);
+        fileSystem.CreateTempDirectory().Returns(_fakeTempWorkDir, _fakeExtractDir);
+        environment.ProcessPath.Returns(_fakeProcessPath);
 
         var client = new HttpClient(httpHandler, disposeHandler: false)
         {
