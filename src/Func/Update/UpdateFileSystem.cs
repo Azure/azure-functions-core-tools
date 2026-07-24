@@ -17,7 +17,14 @@ internal sealed class UpdateFileSystem : IUpdateFileSystem
 
     public string CreateTempDirectory(string siblingPath)
     {
-        string? parentDir = Path.GetDirectoryName(Path.GetFullPath(siblingPath));
+        // siblingPath is expected to be the install directory itself. We create
+        // the temp dir alongside it (in the same parent) so it stays on the same
+        // volume without polluting the install directory.
+        string fullPath = Path.GetFullPath(siblingPath);
+        string parentDir = Directory.Exists(fullPath)
+            ? fullPath
+            : Path.GetDirectoryName(fullPath) ?? string.Empty;
+
         if (string.IsNullOrEmpty(parentDir))
         {
             return CreateTempDirectory();

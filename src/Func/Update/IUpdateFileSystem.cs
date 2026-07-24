@@ -16,7 +16,9 @@ internal interface IUpdateFileSystem
 
     /// <summary>
     /// Creates a new, uniquely-named temporary directory on the same volume as
-    /// <paramref name="siblingPath"/> and returns its path.
+    /// <paramref name="siblingPath"/> and returns its path. When
+    /// <paramref name="siblingPath"/> is an existing directory, the temp dir is
+    /// created inside it; otherwise it is created alongside the file.
     /// </summary>
     public string CreateTempDirectory(string siblingPath);
 

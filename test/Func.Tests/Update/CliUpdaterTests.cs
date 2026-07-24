@@ -39,6 +39,10 @@ public sealed class CliUpdaterTests
         string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
         fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile]);
 
+        // SwapInPlace reads extract dir to track copied files
+        string newFile = Path.Combine(_fakeExtractDir, "func.exe");
+        fileSystem.GetFiles(_fakeExtractDir).Returns([newFile]);
+
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
@@ -77,11 +81,12 @@ public sealed class CliUpdaterTests
 
         string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
         string oldFile = existingFile + ".old";
-        string newFile = Path.Combine(_fakeInstallDir, "func.exe");
+        string extractedFile = Path.Combine(_fakeExtractDir, "func.exe");
 
-        // First call during SwapInPlace returns existing files; second call
-        // during rollback returns the .old files and new files.
-        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile], [oldFile, newFile]);
+        // First GetFiles(_fakeInstallDir) during SwapInPlace returns existing files;
+        // second GetFiles(_fakeInstallDir) during rollback returns the .old files.
+        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile], [oldFile]);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([extractedFile]);
         fileSystem.FileExists(existingFile).Returns(true);
 
         // Act + Assert
@@ -105,6 +110,7 @@ public sealed class CliUpdaterTests
         string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
         string oldFile = existingFile + ".old";
         fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile], [oldFile]);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([Path.Combine(_fakeExtractDir, "func.exe")]);
 
         // The rename throws to simulate a locked file scenario
         fileSystem.When(fs => fs.RenameFile(existingFile, oldFile))

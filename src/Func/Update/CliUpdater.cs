@@ -35,6 +35,7 @@ internal sealed class CliUpdater(
         string tempWorkDir = _fileSystem.CreateTempDirectory(installDir);
         string zipPath = Path.Combine(tempWorkDir, "func-update.zip");
         string extractDir = _fileSystem.CreateTempDirectory(installDir);
+        List<string> copiedFiles = [];
 
         try
         {
@@ -58,14 +59,14 @@ internal sealed class CliUpdater(
             // so we can't move or delete the install directory. Instead, rename
             // existing files in-place (func.exe → func.exe.old) and copy the
             // new files into the same directory.
-            SwapInPlace(installDir, extractDir);
+            copiedFiles = SwapInPlace(installDir, extractDir);
 
             await VerifyAsync(release, installDir, cancellationToken);
 
             CleanupOldFiles(installDir);
             _logger.LogInformation("func {Version} installed successfully.", release.Version);
         }
-        catch (Exception) when (TryRollbackInPlace(installDir))
+        catch (Exception) when (TryRollbackInPlace(installDir, copiedFiles))
         {
             // TryRollbackInPlace always returns false; this catch exists
             // solely to trigger rollback as a filter side-effect.
@@ -78,7 +79,7 @@ internal sealed class CliUpdater(
         }
     }
 
-    private void SwapInPlace(string installDir, string extractDir)
+    private List<string> SwapInPlace(string installDir, string extractDir)
     {
         // Rename every existing file in the install directory to .old
         IReadOnlyList<string> existingFiles = _fileSystem.GetFiles(installDir);
@@ -94,7 +95,17 @@ internal sealed class CliUpdater(
         }
 
         // Copy all new files from the extract directory into the install directory
+        // and track which files were introduced for rollback purposes.
+        IReadOnlyList<string> newFiles = _fileSystem.GetFiles(extractDir);
+        List<string> copiedFiles = new(newFiles.Count);
+        foreach (string newFile in newFiles)
+        {
+            string relativePath = Path.GetRelativePath(extractDir, newFile);
+            copiedFiles.Add(Path.Combine(installDir, relativePath));
+        }
+
         _fileSystem.CopyDirectory(extractDir, installDir);
+        return copiedFiles;
     }
 
     private void CleanupOldFiles(string installDir)
@@ -119,26 +130,31 @@ internal sealed class CliUpdater(
         }
     }
 
-    private bool TryRollbackInPlace(string installDir)
+    private bool TryRollbackInPlace(string installDir, IReadOnlyList<string> copiedFiles)
     {
-        // Restore .old files and remove new files. Best-effort so the original
-        // failure isn't masked. Always returns false so the exception filter
-        // rethrows.
+        // Restore .old files and remove new files that were introduced by the
+        // update. Best-effort so the original failure isn't masked. Always returns
+        // false so the exception filter rethrows.
         try
         {
+            // Remove files that were copied in during the update. This handles
+            // both files that replaced an existing file and entirely new files
+            // that have no .old counterpart.
+            foreach (string file in copiedFiles)
+            {
+                if (_fileSystem.FileExists(file))
+                {
+                    _fileSystem.DeleteFile(file);
+                }
+            }
+
+            // Restore .old files to their original paths
             IReadOnlyList<string> files = _fileSystem.GetFiles(installDir);
             foreach (string file in files)
             {
                 if (file.EndsWith(OldFileSuffix, StringComparison.OrdinalIgnoreCase))
                 {
                     string originalPath = file[..^OldFileSuffix.Length];
-
-                    // Remove the new file that was copied in, if present
-                    if (_fileSystem.FileExists(originalPath))
-                    {
-                        _fileSystem.DeleteFile(originalPath);
-                    }
-
                     _fileSystem.RenameFile(file, originalPath);
                 }
             }
@@ -191,7 +207,7 @@ internal sealed class CliUpdater(
             new ProcessRunRequest(funcBinary, ["--version"], installDir, TimeSpan.FromSeconds(30)),
             cancellationToken);
 
-        if (outcome.ExitCode is not 0 || !outcome.StandardOutput.Contains(expectedVersion, StringComparison.Ordinal))
+        if (outcome.ExitCode is not 0 || !VersionOutputMatches(outcome.StandardOutput, expectedVersion))
         {
             throw new GracefulException(
                 $"Verification failed after installing func {expectedVersion}. " +
@@ -219,6 +235,21 @@ internal sealed class CliUpdater(
 
     private static string GetFuncBinaryPath(string installDir) =>
         Path.Combine(installDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "func.exe" : "func");
+
+    private static bool VersionOutputMatches(string output, string expectedVersion)
+    {
+        // Check each line for an exact match to avoid false positives where one
+        // version string is a substring of another (e.g. "5.1.0" inside "15.1.0").
+        foreach (string line in output.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (line.Equals(expectedVersion, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private void TryDeleteDirectory(string path)
     {
