@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
@@ -145,6 +146,7 @@ namespace Azure.Functions.Cli.Common
             if (template.Id.EndsWith("JavaScript-4.x", StringComparison.OrdinalIgnoreCase) || template.Id.EndsWith("TypeScript-4.x", StringComparison.OrdinalIgnoreCase))
             {
                 await DeployNewNodeProgrammingModel(name, fileName, template);
+                await EnsureDurableFunctionsNpmPackage(template);
             }
             else
             {
@@ -191,6 +193,75 @@ namespace Azure.Functions.Cli.Common
                 }
 
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileList[filePath]);
+            }
+        }
+
+        private async Task EnsureDurableFunctionsNpmPackage(Template template)
+        {
+            var triggerType = template.Metadata?.TriggerType;
+            var isDurableTemplate =
+                string.Equals(triggerType, Constants.OrchestrationTriggerType, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(triggerType, Constants.EntityTriggerType, StringComparison.OrdinalIgnoreCase);
+
+            if (!isDurableTemplate)
+            {
+                return;
+            }
+
+            var packageJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.PackageJsonFileName);
+            if (!FileSystemHelpers.FileExists(packageJsonPath))
+            {
+                return;
+            }
+
+            var dependencyAdded = false;
+            try
+            {
+                var packageJson = JObject.Parse(await FileSystemHelpers.ReadAllTextFromFileAsync(packageJsonPath));
+                if (packageJson["dependencies"] is not JObject dependencies)
+                {
+                    dependencies = new JObject();
+                    packageJson["dependencies"] = dependencies;
+                }
+
+                if (dependencies[Constants.DurableFunctionsNpmPackageName] == null)
+                {
+                    dependencies[Constants.DurableFunctionsNpmPackageName] = Constants.DurableFunctionsNpmPackageVersion;
+                    await FileSystemHelpers.WriteAllTextToFileAsync(packageJsonPath, JsonConvert.SerializeObject(packageJson, Formatting.Indented));
+                    dependencyAdded = true;
+                    ColoredConsole.WriteLine(AdditionalInfoColor($"Added '{Constants.DurableFunctionsNpmPackageName}' to {Constants.PackageJsonFileName}."));
+                }
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.Error.WriteLine(WarningColor($"Warning: Unable to add '{Constants.DurableFunctionsNpmPackageName}' to {Constants.PackageJsonFileName}. You must add it manually. {ex.Message}"));
+                return;
+            }
+
+            if (!dependencyAdded)
+            {
+                return;
+            }
+
+            if (GlobalCoreToolsSettings.IsOfflineMode)
+            {
+                ColoredConsole.WriteLine(WarningColor("Skipping \"npm install\" because the CLI is running in offline mode. You must run \"npm install\" manually when network is available."));
+                return;
+            }
+
+            if (!CommandChecker.CommandExists("npm"))
+            {
+                ColoredConsole.WriteLine(WarningColor("Skipping \"npm install\" because npm was not found. You must run \"npm install\" manually."));
+                return;
+            }
+
+            try
+            {
+                await NpmHelper.Install();
+            }
+            catch (Exception)
+            {
+                ColoredConsole.Error.WriteLine(WarningColor("Warning: You must run \"npm install\" manually"));
             }
         }
 
