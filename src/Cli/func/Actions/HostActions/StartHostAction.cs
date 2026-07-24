@@ -318,6 +318,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             settings["AZURE_FUNCTIONS_ENVIRONMENT"] = "Development";
 
+            // Set WEBSITE_SKU if not already defined so that worker profile conditions referencing the
+            // SKU host property can evaluate correctly in the local development environment.
+            if (!settings.ContainsKey(Constants.WebsiteSku) &&
+                string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.WebsiteSku)))
+            {
+                settings[Constants.WebsiteSku] = Constants.DefaultLocalWebsiteSku;
+            }
+
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
             {
@@ -491,6 +499,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     }
 
                     DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
+                }
+                else if (scriptHost != null && !scriptHost.Functions.Any())
+                {
+                    WarnIfWorkerResolutionMayHaveFailed(hostOptions.ScriptPath);
                 }
             }
 
@@ -975,6 +987,38 @@ namespace Azure.Functions.Cli.Actions.HostActions
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pythonDebugLoggingKey)))
             {
                 Environment.SetEnvironmentVariable(pythonDebugLoggingKey, "1");
+            }
+        }
+
+        /// <summary>
+        /// Warns the user when no functions were loaded but worker configuration files exist on disk,
+        /// which may indicate a worker profile resolution failure.
+        /// </summary>
+        private static void WarnIfWorkerResolutionMayHaveFailed(string scriptPath)
+        {
+            try
+            {
+                // Check if worker.config.json files exist in the workers directory, which would
+                // indicate that a worker is present but may not have been loaded due to profile
+                // condition evaluation failures.
+                var workersDir = Path.Combine(scriptPath, "workers");
+                if (!Directory.Exists(workersDir))
+                {
+                    return;
+                }
+
+                var workerConfigs = Directory.GetFiles(workersDir, "worker.config.json", SearchOption.AllDirectories);
+                if (workerConfigs.Length > 0)
+                {
+                    ColoredConsole.WriteLine(WarningColor(
+                        "No functions were loaded, but worker configuration files were found on disk. " +
+                        "This may indicate that worker profile conditions (e.g., WEBSITE_SKU, environment variables) " +
+                        "did not evaluate to true in this environment. Run with --verbose for detailed host logs."));
+                }
+            }
+            catch
+            {
+                // Best effort diagnostic - don't fail startup for this.
             }
         }
     }

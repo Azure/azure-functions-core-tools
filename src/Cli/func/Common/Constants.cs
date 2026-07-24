@@ -16,6 +16,8 @@ namespace Azure.Functions.Cli.Common
         public const string CliDebug = "CLI_DEBUG";
         public const string DefaultSqlProviderName = "System.Data.SqlClient";
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
+        public const string WebsiteSku = "WEBSITE_SKU";
+        public const string DefaultLocalWebsiteSku = "Dynamic";
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
