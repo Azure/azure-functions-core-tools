@@ -14,6 +14,8 @@ internal sealed class HostProcessStartInfoFactory
     public const string ScriptRootEnvironmentVariable = "AzureWebJobsScriptRoot";
     public const string AzureFunctionsEnvironmentVariable = "AZURE_FUNCTIONS_ENVIRONMENT";
     public const string WebsiteHostnameEnvironmentVariable = "WEBSITE_HOSTNAME";
+    public const string WebsiteSkuEnvironmentVariable = "WEBSITE_SKU";
+    public const string DefaultLocalWebsiteSku = "Dynamic";
     public const string AspNetCoreSuppressStatusMessagesEnvironmentVariable = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
     public const string HostingLifetimeLogLevelEnvironmentVariable = "Logging__LogLevel__Microsoft.Hosting.Lifetime";
 
@@ -64,6 +66,13 @@ internal sealed class HostProcessStartInfoFactory
         startInfo.Environment[ScriptRootEnvironmentVariable] = context.HostRunContext.StartupDirectory.FullName;
         startInfo.Environment[AzureFunctionsEnvironmentVariable] = "Development";
         startInfo.Environment[WebsiteHostnameEnvironmentVariable] = new Uri(localBaseUriText).Authority;
+
+        // Set WEBSITE_SKU so that worker profile conditions referencing the SKU host property
+        // can evaluate correctly in the local development environment. Without this, profiles
+        // gated on SKU silently fail and the host falls back to a non-runnable base worker
+        // description, causing worker resolution to fail despite the worker being present.
+        startInfo.Environment.TryAdd(WebsiteSkuEnvironmentVariable, DefaultLocalWebsiteSku);
+
         startInfo.Environment.TryAdd(AspNetCoreSuppressStatusMessagesEnvironmentVariable, "true");
         startInfo.Environment[HostingLifetimeLogLevelEnvironmentVariable] = "None";
 

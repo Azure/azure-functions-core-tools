@@ -61,6 +61,7 @@ public class HostProcessStartInfoFactoryTests : IDisposable
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.ScriptRootEnvironmentVariable].Should().Be(_startupDirectory.FullName);
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AzureFunctionsEnvironmentVariable].Should().Be("Development");
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable].Should().Be("localhost:7071");
+        launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.WebsiteSkuEnvironmentVariable].Should().Be(HostProcessStartInfoFactory.DefaultLocalWebsiteSku);
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AspNetCoreSuppressStatusMessagesEnvironmentVariable].Should().Be("true");
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable].Should().Be("None");
     }
@@ -81,6 +82,24 @@ public class HostProcessStartInfoFactoryTests : IDisposable
         launchInfo.ListenUri.Should().Be(new Uri("http://0.0.0.0:9090"));
         launchInfo.LocalBaseUri.Should().Be(new Uri("http://localhost:9090"));
         launchInfo.StartInfo.ArgumentList.Should().Equal(["--urls", "http://0.0.0.0:9090"]);
+    }
+
+    [Fact]
+    public void Create_WhenWebsiteSkuAlreadySet_PreservesUserValue()
+    {
+        var factory = new HostProcessStartInfoFactory();
+        HostProcessStartContext context = CreateContext(
+            port: null,
+            enableAuth: false,
+            environmentVariables: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [HostProcessStartInfoFactory.WebsiteSkuEnvironmentVariable] = "ElasticPremium",
+            });
+
+        HostProcessLaunchInfo launchInfo = factory.Create(context);
+
+        launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.WebsiteSkuEnvironmentVariable]
+            .Should().Be("ElasticPremium");
     }
 
     [Theory]
