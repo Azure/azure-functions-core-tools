@@ -19,10 +19,8 @@ public sealed class CliUpdaterTests
     // separators match on every platform (/ on Linux/macOS, \ on Windows).
     private static readonly string _fakeProcessPath = Path.GetFullPath(Path.Combine("/fake", "install", "func"));
     private static readonly string _fakeInstallDir = Path.GetDirectoryName(_fakeProcessPath)!;
-    private static readonly string _fakeBackupDir = _fakeInstallDir + ".backup";
-    private static readonly string _fakeTempWorkDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "work"));
-    private static readonly string _fakeExtractDir = Path.GetFullPath(Path.Combine("/fake", "tmp", "extract"));
-    private static readonly string _fakeZipPath = Path.Combine(_fakeTempWorkDir, "func-update.zip");
+    private static readonly string _fakeTempWorkDir = Path.GetFullPath(Path.Combine(_fakeInstallDir, ".func-update-work"));
+    private static readonly string _fakeExtractDir = Path.GetFullPath(Path.Combine(_fakeInstallDir, ".func-update-extract"));
 
     private static readonly Release _stableRelease = new(
         SemVersion.Parse("5.1.0", SemVersionStyles.Strict),
@@ -38,23 +36,18 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("5.1.0\n"));
 
-        // backupDir must not exist for the precondition check, but does exist
-        // later so the cleanup path deletes it.
-        fileSystem.DirectoryExists(_fakeBackupDir).Returns(false, true);
-        fileSystem.DirectoryExists(Arg.Is<string>(p => p != _fakeBackupDir)).Returns(true);
+        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
+        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile]);
 
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
-        // Assert: backup, then swap into place
-        fileSystem.Received(1).MoveDirectory(_fakeInstallDir, _fakeBackupDir);
-        fileSystem.Received(1).MoveDirectory(_fakeExtractDir, _fakeInstallDir);
+        // Assert: existing files renamed to .old, new files copied in
+        fileSystem.Received(1).RenameFile(existingFile, existingFile + ".old");
+        fileSystem.Received(1).CopyDirectory(_fakeExtractDir, _fakeInstallDir);
 
         // Verify was run
         await processRunner.Received(1).RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>());
-
-        // Backup cleaned up on success
-        fileSystem.Received(1).DeleteDirectory(_fakeBackupDir);
     }
 
     [Fact]
@@ -82,9 +75,14 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("4.0.0\n")); // wrong version
 
-        // backupDir must not exist for precondition, but exists during rollback
-        fileSystem.DirectoryExists(_fakeBackupDir).Returns(false, true);
-        fileSystem.DirectoryExists(_fakeInstallDir).Returns(true);
+        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
+        string oldFile = existingFile + ".old";
+        string newFile = Path.Combine(_fakeInstallDir, "func.exe");
+
+        // First call during SwapInPlace returns existing files; second call
+        // during rollback returns the .old files and new files.
+        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile], [oldFile, newFile]);
+        fileSystem.FileExists(existingFile).Returns(true);
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -92,49 +90,32 @@ public sealed class CliUpdaterTests
 
         Assert.Contains("Verification failed", ex.Message, StringComparison.OrdinalIgnoreCase);
 
-        // Rollback: remove the bad install and restore the backup
-        fileSystem.Received(1).DeleteDirectory(_fakeInstallDir);
-        fileSystem.Received(1).MoveDirectory(_fakeBackupDir, _fakeInstallDir);
+        // Rollback: .old files restored, new files removed
+        fileSystem.Received(1).DeleteFile(existingFile);
+        fileSystem.Received(1).RenameFile(oldFile, existingFile);
     }
 
     [Fact]
-    public async Task UpdateAsync_SwapFails_RollsBackAndRethrows()
+    public async Task UpdateAsync_SwapRenameFileFails_RollsBackAndRethrows()
     {
         // Arrange
         (CliUpdater updater, IUpdateFileSystem fileSystem, _, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
-        // The swap (extractDir → installDir) throws; the backup (installDir → backupDir) succeeds.
-        fileSystem.When(fs => fs.MoveDirectory(_fakeExtractDir, _fakeInstallDir))
-            .Throw(new IOException("disk full"));
+        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
+        string oldFile = existingFile + ".old";
+        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile], [oldFile]);
 
-        // backupDir must not exist for precondition, but exists during rollback
-        fileSystem.DirectoryExists(_fakeInstallDir).Returns(false);
-        fileSystem.DirectoryExists(_fakeBackupDir).Returns(false, true);
+        // The rename throws to simulate a locked file scenario
+        fileSystem.When(fs => fs.RenameFile(existingFile, oldFile))
+            .Throw(new IOException("access denied"));
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
             () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
 
-        // Rollback: backup restored since installDir doesn't exist
-        fileSystem.DidNotReceive().DeleteDirectory(_fakeInstallDir);
-        fileSystem.Received(1).MoveDirectory(_fakeBackupDir, _fakeInstallDir);
-    }
-
-    [Fact]
-    public async Task UpdateAsync_StaleBackupExists_ThrowsGracefulWithCleanupHint()
-    {
-        // Arrange
-        (CliUpdater updater, IUpdateFileSystem fileSystem, _, _) = CreateUpdater(
-            httpHandler: SuccessDownloadHandler());
-
-        fileSystem.DirectoryExists(_fakeBackupDir).Returns(true);
-
-        // Act + Assert
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
-
-        Assert.Contains("previous update backup", ex.Message, StringComparison.OrdinalIgnoreCase);
+        // Rollback attempted: restore .old → original
+        fileSystem.Received(1).RenameFile(oldFile, existingFile);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -146,7 +127,7 @@ public sealed class CliUpdaterTests
         ICliEnvironment environment = Substitute.For<ICliEnvironment>();
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
 
-        fileSystem.CreateTempDirectory().Returns(_fakeTempWorkDir, _fakeExtractDir);
+        fileSystem.CreateTempDirectory(Arg.Any<string>()).Returns(_fakeTempWorkDir, _fakeExtractDir);
         environment.ProcessPath.Returns(_fakeProcessPath);
 
         var client = new HttpClient(httpHandler, disposeHandler: false)

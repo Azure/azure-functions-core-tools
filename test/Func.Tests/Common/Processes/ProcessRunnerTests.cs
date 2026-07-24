@@ -3,7 +3,7 @@
 
 using Azure.Functions.Cli.Common.Processes;
 
-namespace Azure.Functions.Cli.Tests.Commands.Start.Azurite.Processes;
+namespace Azure.Functions.Cli.Tests.Common.Processes;
 
 public class ProcessRunnerTests
 {
