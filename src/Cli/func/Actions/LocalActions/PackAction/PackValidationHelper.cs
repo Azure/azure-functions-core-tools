@@ -133,8 +133,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
         /// <summary>
         /// Runs a host.json existence check and displays the result.
-        /// host.json is optional: the runtime does not require it and Core Tools no longer adds
-        /// one, so its absence is surfaced as a non-blocking warning rather than a failure.
+        /// host.json is optional: the runtime does not require it, so its absence is surfaced
+        /// as a non-blocking warning rather than a failure.
         /// </summary>
         public static void RunHostJsonValidation(string directory)
         {

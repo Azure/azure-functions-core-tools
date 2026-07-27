@@ -282,8 +282,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
                 Assert.NotNull(stream);
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
 
-                // host.json is optional and Core Tools does not add one: the package must not
-                // contain a host.json when the project does not have one...
+                // host.json is optional and the pack path does not add one to the package:
+                // the package must not contain a host.json when the project does not have one...
                 Assert.DoesNotContain(archive.Entries, e => e.FullName == "host.json");
                 Assert.Contains(archive.Entries, e => e.FullName == "function_app.py");
 

@@ -307,9 +307,10 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         /// <summary>
-        /// Verifies the function app root has the files required to build/publish a Go app
-        /// (<c>host.json</c> and <c>go.mod</c>) by routing through <see cref="PackValidationHelper"/>
-        /// so <c>func pack</c> and <c>func publish</c> share the same validation flow and messages.
+        /// Verifies the function app root has the files required to build/publish a Go app.
+        /// <c>go.mod</c> is required; <c>host.json</c> is optional (a warning is emitted when it
+        /// is absent). Routes through <see cref="PackValidationHelper"/> so <c>func pack</c> and
+        /// <c>func publish</c> share the same validation flow and messages.
         /// Throws <see cref="CliException"/> on failure.
         /// </summary>
         internal static void AssertGoFunctionAppLayout(string functionAppRoot)
