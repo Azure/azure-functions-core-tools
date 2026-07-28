@@ -62,8 +62,8 @@ internal sealed class UpdateFileSystem : IUpdateFileSystem
     public IReadOnlyList<string> GetFiles(string directoryPath) =>
         Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
 
-    public void RenameFile(string sourcePath, string destinationPath) =>
-        File.Move(sourcePath, destinationPath);
+    public void RenameFile(string sourcePath, string destinationPath, bool overwrite = false) =>
+        File.Move(sourcePath, destinationPath, overwrite);
 
     public void CopyFile(string sourcePath, string destinationPath) =>
         File.Copy(sourcePath, destinationPath, overwrite: true);

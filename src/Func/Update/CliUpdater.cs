@@ -91,7 +91,12 @@ internal sealed class CliUpdater(
                 continue;
             }
 
-            _fileSystem.RenameFile(file, file + OldFileSuffix);
+            string oldPath = file + OldFileSuffix;
+
+            // Use overwrite so stale .old files left behind by a previous update
+            // (e.g. the running exe was locked and couldn't be deleted) don't
+            // block the rename.
+            _fileSystem.RenameFile(file, oldPath, overwrite: true);
         }
 
         // Copy all new files from the extract directory into the install directory
@@ -133,37 +138,58 @@ internal sealed class CliUpdater(
     private bool TryRollbackInPlace(string installDir, IReadOnlyList<string> copiedFiles)
     {
         // Restore .old files and remove new files that were introduced by the
-        // update. Best-effort so the original failure isn't masked. Always returns
-        // false so the exception filter rethrows.
-        try
+        // update. Best-effort per-file so a single locked file doesn't prevent
+        // the rest from being restored. Always returns false so the exception
+        // filter rethrows.
+        bool anyRestored = false;
+
+        // Remove files that were copied in during the update. This handles
+        // both files that replaced an existing file and entirely new files
+        // that have no .old counterpart.
+        foreach (string file in copiedFiles)
         {
-            // Remove files that were copied in during the update. This handles
-            // both files that replaced an existing file and entirely new files
-            // that have no .old counterpart.
-            foreach (string file in copiedFiles)
+            try
             {
                 if (_fileSystem.FileExists(file))
                 {
                     _fileSystem.DeleteFile(file);
                 }
             }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Rollback: could not remove new file {File}.", file);
+            }
+        }
 
-            // Restore .old files to their original paths
+        // Restore .old files to their original paths
+        try
+        {
             IReadOnlyList<string> files = _fileSystem.GetFiles(installDir);
             foreach (string file in files)
             {
                 if (file.EndsWith(OldFileSuffix, StringComparison.OrdinalIgnoreCase))
                 {
                     string originalPath = file[..^OldFileSuffix.Length];
-                    _fileSystem.RenameFile(file, originalPath);
+                    try
+                    {
+                        _fileSystem.RenameFile(file, originalPath);
+                        anyRestored = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Rollback: could not restore {File}.", file);
+                    }
                 }
             }
-
-            _logger.LogInformation("Previous version restored.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Rollback failed. The installation at {InstallDir} may be in an inconsistent state.", installDir);
+        }
+
+        if (anyRestored)
+        {
+            _logger.LogInformation("Previous version restored.");
         }
 
         return false;
@@ -211,7 +237,7 @@ internal sealed class CliUpdater(
         {
             throw new GracefulException(
                 $"Verification failed after installing func {expectedVersion}. " +
-                $"The binary reported: '{outcome.StandardOutput.Trim()}'. The previous version has been restored.",
+                $"The binary reported: '{outcome.StandardOutput.Trim()}'.",
                 isUserError: true);
         }
     }

@@ -46,8 +46,8 @@ public sealed class CliUpdaterTests
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
-        // Assert: existing files renamed to .old, new files copied in
-        fileSystem.Received(1).RenameFile(existingFile, existingFile + ".old");
+        // Assert: existing files renamed to .old with overwrite, new files copied in
+        fileSystem.Received(1).RenameFile(existingFile, existingFile + ".old", true);
         fileSystem.Received(1).CopyDirectory(_fakeExtractDir, _fakeInstallDir);
 
         // Verify was run
@@ -113,7 +113,7 @@ public sealed class CliUpdaterTests
         fileSystem.GetFiles(_fakeExtractDir).Returns([Path.Combine(_fakeExtractDir, "func.exe")]);
 
         // The rename throws to simulate a locked file scenario
-        fileSystem.When(fs => fs.RenameFile(existingFile, oldFile))
+        fileSystem.When(fs => fs.RenameFile(existingFile, oldFile, true))
             .Throw(new IOException("access denied"));
 
         // Act + Assert

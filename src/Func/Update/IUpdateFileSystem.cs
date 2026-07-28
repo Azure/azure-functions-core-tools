@@ -52,8 +52,10 @@ internal interface IUpdateFileSystem
 
     /// <summary>
     /// Renames <paramref name="sourcePath"/> to <paramref name="destinationPath"/>.
+    /// When <paramref name="overwrite"/> is <c>true</c>, an existing file at the
+    /// destination is replaced.
     /// </summary>
-    public void RenameFile(string sourcePath, string destinationPath);
+    public void RenameFile(string sourcePath, string destinationPath, bool overwrite = false);
 
     /// <summary>
     /// Copies a single file from <paramref name="sourcePath"/> to
