@@ -3,6 +3,7 @@
 
 using System.Text;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
+using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
@@ -19,6 +20,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
     private readonly IDockerAvailabilityProbe _dockerProbe;
     private readonly IAzuriteLauncher _launcher;
     private readonly IAzuriteManagedPathsProvider _pathsProvider;
+    private readonly IListeningProcessInspector _inspector;
     private readonly ILogger<ManagedAzuriteOrchestrator> _logger;
 
     public ManagedAzuriteOrchestrator(
@@ -28,6 +30,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         IDockerAvailabilityProbe dockerProbe,
         IAzuriteLauncher launcher,
         IAzuriteManagedPathsProvider pathsProvider,
+        IListeningProcessInspector inspector,
         ILogger<ManagedAzuriteOrchestrator> logger)
     {
         _classifier = classifier ?? throw new ArgumentNullException(nameof(classifier));
@@ -36,6 +39,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         _dockerProbe = dockerProbe ?? throw new ArgumentNullException(nameof(dockerProbe));
         _launcher = launcher ?? throw new ArgumentNullException(nameof(launcher));
         _pathsProvider = pathsProvider ?? throw new ArgumentNullException(nameof(pathsProvider));
+        _inspector = inspector ?? throw new ArgumentNullException(nameof(inspector));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -108,20 +112,7 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
         switch (probe.Status)
         {
             case AzuriteProbeStatus.Ready:
-                // §11 user-managed-reuse fallback: when MVP discovers something
-                // already on the ports, treat it as user-managed and skip
-                // launching our own.
-                _logger.LogInformation("Existing Azurite endpoint detected; reusing it without launching a managed instance.");
-
-                // This cannot render to the live display directly as it will introduce rendering issues.
-                // TODO: If this information needs to be surfaced beyond initialization, we can introduce a new mechanism to display this data.
-                //_interaction.WriteLine(l => l
-                //    .Muted("Using existing Azurite endpoint at ")
-                //    .Path(endpoints.BlobEndpoint.ToString())
-                //    .Muted("."));
-                //_interaction.WriteBlankLine();
-
-                return new ManagedAzuriteResult.UserManaged(endpoints, "Endpoints already responded with storage-shaped replies.");
+                return await AdoptExistingAsync(endpoints, cancellationToken);
 
             case AzuriteProbeStatus.PortConflict:
             case AzuriteProbeStatus.Partial:
@@ -164,6 +155,81 @@ internal sealed class ManagedAzuriteOrchestrator : IManagedAzuriteOrchestrator
             executablePath: null,
             progress,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Handles the case where something is already answering on the Azurite
+    /// ports. The connection string points here, so we always reuse it; when we
+    /// can identify the owning Azurite we surface its PID and data directory so
+    /// the reuse is visible and reset guidance targets the directory actually in
+    /// use. Never blocks startup.
+    /// </summary>
+    private async Task<ManagedAzuriteResult> AdoptExistingAsync(
+        AzuriteEndpointTuple endpoints,
+        CancellationToken cancellationToken)
+    {
+        AzuriteManagedPaths paths = _pathsProvider.GetPaths();
+        int blobPort = endpoints.BlobEndpoint.Port;
+
+        IReadOnlyList<ListeningProcessInfo> processes = await _inspector.GetListeningProcessesAsync(blobPort, cancellationToken);
+
+        // A dual-stack host can have more than one listener on the same port, so
+        // prefer the one that identifies as Azurite rather than the first PID.
+        ListeningProcessInfo? azurite = processes.FirstOrDefault(p => AzuriteCommandLine.LooksLikeAzurite(p.CommandLine));
+
+        // A relative -l resolves against azurite's working directory, not ours,
+        // so only compare when the detected directory is fully qualified.
+        if (azurite is { } identified
+            && AzuriteCommandLine.TryGetDataDirectory(identified.CommandLine, out string? detectedDirectory)
+            && detectedDirectory is not null
+            && Path.IsPathFullyQualified(detectedDirectory))
+        {
+            if (AzuritePath.AreSameDirectory(detectedDirectory, paths.DataDirectory))
+            {
+                _logger.LogInformation(
+                    "Reusing existing managed Azurite (PID {ProcessId}) already serving data directory {DataDirectory}.",
+                    identified.ProcessId,
+                    paths.DataDirectory);
+                return new ManagedAzuriteResult.UserManaged(
+                    endpoints,
+                    $"Reused existing Azurite (PID {identified.ProcessId}) serving {paths.DataDirectory}.");
+            }
+
+            // Reuse it (the app asked for this endpoint), but surface the actual
+            // directory so reset guidance points at the store in use rather than
+            // the managed default.
+            _logger.LogWarning(
+                "Reusing existing Azurite (PID {ProcessId}) serving data directory {DetectedDirectory}, which differs from the managed default {ExpectedDirectory}. Reset guidance should target the directory in use.",
+                identified.ProcessId,
+                detectedDirectory,
+                paths.DataDirectory);
+            return new ManagedAzuriteResult.UserManaged(
+                endpoints,
+                $"Reused existing Azurite (PID {identified.ProcessId}) serving {detectedDirectory} (differs from the managed default {paths.DataDirectory}).");
+        }
+
+        // Something is on the ports but we cannot read a managed data directory
+        // (Docker proxy, a user-launched tool, a relative -l, or an unreadable
+        // command line). Reuse it and log what we found for self-diagnosis.
+        if (processes.Count > 0)
+        {
+            ListeningProcessInfo representative = azurite ?? processes[0];
+            _logger.LogInformation(
+                "Reusing existing endpoint on port {BlobPort} owned by PID {ProcessId}. Detected command line: {CommandLine}",
+                blobPort,
+                representative.ProcessId,
+                string.IsNullOrEmpty(representative.CommandLine) ? "<unavailable>" : representative.CommandLine);
+            return new ManagedAzuriteResult.UserManaged(
+                endpoints,
+                $"Reused an existing endpoint on the local storage ports (PID {representative.ProcessId}).");
+        }
+
+        _logger.LogInformation(
+            "Reusing existing Azurite endpoint on port {BlobPort}. Could not identify the owning process.",
+            blobPort);
+        return new ManagedAzuriteResult.UserManaged(
+            endpoints,
+            "Reused an existing Azurite endpoint already listening on the local storage ports.");
     }
 
     private async Task<ManagedAzuriteResult> LaunchAsync(
