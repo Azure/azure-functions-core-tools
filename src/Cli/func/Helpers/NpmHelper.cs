@@ -10,12 +10,12 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class NpmHelper
     {
-        public static async Task Install()
+        public static async Task<int> Install()
         {
-            await RunNpmCommand("install", true);
+            return await RunNpmCommand("install", true);
         }
 
-        internal static async Task RunNpmCommand(string args, bool ignoreError = true, bool showProgress = true, string stdIn = null)
+        internal static async Task<int> RunNpmCommand(string args, bool ignoreError = true, bool showProgress = true, string stdIn = null)
         {
             if (showProgress || StaticSettings.IsDebug)
             {
@@ -24,11 +24,11 @@ namespace Azure.Functions.Cli.Helpers
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                await InternalRunCommand("cmd", $"/c npm {args}", ignoreError, stdIn: stdIn);
+                return (await InternalRunCommand("cmd", $"/c npm {args}", ignoreError, stdIn: stdIn)).ExitCode;
             }
             else
             {
-                await InternalRunCommand("npm", args, ignoreError, stdIn: stdIn);
+                return (await InternalRunCommand("npm", args, ignoreError, stdIn: stdIn)).ExitCode;
             }
         }
 

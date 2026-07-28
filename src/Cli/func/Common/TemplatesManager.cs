@@ -257,7 +257,11 @@ namespace Azure.Functions.Cli.Common
 
             try
             {
-                await NpmHelper.Install();
+                var exitCode = await NpmHelper.Install();
+                if (exitCode != 0)
+                {
+                    ColoredConsole.Error.WriteLine(WarningColor("Warning: 'npm install' did not complete successfully. You must run \"npm install\" manually."));
+                }
             }
             catch (Exception)
             {
