@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
+using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 using Azure.Functions.Cli.Common.Processes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -73,6 +74,9 @@ internal static class AzuriteServiceCollectionExtensions
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<IAzuriteExecutableLocator, AzuriteExecutableLocator>();
         services.TryAddSingleton<IDockerAvailabilityProbe, DockerAvailabilityProbe>();
+        services.TryAddSingleton<IPortOwnershipStrategy>(
+            static _ => OperatingSystem.IsWindows() ? new WindowsPortOwnershipStrategy() : new UnixPortOwnershipStrategy());
+        services.TryAddSingleton<IListeningProcessInspector, ListeningProcessInspector>();
 
         return services;
     }

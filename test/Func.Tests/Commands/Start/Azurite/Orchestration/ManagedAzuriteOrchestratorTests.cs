@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
+using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -22,18 +23,21 @@ public class ManagedAzuriteOrchestratorTests
     private readonly IDockerAvailabilityProbe _dockerProbe = Substitute.For<IDockerAvailabilityProbe>();
     private readonly IAzuriteLauncher _launcher = Substitute.For<IAzuriteLauncher>();
     private readonly IAzuriteManagedPathsProvider _paths = Substitute.For<IAzuriteManagedPathsProvider>();
+    private readonly IListeningProcessInspector _inspector = Substitute.For<IListeningProcessInspector>();
+    private readonly string _expectedDataDir = Path.Combine(Path.GetTempPath(), "azurite-data");
 
     public ManagedAzuriteOrchestratorTests()
     {
         AzuriteManagedPaths managed = new(
-            DataDirectory: Path.Combine(Path.GetTempPath(), "azurite-data"),
+            DataDirectory: _expectedDataDir,
             LogFilePath: Path.Combine(Path.GetTempPath(), "azurite", "azurite.log"));
         _paths.GetPaths().Returns(managed);
         _paths.EnsureCreatedAsync(Arg.Any<AzuriteManagedPaths>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        _inspector.GetListeningProcessesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(Listening());
     }
 
     private ManagedAzuriteOrchestrator CreateSut() => new(
-        _classifier, _probe, _locator, _dockerProbe, _launcher, _paths,
+        _classifier, _probe, _locator, _dockerProbe, _launcher, _paths, _inspector,
         NullLogger<ManagedAzuriteOrchestrator>.Instance);
 
     private static ManagedAzuriteRequest Request(bool disabled = false, TimeSpan? timeout = null) =>
@@ -65,6 +69,11 @@ public class ManagedAzuriteOrchestratorTests
         new AzuriteEndpointProbeOutcome(AzuriteService.Queue, new Uri("http://127.0.0.1:10001/devstoreaccount1"), AzuriteEndpointStatus.PortConflict),
         new AzuriteEndpointProbeOutcome(AzuriteService.Table, new Uri("http://127.0.0.1:10002/devstoreaccount1"), AzuriteEndpointStatus.PortConflict),
     });
+
+    private static string AzuriteCommandLineFor(string dataDirectory) =>
+        $"node /usr/lib/node_modules/azurite/dist/src/azurite.js -l \"{dataDirectory}\" --blobHost 127.0.0.1 --blobPort 10000 --queuePort 10001 --tablePort 10002 --silent";
+
+    private static IReadOnlyList<ListeningProcessInfo> Listening(params ListeningProcessInfo[] processes) => processes;
 
     [Fact]
     public async Task Disabled_ReturnsDisabled_WithoutTouchingOtherDependencies()
@@ -120,6 +129,110 @@ public class ManagedAzuriteOrchestratorTests
     {
         _classifier.Classify(Conn).Returns(Manageable());
         _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
+
+        result.Should().BeOfType<ManagedAzuriteResult.UserManaged>();
+        await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Manageable_ProbeReady_ExistingAzuriteSameDataDir_ReturnsUserManaged()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
+        _inspector.GetListeningProcessesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Listening(new ListeningProcessInfo(4242, AzuriteCommandLineFor(_expectedDataDir))));
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
+
+        ManagedAzuriteResult.UserManaged userManaged = result.Should().BeOfType<ManagedAzuriteResult.UserManaged>().Subject;
+        userManaged.Reason.Should().Contain("4242");
+        userManaged.Reason.Should().Contain(_expectedDataDir);
+        await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Manageable_ProbeReady_MultipleListeners_PrefersAzuriteProcess()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
+
+        // A non-Azurite listener (e.g. bound on ::1) is returned first; the
+        // managed Azurite is second. Selection must not depend on order.
+        _inspector.GetListeningProcessesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Listening(
+                new ListeningProcessInfo(111, "com.docker.backend --proxy tcp [::1]:10000"),
+                new ListeningProcessInfo(222, AzuriteCommandLineFor(_expectedDataDir))));
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
+
+        ManagedAzuriteResult.UserManaged userManaged = result.Should().BeOfType<ManagedAzuriteResult.UserManaged>().Subject;
+        userManaged.Reason.Should().Contain("222");
+        userManaged.Reason.Should().NotContain("111");
+        userManaged.Reason.Should().Contain(_expectedDataDir);
+    }
+
+    [Fact]
+    public async Task Manageable_ProbeReady_ExistingAzuriteDifferentDataDir_ReusesAndSurfacesDirectory()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
+        string otherDirectory = Path.Combine(Path.GetTempPath(), "azurite-data-other");
+        _inspector.GetListeningProcessesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Listening(new ListeningProcessInfo(9999, AzuriteCommandLineFor(otherDirectory))));
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
+
+        // Sharing a storage endpoint is legitimate, so a different data directory
+        // is surfaced, not blocked.
+        ManagedAzuriteResult.UserManaged userManaged = result.Should().BeOfType<ManagedAzuriteResult.UserManaged>().Subject;
+        userManaged.Reason.Should().Contain("9999");
+        userManaged.Reason.Should().Contain(otherDirectory);
+        userManaged.Reason.Should().Contain(_expectedDataDir);
+        await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Manageable_ProbeReady_ExistingAzuriteRelativeDataDir_ReusesWithoutFailing()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
+
+        // A relative -l cannot be resolved against azurite's working directory,
+        // so it must never be treated as a mismatch.
+        _inspector.GetListeningProcessesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Listening(new ListeningProcessInfo(4321, "node azurite.js -l ./local-data --blobPort 10000")));
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
+
+        ManagedAzuriteResult.UserManaged userManaged = result.Should().BeOfType<ManagedAzuriteResult.UserManaged>().Subject;
+        userManaged.Reason.Should().Contain("4321");
+        await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Manageable_ProbeReady_ExistingNonAzuriteProcess_ReturnsUserManaged()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
+        _inspector.GetListeningProcessesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Listening(new ListeningProcessInfo(1357, "com.docker.backend --proxy tcp 127.0.0.1:10000")));
+
+        ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
+
+        ManagedAzuriteResult.UserManaged userManaged = result.Should().BeOfType<ManagedAzuriteResult.UserManaged>().Subject;
+        userManaged.Reason.Should().Contain("1357");
+        await _launcher.DidNotReceive().StartAsync(Arg.Any<AzuriteLaunchRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Manageable_ProbeReady_UnidentifiedProcess_ReturnsUserManaged()
+    {
+        _classifier.Classify(Conn).Returns(Manageable());
+        _probe.ProbeAsync(Arg.Any<AzuriteEndpointTuple>(), Arg.Any<CancellationToken>()).Returns(ProbeReady());
+        _inspector.GetListeningProcessesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Listening());
 
         ManagedAzuriteResult result = await CreateSut().EnsureReadyAsync(Request(), progress: null, CancellationToken.None);
 
