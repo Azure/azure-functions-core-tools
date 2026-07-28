@@ -39,6 +39,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
     {
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
+        private const string DefaultAddress = "127.0.0.1";
         private readonly ISecretsManager _secretsManager;
         private readonly IProcessManager _processManager;
         private readonly KeyVaultReferencesManager _keyVaultReferencesManager;
@@ -52,6 +53,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         }
 
         public int Port { get; set; }
+
+        public string Address { get; set; }
 
         public string CorsOrigins { get; set; }
 
@@ -95,6 +98,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"Local port to listen on. Default: {DefaultPort}")
                 .SetDefault(hostSettings.LocalHttpPort == default(int) ? DefaultPort : hostSettings.LocalHttpPort)
                 .Callback(p => Port = p);
+
+            Parser
+                .Setup<string>("address")
+                .WithDescription($"Local IP address to bind to. Default: {DefaultAddress}")
+                .SetDefault(string.IsNullOrWhiteSpace(hostSettings.LocalHttpAddress) ? DefaultAddress : hostSettings.LocalHttpAddress)
+                .Callback(a => Address = a);
 
             Parser
                 .Setup<string>("cors")
@@ -217,7 +226,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 defaultBuilder
                 .UseKestrel(options =>
                 {
-                    options.Listen(IPAddress.Loopback, listenAddress.Port, listenOptins =>
+                    options.Listen(ResolveBindAddress(), listenAddress.Port, listenOptins =>
                     {
                         listenOptins.UseHttps(certificate);
                     });
@@ -918,10 +927,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<(Uri ListenUri, Uri BaseUri, X509Certificate2 Cert)> Setup()
         {
             var protocol = UseHttps ? "https" : "http";
+            var bindEndpoint = new IPEndPoint(ResolveBindAddress(), Port);
             X509Certificate2 cert = UseHttps
                 ? await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
-            return (new Uri($"{protocol}://127.0.0.1:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
+            return (new Uri($"{protocol}://{bindEndpoint}"), new Uri($"{protocol}://localhost:{Port}"), cert);
+        }
+
+        internal IPAddress ResolveBindAddress()
+        {
+            if (!IPAddress.TryParse(Address, out IPAddress address))
+            {
+                throw new CliException($"Invalid --address value '{Address}'. Expected an IP address, for example 127.0.0.1 or 0.0.0.0.");
+            }
+
+            return address;
         }
 
         private void EnsureWorkerRuntimeIsSet()
