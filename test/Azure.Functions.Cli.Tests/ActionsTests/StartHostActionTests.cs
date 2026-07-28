@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using FluentAssertions;
 using NSubstitute;
@@ -167,6 +169,57 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
             output.ToString().Should().Contain("Warning: Cannot find value named 'blah'");
             output.ToString().Should().Contain("Warning: 'connection' property in 'x:\\folder2\\function.json' is empty.");
+        }
+
+        [Fact]
+        public void ParseArgs_NoAddressAndNoConfig_DefaultsToLoopback()
+        {
+            var action = CreateStartHostAction(new HostStartSettings());
+
+            action.ParseArgs(Array.Empty<string>());
+
+            action.Address.Should().Be("127.0.0.1");
+            action.ResolveBindAddress().Should().Be(IPAddress.Loopback);
+        }
+
+        [Fact]
+        public void ParseArgs_ExplicitAddress_OverridesDefault()
+        {
+            var action = CreateStartHostAction(new HostStartSettings());
+
+            action.ParseArgs(new[] { "--address", "0.0.0.0" });
+
+            action.Address.Should().Be("0.0.0.0");
+            action.ResolveBindAddress().Should().Be(IPAddress.Any);
+        }
+
+        [Fact]
+        public void ParseArgs_ConfigAddress_UsedWhenNoFlag()
+        {
+            var action = CreateStartHostAction(new HostStartSettings { LocalHttpAddress = "0.0.0.0" });
+
+            action.ParseArgs(Array.Empty<string>());
+
+            action.Address.Should().Be("0.0.0.0");
+        }
+
+        [Fact]
+        public void ResolveBindAddress_InvalidAddress_ThrowsCliException()
+        {
+            var action = CreateStartHostAction(new HostStartSettings());
+            action.Address = "not-an-ip";
+
+            Action resolve = () => action.ResolveBindAddress();
+
+            resolve.Should().Throw<CliException>();
+        }
+
+        private static StartHostAction CreateStartHostAction(HostStartSettings hostStartSettings)
+        {
+            var secretsManager = Substitute.For<ISecretsManager>();
+            secretsManager.GetHostStartSettings().Returns(hostStartSettings);
+            var processManager = Substitute.For<IProcessManager>();
+            return new StartHostAction(secretsManager, processManager);
         }
 
         private IFileSystem GetFakeFileSystem(IEnumerable<(string folder, string functionJsonContent)> list)
