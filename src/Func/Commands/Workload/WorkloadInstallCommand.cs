@@ -174,14 +174,19 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     }
 
     /// <summary>
-    /// Returns <c>true</c> when the positional argument looks like a path
-    /// to a <c>.nupkg</c> on disk (i.e. ends in <c>.nupkg</c> and points to
-    /// an existing file). Lets the user install a local package without
-    /// going through the catalog. NuGet package ids cannot legally end in
-    /// <c>.nupkg</c>, so this is unambiguous.
+    /// Returns <c>true</c> when the positional argument ends in <c>.nupkg</c>,
+    /// routing it to the local installer instead of the catalog. The suffix is
+    /// the only signal, so the value is not checked for existence or path shape.
     /// </summary>
+    /// <remarks>
+    /// A missing file then fails with a clear "does not exist" error from the
+    /// installer instead of an obscure catalog-resolution error. The tradeoff
+    /// is that the suffix always wins. A package id ending in <c>.nupkg</c> is
+    /// legal per NuGet but can no longer be resolved from the catalog, and no
+    /// published workload is named that way.
+    /// </remarks>
     private static bool LooksLikeLocalPackagePath(string value)
-        => value.EndsWith(".nupkg", StringComparison.OrdinalIgnoreCase) && File.Exists(value);
+        => value.EndsWith(".nupkg", StringComparison.OrdinalIgnoreCase);
 
     private async Task<int?> HandleAlreadyInstalledAsync(
         string identifier,

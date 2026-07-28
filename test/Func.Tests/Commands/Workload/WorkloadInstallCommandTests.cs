@@ -312,6 +312,28 @@ public class WorkloadInstallCommandTests
     }
 
     [Fact]
+    public async Task Install_MissingLocalNupkgPath_RoutesToLocalInstallerAndReportsMissingFile()
+    {
+        // A .nupkg path that does not exist must still route to the local
+        // installer so the user gets a clear "does not exist" error instead
+        // of an obscure catalog-resolution failure (#5479).
+        string missingPkg = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}-missing.nupkg");
+
+        _installer.InstallFromPackageAsync(missingPkg, Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>())
+            .Throws(new FileNotFoundException($"Package file '{missingPkg}' does not exist.", missingPkg));
+
+        var cmd = NewInstall();
+        GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, missingPkg)).Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Contain("does not exist");
+        ex.IsUserError.Should().BeTrue();
+        await _installer.Received(1).InstallFromPackageAsync(
+            missingPkg, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+        await _installer.DidNotReceiveWithAnyArgs().InstallFromCatalogAsync(
+            default!, default, default, default, default, default, default);
+    }
+
+    [Fact]
     public async Task Install_AlreadyInstalled_NonInteractive_ReturnsOneAndDoesNotInstall()
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
