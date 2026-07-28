@@ -220,6 +220,9 @@ Common runtime identifiers: `osx-arm64`, `osx-x64`, `linux-x64`, `win-x64`
 
 - [Code and test Azure Functions locally](https://docs.microsoft.com/azure/azure-functions/functions-run-local)
 - [Contributing Guide](CONTRIBUTING.md)
+- [Design proposals](proposed/)
+
+Files under `proposed/` capture design intent while a design is being shaped and reviewed, so they may lag the current implementation. Submit new proposals against `vnext`; after a design is accepted and implemented, move it to `accepted/` in a follow-up change.
 
 ## Telemetry
 
