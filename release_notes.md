@@ -19,3 +19,4 @@
 - Bumped https-proxy-agent dependency (#5335)
 - Updated target framework to .NET 10 (#4850)
 - Fix Flex Health Check to use `defaultHostName` instead of `enabledHostNames` (#5462)
+- Added `durable-functions` dependency to `package.json` when creating Node.js durable function templates (#5495)
