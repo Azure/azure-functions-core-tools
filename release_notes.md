@@ -19,3 +19,5 @@
 - Bumped https-proxy-agent dependency (#5335)
 - Updated target framework to .NET 10 (#4850)
 - Fix Flex Health Check to use `defaultHostName` instead of `enabledHostNames` (#5462)
+- Changed `func start` to bind to the IPv4 loopback address (`127.0.0.1`) by default instead of `0.0.0.0`, and added an opt-in `--address` flag (and `Host.LocalHttpAddress` setting in `local.settings.json`) to override the bind address (#5484)
+  - **Potential breaking change:** the host now binds to `127.0.0.1` by default, so it is only reachable from the local machine. Setups that relied on binding to `0.0.0.0` — for example reaching the host from outside a Docker container via a published port — will no longer connect. Workaround: start the host with `func start --address 0.0.0.0` (or set `"LocalHttpAddress": "0.0.0.0"` under `Host` in `local.settings.json`) to restore the previous behavior.
