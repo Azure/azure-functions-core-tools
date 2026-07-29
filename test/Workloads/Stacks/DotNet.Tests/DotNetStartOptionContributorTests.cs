@@ -1,0 +1,92 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.CommandLine;
+using Azure.Functions.Cli.Projects;
+
+namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
+
+public class DotNetStartOptionContributorTests
+{
+    private static (DotNetStartOptionContributor Contributor, RootCommand Root) CreateContributor()
+    {
+        var contributor = new DotNetStartOptionContributor();
+        RootCommand root = [];
+        contributor.GetStartOptions(new StartOptionRegistry(root));
+        return (contributor, root);
+    }
+
+    [Fact]
+    public void Stack_IsDotNet()
+    {
+        new DotNetStartOptionContributor().Stack.Should().Be("dotnet");
+    }
+
+    [Fact]
+    public void GetStartOptions_RegistersExpectedOptions()
+    {
+        (DotNetStartOptionContributor contributor, RootCommand root) = CreateContributor();
+
+        root.Options.Select(o => o.Name).Should().Contain(
+            ["--dotnet-isolated-debug", "--enable-json-output", "--json-output-file"]);
+        contributor.GetStartOptions(new StartOptionRegistry(root)).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void Configure_WithNoOptions_ReturnsEmpty()
+    {
+        (DotNetStartOptionContributor contributor, RootCommand root) = CreateContributor();
+        ParseResult parseResult = root.Parse(string.Empty);
+
+        contributor.Configure(parseResult).Should().BeSameAs(StartHostConfiguration.Empty);
+    }
+
+    [Fact]
+    public void Configure_WithDebug_SetsDebuggerWaitAndStartupHook()
+    {
+        (DotNetStartOptionContributor contributor, RootCommand root) = CreateContributor();
+        ParseResult parseResult = root.Parse("--dotnet-isolated-debug");
+
+        StartHostConfiguration configuration = contributor.Configure(parseResult);
+
+        configuration.EnvironmentVariables.Should().Contain(
+            DotNetStartOptionContributor.DebuggerWaitEnvironmentVariable, bool.TrueString);
+        configuration.EnvironmentVariables.Should().Contain(
+            DotNetStartOptionContributor.StartupHooksEnvironmentVariable, DotNetStartOptionContributor.WorkerStartupHook);
+        configuration.EnvironmentVariables.Should().NotContainKey(
+            DotNetStartOptionContributor.JsonOutputEnvironmentVariable);
+        configuration.JsonOutputFilePath.Should().BeNull();
+    }
+
+    [Fact]
+    public void Configure_WithEnableJsonOutput_SetsJsonOutputAndStartupHook()
+    {
+        (DotNetStartOptionContributor contributor, RootCommand root) = CreateContributor();
+        ParseResult parseResult = root.Parse("--enable-json-output");
+
+        StartHostConfiguration configuration = contributor.Configure(parseResult);
+
+        configuration.EnvironmentVariables.Should().Contain(
+            DotNetStartOptionContributor.JsonOutputEnvironmentVariable, bool.TrueString);
+        configuration.EnvironmentVariables.Should().Contain(
+            DotNetStartOptionContributor.StartupHooksEnvironmentVariable, DotNetStartOptionContributor.WorkerStartupHook);
+        configuration.EnvironmentVariables.Should().NotContainKey(
+            DotNetStartOptionContributor.DebuggerWaitEnvironmentVariable);
+        configuration.JsonOutputFilePath.Should().BeNull();
+    }
+
+    [Fact]
+    public void Configure_WithJsonOutputFile_ImpliesJsonOutputAndCapturesPath()
+    {
+        (DotNetStartOptionContributor contributor, RootCommand root) = CreateContributor();
+        ParseResult parseResult = root.Parse(["--json-output-file", "out.json"]);
+
+        StartHostConfiguration configuration = contributor.Configure(parseResult);
+
+        configuration.EnvironmentVariables.Should().Contain(
+            DotNetStartOptionContributor.JsonOutputEnvironmentVariable, bool.TrueString);
+        configuration.EnvironmentVariables.Should().ContainKey(
+            DotNetStartOptionContributor.StartupHooksEnvironmentVariable);
+        configuration.JsonOutputFilePath.Should().Be("out.json");
+    }
+}

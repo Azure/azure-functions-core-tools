@@ -42,7 +42,14 @@ internal sealed class StartHostInitializationStep(IHostProcessRunner hostProcess
         else
         {
             ContentWorkloadInfo hostWorkload = context.State.HostWorkload ?? throw new InvalidOperationException("Host workload was not resolved.");
-            context.State.EventStream = await _hostProcessRunner.StartAsync(new HostProcessStartContext(hostWorkload, hostRunContext, context.Options), cancellationToken);
+            FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+
+            string? jsonOutputFilePath = context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration)
+                ? stackConfiguration.JsonOutputFilePath
+                : null;
+
+            var startContext = new HostProcessStartContext(hostWorkload, hostRunContext, context.Options, jsonOutputFilePath);
+            context.State.EventStream = await _hostProcessRunner.StartAsync(startContext, cancellationToken);
         }
 
         return StartInitializationStepResult.Completed("Host process started");

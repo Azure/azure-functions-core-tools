@@ -96,6 +96,27 @@ public class HostProcessEventStreamTests
         process.KillTreeCallCount.Should().Be(1);
     }
 
+    [Fact]
+    public async Task ReadAsync_WithRawStdoutWriter_TeesStdoutLinesOnly()
+    {
+        var process = new CompletedHostProcess(stdout: "json-line-1\njson-line-2", stderr: "err-line", exitCode: 0);
+        var rawWriter = new StringWriter();
+        var stream = new HostProcessEventStream(
+            process,
+            new LineHostProcessOutputParser(),
+            CreateLaunchInfo(),
+            TimeSpan.FromMilliseconds(1),
+            timeProvider: null,
+            rawStdoutWriter: rawWriter);
+
+        await ReadAllAsync(stream);
+        await stream.WaitForExitAsync(CancellationToken.None);
+
+        string[] teed = rawWriter.ToString()
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        teed.Should().Equal("json-line-1", "json-line-2");
+    }
+
     private static async Task<HostLogEntry[]> ReadAllAsync(IHostEventStream stream)
     {
         List<HostLogEntry> entries = [];

@@ -45,6 +45,35 @@ public class StartCommandTests : IDisposable
     }
 
     [Fact]
+    public void StartCommand_RegistersContributedStackOptions()
+    {
+        var cmd = new StartCommand(
+            _interaction, _palette, _cliVersionProvider,
+            _initializationRunner,
+            Substitute.For<IOptionsMonitor<HostStartupOptions>>(),
+            _shortcutLabels,
+            _platform,
+            startOptionContributors: [new FakeStartHostOptionContributor()]);
+
+        cmd.Options.Select(o => o.Name).Should().Contain("--fake-stack-option");
+    }
+
+    private sealed class FakeStartHostOptionContributor : IStartHostOptionContributor
+    {
+        public string Stack => "fake";
+
+        public Option<bool> Option { get; } = new("--fake-stack-option");
+
+        public IReadOnlyList<Option> GetStartOptions(StartOptionRegistry registry)
+        {
+            registry.GetOrAdd(Option);
+            return [Option];
+        }
+
+        public StartHostConfiguration Configure(ParseResult parseResult) => StartHostConfiguration.Empty;
+    }
+
+    [Fact]
     public void StartCommand_HasExpectedOptions()
     {
         var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider,

@@ -14,6 +14,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
     private readonly IHostProcessOutputParser _parser;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _shutdownTimeout;
+    private readonly TextWriter? _rawStdoutWriter;
     private readonly Channel<HostLogEntry> _channel;
     private readonly Task<int> _exitTask;
     private readonly Task _stdoutTask;
@@ -26,13 +27,15 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         IHostProcessOutputParser parser,
         HostProcessLaunchInfo launchInfo,
         TimeSpan shutdownTimeout,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        TextWriter? rawStdoutWriter = null)
     {
         _process = process ?? throw new ArgumentNullException(nameof(process));
         _parser = parser ?? throw new ArgumentNullException(nameof(parser));
         ArgumentNullException.ThrowIfNull(launchInfo);
         _timeProvider = timeProvider ?? TimeProvider.System;
         _shutdownTimeout = shutdownTimeout;
+        _rawStdoutWriter = rawStdoutWriter;
         _channel = Channel.CreateUnbounded<HostLogEntry>(
             new UnboundedChannelOptions
             {
@@ -141,9 +144,17 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
 
     private async Task ReadLinesAsync(TextReader reader, string streamName)
     {
+        bool teeRawOutput = _rawStdoutWriter is not null
+            && string.Equals(streamName, HostProcessStreamNames.StandardOutput, StringComparison.Ordinal);
+
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
         {
+            if (teeRawOutput)
+            {
+                await _rawStdoutWriter!.WriteLineAsync(line);
+            }
+
             HostLogEntry entry = _parser.ParseLine(streamName, line, _timeProvider.GetUtcNow());
             await _channel.Writer.WriteAsync(entry);
         }
@@ -167,6 +178,10 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         finally
         {
             await _process.DisposeAsync();
+            if (_rawStdoutWriter is not null)
+            {
+                await _rawStdoutWriter.DisposeAsync();
+            }
         }
     }
 }

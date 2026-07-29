@@ -186,6 +186,48 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
             && log.Severity == FunctionsProjectReportSeverity.Error).Should().BeTrue();
     }
 
+    [Fact]
+    public async Task StackHostConfiguration_ForMatchingStack_IsMergedWithHighestPriority()
+    {
+        SetLocalSettings(new() { ["SharedKey"] = "fromFile" });
+        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = new StartHostConfiguration
+            {
+                EnvironmentVariables = new Dictionary<string, string>
+                {
+                    ["DOTNET_STARTUP_HOOKS"] = "Microsoft.Azure.Functions.Worker.Core",
+                    ["SharedKey"] = "fromStack",
+                },
+            },
+        };
+        StartInitializationStepContext context = NewContext(stackConfigurations: stackConfigurations);
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        IDictionary<string, string> env = context.State.HostRunContext!.EnvironmentVariables;
+        env["DOTNET_STARTUP_HOOKS"].Should().Be("Microsoft.Azure.Functions.Worker.Core");
+        env["SharedKey"].Should().Be("fromStack");
+    }
+
+    [Fact]
+    public async Task StackHostConfiguration_ForNonMatchingStack_IsIgnored()
+    {
+        SetLocalSettings([]);
+        var stackConfigurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["dotnet"] = new StartHostConfiguration
+            {
+                EnvironmentVariables = new Dictionary<string, string> { ["FUNCTIONS_ENABLE_DEBUGGER_WAIT"] = "True" },
+            },
+        };
+        StartInitializationStepContext context = NewContext(stackConfigurations: stackConfigurations);
+
+        await NewStep().ExecuteAsync(context, CancellationToken.None);
+
+        context.State.HostRunContext!.EnvironmentVariables.ContainsKey("FUNCTIONS_ENABLE_DEBUGGER_WAIT").Should().BeFalse();
+    }
+
     private void SetLocalSettings(Dictionary<string, string> values)
     {
         var snapshot = new LocalSettingsSnapshot { Values = values };
@@ -198,14 +240,16 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
     private StartInitializationStepContext NewContext(
         FunctionsProject? project = null,
         IStartInitializationRenderer? renderer = null,
-        string? stepId = null)
+        string? stepId = null,
+        IReadOnlyDictionary<string, StartHostConfiguration>? stackConfigurations = null)
     {
         var options = new StartCommandOptions(
             WorkingDirectory.FromExplicit(_projectDir),
             Port: null, Cors: [], CorsCredentials: false, Functions: [],
             NoBuild: false, EnableAuth: false, RequestedProfileName: null, RequestedHostVersion: null,
             Offline: false, OutputMode: OutputMode.Plain, NoTui: true, LogFilePath: null,
-            DemoMode: true, DemoFunctionCount: 0, DemoSpeedMultiplier: 0.001, DemoAutoExit: true);
+            DemoMode: true, DemoFunctionCount: 0, DemoSpeedMultiplier: 0.001, DemoAutoExit: true,
+            StackHostConfigurations: stackConfigurations);
 
         var init = new StartInitializationContext(options, "5.0.0-test", IsInteractive: false, CanPrompt: false);
         var state = new StartInitializationState

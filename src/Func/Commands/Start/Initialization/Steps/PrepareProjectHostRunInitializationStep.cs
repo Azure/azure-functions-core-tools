@@ -101,6 +101,16 @@ internal sealed class PrepareProjectHostRunInitializationStep(
             environmentVariables[name] = value;
         }
 
+        // Stack-specific host adjustments (e.g. .NET worker debug wait / JSON output) sit on top:
+        // the user asked for them explicitly on the command line, so they win over inherited values.
+        if (context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration))
+        {
+            foreach ((string name, string value) in stackConfiguration.EnvironmentVariables)
+            {
+                environmentVariables[name] = value;
+            }
+        }
+
         return environmentVariables;
     }
 
