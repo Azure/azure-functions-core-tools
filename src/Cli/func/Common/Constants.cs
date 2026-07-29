@@ -32,6 +32,12 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
         public const string PackageJsonFileName = "package.json";
+        public const string DurableFunctionsNpmPackageName = "durable-functions";
+
+        // The Node.js v4 programming model requires the durable-functions v3.x npm package.
+        public const string DurableFunctionsNpmPackageVersion = "^3.x";
+        public const string OrchestrationTriggerType = "orchestrationTrigger";
+        public const string EntityTriggerType = "entityTrigger";
         public const string ProxiesJsonFileName = "proxies.json";
         public const string ArtifactsConfigFileName = "artifactsconfig.json";
         public const string MinifiedVersionConfigSectionName = "minifiedVersion";
