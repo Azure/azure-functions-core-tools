@@ -46,6 +46,8 @@ jobs:
 
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
+    env:
+      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 

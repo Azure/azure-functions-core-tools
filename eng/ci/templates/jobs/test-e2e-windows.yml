@@ -34,6 +34,8 @@ jobs:
 
   - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
     displayName: 'Start emulators (NoWait)'
+    env:
+      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 

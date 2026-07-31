@@ -34,11 +34,15 @@ jobs:
 
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
+    env:
+      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
   - script: |
       sudo chown -R $(id -u):$(id -g) ~/.npm
       npm install -g @azure/functions --userconfig "$(Build.SourcesDirectory)/.npmrc"
     displayName: 'Install @azure/functions'
+    env:
+      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
