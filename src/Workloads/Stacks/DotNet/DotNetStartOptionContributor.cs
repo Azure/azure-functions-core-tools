@@ -45,10 +45,10 @@ internal sealed class DotNetStartOptionContributor : IStartHostOptionContributor
         Description = "Emit JSON line output from the .NET worker when applicable."
     };
 
-    public Option<string?> JsonOutputFileOption { get; } = new("--json-output-file")
-    {
-        Description = "Path to a file that receives the JSON output when --enable-json-output is set."
-    };
+public Option<string?> JsonOutputFileOption { get; } = new("--json-output-file")
+{
+    Description = "Path to a file that receives the JSON output (implies --enable-json-output)."
+};
 
     public IReadOnlyList<Option> GetStartOptions(StartOptionRegistry registry)
     {
