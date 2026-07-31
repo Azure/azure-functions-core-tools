@@ -521,9 +521,13 @@ namespace Azure.Functions.Cli.Kubernetes
                 if (serviceExists)
                 {
                     service = TryParse<ServiceV1>(output);
-                    if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == true && service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                    if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == true)
                     {
-                        return service.Status.LoadBalancer.Ingress.First().Ip;
+                        var serviceAddress = GetServiceAddress(service);
+                        if (!string.IsNullOrWhiteSpace(serviceAddress))
+                        {
+                            return serviceAddress;
+                        }
                     }
                     else if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == false && !string.IsNullOrEmpty(service?.Spec?.ClusterIp))
                     {
@@ -538,6 +542,12 @@ namespace Azure.Functions.Cli.Kubernetes
             return string.Empty;
         }
 
+        internal static string GetServiceAddress(ServiceV1 service)
+        {
+            var ingress = service?.Status?.LoadBalancer?.Ingress?.FirstOrDefault();
+            return !string.IsNullOrWhiteSpace(ingress?.Ip) ? ingress.Ip : ingress?.Hostname;
+        }
+
         private static IDictionary<string, string> GetFunctionKeys(IDictionary<string, string> currentImageFuncKeys, IDictionary<string, string> existingFuncKeys)
         {
             if ((currentImageFuncKeys == null || !currentImageFuncKeys.Any())
@@ -549,7 +559,7 @@ namespace Azure.Functions.Cli.Kubernetes
             // The function keys that doesn't exist in Kubernetes yet
             IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-             // Merge the new keys with the keys that already exist in kubernetes
+            // Merge the new keys with the keys that already exist in kubernetes
             foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
             {
                 funcKeys.Add(commonKey);
