@@ -13,8 +13,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
     public class NodeTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private static string BundleCacheHome { get; } = Path.Combine(Path.GetTempPath(), $"func-e2e-bundle-cache-{Environment.ProcessId}");
-
         [Fact]
         public void FuncNew_HttpTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
         {
@@ -167,14 +165,11 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
 
             // Initialize a Node.js v4 (default) JavaScript function app
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "--language", "javascript" });
-            CacheExtensionBundle(testName);
 
             // Create a Durable Functions orchestrator. Run in offline mode so the assertion
             // validates the package.json update without requiring a real 'npm install'.
             var result = new FuncNewCommand(FuncPath, testName, Log)
                 .WithWorkingDirectory(WorkingDirectory)
-                .WithEnvironmentVariable("HOME", BundleCacheHome)
-                .WithEnvironmentVariable("USERPROFILE", BundleCacheHome)
                 .WithEnvironmentVariable("FUNCTIONS_CORE_TOOLS_OFFLINE", "true")
                 .Execute([".", "--template", "DurableFunctionsOrchestrator", "--name", "durableHello"]);
 
@@ -193,14 +188,11 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
 
             // Initialize a Node.js v4 (default) TypeScript function app
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "--language", "typescript" });
-            CacheExtensionBundle(testName);
 
             // Create a Durable Functions entity. Run in offline mode so the assertion
             // validates the package.json update without requiring a real 'npm install'.
             var result = new FuncNewCommand(FuncPath, testName, Log)
                 .WithWorkingDirectory(WorkingDirectory)
-                .WithEnvironmentVariable("HOME", BundleCacheHome)
-                .WithEnvironmentVariable("USERPROFILE", BundleCacheHome)
                 .WithEnvironmentVariable("FUNCTIONS_CORE_TOOLS_OFFLINE", "true")
                 .Execute([".", "--template", "DurableFunctionsEntity", "--name", "counter"]);
 
@@ -231,17 +223,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
 
             var packageJson = await File.ReadAllTextAsync(Path.Combine(WorkingDirectory, "package.json"));
             packageJson.Should().NotContain("durable-functions");
-        }
-
-        private void CacheExtensionBundle(string testName)
-        {
-            var result = new FuncRootCommand(FuncPath, testName, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .WithEnvironmentVariable("HOME", BundleCacheHome)
-                .WithEnvironmentVariable("USERPROFILE", BundleCacheHome)
-                .Execute(["GetExtensionBundlePath"]);
-
-            result.Should().ExitWith(0);
         }
     }
 }
