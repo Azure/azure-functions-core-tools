@@ -23,6 +23,16 @@ public class DotNetStartOptionContributorTests
     }
 
     [Fact]
+    public void DeferredWorkerEnvironmentPrefix_MatchesSharedConstant()
+    {
+        // The host Program.cs duplicates this value because it can't reference Abstractions.
+        // This test ensures the contributor's constant (derived from StartHostConfiguration) stays
+        // in sync with the expected literal the host uses.
+        DotNetStartOptionContributor.DeferredWorkerEnvironmentPrefix
+            .Should().Be(StartHostConfiguration.DeferredWorkerEnvironmentPrefix);
+    }
+
+    [Fact]
     public void GetStartOptions_RegistersExpectedOptions()
     {
         (DotNetStartOptionContributor contributor, RootCommand root) = CreateContributor();

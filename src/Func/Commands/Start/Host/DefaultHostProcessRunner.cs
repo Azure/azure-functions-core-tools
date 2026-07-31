@@ -48,15 +48,15 @@ internal sealed class DefaultHostProcessRunner(
         {
             process.Start();
         }
-        catch (Win32Exception ex)
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
             rawStdoutWriter?.Dispose();
             throw CreateStartFailure(launchInfo, ex);
         }
-        catch (InvalidOperationException ex)
+        catch
         {
             rawStdoutWriter?.Dispose();
-            throw CreateStartFailure(launchInfo, ex);
+            throw;
         }
 
         IHostEventStream stream = new HostProcessEventStream(process, _outputParser, launchInfo, _shutdownTimeout, _timeProvider, rawStdoutWriter);

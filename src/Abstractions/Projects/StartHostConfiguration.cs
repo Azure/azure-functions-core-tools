@@ -11,6 +11,14 @@ namespace Azure.Functions.Cli.Projects;
 public sealed record StartHostConfiguration
 {
     /// <summary>
+    /// Environment variable prefix the CLI uses to defer variables that must not be set on the host
+    /// process itself (e.g. DOTNET_STARTUP_HOOKS) but should be inherited by worker child processes.
+    /// The host strips this prefix post-boot and re-emits the target variable. Both the CLI workload
+    /// and the host must agree on this value.
+    /// </summary>
+    public const string DeferredWorkerEnvironmentPrefix = "FUNCTIONS_CORETOOLS_DEFER_ENV__";
+
+    /// <summary>
     /// A configuration that changes nothing about the host run.
     /// </summary>
     public static StartHostConfiguration Empty { get; } = new();

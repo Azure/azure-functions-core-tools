@@ -22,6 +22,15 @@ public sealed class ProgramTests
     }
 
     [Fact]
+    public void DeferredWorkerEnvironmentPrefix_MatchesExpectedContract()
+    {
+        // This prefix is a contract between the CLI and the host. The canonical definition lives in
+        // StartHostConfiguration.DeferredWorkerEnvironmentPrefix (Abstractions). The host can't
+        // reference that assembly, so we assert against the known literal to catch drift.
+        Program.DeferredWorkerEnvironmentPrefix.Should().Be("FUNCTIONS_CORETOOLS_DEFER_ENV__");
+    }
+
+    [Fact]
     public void ReadDeferredWorkerEnvironment_ExtractsPrefixedVariables_StrippingPrefix()
     {
         var environment = new Dictionary<string, string>

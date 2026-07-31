@@ -68,13 +68,13 @@ internal static class Program
         Environment.SetEnvironmentVariable("FUNCTIONS_CORETOOLS_ENVIRONMENT", "true");
     }
 
-    // Contract with the CLI (mirror of the literal in DotNetStartOptionContributor). Some worker
+    // Contract with the CLI (see StartHostConfiguration.DeferredWorkerEnvironmentPrefix). Some worker
     // environment variables (e.g. DOTNET_STARTUP_HOOKS) are evaluated by the host's own runtime
     // before Main runs and would crash it trying to load worker-only assets. The CLI can't set
     // those on this host process, so it prefixes each one with this marker; we strip the marker
     // and re-emit the real variable here, post-boot, so only worker child processes inherit it.
     // Prefixing the target name keeps the host generic: it never learns which variables these are.
-    private const string DeferredWorkerEnvironmentPrefix = "FUNCTIONS_CORETOOLS_DEFER_ENV__";
+    internal const string DeferredWorkerEnvironmentPrefix = "FUNCTIONS_CORETOOLS_DEFER_ENV__";
 
     private static void ApplyDeferredWorkerEnvironment()
     {

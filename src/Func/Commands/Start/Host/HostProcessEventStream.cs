@@ -110,16 +110,16 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
             {
                 // Process already gone.
             }
+        }
 
-            // _exitTask drains stdout/stderr and disposes _process in its finally block.
-            try
-            {
-                await _exitTask;
-            }
-            catch
-            {
-                // _exitTask may fault after KillTree; we only need it to finish, not succeed.
-            }
+        // Always await _exitTask to ensure stdout/stderr drain and resources (process + writer) are released.
+        try
+        {
+            await _exitTask;
+        }
+        catch
+        {
+            // _exitTask may fault after KillTree; we only need it to finish, not succeed.
         }
     }
 
@@ -178,10 +178,15 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         finally
         {
             await _process.DisposeAsync();
-            if (_rawStdoutWriter is not null)
-            {
-                await _rawStdoutWriter.DisposeAsync();
-            }
+            await DisposeRawStdoutWriterAsync();
+        }
+    }
+
+    private async ValueTask DisposeRawStdoutWriterAsync()
+    {
+        if (_rawStdoutWriter is not null)
+        {
+            await _rawStdoutWriter.DisposeAsync();
         }
     }
 }

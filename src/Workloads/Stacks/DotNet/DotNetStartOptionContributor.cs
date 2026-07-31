@@ -22,9 +22,10 @@ internal sealed class DotNetStartOptionContributor : IStartHostOptionContributor
     // DOTNET_STARTUP_HOOKS can't be set on the host process: it's a .NET app and its runtime would
     // try to load the worker-only hook assembly at startup and crash before the worker launches.
     // The host re-emits any variable carrying this prefix (with the prefix stripped) after its own
-    // boot, so only the worker child inherits it. Prefix is a contract with the host (mirror of the
-    // literal in the host's Program). Value composed here so the host stays value-agnostic.
-    internal const string DeferredWorkerEnvironmentPrefix = "FUNCTIONS_CORETOOLS_DEFER_ENV__";
+    // boot, so only the worker child inherits it. Prefix is a contract with the host (see
+    // StartHostConfiguration.DeferredWorkerEnvironmentPrefix). Value composed here so the host
+    // stays value-agnostic.
+    internal const string DeferredWorkerEnvironmentPrefix = StartHostConfiguration.DeferredWorkerEnvironmentPrefix;
 
     internal const string DeferredStartupHooksEnvironmentVariable =
         DeferredWorkerEnvironmentPrefix + StartupHooksEnvironmentVariable;
