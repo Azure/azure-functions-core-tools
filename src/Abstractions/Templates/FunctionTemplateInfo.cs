@@ -4,24 +4,16 @@
 namespace Azure.Functions.Cli.Templates;
 
 /// <summary>
-/// The CLI's engine-agnostic view of a single template surfaced by an
-/// <see cref="ITemplateEngineProvider"/>. Used by <c>func new</c> (template
-/// selection, option hydration, dispatch) and <c>func new --list</c>
-/// (catalog rendering).
+/// The CLI's engine-agnostic view of a single template. Used by
+/// <c>func new</c> (template selection, option hydration) and
+/// <c>func new --list</c> (catalog rendering).
 /// </summary>
 /// <param name="Id">
-/// Stack-unique template id (e.g. <c>"HttpTrigger"</c>). For V2 this is the
-/// <c>NewTemplate.id</c>; for DotNet this is <c>dotnet-templates.json</c>'s
-/// <c>id</c> (= <c>shortNames[0]</c>). The value the user passes to
-/// <c>--template &lt;id&gt;</c>.
+/// Stack-unique template id (e.g. <c>"HttpTrigger"</c>). The value the user
+/// passes to <c>--template &lt;id&gt;</c>.
 /// </param>
 /// <param name="Stack">
 /// Canonical owning stack (e.g. <c>"node"</c>, <c>"python"</c>, <c>"dotnet"</c>).
-/// </param>
-/// <param name="EngineId">
-/// Dispatch key resolved from the workload payload's directory layout.
-/// One of <see cref="EngineIds.V2"/> or <see cref="EngineIds.DotNet"/>.
-/// Never surfaced to the user.
 /// </param>
 /// <param name="DisplayName">
 /// Human-friendly name (e.g. <c>"HTTP trigger"</c>). Rendered in the
@@ -49,9 +41,19 @@ namespace Azure.Functions.Cli.Templates;
 public sealed record FunctionTemplateInfo(
     string Id,
     string Stack,
-    string EngineId,
     string DisplayName,
     string? Description,
     string? DefaultFunctionName,
     IReadOnlyList<string> Languages,
-    TemplateMetadata Metadata);
+    TemplateMetadata Metadata)
+{
+    /// <summary>
+    /// Every <c>shortName</c> the template declares, including the canonical
+    /// <see cref="Id"/> and legacy suffixed aliases (e.g. <c>http</c>,
+    /// <c>HttpTrigger</c>, <c>HttpTrigger-TypeScript</c>). <c>func new
+    /// --template</c> resolves case-insensitively against this set so old
+    /// scripts keep working (D8/D19). Defaults to just <see cref="Id"/> when
+    /// the catalog surfaces no additional aliases.
+    /// </summary>
+    public IReadOnlyList<string> ShortNames { get; init; } = [];
+}

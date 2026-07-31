@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
+    <ProjectReference Include="$(SrcRoot)Templates.Engine/Templates.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>

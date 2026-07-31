@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Function", "Project" ],
+  "name": "Azure Functions Python Project",
+  "description": "An empty Azure Functions project for the Python (v2) programming model.",
+  "identity": "AzureFunctions.Python.EmptyProject.1.0",
+  "groupIdentity": "AzureFunctions.Python.EmptyProject",
+  "shortName": [ "empty", "EmptyFunctionProject-Python" ],
+  "tags": {
+    "language": "python",
+    "type": "project",
+    "azfunc-stack": "python"
+  },
+  "sourceName": "AzureFunctionsProject",
+  "preferNameDirectory": false
+}

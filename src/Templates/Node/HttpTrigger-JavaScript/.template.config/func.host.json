@@ -1,0 +1,12 @@
+{
+  "$schema": "https://aka.ms/func-cli/func-host-json/v1/schema.json",
+  "symbolInfo": [
+    { "id": "AuthLevel", "longName": "auth-level" }
+  ],
+  "functionName": {
+    "validator": {
+      "expression": "^[a-zA-Z][a-zA-Z0-9_]{0,126}[a-zA-Z0-9]$",
+      "errorText": "Function names must start with a letter, contain only letters, numbers, and underscores, and be at most 128 characters."
+    }
+  }
+}

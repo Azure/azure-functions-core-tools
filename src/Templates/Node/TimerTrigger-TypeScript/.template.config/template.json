@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Function", "Trigger", "Timer" ],
+  "name": "Timer trigger",
+  "description": "A function that will be run on a specified schedule.",
+  "identity": "Azure.Functions.Node.TimerTrigger.TypeScript.1.0",
+  "groupIdentity": "Azure.Functions.Node.TimerTrigger",
+  "shortName": [ "timer", "TimerTrigger", "TimerTrigger-TypeScript" ],
+  "tags": {
+    "language": "typescript",
+    "type": "item",
+    "azfunc-stack": "node",
+    "azfunc-trigger": "timer"
+  },
+  "sourceName": "TimerTriggerFunc",
+  "defaultName": "timerTrigger",
+  "preferNameDirectory": false,
+  "symbols": {
+    "Schedule": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "0 */5 * * * *",
+      "replaces": "SCHEDULE_VALUE",
+      "description": "A CRON expression that controls when the function runs."
+    }
+  },
+  "primaryOutputs": [ { "path": "src/functions/TimerTriggerFunc.ts" } ]
+}

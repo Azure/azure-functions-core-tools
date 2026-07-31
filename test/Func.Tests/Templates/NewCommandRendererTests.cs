@@ -56,11 +56,50 @@ public class NewCommandRendererTests
         interaction.Lines.Should().Contain(l => l.Contains("func new --template <TEMPLATE_ID> --name <function-name>", System.StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void RenderCreated_Prints_PostAction_Messages_After_File_Lists()
+    {
+        var interaction = new TestInteractionService();
+        var renderer = new NewCommandRenderer(interaction);
+
+        renderer.RenderCreated(
+            MakeTemplate(id: "http", displayName: "HttpTrigger", description: ""),
+            "GetOrders",
+            created: ["api.py"],
+            modified: [],
+            messages:
+            [
+                "Register the 'api' blueprint in your function_app.py:",
+                "    from api import bp",
+                "    app.register_functions(bp)",
+            ]);
+
+        interaction.Lines.Should().Contain(l => l.Contains("Register the 'api' blueprint", System.StringComparison.Ordinal));
+        interaction.Lines.Should().Contain("    from api import bp");
+        interaction.Lines.Should().Contain("    app.register_functions(bp)");
+    }
+
+    [Fact]
+    public void RenderCreatedJson_Includes_Messages_Array()
+    {
+        var interaction = new TestInteractionService();
+        var renderer = new NewCommandRenderer(interaction);
+
+        renderer.RenderCreatedJson(
+            MakeTemplate(id: "http", displayName: "HttpTrigger", description: ""),
+            "GetOrders",
+            created: ["api.py"],
+            modified: [],
+            messages: ["    from api import bp"]);
+
+        string json = interaction.Lines.Single(l => l.StartsWith("JSON:", System.StringComparison.Ordinal));
+        json.Should().Contain("\"messages\":[\"    from api import bp\"]");
+    }
+
     private static FunctionTemplateInfo MakeTemplate(string id, string displayName, string? description) =>
         new(
             Id: id,
             Stack: "dotnet",
-            EngineId: EngineIds.V2,
             DisplayName: displayName,
             Description: description,
             DefaultFunctionName: null,

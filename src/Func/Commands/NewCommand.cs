@@ -5,16 +5,17 @@ using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// <c>func new</c> — scaffolds a new function from an installed templates
-/// content workload, or lists available templates when <c>--list</c> is
-/// supplied. Wires the command surface and delegates to
-/// <see cref="NewCommandRunner"/>, which currently terminates at
-/// the engine-dispatch step until <see cref="ITemplateEngineProvider"/>
-/// implementations exist.
+/// <c>func new</c> — scaffolds a new function, lists available templates
+/// (<c>--list</c>), or manages template packages (<c>--install</c> /
+/// <c>--uninstall</c> / <c>--update</c> / <c>--search</c>). Wires the command
+/// surface and delegates to <see cref="NewCommandRunner"/>. The lifecycle and
+/// search modes bypass the project / profile gates so they work in an empty
+/// directory (D30).
 /// </summary>
 internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwareHelpProvider
 {
@@ -48,6 +49,38 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Description = "Output mode (plain | json). Defaults to plain.",
     };
 
+    public Option<string?> InstallOption { get; } = new("--install")
+    {
+        Description = "Install a template package (\"<package>\" or \"<package>::<version>\"). Works without a project.",
+    };
+
+    public Option<string?> UninstallOption { get; } = new("--uninstall")
+    {
+        Description = "Uninstall an installed template package by id. Works without a project.",
+    };
+
+    public Option<string?> UpdateOption { get; } = new("--update")
+    {
+        Description = "Update an installed template package by id, or all installed packages when omitted.",
+        Arity = ArgumentArity.ZeroOrOne,
+    };
+
+    public Option<bool> AllOption { get; } = new("--all")
+    {
+        Description = "With --update, update every installed template package.",
+    };
+
+    public Option<string?> SourceOption { get; } = new("--source")
+    {
+        Description = "NuGet feed to install / update from. Defaults to the configured sources.",
+    };
+
+    public Option<string?> SearchOption { get; } = new("--search")
+    {
+        Description = "Search for template packages by term. Works without a project.",
+        Arity = ArgumentArity.ZeroOrOne,
+    };
+
     private readonly NewCommandRunner _runner;
     private readonly HashSet<string> _builtInOptionNames;
     private readonly Dictionary<string, string> _optionNameToPromptId = new(StringComparer.OrdinalIgnoreCase);
@@ -70,6 +103,55 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Options.Add(NonInteractiveOption);
         Options.Add(ListOption);
         Options.Add(OutputOption);
+        Options.Add(InstallOption);
+        Options.Add(UninstallOption);
+        Options.Add(UpdateOption);
+        Options.Add(AllOption);
+        Options.Add(SourceOption);
+        Options.Add(SearchOption);
+
+        // The lifecycle / search / list modes are mutually exclusive: each
+        // takes a different path through the runner, so combining them is
+        // always a user error. Reject at parse time rather than picking a
+        // precedence at runtime.
+        Validators.Add(result =>
+        {
+            int modes = 0;
+            if (result.GetResult(InstallOption) is not null)
+            {
+                modes++;
+            }
+
+            if (result.GetResult(UninstallOption) is not null)
+            {
+                modes++;
+            }
+
+            if (result.GetResult(UpdateOption) is not null)
+            {
+                modes++;
+            }
+
+            if (result.GetResult(SearchOption) is not null)
+            {
+                modes++;
+            }
+
+            if (result.GetResult(ListOption) is not null)
+            {
+                modes++;
+            }
+
+            if (modes > 1)
+            {
+                result.AddError("Specify only one of --install, --uninstall, --update, --search, or --list.");
+            }
+
+            if (result.GetResult(AllOption) is not null && result.GetResult(UpdateOption) is null)
+            {
+                result.AddError("--all can only be used with --update.");
+            }
+        });
 
         // Tolerate unrecognised options so ExecuteAsync can re-interpret
         // them as per-template prompt values (e.g. `--auth-level anonymous`
@@ -91,6 +173,43 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parseResult);
+
+        // Lifecycle + search modes bypass the project / profile gates (D30):
+        // they operate on the func hive, not a project, so they must work in
+        // an empty directory. Dispatch them before any project resolution.
+        string? source = parseResult.GetValue(SourceOption);
+
+        string? installSpec = parseResult.GetValue(InstallOption);
+        if (!string.IsNullOrWhiteSpace(installSpec))
+        {
+            (string packageIdentifier, string? version) = ParsePackageSpec(installSpec);
+            return _runner.InstallPackageAsync(
+                new TemplatePackageInstallRequest(packageIdentifier, version, source),
+                cancellationToken);
+        }
+
+        string? uninstallPackage = parseResult.GetValue(UninstallOption);
+        if (!string.IsNullOrWhiteSpace(uninstallPackage))
+        {
+            return _runner.UninstallPackageAsync(uninstallPackage, cancellationToken);
+        }
+
+        if (parseResult.GetResult(UpdateOption) is not null)
+        {
+            string? updatePackage = parseResult.GetValue(UpdateOption);
+            bool updateAll = parseResult.GetValue(AllOption) || string.IsNullOrWhiteSpace(updatePackage);
+            return _runner.UpdatePackagesAsync(
+                new TemplatePackageUpdateRequest(
+                    PackageId: updateAll ? null : updatePackage,
+                    All: updateAll,
+                    Source: source),
+                cancellationToken);
+        }
+
+        if (parseResult.GetResult(SearchOption) is not null)
+        {
+            return _runner.SearchTemplatesAsync(parseResult.GetValue(SearchOption), source, cancellationToken);
+        }
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         string? requestedTemplate = parseResult.GetValue(TemplateOption);
@@ -128,7 +247,26 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     }
 
     /// <summary>
-    /// Reads supplied values for the options the pre-parse step attached
+    /// Splits a <c>--install</c> spec of the form <c>&lt;package&gt;</c> or
+    /// <c>&lt;package&gt;::&lt;version&gt;</c> into its parts. The <c>::</c>
+    /// separator keeps the option free of the <c>@</c> character some feeds
+    /// use inside package ids. Returns a <c>null</c> version when none is
+    /// supplied.
+    /// </summary>
+    private static (string PackageIdentifier, string? Version) ParsePackageSpec(string spec)
+    {
+        int separator = spec.IndexOf("::", StringComparison.Ordinal);
+        if (separator < 0)
+        {
+            return (spec.Trim(), null);
+        }
+
+        string packageIdentifier = spec[..separator].Trim();
+        string version = spec[(separator + 2)..].Trim();
+        return (packageIdentifier, string.IsNullOrWhiteSpace(version) ? null : version);
+    }
+
+    /// <summary>
     /// to this command. Each hydrated <see cref="Option"/> was registered
     /// with name <c>--&lt;kebab-paramId&gt;</c>; translate back to the v2
     /// paramId so the engine's variable substitution can pick the value

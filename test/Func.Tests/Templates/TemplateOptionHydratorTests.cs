@@ -154,7 +154,6 @@ public class TemplateOptionHydratorTests
         new(
             Id: "HttpTrigger",
             Stack: stack,
-            EngineId: EngineIds.V2,
             DisplayName: "HTTP trigger",
             Description: "An HTTP-triggered function.",
             DefaultFunctionName: "HttpTrigger",

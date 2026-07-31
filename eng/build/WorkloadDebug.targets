@@ -25,11 +25,20 @@
   -->
   <Target Name="DeployForDebug" DependsOnTargets="Build">
 
-    <Message Condition="'$(PackageType)' != 'FuncCliWorkload'"
-             Importance="High"
-             Text="DeployForDebug: skipping '$(MSBuildProjectName)' (PackageType='$(PackageType)', expected 'FuncCliWorkload')." />
+    <!--
+      PackageType is only computed during pack (SetWorkloadPackageType runs as
+      part of GenerateNuspec), so it is empty at Build time. Gate on the static
+      PackAsWorkload marker instead, which every workload csproj sets.
+    -->
+    <PropertyGroup>
+      <_DeployForDebugIsWorkload Condition="'$(PackAsWorkload)' == 'true'">true</_DeployForDebugIsWorkload>
+    </PropertyGroup>
 
-    <PropertyGroup Condition="'$(PackageType)' == 'FuncCliWorkload'">
+    <Message Condition="'$(_DeployForDebugIsWorkload)' != 'true'"
+             Importance="High"
+             Text="DeployForDebug: skipping '$(MSBuildProjectName)' (PackAsWorkload='$(PackAsWorkload)', expected 'true')." />
+
+    <PropertyGroup Condition="'$(_DeployForDebugIsWorkload)' == 'true'">
       <_DeployForDebugHome Condition="'$(FuncCliWorkloadsHome)' != ''">$(FuncCliWorkloadsHome)</_DeployForDebugHome>
       <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(FUNC_CLI_WORKLOADS_HOME)</_DeployForDebugHome>
       <_DeployForDebugHome Condition="'$(_DeployForDebugHome)' == ''">$(RepoRoot).debug-workloads</_DeployForDebugHome>
@@ -67,21 +76,21 @@
     <Error Condition="'$(_DeployForDebugNeedsInstall)' == 'true' AND '$(FuncCliEnsureWorkloadInstalled)' == 'true' AND !Exists('$(_DeployForDebugInstallVersionDir)')"
            Text="DeployForDebug: install of '$(_DeployForDebugNupkg)' didn't produce '$(_DeployForDebugInstallVersionDir)'. Check the func workload install output above." />
 
-    <Message Condition="'$(PackageType)' == 'FuncCliWorkload' AND '$(_DeployForDebugNeedsInstall)' != 'true'"
+    <Message Condition="'$(_DeployForDebugIsWorkload)' == 'true' AND '$(_DeployForDebugNeedsInstall)' != 'true'"
              Importance="High"
              Text="DeployForDebug: '$(PackageId)' $(PackageVersion) already installed at $(_DeployForDebugInstallVersionDir)." />
 
-    <ItemGroup Condition="'$(PackageType)' == 'FuncCliWorkload' AND '$(IncludeBuildOutput)' != 'false'">
+    <ItemGroup Condition="'$(_DeployForDebugIsWorkload)' == 'true' AND '$(IncludeBuildOutput)' != 'false'">
       <_DeployForDebugPayload Include="$(TargetPath)" />
       <_DeployForDebugPayload Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
     </ItemGroup>
 
-    <Copy Condition="'$(PackageType)' == 'FuncCliWorkload' AND '@(_DeployForDebugPayload)' != ''"
+    <Copy Condition="'$(_DeployForDebugIsWorkload)' == 'true' AND '@(_DeployForDebugPayload)' != ''"
           SourceFiles="@(_DeployForDebugPayload)"
           DestinationFolder="$(_DeployForDebugTargetDir)"
           SkipUnchangedFiles="false" />
 
-    <Message Condition="'$(PackageType)' == 'FuncCliWorkload' AND '@(_DeployForDebugPayload)' != ''"
+    <Message Condition="'$(_DeployForDebugIsWorkload)' == 'true' AND '@(_DeployForDebugPayload)' != ''"
              Importance="High"
              Text="DeployForDebug: copied @(_DeployForDebugPayload->'%(Filename)%(Extension)', ', ') -> $(_DeployForDebugTargetDir)" />
   </Target>

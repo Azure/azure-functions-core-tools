@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Function", "Project" ],
+  "name": "Azure Functions Node.js Project (TypeScript)",
+  "description": "An empty Azure Functions project for the Node.js (v4) programming model using TypeScript.",
+  "identity": "Azure.Functions.Node.EmptyProject.TypeScript.1.0",
+  "groupIdentity": "Azure.Functions.Node.EmptyProject",
+  "shortName": [ "empty", "EmptyFunctionProject-TypeScript" ],
+  "tags": {
+    "language": "typescript",
+    "type": "project",
+    "azfunc-stack": "node"
+  },
+  "sourceName": "AzureFunctionsProject",
+  "preferNameDirectory": false
+}

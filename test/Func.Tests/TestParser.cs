@@ -73,11 +73,11 @@ internal static class TestParser
         services.AddProfiles();
         services.AddTemplatesOrchestrator();
 
-        // NewCommandRunner depends on IFunctionsProjectResolver and on
-        // IWorkloadPaths (via InstalledTemplatesWorkloads). Neither is
-        // registered by the test parser by default; substitute both with
-        // no-op fakes so the orchestrator activates cleanly. Tests that
-        // exercise the resolver replace the substitute.
+        // NewCommandRunner depends on IFunctionsProjectResolver, which the test
+        // parser does not register by default; substitute it with a no-op fake
+        // so the orchestrator activates cleanly. Tests that exercise the
+        // resolver replace the substitute. The bundle/workload fakes below
+        // satisfy the wider built-in command graph (init, setup, ...).
         services.AddSingleton(Substitute.For<Cli.Projects.IFunctionsProjectResolver>());
         services.AddSingleton(Substitute.For<Cli.Workloads.Storage.IWorkloadPaths>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>());
@@ -85,6 +85,21 @@ internal static class TestParser
         services.AddSingleton<Cli.Bundles.InstalledBundleScanner>();
         services.AddSingleton(Substitute.For<Cli.Bundles.IExtensionBundleResolver>());
         services.AddSingleton(Substitute.For<IStartInitializationRunner>());
+
+        // NewCommandRunner also depends on the Templates.Engine seams. The real
+        // AddTemplatesEngine() boots the in-process Microsoft engine host (paths,
+        // hive, session); substitute the four seams the runner touches so the
+        // command graph activates without a real hive. Tests that exercise the
+        // runner replace these. The catalog defaults to an empty list so the
+        // list / scaffold paths don't NRE on a bare substitute.
+        Cli.Templates.Engine.IFuncTemplateCatalog emptyCatalog = Substitute.For<Cli.Templates.Engine.IFuncTemplateCatalog>();
+        emptyCatalog.ListAsync(Arg.Any<Cli.Templates.TemplateListContext>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Cli.Templates.FunctionTemplateInfo>());
+        services.AddSingleton(emptyCatalog);
+        services.AddSingleton(Substitute.For<Cli.Templates.Engine.IFuncTemplateScaffolder>());
+        services.AddSingleton(Substitute.For<Cli.Templates.Engine.IFuncTemplatePackageService>());
+        services.AddSingleton(Substitute.For<Cli.Templates.Engine.IFuncExtensionBundleContextAccessor>());
+        services.AddSingleton(Substitute.For<Cli.Templates.Search.IFuncTemplateSearchService>());
 
         // InitCommand reads local.settings.json to drive adoption decisions.
         // Default to "nothing set" so tests that don't care behave as if there's

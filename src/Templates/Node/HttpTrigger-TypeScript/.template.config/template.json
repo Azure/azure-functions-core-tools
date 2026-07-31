@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Function", "Trigger", "Http" ],
+  "name": "HTTP trigger",
+  "description": "A function that is triggered by HTTP requests.",
+  "identity": "Azure.Functions.Node.HttpTrigger.TypeScript.1.0",
+  "groupIdentity": "Azure.Functions.Node.HttpTrigger",
+  "shortName": [ "http", "HttpTrigger", "HttpTrigger-TypeScript" ],
+  "tags": {
+    "language": "typescript",
+    "type": "item",
+    "azfunc-stack": "node",
+    "azfunc-trigger": "http"
+  },
+  "sourceName": "HttpTriggerFunc",
+  "defaultName": "httpTrigger",
+  "preferNameDirectory": false,
+  "symbols": {
+    "AuthLevel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "anonymous", "description": "No API key is required." },
+        { "choice": "function", "description": "A function-specific API key is required." },
+        { "choice": "admin", "description": "The master key is required." }
+      ],
+      "defaultValue": "anonymous",
+      "replaces": "AUTH_LEVEL_VALUE",
+      "description": "Authorization level for the HTTP endpoint."
+    }
+  },
+  "primaryOutputs": [ { "path": "src/functions/HttpTriggerFunc.ts" } ],
+  "constraints": {
+    "bundle": {
+      "type": "func-extension-bundle",
+      "args": {
+        "id": "Microsoft.Azure.Functions.ExtensionBundle",
+        "version": "[4.0.0, )"
+      }
+    }
+  }
+}

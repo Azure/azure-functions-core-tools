@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [ "Azure Function", "Trigger", "Http" ],
+  "name": "HTTP trigger",
+  "description": "A function that is triggered by HTTP requests, appended to your Python app or a blueprint file.",
+  "identity": "AzureFunctions.Python.HttpTrigger.1.0",
+  "groupIdentity": "AzureFunctions.Python.HttpTrigger",
+  "shortName": [ "http", "HttpTrigger", "HttpTrigger-Python" ],
+  "tags": {
+    "language": "python",
+    "type": "item",
+    "azfunc-stack": "python",
+    "azfunc-trigger": "http"
+  },
+  "sourceName": "HttpTriggerFunc",
+  "defaultName": "http_trigger",
+  "preferNameDirectory": false,
+  "symbols": {
+    "AuthLevel": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "FUNCTION", "description": "A function-specific API key is required." },
+        { "choice": "ANONYMOUS", "description": "No API key is required." },
+        { "choice": "ADMIN", "description": "The master key is required." }
+      ],
+      "defaultValue": "FUNCTION",
+      "replaces": "AUTH_LEVEL_VALUE",
+      "description": "Authorization level for the HTTP endpoint."
+    },
+    "Route": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "http_trigger",
+      "replaces": "ROUTE_VALUE",
+      "description": "Route for the HTTP endpoint."
+    },
+    "AppFile": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "function_app.py",
+      "description": "File to add the function to. A new file is created as a blueprint."
+    },
+    "AppObject": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "app",
+      "replaces": "APP_OBJECT",
+      "description": "The decorator object the function registers on."
+    }
+  },
+  "primaryOutputs": [ { "path": "__snippet__.py" } ],
+  "postActions": [
+    {
+      "actionId": "E715449B-264D-4669-BC62-DFC06539D969",
+      "description": "Add the function to the target app or blueprint file.",
+      "args": {
+        "targetFileParam": "AppFile",
+        "appObjectParam": "AppObject",
+        "deleteStagedFile": "true"
+      },
+      "manualInstructions": [
+        { "text": "Copy the contents of __snippet__.py into your function_app.py (or your blueprint file), then delete __snippet__.py." }
+      ],
+      "continueOnError": "false"
+    }
+  ]
+}

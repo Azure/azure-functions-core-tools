@@ -930,3 +930,59 @@ Ground truth for SP-7 / tasks §3.5, read directly from
   dropped from the `func new --list` JSON envelope or emitted as
   constants. Note: the Task 0 spike scratchpad is no longer on disk —
   design.md §6B is the surviving record of its results.
+
+- **CP-2026-07-30-k** — **Implementation landed end to end (phases 3.1-3.3 + a 3.4 slice).**
+  Executed by six parallel agents. Deleted: `Templates.V2`, `Templates.DotNet`,
+  the `ITemplateEngineProvider` seam/registry/`EngineIds`, channel+sidecar
+  machinery, `src/Workloads/Templates/*` and their targets/scripts/pipelines
+  (Node V2 corpus snapshotted to `corpus-snapshot/node-v2/`). Added
+  `src/Templates.Engine` (host id `func`, relocated-hive `IPathInfo`,
+  session, acquisition via `TemplatePackageManager` + two-layer cross-process
+  hive lock, catalog, scaffolder, host-side post-action dispatcher with the
+  3-GUID allowlist, `func-extension-bundle` constraint, `msbuild:` bind
+  source, `func.host.json` reader) and `src/Templates/{Node,Python}` sample
+  packages + `eng/scripts/build-local-template-feed.ps1`.
+  **Verified independently:** Release build 0/0 under `CI=true`; 1342 tests
+  pass; real CLI in a hermetic `FUNC_CLI_HOME`: install from local feed →
+  `func init` → `--list` → Python append (bound to `app`, `--auth-level`
+  hydrated from `func.host.json`) → blueprint via `--file` (registration
+  instructions printed, `function_app.py` byte-identical) → duplicate guard
+  rejects → `~/.templateengine` provably untouched.
+  **Defects found + fixed during verification:** (a) `DeployForDebug` gated on
+  `PackageType`, which is empty at Build time — no workload ever deployed,
+  making project-gated E2E unreachable (pre-existing infra bug); (b) the
+  renderer silently dropped `Created.Messages`, so blueprint registration
+  instructions never reached the user; (c) constraint-restricted templates
+  surfaced as bare "unknown template" — added `IFuncTemplateCatalog
+  .FindRestrictedAsync` so the CTA renders (spec gap); (d) a failed append
+  deleted the staged snippet its own error message pointed at (cross-agent
+  seam, spec scenario "failed append orphans nothing"); (e) append rewrote
+  the whole target file, flipping CRLF→LF and stripping BOM.
+  **Not yet implemented:** phase 3.5 search (the discovery index client is a
+  `--search` stub), phase 3.6 `func init` project-template step + D31 thin
+  `IProjectInitializer`, 3.4.2 V2→template.json converter for the full 33-template
+  Node corpus (samples were authored fresh), 3.4.6 parity harness, 3.4.7 the
+  upstream `Functions.Templates` package-type PR, 3.2.15 SP-4 adversarial tests.
+  Envelope-field ruling (3.1.7) still pending: `engineId` now emits null,
+  `requiresExtensionBundle`/`minBundleVersion` still emit real values.
+
+- **CP-2026-07-31-l** — **Team review feedback captured** in
+  `DESIGN-FEEDBACK-2026-07-31.md` (not yet ratified into design.md §7):
+  (1) collapse `FuncItemTemplates`/`FuncAppTemplates` into a **single**
+  `FuncAppTemplates` type — team-decided, proposed D34, superseding the
+  package-type half of D26 + the type assignments in D28; enabling fact:
+  item-vs-project filtering already keys off per-template `tags.type`
+  (`FuncTemplateTags`), so the package type is only a feed-level discovery
+  filter and collapsing it is ~34 refs across 14 files with no CLI-layer
+  loss. (2) OQ-25 project-template catalog/filter UX (the index already
+  carries the needed tags). (3) doc gap: init's stack/language list is
+  bounded by *installed workloads* + OQ-26 missing-stack CTA. (4) change
+  request: `func new`'s "Created function 'x'" message
+  (`NewCommandRenderer.cs:158`) overstates — may be many artifacts, or none,
+  or an append-only edit. (5) OQ-27 init × profiles. (6) OQ-28 stack/language
+  version compatibility — proposed as a `func-stack` constraint mirroring the
+  proven `func-extension-bundle` one. (7) OQ-29 a GitHub-quickstart →
+  project-template packaging pipeline (a *different* source adapter from the
+  feed-based `tools/TemplateDiscovery`; suggested as its own change).
+  Time-sensitive: (1) before the upstream 3.4.7 PR, (6) before the corpus
+  conversion. Tracked as tasks.md 5.0.

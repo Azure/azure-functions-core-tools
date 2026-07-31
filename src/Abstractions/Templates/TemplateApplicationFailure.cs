@@ -17,34 +17,12 @@ public abstract record TemplateApplicationFailure
     }
 
     /// <summary>
-    /// No installed templates content workload matches the project's bundle
-    /// channel (Node / Python only).
-    /// </summary>
-    public sealed record NoTemplatesWorkloadForChannel(
-        string Stack,
-        string Channel,
-        string SuggestedPackageId,
-        string SuggestedVersion)
-        : TemplateApplicationFailure;
-
-    /// <summary>
     /// The project requires an extension bundle but the bundles workload is
     /// not installed (or its resolution is empty). Pipeline step 11a.
     /// </summary>
     public sealed record MissingExtensionBundle(
         string Stack,
         string SuggestedBundleId)
-        : TemplateApplicationFailure;
-
-    /// <summary>
-    /// The project's resolved bundle version is older than the selected
-    /// templates workload's declared <c>minBundleVersion</c>. Pipeline step
-    /// 11b. Hard error in v1 — no warning fallback.
-    /// </summary>
-    public sealed record MinBundleVersionTooOld(
-        string InstalledBundleVersion,
-        string RequiredRange,
-        string TemplatesWorkloadVersion)
         : TemplateApplicationFailure;
 
     /// <summary>

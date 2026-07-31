@@ -7,8 +7,11 @@
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
-    <Project Path="src/Templates.V2/Templates.V2.csproj" />
-    <Project Path="src/Templates.DotNet/Templates.DotNet.csproj" />
+    <Project Path="src/Templates.Engine/Templates.Engine.csproj" />
+  </Folder>
+  <Folder Name="/src/Templates/">
+    <Project Path="src/Templates/Node/Templates.Node.csproj" />
+    <Project Path="src/Templates/Python/Templates.Python.csproj" />
   </Folder>
   <Folder Name="/src/Workloads/">
     <Project Path="src/Workloads/Host/Workloads.Host.csproj" />
@@ -22,11 +25,6 @@
     <Project Path="src/Workloads/Stacks/Node/Workloads.Node.csproj" />
     <Project Path="src/Workloads/Stacks/PowerShell/Workloads.PowerShell.csproj" />
     <Project Path="src/Workloads/Stacks/Python/Workloads.Python.csproj" />
-  </Folder>
-  <Folder Name="/src/Workloads/Templates/">
-    <Project Path="src/Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj" />
-    <Project Path="src/Workloads/Templates/Node/Workloads.Templates.Node.csproj" />
-    <Project Path="src/Workloads/Templates/Python/Workloads.Templates.Python.csproj" />
   </Folder>
   <Folder Name="/src/Workloads/Workers/">
     <Project Path="src/Workloads/Workers/Go/Workloads.Workers.Go.csproj" />
@@ -52,5 +50,8 @@
     <Project Path="test/Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/PowerShell.Tests/Workloads.PowerShell.Tests.csproj" />
     <Project Path="test/Workloads/Stacks/Python.Tests/Workloads.Python.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/TemplateDiscovery/TemplateDiscovery.csproj" />
   </Folder>
 </Solution>

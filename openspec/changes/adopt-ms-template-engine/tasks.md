@@ -39,7 +39,7 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
       cache truthfulness, offline read paths. Still open from SP-6's
       scope: update-from-feed and concurrent-install locking → carried
       into §3.2 as tasks 3.2.5/3.2.6.
-- [ ] 2.2 SP-7: discovery-service spike — run
+- [x] 2.2 SP-7: discovery-service spike — run
       `Microsoft.TemplateSearch.TemplateDiscovery` with
       `packageType=FuncItemTemplates`/`FuncAppTemplates` queries against a
       local feed; produce `NuGetTemplateSearchInfoVer2.json`; consume it
@@ -70,20 +70,20 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
 
 ### 3.1 Phase 1 — Demolition (blocking)
 
-- [ ] 3.1.1 **Preserve the Node V2 corpus first**: copy
+- [x] 3.1.1 **Preserve the Node V2 corpus first**: copy
       `src/Workloads/Templates/Node/content/v2/**` (`templates.json`,
       `bindings/userPrompts.json`, `resources/Resources.json`,
       `templates/_bindings.json`) to the conversion input location used by
       3.4.2 — it is the only source for the 33 hand-curated Node templates.
-- [ ] 3.1.2 Delete `src/Templates.V2/` and `test/Func.Tests/Templates/V2/`;
+- [x] 3.1.2 Delete `src/Templates.V2/` and `test/Func.Tests/Templates/V2/`;
       drop the `ProjectReference` from `src/Func/Func.csproj` and the entry
       from `Azure.Functions.Cli.slnx`.
-- [ ] 3.1.3 Delete `src/Templates.DotNet/` and
+- [x] 3.1.3 Delete `src/Templates.DotNet/` and
       `test/Func.Tests/Templates/DotNet/` (hive provisioner, path provider,
       `dotnet new` shell-out, payload/source readers); drop the
       `ProjectReference` + slnx entry. Removes the dotnet-on-PATH
       requirement. (scaffolding: *Failure mapping and isolation*)
-- [ ] 3.1.4 Delete the provider seam (D20):
+- [x] 3.1.4 Delete the provider seam (D20):
       `src/Abstractions/Templates/{ITemplateEngineProvider,EngineIds,
       IInstalledTemplatesWorkloads}.cs`,
       `src/Func/Templates/{ITemplateEngineProviderRegistry,
@@ -92,14 +92,14 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
       remove `EngineId` from `FunctionTemplateInfo`; drop the registry
       registration from `TemplatesServiceCollectionExtensions`.
       (host: *CLI-internal engine hosting*)
-- [ ] 3.1.5 Delete channel + sidecar machinery (D16):
+- [x] 3.1.5 Delete channel + sidecar machinery (D16):
       `src/Func/Templates/{TemplatesChannelMapper,
       TemplatesWorkloadManifestReader,TemplatesWorkloadConstants}.cs` and
       their tests; remove pipeline step 4 (`SelectTemplatesWorkload`) and
       step 11b (`ValidateMinBundleVersion`) from `NewCommandRunner`; remove
       `NoTemplatesWorkloadForChannel` and `MinBundleVersionTooOld` from
       `TemplateApplicationFailure`.
-- [ ] 3.1.6 Delete templates-workload packaging (D21):
+- [x] 3.1.6 Delete templates-workload packaging (D21):
       `src/Workloads/Templates/**` (three csprojs, content,
       `Directory.Version.props`) + slnx entries;
       `eng/build/Workloads/{Workloads.Templates.targets,
@@ -111,79 +111,79 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
       `eng/ci/release/official-release.workload.templates.{dotnet,node,
       python}.yml`; and the templates rows in the stack→workload map in
       `eng/scripts/debug-workloads.ps1` (~L169–171).
-- [ ] 3.1.7 Trim `TemplateMetadata` and the `--list` JSON envelope to the
+- [x] 3.1.7 Trim `TemplateMetadata` and the `--list` JSON envelope to the
       surviving fields. **Flag for the user:** `engineId`,
       `requiresExtensionBundle`, `minBundleVersion`
       (`NewCommandRenderer.cs` ~L165) describe concepts deleted by
       D16/D20 — confirm dropping them vs. emitting constants, since the
       envelope is a documented surface.
-- [ ] 3.1.8 Gate: `dotnet build -c Release` and
+- [x] 3.1.8 Gate: `dotnet build -c Release` and
       `dotnet test --filter "FullyQualifiedName~Templates"` green with
       `func new` temporarily engine-less (typed "no templates engine"
       failure) — the landing zone for §3.2.
 
 ### 3.2 Phase 2 — `src/Templates.Engine` host
 
-- [ ] 3.2.1 Scaffold `src/Templates.Engine/Templates.Engine.csproj`
+- [x] 3.2.1 Scaffold `src/Templates.Engine/Templates.Engine.csproj`
       (net10, internal by default, `InternalsVisibleTo` Func.Tests); add to
       slnx + `Func.csproj`; pin `Microsoft.TemplateEngine.{Abstractions,
       Edge,Orchestrator.RunnableProjects,Utils}` in
       `eng/build/Packages.props`; tests under
       `test/Func.Tests/Templates/Engine/` (mirrors the retired V2/DotNet
       layout). (host: *CLI-internal engine hosting*)
-- [ ] 3.2.2 `FuncTemplateEngineHost : ITemplateEngineHost` — identifier
+- [x] 3.2.2 `FuncTemplateEngineHost : ITemplateEngineHost` — identifier
       `func`, version = CLI version, `ILogger` bridge, component set fixed
       at construction (Edge defaults + RunnableProjects generator + func
       components), host params for `HostIdentifier`.
       (host: *CLI-internal engine hosting*)
-- [ ] 3.2.3 Relocated hive: `IFuncTemplateEnginePaths` overriding
+- [x] 3.2.3 Relocated hive: `IFuncTemplateEnginePaths` overriding
       `DefaultPathInfo.globalSettingsDir` → `<func-home>/template-engine/
       func/<cli-version>` (spike §6B: host id alone is **not** isolation),
       resolved via the existing `FuncHomeResolver`. Test asserts
       `~/.templateengine` is untouched by install/list/scaffold.
       (host: *Engine-managed template acquisition*)
-- [ ] 3.2.4 Engine session: lazily-constructed singleton holding
+- [x] 3.2.4 Engine session: lazily-constructed singleton holding
       `EngineEnvironmentSettings` + `TemplatePackageManager` for the
       process lifetime; disposal on shutdown; single-file-safe path
       resolution (no `AppContext.BaseDirectory` assumptions).
-- [ ] 3.2.5 Acquisition service (`IFuncTemplatePackageService`):
+- [x] 3.2.5 Acquisition service (`IFuncTemplatePackageService`):
       install (`pkg[::ver]`, `--source`), uninstall, update (installed vs.
       source), list-installed — over the engine's managed provider + NuGet
       installer, writing nothing to the workload registry.
       (host: *Engine-managed template acquisition*)
-- [ ] 3.2.6 **SP-3**: cross-process locking around hive writes; tests for
+- [x] 3.2.6 **SP-3**: cross-process locking around hive writes; tests for
       two simultaneous installs and an install landing between reconcile
       and query. (host: *Engine-managed template acquisition*)
-- [ ] 3.2.7 Cache behavior: per-CLI-version scoping, transparent rebuild on
+- [x] 3.2.7 Cache behavior: per-CLI-version scoping, transparent rebuild on
       unparsable/format-mismatched cache, opportunistic cleanup of stale
       sibling version dirs, all read paths offline.
       (host: *Template cache behavior*)
-- [ ] 3.2.8 `func-extension-bundle` constraint component
+- [x] 3.2.8 `func-extension-bundle` constraint component
       (`ITemplateConstraintFactory`, `{ id, version-range }`) with bundle
       context supplied by the CLI (project-resolved for `func new`,
       latest-available for init per D30); evaluation results surfaced to
       the orchestrator so restricted templates keep their call-to-action.
       (host: *Constraint components*)
-- [ ] 3.2.9 Host-side post-action dispatcher keyed by `IPostAction.ActionId`
+- [x] 3.2.9 Host-side post-action dispatcher keyed by `IPostAction.ActionId`
       (there is no engine `IPostActionProcessor` — §2.6): func append,
       manual instructions `AC1156F7…`, add package/project reference
       `B17581D1…` (idempotent, targeted csproj XML edit); unknown ids fall
       through to `manualInstructions` (silent when empty); `continueOnError`
       semantics honored. (host: *Post-action allowlist*)
-- [ ] 3.2.10 Append processor per D13/§2.5: staging-directory
+- [x] 3.2.10 Append processor per D13/§2.5: staging-directory
       instantiation, target resolution from `targetFileParam`/
       `appObjectParam`, create-with-header vs. append, blueprint create +
       printed registration instructions, duplicate `def <name>(` guard (no
       `--force` override), staged-file cleanup, target reported as
       `Modified:`. (scaffolding: *Python append flows*)
-- [ ] 3.2.11 `msbuild:` bind-symbol source reading properties (e.g.
+- [x] 3.2.11 `msbuild:` bind-symbol source reading properties (e.g.
       `TargetFramework`) from the project file in the working directory.
       (host: *msbuild bind-symbol source*)
-- [ ] 3.2.12 `func.host.json` reader + model: `symbolInfo[] { id, longName,
+- [x] 3.2.12 `func.host.json` reader + model: `symbolInfo[] { id, longName,
       isHidden, validator { expression, errorText } }` plus top-level
       `functionName.validator`; engine-inert, consumed by the hydrator.
       (packages: *func.host.json contract*)
-- [ ] 3.2.13 Catalog service: cache query → `FunctionTemplateInfo` (stack
+- [x] 3.2.13 Catalog service: cache query → `FunctionTemplateInfo` (stack
       from `azfunc-stack`, language from `tags.language`, trigger from
       `azfunc-trigger`, prompts from `ParameterDefinitions` + host file),
       `groupIdentity` dedupe, constraint filtering that retains the
@@ -191,7 +191,7 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
       prefixed warnings, zero-template package → reinstall hint.
       (scaffolding: *Catalog sourced from the engine cache*,
       *Failure mapping and isolation*)
-- [ ] 3.2.14 Scaffolding service: `GetCreationEffectsAsync` dry run →
+- [x] 3.2.14 Scaffolding service: `GetCreationEffectsAsync` dry run →
       `AlreadyExists` unless `--force` (engine overwrite mode);
       `InstantiateAsync`; status mapping (`MissingMandatoryParam`/
       `InvalidParamValues` → `InvalidPrompt`, `CreateFailed` →
@@ -204,39 +204,39 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
 
 ### 3.3 Phase 3 — `func new` on the engine
 
-- [ ] 3.3.1 Rewire `NewCommandRunner`: keep steps 1–3, 5, 7–10, 13; steps 6
+- [x] 3.3.1 Rewire `NewCommandRunner`: keep steps 1–3, 5, 7–10, 13; steps 6
       (list) and 12 (apply) call the engine services directly (no
       registry); constraint context = the project's resolved bundle;
       `MissingExtensionBundle` stays a hard error.
       (scaffolding: *Constraint gating with call-to-action*)
-- [ ] 3.3.2 `TemplateOptionHydrator` source switch to
+- [x] 3.3.2 `TemplateOptionHydrator` source switch to
       `ITemplateInfo.ParameterDefinitions` + `func.host.json` (aliases,
       hidden flags, regex validators) with the stack default function-name
       validator from `IProjectInitializer`; choice symbols constrain
       values; hidden symbols hydrate nothing but stay CLI-settable.
       (scaffolding: *Option hydration from live template metadata*)
-- [ ] 3.3.3 `--template` resolution against every declared `shortName`
+- [x] 3.3.3 `--template` resolution against every declared `shortName`
       (case-insensitive, incl. legacy suffixed aliases); unmatched id keeps
       the existing unknown-template error + catalog hint.
       (scaffolding: *Template resolution by shortName*;
       packages: *Unified template identity scheme*)
-- [ ] 3.3.4 Constraint-gating UX: restricted templates hidden from
+- [x] 3.3.4 Constraint-gating UX: restricted templates hidden from
       `--list`, picker and completion; a requested id whose only match is
       bundle-restricted → call-to-action naming the bundle change, exit
       non-zero. (scaffolding: *Constraint gating with call-to-action*)
-- [ ] 3.3.5 `NewCommandRenderer`: `Created:` ∪ `Modified:` in plain and
+- [x] 3.3.5 `NewCommandRenderer`: `Created:` ∪ `Modified:` in plain and
       json output; warning channel for degraded post actions and skipped
       templates. (scaffolding: *Create-flow scaffolding*)
-- [ ] 3.3.6 Lifecycle/search flags on `NewCommand`: `--search [term]`,
+- [x] 3.3.6 Lifecycle/search flags on `NewCommand`: `--search [term]`,
       `--install <pkg[::ver]>`, `--uninstall <pkg>`,
       `--update [<pkg> | --all]`, `--source <feed>`; mutual-exclusion
       validation, help text, and **gate bypass** (no project/profile
       requirement) per D30.
       (scaffolding: *Template package management folds into func new*)
-- [ ] 3.3.7 `TemplatePicker`, tab completion and the `--help` "Available
+- [x] 3.3.7 `TemplatePicker`, tab completion and the `--help` "Available
       templates" section fed from the new catalog service; `--list` JSON
       envelope per the 3.1.7 ruling.
-- [ ] 3.3.8 Tests: rework `test/Func.Tests/Templates/*` and
+- [x] 3.3.8 Tests: rework `test/Func.Tests/Templates/*` and
       `Commands/NewCommandTests.cs` onto the new seams; add an end-to-end
       test over a fixture hive (install a local folder package → list →
       scaffold → uninstall).
@@ -253,6 +253,11 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
       `eng/ci/release/official-release.templates.{node,python}.yml`.
       (packages: *Packages identified by func package types*,
       *Official packages*)
+      **PARTIAL (2026-07-31 audit):** csprojs exist, both package types
+      verified in the nuspec, packages pack + install, and slnx entries were
+      added so CI builds them. **Still missing:** the shared
+      `eng/build/Templates/TemplatePackage.targets` and the release
+      pipelines `official-release.templates.{node,python}.yml`.
 - [ ] 3.4.2 One-time V2 → template.json converter (PowerShell or a .NET
       file-based app under `eng/scripts/`): inline `files` → real files,
       `$(FUNCTION_NAME_INPUT)` → `sourceName`, `userPrompts` → symbols +
@@ -270,7 +275,7 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
       with the func append post action; `AppFile`/`AppObject` symbols and
       the `func.host.json` mapping (`--file`, hidden `AppObject`).
       (scaffolding: *Python append flows*)
-- [ ] 3.4.5 `Empty` project templates (`tags.type: "project"`) for Node and
+- [x] 3.4.5 `Empty` project templates (`tags.type: "project"`) for Node and
       Python reproducing today's `func init` output (host.json, ignore
       files, stack project files, Python's `function_app.py`); no bundle
       constraints (D30).
@@ -289,11 +294,11 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
 
 ### 3.5 Phase 5 — Search (parallel)
 
-- [ ] 3.5.1 **SP-7** (§2.2) as this phase's first slice: TemplateDiscovery
+- [x] 3.5.1 **SP-7** (§2.2) as this phase's first slice: TemplateDiscovery
       with `packageType=FuncItemTemplates|FuncAppTemplates` against a local
       feed → `NuGetTemplateSearchInfoVer2.json` → consumed by a func host
       via a local-override URI.
-- [ ] 3.5.2 `tools/TemplateDiscovery/` — func discovery service based on
+- [x] 3.5.2 `tools/TemplateDiscovery/` — func discovery service based on
       `Microsoft.TemplateSearch.TemplateDiscovery`: package-type queries,
       `template.json` prefilter, engine scan, `--diff` incremental runs +
       `nonTemplatePacks.json` skip-list, index output.
@@ -308,14 +313,14 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
 - [ ] 3.5.3 `eng/ci/templates-search-index.yml`: daily incremental run plus
       on-demand trigger, publishing to Functions CDN blob storage behind
       the `aka.ms` vanity URI (D29); document the URI and how to repoint it.
-- [ ] 3.5.4 CLI search consumer: search coordinator/provider pointed at the
+- [x] 3.5.4 CLI search consumer: search coordinator/provider pointed at the
       func index URI, local cache, local-file override toggle, actionable
       error when the index is unreachable and no cached/local copy exists.
       (search: *CLI search over the published index*)
-- [ ] 3.5.5 `--source <feed>` direct NuGet search-API query at invocation
+- [x] 3.5.5 `--source <feed>` direct NuGet search-API query at invocation
       time, filtered to the func package types.
       (search: *Direct feed search via --source*)
-- [ ] 3.5.6 Search rendering: package id, version, template names,
+- [x] 3.5.6 Search rendering: package id, version, template names,
       stack/language tags, plus installed-state annotation with an
       update-available marker.
       (search: *Search results distinguish installed state*)
@@ -372,7 +377,7 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
 - [ ] 3.7.2 Re-measure performance at realistic corpus size (cold/warm
       list, install) against the §3 budgets; escalate if the cold scan
       exceeds ~500 ms.
-- [ ] 3.7.3 Telemetry: drop the engine-id axis; keep `cli.new.*`; add
+- [x] 3.7.3 Telemetry: drop the engine-id axis; keep `cli.new.*`; add
       install/update/search outcome events if warranted.
 - [ ] 3.7.4 Release notes: templates are no longer workloads (migration
       note for `func workload install *-templates`), new `func new`
@@ -384,18 +389,27 @@ SP-7 (discovery), SP-8 (project-template/init), constraint evaluation.
 
 ## 4. Cross-repo & human track (non-blocking)
 
-- [ ] 4.1 jviau merge conversation on `func-universal-template-engine`
-      (design §6 table is the agenda).
-- [ ] 4.2 Python stack owners sign-off on D13 and the §2.7 update-flow
-      change (Python template updates leave the bundle republish path).
+> 4.1 (jviau merge conversation) and 4.2 (Python owners' sign-off on D13 /
+> §2.7) were **dropped from this change's scope on 2026-07-31** by user
+> ruling — they are not gates on landing or archiving.
+
 - [ ] 4.3 `Functions.Templates` PR (3.4.7): review, publish cadence, and
       the version func pins for first-run install.
 
 ## 5. Before archiving
 
+- [ ] 5.0 **Rule on the 2026-07-31 team review** —
+      `DESIGN-FEEDBACK-2026-07-31.md` holds 1 team-decided change (single
+      `FuncAppTemplates` package type), 5 open questions (OQ-24…OQ-29) and
+      2 doc gaps. Fold each into `design.md` §7 as it is ruled. **Two are
+      time-sensitive:** the package-type collapse must land before the
+      upstream `Functions.Templates` PR (3.4.7), and the stack-version
+      constraint question (OQ-28) before the corpus conversion (3.4.2–3.4.4).
 - [ ] 5.1 Revise the legacy specs per design §4:
       `docs/proposed/{templates-workload-spec,func-new.spec,workload-spec}.md`.
-- [ ] 5.2 Decide OQ-17 (PowerShell templates) — expected outcome is a
-      follow-up change, not scope creep here.
+- [x] 5.2 OQ-17 (PowerShell templates) — **decided 2026-07-31: follow-up
+      change**, out of scope here. Node/Python/.NET only.
 - [ ] 5.3 `openspec validate adopt-ms-template-engine` clean, then archive.
+
+
 

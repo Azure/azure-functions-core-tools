@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>CLI-internal host for the Microsoft templating engine (func new / func init).</Description>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="func" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Microsoft.TemplateEngine.Abstractions" />
+    <PackageReference Include="Microsoft.TemplateEngine.Edge" />
+    <PackageReference Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" />
+    <PackageReference Include="Microsoft.TemplateEngine.Utils" />
+  </ItemGroup>
+
+</Project>

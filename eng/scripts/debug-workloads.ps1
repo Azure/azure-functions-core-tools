@@ -166,9 +166,9 @@ $allProjects = Get-AllWorkloadProjects
 $featureMap = @{
     'host'    = @('Workloads.Host')
     'runtime' = @('Workloads.Host', 'Workloads.ExtensionBundles')
-    'dotnet'  = @('Workloads.Host', 'Workloads.DotNet', 'Workloads.Templates.DotNet')
-    'node'    = @('Workloads.Host', 'Workloads.Node', 'Workloads.Workers.Node', 'Workloads.Templates.Node', 'Workloads.ExtensionBundles')
-    'python'  = @('Workloads.Host', 'Workloads.Python', 'Workloads.Workers.Python', 'Workloads.Templates.Python', 'Workloads.ExtensionBundles')
+    'dotnet'  = @('Workloads.Host', 'Workloads.DotNet')
+    'node'    = @('Workloads.Host', 'Workloads.Node', 'Workloads.Workers.Node', 'Workloads.ExtensionBundles')
+    'python'  = @('Workloads.Host', 'Workloads.Python', 'Workloads.Workers.Python', 'Workloads.ExtensionBundles')
     'go'      = @('Workloads.Host', 'Workloads.Go', 'Workloads.Workers.Go', 'Workloads.ExtensionBundles')
 }
 

@@ -7,11 +7,8 @@
       $(BundleVersion)  - the bundle payload version. Drives the CDN URL
                           and the user-facing version in func logs. Bare
                           three-part SemVer. Defaults to the channel's
-                          pinned value in
-                          eng/build/Workloads/Workloads.Templates.SourceBundleVersion.props
-                          so the bundle this workload ships always matches
-                          the snapshot the templates workloads were built
-                          against (one-line bump for both).
+                          pinned value in the channel/version mapping
+                          inlined below.
       $(BundleChannel)  - stable | preview | experimental. Selects the CDN
                           bundle id (see DownloadDefaultBundle.targets) and
                           the workload pkg's prerelease label.
@@ -26,7 +23,26 @@
     <BundleChannel>$([System.Text.RegularExpressions.Regex]::Match($(BUILD_SOURCEBRANCHNAME), '^v[^-]+(?:-([^.]+))').Groups[1].Value)</BundleChannel>
   </PropertyGroup>
 
-  <Import Project="$(EngBuildRoot)Workloads/Workloads.Templates.SourceBundleVersion.props" />
+  <!--
+    Channel/version mapping. Selects the CDN bundle id and the channel-pinned
+    bundle version this workload ships. Previously shared with the (removed)
+    templates workloads; now inlined here as the sole remaining consumer.
+      $(BundleChannel)   stable (default) | preview | experimental.
+      $(_BundleCdnId)    The CDN package id for the channel.
+      $(BundleVersion)   The bundle version this build targets for the channel.
+  -->
+  <PropertyGroup>
+    <BundleChannel Condition="'$(BundleChannel)' == ''">stable</BundleChannel>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'stable'">Microsoft.Azure.Functions.ExtensionBundle</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'preview'">Microsoft.Azure.Functions.ExtensionBundle.Preview</_BundleCdnId>
+    <_BundleCdnId Condition="'$(BundleChannel)' == 'experimental'">Microsoft.Azure.Functions.ExtensionBundle.Experimental</_BundleCdnId>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BundleVersion)' == ''">
+    <BundleVersion Condition="'$(BundleChannel)' == 'stable'">4.35.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'preview'">4.42.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'experimental'">4.6.0</BundleVersion>
+  </PropertyGroup>
 
   <PropertyGroup>
     <VersionPrefix>$(BundleVersion)</VersionPrefix>

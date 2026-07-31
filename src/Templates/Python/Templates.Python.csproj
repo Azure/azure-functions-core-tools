@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+
+    <!--
+      Content-only template package: the templating engine reads the
+      '<TemplateName>/.template.config/template.json' trees straight from the
+      package. No assembly ships, so build output is excluded and the
+      "package has no lib" warning is suppressed at the source.
+    -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+
+    <PackageId>Microsoft.Azure.Functions.Templates.Python</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <PackageType>FuncItemTemplates;FuncAppTemplates</PackageType>
+    <Title>Azure Functions Python Templates</Title>
+    <Description>Python function and project templates for the Azure Functions CLI (func new / func init).</Description>
+    <PackageTags>azure-functions;func;templates;python</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="**/*"
+          Exclude="$(MSBuildProjectFile);bin/**;obj/**"
+          Pack="true"
+          PackagePath="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
