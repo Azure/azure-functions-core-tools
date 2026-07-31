@@ -52,9 +52,12 @@ public class DotNetStartOptionContributorTests
         configuration.EnvironmentVariables.Should().Contain(
             DotNetStartOptionContributor.DebuggerWaitEnvironmentVariable, bool.TrueString);
         configuration.EnvironmentVariables.Should().Contain(
-            DotNetStartOptionContributor.StartupHooksEnvironmentVariable, DotNetStartOptionContributor.WorkerStartupHook);
+            DotNetStartOptionContributor.DeferredStartupHooksEnvironmentVariable, DotNetStartOptionContributor.WorkerStartupHook);
         configuration.EnvironmentVariables.Should().NotContainKey(
             DotNetStartOptionContributor.JsonOutputEnvironmentVariable);
+        configuration.EnvironmentVariables.Should().NotContainKey(
+            DotNetStartOptionContributor.StartupHooksEnvironmentVariable);
+        configuration.StartupNotice.Should().Be(DotNetStartOptionContributor.DebuggerWaitNotice);
         configuration.JsonOutputFilePath.Should().BeNull();
     }
 
@@ -69,9 +72,10 @@ public class DotNetStartOptionContributorTests
         configuration.EnvironmentVariables.Should().Contain(
             DotNetStartOptionContributor.JsonOutputEnvironmentVariable, bool.TrueString);
         configuration.EnvironmentVariables.Should().Contain(
-            DotNetStartOptionContributor.StartupHooksEnvironmentVariable, DotNetStartOptionContributor.WorkerStartupHook);
+            DotNetStartOptionContributor.DeferredStartupHooksEnvironmentVariable, DotNetStartOptionContributor.WorkerStartupHook);
         configuration.EnvironmentVariables.Should().NotContainKey(
             DotNetStartOptionContributor.DebuggerWaitEnvironmentVariable);
+        configuration.StartupNotice.Should().BeNull();
         configuration.JsonOutputFilePath.Should().BeNull();
     }
 
@@ -86,7 +90,7 @@ public class DotNetStartOptionContributorTests
         configuration.EnvironmentVariables.Should().Contain(
             DotNetStartOptionContributor.JsonOutputEnvironmentVariable, bool.TrueString);
         configuration.EnvironmentVariables.Should().ContainKey(
-            DotNetStartOptionContributor.StartupHooksEnvironmentVariable);
+            DotNetStartOptionContributor.DeferredStartupHooksEnvironmentVariable);
         configuration.JsonOutputFilePath.Should().Be("out.json");
     }
 }

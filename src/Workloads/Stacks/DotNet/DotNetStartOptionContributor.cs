@@ -15,8 +15,22 @@ internal sealed class DotNetStartOptionContributor : IStartHostOptionContributor
 {
     internal const string DebuggerWaitEnvironmentVariable = "FUNCTIONS_ENABLE_DEBUGGER_WAIT";
     internal const string JsonOutputEnvironmentVariable = "FUNCTIONS_ENABLE_JSON_OUTPUT";
-    internal const string StartupHooksEnvironmentVariable = "DOTNET_STARTUP_HOOKS";
     internal const string WorkerStartupHook = "Microsoft.Azure.Functions.Worker.Core";
+
+    internal const string StartupHooksEnvironmentVariable = "DOTNET_STARTUP_HOOKS";
+
+    // DOTNET_STARTUP_HOOKS can't be set on the host process: it's a .NET app and its runtime would
+    // try to load the worker-only hook assembly at startup and crash before the worker launches.
+    // The host re-emits any variable carrying this prefix (with the prefix stripped) after its own
+    // boot, so only the worker child inherits it. Prefix is a contract with the host (mirror of the
+    // literal in the host's Program). Value composed here so the host stays value-agnostic.
+    internal const string DeferredWorkerEnvironmentPrefix = "FUNCTIONS_CORETOOLS_DEFER_ENV__";
+
+    internal const string DeferredStartupHooksEnvironmentVariable =
+        DeferredWorkerEnvironmentPrefix + StartupHooksEnvironmentVariable;
+
+    internal const string DebuggerWaitNotice =
+        "The .NET isolated worker will pause on startup until a debugger attaches.";
 
     public string Stack => "dotnet";
 
@@ -74,12 +88,14 @@ internal sealed class DotNetStartOptionContributor : IStartHostOptionContributor
         }
 
         // Either flag requires the worker startup hook so the worker honours the env vars above.
-        environmentVariables[StartupHooksEnvironmentVariable] = WorkerStartupHook;
+        // Deferred (not set as DOTNET_STARTUP_HOOKS) so the host doesn't load it into itself.
+        environmentVariables[DeferredStartupHooksEnvironmentVariable] = WorkerStartupHook;
 
         return new StartHostConfiguration
         {
             EnvironmentVariables = environmentVariables,
             JsonOutputFilePath = string.IsNullOrWhiteSpace(jsonOutputFile) ? null : jsonOutputFile,
+            StartupNotice = debug ? DebuggerWaitNotice : null,
         };
     }
 }

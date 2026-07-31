@@ -196,7 +196,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
             {
                 EnvironmentVariables = new Dictionary<string, string>
                 {
-                    ["DOTNET_STARTUP_HOOKS"] = "Microsoft.Azure.Functions.Worker.Core",
+                    ["FUNCTIONS_CORETOOLS_DEFER_ENV__DOTNET_STARTUP_HOOKS"] = "Microsoft.Azure.Functions.Worker.Core",
                     ["SharedKey"] = "fromStack",
                 },
             },
@@ -206,7 +206,7 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
         await NewStep().ExecuteAsync(context, CancellationToken.None);
 
         IDictionary<string, string> env = context.State.HostRunContext!.EnvironmentVariables;
-        env["DOTNET_STARTUP_HOOKS"].Should().Be("Microsoft.Azure.Functions.Worker.Core");
+        env["FUNCTIONS_CORETOOLS_DEFER_ENV__DOTNET_STARTUP_HOOKS"].Should().Be("Microsoft.Azure.Functions.Worker.Core");
         env["SharedKey"].Should().Be("fromStack");
     }
 

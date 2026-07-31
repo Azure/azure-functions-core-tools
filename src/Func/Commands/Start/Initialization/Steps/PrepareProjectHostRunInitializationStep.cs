@@ -109,6 +109,11 @@ internal sealed class PrepareProjectHostRunInitializationStep(
             {
                 environmentVariables[name] = value;
             }
+
+            if (!string.IsNullOrWhiteSpace(stackConfiguration.StartupNotice))
+            {
+                _interaction.WriteHint(stackConfiguration.StartupNotice);
+            }
         }
 
         return environmentVariables;

@@ -27,4 +27,11 @@ public sealed record StartHostConfiguration
     /// <c>null</c> disables file capture.
     /// </summary>
     public string? JsonOutputFilePath { get; init; }
+
+    /// <summary>
+    /// An optional message the CLI shows the user before the host starts (e.g. a note that the
+    /// worker will pause until a debugger attaches). The workload owns the wording; the CLI just
+    /// renders it. <c>null</c> shows nothing.
+    /// </summary>
+    public string? StartupNotice { get; init; }
 }
