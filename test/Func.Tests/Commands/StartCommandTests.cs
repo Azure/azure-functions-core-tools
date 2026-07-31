@@ -58,6 +58,39 @@ public class StartCommandTests : IDisposable
         cmd.Options.Select(o => o.Name).Should().Contain("--fake-stack-option");
     }
 
+    [Fact]
+    public void StartOptionRegistry_ThrowsWhenContributorCollidesWithBuiltInOption()
+    {
+        var command = new RootCommand();
+        var builtIn = new Option<int>("--port");
+        command.Options.Add(builtIn);
+
+        var registry = new StartOptionRegistry(command);
+        registry.SetActiveStack("bad-workload");
+
+        // Same name but different type triggers a collision error.
+        Action act = () => registry.GetOrAdd(new Option<string>("--port"));
+
+        act.Should().Throw<InvalidOperationException>()
+            .And.Message.Should().Contain("bad-workload");
+    }
+
+    [Fact]
+    public void StartOptionRegistry_ReturnsBuiltInWhenContributorRegistersMatchingType()
+    {
+        var command = new RootCommand();
+        var builtIn = new Option<int>("--port");
+        command.Options.Add(builtIn);
+
+        var registry = new StartOptionRegistry(command);
+        registry.SetActiveStack("workload");
+
+        // Same name and same type de-dupes to the existing built-in instance.
+        Option<int> result = registry.GetOrAdd(new Option<int>("--port"));
+
+        result.Should().BeSameAs(builtIn);
+    }
+
     private sealed class FakeStartHostOptionContributor : IStartHostOptionContributor
     {
         public string Stack => "fake";

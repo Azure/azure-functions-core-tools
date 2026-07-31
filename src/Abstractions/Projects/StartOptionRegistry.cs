@@ -25,6 +25,17 @@ public sealed class StartOptionRegistry
     public StartOptionRegistry(Command command)
     {
         _command = command ?? throw new ArgumentNullException(nameof(command));
+
+        // Seed from the command's existing options so GetOrAdd detects collisions with built-ins.
+        foreach (Option existing in _command.Options)
+        {
+            var entry = new Entry(existing, "built-in");
+            _byName[existing.Name] = entry;
+            foreach (string alias in existing.Aliases)
+            {
+                _byName[alias] = entry;
+            }
+        }
     }
 
     /// <summary>
