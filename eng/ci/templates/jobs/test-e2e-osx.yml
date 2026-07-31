@@ -30,12 +30,14 @@ jobs:
         runtime: 'osx-x64'
 
   steps:
+  - template: /eng/ci/templates/steps/authenticate-e2e-dependencies.yml@self
+
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
 
   - script: |
       sudo chown -R $(id -u):$(id -g) ~/.npm
-      npm install -g @azure/functions
+      npm install -g @azure/functions --userconfig "$(Build.SourcesDirectory)/.npmrc"
     displayName: 'Install @azure/functions'
 
   - template: /eng/ci/templates/steps/install-tools.yml@self

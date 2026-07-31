@@ -1,0 +1,27 @@
+steps:
+- task: npmAuthenticate@0
+  displayName: 'Authenticate npm for repository tools'
+  inputs:
+    workingFile: '$(Build.SourcesDirectory)/.npmrc'
+
+- task: npmAuthenticate@0
+  displayName: 'Authenticate npm for Node test project'
+  inputs:
+    workingFile: '$(Build.SourcesDirectory)/test/TestFunctionApps/TestNodeProject/.npmrc'
+
+- task: PipAuthenticate@1
+  displayName: 'Authenticate pip'
+  inputs:
+    artifactFeeds: 'public/upstream-public'
+    onlyAddExtraIndex: false
+
+- pwsh: |
+    if ($IsWindows) {
+      $userConfigDirectory = Join-Path $env:APPDATA 'NuGet'
+    } else {
+      $userConfigDirectory = Join-Path $HOME '.nuget/NuGet'
+    }
+
+    New-Item -ItemType Directory -Force -Path $userConfigDirectory | Out-Null
+    Copy-Item '$(Build.SourcesDirectory)/NuGet.Config' (Join-Path $userConfigDirectory 'NuGet.Config') -Force
+  displayName: 'Configure NuGet for temporary E2E projects'

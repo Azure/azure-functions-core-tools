@@ -49,6 +49,9 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  - task: NuGetAuthenticate@1
+    displayName: 'Authenticate NuGet'
+
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
     inputs:

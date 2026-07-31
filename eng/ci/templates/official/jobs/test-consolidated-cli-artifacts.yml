@@ -31,6 +31,9 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  - task: NuGetAuthenticate@1
+    displayName: 'Authenticate NuGet'
+
   # For win-x86, we need to install x86 .NET 10 runtime. The install-tools.yml installs x64 versions.
   # The x86 func CLI spawns x86 worker processes that look for .NET in 'C:\Program Files (x86)\dotnet\'.
   # We install 'aspnetcore' runtime which includes both Microsoft.NETCore.App and Microsoft.AspNetCore.App.

@@ -8,6 +8,7 @@ param(
 )
 
 $DebugPreference = 'Continue'
+$npmConfigPath = Join-Path $PSScriptRoot '..\..\.npmrc'
 
 Write-Host "Skip Storage Emulator: $SkipStorageEmulator"
 
@@ -51,12 +52,12 @@ if (!$SkipStorageEmulator)
     {
         if ($IsWindows -or $assumeWindows)
         {
-            npm install -g azurite
+            npm install -g azurite --userconfig $npmConfigPath
             Start-Process azurite.cmd -ArgumentList "--silent --skipApiVersionCheck"
         }
         else
         {
-            sudo npm install -g azurite
+            sudo npm install -g azurite --userconfig $npmConfigPath
             sudo mkdir azurite
             sudo azurite --silent --skipApiVersionCheck --location azurite --debug azurite\debug.log &
         }
