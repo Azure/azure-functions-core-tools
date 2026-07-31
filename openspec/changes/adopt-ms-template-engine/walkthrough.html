@@ -1,0 +1,2349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>func templates — design walkthrough</title>
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#131a23; --panel:#161d27; --line:#242e3b;
+    --fg:#d7e0ea; --dim:#8a97a8; --dimmer:#63707f;
+    --accent:#4aa3ff; --accent2:#7dd3fc; --good:#3fb950; --warn:#d29922; --bad:#f85149;
+    --purple:#bc8cff; --mono:"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+  a{color:var(--accent2)}
+
+  /* ---------- layout ---------- */
+  #shell{display:grid;grid-template-columns:270px 1fr;min-height:100vh}
+  #side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--bg2);padding:18px 0 40px}
+  #side h1{font-size:15px;margin:0 18px 2px;letter-spacing:.2px}
+  #side .sub{font-size:11.5px;color:var(--dim);margin:0 18px 14px;line-height:1.45}
+  #nav{list-style:none;margin:0;padding:0}
+  #nav li{margin:0}
+  #nav a{display:flex;gap:9px;align-items:baseline;padding:6px 18px;color:var(--dim);text-decoration:none;font-size:13px;border-left:2px solid transparent}
+  #nav a:hover{color:var(--fg);background:#1b2431}
+  #nav a.on{color:var(--fg);border-left-color:var(--accent);background:#1b2431}
+  #nav a .ix{color:var(--dimmer);font:11px/1 var(--mono);min-width:20px}
+  #nav .grp{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--dimmer);padding:16px 18px 5px}
+  #main{padding:38px 46px 140px;max-width:1080px}
+
+  /* ---------- controls ---------- */
+  #ctl{margin:18px 18px 0;display:flex;flex-wrap:wrap;gap:6px}
+  .btn{background:#1e2733;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:5px 9px;font-size:11.5px;cursor:pointer;font-family:var(--sans)}
+  .btn:hover{color:var(--fg);border-color:#39465a}
+  .btn.on{color:#0d1117;background:var(--accent);border-color:var(--accent);font-weight:600}
+
+  /* ---------- sections ---------- */
+  .stage{margin:0 0 76px;scroll-margin-top:24px}
+  .stage>header{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:22px}
+  .eyebrow{font:11px/1 var(--mono);letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);margin-bottom:9px}
+  .stage h2{font-size:27px;margin:0 0 8px;letter-spacing:-.3px;font-weight:650}
+  .moment{color:var(--dim);font-size:15.5px;margin:0;max-width:74ch}
+  h3{font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin:30px 0 12px;font-weight:600}
+  p{max-width:78ch}
+  .lead{font-size:15.5px}
+  ul.tight{margin:10px 0;padding-left:20px}
+  ul.tight li{margin:5px 0;max-width:76ch}
+  .muted{color:var(--dim)}
+  .small{font-size:13px}
+
+  /* ---------- terminal ---------- */
+  .term{background:#05080c;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin:14px 0}
+  .term-bar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#0e141c;border-bottom:1px solid var(--line)}
+  .dot{width:10px;height:10px;border-radius:50%;background:#333d4b}
+  .term-title{font:11px/1 var(--mono);color:var(--dimmer);margin-left:6px;flex:1}
+  .replay{background:none;border:1px solid var(--line);color:var(--dimmer);border-radius:5px;font-size:10.5px;padding:2px 7px;cursor:pointer}
+  .replay:hover{color:var(--fg)}
+  .term pre{margin:0;padding:13px 15px;font:13px/1.62 var(--mono);white-space:pre-wrap;word-break:break-word}
+  .term .cmd{color:#e8eef6}
+  .term .cmd .p{color:var(--good);font-weight:700}
+  .term .ok{color:var(--good)}
+  .term .er{color:var(--bad)}
+  .term .wa{color:var(--warn)}
+  .term .q{color:var(--accent2)}
+  .term .sel{color:#fff;background:#1d2a3a;display:inline-block;width:100%}
+  .term .cm{color:var(--dimmer);font-style:italic}
+  .term .out{color:#9fb0c3}
+  .term .hd{color:var(--dim);font-weight:700}
+  .term .hidden{visibility:hidden}
+
+  /* ---------- internals panel ---------- */
+  .panel{border:1px solid var(--line);border-radius:9px;margin:14px 0;background:var(--panel);overflow:hidden}
+  .panel>summary{cursor:pointer;list-style:none;padding:11px 14px;display:flex;align-items:center;gap:10px;font-size:13.5px;user-select:none}
+  .panel>summary::-webkit-details-marker{display:none}
+  .panel>summary:hover{background:#1b2431}
+  .panel>summary .caret{color:var(--accent);font-size:11px;transition:transform .15s;display:inline-block}
+  .panel[open]>summary .caret{transform:rotate(90deg)}
+  .panel>summary .lbl{font-weight:600;color:var(--accent2)}
+  .panel>summary .hint{color:var(--dimmer);font-size:11.5px;margin-left:auto;font-family:var(--mono)}
+  .panel .body{padding:4px 16px 16px;border-top:1px solid var(--line)}
+  .panel .body>*:first-child{margin-top:12px}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0 0;border-bottom:1px solid var(--line)}
+  .tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);padding:7px 11px;font-size:12.5px;cursor:pointer;font-family:var(--sans)}
+  .tabs button:hover{color:var(--fg)}
+  .tabs button.on{color:var(--fg);border-bottom-color:var(--accent)}
+  .pane{display:none;padding-top:6px}
+  .pane.on{display:block}
+
+  /* ---------- code ---------- */
+  figure.code{margin:12px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#05080c}
+  figure.code figcaption{font:11px/1.5 var(--mono);color:var(--dimmer);padding:7px 12px;background:#0e141c;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+  figure.code figcaption .tag{color:var(--accent);text-transform:uppercase;letter-spacing:.7px;font-size:9.5px;border:1px solid #26466b;border-radius:3px;padding:1px 5px}
+  figure.code figcaption .real{color:var(--good);border-color:#1d4429}
+  figure.code figcaption .new{color:var(--purple);border-color:#4b3a6b}
+  figure.code pre{margin:0;padding:12px 14px;overflow-x:auto;font:12.5px/1.6 var(--mono)}
+  .s{color:#a5d6ff}.k{color:#7ee787}.c{color:#6a7686;font-style:italic}.n{color:#ffab70}.b{color:#79c0ff}
+  .kw{color:#ff7b72}.ty{color:#79c0ff}.at{color:#d2a8ff}
+
+  /* ---------- tables ---------- */
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#1b2431;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.7px}
+  td code,li code,p code{background:#1b2431;border-radius:4px;padding:1px 5px;font:12px var(--mono);color:#c9d6e4}
+  tr:hover td{background:#141b25}
+
+  /* ---------- chips / callouts ---------- */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0}
+  .chip{background:#1b2431;border:1px solid #2c3b4e;color:var(--accent2);border-radius:20px;padding:3px 11px;font:11.5px var(--mono);cursor:pointer}
+  .chip:hover{background:#22304a;border-color:var(--accent)}
+  .note{border-left:3px solid var(--accent);background:#111a26;padding:11px 15px;margin:14px 0;border-radius:0 7px 7px 0;font-size:13.5px}
+  .note.warn{border-left-color:var(--warn);background:#1e1a10}
+  .note.del{border-left-color:var(--bad);background:#1e1315}
+  .note.good{border-left-color:var(--good);background:#0f1c14}
+  .note b{color:#fff}
+
+  /* ---------- stat cards ---------- */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:13px 15px}
+  .stat .v{font:22px/1.2 var(--mono);color:var(--accent2)}
+  .stat .l{font-size:11.5px;color:var(--dim);margin-top:3px}
+
+  /* ---------- two-col ---------- */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .cols>div{min-width:0}
+  @media(max-width:1100px){.cols{grid-template-columns:1fr}}
+
+  /* ---------- flow diagram ---------- */
+  .flow{background:#05080c;border:1px solid var(--line);border-radius:8px;padding:16px;margin:14px 0;font:12.5px/1.75 var(--mono);color:#9fb0c3;overflow-x:auto;white-space:pre}
+  .flow b{color:var(--accent2);font-weight:600}
+  .flow i{color:var(--good);font-style:normal}
+  .flow u{color:var(--bad);text-decoration:line-through}
+
+  /* ---------- modal ---------- */
+  #modal{position:fixed;inset:0;background:rgba(3,6,10,.82);display:none;align-items:center;justify-content:center;z-index:60;padding:24px}
+  #modal.on{display:flex}
+  #modal .box{background:var(--panel);border:1px solid #33445c;border-radius:11px;max-width:640px;width:100%;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #modal h4{margin:0 0 4px;font-size:17px}
+  #modal .meta{font:11.5px var(--mono);color:var(--dim);margin-bottom:12px}
+  #modal .sup{margin-top:12px;font-size:12.5px;color:var(--dim);border-top:1px solid var(--line);padding-top:10px}
+
+  /* ---------- deck mode ---------- */
+  body.deck #main{padding:56px 64px 120px}
+  body.deck .stage{display:none;margin-bottom:0;min-height:calc(100vh - 190px)}
+  body.deck .stage.active{display:block}
+  body.deck .stage h2{font-size:32px}
+  body.deck .moment{font-size:17px}
+  #deckbar{display:none;position:fixed;bottom:0;left:270px;right:0;background:rgba(13,17,23,.95);border-top:1px solid var(--line);padding:10px 24px;align-items:center;gap:14px;backdrop-filter:blur(6px);z-index:40}
+  body.deck #deckbar{display:flex}
+  #deckbar .pos{font:12px var(--mono);color:var(--dim);min-width:56px}
+  #deckbar .now{flex:1;font-size:13px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #bar{height:2px;background:var(--line);position:fixed;top:0;left:270px;right:0;z-index:50}
+  #bar div{height:100%;width:0;background:var(--accent);transition:width .2s}
+
+  @media print{
+    #side,#deckbar,#bar{display:none}
+    body,#main{background:#fff;color:#000;padding:0}
+    #shell{grid-template-columns:1fr}
+    .panel{break-inside:avoid}
+    .panel .body{display:block!important}
+    .pane{display:block!important}
+  }
+</style>
+</head>
+<body>
+<div id="bar"><div></div></div>
+<div id="shell">
+  <aside id="side">
+    <h1>func templates — design walkthrough</h1>
+    <p class="sub">Adopting the Microsoft templating engine.<br />OpenSpec change <code>adopt-ms-template-engine</code></p>
+    <div id="ctl">
+      <button class="btn" id="btn-deck" title="Toggle one-section-at-a-time presentation mode (d)">Deck mode</button>
+      <button class="btn" id="btn-exp" title="Open every 'under the hood' panel (e)">Expand all</button>
+      <button class="btn" id="btn-help" title="Keyboard shortcuts (?)">?</button>
+    </div>
+    <ul id="nav"></ul>
+  </aside>
+
+  <main id="main">
+    <!-- ================= 00 · FRAMING ================= -->
+    <section class="stage" id="s0" data-nav="Why we are doing this" data-ix="00" data-group="Framing">
+      <header>
+        <div class="eyebrow">The problem</div>
+        <h2>Two bespoke engines, two formats, one CLI</h2>
+        <p class="moment">Today <code>func new</code> is powered by two templating engines we wrote and maintain ourselves. This change replaces both with the engine that already powers <code>dotnet new</code> — hosted inside our own binary.</p>
+      </header>
+
+      <div class="cols">
+        <div>
+          <h3>Before</h3>
+          <div class="flow">func new
+  │
+  ├─► <b>Templates.V2</b>        Node + Python
+  │     custom jobs/actions JSON DSL
+  │     template files inline as JSON strings
+  │     $(TOKEN) substitution, hand-written
+  │
+  └─► <b>Templates.DotNet</b>    .NET
+        build-time down-projection of
+        template.json → dotnet-templates.json
+        scaffold = <u>shell out to `dotnet new`</u>
+        against a provisioned hive
+
+delivery: 3 × kind:content <b>workloads</b>
+gating:   channel prerelease labels
+          + sidecar manifest + minBundle tag
+          + pack-time template subsetting</div>
+        </div>
+        <div>
+          <h3>After</h3>
+          <div class="flow">func new ─┐
+func init ─┴─► <b>Templates.Engine</b>  (in-process)
+        Microsoft.TemplateEngine.Edge
+        + Orchestrator.RunnableProjects
+        host id <i>"func"</i>, isolated hive
+          │
+          ├─ TemplatePackageManager  (install/update)
+          ├─ constraints  func-extension-bundle
+          ├─ post actions append │ add-ref │ manual
+          └─ template cache = <i>installed truth</i>
+
+delivery: standard NuGet template packages
+          typed <i>FuncItemTemplates</i> / <i>FuncAppTemplates</i>
+gating:   per-template template.json constraints</div>
+        </div>
+      </div>
+
+      <h3>What this buys</h3>
+      <ul class="tight">
+        <li><b>One format.</b> <code>template.json</code> everywhere — the format our .NET templates are <em>already</em> authored in, in a repo we own.</li>
+        <li><b>No <code>dotnet</code> on PATH.</b> .NET scaffolding stops shelling out; the hive and its provisioning step disappear.</li>
+        <li><b>Free capability.</b> Conditions, generated symbols, localization sidecars, dry-run, host config files — none of which our DSL has.</li>
+        <li><b>Ecosystem.</b> Anyone can publish a func template package; search and install come with the model.</li>
+        <li><b>Less code we own.</b> Two engine projects, a channel mapper, a manifest reader, a hive provisioner, four build scripts and three release pipelines are deleted.</li>
+      </ul>
+
+      <div class="note good"><b>De-risked.</b> A walking-skeleton spike ran the whole path end to end before any of this was written: 19/19 checks passed. The numbers below are measured, not estimated. <span class="muted">(design.md §6B)</span></div>
+
+      <div class="stats">
+        <div class="stat"><div class="v">0.84 MB</div><div class="l">engine libraries added to the binary</div></div>
+        <div class="stat"><div class="v">~120 ms</div><div class="l">cold template list</div></div>
+        <div class="stat"><div class="v">0 ms</div><div class="l">warm list (cached)</div></div>
+        <div class="stat"><div class="v">36</div><div class="l">upstream .NET templates loaded verbatim</div></div>
+        <div class="stat"><div class="v">33</div><div class="l">recorded design decisions</div></div>
+      </div>
+
+      <div class="chips">
+        <button class="chip" data-d="D1">D1 · CLI-internal engine</button>
+        <button class="chip" data-d="D2">D2 · all stacks at once</button>
+        <button class="chip" data-d="D21">D21 · the pivot</button>
+        <button class="chip" data-d="D32">D32 · spike GO</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — what a template looks like in each world <span class="hint">before / after</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">Today: V2 DSL</button>
+            <button>Today: prompt catalog</button>
+            <button>After: template.json</button>
+          </div>
+          <div class="pane on">
+            <p class="small muted">A real entry from our Node corpus. The function body is a JSON string; the flow is hand-rolled jobs and actions; every input is a reference into a separate prompt catalog.</p>
+            <figure class="code" data-lang="json">
+              <figcaption><span class="tag real">real artifact</span> src/Workloads/Templates/Node/content/v2/templates/templates.json</figcaption>
+<script type="text/plain">
+{
+  "author": "Microsoft",
+  "name": "Azure Blob Storage trigger",
+  "description": "$BlobTrigger_description",
+  "programmingModel": "v2",
+  "language": "javascript",
+  "jobs": [
+    {
+      "name": "Create new Azure Blob Storage trigger (JavaScript)",
+      "type": "CreateNewApp",
+      "inputs": [
+        { "assignTo": "$(FUNCTION_NAME_INPUT)", "paramId": "trigger-functionName",
+          "required": true, "defaultValue": "storageBlobTrigger" },
+        { "assignTo": "$(CONNECTION_INPUT)", "paramId": "blobTrigger-connection",
+          "required": true, "defaultValue": "" },
+        { "assignTo": "$(PATH_INPUT)", "paramId": "blobTrigger-path",
+          "required": true, "defaultValue": "samples-workitems/{name}" }
+      ],
+      "actions": [ "readFileContent_Function", "writeFile_Function" ]
+    }
+  ],
+  "actions": [
+    { "name": "readFileContent_Function", "type": "GetTemplateFileContent",
+      "assignTo": "$(FUNCTION_CONTENT)", "filePath": "function.js" },
+    { "name": "writeFile_Function", "type": "WriteToFile",
+      "source": "$(FUNCTION_CONTENT)",
+      "filePath": "src/functions/$(FUNCTION_NAME_INPUT).js",
+      "continueOnError": false, "replaceTokens": true, "FileExtension": ".js" }
+  ],
+  "id": "BlobTrigger-JavaScript",
+  "files": {
+    "function.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageBlob('$(FUNCTION_NAME_INPUT)', {\r\n    path: 'samples-workitems/{name}',\r\n    connection: '',\r\n    handler: (blob, context) => {\r\n        context.log(`...`);\r\n    }\r\n});\r\n"
+  }
+}
+</script>
+            </figure>
+            <div class="note del">The file the user ends up with is a <b>JSON string literal</b> — not diffable, not lintable, not runnable in isolation. Every trigger repeats the same four boilerplate actions.</div>
+          </div>
+          <div class="pane">
+            <p class="small muted">Inputs live in a second file and are wired by <code>paramId</code>. This is the only place a validator can be expressed today.</p>
+            <figure class="code" data-lang="json">
+              <figcaption><span class="tag real">real artifact</span> content/v2/bindings/userPrompts.json</figcaption>
+<script type="text/plain">
+{
+  "id": "trigger-functionName",
+  "name": "trigger-functionName",
+  "value": "string",
+  "label": "$trigger_functionName_label",
+  "help": "$trigger_functionName_help",
+  "validators": [
+    {
+      "expression": "^[a-zA-Z][a-zA-Z0-9_]{0,126}[a-zA-Z0-9]$",
+      "errorText": "$trigger_functionName_errorText"
+    }
+  ]
+}
+</script>
+            </figure>
+          </div>
+          <div class="pane">
+            <p class="small muted">The same template after conversion: real files on disk, engine-native symbols, and the trigger's bundle requirement declared on the template itself.</p>
+            <figure class="code" data-lang="jsonc">
+              <figcaption><span class="tag new">target shape</span> BlobTrigger/.template.config/template.json</figcaption>
+<script type="text/plain">
+{
+  "author": "Microsoft",
+  "name": "Azure Blob Storage trigger",
+  "description": "Function triggered by an Azure Blob Storage container.",
+  "identity": "AzureFunctions.Node.BlobTrigger.1.0",
+  "groupIdentity": "AzureFunctions.Node.BlobTrigger",
+  "shortName": [ "blob", "BlobTrigger", "BlobTrigger-JavaScript" ], // D19 + legacy aliases
+  "tags": {
+    "language": "javascript", "type": "item",
+    "azfunc-stack": "node", "azfunc-trigger": "blob"
+  },
+  "sourceName": "storageBlobTrigger",   // --name renames the file AND the content token
+  "defaultName": "storageBlobTrigger",
+  "symbols": {
+    "Path":       { "type": "parameter", "datatype": "string",
+                    "defaultValue": "samples-workitems/{name}", "replaces": "PATH_VALUE" },
+    "Connection": { "type": "parameter", "datatype": "string",
+                    "defaultValue": "", "replaces": "CONNECTION_VALUE" }
+  },
+  "constraints": {
+    "bundle": { "type": "func-extension-bundle",
+                "args": { "id": "Microsoft.Azure.Functions.ExtensionBundle",
+                          "version": "[4.0.0, )" } }
+  },
+  "primaryOutputs": [ { "path": "src/functions/storageBlobTrigger.js" } ]
+}
+</script>
+            </figure>
+            <figure class="code" data-lang="text">
+              <figcaption><span class="tag new">target shape</span> BlobTrigger/src/functions/storageBlobTrigger.js — a real, runnable file</figcaption>
+<script type="text/plain">
+const { app } = require('@azure/functions');
+
+app.storageBlob('storageBlobTrigger', {
+    path: 'PATH_VALUE',
+    connection: 'CONNECTION_VALUE',
+    handler: (blob, context) => {
+        context.log(`Storage blob function processed blob "${context.triggerMetadata.name}"`);
+    }
+});
+</script>
+            </figure>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 01 · INSTALL / FIRST RUN ================= -->
+    <section class="stage" id="s1" data-nav="Install &amp; first contact" data-ix="01" data-group="The user journey">
+      <header>
+        <div class="eyebrow">Stage 1 · a fresh machine</div>
+        <h2>Install the CLI</h2>
+        <p class="moment">A developer installs <code>func</code> and has no templates yet. Nothing is downloaded until they ask for something — except at <code>func init</code>, which is allowed to fetch what the stack needs.</p>
+      </header>
+
+      <div class="term" data-title="fresh machine">
+<script type="text/plain">
+$ func setup
+# optional, profile-driven — MAY pre-install template packages (D27)
+✓ Profile 'default' applied
+✓ Host runtime installed          Azure.Functions.Cli.Workloads.Host.win-x64  4.1.3
+✓ Stack installed                 Azure.Functions.Cli.Workloads.Python        1.0.0
+✓ Template package installed      Microsoft.Azure.Functions.Templates.Python  1.0.0
+
+$ func new --list
+✗ This directory is not an Azure Functions project.
+  Run 'func init' to create one.
+</script>
+      </div>
+
+      <div class="note"><b>Three actors, one home.</b> Workloads still deliver the host runtime, workers, stacks and extension bundles. Template packages no longer ride that system — they live in an engine-owned hive next door. <span class="muted">That split is the whole pivot (D21).</span></div>
+
+      <div class="chips">
+        <button class="chip" data-d="D21">D21 · templates are not workloads</button>
+        <button class="chip" data-d="D27">D27 · first-run acquisition</button>
+        <button class="chip" data-d="D32">D32 · isolation proven</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — where state lives, and why isolation was the tricky bit <span class="hint">disk layout · C#</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">On disk</button>
+            <button>Hive isolation (C#)</button>
+            <button>Hosting stack</button>
+          </div>
+          <div class="pane on">
+            <figure class="code" data-lang="text">
+              <figcaption><span class="tag new">new</span> ~/.azure-functions — the CLI home after this change</figcaption>
+<script type="text/plain">
+~/.azure-functions/
+├── workloads/                     ← host runtime, workers, stacks, bundles  (unchanged)
+├── workloads.json                 ← workload registry                       (no template rows)
+└── template-engine/               ← NEW · engine-owned, CLI-version scoped
+    └── func/
+        └── 5.0.0/
+            ├── packages/          ← installed template packages (.nupkg)
+            ├── templatecache.json ← derived metadata = the offline catalog
+            └── settings.json      ← engine's own installed-package store
+
+~/.templateengine/dotnetcli/       ← the user's `dotnet new` state — NEVER touched
+</script>
+            </figure>
+            <div class="note good"><b>Spike-verified:</b> after a full install → list → scaffold → uninstall cycle, the modification time on <code>~/.templateengine</code> was unchanged.</div>
+          </div>
+          <div class="pane">
+            <p class="small">The engine scopes its settings by host identifier <em>and</em> by a global settings directory. Overriding only the host id still shares the global path with <code>dotnet new</code> — the spike caught this.</p>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag new">new</span> src/Templates.Engine/FuncTemplateEnginePaths.cs — shape</figcaption>
+<script type="text/plain">
+/// <summary>
+/// Path layout for the func-owned template hive.
+/// </summary>
+/// <remarks>
+/// Isolation from `dotnet new` requires overriding the engine's *global*
+/// settings directory; the host identifier alone leaves the global path shared.
+/// </remarks>
+internal sealed class FuncTemplateEnginePaths : IPathInfo
+{
+    public FuncTemplateEnginePaths(IFuncHome home, ICliVersion cliVersion)
+    {
+        ArgumentNullException.ThrowIfNull(home);
+        ArgumentNullException.ThrowIfNull(cliVersion);
+
+        GlobalSettingsDir = Path.Combine(home.Root, "template-engine", "func", cliVersion.Value);
+        HostSettingsDir = GlobalSettingsDir;
+        HostVersionSettingsDir = GlobalSettingsDir;
+    }
+
+    public string GlobalSettingsDir { get; }
+    public string HostSettingsDir { get; }
+    public string HostVersionSettingsDir { get; }
+}
+</script>
+            </figure>
+          </div>
+          <div class="pane">
+            <div class="flow"><b>FuncTemplateEngineHost</b> : ITemplateEngineHost
+   Identifier = <i>"func"</i>          → reads func.host.json from templates
+   Version    = CLI version
+   Components = <i>fixed at construction</i>  (nothing loads from packages)
+        │
+        ▼
+<b>EngineEnvironmentSettings</b>
+   IPathInfo   → FuncTemplateEnginePaths   (the hive, above)
+   IEnvironment, ComponentManager
+        │
+        ├─► <b>TemplatePackageManager</b>   install · uninstall · update · scan
+        ├─► <b>TemplateCreator</b>          dry-run (GetCreationEffectsAsync) · instantiate
+        └─► <b>TemplateConstraintManager</b> evaluates func-extension-bundle, host, os</div>
+            <p class="small muted">Built lazily on first use and kept alive for the process — the first scan is the expensive one.</p>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 02 · FUNC INIT ================= -->
+    <section class="stage" id="s2" data-nav="func init" data-ix="02">
+      <header>
+        <div class="eyebrow">Stage 2 · create the project</div>
+        <h2><code>func init</code> — now template-powered</h2>
+        <p class="moment">The wizard gains one new step: which project template? The default <code>Empty</code> reproduces exactly what init produces today, so the default path feels unchanged.</p>
+      </header>
+
+      <div class="term" data-title="func init — interactive">
+<script type="text/plain">
+$ func init
+? Select a worker runtime:
+> Python
+  Node.js
+  .NET
+  PowerShell
+? Select a language:  Python
+
+# stack resolved → its official template package is missing → auto-install (D27)
+Installing Microsoft.Azure.Functions.Templates.Python 1.0.0 … done (1.9s)
+
+? Select a project template:
+> Empty              Blank Functions app                        installed
+  Http API           Starter app with one HTTP endpoint         installed
+  Durable Starter    Orchestrator + activity sample             from index — will install
+
+Creating project…
+Created:  host.json
+Created:  local.settings.json
+Created:  requirements.txt
+Created:  function_app.py
+Created:  .gitignore
+Wrote:    .func/config.json          stack=python  language=python
+✓ Project ready. Run 'func new' to add a function.
+</script>
+      </div>
+
+      <div class="cols">
+        <div>
+          <h3>What stayed the same</h3>
+          <ul class="tight small">
+            <li>Stack and language selection, and the resulting file set for <code>Empty</code>.</li>
+            <li><code>.func/config.json</code> is still written by <b>init itself</b> — templates never author CLI config.</li>
+            <li>The stack workload is still required before init can run.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What is new</h3>
+          <ul class="tight small">
+            <li>A project-template step, filtered to the chosen stack; <code>--template</code> skips it.</li>
+            <li>Auto-install of the stack's official packages when missing (offline gives an actionable error).</li>
+            <li>.NET init no longer shells out to <code>dotnet new func</code>.</li>
+            <li>Per-stack init options now come from the template's own symbols.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="chips">
+        <button class="chip" data-d="D23">D23 · project templates</button>
+        <button class="chip" data-d="D26">D26 · FuncAppTemplates</button>
+        <button class="chip" data-d="D27">D27 · auto-install at init</button>
+        <button class="chip" data-d="D30">D30 · latest-bundle context</button>
+        <button class="chip" data-d="D31">D31 · thin initializer</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — the Empty template, the shrunken stack contract, and the init pipeline <span class="hint">json · C# · flow</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">Empty template.json</button>
+            <button>IProjectInitializer: before → after</button>
+            <button>Init pipeline</button>
+            <button>Constraints without a project</button>
+          </div>
+          <div class="pane on">
+            <figure class="code" data-lang="jsonc">
+              <figcaption><span class="tag new">target shape</span> Empty/.template.config/template.json — Python</figcaption>
+<script type="text/plain">
+{
+  "author": "Microsoft",
+  "name": "Empty",
+  "description": "An empty Azure Functions app.",
+  "identity": "AzureFunctions.Python.Project.Empty.1.0",
+  "groupIdentity": "AzureFunctions.Python.Project.Empty",
+  "shortName": [ "empty" ],
+  "tags": {
+    "language": "python",
+    "type": "project",          // ← what makes this a func init template
+    "azfunc-stack": "python"
+  },
+  "sourceName": "FunctionsApp",
+  "preferNameDirectory": true,
+  "symbols": {
+    "PythonVersion": {
+      "type": "parameter", "datatype": "choice",
+      "choices": [ { "choice": "3.11" }, { "choice": "3.12" } ],
+      "defaultValue": "3.11", "replaces": "PY_VERSION"
+    }
+  }
+  // NOTE: official Empty templates declare NO bundle constraints (D30)
+}
+</script>
+            </figure>
+            <p class="small muted">The <code>PythonVersion</code> choice symbol is the whole point of D31: it hydrates into <code>func init --python-version</code> using the same code path as a <code>func new</code> option — no stack-workload code involved.</p>
+          </div>
+          <div class="pane">
+            <p class="small">The stack workload stops scaffolding and becomes a metadata record. Two members go away; one is added.</p>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag real">on the branch today</span> src/Abstractions/Projects/IProjectInitializer.cs — excerpt</figcaption>
+<script type="text/plain">
+public interface IProjectInitializer
+{
+    public string Stack { get; }
+    public IReadOnlyList<string> WorkerRuntimeAliases => [];
+    public string DisplayName => Stack;
+    public IReadOnlyList<string> SupportedLanguages { get; }
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
+    public Regex? DefaultFunctionNameValidator => null;
+
+    // ---- deleted by D31 ------------------------------------------------
+    public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry);
+    public Task InitializeAsync(InitContext context, ParseResult parseResult,
+                                CancellationToken cancellationToken = default);
+}
+</script>
+            </figure>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag new">after</span> thin stack-metadata contract</figcaption>
+<script type="text/plain">
+/// <summary>
+/// Describes a stack to the init pipeline. Metadata only: no scaffolding code,
+/// no option contributions.
+/// </summary>
+public interface IProjectInitializer
+{
+    public string Stack { get; }
+    public IReadOnlyList<string> WorkerRuntimeAliases => [];
+    public string DisplayName => Stack;
+    public IReadOnlyList<string> SupportedLanguages { get; }
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
+    public Regex? DefaultFunctionNameValidator => null;
+
+    /// <summary>
+    /// Official template packages for this stack. Drives init's first-run
+    /// auto-install and the "no templates installed" hint from func new.
+    /// </summary>
+    public IReadOnlyList<string> OfficialTemplatePackageIds { get; }
+}
+</script>
+            </figure>
+          </div>
+          <div class="pane">
+            <div class="flow"><b>func init</b>
+ 1. resolve stack        ← installed stack workloads' metadata
+ 2. resolve language     ← wizard / --language
+ 3. <i>ensure packages</i>      ← OfficialTemplatePackageIds not installed?
+                              online  → install, print a message      (D27)
+                              offline → actionable error, name the pkg
+ 4. select project template
+       installed app templates  +  index results for this stack
+       --template &lt;id&gt; bypasses · non-interactive defaults to Empty
+ 5. hydrate options      ← the template's symbols, same hydrator as func new
+ 6. <i>engine scaffold</i>      ← TemplateCreator.InstantiateAsync
+ 7. <b>CLI-owned post steps</b> ← .func/config.json written by init, not the template</div>
+          </div>
+          <div class="pane">
+            <p class="small">Bundle constraints are evaluated against the project's <code>host.json</code>. During init there is no project yet — so init evaluates against the <b>latest available bundle</b>, resolved offline from installed bundle content where possible.</p>
+            <table>
+              <tr><th>Surface</th><th>Constraint context</th><th>If it cannot be resolved</th></tr>
+              <tr><td><code>func new</code></td><td>the project's resolved extension bundle</td><td><code>MissingExtensionBundle</code> — hard error (unchanged)</td></tr>
+              <tr><td><code>func init</code></td><td>latest available bundle</td><td>official <code>Empty</code> templates carry no constraints, so init still works</td></tr>
+              <tr><td>init wizard, offline</td><td>installed packages only</td><td>index lookup degrades silently — no error</td></tr>
+            </table>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 03 · CATALOG ================= -->
+    <section class="stage" id="s3" data-nav="func new --list" data-ix="03">
+      <header>
+        <div class="eyebrow">Stage 3 · discover what I can add</div>
+        <h2>The catalog comes from the engine cache</h2>
+        <p class="moment">Same output the user knows — but every row is now derived from a real <code>template.json</code>, read from a cache that works with the network unplugged.</p>
+      </header>
+
+      <div class="term" data-title="a Python project">
+<script type="text/plain">
+$ func new --list
+:: NAME       TRIGGER    DESCRIPTION
+http       http       Function triggered by HTTP requests
+timer      timer      Function triggered on a schedule
+queue      queue      Function triggered by an Azure Storage queue message
+blob       blob       Function triggered by an Azure Blob Storage container
+eventhub   eventhub   Function triggered by an Azure Event Hub
+# unified ids across every stack (D19) — `http` means the same thing in Node, Python and .NET
+</script>
+      </div>
+
+      <div class="note"><b>Ids changed; acceptance did not.</b> The catalog now shows short, language-free ids. <code>HttpTrigger-TypeScript</code> and friends stay valid as hidden aliases, so existing scripts and muscle memory keep working. <span class="muted">(D8 → D19)</span></div>
+
+      <div class="chips">
+        <button class="chip" data-d="D19">D19 · unified ids</button>
+        <button class="chip" data-d="D8">D8 · legacy aliases</button>
+        <button class="chip" data-d="D24">D24 · offline = cache</button>
+        <button class="chip" data-d="D20">D20 · no provider seam</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — how a template.json becomes a catalog row <span class="hint">mapping · cache · pipeline</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">Metadata mapping</button>
+            <button>The cache</button>
+            <button>Pipeline: before → after</button>
+            <button>One bad template</button>
+          </div>
+          <div class="pane on">
+            <table>
+              <tr><th>Catalog column / concept</th><th>Source in template.json</th><th>Note</th></tr>
+              <tr><td>NAME</td><td><code>shortName[0]</code></td><td>aliases follow in the same array</td></tr>
+              <tr><td>TRIGGER</td><td><code>tags.azfunc-trigger</code></td><td>func-defined tag; drives picker grouping</td></tr>
+              <tr><td>DESCRIPTION</td><td><code>description</code></td><td>localizable via <code>localize/templatestrings.&lt;lang&gt;.json</code></td></tr>
+              <tr><td>stack filter</td><td><code>tags.azfunc-stack</code></td><td>authoritative since packages no longer carry provenance</td></tr>
+              <tr><td>language filter</td><td><code>tags.language</code></td><td>engine-native</td></tr>
+              <tr><td>variant dedupe</td><td><code>groupIdentity</code></td><td>C#/F#, JS/TS collapse to one row</td></tr>
+              <tr><td>default name</td><td><code>defaultName</code></td><td><code>sourceName</code> is what <code>--name</code> replaces</td></tr>
+              <tr><td>options</td><td><code>symbols</code> + <code>func.host.json</code></td><td>read live — see stage 4</td></tr>
+              <tr><td>visibility</td><td><code>constraints</code></td><td>evaluated per project — see stage 8</td></tr>
+            </table>
+          </div>
+          <div class="pane">
+            <p class="small">The engine persists derived metadata for every template in every installed package, and reconciles before serving a query.</p>
+            <figure class="code" data-lang="jsonc">
+              <figcaption>templatecache.json — shape (engine-owned)</figcaption>
+<script type="text/plain">
+{
+  "Version": "1.0.0.0",
+  "Locale": "en-US",
+  "MountPointsInfo": {
+    "…/packages/Microsoft.Azure.Functions.Templates.Python.1.0.0.nupkg": 638600000000000000
+  },
+  "TemplateInfo": [
+    {
+      "Identity": "AzureFunctions.Python.HttpTrigger.1.0",
+      "GroupIdentity": "AzureFunctions.Python.HttpTrigger",
+      "ShortNameList": [ "http", "HttpTrigger", "HttpTrigger-Python" ],
+      "Name": "HTTP trigger",
+      "Tags": { "language": "python", "type": "item", "azfunc-stack": "python" },
+      "ParameterDefinitions": [ "AuthLevel", "Route", "AppFile", "AppObject" ]
+    }
+  ]
+}
+</script>
+            </figure>
+            <ul class="tight small">
+              <li>Rebuild triggers, in order: unparsable file or format-version mismatch, locale mismatch, a mount with a newer timestamp, or a changed mount-URI set.</li>
+              <li>Scoped per CLI version, so an upgrade costs exactly one cold scan and can never read a stale-format cache.</li>
+              <li>Deleting the directory is always safe — worst case is one rescan.</li>
+            </ul>
+          </div>
+          <div class="pane">
+            <div class="flow">  <b>func new</b> pipeline — 13 steps today, 11 after
+
+  1. resolve profile                     unchanged
+  2. resolve project        <i>(hard gate)</i>  unchanged
+  3. validate stack                      unchanged
+  <u>4. select templates workload  ← channel matching</u>   DELETED (D16/D21)
+  5. resolve language                    unchanged
+  6. list templates          ← <b>engine cache query</b>, was: aggregate providers
+  7. resolve template        ← shortName match or picker
+  8. hydrate options         ← <b>live parameter definitions</b>, was: two bespoke readers
+  9. re-parse with hydration             unchanged
+ 10. resolve function name               unchanged
+ 11a. validate bundle presence           unchanged
+ <u>11b. validate minBundleVersion</u>          DELETED — constraints subsume it (D16)
+ 12. apply                  ← <b>engine dry-run + instantiate</b>, was: dispatch by EngineId
+ 13. render                             unchanged</div>
+          </div>
+          <div class="pane">
+            <p class="small">Today a malformed entry can take down a whole stack's catalog. Under the engine, scanning is per template.</p>
+            <div class="term" data-title="scan isolation">
+<script type="text/plain">
+$ func new --list
+⚠ [Contoso.Functions.Templates.Kafka] skipped 1 template with an invalid template.json
+:: NAME       TRIGGER    DESCRIPTION
+http       http       Function triggered by HTTP requests
+kafka      kafka       Function triggered by a Kafka topic
+# the rest of the catalog survives
+</script>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 04 · HELP / HYDRATION ================= -->
+    <section class="stage" id="s4" data-nav="Per-template options" data-ix="04">
+      <header>
+        <div class="eyebrow">Stage 4 · what can I configure?</div>
+        <h2>Every template input is a real CLI option</h2>
+        <p class="moment">The user types <code>--help</code> for a specific template and sees native options with completion, choice validation and error text. Adding a new input to a template requires <em>no CLI release</em>.</p>
+      </header>
+
+      <div class="term" data-title="stage-B help">
+<script type="text/plain">
+$ func new --template http --help
+Usage: func new [options]
+
+Options:
+  -n, --name <name>          Function name.
+  -t, --template <template>  Template ID.
+      --force                Overwrite existing files.
+
+Template Options (http)
+      --auth-level <FUNCTION|ANONYMOUS|ADMIN>   Authorization level for the endpoint. [default: FUNCTION]
+      --route <route>                           Route for the HTTP endpoint. [default: http_trigger]
+      --file <file>                             File to add the function to. A new file is created as a blueprint.
+
+$ func new -t http -n GetOrders --auth-level ANONYMOUS --route orders
+</script>
+      </div>
+
+      <div class="note"><b>Every prompt is an option.</b> No <code>-p key=value</code> catch-all, and options are strictly template-scoped: passing <code>--file</code> to a Node template is a normal unrecognized-option error, because only Python templates declare that symbol.</div>
+
+      <div class="chips">
+        <button class="chip" data-d="D9">D9 · func.host.json</button>
+        <button class="chip" data-d="D10">D10 · hints at the source</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — symbols to options, and the file that names them <span class="hint">flow · json · C#</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">Two-stage parse</button>
+            <button>func.host.json</button>
+            <button>Hydrator input</button>
+          </div>
+          <div class="pane on">
+            <div class="flow">argv: func new -t http -n GetOrders --auth-level ANONYMOUS
+
+  <b>stage A</b>  parse only the built-in options
+             └─ read --template http
+                    │
+                    ▼
+             resolve template in the engine cache
+                    │
+                    ▼
+             <b>hydrate</b>: ITemplateInfo.ParameterDefinitions
+                        + func.host.json  (longName · isHidden · validator)
+                        + stack default function-name validator
+                    │
+                    ▼
+             attach real Option&lt;T&gt; instances to the `new` command
+                    │
+  <b>stage B</b>  re-parse the original argv — now --auth-level is a first-class
+             option with choices, a default, help text and tab completion</div>
+            <p class="small muted">Identical mechanism to what ships today; only the metadata source changes — from a build-time projection and a hand-written prompt catalog, to the live engine cache.</p>
+          </div>
+          <div class="pane">
+            <p class="small">The engine ignores unknown host files, so this is func-private metadata that travels with the template. It is what turns <code>AccessRights</code> into <code>--auth-level</code>.</p>
+            <figure class="code" data-lang="jsonc">
+              <figcaption><span class="tag new">new convention</span> HttpTrigger/.template.config/func.host.json</figcaption>
+<script type="text/plain">
+{
+  "$schema": "https://aka.ms/func-cli/func-host-json/v1/schema.json",
+  "symbolInfo": [
+    { "id": "AuthLevel", "longName": "auth-level" },
+    { "id": "Route",     "longName": "route" },
+    { "id": "AppFile",   "longName": "file" },
+    { "id": "AppObject", "isHidden": true },        // CLI sets it; users never see it
+    { "id": "QueueName", "longName": "queue-name",
+      "validator": { "expression": "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$",
+                     "errorText": "Queue names must be lowercase alphanumeric or dashes." } }
+  ],
+  "functionName": {
+    "validator": {
+      "expression": "^[a-zA-Z][a-zA-Z0-9_]{0,126}[a-zA-Z0-9]$",
+      "errorText": "Function names must start with a letter and be at most 128 characters."
+    }
+  }
+}
+</script>
+            </figure>
+            <div class="note warn"><b>Ground truth check.</b> We assumed func could inherit option names from upstream <code>dotnetcli.host.json</code> files. There are none — the corpus has only VS host files, and <code>dotnet new</code> has always used raw symbol names. Since we own that repo, <code>func.host.json</code> is contributed at the source for .NET too. <span class="muted">(D10)</span></div>
+          </div>
+          <div class="pane">
+            <p class="small">What the hydrator reads for the real upstream HTTP template — note the raw symbol name that D10 exists to rename.</p>
+            <figure class="code" data-lang="json">
+              <figcaption><span class="tag real">real artifact</span> Functions.Templates/HttpTrigger-CSharp-Isolated — symbols excerpt</figcaption>
+<script type="text/plain">
+"symbols": {
+  "namespace": {
+    "description": "namespace for the generated code",
+    "replaces": "Company.Function",
+    "type": "parameter"
+  },
+  "AccessRights": {
+    "type": "parameter",
+    "datatype": "choice",
+    "description": "Authorization level controls whether the function requires an API key…",
+    "choices": [
+      { "choice": "Function",  "description": "Function"  },
+      { "choice": "Anonymous", "description": "Anonymous" },
+      { "choice": "Admin",     "description": "Admin"     }
+    ],
+    "replaces": "AuthLevelValue",
+    "defaultValue": "Function"
+  }
+}
+</script>
+            </figure>
+            <p class="small muted">The spike loaded this template from nuget.org and confirmed the parameter set arrives intact: <code>http</code> → <code>namespace</code>, <code>AccessRights</code>.</p>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 05 · NODE SCAFFOLD ================= -->
+    <section class="stage" id="s5" data-nav="Scaffold: create flow" data-ix="05">
+      <header>
+        <div class="eyebrow">Stage 5 · the common case</div>
+        <h2>Scaffolding a new file (Node, .NET)</h2>
+        <p class="moment">Most templates create files. The engine dry-runs first, so conflicts are detected before anything is written.</p>
+      </header>
+
+      <div class="cols">
+        <div>
+          <div class="term" data-title="happy path">
+<script type="text/plain">
+$ func new -t http -n GetOrders
+Created: src/functions/GetOrders.ts
+✓ Function 'GetOrders' created.
+</script>
+          </div>
+        </div>
+        <div>
+          <div class="term" data-title="conflict">
+<script type="text/plain">
+$ func new -t http -n GetOrders
+✗ src/functions/GetOrders.ts already exists.
+  Re-run with --force to overwrite.
+# nothing was written — the dry-run caught it
+</script>
+          </div>
+        </div>
+      </div>
+
+      <div class="chips">
+        <button class="chip" data-d="D6">D6 · post-action allowlist</button>
+        <button class="chip" data-d="D12">D12 · authoring home</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — dry run, sourceName, and what "Created" means <span class="hint">flow · C#</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">Apply sequence</button>
+            <button>sourceName</button>
+            <button>Status mapping</button>
+          </div>
+          <div class="pane on">
+            <div class="flow">ApplyAsync(template, name, options)
+  │
+  ├─ 1. <b>GetCreationEffectsAsync</b>   ← dry run: file operations, no writes
+  │      any create collides with an existing file and no --force?
+  │           → <i>AlreadyExists</i> failure, exit non-zero, nothing written
+  │
+  ├─ 2. <b>InstantiateAsync</b>          ← stage-B parameter values
+  │      --force maps to the engine's overwrite mode
+  │
+  ├─ 3. <b>post actions</b>              ← host-side dispatch by ActionId (stage 6)
+  │
+  └─ 4. report <i>Created:</i> (engine outputs) ∪ <i>Modified:</i> (post-action effects)</div>
+            <p class="small muted">The conflict gate is scoped to template outputs. Post-action effects — a csproj edit, a Python append target — are not conflicts; those processors are written to be idempotent.</p>
+          </div>
+          <div class="pane">
+            <p class="small">One mechanism replaces the V2 engine's <code>filePath</code> action arguments <em>and</em> its content token substitution.</p>
+            <figure class="code" data-lang="text">
+              <figcaption>sourceName: "storageBlobTrigger" · func new -n GetOrders</figcaption>
+<script type="text/plain">
+template content                          scaffolded output
+─────────────────────────────────────     ─────────────────────────────────────
+src/functions/storageBlobTrigger.js  →    src/functions/GetOrders.js
+   app.storageBlob('storageBlobTrigger'   →   app.storageBlob('GetOrders'
+
+Derived forms come free: safe_name, camelCase, PascalCase, snake_case…
+</script>
+            </figure>
+          </div>
+          <div class="pane">
+            <table>
+              <tr><th>Engine status</th><th>Mapped CLI failure</th></tr>
+              <tr><td><code>Success</code></td><td>—</td></tr>
+              <tr><td><code>MissingMandatoryParam</code>, <code>InvalidParamValues</code></td><td><code>InvalidPrompt</code></td></tr>
+              <tr><td><code>CreateFailed</code></td><td><code>WriteFailed</code> / <code>ProviderError</code></td></tr>
+              <tr><td><code>NotFound</code></td><td>unknown-template error + catalog hint</td></tr>
+            </table>
+            <p class="small muted">The typed failure hierarchy the CLI already renders is preserved; only its inputs change.</p>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 06 · DOTNET SCAFFOLD ================= -->
+    <section class="stage" id="s6" data-nav="Scaffold: .NET &amp; post actions" data-ix="06">
+      <header>
+        <div class="eyebrow">Stage 6 · the case that needs more than files</div>
+        <h2>.NET: the scaffold that edits your project file</h2>
+        <p class="moment">An isolated-worker function needs an extension package reference, at the version that matches the project's target framework. Today <code>dotnet new</code> does that for us. In-process, we have to do it ourselves — and this is the part the design nearly missed.</p>
+      </header>
+
+      <div class="term" data-title="net8.0 isolated project — no dotnet CLI required">
+<script type="text/plain">
+$ func new -t http -n GetOrders --namespace Contoso.Api --auth-level Anonymous
+Created:  GetOrders.cs
+Modified: Contoso.Api.csproj
+          + PackageReference Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore 2.0.1
+✓ Function 'GetOrders' created.
+</script>
+      </div>
+
+      <div class="note warn"><b>Discovered by ground-truthing, not by design.</b> Reading the real corpus showed isolated templates depend on two things the engine does not give a host for free: the add-reference post action, and an <code>msbuild:</code> bind source. Without both, .NET scaffolds are <em>silently</em> broken — wrong package version, or no reference at all. <span class="muted">(D11 amends D6)</span></div>
+
+      <div class="chips">
+        <button class="chip" data-d="D11">D11 · add-reference + msbuild bind</button>
+        <button class="chip" data-d="D6">D6 · allowlist</button>
+        <button class="chip" data-d="D28">D28 · upstream package ids</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — the real upstream template, and how the host answers it <span class="hint">real json · C# · dispatch table</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">The real template.json</button>
+            <button>Post-action dispatch</button>
+            <button>msbuild: bind source</button>
+            <button>What runs, what does not</button>
+          </div>
+          <div class="pane on">
+            <p class="small">Unedited from the repo we own. Note the bind symbol, the computed TFM predicates, and three conditional post actions choosing package versions.</p>
+            <figure class="code" data-lang="json">
+              <figcaption><span class="tag real">real artifact</span> Functions.Templates/Templates/HttpTrigger-CSharp-Isolated/.template.config/template.json</figcaption>
+<script type="text/plain">
+{
+  "name": "HttpTrigger",
+  "identity": "Azure.Function.CSharp.Isolated.HttpTrigger.3.x",
+  "groupIdentity": "Azure.Function.HttpTrigger",
+  "shortName": "http",
+  "tags": { "language": "C#", "type": "item" },
+  "sourceName": "HttpTriggerCSharp",
+  "symbols": {
+    "Framework": {
+      "type": "bind",
+      "binding": "msbuild:TargetFramework",      // ← host must answer this
+      "defaultValue": "net8.0"
+    },
+    "NetCore": {
+      "type": "computed",
+      "value": "(Framework == \"net9.0\" || Framework == \"net8.0\" || Framework == \"net7.0\" || Framework == \"net6.0\")"
+    },
+    "FrameworkShouldUseV1Dependencies": {
+      "type": "computed",
+      "value": "(Framework == \"net48\" || Framework == \"net7.0\" || Framework == \"net6.0\")"
+    },
+    "AccessRights": { "type": "parameter", "datatype": "choice", "replaces": "AuthLevelValue" }
+  },
+  "primaryOutputs": [ { "path": "HttpTriggerCSharp.cs" } ],
+  "postActions": [
+    {
+      "condition": "(NetCore && FrameworkShouldUseV1Dependencies)",
+      "Description": "Adding Reference to …Worker.Extensions.Http.AspNetCore Nuget package",
+      "ActionId": "B17581D1-C5C9-4489-8F0A-004BE667B814",
+      "ContinueOnError": "true",
+      "ManualInstructions": [],                  // ← nothing to fall back to
+      "args": { "referenceType": "package",
+                "reference": "Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore",
+                "version": "1.3.3", "projectFileExtensions": ".csproj" }
+    },
+    {
+      "condition": "(NetCore && !FrameworkShouldUseV1Dependencies)",
+      "ActionId": "B17581D1-C5C9-4489-8F0A-004BE667B814",
+      "args": { "reference": "Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore",
+                "version": "2.0.1", "projectFileExtensions": ".csproj" }
+    },
+    {
+      "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+      "description": "Opens the function class file in the editor",
+      "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6",
+      "manualInstructions": [], "continueOnError": true
+    }
+  ]
+}
+</script>
+            </figure>
+            <p class="small muted">Empty <code>ManualInstructions</code> is the tell: if the host does not implement the action, the user is told nothing at all. That is why it had to join the allowlist.</p>
+          </div>
+          <div class="pane">
+            <div class="note"><b>Spike correction.</b> The engine has no <code>IPostActionProcessor</code> component model. It returns <code>ICreationResult.PostActions</code>; the <em>host</em> runs its own code keyed by <code>ActionId</code>. The allowlist is therefore a switch we own — templates cannot introduce executable behaviour at all. <span class="muted">(D32 refines §2.6)</span></div>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag new">new</span> src/Templates.Engine/PostActions/PostActionDispatcher.cs — shape</figcaption>
+<script type="text/plain">
+/// <summary>
+/// Runs the post actions the func host supports. Unknown action ids are never
+/// executed: they degrade to their manual instructions.
+/// </summary>
+internal sealed class PostActionDispatcher(
+    IAppendToFileProcessor append,
+    IAddReferenceProcessor addReference,
+    IInteractionService interaction) : IPostActionDispatcher
+{
+    private static readonly Guid Append = new("…func-owned…");
+    private static readonly Guid AddReference = new("B17581D1-C5C9-4489-8F0A-004BE667B814");
+    private static readonly Guid ManualInstructions = new("AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C");
+
+    private readonly IAppendToFileProcessor _append = append ?? throw new ArgumentNullException(nameof(append));
+    private readonly IAddReferenceProcessor _addReference = addReference ?? throw new ArgumentNullException(nameof(addReference));
+    private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+
+    public async Task<PostActionOutcome> RunAsync(
+        IPostAction action, PostActionContext context, CancellationToken cancellationToken)
+    {
+        if (action.ActionId == Append)
+        {
+            return await _append.RunAsync(action, context, cancellationToken);
+        }
+
+        if (action.ActionId == AddReference)
+        {
+            return await _addReference.RunAsync(action, context, cancellationToken);
+        }
+
+        // Everything else — run-script, restore, open-in-editor — is never
+        // executed. Show the author's fallback text, or skip when there is none.
+        return ShowManualInstructions(action);
+    }
+}
+</script>
+            </figure>
+          </div>
+          <div class="pane">
+            <p class="small">The engine ships <code>host:</code> and <code>env:</code> bind sources. <code>msbuild:</code> comes from the <code>dotnet new</code> CLI host — so func must supply its own or every TFM predicate silently falls back to the template's default.</p>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag new">new</span> src/Templates.Engine/Binding/MsBuildBindSource.cs — shape</figcaption>
+<script type="text/plain">
+/// <summary>
+/// Answers <c>msbuild:</c> bind symbols by reading the property from the
+/// project file in the working directory (e.g. <c>msbuild:TargetFramework</c>).
+/// </summary>
+internal sealed class MsBuildBindSource(IProjectFileReader reader) : IBindSymbolSource
+{
+    private readonly IProjectFileReader _reader = reader ?? throw new ArgumentNullException(nameof(reader));
+
+    public string SourcePrefix => "msbuild";
+
+    public Task<string?> GetBoundValueAsync(
+        IEngineEnvironmentSettings settings, string bindName, CancellationToken cancellationToken)
+        => _reader.TryReadPropertyAsync(bindName, cancellationToken);
+}
+</script>
+            </figure>
+            <table>
+              <tr><th>Project TFM</th><th><code>Framework</code> resolves to</th><th>Reference added</th></tr>
+              <tr><td>net8.0</td><td>net8.0</td><td>…Http.AspNetCore <b>2.0.1</b></td></tr>
+              <tr><td>net6.0</td><td>net6.0</td><td>…Http.AspNetCore <b>1.3.3</b></td></tr>
+              <tr><td>net48</td><td>net48</td><td>…Extensions.Http <b>3.3.0</b></td></tr>
+              <tr><td class="muted">(no bind source)</td><td class="muted">net8.0 — the default</td><td class="muted">wrong version on net6.0, silently</td></tr>
+            </table>
+          </div>
+          <div class="pane">
+            <table>
+              <tr><th>Post action</th><th>GUID</th><th>func host</th></tr>
+              <tr><td>Func append to target file</td><td>func-owned</td><td class="ok"><b>runs</b> — stage 7</td></tr>
+              <tr><td>Add package / project reference</td><td><code>B17581D1…</code></td><td><b>runs</b> — targeted csproj XML edit, idempotent</td></tr>
+              <tr><td>Display manual instructions</td><td><code>AC1156F7…</code></td><td><b>runs</b> — prints text</td></tr>
+              <tr><td>Run script</td><td><code>3A7C4B45…</code></td><td>never executed → manual instructions</td></tr>
+              <tr><td>Restore NuGet packages</td><td><code>210D431B…</code></td><td>not dispatched</td></tr>
+              <tr><td>Open file in editor</td><td><code>84C0DA21…</code></td><td>skipped silently (VS-oriented, empty instructions)</td></tr>
+              <tr><td>Add project to solution</td><td><code>D396686C…</code></td><td>not dispatched</td></tr>
+            </table>
+            <div class="note"><b>Failure semantics follow the template's own flag.</b> <code>continueOnError: true</code> (the upstream add-reference actions) degrades to a warning with manual remediation text on an otherwise successful scaffold. The func append action is <code>continueOnError: false</code> — a typed hard failure.</div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 07 · PYTHON APPEND ================= -->
+    <section class="stage" id="s7" data-nav="Scaffold: Python append" data-ix="07">
+      <header>
+        <div class="eyebrow">Stage 7 · the hardest case</div>
+        <h2>Python v2: adding a function to a file that already exists</h2>
+        <p class="moment">Python's programming model registers functions on a shared <code>app</code> object. The engine has no "append" primitive — it materializes file trees. This was the one risk that could have sunk the whole design, so it was spiked first.</p>
+      </header>
+
+      <div class="cols">
+        <div>
+          <div class="term" data-title="append to the app">
+<script type="text/plain">
+$ func new -t http -n get_orders
+Modified: function_app.py
+✓ Function 'get_orders' added.
+</script>
+          </div>
+        </div>
+        <div>
+          <div class="term" data-title="new blueprint">
+<script type="text/plain">
+$ func new -t http -n get_orders --file api.py
+Created:  api.py
+✓ Function 'get_orders' added to blueprint 'api.py'.
+
+  Register the blueprint in function_app.py:
+      from api import bp
+      app.register_functions(bp)
+</script>
+          </div>
+        </div>
+      </div>
+
+      <h3>Flow matrix</h3>
+      <table>
+        <tr><th>Invocation</th><th>Target state</th><th>Behaviour</th></tr>
+        <tr><td>no <code>--file</code></td><td><code>function_app.py</code> exists</td><td>append, bound to <code>app</code></td></tr>
+        <tr><td>no <code>--file</code></td><td><code>function_app.py</code> missing</td><td><b>create with the full app header</b>, then append — v4 parity, forgiving of a deleted file</td></tr>
+        <tr><td><code>--file api.py</code></td><td>missing</td><td><b>create as a blueprint</b> (<code>bp = func.Blueprint()</code>) and <b>print</b> registration instructions — no auto-edit of the user's Python</td></tr>
+        <tr><td><code>--file api.py</code></td><td>exists</td><td>append, bound to <code>bp</code></td></tr>
+        <tr><td>any</td><td>target already defines <code>def get_orders(</code></td><td>hard error — <b><code>--force</code> does not override</b></td></tr>
+      </table>
+
+      <div class="note good"><b>All four flows passed the spike</b>, including staging isolation and duplicate rejection. The V2 engine expressed this as four near-duplicate jobs per template; it collapses to one template and one snippet. <span class="muted">(D13, SP-2)</span></div>
+
+      <div class="chips">
+        <button class="chip" data-d="D13">D13 · flow matrix</button>
+        <button class="chip" data-d="D2">D2 · no stack left behind</button>
+        <button class="chip" data-d="D32">D32 · spike result</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — one snippet, one post action, a staging directory <span class="hint">json · python · flow</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">The template</button>
+            <button>The snippet</button>
+            <button>Staging isolation</button>
+            <button>Degrading elsewhere</button>
+          </div>
+          <div class="pane on">
+            <figure class="code" data-lang="jsonc">
+              <figcaption><span class="tag new">target shape</span> HttpTrigger/.template.config/template.json — Python</figcaption>
+<script type="text/plain">
+{
+  "name": "HTTP trigger",
+  "identity": "AzureFunctions.Python.HttpTrigger.1.0",
+  "groupIdentity": "AzureFunctions.Python.HttpTrigger",
+  "shortName": [ "http", "HttpTrigger", "HttpTrigger-Python" ],
+  "tags": { "language": "python", "type": "item",
+            "azfunc-stack": "python", "azfunc-trigger": "http" },
+  "sourceName": "HttpTriggerFunc",
+  "defaultName": "http_trigger",
+  "symbols": {
+    "AuthLevel": { "type": "parameter", "datatype": "choice",
+      "choices": [ { "choice": "FUNCTION" }, { "choice": "ANONYMOUS" }, { "choice": "ADMIN" } ],
+      "defaultValue": "FUNCTION", "replaces": "AUTH_LEVEL_VALUE" },
+    "Route":     { "type": "parameter", "datatype": "string",
+      "defaultValue": "http_trigger", "replaces": "ROUTE_VALUE" },
+    "AppFile":   { "type": "parameter", "datatype": "string",   // ← becomes --file
+      "defaultValue": "function_app.py" },
+    "AppObject": { "type": "parameter", "datatype": "string",   // ← hidden; CLI sets app|bp
+      "defaultValue": "app", "replaces": "APP_OBJECT" }
+  },
+  "primaryOutputs": [ { "path": "__snippet__.py" } ],
+  "postActions": [ {
+    "actionId": "<func-append-GUID>",
+    "description": "Add the function to the target app or blueprint file.",
+    "args": { "targetFileParam": "AppFile", "appObjectParam": "AppObject",
+              "deleteStagedFile": "true" },
+    "manualInstructions": [
+      { "text": "Copy the contents of __snippet__.py into your function_app.py." } ],
+    "continueOnError": "false"
+  } ]
+}
+</script>
+            </figure>
+            <ul class="tight small">
+              <li><b><code>--file</code> is not hardcoded in the CLI</b> — it is the <code>func.host.json</code> alias of the <code>AppFile</code> symbol. Any stack can adopt append semantics by declaring the same shape.</li>
+              <li>The flow keys off the <b>post action</b>, not the stack.</li>
+              <li>Blueprint is not a separate catalog row — one template per trigger, <code>--file</code> routes the flow.</li>
+            </ul>
+          </div>
+          <div class="pane">
+            <figure class="code" data-lang="python">
+              <figcaption><span class="tag new">target shape</span> HttpTrigger/__snippet__.py</figcaption>
+<script type="text/plain">
+@APP_OBJECT.route(route="ROUTE_VALUE", auth_level=func.AuthLevel.AUTH_LEVEL_VALUE)
+def HttpTriggerFunc(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("Python HTTP trigger function processed a request.")
+    return func.HttpResponse("OK", status_code=200)
+</script>
+            </figure>
+            <p class="small"><code>sourceName</code> renames <code>HttpTriggerFunc</code>; <code>APP_OBJECT</code> becomes <code>app</code> or <code>bp</code> depending on the flow the CLI resolved.</p>
+            <div class="note"><b>Authoring rule:</b> snippets assume the standard preamble (<code>import azure.functions as func</code>, <code>import logging</code>) and must not require new imports — we do not rewrite the user's import block.</div>
+          </div>
+          <div class="pane">
+            <div class="flow">func new -t http -n get_orders
+  │
+  ├─ engine instantiates into a <b>provider-owned staging directory</b>
+  │     %TEMP%/func-scaffold-a1b2/__snippet__.py       ← not the project
+  │
+  ├─ append processor
+  │     resolve target      ← AppFile (explicit --file or default)
+  │     duplicate guard     ← scan for `def get_orders(`  → error if present
+  │     create vs append    ← header written only when creating
+  │     append with separator hygiene
+  │     delete staged file
+  │     report target as <i>Modified:</i>
+  │
+  └─ failure? the project is untouched and the staged snippet is
+     named in the error for manual recovery</div>
+            <p class="small muted">The engine's dry run cannot see the append, so the provider adds the append target to its own conflict and reporting logic.</p>
+          </div>
+          <div class="pane">
+            <p class="small">The same package can be consumed by hosts that do not implement our action — Visual Studio, <code>dotnet new</code>. They do not fail; they fall back to the author's text.</p>
+            <div class="term" data-title="dotnet new — no func processor">
+<script type="text/plain">
+$ dotnet new http -n get_orders
+The template "HTTP trigger" was created successfully.
+
+Processing post-creation actions...
+Description: Add the function to the target app or blueprint file.
+Manual instructions: Copy the contents of __snippet__.py into your function_app.py.
+</script>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 08 · GATING ================= -->
+    <section class="stage" id="s8" data-nav="Gating by extension bundle" data-ix="08">
+      <header>
+        <div class="eyebrow">Stage 8 · "why can't I see that template?"</div>
+        <h2>Availability is declared by the template, evaluated per project</h2>
+        <p class="moment">A trigger whose binding only exists in newer extension bundles should not be offered to a project pinned to an older one — and when the user asks for it by name, they should be told exactly what to change.</p>
+      </header>
+
+      <div class="term" data-title="project pinned to bundle 4.32">
+<script type="text/plain">
+$ func new --list
+:: NAME       TRIGGER    DESCRIPTION
+http       http       Function triggered by HTTP requests
+timer      timer      Function triggered on a schedule
+# mcp-tool is not listed — its constraint is unmet for this project
+
+$ func new -t mcp-tool -n Lookup
+✗ Template 'mcp-tool' is not available in this project.
+  It requires extension bundle [4.42.0, ) — host.json declares [4.0.0, 5.0.0) (resolved 4.32.0).
+  Update host.json:  "extensionBundle": { "version": "[4.42.0, 5.0.0)" }
+</script>
+      </div>
+
+      <div class="note del"><b>This one decision deleted a lot of machinery:</b> the channel axis (stable/preview/experimental prerelease labels and per-channel packages), the <code>templates-workload.json</code> sidecar, the <code>minBundle:</code> nuspec tag, the channel-match pipeline step, two failure modes, and the entire Node pack-time subsetting pipeline (CDN index fetch, HTTP-Range zip extraction, binding cross-reference). <span class="muted">(D16)</span></div>
+
+      <div class="chips">
+        <button class="chip" data-d="D16">D16 · constraints own gating</button>
+        <button class="chip" data-d="D30">D30 · evaluation contexts</button>
+        <button class="chip" data-d="D18">D18 · project mandate stands</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — a constraint, a component, and three contexts <span class="hint">json · C# · table</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">Declared on the template</button>
+            <button>The constraint component</button>
+            <button>Before → after</button>
+          </div>
+          <div class="pane on">
+            <figure class="code" data-lang="jsonc">
+              <figcaption><span class="tag new">new convention</span> constraints block — sits alongside symbols</figcaption>
+<script type="text/plain">
+"constraints": {
+  "bundle": {
+    "type": "func-extension-bundle",          // func-registered component
+    "args": {
+      "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+      "version": "[4.42.0, )"
+    }
+  },
+  "os": {                                      // built-in constraints still available
+    "type": "os",
+    "args": [ "Windows", "Linux" ]
+  }
+}
+</script>
+            </figure>
+            <p class="small">Right granularity (per template), right owner (the template author), and it travels with the package — a community template can declare its own bundle requirement with no CLI involvement.</p>
+          </div>
+          <div class="pane">
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag new">new</span> src/Templates.Engine/Constraints/ExtensionBundleConstraint.cs — shape</figcaption>
+<script type="text/plain">
+/// <summary>
+/// Evaluates a template's declared extension-bundle requirement against the
+/// bundle context supplied by the CLI.
+/// </summary>
+internal sealed class ExtensionBundleConstraint(IBundleContextAccessor accessor) : ITemplateConstraint
+{
+    private readonly IBundleContextAccessor _accessor = accessor ?? throw new ArgumentNullException(nameof(accessor));
+
+    public string Type => "func-extension-bundle";
+
+    public TemplateConstraintResult Evaluate(string? args)
+    {
+        BundleRequirement requirement = BundleRequirement.Parse(args);
+        BundleContext context = _accessor.Current;
+
+        if (context.Matches(requirement))
+        {
+            return TemplateConstraintResult.CreateAllowed(this);
+        }
+
+        return TemplateConstraintResult.CreateRestricted(
+            this,
+            $"Requires extension bundle {requirement.Range} of {requirement.Id}.",
+            cta: $"Update host.json: \"extensionBundle\": {{ \"version\": \"{requirement.Suggested}\" }}");
+    }
+}
+</script>
+            </figure>
+            <table>
+              <tr><th>Context</th><th>Bundle used</th></tr>
+              <tr><td><code>func new</code> (list, help, scaffold)</td><td>the project's resolved bundle from <code>host.json</code></td></tr>
+              <tr><td><code>func init</code> surfaces</td><td>latest available bundle — no project exists yet (D30)</td></tr>
+              <tr><td>a foreign host (VS, <code>dotnet new</code>)</td><td>component not loaded → template treated as restricted, not an error</td></tr>
+            </table>
+          </div>
+          <div class="pane">
+            <div class="cols">
+              <div>
+                <div class="flow"><b>Before</b>
+host.json bundle id
+   → channel (stable|preview|experimental)
+   → pick the templates workload whose
+     prerelease label matches
+   → read templates-workload.json
+   → compare minBundleVersion
+   → <u>hard error after selection</u>
+
+pack time: subset Node templates per
+channel by cross-referencing the CDN
+bundle's extensions.json</div>
+              </div>
+              <div>
+                <div class="flow"><b>After</b>
+host.json bundle
+   → evaluate each template's
+     <i>own</i> constraints
+   → unmet = hidden from selection,
+     retained for the call-to-action
+
+pack time: nothing. One package per
+stack ships every template; visibility
+is decided at invocation.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 09 · SEARCH ================= -->
+    <section class="stage" id="s9" data-nav="Search &amp; install" data-ix="09">
+      <header>
+        <div class="eyebrow">Stage 9 · templates we did not write</div>
+        <h2>Discover and install any func template package</h2>
+        <p class="moment">Because packages are now standard NuGet template packages with a func package type, anyone can publish one — and the CLI can find it.</p>
+      </header>
+
+      <div class="term" data-title="search, install, use">
+<script type="text/plain">
+$ func new --search kafka
+:: PACKAGE                                    VERSION   TEMPLATES                    STATE
+Contoso.Functions.Templates.Kafka          2.1.0     kafka-trigger, kafka-output  —
+Microsoft.Azure.Functions.Templates.Node   1.2.0     http, timer, queue, kafka    installed 1.0.0 · update available
+
+$ func new --install Contoso.Functions.Templates.Kafka
+Installing Contoso.Functions.Templates.Kafka 2.1.0 … done
+✓ 2 item templates added.
+
+$ func new -t kafka-trigger -n OrderEvents
+Created: src/functions/OrderEvents.ts
+</script>
+      </div>
+
+      <div class="note"><b>Search and install do not need a project.</b> Lifecycle modes bypass the project and profile gates — searching before you have anywhere to scaffold is the normal case. Listing and scaffolding still require an initialized project. <span class="muted">(D30)</span></div>
+
+      <div class="chips">
+        <button class="chip" data-d="D22">D22 · discovery service</button>
+        <button class="chip" data-d="D26">D26 · folds into func new</button>
+        <button class="chip" data-d="D29">D29 · index hosting</button>
+        <button class="chip" data-d="D33">D33 · where it lives</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — the indexing tool, and indexing by package type <span class="hint">real source · CLI · index format</span></summary>
+        <div class="body tabbed">
+          <div class="tabs">
+            <button class="on">Discovery pipeline</button>
+            <button>The tool &amp; its options</button>
+            <button>Indexing by package type</button>
+            <button>Prefilters</button>
+            <button>The index file</button>
+            <button>CLI consumer</button>
+            <button>Package identity</button>
+            <button>Private feeds</button>
+          </div>
+          <div class="pane on">
+            <div class="flow"><b>Service side</b> — tools/TemplateDiscovery, daily incremental + on-demand (D29/D33)
+
+  nuget.org service index → <i>SearchQueryService</i>
+     ?<b>packageType=FuncItemTemplates</b>&amp;skip=0&amp;take=100&amp;prerelease=false&amp;semVerLevel=2.0.0
+     ?<b>packageType=FuncAppTemplates</b>&amp;…                ← our queries, not "Template"
+        │  paged, 100/page
+        ▼
+  <b>prefilter</b> candidates            template.json present? · known non-pack? · author spoofing?
+        │
+        ▼
+  download .nupkg → <b>scan with the real engine</b>   (same parser the CLI uses)
+        │                                   + IAdditionalDataProducer (per-host extras)
+        ▼
+  write <b>SearchCache/</b>
+     NuGetTemplateSearchInfoVer2.json   ← the index the CLI reads
+     NuGetTemplateSearchInfo.json       ← legacy v1 format
+     nonTemplatePacks.json              ← skip-list for the next run
+        │
+        ▼
+  publish → aka.ms/func/templates-search/v2 → cdn.functions.azure.com
+
+<b>CLI side</b>
+  func new --search  →  download + cache (1 h TTL, ETag) → match → render
+                        local-file override for air-gapped and dev
+                        unreachable + no cached copy = actionable error</div>
+            <p class="small muted">This is the pipeline behind <code>dotnet new search</code>, pointed at our package types. We reuse a proven scraper instead of inventing a registry.</p>
+          </div>
+
+          <div class="pane">
+            <p class="small">The tool is a real console app in the templating repo — <code>Tools/Microsoft.TemplateSearch.TemplateDiscovery</code>. Its command is <code>template-discovery</code>: <em>"Generates the template package search cache file based on the packages available on NuGet.org."</em></p>
+            <table>
+              <tr><th>Option</th><th>What it does</th><th>Why we care</th></tr>
+              <tr><td><code>--basePath</code> <span class="muted">(required)</span></td><td>Root output directory for the run</td><td>Pipeline artifact staging</td></tr>
+              <tr><td><code>--queries</code></td><td>Which providers to run: <code>PackageTypeQuery</code>, <code>TemplateQuery</code>. Omitted = run all</td><td><b>The extension point</b> — func adds its own entries</td></tr>
+              <tr><td><code>--diff</code> <span class="muted">(default true)</span></td><td>Compares against the previous published cache; unchanged package versions are not rescanned</td><td>Makes a daily run cheap</td></tr>
+              <tr><td><code>--diff-override-cache</code></td><td>Use a local previous-cache file instead of downloading it</td><td>Dev loop and SP-7 offline runs</td></tr>
+              <tr><td><code>--diff-override-non-packages</code></td><td>Use a local skip-list instead of downloading it</td><td>Same</td></tr>
+              <tr><td><code>--packagesPath</code></td><td>Scan pre-downloaded packages; nothing is fetched from NuGet.org</td><td><b>Local-feed path</b> — how SP-7 runs with no network</td></tr>
+              <tr><td><code>--allowPreviewPacks</code></td><td>Include prerelease versions (default: stable only)</td><td>Policy call for our index</td></tr>
+              <tr><td><code>--pageSize</code>, <code>--onePage</code></td><td>Paging controls (default 100)</td><td>Debugging</td></tr>
+              <tr><td><code>--noTemplateJsonFilter</code></td><td>Disables the template.json prefilter</td><td>Diagnostics only</td></tr>
+              <tr><td><code>--savePacks</code></td><td>Keep downloaded candidate packs</td><td>Investigating a bad scan</td></tr>
+              <tr><td><code>--test</code></td><td>Runs assertions over the generated metadata files</td><td>Gate the pipeline on it</td></tr>
+              <tr><td><code>--verbose</code></td><td>Verbose processing output</td><td>Pipeline logs</td></tr>
+            </table>
+            <div class="term" data-title="what our pipeline runs">
+<script type="text/plain">
+$ template-discovery --basePath ./out --queries FuncItemTemplates FuncAppTemplates --diff --test
+Retrieving package information from NuGet.org…
+FuncItemTemplates: 14 packages found
+FuncAppTemplates:   9 packages found
+Prefiltering candidates (template.json present, skip-list, author check)…
+Scanning 6 changed packages with the template engine…
+Search cache file created: ./out/SearchCache/NuGetTemplateSearchInfoVer2.json
+Non template pack list was created: ./out/SearchCache/nonTemplatePacks.json
+</script>
+            </div>
+          </div>
+
+          <div class="pane">
+            <p class="small">Indexing is driven by <b>NuGet package type</b>, not by name conventions, tags or an allow-list. This is the mechanism that makes third-party func templates discoverable at all.</p>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag real">real source</span> TemplateDiscovery/NuGet/NuGetPackSourceCheckerFactory.cs</figcaption>
+<script type="text/plain">
+private static readonly Dictionary<SupportedQueries, string> SupportedProviders = new Dictionary<SupportedQueries, string>()
+{
+    { SupportedQueries.PackageTypeQuery, "packageType=Template" },
+    { SupportedQueries.TemplateQuery,    "q=template" }
+};
+</script>
+            </figure>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag real">real source</span> TemplateDiscovery/NuGet/NugetPackProvider.cs — how the query becomes a URL</figcaption>
+<script type="text/plain">
+private const string NuGetOrgFeed = "https://api.nuget.org/v3/index.json";
+
+// resolve the feed's search endpoint from its service index
+IReadOnlyList<ServiceIndexEntry> searchResources = indexResource.GetServiceEntries("SearchQueryService");
+
+_searchUriFormat = $"{searchResources[0].Uri}?{query}&skip={{0}}&take={{1}}&prerelease={includePreviewPacks}&semVerLevel=2.0.0";
+</script>
+            </figure>
+            <p class="small">So the func index is produced by substituting the query string — the rest of the machinery is untouched:</p>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag new">func change</span> the only functional difference in the scraper</figcaption>
+<script type="text/plain">
+{ SupportedQueries.FuncItemTemplates, "packageType=FuncItemTemplates" },   // → func new
+{ SupportedQueries.FuncAppTemplates,  "packageType=FuncAppTemplates"  },   // → func init
+</script>
+            </figure>
+            <div class="note"><b>Implementation note.</b> The query set is a hard-coded dictionary keyed by an internal enum, and the feed URL is a constant. Adding func's package types therefore means either an upstream contribution (make queries/feed configurable) or a small func-owned fork of the tool. Either way the scanning, prefiltering, diffing and cache-writing code is reused as is. <span class="muted">Sequenced as task 3.5.2.</span></div>
+            <div class="note good"><b>Why the package-type query matters for scale.</b> The NuGet search API caps at <code>skip</code> 3000 / page 1000 — the tool can retrieve at most <b>4000</b> packages per query and warns when a query exceeds it. <code>packageType=Template</code> is close to that ceiling; <code>packageType=FuncItemTemplates</code> returns a handful. Our index stays small, fast and complete.</div>
+          </div>
+
+          <div class="pane">
+            <p class="small">Three prefilters run before a package is downloaded and scanned. They are the reason the index stays clean and the daily run stays cheap.</p>
+            <table>
+              <tr><th>Prefilter</th><th>Behaviour</th></tr>
+              <tr><td><code>TemplateJsonExistencePackFilter</code></td><td>Drops packages containing no <code>template.json</code> at all. Disabled with <code>--noTemplateJsonFilter</code>.</td></tr>
+              <tr><td><code>SkipTemplatePacksFilter</code></td><td>Skips packages already recorded in <code>nonTemplatePacks.json</code> from earlier runs.</td></tr>
+              <tr><td><code>FilterNonMicrosoftAuthors</code></td><td><b>Anti-spoofing.</b> If a template declares <code>"author": "Microsoft"</code> but the package id does not start with the reserved <code>Microsoft.</code> prefix, the package is filtered out.</td></tr>
+            </table>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag real">real source</span> TemplateDiscovery/Filters/FilterNonMicrosoftAuthors.cs — the rule</figcaption>
+<script type="text/plain">
+// All NuGet packages that start with Microsoft. are OK since that is protected prefix on NuGet.org
+if (packInfo.Name.StartsWith("Microsoft."))
+{
+    return new PreFilterResult(FilterId, isFiltered: false);
+}
+// …otherwise, if any template.json in the package claims Author=Microsoft, drop the package
+if (author?.Contains("microsoft", StringComparison.OrdinalIgnoreCase) ?? false)
+{
+    return new PreFilterResult(FilterId, isFiltered: true,
+        $"{templateJson.FullPath} has Author=Microsoft and package id is {packInfo.Name}");
+}
+</script>
+            </figure>
+            <p class="small muted">Our official packages keep the <code>Microsoft.</code> prefix, so they pass; a community package impersonating Microsoft authorship never reaches the index.</p>
+          </div>
+
+          <div class="pane">
+            <p class="small">The published artifact is the engine's own search-cache format — version <code>2.0</code>. It is a reverse index: packages, each carrying the template metadata needed to <em>display</em> a result without downloading anything.</p>
+            <figure class="code" data-lang="jsonc">
+              <figcaption><span class="tag new">shape</span> SearchCache/NuGetTemplateSearchInfoVer2.json — a func entry</figcaption>
+<script type="text/plain">
+{
+  "Version": "2.0",
+  "TemplatePackages": [
+    {
+      "Name": "Contoso.Functions.Templates.Kafka",
+      "Version": "2.1.0",
+      "TotalDownloads": 18342,
+      "Owners": [ "contoso" ],
+      "Reserved": false,              // NuGet prefix reservation — a trust signal to render
+      "Description": "Kafka trigger and output templates for Azure Functions.",
+      "IconUrl": "https://…/icon.png",
+      "Templates": [
+        {
+          "Identity": "Contoso.Functions.Kafka.Trigger.1.0",
+          "GroupIdentity": "Contoso.Functions.Kafka.Trigger",
+          "Precedence": 100,
+          "Name": "Kafka trigger",
+          "ShortNameList": [ "kafka-trigger" ],
+          "Author": "Contoso",
+          "Description": "Function triggered by a Kafka topic.",
+          "Classifications": [ "Azure Function", "Trigger", "Kafka" ],
+          "TagsCollection": {
+            "language": "typescript", "type": "item",
+            "azfunc-stack": "node", "azfunc-trigger": "kafka"
+          },
+          "Parameters": [
+            { "Name": "BrokerList", "DataType": "string", "Description": "Kafka broker list." },
+            { "Name": "AuthMode", "DataType": "choice",
+              "Choices": { "Plain": { "DisplayName": "Plain" }, "Sasl": { "DisplayName": "SASL" } } }
+          ],
+          "PostActions": [ "B17581D1-C5C9-4489-8F0A-004BE667B814" ]
+        }
+      ]
+    }
+  ]
+}
+</script>
+            </figure>
+            <ul class="tight small">
+              <li>Our stack/trigger tags ride along in <code>TagsCollection</code> for free, so search results can be filtered by stack the same way the local catalog is.</li>
+              <li><code>Reserved</code> and <code>TotalDownloads</code> are the signals to surface when showing third-party results.</li>
+              <li><code>IAdditionalDataProducer</code> (used upstream by <code>CliHostDataProducer</code> to embed <code>dotnetcli.host.json</code> data) is the hook if we ever want <code>func.host.json</code> data in the index too.</li>
+            </ul>
+          </div>
+
+          <div class="pane">
+            <p class="small">The consumer side is <code>Microsoft.TemplateSearch.Common</code>. It already does the caching, revalidation and offline fallbacks — we point it at our index.</p>
+            <table>
+              <tr><th>Behaviour</th><th>Upstream (<code>dotnet new</code>)</th><th>func</th></tr>
+              <tr><td>Index URI</td><td>two <code>go.microsoft.com/fwlink</code> URIs (v2, then v1)</td><td>one <code>aka.ms</code> vanity URI → Functions CDN (D29)</td></tr>
+              <tr><td>Local cache file</td><td><code>nugetTemplateSearchInfo.json</code> in the host version settings dir</td><td>same name, inside the func hive</td></tr>
+              <tr><td>Refresh policy</td><td>re-download only if the cached copy is older than <b>1 hour</b></td><td>unchanged</td></tr>
+              <tr><td>Bandwidth</td><td><code>ETag</code> stored beside the cache; <code>If-None-Match</code> on each request; <code>304</code> just touches the timestamp</td><td>unchanged</td></tr>
+              <tr><td>Download fails</td><td>fall back to the stale local copy with a warning; if none exists, throw</td><td>same, surfaced as an actionable CLI error</td></tr>
+              <tr><td>Path override</td><td><code>DOTNET_NEW_SEARCH_FILE_OVERRIDE</code></td><td>func-prefixed equivalent</td></tr>
+              <tr><td>Never download</td><td><code>DOTNET_NEW_LOCAL_SEARCH_FILE_ONLY</code></td><td>func-prefixed equivalent — the air-gapped switch</td></tr>
+            </table>
+            <figure class="code" data-lang="csharp">
+              <figcaption><span class="tag real">real source</span> TemplateSearch.Common/Providers/NuGetMetadataSearchProvider.cs — the seam we use</figcaption>
+<script type="text/plain">
+/// <summary>
+/// Test constructor allowing override search cache Uris.
+/// </summary>
+internal NuGetMetadataSearchProvider(
+    ITemplateSearchProviderFactory factory,
+    IEngineEnvironmentSettings environmentSettings,
+    IReadOnlyDictionary<string, Func<object, object>> additionalDataReaders,
+    IEnumerable<string> searchCacheUri) : this(factory, environmentSettings, additionalDataReaders)
+{
+    _searchMetadataUris = searchCacheUri.Select(s => new Uri(s)).ToArray();
+}
+</script>
+            </figure>
+            <p class="small muted">The URI list is the only func-specific input; everything below it — parsing, filtering, matching — is shared with <code>dotnet new search</code>. Note the constructor is <code>internal</code> today, so this is the other place a small upstream contribution is cleaner than a fork.</p>
+            <div class="note"><b>Precedent for the vanity URI (D29):</b> the scraper itself resolves the previous run's cache through <code>aka.ms/dotnet/templating/searchcacheurl</code>, whose comment says it should point at "whatever the future absolute URL for the JSON file is". Same indirection, same reason — move the backend without shipping a client.</div>
+          </div>
+
+          <div class="pane">
+            <p class="small">Two package types do all the routing. A single package may declare both.</p>
+            <figure class="code" data-lang="xml">
+              <figcaption><span class="tag new">new</span> Microsoft.Azure.Functions.Templates.Python.nuspec — excerpt</figcaption>
+<script type="text/plain">
+<package>
+  <metadata>
+    <id>Microsoft.Azure.Functions.Templates.Python</id>
+    <version>1.0.0</version>
+    <packageTypes>
+      <packageType name="FuncItemTemplates" />   <!-- surfaces in func new  -->
+      <packageType name="FuncAppTemplates" />    <!-- surfaces in func init -->
+    </packageTypes>
+  </metadata>
+</package>
+</script>
+            </figure>
+            <table>
+              <tr><th>Stack</th><th>Official package</th><th>Types</th></tr>
+              <tr><td>.NET (items)</td><td><code>Microsoft.Azure.Functions.Worker.ItemTemplates</code></td><td><code>Template</code> + <code>FuncItemTemplates</code></td></tr>
+              <tr><td>.NET (projects)</td><td><code>Microsoft.Azure.Functions.Worker.ProjectTemplates</code></td><td><code>Template</code> + <code>FuncAppTemplates</code></td></tr>
+              <tr><td>Node</td><td><code>Microsoft.Azure.Functions.Templates.Node</code></td><td>both func types</td></tr>
+              <tr><td>Python</td><td><code>Microsoft.Azure.Functions.Templates.Python</code></td><td>both func types</td></tr>
+            </table>
+            <div class="note good">Keeping the standard <code>Template</code> type on the .NET packages means <b>zero churn for existing <code>dotnet new</code> consumers</b> — no rename, no republish under new ids. Those packages appear in <em>both</em> indexes. <span class="muted">(D28)</span></div>
+          </div>
+
+          <div class="pane">
+            <p class="small">The index only knows what the service scanned. For a private or local feed, the CLI queries the feed's own search API at invocation time — the same <code>packageType</code> filter, evaluated live.</p>
+            <div class="term" data-title="private feed">
+<script type="text/plain">
+$ func new --search --source https://contoso.pkgs.visualstudio.com/_packaging/fn/nuget/v3/index.json
+:: PACKAGE                          VERSION   TEMPLATES
+Contoso.Internal.Templates       4.0.0     contoso-http, contoso-saga
+
+$ func new --install Contoso.Internal.Templates --source https://contoso.pkgs…/index.json
+</script>
+            </div>
+            <p class="small muted">For building an index over a private feed instead, the tool's <code>--packagesPath</code> mode scans pre-downloaded packages and skips NuGet.org entirely.</p>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 10 · UPDATE / OFFLINE ================= -->
+    <section class="stage" id="s10" data-nav="Update &amp; offline" data-ix="10">
+      <header>
+        <div class="eyebrow">Stage 10 · living with it</div>
+        <h2>Updates are explicit; offline always works</h2>
+        <p class="moment">Everything a user needs to list and scaffold is on disk. The network is used for exactly four things: search, install, update, and init's first-run acquisition.</p>
+      </header>
+
+      <div class="cols">
+        <div>
+          <div class="term" data-title="update">
+<script type="text/plain">
+$ func new --update --all
+Microsoft.Azure.Functions.Templates.Python  1.0.0 → 1.2.0  updated
+Contoso.Functions.Templates.Kafka           2.1.0         up to date
+✓ 1 package updated.
+</script>
+          </div>
+        </div>
+        <div>
+          <div class="term" data-title="on a plane">
+<script type="text/plain">
+$ func new --list
+:: NAME       TRIGGER    DESCRIPTION
+http       http       Function triggered by HTTP requests
+timer      timer      Function triggered on a schedule
+# served entirely from the engine cache — no network
+
+$ func new -t http -n GetOrders
+Created: src/functions/GetOrders.ts
+</script>
+          </div>
+        </div>
+      </div>
+
+      <table>
+        <tr><th>Operation</th><th>Network</th><th>Project required</th></tr>
+        <tr><td><code>func new --list</code>, <code>--help</code>, scaffold</td><td>never</td><td>yes</td></tr>
+        <tr><td><code>func new --search</code></td><td>index (or cache / local override)</td><td>no</td></tr>
+        <tr><td><code>func new --install</code> / <code>--uninstall</code> / <code>--update</code></td><td>install and update only</td><td>no</td></tr>
+        <tr><td><code>func init</code></td><td>only when official packages are missing</td><td>n/a</td></tr>
+      </table>
+
+      <div class="chips">
+        <button class="chip" data-d="D24">D24 · offline &amp; updates</button>
+        <button class="chip" data-d="D30">D30 · gate bypass</button>
+        <button class="chip" data-d="D14">D14 · old hive left alone</button>
+      </div>
+
+      <details class="panel">
+        <summary><span class="caret">&#9654;</span><span class="lbl">Under the hood</span> — rollback, concurrency, and the upgrade path <span class="hint">semantics</span></summary>
+        <div class="body">
+          <ul class="tight">
+            <li><b>Rollback</b> is an explicit install of an older version (<code>func new --install pkg::1.0.0</code>). There is no workload-style side-by-side "highest wins" any more — the engine's store holds one version per package, which is also what makes the cache honest.</li>
+            <li><b>Concurrency</b> (spike SP-3, still open): two simultaneous installs, and an install landing between cache reconcile and query, need cross-process locking around hive writes. Tracked as an implementation task, not a design risk.</li>
+            <li><b>CLI upgrade</b> uses a version-scoped cache directory, so a new CLI pays one cold scan and can never read a stale-format cache; stale sibling directories are cleaned opportunistically.</li>
+            <li><b>The old dotnet template hive</b> from the pre-change CLI is left on disk and documented in release notes — it is inert, and only exists on v5 preview machines (D14).</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= 11 · FAILURES & SECURITY ================= -->
+    <section class="stage" id="s11" data-nav="Failure paths &amp; security" data-ix="11">
+      <header>
+        <div class="eyebrow">Stage 11 · when things go wrong</div>
+        <h2>Failure paths, and why a template package cannot hurt you</h2>
+        <p class="moment">The typed failure UX users already know is preserved. Three failure modes disappear entirely, and two new safety behaviours appear.</p>
+      </header>
+
+      <h3>Failure inventory</h3>
+      <table>
+        <tr><th>Failure</th><th>Status</th></tr>
+        <tr><td>Not a Functions project → run <code>func init</code></td><td>unchanged (list/scaffold only)</td></tr>
+        <tr><td>Unknown template id</td><td>unchanged — and <em>less likely</em>, thanks to legacy aliases</td></tr>
+        <tr><td>File already exists → <code>--force</code></td><td>unchanged, now driven by the engine dry run</td></tr>
+        <tr><td>Missing / unresolvable extension bundle</td><td>unchanged hard error</td></tr>
+        <tr><td>No templates installed for this stack</td><td>install hint; <code>func new</code> never auto-installs</td></tr>
+        <tr><td><code>dotnet</code> not on PATH</td><td><b>deleted</b> — nothing shells out</td></tr>
+        <tr><td>Template hive missing / partially provisioned</td><td><b>deleted</b> — no hive</td></tr>
+        <tr><td>Five-minute provisioning timeout</td><td><b>deleted</b></td></tr>
+        <tr><td>No templates workload for this channel</td><td><b>deleted</b> — no channels</td></tr>
+        <tr><td>minBundleVersion too old</td><td><b>replaced</b> by constraint gating with a call-to-action</td></tr>
+        <tr><td>Malformed <code>template.json</code> in a package</td><td><b>new</b> — that template is skipped with a <code>[packageId]</code> warning; the catalog survives</td></tr>
+        <tr><td>Post action failed</td><td><b>new</b> — warns with manual steps when <code>continueOnError</code>, otherwise a typed failure</td></tr>
+      </table>
+
+      <h3>Security posture</h3>
+      <div class="note"><b>Template packages are data.</b> The engine component set is fixed when the host is constructed. No assembly, generator, macro or post-action processor is ever loaded from an installed package; unknown post-action ids are not executed; unresolvable components fail that template's use with a diagnostic rather than loading anything.</div>
+      <ul class="tight small">
+        <li>Scanning a package is <code>template.json</code> parsing — the spike confirmed no payload code executed on the first pass.</li>
+        <li>The run-script post action is deliberately <b>not</b> dispatched, even though the engine format supports it.</li>
+        <li>An adversarial test (malicious component pack and a payload assembly) is an implementation task, not an open design question. <span class="muted">(SP-4)</span></li>
+      </ul>
+
+      <div class="chips">
+        <button class="chip" data-d="D6">D6 · no code execution</button>
+        <button class="chip" data-d="D11">D11 · the two exceptions</button>
+      </div>
+    </section>
+
+    <!-- ================= 12 · PUBLISHER ================= -->
+    <section class="stage" id="s12" data-nav="Authoring &amp; publishing" data-ix="12">
+      <header>
+        <div class="eyebrow">Stage 12 · the other user</div>
+        <h2>Authoring a template</h2>
+        <p class="moment">Two audiences: our own teams converting the existing corpus, and third parties shipping their own triggers. Both use the same format and the same publish path.</p>
+      </header>
+
+      <h3>Adding an input to an existing template — the whole change</h3>
+      <div class="cols">
+        <div>
+          <figure class="code" data-lang="jsonc">
+            <figcaption>template.json — one symbol</figcaption>
+<script type="text/plain">
+"symbols": {
+  "MaxRetries": {
+    "type": "parameter",
+    "datatype": "int",
+    "defaultValue": "3",
+    "replaces": "MAX_RETRIES",
+    "description": "Delivery attempts before dead-lettering."
+  }
+}
+</script>
+          </figure>
+        </div>
+        <div>
+          <figure class="code" data-lang="jsonc">
+            <figcaption>func.host.json — one line</figcaption>
+<script type="text/plain">
+"symbolInfo": [
+  { "id": "MaxRetries", "longName": "max-retries" }
+]
+</script>
+          </figure>
+        </div>
+      </div>
+      <div class="note good"><code>func new -t queue --help</code> shows <code>--max-retries</code> immediately, with type checking and a default. <b>No CLI release, no schema change, no code.</b> That was the goal all along; it now holds with zero bespoke schema on our side.</div>
+
+      <h3>Internal conversion pipeline</h3>
+      <table>
+        <tr><th>Stack</th><th>Work</th><th>Ongoing</th></tr>
+        <tr><td>Node</td><td>Convert 33 in-repo V2 entries to template folders (inline files → real files, <code>$(FUNCTION_NAME_INPUT)</code> → <code>sourceName</code>, prompts → symbols), then hand-finish per template</td><td>Authored here, as today</td></tr>
+        <tr><td>Python</td><td>Author from the extension bundle's Python corpus as snippet + append post action</td><td><b>Changes ownership:</b> updates flow through this repo instead of riding bundle republishes — needs Python owners' sign-off</td></tr>
+        <tr><td>.NET</td><td>No authoring. Add the func package types and <code>func.host.json</code> at the source</td><td>Upstream, unchanged</td></tr>
+      </table>
+      <p class="small muted">Content is authored in core-tools while it churns, with a declared end state of migrating the finished trees to <code>Functions.Templates</code> so every stack follows the .NET model. <span class="muted">(D12)</span></p>
+
+      <div class="note"><b>Authoring loop upgrade:</b> the engine diffs mount timestamps, so editing an installed template in place is picked up on the next <code>func new</code> — no reinstall, no repack while developing a template.</div>
+
+      <div class="chips">
+        <button class="chip" data-d="D12">D12 · authoring home</button>
+        <button class="chip" data-d="D9">D9 · host file</button>
+        <button class="chip" data-d="D28">D28 · official ids</button>
+      </div>
+    </section>
+
+    <!-- ================= 13 · ARCHITECTURE ================= -->
+    <section class="stage" id="s13" data-nav="Architecture recap" data-ix="13" data-group="Reference">
+      <header>
+        <div class="eyebrow">Reference</div>
+        <h2>The pieces, in one picture</h2>
+        <p class="moment">Everything the walkthrough touched, assembled.</p>
+      </header>
+
+      <div class="flow"><b>src/Func</b>                          the CLI
+ ├── Commands/NewCommand.cs        --search --install --uninstall --update  (D26)
+ ├── Commands/InitCommand.cs       project-template step + auto-install     (D23/D27)
+ ├── Templates/                    orchestrator: gates, picker, hydrator, renderer
+ │      <u>channel mapper · manifest reader · workload enumeration</u>   DELETED
+ └── (project ref) ──► Templates.Engine
+
+<b>src/Templates.Engine</b>              NEW · CLI-internal, no public contract   (D1)
+ ├── FuncTemplateEngineHost        id "func", version = CLI version
+ ├── FuncTemplateEnginePaths       relocated hive — the isolation finding    (D32)
+ ├── TemplatePackageService        install / uninstall / update / list       (D21)
+ ├── Constraints/                  func-extension-bundle (+ built-in host, os) (D16)
+ ├── PostActions/                  append · add-reference · manual instructions (D6/D11/D13)
+ ├── Binding/MsBuildBindSource     answers msbuild:TargetFramework           (D11)
+ ├── HostFiles/FuncHostJson        aliases · hidden · validators             (D9)
+ └── Catalog + Scaffolding         cache query → FunctionTemplateInfo; dry-run → instantiate
+
+<b>src/Templates/&lt;Stack&gt;</b>              template packages, not workloads         (D33)
+ └── HttpTrigger/.template.config/…  → Microsoft.Azure.Functions.Templates.&lt;Stack&gt;
+
+<b>tools/TemplateDiscovery</b>            index builder + eng/ci publish pipeline  (D22/D29/D33)
+
+<u>src/Templates.V2 · src/Templates.DotNet · src/Workloads/Templates/*</u>          DELETED</div>
+
+      <h3>Spike results — what is measured, what is still open</h3>
+      <div class="cols">
+        <div>
+          <div class="note good"><b>Proven (19/19 checks)</b>
+            <ul class="tight small">
+              <li>In-process hosting under single-file publish</li>
+              <li>Engine-managed install into a relocated func hive, provably isolated</li>
+              <li>All four Python append flows, with staging isolation</li>
+              <li>Upstream <code>Worker.ItemTemplates</code> loaded verbatim — 36 templates</li>
+              <li>Engine libraries: 0.84 MB (the earlier estimate said 2–3 MB)</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div class="note warn"><b>Still to verify during implementation</b>
+            <ul class="tight small">
+              <li>SP-3 — concurrent-install locking</li>
+              <li>SP-4 — adversarial security test</li>
+              <li>SP-7 — discovery pipeline end to end</li>
+              <li>SP-8 — project template through an init flow</li>
+              <li>Constraint evaluation against a real bundle</li>
+              <li>Performance at realistic corpus size</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 14 · DECISIONS ================= -->
+    <section class="stage" id="s14" data-nav="Decision log" data-ix="14">
+      <header>
+        <div class="eyebrow">Reference</div>
+        <h2>Every decision, with its rationale</h2>
+        <p class="moment">Thirty-three numbered decisions, each dated and linked to what it supersedes. Filter and click for detail — this is the table to argue with.</p>
+      </header>
+      <input id="dfilter" class="btn" style="width:100%;max-width:420px;padding:8px 11px;font-size:13px;color:var(--fg)" placeholder="Filter decisions — try 'bundle', 'acquisition', 'python'…" />
+      <table id="dtable"><thead><tr><th style="width:52px">#</th><th style="width:92px">Date</th><th>Decision</th></tr></thead><tbody></tbody></table>
+      <div class="note"><b>Reversals are visible on purpose.</b> Acquisition went D5 (engine package management unused) → D17 (reaffirmed) → <b>D21</b> (reversed — the engine owns acquisition). Anyone reopening that thread should read all three first.</div>
+    </section>
+
+    <!-- ================= 15 · PLAN ================= -->
+    <section class="stage" id="s15" data-nav="Plan &amp; status" data-ix="15">
+      <header>
+        <div class="eyebrow">Where we are</div>
+        <h2>Design complete, spike passed, implementation sequenced</h2>
+        <p class="moment">The OpenSpec change has all four artifacts complete and validates clean. The implementation checklist is 69 tasks across seven phases.</p>
+      </header>
+
+      <div class="stats">
+        <div class="stat"><div class="v">4 / 4</div><div class="l">artifacts complete</div></div>
+        <div class="stat"><div class="v">5</div><div class="l">capability specs</div></div>
+        <div class="stat"><div class="v">69</div><div class="l">implementation tasks</div></div>
+        <div class="stat"><div class="v">GO</div><div class="l">gating spike verdict</div></div>
+      </div>
+
+      <table>
+        <tr><th>Phase</th><th>Content</th><th>Sequencing</th></tr>
+        <tr><td><b>3.1</b> Demolition</td><td>Both engines, the provider seam, channel and sidecar machinery, templates-workload projects, targets, scripts and pipelines</td><td>blocking — everything else lands on the cleared ground</td></tr>
+        <tr><td><b>3.2</b> Templates.Engine</td><td>Host, hive, acquisition, locking, cache, constraints, post actions, bind source, host files, catalog, scaffolding, security tests</td><td>blocking</td></tr>
+        <tr><td><b>3.3</b> <code>func new</code></td><td>Rewire the orchestrator, hydrator source switch, shortName resolution, gating UX, lifecycle flags</td><td>blocking</td></tr>
+        <tr><td><b>3.4</b> Packages &amp; corpus</td><td>Package projects, V2 converter, Node and Python corpora, Empty templates, parity harness, upstream .NET PR</td><td>parallel after 3.3</td></tr>
+        <tr><td><b>3.5</b> Search</td><td>SP-7 first, then the discovery service, publish pipeline, CLI consumer, <code>--source</code></td><td>parallel</td></tr>
+        <tr><td><b>3.6</b> <code>func init</code></td><td>SP-8 first, then the thin contract, init orchestration, wizard step, <code>func setup</code> pre-install</td><td>parallel</td></tr>
+        <tr><td><b>3.7</b> Validation</td><td>Build, tests, single-file check, performance re-measure, telemetry, release notes, docs</td><td>last</td></tr>
+      </table>
+
+      <h3>Not blocking implementation, but needed before we ship</h3>
+      <ul class="tight">
+        <li><b>Merge conversation with jviau</b> — a parallel change reached the same engine, format, gating and acquisition conclusions independently. Their change lacks the Python append design, the post-action allowlist, the <code>msbuild:</code> bind source and <code>func.host.json</code>; ours adopted their constraint gating and provider-seam deletion. The reconciliation table is the agenda.</li>
+        <li><b>Python owners' sign-off</b> on the append design and on template updates moving out of the bundle republish path.</li>
+        <li><b>The <code>Functions.Templates</code> PR</b> — package types plus host files, plus a publish cadence and the version func pins for first-run install.</li>
+        <li><b>OQ-17: PowerShell.</b> The v5 CLI has a PowerShell stack and the corpus exists, but this change covers Node, Python and .NET. Parked as a follow-up change — flag it if that is the wrong call.</li>
+      </ul>
+
+      <h3>Open questions for the room</h3>
+      <ol class="tight">
+        <li>The <code>--list</code> JSON envelope still emits <code>engineId</code>, <code>requiresExtensionBundle</code> and <code>minBundleVersion</code>. All three describe concepts this change deletes. Drop them, or keep emitting constants for compatibility?</li>
+        <li>Anything in the flow matrix (stage 7) that Python owners would push back on?</li>
+        <li>Is PowerShell really a follow-up, or does it belong in this change?</li>
+      </ol>
+    </section>
+
+    <!-- SECTIONS-END -->
+  </main>
+</div>
+
+<div id="deckbar">
+  <button class="btn" id="d-prev">&larr; Prev</button>
+  <button class="btn" id="d-next">Next &rarr;</button>
+  <span class="pos" id="d-pos"></span>
+  <span class="now" id="d-now"></span>
+</div>
+
+<div id="modal"><div class="box" id="modal-box"></div></div>
+
+<script>
+/* =====================================================================
+   Decision log (design.md §7) — chips throughout the deck open these.
+   ===================================================================== */
+const DECISIONS = {
+  D1:["2026-07-28","Engine is CLI-internal","New Templates.Engine csproj hosting the engine in-process; no engine workload. AOT-viable, no new public contract, fastest startup; templates still rev independently.","Exploration's 'engine as a workload' option"],
+  D2:["2026-07-28","All stacks move at once","One design covers Node, Python and .NET; the V2 DSL and the dotnet-new shell-out are both deleted. Python append risk was handled up front by spike SP-2.","Phased per-stack migration"],
+  D3:["2026-07-28","Per-stack payload mix","DotNet embedded the pinned upstream nupkg; Node/Python shipped authored folder trees. Mooted by D21 — packages are now standard template packages with no wrapping.","dotnet-templates.json + source.json + hive"],
+  D4:["2026-07-28","This OpenSpec change is the canonical design home","Flows through propose to apply to archive.","Initial docs/proposed placement"],
+  D5:["2026-07-28","Engine package management unused (retired)","A non-managed provider over installed workloads. Reversed by D21.","—"],
+  D6:["2026-07-28","Post-action allowlist","Only func-owned actions run: append and manual instructions (later plus add-reference, D11). No run-script, no restore, no assembly scanning. Template content must never execute code.","—"],
+  D7:["2026-07-28","Template cache is lazy","First func new after a package change pays the scan; installers get no templates special-casing. Largely moot post-D21 (the engine maintains the cache during install).","OQ-15"],
+  D8:["2026-07-28","Short, language-free template ids","HttpTrigger rather than HttpTrigger-JavaScript; legacy suffixed ids stay as hidden aliases so scripts keep working.","OQ-12"],
+  D9:["2026-07-28","func.host.json carries CLI hints","Per-symbol option aliases (longName), regex validators, hidden flags, plus a template-level functionName validator. Engine-inert; read by the option hydrator.","OQ-8"],
+  D10:["2026-07-28","DotNet hints added at the source","We own the Functions.Templates repo, so func.host.json is contributed upstream. Ground-truthing killed the assumption that dotnetcli.host.json hints could be inherited — that file does not exist anywhere in the corpus.","OQ-10; the 'inherit dotnetcli hints for free' assumption"],
+  D11:["2026-07-28","Add-reference post action + msbuild: bind source","Real isolated-worker templates depend on both to scaffold correctly (TFM-conditional extension PackageReferences with empty manual instructions). Without them, .NET scaffolds are silently broken.","Amends D6"],
+  D12:["2026-07-28","Author Node/Python content in core-tools now","Declared end state: migrate the finished trees to Functions.Templates, which then publishes per-stack nupkgs — the DotNet model for every stack.","OQ-16"],
+  D13:["2026-07-28","Python append flow matrix","One template plus one snippet with hidden AppObject/AppFile knobs. Missing function_app.py is created with a full app header; a new blueprint prints registration instructions rather than editing user Python; duplicate function names are a hard error with no --force.","OQ-14"],
+  D14:["2026-07-28","Orphaned dotnet hive left on disk","Release-note documentation only, no cleanup code. Zero-risk preference; the directory is inert and only exists on v5 preview machines.","OQ-11"],
+  D15:["2026-07-28","Sidecar manifest stays minimal (retired)","Superseded by D16, which deletes the manifest entirely.","OQ-13"],
+  D16:["2026-07-28","Gating moves into template.json constraints","A custom func-extension-bundle constraint plus built-in host/os, evaluated against the project's resolved bundle. Deletes the channel axis, the sidecar manifest, the minBundle tag and the Node pack-time subsetting pipeline. Unmet constraints hide the template with a call-to-action instead of erroring after selection.","D15; channel machinery; MinBundleVersionTooOld"],
+  D17:["2026-07-28","Acquisition stays workload-based (retired)","Reaffirmed D5 during the jviau reconciliation; reversed two days later by D21.","Fork 1 of the reconciliation"],
+  D18:["2026-07-28","Project mandate and no --language stand","Functions apps are single-runtime, so cross-stack scaffolds do not run and empty-directory scaffolds are incomplete. The alternative mode is recorded as a future product discussion.","Fork 3"],
+  D19:["2026-07-28","Unified ids across stacks","Upstream-style shortNames (http, timer, queue) are displayed for every stack; HttpTrigger-style and legacy suffixed forms remain accepted aliases.","Amends D8 (fork 4a)"],
+  D20:["2026-07-28","ITemplateEngineProvider seam deleted","Interface, registry and EngineIds are removed; the orchestrator calls the engine service directly. With one engine and no plausible second, the seam is dead abstraction.","Fork 4b"],
+  D21:["2026-07-30","PIVOT: templates are not workloads","Acquisition runs through the engine's TemplatePackageManager against a func-owned hive, and the engine's template cache is the source of truth for what is installed. No workload registry rows, no workload.json, no FuncCliWorkload type. NuGet package types identify func templates.","D17, D5, the provider/yield machinery, parts of D3 and D7"],
+  D22:["2026-07-30","Template search is in scope","A func-owned discovery service based on Microsoft.TemplateSearch.TemplateDiscovery scans feeds by package type and publishes a reverse index in the engine's search-cache format; the CLI consumes it through a search coordinator.","The implicit 'no search' scope"],
+  D23:["2026-07-30","Project templates join the design","Per-stack Empty templates reproduce today's func init output; init gains a project-template selection step sourced from installed packages and the index.","func init scope exclusion"],
+  D24:["2026-07-30","Offline and update posture","Offline lists installed templates only, from the engine cache. Updates compare installed versions against the online source and install newer.","Strict offline-only posture from the workload model"],
+  D25:["2026-07-30","func new stays the item path","Project templates surface only through func init.","—"],
+  D26:["2026-07-30","Command surface folds into func new / func init","No func templates tree. func new gains --search/--install/--uninstall/--update; func init gains --template plus a wizard step. Project-template package type is FuncAppTemplates.","OQ-18, OQ-19"],
+  D27:["2026-07-30","First-run auto-install at init","func init auto-installs the resolved stack's official packages when missing (offline gives an actionable error). func setup may pre-install. func new never auto-installs — hint only.","OQ-20"],
+  D28:["2026-07-30","Official package ids","NET keeps its upstream ids (Worker.ItemTemplates, Worker.ProjectTemplates) with func package types added alongside the standard Template type. Node and Python each get one dual-type Microsoft.Azure.Functions.Templates.&lt;Stack&gt; package.","OQ-22a"],
+  D29:["2026-07-30","Index hosting and cadence","A stable aka.ms vanity URI redirects to Functions CDN blob storage; a daily incremental discovery pipeline owned by Core Tools, with an on-demand trigger for official releases.","OQ-22b"],
+  D30:["2026-07-30","Completion rules","Lifecycle and search modes bypass the project and profile gates. On func init surfaces only, bundle constraints evaluate against the latest available bundle since no project exists yet. Init's index lookup degrades silently to installed-only when offline.","Completes the D18/D16 interplay and D23"],
+  D31:["2026-07-30","IProjectInitializer becomes thin metadata","InitializeAsync and GetInitOptions are removed. The contract keeps stack id, runtime aliases, display name, languages and the default function-name validator, and gains the stack's official template package ids. Init options become Empty-template symbols hydrated by the same code as func new.","OQ-23; DotNetProjectInitializer scaffolding"],
+  D32:["2026-07-30","Task 0 spike passed — GO","Confirms in-proc hosting, engine-managed acquisition into a relocated hive, the Python append flows, and single-file publish. Three refinements folded in: isolation needs the global settings dir override; post actions are host-dispatched by ActionId; engine libs measure 0.84 MB.","The +2-3 MB estimate; 'register processors' wording"],
+  D33:["2026-07-30","Implementation-time placement","Template package content projects live at src/Templates/&lt;Stack&gt;/ beside src/Templates.Engine; the discovery service lives in this repo at tools/TemplateDiscovery/ with an eng/ci pipeline publishing the index.","design §4's 'naming at implementation time'"]
+};
+
+/* =====================================================================
+   Syntax highlighting — single-pass tokenisers, run on escaped text.
+   ===================================================================== */
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function hiJson(t){
+  return t.replace(/(\/\/[^\n]*)|("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?)/g,
+    function(m,c,str,colon,bool,num){
+      if(c) return '<span class="c">'+c+'</span>';
+      if(str) return colon ? '<span class="k">'+str+'</span>'+colon : '<span class="s">'+str+'</span>';
+      if(bool) return '<span class="b">'+bool+'</span>';
+      if(num) return '<span class="n">'+num+'</span>';
+      return m;
+    });
+}
+const CS_KW = "public|private|protected|internal|sealed|abstract|static|readonly|const|class|interface|record|struct|enum|namespace|using|new|return|await|async|var|if|else|foreach|for|while|switch|case|break|throw|try|catch|finally|null|true|false|this|override|virtual|partial|get|set|init|is|not|when|required";
+const CS_RE = new RegExp(
+  "(\\/\\/[^\\n]*)|(\\/\\*[\\s\\S]*?\\*\\/)|(@?\\$?\"(?:\\\\.|[^\"\\\\])*\")|\\b("+CS_KW+")\\b|\\b([A-Z][A-Za-z0-9_]*)\\b|\\b(\\d+(?:\\.\\d+)?)\\b","g");
+function hiCs(t){
+  return t.replace(CS_RE,
+    function(m,c1,c2,str,kw,ty,num){
+      if(c1||c2) return '<span class="c">'+(c1||c2)+'</span>';
+      if(str) return '<span class="s">'+str+'</span>';
+      if(kw) return '<span class="kw">'+kw+'</span>';
+      if(ty) return '<span class="ty">'+ty+'</span>';
+      if(num) return '<span class="n">'+num+'</span>';
+      return m;
+    });
+}
+function hiXml(t){
+  return t.replace(/(&lt;!--[\s\S]*?--&gt;)|(&lt;\/?)([\w.:-]+)|([\w.:-]+)=("(?:[^"]*)")/g,
+    function(m,cm,open,tag,attr,val){
+      if(cm) return '<span class="c">'+cm+'</span>';
+      if(tag) return open+'<span class="kw">'+tag+'</span>';
+      if(attr) return '<span class="at">'+attr+'</span>=<span class="s">'+val+'</span>';
+      return m;
+    });
+}
+function hiPy(t){
+  return t.replace(/(#[^\n]*)|("""[\s\S]*?"""|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|\b(def|import|from|as|return|if|else|None|True|False)\b|(@[\w.]+)/g,
+    function(m,c,str,kw,dec){
+      if(c) return '<span class="c">'+c+'</span>';
+      if(str) return '<span class="s">'+str+'</span>';
+      if(kw) return '<span class="kw">'+kw+'</span>';
+      if(dec) return '<span class="at">'+dec+'</span>';
+      return m;
+    });
+}
+function highlight(raw,lang){
+  const t = esc(raw);
+  switch(lang){
+    case "json": case "jsonc": return hiJson(t);
+    case "csharp": return hiCs(t);
+    case "xml": return hiXml(t);
+    case "python": return hiPy(t);
+    default: return t;
+  }
+}
+
+/* =====================================================================
+   Boot: expand <figure class="code"> and <div class="term"> payloads,
+   wire tabs, nav, deck mode, chips.
+   ===================================================================== */
+function trimBlock(s){
+  const lines = s.replace(/\t/g,"  ").split("\n");
+  while(lines.length && !lines[0].trim()) lines.shift();
+  while(lines.length && !lines[lines.length-1].trim()) lines.pop();
+  const indent = lines.filter(l=>l.trim()).reduce((m,l)=>Math.min(m,l.match(/^ */)[0].length),99);
+  return lines.map(l=>l.slice(indent)).join("\n");
+}
+
+document.querySelectorAll("figure.code").forEach(function(fig){
+  const src = fig.querySelector("script");
+  if(!src) return;
+  const lang = fig.dataset.lang || "text";
+  const code = trimBlock(src.textContent);
+  const pre = document.createElement("pre");
+  pre.innerHTML = "<code>"+highlight(code,lang)+"</code>";
+  src.remove();
+  fig.appendChild(pre);
+});
+
+/* Terminal transcripts. Line prefixes:
+     $   command          #  comment            ?  prompt/question
+     >   highlighted pick ✓  success            ✗  failure       ⚠ warning
+     ::  column header                                                     */
+function renderTerm(term){
+  const src = term.querySelector("script");
+  if(!src) return;
+  const raw = trimBlock(src.textContent);
+  src.remove();
+  const title = term.dataset.title || "";
+  const bar = document.createElement("div");
+  bar.className = "term-bar";
+  bar.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>'+
+                  '<span class="term-title">'+esc(title)+'</span>'+
+                  '<button class="replay" title="Replay output">&#9654; replay</button>';
+  const pre = document.createElement("pre");
+  const html = raw.split("\n").map(function(l){
+    const t = l.trim();
+    if(t.startsWith("$ ")) return '<span class="cmd"><span class="p">$</span> '+esc(l.slice(l.indexOf("$ ")+2))+"</span>";
+    if(t.startsWith("# ")) return '<span class="cm">'+esc(l)+"</span>";
+    if(t.startsWith("? ")) return '<span class="q">'+esc(l)+"</span>";
+    if(t.startsWith("> ")) return '<span class="sel">'+esc(l)+"</span>";
+    if(t.startsWith("\u2713")) return '<span class="ok">'+esc(l)+"</span>";
+    if(t.startsWith("\u2717")) return '<span class="er">'+esc(l)+"</span>";
+    if(t.startsWith("\u26a0")) return '<span class="wa">'+esc(l)+"</span>";
+    if(t.startsWith(":: ")) return '<span class="hd">'+esc(l.replace(":: ",""))+"</span>";
+    return '<span class="out">'+esc(l)+"</span>";
+  }).join("\n");
+  pre.innerHTML = html;
+  term.prepend(pre);
+  term.prepend(bar);
+  bar.querySelector(".replay").addEventListener("click",function(){
+    const spans = Array.from(pre.children);
+    spans.forEach(s=>s.classList.add("hidden"));
+    let i=0;
+    (function step(){
+      if(i>=spans.length) return;
+      spans[i].classList.remove("hidden");
+      i++;
+      setTimeout(step, spans[i-1] && spans[i-1].className==="cmd" ? 220 : 55);
+    })();
+  });
+}
+document.querySelectorAll(".term").forEach(renderTerm);
+
+/* Tabs */
+document.querySelectorAll(".tabbed").forEach(function(box){
+  const btns = box.querySelectorAll(".tabs button");
+  const panes = box.querySelectorAll(".pane");
+  btns.forEach(function(b,i){
+    b.addEventListener("click",function(){
+      btns.forEach(x=>x.classList.remove("on"));
+      panes.forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");
+      if(panes[i]) panes[i].classList.add("on");
+    });
+  });
+});
+
+/* Decision chips -> modal */
+const modal = document.getElementById("modal");
+const modalBox = document.getElementById("modal-box");
+document.body.addEventListener("click",function(e){
+  const chip = e.target.closest(".chip[data-d]");
+  if(chip){
+    const id = chip.dataset.d, d = DECISIONS[id];
+    if(!d) return;
+    modalBox.innerHTML = "<h4>"+id+" &mdash; "+d[1]+"</h4>"+
+      '<div class="meta">decided '+d[0]+" &middot; design.md §7</div>"+
+      "<p>"+d[2]+"</p>"+
+      (d[3] && d[3]!=="—" ? '<div class="sup"><b>Supersedes:</b> '+d[3]+"</div>" : "");
+    modal.classList.add("on");
+    return;
+  }
+  if(e.target === modal) modal.classList.remove("on");
+});
+
+/* Nav + scroll spy */
+const stages = Array.from(document.querySelectorAll(".stage"));
+const nav = document.getElementById("nav");
+stages.forEach(function(s,i){
+  if(s.dataset.group){
+    const g = document.createElement("li");
+    g.className = "grp";
+    g.textContent = s.dataset.group;
+    nav.appendChild(g);
+  }
+  const li = document.createElement("li");
+  li.innerHTML = '<a href="#'+s.id+'"><span class="ix">'+(s.dataset.ix||"")+'</span><span>'+s.dataset.nav+"</span></a>";
+  nav.appendChild(li);
+});
+const links = Array.from(nav.querySelectorAll("a"));
+function markActive(i){
+  links.forEach(l=>l.classList.remove("on"));
+  if(links[i]) links[i].classList.add("on");
+  document.querySelector("#bar div").style.width = ((i+1)/stages.length*100)+"%";
+}
+const obs = typeof IntersectionObserver === "function" ? new IntersectionObserver(function(entries){
+  if(document.body.classList.contains("deck")) return;
+  entries.forEach(function(en){
+    if(en.isIntersecting) markActive(stages.indexOf(en.target));
+  });
+},{rootMargin:"-15% 0px -75% 0px"}) : null;
+if(obs) stages.forEach(s=>obs.observe(s));
+
+/* Deck mode */
+let cur = 0;
+function showStage(i){
+  cur = Math.max(0, Math.min(stages.length-1, i));
+  stages.forEach((s,ix)=>s.classList.toggle("active", ix===cur));
+  markActive(cur);
+  document.getElementById("d-pos").textContent = (cur+1)+" / "+stages.length;
+  document.getElementById("d-now").textContent = stages[cur].dataset.nav;
+  window.scrollTo(0,0);
+}
+function setDeck(on){
+  document.body.classList.toggle("deck", on);
+  document.getElementById("btn-deck").classList.toggle("on", on);
+  if(on) showStage(cur); else stages[cur].scrollIntoView();
+}
+document.getElementById("btn-deck").addEventListener("click",()=>setDeck(!document.body.classList.contains("deck")));
+document.getElementById("d-next").addEventListener("click",()=>showStage(cur+1));
+document.getElementById("d-prev").addEventListener("click",()=>showStage(cur-1));
+links.forEach(function(l,i){
+  l.addEventListener("click",function(e){
+    if(document.body.classList.contains("deck")){ e.preventDefault(); showStage(i); }
+    else cur = i;
+  });
+});
+
+/* Expand all */
+let expanded = false;
+document.getElementById("btn-exp").addEventListener("click",function(){
+  expanded = !expanded;
+  document.querySelectorAll("details.panel").forEach(d=>d.open = expanded);
+  this.classList.toggle("on", expanded);
+  this.textContent = expanded ? "Collapse all" : "Expand all";
+});
+
+/* Help */
+document.getElementById("btn-help").addEventListener("click",function(){
+  modalBox.innerHTML = "<h4>Keyboard</h4><div class='meta'>presenter shortcuts</div>"+
+    "<table><tr><th>Key</th><th>Action</th></tr>"+
+    "<tr><td><code>d</code></td><td>Toggle deck (one section at a time)</td></tr>"+
+    "<tr><td><code>&rarr;</code> / <code>space</code></td><td>Next section</td></tr>"+
+    "<tr><td><code>&larr;</code></td><td>Previous section</td></tr>"+
+    "<tr><td><code>e</code></td><td>Expand / collapse every internals panel</td></tr>"+
+    "<tr><td><code>Esc</code></td><td>Close this dialog</td></tr></table>"+
+    "<div class='sup'>Click any <b>Under the hood</b> row to reveal the mechanism; click a <b>D-number</b> chip for the decision behind it.</div>";
+  modal.classList.add("on");
+});
+
+document.addEventListener("keydown",function(e){
+  if(e.target.matches("input,textarea")) return;
+  if(e.key==="Escape") modal.classList.remove("on");
+  if(e.key==="d") setDeck(!document.body.classList.contains("deck"));
+  if(e.key==="e") document.getElementById("btn-exp").click();
+  if(e.key==="?") document.getElementById("btn-help").click();
+  if(!document.body.classList.contains("deck")) return;
+  if(e.key==="ArrowRight"||e.key===" "){ e.preventDefault(); showStage(cur+1); }
+  if(e.key==="ArrowLeft"){ e.preventDefault(); showStage(cur-1); }
+});
+
+/* Decision table (section 14) */
+const dbody = document.querySelector("#dtable tbody");
+if(dbody){
+  Object.keys(DECISIONS).sort(function(a,b){return (+a.slice(1))-(+b.slice(1));}).forEach(function(id){
+    const d = DECISIONS[id];
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td><button class="chip" data-d="'+id+'">'+id+"</button></td>"+
+                   "<td class='small muted'>"+d[0]+"</td>"+
+                   "<td><b>"+d[1]+"</b><div class='small muted'>"+d[2].slice(0,150)+(d[2].length>150?"…":"")+"</div></td>";
+    tr.dataset.hay = (id+" "+d[1]+" "+d[2]).toLowerCase();
+    dbody.appendChild(tr);
+  });
+  const filter = document.getElementById("dfilter");
+  filter.addEventListener("input",function(){
+    const q = filter.value.toLowerCase().trim();
+    Array.from(dbody.rows).forEach(function(r){
+      r.style.display = !q || r.dataset.hay.includes(q) ? "" : "none";
+    });
+  });
+}
+
+markActive(0);
+</script>
+</body>
+</html>
