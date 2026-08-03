@@ -32,6 +32,8 @@ jobs:
   steps:
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  - template: /eng/ci/templates/steps/authenticate-e2e-dependencies.yml@self
+
   # The 1es-ubuntu-24.04-min image doesn't ship npm. NodeTool@0 in install-tools.yml
   # installs Node into the agent user's tool cache, but start-emulators.ps1 runs
   # `sudo npm install -g azurite` and sudo's PATH doesn't include the tool cache.
@@ -44,6 +46,10 @@ jobs:
 
   - pwsh: ./eng/scripts/start-emulators.ps1
     displayName: 'Start emulators (NoWait)'
+    env:
+      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
+
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
   - pwsh: |
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `

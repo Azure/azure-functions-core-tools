@@ -1,10 +1,7 @@
 # Run: ./download-templates.ps1 || From root of the repo: ./eng/scripts/download-templates.ps1
 # Optional parameters: -OutputPath "./desired/output/path" -TemplatesVersion "4.0.5337" -TemplateJsonVersion "3.1.1648"
 
-# You can check NuGet for the latest template versions:
-# https://www.nuget.org/packages/Microsoft.Azure.Functions.Worker.ItemTemplates/
-# https://www.nuget.org/packages/Microsoft.Azure.Functions.Worker.ProjectTemplates/
-# https://www.nuget.org/packages/Microsoft.Azure.WebJobs.ItemTemplates/
+# Template packages are restored from the repository's configured NuGet feed.
 
 # For the json templates version, you can check the latest entry of the tooling feed i.e.
 # https://github.com/Azure/azure-functions-tooling-feed/blob/eeb299f0f24e4f778a6e2ec3c92e3f76a7fd03e8/cli-feed-v4.json#L36596
@@ -27,10 +24,6 @@ $templatesV2Path = Join-Path $OUTPUT_DIR "templates-v2"
 $isolatedTemplatesPath = Join-Path $templatesPath "net-isolated"
 
 # URLs
-$DOTNET_ISOLATED_ITEM_TEMPLATES_URL = "https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/$TEMPLATES_VERSION"
-$DOTNET_ISOLATED_PROJECT_TEMPLATES_URL = "https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/$TEMPLATES_VERSION"
-$DOTNET_ITEM_TEMPLATES_URL = "https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/$TEMPLATES_VERSION"
-$DOTNET_PROJECT_TEMPLATES_URL = "https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/$TEMPLATES_VERSION"
 $TEMPLATES_JSON_ZIP_URL = "https://cdn.functions.azure.com/public/TemplatesApi/$TEMPLATE_JSON_VERSION.zip"
 
 Write-Verbose "Setting up directories for templates and isolated templates"
@@ -41,16 +34,50 @@ New-Item -ItemType Directory -Path $isolatedTemplatesPath -Force | Out-Null
 
 Write-Host "Downloading templates to $templatesPath and $isolatedTemplatesPath"
 
-# Download files
-Invoke-WebRequest -Uri $DOTNET_ISOLATED_ITEM_TEMPLATES_URL -OutFile (Join-Path $isolatedTemplatesPath "itemTemplates.$TEMPLATES_VERSION.nupkg")
-Invoke-WebRequest -Uri $DOTNET_ISOLATED_PROJECT_TEMPLATES_URL -OutFile (Join-Path $isolatedTemplatesPath "projectTemplates.$TEMPLATES_VERSION.nupkg")
-Invoke-WebRequest -Uri $DOTNET_ITEM_TEMPLATES_URL -OutFile (Join-Path $templatesPath "itemTemplates.$TEMPLATES_VERSION.nupkg")
-Invoke-WebRequest -Uri $DOTNET_PROJECT_TEMPLATES_URL -OutFile (Join-Path $templatesPath "projectTemplates.$TEMPLATES_VERSION.nupkg")
-
-# Setup template.json
 $tempDirectoryPath = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Path $tempDirectoryPath | Out-Null
 
+# Restore template packages through NuGet so the Azure Artifacts credential provider can authenticate.
+$packagesConfigPath = Join-Path $tempDirectoryPath "packages.config"
+$packagesPath = Join-Path $tempDirectoryPath "packages"
+$nugetConfigPath = Join-Path $PSScriptRoot "..\..\NuGet.Config"
+if (-not (Get-Command nuget -ErrorAction SilentlyContinue)) {
+  throw "The NuGet CLI is required to download template packages."
+}
+
+@"
+<?xml version="1.0" encoding="utf-8"?>
+<packages>
+  <package id="Microsoft.Azure.Functions.Worker.ItemTemplates" version="$TEMPLATES_VERSION" />
+  <package id="Microsoft.Azure.Functions.Worker.ProjectTemplates" version="$TEMPLATES_VERSION" />
+  <package id="Microsoft.Azure.WebJobs.ItemTemplates" version="$TEMPLATES_VERSION" />
+  <package id="Microsoft.Azure.WebJobs.ProjectTemplates" version="$TEMPLATES_VERSION" />
+</packages>
+"@ | Set-Content -Path $packagesConfigPath -Encoding utf8
+
+& nuget restore $packagesConfigPath `
+  -PackagesDirectory $packagesPath `
+  -ConfigFile $nugetConfigPath `
+  -PackageSaveMode nupkg `
+  -DirectDownload `
+  -NonInteractive
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to restore template packages from the configured NuGet feed."
+}
+
+$templatePackages = @(
+  @{ Id = "Microsoft.Azure.Functions.Worker.ItemTemplates"; OutputPath = Join-Path $isolatedTemplatesPath "itemTemplates.$TEMPLATES_VERSION.nupkg" },
+  @{ Id = "Microsoft.Azure.Functions.Worker.ProjectTemplates"; OutputPath = Join-Path $isolatedTemplatesPath "projectTemplates.$TEMPLATES_VERSION.nupkg" },
+  @{ Id = "Microsoft.Azure.WebJobs.ItemTemplates"; OutputPath = Join-Path $templatesPath "itemTemplates.$TEMPLATES_VERSION.nupkg" },
+  @{ Id = "Microsoft.Azure.WebJobs.ProjectTemplates"; OutputPath = Join-Path $templatesPath "projectTemplates.$TEMPLATES_VERSION.nupkg" }
+)
+foreach ($package in $templatePackages) {
+  $packageDirectory = Join-Path $packagesPath "$($package.Id).$TEMPLATES_VERSION"
+  $packagePath = Join-Path $packageDirectory "$($package.Id).$TEMPLATES_VERSION.nupkg"
+  Copy-Item -Path $packagePath -Destination $package.OutputPath
+}
+
+# Setup template.json
 $zipFilePath = Join-Path $tempDirectoryPath "templates.zip"
 Invoke-WebRequest -Uri $TEMPLATES_JSON_ZIP_URL -OutFile $zipFilePath
 

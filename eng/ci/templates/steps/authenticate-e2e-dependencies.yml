@@ -1,0 +1,46 @@
+steps:
+- task: npmAuthenticate@0
+  displayName: 'Authenticate npm for repository tools'
+  inputs:
+    workingFile: '$(Build.SourcesDirectory)/.npmrc'
+
+- task: npmAuthenticate@0
+  displayName: 'Authenticate npm for Node test project'
+  inputs:
+    workingFile: '$(Build.SourcesDirectory)/test/TestFunctionApps/TestNodeProject/.npmrc'
+
+- task: PipAuthenticate@1
+  displayName: 'Authenticate pip'
+  inputs:
+    artifactFeeds: 'public/upstream-public'
+    onlyAddExtraIndex: false
+
+- pwsh: |
+    if ($IsWindows) {
+      $userConfigDirectory = Join-Path $env:APPDATA 'NuGet'
+    } else {
+      $userConfigDirectory = Join-Path $HOME '.nuget/NuGet'
+    }
+
+    New-Item -ItemType Directory -Force -Path $userConfigDirectory | Out-Null
+    $userConfigPath = Join-Path $userConfigDirectory 'NuGet.Config'
+    [xml]$nugetConfig = Get-Content '$(Build.SourcesDirectory)/NuGet.Config' -Raw
+
+    # Source mapping is repository-specific. Applying it at user scope blocks
+    # auto-injected pipeline tools from restoring packages from their own feeds.
+    $packageSourceMapping = $nugetConfig.configuration.packageSourceMapping
+    if ($null -ne $packageSourceMapping) {
+      $nugetConfig.configuration.RemoveChild($packageSourceMapping) | Out-Null
+    }
+
+    if (Test-Path $userConfigPath) {
+      [xml]$existingConfig = Get-Content $userConfigPath -Raw
+      $packageSourceCredentials = $existingConfig.configuration.packageSourceCredentials
+      if ($null -ne $packageSourceCredentials) {
+        $importedCredentials = $nugetConfig.ImportNode($packageSourceCredentials, $true)
+        $nugetConfig.configuration.AppendChild($importedCredentials) | Out-Null
+      }
+    }
+
+    $nugetConfig.Save($userConfigPath)
+  displayName: 'Configure NuGet for temporary E2E projects'
