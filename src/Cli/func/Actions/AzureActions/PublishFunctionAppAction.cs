@@ -210,7 +210,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Get the GitIgnoreParser from the functionApp root
-            var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+            var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, ScriptHostHelpers.GetProjectRootSearchFiles(workerRuntime));
             var ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
 
             // Get Stacks once for both .NET version determination and EOL checking
@@ -680,7 +680,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings, WorkerRuntime workerRuntime)
         {
             ColoredConsole.WriteLine("Getting site publishing info...");
-            var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+            var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, ScriptHostHelpers.GetProjectRootSearchFiles(workerRuntime));
 
             // For dedicated linux apps, we do not support run from package right now
             var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium && !functionApp.IsFlex;
@@ -1398,7 +1398,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // even when 'func publish' is run from a subdirectory. The Go binary ('app') may
                 // not exist yet when --list-included-files is run before a build, so annotate it
                 // rather than printing a misleading path that doesn't exist on disk.
-                var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+                var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, ScriptHostHelpers.GetProjectRootSearchFiles(GlobalCoreToolsSettings.CurrentWorkerRuntime));
                 foreach (var file in GoHelpers.GetPackFiles(functionAppRoot))
                 {
                     if (FileSystemHelpers.FileExists(file))
