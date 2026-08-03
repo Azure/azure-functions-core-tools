@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
+using Microsoft.Extensions.Logging;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Workers;
@@ -12,11 +13,13 @@ namespace Azure.Functions.Cli.Workers;
 internal sealed class DefaultFunctionsWorkerResolver(
     IWorkloadProvider workloadProvider,
     IFunctionsWorkerContentResolver workerContentResolver,
+    ILogger<DefaultFunctionsWorkerResolver> logger,
     IReadOnlyDictionary<string, VersionRange>? activeWorkerConstraints = null) : IFunctionsWorkerResolver
 {
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
     private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
         ?? throw new ArgumentNullException(nameof(workerContentResolver));
+    private readonly ILogger<DefaultFunctionsWorkerResolver> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IReadOnlyDictionary<string, VersionRange> _activeWorkerConstraints =
         activeWorkerConstraints is null
             ? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase)
@@ -28,8 +31,15 @@ internal sealed class DefaultFunctionsWorkerResolver(
         cancellationToken.ThrowIfCancellationRequested();
 
         _activeWorkerConstraints.TryGetValue(workerId.Value, out VersionRange? constraint);
+        _logger.LogDebug(
+            "[worker-resolve] Resolving worker '{WorkerId}' with constraint '{Constraint}'.",
+            workerId.Value, constraint?.ToString() ?? "(none)");
 
         IReadOnlyList<ContentWorkloadInfo> installedWorkers = GetWorkerWorkloads(workerId);
+        _logger.LogDebug(
+            "[worker-resolve] Workload search for '{WorkerId}' found {Count} candidate(s).",
+            workerId.Value, installedWorkers.Count);
+
         return Task.FromResult(_workerContentResolver.ResolveWorker(workerId, installedWorkers, constraint, cancellationToken));
     }
 
