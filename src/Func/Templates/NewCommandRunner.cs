@@ -30,17 +30,33 @@ namespace Azure.Functions.Cli.Templates;
 internal sealed class NewCommandRunner
 {
     private readonly IInteractionService _interaction;
-    private readonly IFunctionsProjectResolver _projectResolver;
-    private readonly IProfileResolver _profileResolver;
-    private readonly IOptionsMonitor<StackOptions> _stackOptions;
-    private readonly IReadOnlyDictionary<string, IProjectInitializer> _projectInitializersByStack;
-    private readonly IInstalledTemplatesWorkloads _installedTemplatesWorkloads;
+    private readonly INewCommandContextResolver _contextResolver;
     private readonly ITemplateEngineProviderRegistry _engineProviders;
     private readonly TemplateOptionHydrator _optionHydrator;
     private readonly TemplatePicker _picker;
     private readonly NewCommandRenderer _renderer;
     private readonly IHostJsonBundleSectionReader _hostJsonReader;
     private readonly IExtensionBundleResolver _bundleResolver;
+
+    public NewCommandRunner(
+        IInteractionService interaction,
+        INewCommandContextResolver contextResolver,
+        ITemplateEngineProviderRegistry engineProviders,
+        TemplateOptionHydrator optionHydrator,
+        TemplatePicker picker,
+        NewCommandRenderer renderer,
+        IHostJsonBundleSectionReader hostJsonReader,
+        IExtensionBundleResolver bundleResolver)
+    {
+        _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+        _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
+        _engineProviders = engineProviders ?? throw new ArgumentNullException(nameof(engineProviders));
+        _optionHydrator = optionHydrator ?? throw new ArgumentNullException(nameof(optionHydrator));
+        _picker = picker ?? throw new ArgumentNullException(nameof(picker));
+        _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
+        _hostJsonReader = hostJsonReader ?? throw new ArgumentNullException(nameof(hostJsonReader));
+        _bundleResolver = bundleResolver ?? throw new ArgumentNullException(nameof(bundleResolver));
+    }
 
     public NewCommandRunner(
         IInteractionService interaction,
@@ -55,38 +71,37 @@ internal sealed class NewCommandRunner
         NewCommandRenderer renderer,
         IHostJsonBundleSectionReader hostJsonReader,
         IExtensionBundleResolver bundleResolver)
+        : this(
+            interaction,
+            new NewCommandContextResolver(
+                interaction,
+                projectResolver,
+                profileResolver,
+                stackOptions,
+                projectInitializers,
+                installedTemplatesWorkloads,
+                hostJsonReader),
+            engineProviders,
+            optionHydrator,
+            picker,
+            renderer,
+            hostJsonReader,
+            bundleResolver)
     {
-        _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
-        _projectResolver = projectResolver ?? throw new ArgumentNullException(nameof(projectResolver));
-        _profileResolver = profileResolver ?? throw new ArgumentNullException(nameof(profileResolver));
-        _stackOptions = stackOptions ?? throw new ArgumentNullException(nameof(stackOptions));
-        ArgumentNullException.ThrowIfNull(projectInitializers);
-        _installedTemplatesWorkloads = installedTemplatesWorkloads ?? throw new ArgumentNullException(nameof(installedTemplatesWorkloads));
-        _engineProviders = engineProviders ?? throw new ArgumentNullException(nameof(engineProviders));
-        _optionHydrator = optionHydrator ?? throw new ArgumentNullException(nameof(optionHydrator));
-        _picker = picker ?? throw new ArgumentNullException(nameof(picker));
-        _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
-        _hostJsonReader = hostJsonReader ?? throw new ArgumentNullException(nameof(hostJsonReader));
-        _bundleResolver = bundleResolver ?? throw new ArgumentNullException(nameof(bundleResolver));
-
-        _projectInitializersByStack = projectInitializers
-            .Where(p => !string.IsNullOrWhiteSpace(p.Stack))
-            .GroupBy(p => p.Stack.Trim(), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<int> ExecuteAsync(NewInvocation invocation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(invocation);
 
-        ResolutionOutcome outcome = await ResolveContextAsync(invocation, cancellationToken);
+        NewCommandResolutionResult outcome = await _contextResolver.ResolveAsync(invocation, cancellationToken);
         if (outcome.Failure is { } executeFailure)
         {
             RenderResolutionFailure(executeFailure);
             return 1;
         }
 
-        ResolvedContext resolved = outcome.Context!;
+        NewCommandResolvedContext resolved = outcome.Context!;
 
         if (resolved.UsedStableFallback)
         {
@@ -170,14 +185,14 @@ internal sealed class NewCommandRunner
     {
         ArgumentNullException.ThrowIfNull(invocation);
 
-        ResolutionOutcome outcome = await ResolveContextAsync(invocation, cancellationToken);
+        NewCommandResolutionResult outcome = await _contextResolver.ResolveAsync(invocation, cancellationToken);
         if (outcome.Failure is { } listFailure)
         {
             RenderResolutionFailure(listFailure);
             return 1;
         }
 
-        ResolvedContext resolved = outcome.Context!;
+        NewCommandResolvedContext resolved = outcome.Context!;
 
         if (resolved.UsedStableFallback)
         {
@@ -244,7 +259,7 @@ internal sealed class NewCommandRunner
         ArgumentNullException.ThrowIfNull(invocation);
         ArgumentException.ThrowIfNullOrWhiteSpace(templateId);
 
-        ResolutionOutcome outcome = await ResolveContextAsync(invocation, cancellationToken);
+        NewCommandResolutionResult outcome = await _contextResolver.ResolveAsync(invocation, cancellationToken);
         if (outcome.Context is not { } resolved)
         {
             return null;
@@ -262,119 +277,6 @@ internal sealed class NewCommandRunner
         return _optionHydrator.HydrateWithIds(template);
     }
 
-    private async Task<ResolutionOutcome> ResolveContextAsync(
-        NewInvocation invocation,
-        CancellationToken cancellationToken)
-    {
-        // Step 1: resolve the active profile. Diagnostics are surfaced by
-        // the resolver itself; the stack-vs-profile gate is wired in a
-        // follow-up commit.
-        await _profileResolver.ResolveAsync(
-            new ProfileResolutionContext(
-                invocation.WorkingDirectory.Info,
-                RequestedProfileName: null,
-                CanPrompt: _interaction.IsInteractive),
-            cancellationToken);
-
-        // Step 2: resolve the project (hard exit if absent).
-        ProjectResolutionResult projectResult = await _projectResolver.ResolveProjectAsync(
-            new ProjectResolutionContext(invocation.WorkingDirectory),
-            cancellationToken);
-
-        if (projectResult is not ProjectResolutionResult.Resolved resolved)
-        {
-            return ResolutionOutcome.Fail(new ResolutionFailure(ResolutionFailureKind.ProjectRequired));
-        }
-
-        string stack = resolved.Project.StackName;
-
-        // Step 4 (Node/Python): channel match against host.json.
-        InstalledTemplatesWorkload? workload;
-        string? bundleId = null;
-        BundleChannel channel = BundleChannel.Unknown;
-        bool usedStableFallback = false;
-        if (string.Equals(stack, "dotnet", StringComparison.OrdinalIgnoreCase))
-        {
-            IReadOnlyList<InstalledTemplatesWorkload> allRows =
-                await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken);
-            workload = allRows
-                .OrderByDescending(r => r.PackageVersion, StringComparer.Ordinal)
-                .FirstOrDefault();
-        }
-        else
-        {
-            HostJsonBundleSection? section = await _hostJsonReader.ReadAsync(
-                invocation.WorkingDirectory.Info, cancellationToken);
-            if (section is null || string.IsNullOrWhiteSpace(section.Id))
-            {
-                return ResolutionOutcome.Fail(new ResolutionFailure(ResolutionFailureKind.HostJsonBundleMissing));
-            }
-
-            bundleId = section.Id;
-            if (!BundleHelpers.TryGetBundleChannel(bundleId, out channel))
-            {
-                return ResolutionOutcome.Fail(new ResolutionFailure(
-                    ResolutionFailureKind.UnrecognisedBundleId,
-                    BundleId: bundleId));
-            }
-
-            IReadOnlyList<InstalledTemplatesWorkload> allRows =
-                await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken);
-            workload = TemplatesChannelMapper.PickChannelMatched(allRows, channel);
-
-            // Issue #5369: when the project asks for a non-stable channel
-            // (preview / experimental) and no matching workload is installed,
-            // fall back to the stable templates workload if one exists rather
-            // than hard-failing. The warning is emitted by Execute / List so
-            // pre-parse hydration paths stay silent.
-            if (workload is null && channel != BundleChannel.Stable)
-            {
-                workload = TemplatesChannelMapper.PickChannelMatched(allRows, BundleChannel.Stable);
-                if (workload is not null)
-                {
-                    usedStableFallback = true;
-                }
-            }
-        }
-
-        if (workload is null)
-        {
-            if (channel is BundleChannel.Unknown)
-            {
-                return ResolutionOutcome.Fail(new ResolutionFailure(
-                    ResolutionFailureKind.NoTemplatesWorkloadInstalled,
-                    Stack: stack));
-            }
-
-            return ResolutionOutcome.Fail(new ResolutionFailure(
-                ResolutionFailureKind.NoTemplatesWorkloadForChannel,
-                Stack: stack,
-                BundleId: bundleId,
-                Channel: channel));
-        }
-
-        // Step 5: language resolution via IOptionsMonitor<StackOptions>.
-        string projectDirectory = Path.GetFullPath(invocation.WorkingDirectory.Info.FullName);
-        StackOptions stackOptionsBound = _stackOptions.Get(projectDirectory);
-        string? language = ResolveLanguage(stack, stackOptionsBound);
-        if (language is null)
-        {
-            return ResolutionOutcome.Fail(new ResolutionFailure(
-                ResolutionFailureKind.MissingLanguage,
-                Stack: stack,
-                ProjectPath: projectDirectory));
-        }
-
-        return ResolutionOutcome.Succeed(new ResolvedContext(
-            invocation.WorkingDirectory,
-            stack,
-            language,
-            workload,
-            bundleId,
-            channel,
-            usedStableFallback));
-    }
-
     /// <summary>
     /// Renders a single <see cref="ResolutionFailure"/>. Centralizing the
     /// render here keeps <see cref="ResolveContextAsync"/> side-effect free:
@@ -383,15 +285,15 @@ internal sealed class NewCommandRunner
     /// resolution passes a caller adds (pre-parse / hydration paths run the
     /// same resolver but consume the outcome silently).
     /// </summary>
-    private void RenderResolutionFailure(ResolutionFailure failure)
+    private void RenderResolutionFailure(NewCommandResolutionFailure failure)
     {
         switch (failure.Kind)
         {
-            case ResolutionFailureKind.ProjectRequired:
+            case NewCommandResolutionFailureKind.ProjectRequired:
                 _renderer.RenderProjectRequired();
                 break;
 
-            case ResolutionFailureKind.HostJsonBundleMissing:
+            case NewCommandResolutionFailureKind.HostJsonBundleMissing:
                 _interaction.WriteError(
                     "Cannot resolve templates: host.json declares no extension bundle.");
                 _interaction.WriteLine(l => l
@@ -402,7 +304,7 @@ internal sealed class NewCommandRunner
                     .Muted(" with a stack that declares one."));
                 break;
 
-            case ResolutionFailureKind.UnrecognisedBundleId:
+            case NewCommandResolutionFailureKind.UnrecognisedBundleId:
                 _interaction.WriteError($"Unrecognized extension bundle id '{failure.BundleId}'.");
                 _interaction.WriteLine(l => l
                     .Muted("Use one of: ")
@@ -414,11 +316,11 @@ internal sealed class NewCommandRunner
                     .Muted("."));
                 break;
 
-            case ResolutionFailureKind.NoTemplatesWorkloadInstalled:
+            case NewCommandResolutionFailureKind.NoTemplatesWorkloadInstalled:
                 _renderer.RenderNoTemplatesWorkloadInstalled(failure.Stack!);
                 break;
 
-            case ResolutionFailureKind.NoTemplatesWorkloadForChannel:
+            case NewCommandResolutionFailureKind.NoTemplatesWorkloadForChannel:
                 {
                     string channelName = failure.Channel.ToDisplayString();
                     string suggestedPkg = TemplatesWorkloadConstants.GetPackageId(failure.Stack!);
@@ -435,7 +337,7 @@ internal sealed class NewCommandRunner
                     break;
                 }
 
-            case ResolutionFailureKind.MissingLanguage:
+            case NewCommandResolutionFailureKind.MissingLanguage:
                 _renderer.RenderMissingLanguage(failure.Stack!, failure.ProjectPath!);
                 break;
 
@@ -445,12 +347,12 @@ internal sealed class NewCommandRunner
                 // with no user-visible error, reintroducing the class of bug this
                 // refactor exists to prevent.
                 throw new UnreachableException(
-                    $"Unhandled {nameof(ResolutionFailureKind)}: {failure.Kind}.");
+                    $"Unhandled {nameof(NewCommandResolutionFailureKind)}: {failure.Kind}.");
         }
     }
 
     private async Task<int> EnforceBundleGatesAsync(
-        ResolvedContext resolved,
+        NewCommandResolvedContext resolved,
         CancellationToken cancellationToken)
     {
         // DotNet skips both gates (no extension-bundle dependency).
@@ -517,7 +419,7 @@ internal sealed class NewCommandRunner
     }
 
     private async Task<IReadOnlyList<FunctionTemplateInfo>> ListTemplatesAsync(
-        ResolvedContext resolved,
+        NewCommandResolvedContext resolved,
         CancellationToken cancellationToken)
     {
         var listContext = new TemplateListContext(
@@ -666,29 +568,6 @@ internal sealed class NewCommandRunner
     }
 
     /// <summary>
-    /// Language resolution: read <c>StackOptions.Language</c>, fall back to
-    /// the stack's single canonical language for single-language stacks,
-    /// return <c>null</c> for multi-language stacks when the configured
-    /// language is missing (the runner treats <c>null</c> as a hard error
-    /// and points at <c>func init</c>).
-    /// </summary>
-    private string? ResolveLanguage(string stack, StackOptions stackOptions)
-    {
-        if (!string.IsNullOrWhiteSpace(stackOptions.Language))
-        {
-            return stackOptions.Language.Trim();
-        }
-
-        if (_projectInitializersByStack.TryGetValue(stack, out IProjectInitializer? initializer)
-            && initializer.SupportedLanguages.Count == 1)
-        {
-            return initializer.SupportedLanguages[0];
-        }
-
-        return null;
-    }
-
-    /// <summary>
     /// Minimal NuGet-style range containment check for v1 — accepts the
     /// open-ended forms <c>[X.Y.Z, )</c> and bare <c>X.Y.Z</c> (treated as
     /// "min X.Y.Z, no upper bound"). A follow-up can swap in NuGetVersion.
@@ -735,48 +614,6 @@ internal sealed class NewCommandRunner
         return dash < 0 ? version : version[..dash];
     }
 
-    private sealed record ResolvedContext(
-        WorkingDirectory WorkingDirectory,
-        string Stack,
-        string Language,
-        InstalledTemplatesWorkload Workload,
-        string? BundleId,
-        BundleChannel Channel,
-        bool UsedStableFallback);
-
-    private enum ResolutionFailureKind
-    {
-        ProjectRequired,
-        HostJsonBundleMissing,
-        UnrecognisedBundleId,
-        NoTemplatesWorkloadInstalled,
-        NoTemplatesWorkloadForChannel,
-        MissingLanguage,
-    }
-
-    private sealed record ResolutionFailure(
-        ResolutionFailureKind Kind,
-        string? Stack = null,
-        string? ProjectPath = null,
-        string? BundleId = null,
-        BundleChannel Channel = BundleChannel.Unknown);
-
-    private readonly struct ResolutionOutcome
-    {
-        private ResolutionOutcome(ResolvedContext? context, ResolutionFailure? failure)
-        {
-            Context = context;
-            Failure = failure;
-        }
-
-        public ResolvedContext? Context { get; }
-
-        public ResolutionFailure? Failure { get; }
-
-        public static ResolutionOutcome Succeed(ResolvedContext context) => new(context, null);
-
-        public static ResolutionOutcome Fail(ResolutionFailure failure) => new(null, failure);
-    }
 }
 
 /// <summary>

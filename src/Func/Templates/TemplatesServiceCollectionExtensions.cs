@@ -23,6 +23,7 @@ internal static class TemplatesServiceCollectionExtensions
 
         services.AddSingleton<IInstalledTemplatesWorkloads, InstalledTemplatesWorkloads>();
         services.AddSingleton<ITemplateEngineProviderRegistry, TemplateEngineProviderRegistry>();
+        services.AddSingleton<INewCommandContextResolver, NewCommandContextResolver>();
         services.AddSingleton<TemplateOptionHydrator>();
         services.AddSingleton<TemplatePicker>();
         services.AddSingleton<NewCommandRenderer>();
