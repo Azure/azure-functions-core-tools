@@ -60,6 +60,32 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
     {
         _interaction.WriteError($"No installed stack matches '{hint.RequestedStack}'.");
         WriteInstalledStacks(hint.InstalledStacks);
+
+        _interaction.WriteBlankLine();
+
+        if (hint.RequestedStack is not null
+            && KnownInstallableWorkloads.LanguageMap.ContainsKey(hint.RequestedStack))
+        {
+            _interaction.WriteHint($"Install it with:");
+            _interaction.WriteLine(l => l
+                .Muted("  ")
+                .Command($"func setup --features {hint.RequestedStack}"));
+        }
+        else
+        {
+            _interaction.WriteHint($"Set up a stack to {hint.ActionDescription}:");
+            _interaction.WriteBlankLine();
+
+            IEnumerable<DefinitionItem> items = KnownInstallableWorkloads.LanguageMap.Select(static kvp =>
+                new DefinitionItem($"func setup --features {kvp.Key}", string.Join(", ", kvp.Value)));
+            _interaction.WriteDefinitionList(items);
+        }
+
+        _interaction.WriteBlankLine();
+        _interaction.WriteLine(l => l
+            .Muted("Run ")
+            .Command("func workload search")
+            .Muted(" to discover available stacks."));
     }
 
     private void RenderAmbiguousStackChoice(WorkloadHint hint)
