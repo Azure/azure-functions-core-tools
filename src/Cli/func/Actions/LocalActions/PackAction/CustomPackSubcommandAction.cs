@@ -39,11 +39,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
                     // host.json is optional. Without it there is no custom handler configuration
                     // to validate, so surface a non-blocking warning instead of failing the pack.
+                    // Custom handler apps normally declare their executable via the
+                    // customHandler.description.defaultExecutablePath property in host.json, so when
+                    // host.json is absent the deployed app will not start unless that path is supplied
+                    // another way. Point the user at the equivalent application setting override.
                     if (!FileSystemHelpers.FileExists(hostJsonPath))
                     {
                         PackValidationHelper.DisplayValidationWarning(
                             validateCustomHandlerTitle,
-                            $"No {Constants.HostJsonFileName} found. Skipping custom handler configuration validation.");
+                            $"No {Constants.HostJsonFileName} found. Skipping custom handler configuration validation. " +
+                            "Custom handler apps require the executable to be configured via the " +
+                            "customHandler.description.defaultExecutablePath property in host.json. " +
+                            "Without host.json, set the 'AzureFunctionsJobHost__customHandler__description__defaultExecutablePath' " +
+                            "application setting on the function app after deployment so the custom handler can start. " +
+                            "See https://aka.ms/custom-handler-host-json for details.");
                         return;
                     }
 
