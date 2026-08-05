@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Update;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Semver;
@@ -171,22 +172,21 @@ public sealed class CliUpdaterTests
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static (CliUpdater Updater, IFileSystem FileSystem, IProcessRunner ProcessRunner, ICliEnvironment Environment)
+    private static (CliUpdater Updater, IFileSystem FileSystem, IProcessRunner ProcessRunner, CliEnvironmentOptions Environment)
         CreateUpdater(StubHttpMessageHandler httpHandler)
     {
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
-        ICliEnvironment environment = Substitute.For<ICliEnvironment>();
+        var environment = new CliEnvironmentOptions { ProcessPath = _fakeProcessPath };
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
 
         fileSystem.CreateTempDirectory(Arg.Any<string>()).Returns(_fakeTempWorkDir, _fakeExtractDir);
-        environment.ProcessPath.Returns(_fakeProcessPath);
 
         var client = new HttpClient(httpHandler, disposeHandler: false)
         {
             BaseAddress = new Uri("https://cdn.functions.azure.com/"),
         };
 
-        CliUpdater updater = new(client, fileSystem, environment, processRunner, NullLogger<CliUpdater>.Instance);
+        CliUpdater updater = new(client, fileSystem, Options.Create(environment), processRunner, NullLogger<CliUpdater>.Instance);
         return (updater, fileSystem, processRunner, environment);
     }
 

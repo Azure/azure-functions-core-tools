@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Update;
 
@@ -12,7 +13,7 @@ namespace Azure.Functions.Cli.Update;
 internal sealed class CliUpdater(
     HttpClient httpClient,
     IFileSystem fileSystem,
-    ICliEnvironment environment,
+    IOptions<CliEnvironmentOptions> environmentOptions,
     IProcessRunner processRunner,
     ILogger<CliUpdater> logger) : ICliUpdater
 {
@@ -20,7 +21,7 @@ internal sealed class CliUpdater(
 
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-    private readonly ICliEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+    private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
     private readonly ILogger<CliUpdater> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
