@@ -1,6 +1,6 @@
 ## Purpose
 
-Defines how users install template packages through `func new`, including package ownership, upgrades, source conflicts, and safe replacement behavior.
+Defines how users install, update, and uninstall template packages through `func new`, including package ownership, version changes, source conflicts, and safe replacement behavior.
 
 ## ADDED Requirements
 
@@ -22,6 +22,85 @@ The CLI SHALL expose `func new install <package>` as the canonical command for i
 
 - **WHEN** a user appends `--force` to either template install form
 - **THEN** the CLI applies the same forced-replacement policy for both forms
+
+#### Scenario: Source is accepted by both forms
+
+- **WHEN** a user appends `--source <feed>` to either template install form
+- **THEN** the CLI uses the specified feed for NuGet package resolution
+
+### Requirement: func new owns template package uninstallation
+
+The CLI SHALL expose `func new uninstall <package>` as the canonical command for uninstalling a template package. The CLI SHALL also accept `func new --uninstall <package>` as an equivalent convenience form with the same validation, uninstall behavior, output, and exit code.
+
+#### Scenario: Uninstall through the canonical subcommand
+
+- **WHEN** a user runs `func new uninstall <package>` for an installed template package
+- **THEN** the CLI uninstalls the requested package from the func template store
+- **AND** templates provided by that package are no longer available through `func new`
+
+#### Scenario: Uninstall through the option form
+
+- **WHEN** a user runs `func new --uninstall <package>`
+- **THEN** the CLI performs the same operation as `func new uninstall <package>`
+
+### Requirement: TemplateEngine owns uninstall request semantics
+
+The CLI SHALL use Microsoft.TemplateEngine's installed-package identity and package manager semantics to resolve and uninstall template packages. Uninstallation through `func new` MUST NOT remove or modify packages in the func workload store.
+
+#### Scenario: Installed template package is resolved by TemplateEngine
+
+- **WHEN** a user supplies an installed template package identity supported by Microsoft.TemplateEngine
+- **THEN** the CLI delegates removal of that package to Microsoft.TemplateEngine
+
+#### Scenario: Workload packages are unaffected
+
+- **WHEN** a user invokes either template uninstall form
+- **THEN** packages managed by `func workload` remain unchanged
+
+### Requirement: func new owns template package updates
+
+The CLI SHALL expose `func new update <package>` as the canonical command for updating one installed template package. The CLI SHALL also accept `func new --update <package>` as an equivalent convenience form with the same validation, update behavior, output, and exit code.
+
+#### Scenario: Update through the canonical subcommand
+
+- **WHEN** a user runs `func new update <package>`
+- **THEN** the CLI checks the specified installed template package for a newer version and applies an available update
+
+#### Scenario: Update through the option form
+
+- **WHEN** a user runs `func new --update <package>`
+- **THEN** the CLI performs the same operation as `func new update <package>`
+
+#### Scenario: Update targets one package
+
+- **WHEN** a user updates one installed template package
+- **THEN** other installed template packages remain unchanged
+
+#### Scenario: Source is accepted by both update forms
+
+- **WHEN** a user appends `--source <feed>` to either template update form
+- **THEN** the CLI uses the specified feed to resolve an update for that package
+
+#### Scenario: No updates are available
+
+- **WHEN** a user runs either template update form
+- **AND** the specified template package has no newer available version
+- **THEN** the command succeeds without changing the installed template package
+
+### Requirement: TemplateEngine owns update semantics
+
+The CLI SHALL use Microsoft.TemplateEngine's installed-package identity, source identity, and package manager semantics to discover and apply an update for the specified template package. Updating through `func new` MUST NOT remove, modify, or update packages in the func workload store.
+
+#### Scenario: Template package update is available
+
+- **WHEN** Microsoft.TemplateEngine resolves a newer version for an installed template package
+- **THEN** the CLI delegates the update to Microsoft.TemplateEngine
+- **AND** templates from the newer package version replace those from the previous version
+
+#### Scenario: Workload packages are unaffected by update
+
+- **WHEN** a user invokes either template update form
+- **THEN** packages managed by `func workload` remain unchanged
 
 ### Requirement: TemplateEngine owns install request semantics
 
@@ -56,20 +135,53 @@ The CLI SHALL initially support template package installation from a folder and 
 - **WHEN** a user supplies a package expression for a source other than folder or NuGet feed
 - **THEN** the CLI exits non-zero and reports that the install source is unsupported
 
-### Requirement: NuGet template installs honor the workload feed environment variable
+### Requirement: NuGet template operations share workload feed configuration
 
-The CLI SHALL use the `FUNC_CLI_WORKLOADS_SOURCE` environment variable as the NuGet feed override for template package installation, matching the feed override used by `func workload install`. Folder installation MUST NOT be affected by this environment variable.
+The CLI SHALL accept `--source <feed>` on template install and update commands as an explicit NuGet feed override. NuGet feed selection for both operations SHALL use `--source` when supplied, then the `FUNC_CLI_WORKLOADS_SOURCE` environment variable when configured, matching the precedence used by `func workload install`. Folder installation and update MUST NOT use NuGet feed configuration.
+
+#### Scenario: Explicit NuGet source is supplied
+
+- **WHEN** a user installs a template package with `--source <feed>`
+- **THEN** the CLI resolves the package from the specified NuGet feed
+
+#### Scenario: Explicit source overrides the environment
+
+- **WHEN** `FUNC_CLI_WORKLOADS_SOURCE` contains a configured NuGet feed
+- **AND** the user installs a template package with a different `--source <feed>`
+- **THEN** the CLI resolves the package from the feed specified by `--source`
+
+#### Scenario: Explicit NuGet source is supplied for update
+
+- **WHEN** a user updates a NuGet template package with `--source <feed>`
+- **THEN** the CLI resolves the package update from the specified NuGet feed
+
+#### Scenario: Update source overrides the environment
+
+- **WHEN** `FUNC_CLI_WORKLOADS_SOURCE` contains a configured NuGet feed
+- **AND** the user updates a NuGet template package with a different `--source <feed>`
+- **THEN** the CLI resolves the package update from the feed specified by `--source`
 
 #### Scenario: NuGet feed override is configured
 
 - **WHEN** `FUNC_CLI_WORKLOADS_SOURCE` contains a configured NuGet feed
+- **AND** the user does not supply `--source`
 - **AND** the user installs a template package through the TemplateEngine NuGet installer
 - **THEN** the CLI resolves the package from that configured feed
 
-#### Scenario: Folder install ignores NuGet feed override
+#### Scenario: Source is invalid for a folder install
+
+- **WHEN** a user supplies a folder package expression with `--source <feed>`
+- **THEN** the CLI exits non-zero and reports that `--source` applies only to NuGet installs
+
+#### Scenario: Source is invalid for a folder update
+
+- **WHEN** a user updates a folder-installed template package with `--source <feed>`
+- **THEN** the CLI exits non-zero and reports that `--source` applies only to NuGet updates
+
+#### Scenario: Folder install ignores the environment
 
 - **WHEN** `FUNC_CLI_WORKLOADS_SOURCE` contains a configured NuGet feed
-- **AND** the user installs a template package through the TemplateEngine folder installer
+- **AND** the user installs a folder package without `--source`
 - **THEN** the CLI installs from the requested folder without consulting the configured NuGet feed
 
 ### Requirement: Package types determine the owning command
@@ -111,9 +223,9 @@ The CLI SHALL install a package through `func new install` only when it declares
 - **WHEN** a package declares neither `FuncTemplate` nor `FuncCliWorkload`
 - **THEN** the CLI exits non-zero and reports that the package is unsupported
 
-### Requirement: Same-source installation is upgrade-only and idempotent
+### Requirement: Same-source installation supports version replacement and is idempotent
 
-The CLI SHALL compare an install request with the existing package using the installer/source identity reported by Microsoft.TemplateEngine. For the same package and source, a newer resolved version SHALL replace the installed version as an upgrade, the same version SHALL succeed without reinstalling, and an older version SHALL be rejected as a downgrade. The `--force` option MUST NOT bypass this same-source downgrade protection.
+The CLI SHALL compare an install request with the existing package using the installer/source identity reported by Microsoft.TemplateEngine. For the same package and source, a different explicitly resolved version SHALL replace the installed version, whether newer or older, and the same version SHALL succeed without reinstalling.
 
 #### Scenario: Newer version from the same source upgrades
 
@@ -127,16 +239,11 @@ The CLI SHALL compare an install request with the existing package using the ins
 - **AND** the user installs the same package version from the same source
 - **THEN** the command succeeds without reinstalling or changing the installed package
 
-#### Scenario: Older version from the same source is rejected
+#### Scenario: Older version from the same source downgrades
 
 - **WHEN** a template package is installed from a TemplateEngine source
 - **AND** the user requests an older version of the same package from the same source
-- **THEN** the CLI exits non-zero and reports that the request would downgrade the package
-
-#### Scenario: Force does not enable a same-source downgrade
-
-- **WHEN** the user requests an older version from the same source with `--force`
-- **THEN** the CLI rejects the downgrade
+- **THEN** the CLI replaces the installed package with the requested older version
 
 ### Requirement: Different-source installation requires explicit replacement
 
