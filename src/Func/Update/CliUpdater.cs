@@ -70,10 +70,9 @@ internal sealed partial class CliUpdater(
             CleanupOldFiles(installDir);
             Log.InstalledSuccessfully(_logger, release.Version);
         }
-        catch (Exception) when (TryRollbackInPlace(installDir, copiedFiles))
+        catch (Exception)
         {
-            // TryRollbackInPlace always returns false; this catch exists
-            // solely to trigger rollback as a filter side-effect.
+            TryRollbackInPlace(installDir, copiedFiles);
             throw;
         }
         finally
@@ -139,12 +138,11 @@ internal sealed partial class CliUpdater(
         }
     }
 
-    private bool TryRollbackInPlace(string installDir, IReadOnlyList<string> copiedFiles)
+    private void TryRollbackInPlace(string installDir, IReadOnlyList<string> copiedFiles)
     {
         // Restore .old files and remove new files that were introduced by the
         // update. Best-effort per-file so a single locked file doesn't prevent
-        // the rest from being restored. Always returns false so the exception
-        // filter rethrows.
+        // the rest from being restored.
         bool anyRestored = false;
 
         // Remove files that were copied in during the update. This handles
@@ -195,8 +193,6 @@ internal sealed partial class CliUpdater(
         {
             Log.PreviousVersionRestored(_logger);
         }
-
-        return false;
     }
 
     private async Task DownloadAsync(Release release, string zipPath, CancellationToken cancellationToken)
