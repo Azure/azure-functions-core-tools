@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Update;
 /// downloads are constructed from the version and RID. This avoids GitHub API
 /// rate limits and authentication requirements.
 /// </summary>
-internal sealed class CdnReleaseFeed(
+internal sealed partial class CdnReleaseFeed(
     HttpClient httpClient,
     ILogger<CdnReleaseFeed> logger) : IReleaseFeed
 {
@@ -136,10 +136,7 @@ internal sealed class CdnReleaseFeed(
 
         if (!SemVersion.TryParse(versionString, SemVersionStyles.Strict, out SemVersion? version))
         {
-            _logger.LogWarning(
-                "CDN manifest contains unparseable version '{Version}' for {Field}.",
-                versionString,
-                fieldName);
+            Log.UnparseableVersion(_logger, versionString, fieldName);
             return null;
         }
 
@@ -151,5 +148,11 @@ internal sealed class CdnReleaseFeed(
         string rid = RuntimeInformation.RuntimeIdentifier;
         string extension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
         return new Uri($"public/cli/v5/{version}/Azure.Functions.Cli.{rid}.{version}.{extension}", UriKind.Relative);
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(LogLevel.Warning, "CDN manifest contains unparseable version '{Version}' for {Field}.")]
+        public static partial void UnparseableVersion(ILogger logger, string version, string field);
     }
 }

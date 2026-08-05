@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 namespace Azure.Functions.Cli.Update;
 
 /// <inheritdoc cref="ICliUpdater" />
-internal sealed class CliUpdater(
+internal sealed partial class CliUpdater(
     HttpClient httpClient,
     IFileSystem fileSystem,
     IOptions<CliEnvironmentOptions> environmentOptions,
@@ -41,12 +41,12 @@ internal sealed class CliUpdater(
 
         try
         {
-            _logger.LogInformation("Downloading func {Version}.", release.Version);
+            Log.DownloadingVersion(_logger, release.Version);
             await DownloadAsync(release, archivePath, cancellationToken);
 
             await VerifyChecksumAsync(release, archivePath, cancellationToken);
 
-            _logger.LogInformation("Extracting update package.");
+            Log.ExtractingUpdatePackage(_logger);
             try
             {
                 ExtractArchive(archivePath, extractDir);
@@ -68,7 +68,7 @@ internal sealed class CliUpdater(
             await VerifyAsync(release, installDir, cancellationToken);
 
             CleanupOldFiles(installDir);
-            _logger.LogInformation("func {Version} installed successfully.", release.Version);
+            Log.InstalledSuccessfully(_logger, release.Version);
         }
         catch (Exception) when (TryRollbackInPlace(installDir, copiedFiles))
         {
@@ -133,7 +133,7 @@ internal sealed class CliUpdater(
                 {
                     // Locked files (e.g. the running exe) can't be deleted yet;
                     // they'll be cleaned up on the next launch or update.
-                    _logger.LogDebug(ex, "Could not remove {File}; it will be cleaned up on next launch.", file);
+                    Log.CouldNotRemoveOldFile(_logger, ex, file);
                 }
             }
         }
@@ -161,7 +161,7 @@ internal sealed class CliUpdater(
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Rollback: could not remove new file {File}.", file);
+                Log.RollbackCouldNotRemoveNewFile(_logger, ex, file);
             }
         }
 
@@ -181,19 +181,19 @@ internal sealed class CliUpdater(
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogDebug(ex, "Rollback: could not restore {File}.", file);
+                        Log.RollbackCouldNotRestoreFile(_logger, ex, file);
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Rollback failed. The installation at {InstallDir} may be in an inconsistent state.", installDir);
+            Log.RollbackFailed(_logger, ex, installDir);
         }
 
         if (anyRestored)
         {
-            _logger.LogInformation("Previous version restored.");
+            Log.PreviousVersionRestored(_logger);
         }
 
         return false;
@@ -233,7 +233,7 @@ internal sealed class CliUpdater(
         if (release.Sha256Checksum is null)
         {
             // TODO: Remove this early-return once the release feed publishes checksums (#5445).
-            _logger.LogDebug("No checksum available for {Version}; skipping integrity check.", release.Version);
+            Log.NoChecksumAvailable(_logger, release.Version);
             return;
         }
 
@@ -248,7 +248,7 @@ internal sealed class CliUpdater(
                 isUserError: true);
         }
 
-        _logger.LogDebug("Checksum verified for {Version}.", release.Version);
+        Log.ChecksumVerified(_logger, release.Version);
     }
 
     private async Task VerifyAsync(Release release, string installDir, CancellationToken cancellationToken)
@@ -334,7 +334,43 @@ internal sealed class CliUpdater(
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not remove temporary directory {Path}.", path);
+            Log.CouldNotRemoveTempDirectory(_logger, ex, path);
         }
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(LogLevel.Information, "Downloading func {Version}.")]
+        public static partial void DownloadingVersion(ILogger logger, object version);
+
+        [LoggerMessage(LogLevel.Information, "Extracting update package.")]
+        public static partial void ExtractingUpdatePackage(ILogger logger);
+
+        [LoggerMessage(LogLevel.Information, "func {Version} installed successfully.")]
+        public static partial void InstalledSuccessfully(ILogger logger, object version);
+
+        [LoggerMessage(LogLevel.Debug, "Could not remove {File}; it will be cleaned up on next launch.")]
+        public static partial void CouldNotRemoveOldFile(ILogger logger, Exception ex, string file);
+
+        [LoggerMessage(LogLevel.Debug, "Rollback: could not remove new file {File}.")]
+        public static partial void RollbackCouldNotRemoveNewFile(ILogger logger, Exception ex, string file);
+
+        [LoggerMessage(LogLevel.Debug, "Rollback: could not restore {File}.")]
+        public static partial void RollbackCouldNotRestoreFile(ILogger logger, Exception ex, string file);
+
+        [LoggerMessage(LogLevel.Error, "Rollback failed. The installation at {InstallDir} may be in an inconsistent state.")]
+        public static partial void RollbackFailed(ILogger logger, Exception ex, string installDir);
+
+        [LoggerMessage(LogLevel.Information, "Previous version restored.")]
+        public static partial void PreviousVersionRestored(ILogger logger);
+
+        [LoggerMessage(LogLevel.Debug, "No checksum available for {Version}; skipping integrity check.")]
+        public static partial void NoChecksumAvailable(ILogger logger, object version);
+
+        [LoggerMessage(LogLevel.Debug, "Checksum verified for {Version}.")]
+        public static partial void ChecksumVerified(ILogger logger, object version);
+
+        [LoggerMessage(LogLevel.Warning, "Could not remove temporary directory {Path}.")]
+        public static partial void CouldNotRemoveTempDirectory(ILogger logger, Exception ex, string path);
     }
 }
