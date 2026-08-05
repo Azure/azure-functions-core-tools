@@ -253,11 +253,10 @@ internal sealed partial class CliUpdater(
 
     private async Task VerifyAsync(Release release, string installDir, CancellationToken cancellationToken)
     {
-        string funcBinary = GetFuncBinaryPath(installDir);
         string expectedVersion = release.Version.ToString();
 
         ProcessOutcome outcome = await _processRunner.RunAsync(
-            new ProcessRunRequest(funcBinary, ["--version"], installDir, TimeSpan.FromSeconds(30)),
+            new ProcessRunRequest(_environment.ProcessPath!, ["--version"], installDir, TimeSpan.FromSeconds(30)),
             cancellationToken);
 
         if (outcome.ExitCode is not 0 || !VersionOutputMatches(outcome.StandardOutput, expectedVersion))
@@ -285,9 +284,6 @@ internal sealed partial class CliUpdater(
 
         return dir;
     }
-
-    private static string GetFuncBinaryPath(string installDir) =>
-        Path.Combine(installDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "func.exe" : "func");
 
     private static bool VersionOutputMatches(string output, string expectedVersion)
     {
