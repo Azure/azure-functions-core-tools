@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 
 namespace Azure.Functions.Cli.Profiles;
@@ -10,7 +11,7 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Default project profile config store.
 /// </summary>
-internal sealed class ProjectProfileConfigStore(IProfileFileSystem fileSystem) : IProjectProfileConfigStore
+internal sealed class ProjectProfileConfigStore(IFileSystem fileSystem) : IProjectProfileConfigStore
 {
     private static readonly string _projectConfigDisplayName = CliConfigurationPathsOptions.ProjectConfigDisplayPath;
 
@@ -19,7 +20,7 @@ internal sealed class ProjectProfileConfigStore(IProfileFileSystem fileSystem) :
         WriteIndented = true,
     };
 
-    private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public async Task<ProjectProfileConfigUpdateResult> SetDefaultProfileAsync(DirectoryInfo projectDirectory, string profileName, CancellationToken cancellationToken)
     {

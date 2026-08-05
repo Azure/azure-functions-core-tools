@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Update;
 /// <inheritdoc cref="ICliUpdater" />
 internal sealed class CliUpdater(
     HttpClient httpClient,
-    IUpdateFileSystem fileSystem,
+    IFileSystem fileSystem,
     ICliEnvironment environment,
     IProcessRunner processRunner,
     ILogger<CliUpdater> logger) : ICliUpdater
@@ -19,7 +19,7 @@ internal sealed class CliUpdater(
     private const string OldFileSuffix = ".old";
 
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-    private readonly IUpdateFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly ICliEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
     private readonly ILogger<CliUpdater> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -96,7 +96,7 @@ internal sealed class CliUpdater(
             // Use overwrite so stale .old files left behind by a previous update
             // (e.g. the running exe was locked and couldn't be deleted) don't
             // block the rename.
-            _fileSystem.RenameFile(file, oldPath, overwrite: true);
+            _fileSystem.MoveFile(file, oldPath, overwrite: true);
         }
 
         // Copy all new files from the extract directory into the install directory
@@ -172,7 +172,7 @@ internal sealed class CliUpdater(
                     string originalPath = file[..^OldFileSuffix.Length];
                     try
                     {
-                        _fileSystem.RenameFile(file, originalPath);
+                        _fileSystem.MoveFile(file, originalPath);
                         anyRestored = true;
                     }
                     catch (Exception ex)

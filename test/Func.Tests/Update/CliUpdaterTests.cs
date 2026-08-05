@@ -30,7 +30,7 @@ public sealed class CliUpdaterTests
     public async Task UpdateAsync_HappyPath_DownloadsExtractsSwapsAndVerifies()
     {
         // Arrange
-        (CliUpdater updater, IUpdateFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
@@ -47,7 +47,7 @@ public sealed class CliUpdaterTests
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
         // Assert: existing files renamed to .old with overwrite, new files copied in
-        fileSystem.Received(1).RenameFile(existingFile, existingFile + ".old", true);
+        fileSystem.Received(1).MoveFile(existingFile, existingFile + ".old", true);
         fileSystem.Received(1).CopyDirectory(_fakeExtractDir, _fakeInstallDir);
 
         // Verify was run
@@ -73,7 +73,7 @@ public sealed class CliUpdaterTests
     public async Task UpdateAsync_VerificationOutputMismatch_RollsBackAndThrowsGraceful()
     {
         // Arrange
-        (CliUpdater updater, IUpdateFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
@@ -97,14 +97,14 @@ public sealed class CliUpdaterTests
 
         // Rollback: .old files restored, new files removed
         fileSystem.Received(1).DeleteFile(existingFile);
-        fileSystem.Received(1).RenameFile(oldFile, existingFile);
+        fileSystem.Received(1).MoveFile(oldFile, existingFile);
     }
 
     [Fact]
     public async Task UpdateAsync_SwapRenameFileFails_RollsBackAndRethrows()
     {
         // Arrange
-        (CliUpdater updater, IUpdateFileSystem fileSystem, _, _) = CreateUpdater(
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
         string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
@@ -113,7 +113,7 @@ public sealed class CliUpdaterTests
         fileSystem.GetFiles(_fakeExtractDir).Returns([Path.Combine(_fakeExtractDir, "func.exe")]);
 
         // The rename throws to simulate a locked file scenario
-        fileSystem.When(fs => fs.RenameFile(existingFile, oldFile, true))
+        fileSystem.When(fs => fs.MoveFile(existingFile, oldFile, true))
             .Throw(new IOException("access denied"));
 
         // Act + Assert
@@ -121,15 +121,15 @@ public sealed class CliUpdaterTests
             () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
 
         // Rollback attempted: restore .old → original
-        fileSystem.Received(1).RenameFile(oldFile, existingFile);
+        fileSystem.Received(1).MoveFile(oldFile, existingFile);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static (CliUpdater Updater, IUpdateFileSystem FileSystem, IProcessRunner ProcessRunner, ICliEnvironment Environment)
+    private static (CliUpdater Updater, IFileSystem FileSystem, IProcessRunner ProcessRunner, ICliEnvironment Environment)
         CreateUpdater(StubHttpMessageHandler httpHandler)
     {
-        IUpdateFileSystem fileSystem = Substitute.For<IUpdateFileSystem>();
+        IFileSystem fileSystem = Substitute.For<IFileSystem>();
         ICliEnvironment environment = Substitute.For<ICliEnvironment>();
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
 
