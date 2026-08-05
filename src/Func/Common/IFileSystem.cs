@@ -107,4 +107,11 @@ internal interface IFileSystem
     /// <paramref name="destinationDirectory"/>.
     /// </summary>
     public void ExtractZip(string zipPath, string destinationDirectory);
+
+    // ── Hash operations ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Computes the SHA-256 hash of a file and returns it as a lowercase hex string.
+    /// </summary>
+    public Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken);
 }

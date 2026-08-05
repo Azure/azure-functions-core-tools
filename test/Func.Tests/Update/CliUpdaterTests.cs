@@ -124,6 +124,51 @@ public sealed class CliUpdaterTests
         fileSystem.Received(1).MoveFile(oldFile, existingFile);
     }
 
+    [Fact]
+    public async Task UpdateAsync_ChecksumMismatch_ThrowsGracefulBeforeExtract()
+    {
+        // Arrange — release carries an expected checksum that won't match
+        Release releaseWithChecksum = _stableRelease with { Sha256Checksum = "expected0000" };
+
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        fileSystem.ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("actual1111");
+
+        // Act + Assert
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(releaseWithChecksum, CancellationToken.None));
+
+        Assert.Contains("Checksum mismatch", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("expected0000", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("actual1111", ex.Message, StringComparison.Ordinal);
+
+        // Extract should never have been called
+        fileSystem.DidNotReceive().ExtractZip(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NoChecksum_SkipsVerificationAndProceeds()
+    {
+        // Arrange — null checksum (current state until feed publishes them)
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
+            .Returns(OkOutcome("5.1.0\n"));
+
+        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
+        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile]);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([Path.Combine(_fakeExtractDir, "func.exe")]);
+
+        // Act
+        await updater.UpdateAsync(_stableRelease, CancellationToken.None);
+
+        // Assert — ComputeSha256Async was never called
+        await fileSystem.DidNotReceive().ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (CliUpdater Updater, IFileSystem FileSystem, IProcessRunner ProcessRunner, ICliEnvironment Environment)

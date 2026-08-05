@@ -328,5 +328,7 @@ public class RemoteProfileSourceTests
         public void DeleteDirectory(string path) => throw new NotImplementedException();
         public IReadOnlyList<string> GetFiles(string directoryPath) => throw new NotImplementedException();
         public void ExtractZip(string zipPath, string destinationDirectory) => throw new NotImplementedException();
+
+        public Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

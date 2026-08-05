@@ -13,5 +13,12 @@ namespace Azure.Functions.Cli.Update;
 /// </summary>
 internal sealed record Release(SemVersion Version, Uri DownloadUrl)
 {
+    /// <summary>
+    /// Expected SHA-256 hex digest of the downloaded archive, or <c>null</c>
+    /// when the release feed does not yet publish checksums.
+    /// </summary>
+    // TODO: Populate from the release feed once checksum metadata is available (#5445).
+    public string? Sha256Checksum { get; init; }
+
     public bool IsPrerelease => Version.IsPrerelease;
 }

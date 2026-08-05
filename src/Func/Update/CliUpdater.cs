@@ -42,6 +42,8 @@ internal sealed class CliUpdater(
             _logger.LogInformation("Downloading func {Version}.", release.Version);
             await DownloadAsync(release, zipPath, cancellationToken);
 
+            await VerifyChecksumAsync(release, zipPath, cancellationToken);
+
             _logger.LogInformation("Extracting update package.");
             try
             {
@@ -222,6 +224,29 @@ internal sealed class CliUpdater(
             await using Stream content = await response.Content.ReadAsStreamAsync(cancellationToken);
             await _fileSystem.SaveStreamToFileAsync(zipPath, content, cancellationToken);
         }
+    }
+
+    private async Task VerifyChecksumAsync(Release release, string filePath, CancellationToken cancellationToken)
+    {
+        if (release.Sha256Checksum is null)
+        {
+            // TODO: Remove this early-return once the release feed publishes checksums (#5445).
+            _logger.LogDebug("No checksum available for {Version}; skipping integrity check.", release.Version);
+            return;
+        }
+
+        string actual = await _fileSystem.ComputeSha256Async(filePath, cancellationToken);
+
+        if (!string.Equals(actual, release.Sha256Checksum, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GracefulException(
+                $"Checksum mismatch for func {release.Version}. " +
+                $"Expected '{release.Sha256Checksum}' but got '{actual}'. " +
+                "The download may be corrupt or tampered with. Try running 'func update' again.",
+                isUserError: true);
+        }
+
+        _logger.LogDebug("Checksum verified for {Version}.", release.Version);
     }
 
     private async Task VerifyAsync(Release release, string installDir, CancellationToken cancellationToken)

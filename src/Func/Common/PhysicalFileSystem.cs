@@ -127,6 +127,15 @@ internal sealed class PhysicalFileSystem : IFileSystem
     public void ExtractZip(string zipPath, string destinationDirectory) =>
         ZipFile.ExtractToDirectory(zipPath, destinationDirectory);
 
+    // ── Hash operations ─────────────────────────────────────────────────────
+
+    public async Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken)
+    {
+        await using FileStream stream = File.OpenRead(filePath);
+        byte[] hash = await System.Security.Cryptography.SHA256.HashDataAsync(stream, cancellationToken);
+        return Convert.ToHexStringLower(hash);
+    }
+
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private static void EnsureParentDirectory(string filePath)
