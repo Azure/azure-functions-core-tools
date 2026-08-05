@@ -108,6 +108,12 @@ internal interface IFileSystem
     /// </summary>
     public void ExtractZip(string zipPath, string destinationDirectory);
 
+    /// <summary>
+    /// Extracts a gzipped tar archive at <paramref name="tarGzPath"/> into
+    /// <paramref name="destinationDirectory"/>.
+    /// </summary>
+    public void ExtractTarGz(string tarGzPath, string destinationDirectory);
+
     // ── Hash operations ─────────────────────────────────────────────────────
 
     /// <summary>

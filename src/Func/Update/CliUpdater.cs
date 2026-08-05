@@ -33,21 +33,22 @@ internal sealed class CliUpdater(
         // Stage the extraction on the same volume as the install directory so
         // Directory.Move / File.Move never crosses volume boundaries.
         string tempWorkDir = _fileSystem.CreateTempDirectory(installDir);
-        string zipPath = Path.Combine(tempWorkDir, "func-update.zip");
+        string archiveExtension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
+        string archivePath = Path.Combine(tempWorkDir, $"func-update.{archiveExtension}");
         string extractDir = _fileSystem.CreateTempDirectory(installDir);
         List<string> copiedFiles = [];
 
         try
         {
             _logger.LogInformation("Downloading func {Version}.", release.Version);
-            await DownloadAsync(release, zipPath, cancellationToken);
+            await DownloadAsync(release, archivePath, cancellationToken);
 
-            await VerifyChecksumAsync(release, zipPath, cancellationToken);
+            await VerifyChecksumAsync(release, archivePath, cancellationToken);
 
             _logger.LogInformation("Extracting update package.");
             try
             {
-                _fileSystem.ExtractZip(zipPath, extractDir);
+                ExtractArchive(archivePath, extractDir);
             }
             catch (InvalidDataException ex)
             {
@@ -300,6 +301,24 @@ internal sealed class CliUpdater(
         }
 
         return false;
+    }
+
+    private void ExtractArchive(string archivePath, string destinationDirectory)
+    {
+        if (archivePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            _fileSystem.ExtractZip(archivePath, destinationDirectory);
+        }
+        else if (archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+        {
+            _fileSystem.ExtractTarGz(archivePath, destinationDirectory);
+        }
+        else
+        {
+            throw new GracefulException(
+                $"Unsupported archive format: '{Path.GetFileName(archivePath)}'. Expected .zip or .tar.gz.",
+                isUserError: true);
+        }
     }
 
     private void TryDeleteDirectory(string path)

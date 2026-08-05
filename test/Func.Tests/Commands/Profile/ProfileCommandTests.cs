@@ -369,6 +369,8 @@ public sealed class ProfileCommandTests : IDisposable
         public IReadOnlyList<string> GetFiles(string directoryPath) => throw new NotImplementedException();
         public void ExtractZip(string zipPath, string destinationDirectory) => throw new NotImplementedException();
 
+        public void ExtractTarGz(string tarGzPath, string destinationDirectory) => throw new NotImplementedException();
+
         public Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
