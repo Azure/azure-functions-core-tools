@@ -143,6 +143,14 @@ internal sealed class NewCommandContextResolver(
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Reads the configured language, falling back to the stack's single
+    /// canonical language on single-language stacks.
+    /// </summary>
+    /// <remarks>
+    /// Returns <c>null</c> for a multi-language stack with no configured
+    /// language. Callers treat that as a hard error pointing at <c>func init</c>.
+    /// </remarks>
     private string? ResolveLanguage(string stack, StackOptions stackOptions)
     {
         if (!string.IsNullOrWhiteSpace(stackOptions.Language))

@@ -5,6 +5,16 @@ using System.CommandLine;
 
 namespace Azure.Functions.Cli.Templates;
 
+/// <summary>
+/// Hydrates a single template's options for the help and pre-parse passes in
+/// <c>NewCommand</c>.
+/// </summary>
+/// <remarks>
+/// These callers are best-effort and return <c>null</c> silently when
+/// resolution fails. The execute and list entry-points resolve and render
+/// failures themselves, so rendering here too would surface the same error
+/// twice for a single invocation (issue #5304).
+/// </remarks>
 internal interface INewCommandTemplateOptionProvider
 {
     public Task<IReadOnlyList<Option>?> HydrateOptionsForTemplateAsync(
