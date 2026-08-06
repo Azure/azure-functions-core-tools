@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -114,7 +115,7 @@ internal sealed class NewCommandResultRenderer(
     {
         string channelName = failure.Channel.ToDisplayString();
         string suggestedPackage = TemplatesWorkloadConstants.GetPackageId(failure.Stack!);
-        string suggestedVersion = failure.Channel == Projects.BundleChannel.Stable
+        string suggestedVersion = failure.Channel == BundleChannel.Stable
             ? "<version>"
             : $"<version>-{channelName}.1";
         _interaction.WriteError(
